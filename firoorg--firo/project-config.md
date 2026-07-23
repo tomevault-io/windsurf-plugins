@@ -1,179 +1,145 @@
 ---
 trigger: always_on
-description: This file is a concise guide for coding agents working in the Firo repository. It is intentionally practical: use it to orient yourself quickly, choose the right build and test commands, and avoid risky changes in consensus- or wallet-sensitive code.
+description: Firo is a privacy-focused cryptocurrency forked from Bitcoin Core, featuring zero-knowledge proof protocols (Spark, Lelantus), masternode infrastructure (LLMQ), and FiroPOW mining. Current version: **0.14.15.3**. Licensed under MIT.
 ---
 
-# AGENTS.md - Firo repository guide
+# CLAUDE.md - Firo Development Guide
 
-This file is a concise guide for coding agents working in the Firo repository. It is intentionally practical: use it to orient yourself quickly, choose the right build and test commands, and avoid risky changes in consensus- or wallet-sensitive code.
+## Project Overview
 
-## Project snapshot
+Firo is a privacy-focused cryptocurrency forked from Bitcoin Core, featuring zero-knowledge proof protocols (Spark, Lelantus), masternode infrastructure (LLMQ), and FiroPOW mining. Current version: **0.14.15.3**. Licensed under MIT.
 
-- Privacy-focused cryptocurrency forked from Bitcoin Core
-- Current version in `CMakeLists.txt`: `0.14.15.3`
-- Languages: C++20 and C11
-- Build system: CMake 3.22+ with out-of-tree builds only
-- Main executables:
-  - `firod`
-  - `firo-cli`
-  - `firo-tx`
-  - `firo-qt`
+## Build System
 
-Core features include Spark and Lelantus privacy protocols, deterministic masternodes, LLMQ-based ChainLocks and InstantSend, BIP47 payment codes, and FiroPOW mining.
+**CMake 3.22+** with **C++20** standard. No autotools.
 
-## Repository map
-
-Top-level directories you will touch most often:
-
-- `src/` - production C++ code
-- `src/test/` - Boost unit tests
-- `src/wallet/test/`, `src/libspark/test/`, `src/liblelantus/test/`, `src/hdmint/test/` - domain-specific unit tests
-- `qa/rpc-tests/` - Python functional tests
-- `qa/pull-tester/` - functional test runner and framework
-- `depends/` - deterministic dependency build system and cross-compilation support
-- `cmake/` - CMake modules and helper logic
-- `doc/` - developer notes and build documentation
-- `.github/workflows/ci-master.yml` - main CI pipeline
-
-Important source areas:
-
-- `src/validation.cpp` - block and transaction validation, consensus-critical
-- `src/net_processing.cpp` / `src/net.cpp` - peer-to-peer networking
-- `src/init.cpp` - startup and shutdown wiring
-- `src/miner.cpp` / `src/pow.cpp` - mining and proof-of-work logic
-- `src/chainparams.cpp` - network configuration
-- `src/txmempool.cpp` - mempool behavior
-- `src/wallet/` - wallet storage, RPC, coin selection, privacy spends
-- `src/libspark/`, `src/spark/` - current privacy protocol
-- `src/liblelantus/` - legacy privacy protocol
-- `src/evo/`, `src/llmq/` - masternodes, quorums, ChainLocks, InstantSend
-
-## Build quickstart
-
-Firo uses a two-stage build:
-
-1. Build dependencies with `depends/`
-2. Configure and build with CMake
-
-Preferred Linux build matching CI:
+### Quick Build (Linux)
 
 ```bash
+# 1. Build dependencies
 make -C depends -j$(nproc)
 
+# 2. Configure and build
 export HOST_TRIPLET=$(depends/config.guess)
-env PKG_CONFIG_PATH="$(realpath depends/$HOST_TRIPLET/lib/pkgconfig):$PKG_CONFIG_PATH" \
 cmake -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$(realpath depends/$HOST_TRIPLET/toolchain.cmake)" \
-  -DBUILD_CLI=ON \
-  -DBUILD_DAEMON=ON \
-  -DBUILD_GUI=ON \
-  -DBUILD_TESTS=ON \
-  -DENABLE_CRASH_HOOKS=ON \
+  -DCMAKE_TOOLCHAIN_FILE=$(pwd)/depends/$HOST_TRIPLET/toolchain.cmake \
+  -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_CRASH_HOOKS=ON \
   -DCMAKE_BUILD_TYPE=Release \
-  -S "$(pwd)" \
-  -B "$(pwd)/build"
-
-cmake --build build
+  -S. -Bbuild
+cd build && ninja
 ```
 
-Headless build:
+### Key CMake Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `BUILD_DAEMON` | ON | Build `firod` |
+| `BUILD_GUI` | ON | Build `firo-qt` (requires Qt 6.7.3+) |
+| `BUILD_CLI` | ON | Build `firo-cli` |
+| `BUILD_TX` | `${BUILD_CLI}` | Build `firo-tx` (defaults to same as `BUILD_CLI`) |
+| `BUILD_TESTS` | OFF | Build unit test suite |
+| `ENABLE_WALLET` | ON | Wallet functionality |
+| `WITH_ZMQ` | ON | ZeroMQ notifications |
+| `ENABLE_CRASH_HOOKS` | OFF | Stack trace generation (auto-enabled for Release/RelWithDebInfo/MinSizeRel) |
+| `CLIENT_VERSION_IS_RELEASE` | false | Release build flag |
+
+### Build Outputs
+
+Binaries go to `build/bin/`: `firod`, `firo-cli`, `firo-qt`, `firo-tx`
+
+### Cross-Compilation
+
+Use the `depends/` system with host triplets:
+- Linux: `x86_64-pc-linux-gnu` (default), `aarch64-linux-gnu`
+- Windows: `make -C depends HOST=x86_64-w64-mingw32`
+- macOS: requires SDK in `depends/SDKs/`
+
+### Docker Build
 
 ```bash
-cmake -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$(realpath depends/$HOST_TRIPLET/toolchain.cmake)" \
-  -DBUILD_GUI=OFF \
-  -DBUILD_CLI=ON \
-  -DBUILD_DAEMON=ON \
-  -DBUILD_TESTS=ON \
-  -S "$(pwd)" \
-  -B "$(pwd)/build"
-cmake --build build
-```
-
-Useful CMake options:
-
-| Option | Default | Notes |
-|--------|---------|-------|
-| `BUILD_DAEMON` | `ON` | Builds `firod` |
-| `BUILD_GUI` | `ON` | Builds `firo-qt`; requires Qt `6.7.3` |
-| `BUILD_CLI` | `ON` | Builds `firo-cli` |
-| `BUILD_TX` | `${BUILD_CLI}` | Builds `firo-tx` |
-| `BUILD_TESTS` | `OFF` | Builds `test_firo` and test targets |
-| `BUILD_BENCH` | `OFF` | Builds `bench_firo` |
-| `ENABLE_WALLET` | `ON` | Wallet support |
-| `WITH_BDB` | `OFF` | Legacy Berkeley DB wallet support |
-| `WITH_ZMQ` | `ON` | ZMQ notification support |
-| `ENABLE_CRASH_HOOKS` | config-dependent | Enabled by default for release-like single-config builds |
-| `CLIENT_VERSION_IS_RELEASE` | `false` | Set in CI per build type |
-
-Build outputs are placed under `build/bin/` and libraries under `build/lib/`.
-
-### Cross-compilation
-
-`depends/` supports multiple host triplets. Typical examples:
-
-- Native Linux: `$(depends/config.guess)`
-- Windows: `x86_64-w64-mingw32`
-- Linux ARM64: `aarch64-linux-gnu`
-- macOS cross-builds require an SDK in `depends/SDKs/`
-
-Example Windows dependency build:
-
-```bash
-make -C depends HOST=x86_64-w64-mingw32 -j$(nproc)
+docker build . -t firo-local
+docker run -d --name firod -v "${HOME}/.firo:/home/firod/.firo" firo-local
 ```
 
 ## Testing
 
-Always run the most targeted tests that cover your change. For high-risk areas such as consensus, wallet accounting, Spark/Lelantus logic, or networking, broaden coverage before finishing.
-
-### Unit tests
-
-Build with `-DBUILD_TESTS=ON`, then run:
+### Unit Tests (Boost.Test)
 
 ```bash
-cd build
-ctest --output-on-failure
+cmake -Bbuild -DBUILD_TESTS=ON ...
+cd build && ctest --output-on-failure
 ```
 
-Run a specific Boost test suite:
+Test source: `src/test/` (~80 test files). Framework setup in `src/test/test_bitcoin.h`.
+
+### Integration Tests (Python)
 
 ```bash
-./bin/test_firo --run_test=<suite_name> --catch_system_error=no --log_level=test_suite -- DEBUG_LOG_OUT
-```
-
-Examples:
-
-- `./bin/test_firo --run_test=lelantus_tests`
-- `./bin/test_firo --run_test=spark_wallet_tests`
-
-Test registration is driven from `src/test/CMakeLists.txt`.
-
-### Functional / RPC tests
-
-Functional tests live under `qa/rpc-tests/` and launch real `firod` nodes in regtest mode.
-
-Before running the harness, copy binaries where the test framework expects them:
-
-```bash
+# Copy binaries where the test harness expects them
 cp -rf build/bin/* build/src/
 qa/pull-tester/rpc-tests.py -extended
 ```
 
-Run a single script directly:
+Test scripts: `qa/rpc-tests/` (100+ Python scripts covering wallet, privacy protocols, masternodes, consensus).
 
-```bash
-qa/rpc-tests/<test_name>.py
+### Test Networks
+
+- `-testnet` for multi-node testing over the network
+- `-regtest` for local single-node testing with on-demand block creation
+
+## Repository Structure
+
+```
+src/                        # Main source code
+├── libspark/               # Spark protocol (current privacy protocol) - ZK proofs, crypto primitives
+├── spark/                  # Spark wallet integration and state management
+├── liblelantus/            # Lelantus protocol (legacy privacy protocol)
+├── wallet/                 # Full wallet implementation
+├── rpc/                    # JSON-RPC API endpoints
+├── qt/                     # Qt GUI wallet
+├── evo/                    # Deterministic masternode lists, special transactions
+├── llmq/                   # Long Living Masternode Quorums (chainlocks, instant send)
+├── bls/                    # BLS signatures for quorum signing
+├── bip47/                  # BIP47 payment codes
+├── hdmint/                 # Hierarchical deterministic minting
+├── crypto/                 # Cryptographic functions (SHA, HMAC, ChaCha20, Lyra2Z, ProgPoW)
+├── consensus/              # Consensus rules and validation parameters
+├── primitives/             # Block and transaction primitives
+├── script/                 # Bitcoin script interpreter
+├── policy/                 # Transaction policy (fees)
+├── secp256k1/              # ECDSA library (subtree)
+├── leveldb/                # Key-value storage (subtree)
+├── univalue/               # JSON parsing (subtree)
+├── test/                   # Unit tests
+├── fuzz/                   # Fuzz testing
+├── bench/                  # Benchmarks
+├── config/                 # Build configuration headers
+├── validation.cpp/h        # Core block/transaction validation (~6100 lines)
+├── net.cpp/h               # Network layer
+├── net_processing.cpp/h    # Peer protocol handling
+├── init.cpp/h              # Application initialization
+├── miner.cpp/h             # Block mining (FiroPOW)
+├── pow.cpp/h               # Proof-of-Work consensus
+├── chainparams.cpp/h       # Network parameters (mainnet/testnet/regtest)
+└── firo_params.h           # Protocol parameters
+depends/                    # Deterministic dependency build system
+cmake/                      # CMake modules
+contrib/                    # Auxiliary tools (gitian, guix, packaging, devtools)
+qa/                         # Integration test suite
+doc/                        # Documentation (build guides, developer notes, API docs)
+share/                      # UI resources, scripts
 ```
 
-Useful environment variables:
+## Coding Conventions
 
-- `FIROD` - defaults to `build/src/firod`
-- `FIROCLI` - defaults to `build/src/firo-cli`
+### Style Rules (from `src/.clang-format` and `doc/developer-notes.md`)
 
+- **Indentation**: 4 spaces, no tabs
+- **Braces**: Linux style - new line for namespaces, classes, functions; same line for control flow
+- **No column limit** (ColumnLimit: 0)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [firoorg/firo](https://github.com/firoorg/firo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
