@@ -1,57 +1,129 @@
 ---
 trigger: always_on
-description: > **Discovery path**: read this file → skim [`CLAUDE.md`](CLAUDE.md) for the locked design decisions → load only the [`docs/CODEMAPS/`](docs/CODEMAPS/) map matching the area you're touching. Do **not** load the full source tree blindly — the codemaps exist to keep agent context lean.
+description: - Do what has been asked; nothing more, nothing less
 ---
 
-# Agent Instructions
+# Ruflo — Claude Code Configuration
 
-> **Discovery path**: read this file → skim [`CLAUDE.md`](CLAUDE.md) for the locked design decisions → load only the [`docs/CODEMAPS/`](docs/CODEMAPS/) map matching the area you're touching. Do **not** load the full source tree blindly — the codemaps exist to keep agent context lean.
+## Rules
 
-## Codemap Index
+- Do what has been asked; nothing more, nothing less
+- NEVER create files unless absolutely necessary — prefer editing existing files
+- NEVER create documentation files unless explicitly requested
+- NEVER save working files or tests to root — use `/src`, `/tests`, `/docs`, `/config`, `/scripts`
+- ALWAYS read a file before editing it
+- NEVER commit secrets, credentials, or .env files
+- Keep files under 500 lines
+- Validate input at system boundaries
 
-| Area | Codemap |
-|---|---|
-| High-level topology | [`docs/CODEMAPS/architecture.md`](docs/CODEMAPS/architecture.md) |
-| MCP tools (count in codemap) | [`docs/CODEMAPS/mcp-tools.md`](docs/CODEMAPS/mcp-tools.md) |
-| CLI flags / commands | [`docs/CODEMAPS/cli.md`](docs/CODEMAPS/cli.md) |
-| Language plugins (count in codemap) | [`docs/CODEMAPS/languages.md`](docs/CODEMAPS/languages.md) |
-| Output formatters | [`docs/CODEMAPS/formatters.md`](docs/CODEMAPS/formatters.md) |
-| Security boundary | [`docs/CODEMAPS/security.md`](docs/CODEMAPS/security.md) |
+## Test Quality Rules — LOCKED (2026-06-28)
 
-## Test Runtime Contract
+These rules exist because the test suite grew to 1,093 files / 21,000 tests with
+systematic duplication, coverage-chasing files, and weak assertions that let real
+bugs through (ref: 2026-06-08 TOON incident, §11). **All 5 rules are enforced at
+pre-commit and CI. Violations block merge.**
 
-- The default full-suite command is `uv run pytest -q`.
-- Do not run the full suite serially. Project pytest config enables xdist with `--numprocesses=auto --dist=loadfile`.
-- The full suite must finish in under 5 minutes. The config enforces `--session-timeout=900` and `--timeout=30`. (Bumped from 300 in v1.13.1 — see `docs/POSTMORTEM_v1.13.md` § 9.)
-- After edits, run `uv run python -m tree_sitter_analyzer --change-impact --format json` and follow its `verification_command`.
-- If `test_required` is `false`, do not run tests just to look busy; run the reported non-test verification such as `git diff --check`.
-- For targeted code feedback, prefer `verification_command`/`test_command`; `pytest_required` and `pytest_command` are retained for pytest-specific compatibility.
-- For PRs that change Python source, run focused tests with `--cov=tree_sitter_analyzer --cov-report=json`, then run `uv run python scripts/check_patch_coverage.py --base origin/develop --coverage-json coverage.json` before pushing. The local patch gate must report no added executable misses; add effective tests instead of waiting for CI Codecov to block the PR.
-- Benchmark-only runs are the exception: use `uv run pytest tests/benchmarks/ --benchmark-enable --benchmark-only -n 0 --session-timeout=0`.
-- Do not remove or weaken these pytest defaults. They prevent repeated agent mistakes: serial full-suite runs, accidental benchmark execution, hidden hangs, and >5 minute feedback loops.
-- If a test-runtime setting must change, update `tests/contracts/test_pytest_runtime_contract.py`, explain why the new setting is faster or safer, and prove `uv run pytest -q` still finishes under 5 minutes.
+### T-1: No new test files for existing plugins (BLOCKER)
 
-## CI Test Tier Contract
+**🔒 LOCKED:** When adding tests for an existing language plugin or MCP tool,
+ADD to the existing `test_{plugin}.py` file. Do NOT create new files.
 
-- CI must not run exhaustive all-language golden/regression tests on every OS/Python axis. Mark that class with `@pytest.mark.full_language`.
-- `.github/workflows/reusable-test.yml` runs `full_language` tests only on the single Linux coverage axis; every no-coverage matrix job must exclude `not full_language`.
-- PR feedback uses `matrix-profile: pr` to run a small representative matrix (Linux coverage/full-language, Linux latest Python, Windows, macOS). Release/hotfix/push validation must keep `matrix-profile: full`.
-- `.github/workflows/test-coverage.yml` is manual-only because reusable-test already uploads coverage on the Linux coverage axis. Do not re-enable PR/push triggers unless reusable-test coverage is removed in the same change.
-- `.github/workflows/ci.yml` owns ordinary PR routing through `scripts/ci_route.py` and `config/ci-routing.yml`. Expensive optional checks such as regression, SQL platform compatibility, benchmarks, and broad E2E must be path-routed or manual/scheduled instead of running unconditionally on every PR.
-- For language-plugin changes, rely on `--change-impact --change-impact-scope ...` during development, run the focused command it reports, then let CI's single full-language axis provide the final cross-language golden gate.
+Banned name patterns — pre-commit will reject any new file matching:
+- `*_comprehensive*.py`
+- `*_edge_cases*.py`
+- `*_coverage_boost*.py`
+- `*_coverage*.py` (unless it is a coverage measurement tool, not a test)
+- `*_extended*.py`
+- `*_optimized*.py`
 
-## Agent Dogfood Feedback Loop
+**Why:** java grew to 38 test files for 498 lines of code. The root cause was
+"not sure if I covered it → add another file" without a deletion culture.
 
-For non-trivial work, expert agents must use this project as their primary feedback instrument while they work, then preserve the learning in memory:
+**Legitimate exception:** A new file is allowed ONLY when it tests a genuinely
+new subsystem (a new subpackage, a new MCP tool, a new CLI command) that has no
+existing test file. The file name must match the module it tests exactly.
 
-1. **Before edits:** run `uv run python -m tree_sitter_analyzer --change-impact --format json` to get the affected surface and verification command.
-2. **During exploration:** prefer TSA queries over blind file scans. Use focused codegraph/query/health commands for the area being changed, and keep the raw command outputs small enough to compare before/after.
-3. **After edits:** rerun change-impact and the reported verification command. For Python source changes, also run the local patch coverage gate from the Test Runtime Contract.
-4. **Memory capture:** store a concise JSON record in project memory with `branch`, `task`, `tools_used`, `signals`, `decision`, `verification`, and `followups`. Use the available `memory_store` MCP when present; otherwise use the Claude Flow memory CLI (`npx @claude-flow/cli@latest memory store --namespace tsa/agent-feedback ...`). If neither memory backend is available, include the JSON in the final response so the lead can store it.
+### T-2: No weak assertions — ratchet-enforced (BLOCKER)
 
+See §"Exact assertions only" below. The `weak-assertion-ratchet` pre-commit hook
+enforces this mechanically. Current baseline: 171 (only decreases, never increases).
+
+### T-3: Coverage rate is a by-product, never a goal (BLOCKER)
+
+**🔒 LOCKED:** Writing a test whose primary purpose is to increase a coverage
+percentage is prohibited. Every test must assert a concrete behavioral fact.
+
+Symptom of violation: the test has no `assert` that would fail if the function
+returned the wrong value — only asserts that it "ran without error" or returned
+"something non-None".
+
+**Why:** `_coverage_boost_` files were created exactly this way (commit a4d4b57e).
+They add lines to the coverage report without adding any bug-detection power.
+
+### T-4: One behavior per test function
+
+Each `def test_*` function must test exactly one behavior. Mixed-behavior tests
+hide failures and make root-cause analysis slow.
+
+```python
+# WRONG: tests import extraction AND class extraction in one function
+def test_extract():
+    imports = plugin.extract_imports(tree, code)
+    assert len(imports) == 3
+    classes = plugin.extract_classes(tree, code)
+    assert len(classes) == 2
+
+# RIGHT: split by behavior
+def test_extract_imports_count():
+    imports = plugin.extract_imports(tree, code)
+    assert len(imports) == 3
+
+def test_extract_classes_count():
+    classes = plugin.extract_classes(tree, code)
+    assert len(classes) == 2
+```
+
+### T-5: Regression tests require an issue reference
+
+Any test written to prevent a specific past bug from recurring MUST include a
+comment citing the issue number or incident date.
+
+```python
+def test_annotation_not_duplicated_in_ifdef():
+    # Issue #534: @Cacheable extracted twice when defined in both #ifdef branches
+    result = extractor.extract_functions(tree, code)
+    assert len([f for f in result if f.name == "SQUARE"]) == 1
+```
+
+Tests without an issue reference are assumed to be behavioral tests (T-4),
+not regression tests. Do not add "regression" to the name without the reference.
+
+---
+
+### Exact assertions only — no `>=` / approximate test assertions
+
+**🔒 LOCKED BY USER (2026-06-10):** 「测试拒绝大于等于这样的约等不严谨的测试」。
+Count/measurement assertions in tests MUST pin the **exact** expected value
+(`== 11`), never a loose bound (`>= 10`, `> 0`, `<= 100`) that lets drift pass
+silently. If an upstream change (e.g. a grammar-version bump) shifts the
+number, the test SHOULD go red and force a conscious re-pin with the new
+measured value — an approximate green is a false green. Reviewer suggestions
+to "relax to a lower bound for resilience" are REJECTED under this rule.
+Legitimate exceptions are rare and only where the value is genuinely
+nondeterministic (timing, memory) — and then the test should assert a
+documented invariant, not a hand-waved bound on a deterministic count.
+
+## Deliberate design decisions — do NOT "fix" these
+
+These look like inconsistencies in a dogfood pass, but they are intentional and reflect the project's design priorities. Reverting them costs real value. **If a dogfood agent proposes any of the items below as a "finding", REJECT the finding and link the agent back to this section.**
+
+### 1. MCP defaults to TOON; CLI defaults to JSON — LOCKED
+
+- **Why**: TOON is 50-70% more token-efficient than JSON. MCP callers are LLM agents — token cost is real money. CLI callers are humans / shells — JSON is human-readable and pipes into `jq`.
+- **Symptom that looks like a bug**: `MCP execute()` returns `{format: "toon", toon_content: "..."}` while CLI returns a parsed dict.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aimasteracc/tree-sitter-analyzer](https://github.com/aimasteracc/tree-sitter-analyzer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
