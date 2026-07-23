@@ -1,126 +1,192 @@
 ---
 trigger: always_on
-description: This document provides comprehensive guidance for AI assistants working with the SolidInvoice codebase. It covers the architecture, conventions, workflows, and best practices to help you understand and effectively contribute to this project.
+description: Open-source invoicing application for small businesses/freelancers. Features: client management, quotes, invoices (recurring), payments (Payum), tax/discounts, REST API, notifications.
 ---
 
 # SolidInvoice - AI Assistant Guide
 
-This document provides comprehensive guidance for AI assistants working with the SolidInvoice codebase. It covers the architecture, conventions, workflows, and best practices to help you understand and effectively contribute to this project.
+Open-source invoicing application for small businesses/freelancers. Features: client management, quotes, invoices (recurring), payments (Payum), tax/discounts, REST API, notifications.
 
-## Table of Contents
+**Version:** 3.0.0-dev | **License:** MIT | **Author:** Pierre du Plessis
 
-- [Project Overview](#project-overview)
-- [Technology Stack](#technology-stack)
-- [Codebase Structure](#codebase-structure)
-- [Architecture & Design Patterns](#architecture--design-patterns)
-- [Development Workflow](#development-workflow)
-- [Testing Strategy](#testing-strategy)
-- [Code Quality & Standards](#code-quality--standards)
-- [Common Tasks & Commands](#common-tasks--commands)
-- [Key Conventions](#key-conventions)
-- [Database & ORM](#database--orm)
-- [API Development](#api-development)
-- [Frontend Development](#frontend-development)
-- [Security Considerations](#security-considerations)
-
----
-
-## Project Overview
-
-**SolidInvoice** is a sophisticated open-source invoicing application designed for small businesses and freelancers. It provides comprehensive billing operations including:
-
-- Client and contact management
-- Quote creation and management
-- Invoice generation and tracking (including recurring invoices)
-- Online payment processing (multiple gateways via Payum)
-- Tax and discount handling
-- RESTful API for integrations
-- Multi-channel notifications (email, SMS, webhooks)
-
-**Current Version:** 2.3.11
-**License:** MIT
-**Primary Author:** Pierre du Plessis
-
-### Current Status
-
-The current branch is in the process of a UI rewrite from AdminLTE (Bootstrap 4) to Tabler (Bootstrap 5.3).
-Any changes to templates or frontend code should be made in accordance with the new Tabler design system.
+**Current Status:** UI rewrite from AdminLTE (Bootstrap 4) to Tabler (Bootstrap 5.3). All frontend changes must follow Tabler design system.
 
 ---
 
 ## Technology Stack
 
-### Backend
+**Backend:** Symfony 7.1+, PHP 8.4+, Doctrine ORM, API Platform 4.0+, payum/payum-bundle, moneyphp/money
 
-| Component          | Technology              | Version                |
-|--------------------|-------------------------|------------------------|
-| Framework          | Symfony                 | 7.1+                   |
-| Platform           | SolidWorx/Platform      | dev-main               |
-| PHP                | PHP                     | 8.4+                   |
-| ORM                | Doctrine ORM            | 2.15+                  |
-| Migrations         | Doctrine Migrations     | 3.5+                   |
-| Database           | MySQL/PostgreSQL/SQLite | MySQL 8.0+ recommended |
-| API Framework      | API Platform            | 4.0+                   |
-| PDF Generation     | mPDF                    | 8.0+                   |
-| Money Handling     | moneyphp/money          | 4.5+                   |
-| Task Scheduling    | Symfony Schedule        | 7.1+                   |
-| Payment Processing | Payum                   | 1.7+                   |
-| Workflow           | Symfony Workflow        | 7.1+                   |
+**Frontend:** Webpack (Encore), Stimulus, Tabler (Bootstrap 5.3), Sass, Bun
 
-### Frontend
+**Tools:** PHPStan (Level 6), ECS, Rector, PHPUnit, Foundry, GitHub Actions
 
-| Component            | Technology               | Version |
-|----------------------|--------------------------|---------|
-| Build Tool           | Webpack (Symfony Encore) | 5.3+    |
-| CSS Preprocessor     | Sass                     | 1.63+   |
-| JavaScript Framework | Stimulus                 | 3.2+    |
-| UI Framework         | Tabler (Bootstrap)       | 1.4+    |
-| Icons                | FontAwesome              | 6.4+    |
-| Package Manager      | Bun                      | 1.3+    |
-
-### Development Tools
-
-- **Static Analysis:** PHPStan (Level 6)
-- **Coding Standards:** EasyCodingStandard (Symplify)
-- **Code Refactoring:** Rector (PHP 8.4+)
-- **Testing:** PHPUnit 10.4+, Mockery, Symfony Panther
-- **Fixtures:** Foundry
-- **CI/CD:** GitHub Actions
-
-### Distribution
-
-- **Docker:** Official SolidInvoice Docker images available on Docker Hub (solidinvoice/solidinvoice). Runs the FrankenPHP binary inside the container.
-- **FrankenPHP:** Official recommended installation method. Application is built into a single binary, which contains PHP, all required extensions, the web server, and the application code.
-- **Archive:** ZIP/TAR archives for manual installation (all assets pre-compiled)
+**Platform:** Built on SolidWorx/Platform for base entities, services, and UI components.
 
 ---
 
 ## Codebase Structure
 
-### Root Directory Layout
+```
+├── assets/          # Frontend (Stimulus controllers, SCSS)
+├── bin/             # Executables (console, phpunit)
+├── config/          # Symfony config (packages/, routes/, services.php)
+├── migrations/      # Database migrations
+├── src/             # 20 bundles (see below)
+├── templates/       # Twig template overrides
+├── tests/           # Test bootstrap
+```
 
-```text
-/home/user/SolidInvoice/
-├── assets/                 # Frontend JavaScript and SCSS
-│   ├── controllers/        # Stimulus controllers
-│   ├── img/                # Images and icons
-│   ├── scss/               # Sass stylesheets
-│   ├── controllers.json    # Stimulus config
-│   └── core.ts             # Main application entry
-├── bin/                    # Executables (console, phpunit, etc.)
-├── config/                 # Symfony configuration
-│   ├── packages/           # Package configurations
-│   ├── routes/             # Route definitions
-│   └── services.php        # Service container config
-├── docker/                 # Docker configuration
-├── frankenphp/             # FrankenPHP code and config (Go files and shell scripts to build and compile the binary)
-├── migrations/             # Database migrations
-├── public/                 # Web-accessible files
-├── scripts/                # Shell scripts for various tasks
-├── src/                    # Application source code (18 bundles)
+### Bundles (src/)
+
+**Business:** InvoiceBundle, QuoteBundle, ClientBundle, PaymentBundle, TaxBundle
+
+**User/Security:** UserBundle
+
+**System:** CoreBundle, ApiBundle, MailerBundle, SettingsBundle, InstallBundle, CronBundle
+
+**UI:** DashboardBundle, DataGridBundle, FormBundle, MenuBundle
+
+**Specialized:** NotificationBundle, MoneyBundle, SaasBundle, McpBundle
+
+### Bundle Structure
+
+```
+BundleNameBundle/
+├── Action/          # HTTP entry points (not controllers)
+├── Entity/          # Doctrine entities
+├── Form/            # Form types
+├── Listener/        # Event listeners
+├── Manager/         # Business logic
+├── Repository/      # Data access
+├── Resources/       # config/, translations/, views/
+├── Tests/           # Tests (Functional/ subdirectory for functional)
+```
+
+---
+
+## Architecture Patterns
+
+### Action Pattern
+
+HTTP entry points are single-responsibility Action classes, not controllers:
+
+```php
+class CreateAction {
+    public function __invoke(Request $request): Response { /* ... */ }
+}
+```
+
+### Key Patterns
+
+- **Repository Pattern:** Extend `SolidWorx\Platform\PlatformBundle\Repository\EntityRepository`
+- **Event-Driven:** Symfony EventDispatcher for state transitions, lifecycle
+- **Manager Pattern:** Complex operations in Manager classes
+- **State Machine:** Symfony Workflow for invoice states (draft, pending, paid, etc.)
+
+### Entity Traits
+
+Use these traits on entities as needed:
+
+- `Archivable` - Soft deletes
+- `TimeStampable` - created/updated timestamps
+- `CompanyAware` - Multi-tenancy
+
+### Platform
+
+- Repositories extend `SolidWorx\Platform\PlatformBundle\Repository\EntityRepository`
+- Commands extend `SolidWorx\Platform\PlatformBundle\Console\Command`
+- Use SolidWorx/PlatformUI components for UI
+
+---
+
+## Development Commands
+
+```bash
+# Frontend
+bun install && bun run dev   # Setup & build
+bun run build                # Production build
+
+# Backend
+bin/console cache:clear
+bin/console doctrine:migrations:migrate
+
+# Quality (see .claude/skills/code-quality.md)
+bin/ecs check --fix
+bin/phpstan analyse
+bin/phpunit
+bin/rector process --dry-run  # Preview refactoring suggestions
+```
+
+---
+
+## Key Conventions
+
+### Naming
+
+| Type       | Pattern           | Example                      |
+|------------|-------------------|------------------------------|
+| Entity     | Singular          | `Invoice`, `Client`          |
+| Repository | Entity+Repository | `InvoiceRepository`          |
+| Form       | Name+Type         | `InvoiceType`                |
+| Action     | Verb              | `CreateAction`, `EditAction` |
+| Manager    | Entity+Manager    | `InvoiceManager`             |
+
+### PHP Standards
+
+- Always `declare(strict_types=1);`
+- Always type hints (params + returns)
+- Prefer `final` classes — **exception: Doctrine entities must never be `final`**, as Doctrine generates proxy classes by extending them at runtime
+- Use PHP 8.1+ backed enums for fixed sets of values (status, type, etc.), NEVER class constants
+- File header required (see .claude/skills/code-quality.md)
+
+### Doctrine
+
+- PHP 8 Attributes for mapping
+- ULID primary keys
+- Global filters: `CompanyFilter` (multi-tenancy), `ArchivableFilter` (soft deletes)
+
+### Migrations
+
+Location: `/migrations/`
+
+- Use Doctrine Schema tool, not raw SQL
+- Naming: `Version{major}{minor}{patch}.php` (e.g., `Version203011.php`)
+- From 2.4: `Version{version}_{part}.php` (e.g., `Version20400_1.php`)
+
+---
+
+## Database
+
+ULID primary keys:
+
+```php
+#[ORM\Column(type: UlidType::NAME)]
+#[ORM\Id]
+#[ORM\GeneratedValue(strategy: 'CUSTOM')]
+#[ORM\CustomIdGenerator(class: UlidGenerator::class)]
+private Ulid $id;
+```
+
+---
+
+## API
+
+API Platform 4.0+. Auth: `X-API-TOKEN` header.
+
+Endpoints: `/api/invoices`, `/api/quotes`, `/api/clients`, `/api/contacts`, `/api/payments`, `/api/tax`
+
+Formats: JSON-LD (default), JSON-HAL, JSON, XML
+
+Custom normalizers: `MoneyNormalizer`, `CreditNormalizer`, `DiscountNormalizer`
+
+---
+
+## Money Handling
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SolidInvoice/SolidInvoice](https://github.com/SolidInvoice/SolidInvoice) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
