@@ -1,0 +1,94 @@
+---
+trigger: always_on
+description: An MCP server bridging Claude and Apple Mail via AppleScript on macOS.
+---
+
+# Apple Mail MCP Server
+
+An MCP server bridging Claude and Apple Mail via AppleScript on macOS.
+
+**Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`)
+**Version:** v0.10.2 | **Tests:** 1396 unit / 29 e2e / 62 integration | **Coverage:** 92%
+
+## Commands
+
+```bash
+make test                  # Unit tests (~1s, mocked AppleScript)
+make test-integration      # Real Mail.app tests (requires test account)
+make test-e2e              # End-to-end MCP tool tests
+make lint                  # Ruff linting
+make format                # Ruff formatting
+make typecheck             # Mypy strict mode
+make check-all             # All checks (lint, typecheck, test, complexity, version-sync, parity)
+make coverage              # Coverage report
+./scripts/check_complexity.sh          # Cyclomatic complexity check
+./scripts/check_client_server_parity.sh  # Verify all connector methods are exposed
+./scripts/check_version_sync.sh        # Version consistency across files
+```
+
+**Running the server:** `uv run python -m apple_mail_fast_mcp.server` or via Claude Desktop config.
+
+## API Surface (25 MCP tools)
+
+**Core:** list_mailboxes, search_messages, get_messages, update_message
+**Drafts lifecycle (#134):** create_draft, update_draft, delete_draft
+**Mailbox CRUD:** create_mailbox, update_mailbox (rename + move via IMAP), delete_mailbox (IMAP-only)
+**Attachments & Management:** save_attachments, get_attachment_content (#250, inline read), delete_messages
+**Discovery & Rules:** list_accounts, list_rules, get_thread, create_rule, update_rule, delete_rule
+**Analytics (#378):** get_statistics (inbox stats: volume / read-ratio / top senders; compose-only)
+**Templates:** list_templates, get_template, save_template, delete_template, render_template
+
+## Core Principles
+
+- **TDD always** — RED/GREEN/REFACTOR. Tests before implementation.
+- **Backend + frontend together** — Every feature touches `mail_connector.py` AND `server.py`. Verify with `check_client_server_parity.sh`.
+- **Sanitize everything twice** — All user input: `sanitize_input()` then `escape_applescript_string()` before AppleScript.
+- **Structured responses** — Every tool returns `{"success": bool, ...}`. Errors include `error` and `error_type`.
+- **Security checklist per feature** — see [`docs/guides/SECURITY_CHECKLIST.md`](../docs/guides/SECURITY_CHECKLIST.md) for the canonical reference (5 concerns: input sanitization, AppleScript escaping, path-traversal-safe name validation, rate limiting, audit logging). Don't duplicate guidance here; link out instead.
+- **If you touched AppleScript, write integration tests** — Unit tests mock `_run_applescript()` and CANNOT catch AppleScript bugs.
+
+## AppleScript Gotchas
+
+**JSON output from AppleScript:** Scripts emit JSON via ASObjC + `NSJSONSerialization` (wrap with `_wrap_as_json_script`, parse with `parse_applescript_json`). Always quote the `name` record key as `|name|:` — the bare form is silently dropped during NSDictionary conversion. Coerce `missing value` to safe defaults (`{}` / `0`) before serializing. See applescript-mail skill for details.
+
+**Gmail mode:** Gmail's label-based system doesn't support standard IMAP move. The `update_message` tool has a `gmail_mode` parameter that uses copy+delete instead of move.
+
+**Message ID lookup:** Finding a message by ID requires searching across all accounts and mailboxes. AppleScript `whose` clauses are used for efficiency.
+
+**String escaping:** Always use `escape_applescript_string()` for user text. Unescaped quotes/backslashes break AppleScript silently.
+
+**Attachment paths:** Use POSIX file references (`POSIX file "/path/to/file"`) in AppleScript. Path objects converted via `.as_posix()`.
+
+**Timeout:** Default 60s, configurable via `AppleMailConnector(timeout=N)`. Some operations on large mailboxes may need more.
+
+## Performance Constraints
+
+- Each `osascript` subprocess call: 100-300ms overhead minimum
+- Search: ~1-5s for typical mailboxes (uses `whose` clauses)
+- Send: ~1-2s
+- Read: <1s per message
+- Bulk operations capped at 100 items
+
+## User Data on Disk
+
+- All persistent user data lives under `~/.apple_mail_mcp/`. Override the location with `APPLE_MAIL_MCP_HOME=/some/path` (the subdirectory layout is appended automatically).
+- Current subdirs: `templates/` (one `<name>.md` file per email template, see `src/apple_mail_fast_mcp/templates.py`).
+- Names that get used as filename stems must be regex-validated **before** building any path — see `_validate_name` in `templates.py` for the path-traversal-safe pattern. Don't `Path(user_input)` directly.
+- Storage objects should resolve their root at use time, not import time, so env-var overrides and test-time monkeypatching are honored. Example: `_get_template_store()` in `server.py`.
+
+## Testing Requirements
+
+| Type | When Required | How |
+|------|--------------|-----|
+| Unit tests | Every code change | `make test` |
+| Integration tests | New/modified AppleScript | `make test-integration` |
+| E2E tests | New/modified tools | `make test-e2e` |
+
+**Hard rule:** If you wrote or modified AppleScript in the connector, integration tests must cover it before merge.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [s-morgan-jeffries/apple-mail-mcp](https://github.com/s-morgan-jeffries/apple-mail-mcp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
