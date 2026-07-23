@@ -1,97 +1,69 @@
 ---
 trigger: always_on
-description: Butler is a Node.js application that adds "superpowers" to Qlik Sense Enterprise on Windows, including advanced reload failure alerts, task scheduling, key-value store, file system access, and REST API capabilities.
+description: <!-- gitnexus:start -->
 ---
 
-# Butler - Agent Guide
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
 
-Butler is a Node.js application that adds "superpowers" to Qlik Sense Enterprise on Windows, including advanced reload failure alerts, task scheduling, key-value store, file system access, and REST API capabilities.
+This project is indexed by GitNexus as **butler** (2798 symbols, 5571 relationships, 234 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-## Commands
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
-- `npm ci --include=dev --include=prod` — install all deps (33s, NEVER CANCEL, timeout 90+s)
-- `npm test` / `npm run test:unit` — run unit tests only (~50 tests, excludes API tests, 10s)
-- `npm run test:integration` — run integration tests only (25 REST API tests with Fastify)
-- `npm run test:full` — run all tests with coverage
-- `npm run lint:fix` then `npm test` — required quality gates
-- `npm run lint` — ESLint validation (2s, NEVER CANCEL, timeout 30+s)
-- `npm run format` — Prettier (tabWidth: 4, singleQuote: true, printWidth: 140, 4s, NEVER CANCEL, timeout 30+s)
-- **Test single file:** `node --experimental-vm-modules node_modules/jest/bin/jest.js src/path/to/file.test.js`
-- `node src/butler.js` — start app (needs config file via `-c` flag)
-- `node src/butler.js -c ./src/config/config-gen-api-docs.yaml --no-qs-connection` — start with test config
+## Always Do
 
-## Build Process
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
 
-- **Fast esbuild compilation:** `./node_modules/.bin/esbuild src/butler.js --bundle --external:axios --external:xdg-open --external:enigma.js --outfile=./build/build.cjs --format=cjs --platform=node --target=node22 --minify --inject:./src/lib/import-meta-url.js --define:import.meta.url=import_meta_url` (0.4s, NEVER CANCEL, timeout 30+s)
-- Create build directory first: `mkdir -p build`
-- **Generate Node.js Single Executable blob:** `node --experimental-sea-config build-script/sea-config.json` (0.04s)
-- Test built application: `node build/build.cjs --version`
-- The build process is extremely fast (sub-second for main compilation)
+## Never Do
 
-### Docker Build (WARNING: SLOW)
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
 
-- Build Docker image: `docker build -t butler-test .` — takes 10+ minutes due to npm install in container. NEVER CANCEL. Set timeout to 20+ minutes.
-- Docker builds work but are significantly slower than local development
-- For development, prefer local Node.js setup over Docker
+## Resources
 
-## Architecture
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/butler/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/butler/clusters` | All functional areas |
+| `gitnexus://repo/butler/processes` | All execution flows |
+| `gitnexus://repo/butler/process/{name}` | Step-by-step execution trace |
 
-- **Entry point:** `src/butler.js` → initializes globals → delegates to `src/app.js` (Fastify)
-- **Globals singleton:** `src/globals.js` — config, logger, shared state (always use `globals.logger`, never `console.log`)
-- **Config:** YAML via `config` package, template at `src/config/production_template.yaml`
-- **ESM only** (`"type": "module"`) — use `import`/`export`, all test files must use `--experimental-vm-modules`
-- **UDP server:** `src/udp/udp_handlers.js` — task events from Qlik Sense schedulers
-- **REST API:** serves on port 8081 when using test config, API docs at http://localhost:8081/documentation
-- **Test API endpoint:** `curl localhost:8081/v4/butlerping` returns `{"response":"Butler reporting for duty","butlerVersion":"13.1.2"}`
+## CLI
 
-## Directory Structure
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Work in the Configvis area (137 symbols) | `.claude/skills/generated/configvis/SKILL.md` |
+| Work in the Qseow area (80 symbols) | `.claude/skills/generated/qseow/SKILL.md` |
+| Work in the Rest_server area (48 symbols) | `.claude/skills/generated/rest-server/SKILL.md` |
+| Work in the Qrs_util area (45 symbols) | `.claude/skills/generated/qrs-util/SKILL.md` |
+| Work in the Influxdb area (44 symbols) | `.claude/skills/generated/influxdb/SKILL.md` |
+| Work in the Smtp area (29 symbols) | `.claude/skills/generated/smtp/SKILL.md` |
+| Work in the Incident_mgmt area (27 symbols) | `.claude/skills/generated/incident-mgmt/SKILL.md` |
+| Work in the Udp area (20 symbols) | `.claude/skills/generated/udp/SKILL.md` |
+| Work in the Assert area (13 symbols) | `.claude/skills/generated/assert/SKILL.md` |
+| Work in the Qscloud area (12 symbols) | `.claude/skills/generated/qscloud/SKILL.md` |
+| Work in the Cluster_30 area (8 symbols) | `.claude/skills/generated/cluster-30/SKILL.md` |
+| Work in the Get area (7 symbols) | `.claude/skills/generated/get/SKILL.md` |
+| Work in the Api area (6 symbols) | `.claude/skills/generated/api/SKILL.md` |
+| Work in the Cluster_27 area (6 symbols) | `.claude/skills/generated/cluster-27/SKILL.md` |
+| Work in the Cluster_29 area (6 symbols) | `.claude/skills/generated/cluster-29/SKILL.md` |
+| Work in the Handlers area (6 symbols) | `.claude/skills/generated/handlers/SKILL.md` |
+| Work in the Cluster_32 area (5 symbols) | `.claude/skills/generated/cluster-32/SKILL.md` |
 
-```
-src/
-├── butler.js          # Main application entry point
-├── app.js            # Core application setup
-├── config/           # Configuration templates and files
-├── test/             # Jest test suite
-├── lib/              # Utility libraries
-├── api/              # API route handlers
-├── routes/           # Express route definitions
-└── globals.js        # Global configuration and state
-
-build-script/         # Build automation scripts
-docs/                # Documentation
-static/              # Static web assets
-```
-
-## Conventions
-
-- **JSDoc enforced** — ESLint with `eslint-plugin-jsdoc`
-- **Logging:** always `globals.logger`, never `console.log`
-- **Config-driven** — prefer YAML config over env vars
-- **Dependencies:** `npm ci --include=prod` for Docker/SEA builds
-- **Conventional Commits:** use format `type(scope)!: short, imperative summary`
-  - Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `perf`, `test`, `build`, `ci`, `style`, `revert`
-  - Scopes: `api`, `routes`, `config`, `lib`, `docs`, `build`, `deps`, `k8s`, `docker`, `tests`
-  - Rules: present/imperative mood, lowercase summary, no trailing period, mark breaking changes with `!` and `BREAKING CHANGE:` footer
-  - Examples: `feat(api): add /v4/systeminfo endpoint`, `fix(config): handle missing smtp.auth.user`
-
-## Testing Quirks
-
-- **Jest + ESM:** all test runs need `node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js`
-- **Test separation:** unit tests (`*.test.js`) vs integration tests (`*.api.test.js` in `routes/rest_server/__tests__/`)
-- **Unit tests:** `npm run test:unit` — mocks all external dependencies, tests individual modules
-- **Integration tests:** `npm run test:integration` — spins up Fastify server, tests REST API endpoints
-- **Single test:** `node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js src/udp/__tests__/udp_handlers.test.js --verbose`
-- **Mock pattern:** use `jest.unstable_mockModule()` (ESM mocks), never `jest.mock()`
-- **Standalone test:** `src/test/config/systeminfo.test.js` validates configuration schema
-
-## Validation
-
-### Manual Testing Scenarios
-
-ALWAYS test API functionality after making changes:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+<!-- gitnexus:end -->
 
 ---
 > Source: [ptarmiganlabs/butler](https://github.com/ptarmiganlabs/butler) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
