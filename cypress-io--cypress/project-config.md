@@ -1,136 +1,57 @@
 ---
 trigger: always_on
-description: Cypress is an open-source end-to-end and component testing framework for the modern web. This monorepo ships the Cypress desktop application and CLI (`cypress`), the JavaScript driver that runs tests in the browser, the Electron-based test runner, a suite of published npm packages (component testing adapters, webpack/vite dev-server integrations, plugins), and the internal tooling used to build and release all of it. Cypress is used by millions of developers to test web applications across Chrom
+description: - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 ---
 
-# Cypress Monorepo — AGENTS.md
+# CLAUDE.md
 
-## Overview
+## Workflow Orchestration
 
-Cypress is an open-source end-to-end and component testing framework for the modern web. This monorepo ships the Cypress desktop application and CLI (`cypress`), the JavaScript driver that runs tests in the browser, the Electron-based test runner, a suite of published npm packages (component testing adapters, webpack/vite dev-server integrations, plugins), and the internal tooling used to build and release all of it. Cypress is used by millions of developers to test web applications across Chrome, Firefox, Edge, WebKit, and Electron.
+### 1. Plan Mode Default
 
-## Workspaces
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately - don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
 
-- **`cli/`** — The main `cypress` npm package (CLI entry point) and co-located component testing framework adapters (`@cypress/react`, `@cypress/vue`, `@cypress/angular`, `@cypress/svelte`, `@cypress/mount-utils`)
-- **`packages/`** — Core internal packages: the test driver, Electron app, HTTP server, proxy, rewriter, launcher, frontend Vue app, launchpad, reporter, config, data-context, telemetry, types, errors, and more (33 packages total)
-- **`npm/`** — Publicly published npm packages: bundler integrations, component testing adapters, plugins, and dev tooling (15 packages)
-- **`tooling/`** — Internal build tooling: V8 snapshot creation, `packherd` dependency bundler, and `electron-mksnapshot` (3 packages)
-- **`system-tests/`** — Full end-to-end system test suite run against a built Cypress binary
-- **`scripts/`** — Internal build, release, and CI automation scripts
+### 2. Subagent Strategy
 
-## Prerequisites
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
 
-- **Node**: Use the node version specified in the `.node-version` file (check with `node -v`; run `nvm use` to manage versions)
-- **Package manager**: Yarn 1 (`yarn@1.22.22`) — do not use npm or pnpm
-- **Lerna**: Orchestrated via root `package.json` scripts; installed as a dev dependency
-- **Electron** (for binary builds): handled automatically by `@packages/electron` during build
+### 3. Self-Improvement Loop
 
-## Common Commands
+- After ANY correction from the user: update the closest relevant `CLAUDE.md` file
+- Write rules for yourself that prevent the same mistake
 
-### Setup & Development
+### 4. Verification Before Done
 
-```bash
-# Install all dependencies (runs post-install hooks automatically)
-yarn
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run relevant tests only, check logs, demonstrate correctness
 
-# Start Cypress in dev mode (watch, rebuilds on change)
-yarn dev
+### 5. Demand Elegance (Balanced)
 
-# Open the Cypress GUI in dev + global mode
-yarn start
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes - don't over-engineer
+- Challenge your own work before presenting it
 
-```
+## Core Principles
 
-### Testing
+- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
 
-```bash
-# Run tests scoped to a single package (preferred over bare yarn test)
-yarn test --scope @packages/server
+## Working Constraints
 
-# Target a specific vitest spec file (packages that use vitest)
-yarn workspace @packages/config test -- <path-to-spec>
+- Worktrees must use a full `yarn` install in the worktree. Do not symlink `node_modules` or packages back to another checkout.
+- E2E and packaged-binary integration tests do not run in the sandbox. When they are needed, provide the exact commands and ask the user to run them.
+- Before committing or pushing, `yarn check-ts`, `yarn lint`, and relevant unit tests must pass locally. CI currently does not block expensive e2e jobs when these fail.
 
-# Target a specific vitest spec by glob pattern
-yarn workspace @packages/net-stubbing test -- "<glob-pattern>"
-
-# Target a specific mocha spec file (packages that use mocha)
-yarn workspace @packages/server test-unit -- <path-to-spec>
-
-# Filter mocha tests by name pattern
-yarn workspace @packages/server test-unit -- --grep "<pattern>"
-
-# Run system tests (full binary-level E2E)
-yarn test-system
-
-# Run Cypress headlessly against a specific spec (dev mode)
-yarn cypress:run -- --spec "path/to/spec.cy.ts"
-
-# Run Cypress component tests against a specific spec (dev mode)
-yarn cypress:run:ct -- --spec "path/to/spec.cy.ts"
-```
-
-### Type Checking
-
-```bash
-# Type-check all TypeScript across the monorepo
-yarn type-check
-
-# Lerna-only type check pass
-yarn check-ts
-```
-
-### Linting & Formatting
-
-```bash
-# Lint all packages (no bail, concurrency 2)
-yarn lint
-
-# Lint and auto-fix specific scopes
-yarn lint:fix
-```
-
-> **Note**: This project does **not** use Prettier. All formatting is enforced via ESLint.
-
-### Build
-
-```bash
-# Full monorepo build
-yarn build
-
-# Build V8 snapshot (dev)
-yarn build-v8-snapshot-dev
-
-# Build V8 snapshot (prod)
-yarn build-v8-snapshot-prod
-
-# Clean all build artifacts
-yarn clean
-
-# Clean and reinstall (nuclear)
-yarn clean-deps && yarn
-```
-
-## Architecture
-
-### CLI & Distribution
-
-- **`cypress` (`cli/`)** — The `cypress` npm package users install. Entry point for `cypress open`, `cypress run`, `cypress install`, etc. Version: 15.x.
-
-### Test Runner & Driver
-
-- **`@packages/driver`** — The JavaScript test driver that executes user test code inside the browser. Implements Cypress commands, assertions, retries, and all `cy.*` APIs.
-- **`@packages/runner`** — The webpack-bundled runner UI that hosts the AUT (application under test) iframe and driver communication layer.
-- **`@packages/app`** — The Vue 3 frontend for the Cypress GUI / Launchpad. Main visual interface for the desktop app.
-- **`@packages/launchpad`** — Project creation, onboarding, and test file scaffold UI.
-- **`@packages/frontend-shared`** — Shared Vue components and design system tokens used by `app` and `launchpad`.
-- **`@packages/reporter`** — The test results reporter UI component (pass/fail tree, log panel).
-
-### Server & Network
-
-- **`@packages/server`** — HTTP server responsible for serving test files, handling browser launching, socket communication, and orchestrating the test run.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+@AGENTS.md
 
 ---
 > Source: [cypress-io/cypress](https://github.com/cypress-io/cypress) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
