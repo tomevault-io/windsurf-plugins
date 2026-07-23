@@ -1,83 +1,99 @@
 ---
 trigger: always_on
-description: Agile, measurable, and reliable workflow enforcement for AI-assisted engineering.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# AgenFK Engineering Framework (agenfk)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This skill enforces the core AgenFK Engineering workflow to ensure all software tasks are Agile, Measurable, Visual, Repeatable, Reliable, and Flexible.
+## Repository purpose
 
-## Strict Enforcement Mandate
+This repo is the **AgEnFK framework itself** — a TypeScript monorepo that ships:
+- An MCP server + REST/WebSocket API (`packages/server`)
+- A CLI (`packages/cli`, exposed at the repo root via `bin/agenfk.js`)
+- A React Kanban UI (`packages/ui`)
+- A `core` package with shared types/lifecycle logic, a `storage-sqlite` plugin, and `telemetry`
+- A `create` package (project scaffolder) and per-client rule bundles in `clauderules/`, `cursorrules/`, `codexrules/`, `geminirules/`, plus `commands/` and `skills/` for slash-command/skill packs
+- Installer/uninstaller scripts (`scripts/install.mjs`, `scripts/uninstall.mjs`) that copy these rule bundles, MCP config, and PreToolUse hooks into each AI client's config dir
 
-> **MANDATORY**: You are strictly prohibited from modifying ANY file in the codebase without an active task in `IN_PROGRESS` status and a successful `workflow_gatekeeper` call. Bypassing this workflow is a critical operational failure.
+Note: the repo's own CLAUDE.md (this file) is *not* the file that gets installed onto end-user machines — `clauderules/CLAUDE.md` is. The installer merges that bundle plus equivalents (`AGENTS.md`, `.cursor/rules/*.mdc`, etc.) into the user's client config. Keep `clauderules/CLAUDE.md` in sync with `SKILL.md`/`SDLC.md` when changing workflow rules.
 
-### Hard Block Rules
-1. **NO TASK = NO CODE**: If no task is `IN_PROGRESS`, stop immediately and create one.
-2. **NO GATE = NO CODE**: Call `workflow_gatekeeper` before the first edit of every session.
-3. **NO BYPASS**: Never use `git commit`, `npm test`, or direct file writes to circumvent `validate_progress`.
-4. **MEASURE EVERYTHING**: Every task MUST have token usage logged via `log_token_usage` before completion.
+The release commands (`/agenfk-release`, `/agenfk-release-beta`, `/agenfk-release-hub`) are **repo-private**: they cut releases of the framework itself, so they live in `.claude/commands/` and are NOT shipped to users (guarded by `packages/cli/src/test/release-commands-private.test.ts`; the installer deletes stale global copies on upgrade). They are exempt from the active-task requirement — do not create or require an AgEnFK task when executing them.
 
-## Operation Modes
+## Common commands
 
-AgenFK supports two distinct operation modes based on the slash command invoked:
+Build everything (core/storage/telemetry first, then cli/server/ui):
+```
+npm run build
+```
 
-### 1. Standard Mode (via `/agenfk`)
-*   **Behavior**: Single-agent, proactive execution.
-*   **Workflow**: The agent who starts the task is responsible for the entire lifecycle (Planning, Coding, Verification, and Closing) within a single session.
-*   **Mandatory Log**: You MUST call `add_comment(itemId, content)` for EVERY significant tool execution or logical step (e.g. "Analyzed file X", "Implemented function Y", "Running tests").
-*   **Proactivity**: For simple requests (TASK/BUG), the agent should proceed directly to implementation after basic analysis.
-*   **Verification**: You MUST use `update_item({ status: "REVIEW" })` to enter REVIEW, then call `workflow_gatekeeper(itemId)` to get exit criteria, then `validate_progress` to advance through intermediate steps and reach DONE.
-*   **Decomposition**: MANDATORY. Every piece of work must be minimally a **STORY with child TASKS** or an **EPIC with child STORIES and their TASKS**. Direct coding on a STORY or EPIC without child TASKS is prohibited.
-*   **Handoff**: None. Do not spawn sub-agents.
+Build a single package:
+```
+npm run build -w packages/server
+```
 
-### 2. Deep Mode (via `/agenfk-deep`)
-*   **Behavior**: Multi-agent, automated orchestration.
-*   **Trigger**: Use this mode for complex architectural changes, high-security code, or large features.
-*   **Supervisor Pattern**: You act as a supervisor, responsible for decomposing the task and spawning specialized sub-agents via the `task` tool at every phase transition.
-*   **Parallel Execution**: Deep Mode supports **parallel execution** of independent tasks.
-    - If an EPIC or STORY has multiple independent sub-items, you SHOULD spawn multiple sub-agents simultaneously using the `task` tool.
-    - When working in parallel, you MUST pass the `itemId` to the `workflow_gatekeeper(intent, role, itemId)` to authorize changes against the specific task.
-*   **Plan & Pause**: Mandatory decomposition into sub-items. You **MUST PAUSE** and obtain human approval of the plan before moving any item to `IN_PROGRESS`.
-*   **Automated Handover**:
-    - **Coding to Review**: Automatically spawn a "Review Agent" after `update_item({ status: "REVIEW" })`.
-    - **Review to Test**: Automatically spawn a "Test Agent" after successful review.
-    - **Test to Done**: Automatically spawn a "Closing Agent" after successful testing.
+Run all tests (vitest, node env, file-parallelism off — tests share filesystem state):
+```
+npm test
+```
 
----
+Run a single test file or filter by name:
+```
+npx vitest run packages/server/src/test/foo.test.ts
+npx vitest run -t "name pattern"
+```
 
-## MCP Access Rules — MANDATORY
+Coverage (gated at 80% for `core`, `storage-sqlite`, `server` per `vitest.config.ts`):
+```
+npm run test:coverage
+```
 
-**ALWAYS** use MCP tool invocations (`list_items`, `create_item`, `update_item`, `get_item`, etc.) for all workflow state operations.
+UI is excluded from the root vitest run. For UI tests + coverage:
+```
+npm run test:ui:coverage
+```
 
-**NEVER** use any of the following shortcuts — PreToolUse hooks will block them mechanically:
+UI dev server / lint:
+```
+cd packages/ui && npm run dev
+cd packages/ui && npm run lint
+```
 
-| Forbidden | Use instead |
-|-----------|-------------|
-| Reading `.agenfk/db.sqlite` or `.agenfk/db.json` directly (via Bash or Read tool) | `list_items(projectId)` · `get_item(id)` |
-| `curl` / `wget` to `http://localhost:3000` (direct REST API) | `list_items()` · `create_item()` · `update_item()` |
-| `agenfk list`, `agenfk status`, `agenfk get`, `npx agenfk ...` (CLI state queries) | `list_items()` · `get_item()` · `list_projects()` |
+Installer / services (used by end users, but useful when iterating on install logic):
+```
+npm run install:framework      # copies rules + MCP config into ~/.claude, ~/.cursor, etc.
+npm run uninstall:framework
+npm run start:services         # launches the API server + UI
+```
 
-If MCP tools are not available in your context, surface the connectivity problem clearly rather than falling back to a bypass route.
+The CLI binary `bin/agenfk.js` is a thin shim that resolves to `packages/cli`. Build CLI before invoking it directly: `npm run build -w packages/cli`.
 
----
+Bump the monorepo version everywhere at once (root + all `packages/*/package.json`, including internal `@agenfk/*` dep references across dependencies/devDependencies/peerDependencies):
+```
+node scripts/bump-version.mjs <new-version>   # e.g. 1.1.8-beta.6
+npm install --package-lock-only               # regenerate the lockfile
+git add . && git commit -m "chore: bump version to <new-version>"
+```
+The old version is read from the root `package.json`; commit the manifest changes and the regenerated lockfile together so they never drift. The release commands (`/agenfk-release`, `/agenfk-release-beta`) use this flow.
 
-## What I do
+## Architecture (big picture)
 
-1.  **Initialization**
-    *   **Clean Start from Main (MANDATORY)**:
-        1. Run `git status` — if the working tree has uncommitted or modified files, **STOP** and ask the user how to proceed (stash, commit, or discard). Never start new work on a dirty working tree.
-        2. Run `git branch --show-current` — if NOT on `main` (or `master`) and the current branch does not belong to an item you're about to resume, run `git checkout main` (or `master`).
-        3. Run `git pull` to ensure you have the latest upstream changes.
-    *   **Action**:
-        1. Check for `.agenfk/project.json` in the project root.
-        2. If missing, DO NOT assume an existing project should be reused based on name alone.
-        3. Call `list_projects()` via MCP to see existing projects.
-        4. **MANDATORY**: Ask the user if they want to use an existing project (by name/ID) or create a new one (recommended).
-        5. If creating a new one, use the current directory name as the default project name unless the user specifies otherwise.
+**Single Owner**: the API server in `packages/server` is the only writer of state. CLI, MCP clients, and UI all go through its REST endpoints; updates fan out over Socket.io. Never read `.agenfk/db.sqlite` directly from other packages — go through the storage interface in `core`.
+
+**Storage**: SQLite-only via `better-sqlite3` (`packages/storage-sqlite`). The repo previously supported `db.json`; existing JSON DBs are auto-migrated by the installer. WAL mode + indexed schema.
+
+**Workflow engine** (`packages/core` + enforced by `packages/server`):
+- Items have type (EPIC / STORY / TASK / BUG) and move through a configurable **Flow** of `FlowStep`s (default: TODO → IN_PROGRESS → REVIEW → TEST → DONE; per-project flows override this).
+- Forward transitions are gated by `validate_progress(itemId, evidence, command?)`. The final step's `command` defaults to `project.verifyCommand`.
+- DONE is unreachable by direct `update_item({ status: "DONE" })` — the server blocks it; only `validate_progress` on the final step can land it.
+- `workflow_gatekeeper(intent, itemId?)` is the pre-edit authorization check; it surfaces the active step's `exitCriteria` so the caller knows what to satisfy before `validate_progress`.
+
+**MCP surface**: the server registers MCP tools (`mcp__agenfk__*`) backed by the same handlers as the REST endpoints. Tool definitions live in `packages/server/src` alongside the Express routes. Adding a new MCP tool means: handler in core, REST route in server, MCP tool registration in server, and (usually) a CLI subcommand in `packages/cli` for the fallback path.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cglab-public/agenfk](https://github.com/cglab-public/agenfk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
