@@ -1,0 +1,173 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+GPT-Vis is an AI-native, framework-agnostic visualization library for LLM applications. It provides a markdown-like syntax that LLMs can generate to render 26 chart types. Built on @antv/g2 v5 (statistical charts) and @antv/g6 v5 (graph charts). Published as `@antv/gpt-vis` on npm.
+
+## Commands
+
+```bash
+# Install dependencies
+pnpm install
+
+# Development build (ESM only, faster)
+pnpm dev
+
+# Production build (ESM, CJS, UMD outputs via father)
+pnpm build
+
+# Lint TypeScript
+pnpm lint:ts
+
+# Lint with auto-fix
+pnpm lint:ts-fix
+
+# Format code
+pnpm format
+
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run single test file
+pnpm vitest run __tests__/line.test.ts
+
+# Documentation site
+cd site && pnpm dev      # Start Next.js dev server
+```
+
+## Build System
+
+Uses `father` (configured in `.fatherrc.ts`):
+
+- **Dev mode** (`pnpm dev`): ESM output only → `dist/esm`
+- **Production** (`pnpm build`): ESM + CJS (`dist/cjs`) + UMD (`dist/umd/index.min.js`)
+- UMD global export name: `GPTVis`, targets Chrome 80+
+- Size limits enforced: UMD max 3 MB uncompressed, 1 MB gzipped
+
+## Architecture
+
+### Core Structure
+
+```
+src/
+├── index.ts           # Public exports (GPTVis class + all chart components)
+├── gpt-vis/           # Unified GPTVis class - main API entry point
+├── syntax/            # Parser for markdown-like vis syntax
+├── types/             # Shared TypeScript interfaces
+├── util/              # Theme utilities (3 themes: default/dark/academy)
+├── vis/               # Individual chart components (26 types)
+└── vis-wrapper/       # Optional UI wrapper with tabs/download/copy/zoom
+```
+
+### Key Patterns
+
+**Chart Component Pattern**: Each chart in `src/vis/<type>/index.ts` follows this factory pattern:
+
+```typescript
+export interface XxxConfig {
+  type?: 'xxx';           // Chart type identifier
+   XxxDataItem[];    // Data structure
+  title?: string;
+  theme?: 'default' | 'academy' | 'dark';
+  style?: { ... };
+}
+
+export interface XxxInstance {
+  render: (config: XxxConfig) => void;
+  destroy: () => void;
+}
+
+export const Xxx = (options: VisualizationOptions): XxxInstance => {
+  // Creates G2 Chart instance
+  // Returns render/destroy methods
+};
+```
+
+**G6-based Chart Pattern**: Charts built on `@antv/g6` follow the same pattern but also expose zoom control methods in the returned instance:
+
+```typescript
+export const Xxx = (options: VisualizationOptions) => {
+  // Creates G6 Graph instance
+  return {
+    render,
+    destroy,
+    zoomTo: (zoom: number) => graph?.zoomTo(zoom), // Set zoom level
+    getZoom: () => graph?.getZoom() ?? 1, // Get current zoom level
+  };
+};
+```
+
+All G6-based charts must expose `zoomTo` and `getZoom` to allow callers to programmatically control zoom for a better user experience.
+
+**GPTVis Unified API**: The `GPTVis` class (`src/gpt-vis/index.ts`) provides:
+
+- Registry of all chart types
+- `render(config)` accepts either config object or syntax string
+- `destroy()` cleanup
+
+**Syntax Parser**: `src/syntax/parser.ts` converts markdown-like syntax to config objects:
+
+```
+vis line
+data
+  - time 2020
+    value 100
+title My Chart
+```
+
+→ `{ type: 'line',  [{ time: '2020', value: 100 }], title: 'My Chart' }`
+
+Parser details:
+
+- **Special array sections**: `data`, `categories`, `series`, `children`, `nodes`, `edges` are parsed as arrays
+- **Special object sections**: `style` is parsed as a nested object
+- **Value coercion**: Values auto-coerce to number/boolean; use quotes (single or double) to preserve strings with spaces or prevent coercion
+- **Hierarchical data**: `children` supports nesting for mind-map, treemap, etc.
+
+**Streaming Support**: Use `isVisSyntax()` to detect if a string starts with `vis ` prefix, enabling real-time rendering of LLM output:
+
+```typescript
+import { GPTVis, isVisSyntax } from '@antv/gpt-vis';
+
+let buffer = '';
+function onToken(token) {
+  buffer += token;
+  if (isVisSyntax(buffer)) {
+    gptVis.render(buffer); // Re-render as content streams in
+  }
+}
+```
+
+**Vis-Wrapper**: Optional UI container (`wrapper: true` in `VisualizationOptions`) that adds Chart/Code tabs, PNG download (via snapdom), copy code, and zoom controls for G6 charts. Supports `zh-CN` and `en-US` labels.
+
+### Supported Chart Types
+
+G2-based: `area`, `bar`, `boxplot`, `column`, `dual-axes`, `funnel`, `histogram`, `line`, `liquid`, `pie`, `radar`, `sankey`, `scatter`, `summary`, `table`, `treemap`, `venn`, `violin`, `waterfall`, `word-cloud`
+
+G6-based (expose `zoomTo`/`getZoom` in addition to `render`/`destroy`): `fishbone-diagram`, `flow-diagram`, `indented-tree`, `mindmap`, `network-graph`, `organization-chart`
+
+### Theme System
+
+Three themes in `src/util/theme.ts`: `default` (light), `dark`, `academy`. Each provides color palettes (10 colors), background colors, and G2 theme configuration. `normalizePalette()` ensures palette is always an array, falling back to theme defaults.
+
+### Dependencies
+
+- `@antv/g2` v5.4+ - Core charting engine (G2-based charts)
+- `@antv/g6` v5.1+ - Graph visualization engine (G6-based charts)
+- `@antv/t8` - Additional visualization utilities
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [antvis/GPT-Vis](https://github.com/antvis/GPT-Vis) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
