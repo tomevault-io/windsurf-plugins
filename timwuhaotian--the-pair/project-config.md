@@ -1,73 +1,111 @@
 ---
 trigger: always_on
-description: This file contains instructions and context for any AI agents (like yourself) working on the `the-pair` repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AI Agent Guidelines for "The Pair"
+# CLAUDE.md
 
-This file contains instructions and context for any AI agents (like yourself) working on the `the-pair` repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Identity
+`AGENTS.md` contains the longer architectural reference (module table, component table, state machine, release process). Read it when you need that depth; this file covers the essentials for getting productive fast.
 
-"The Pair" is a Desktop application (v1.2.3) built with Tauri 2.x, React 19, and TypeScript. It orchestrates two local AI agents — a **Mentor** (planner/reviewer, read-only) and an **Executor** (code writer/command runner) — that cross-check each other's work. The app manages their lifecycle, monitors resources, tracks git changes, and provides a polished UI for humans to observe and intervene.
+## What this app is
 
-## Tech Stack
+The Pair is a Tauri 2 desktop app (Rust backend, React 19 + TypeScript frontend) that orchestrates two AI agents working together on a coding task:
 
-- **Framework:** Tauri 2.0
-- **Backend:** Rust
-- **Frontend:** React 19, TypeScript
-- **Styling:** Tailwind CSS v4, `clsx`, `tailwind-merge`
-- **Icons:** `lucide-react`
-- **State Management:** `zustand` (`usePairStore`, `useUpdateStore`, `useThemeStore`)
-- **Animations:** Framer Motion
+- **Mentor** — read-only planner/reviewer
+- **Executor** — code writer / command runner
 
-## Architecture Rules
+The Rust backend spawns local provider CLIs (`opencode`, `claude`, `codex`, `gemini`), parses their JSON event streams, runs a turn-based state machine, monitors process resources, and tracks git changes. The React frontend renders the conversation, status, and controls.
 
-1. **Rust Backend vs. React Frontend:**
-   - Never import Node.js built-ins directly into the Renderer (`src/renderer/src/`).
-   - Use Tauri commands in `src-tauri/src/` to expose strict APIs to the frontend.
-   - Frontend calls backend via `invoke()` from `@tauri-apps/api/core`.
-2. **Styling:**
-   - Always use Tailwind CSS classes. Custom dark/light mode palette is defined in `src/renderer/src/assets/main.css`.
-   - Use the `cn()` utility from `src/renderer/src/lib/utils.ts` for conditional class merging.
-3. **Agent Interactions:**
-   - The application spawns processes. Always implement an iteration limit (`maxIterations`) before pausing for human intervention.
-   - Use the handoff guard (`src/renderer/src/lib/handoffGuard.ts`) to prevent race conditions when pairs finish.
-4. **Error Handling:**
-   - Handle permissions and locked files defensively in the Rust backend.
-   - Propagate errors cleanly to the frontend via Tauri commands to display in the `ErrorDetailPanel`.
+## Commands
 
-## Rust Backend Modules (`src-tauri/src/`)
+```bash
+# Setup
+npm install
+npm run preflight              # Verify rust/node/CLI tools are present
 
-| Module              | Responsibility                                                                                        |
-| ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `pair_manager`      | Pair lifecycle: create, list, delete, pause, resume, assign task, update models                       |
-| `message_broker`    | State machine for agent turn coordination and event routing                                           |
-| `process_spawner`   | Spawns opencode/claude/codex/gemini CLI processes, parses JSON event streams                          |
-| `provider_adapter`  | Abstracts provider differences (input/output transport, session/permission/cwd strategies)            |
-| `provider_registry` | Detects installed providers (opencode, codex, claude, gemini), reads their configs and model catalogs |
-| `model_catalog`     | Static model metadata (display names, billing kind, recommended roles)                                |
-| `session_snapshot`  | Persists and restores full pair state; supports session recovery after crash/restart                  |
-| `skill_discovery`   | Scans project dirs for `.md` skill files with YAML frontmatter                                        |
-| `resource_monitor`  | Per-agent CPU/memory polling (1s interval)                                                            |
-| `git_tracker`       | Detects modified/added/deleted files relative to a baseline commit                                    |
-| `file_cache`        | Lists files and parses `@mention` references in task specs                                            |
-| `path_env`          | Refreshes `$PATH` from login shell so CLI tools are discoverable                                      |
-| `config_paths`      | Resolves platform-specific config file locations                                                      |
-| `stubs`             | Placeholder Tauri commands not yet fully implemented                                                  |
+# Dev (runs Tauri shell + Vite renderer on :5173)
+npm run dev                    # Uses scripts/run-with-rustup.mjs to inject PATH
+npm run dev:mock               # Same, with THE_PAIR_E2E_MOCK=true (no real CLI spawns)
+npm run dev:renderer           # Renderer-only (browser at :5173, no Tauri APIs)
 
-## Frontend Components (`src/renderer/src/components/`)
+# Quality gates (run before committing)
+npm run lint                   # eslint --cache
+npm run typecheck              # Runs both typecheck:node and typecheck:web
+npm test                       # JS tests then `cargo test` for src-tauri
+npm run test:js                # node --test against tests/*.test.ts (tsx loader)
+npm run test:rust              # cargo test in src-tauri
 
-| Component                                       | Purpose                                                                                            |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `App.tsx`                                       | Root: routing between dashboard and pair detail views                                              |
-| `AppChrome.tsx`                                 | Window chrome, title bar, theme toggle                                                             |
-| `OnboardingWizard.tsx`                          | First-run guided setup (model config, directory selection)                                         |
-| `CreatePairModal.tsx`                           | New pair creation form                                                                             |
-| `PairSettingsModal.tsx`                         | Edit existing pair settings                                                                        |
+# Run a single JS test file
+node --import tsx --test tests/handoffGuard.test.ts
+
+# Run a single Rust test
+cargo test -q --manifest-path src-tauri/Cargo.toml <test_name>
+
+# Builds (each runs preflight + ensures rust targets first)
+npm run build:mac              # universal-apple-darwin DMG
+npm run build:mac:release      # Release ZIP bundle used in GitHub Releases
+npm run build:win              # x86_64-pc-windows-msvc
+npm run build:linux            # x86_64-unknown-linux-gnu
+
+# E2E (Appium + WebdriverIO, macOS only, mock mode)
+npm run e2e:setup              # One-time: appium driver install mac2
+npm run e2e
+
+# Release
+npm run bump <version>         # Updates package.json + Cargo.toml + tauri.conf.json
+npm run validate:changelog
+```
+
+`npm test` does **not** invoke the renderer or run e2e — `tests/*.test.ts` are pure-Node unit tests covering lib utilities, store logic, and build scripts. Renderer components are tested by reasoning about pure helpers extracted out of them (see `tests/dashboardPairs.test.ts`, `tests/pairListSection.test.ts`).
+
+## Architecture in 60 seconds
+
+```
+src/renderer/src/          React 19 frontend
+  components/              UI (PascalCase.tsx); primitives live in components/ui/
+  store/                   Zustand stores: usePairStore, useUpdateStore, useThemeStore, useLocaleStore
+  lib/                     Pure helpers — testable without React. tauri-api.ts wraps invoke()
+  hooks/                   Cross-component React hooks
+  locales/  i18n.ts        i18next setup (en/zh/ja/ko)
+  assets/main.css          Tailwind v4 + theme tokens (light/dark)
+
+src-tauri/src/             Rust backend (see AGENTS.md for the full module table)
+  lib.rs                   Registers every Tauri command in invoke_handler![]
+  pair_manager.rs          Pair CRUD + task assignment
+  message_broker.rs        Turn-coordination state machine
+  process_spawner.rs       Spawns provider CLIs, parses JSON event streams
+  provider_adapter.rs      Per-provider Input/Output/Session/Permission/Cwd strategies
+  provider_registry.rs     Detect installed CLIs + their model catalogs
+  session_snapshot.rs      Persist/restore full pair state
+  resource_monitor.rs      Per-agent CPU/memory polling
+  git_tracker.rs           Diff vs baseline commit
+  recent_activity.rs       Recent activity feed shown on the dashboard
+
+tests/                     Node --test unit tests (TypeScript via tsx)
+e2e/                       Appium + WDIO end-to-end specs (macOS, mock mode)
+scripts/                   Node-based build/release tooling
+```
+
+### How frontend talks to backend
+
+Always go through `src/renderer/src/lib/tauri-api.ts`, which wraps `invoke()` from `@tauri-apps/api/core` with typed helpers. The renderer never imports Node built-ins; the only escape hatch is `tauri-shim.ts`, which provides safe fallbacks when running under `npm run dev:renderer` (no Tauri host).
+
+### Adding a Tauri command
+
+1. Implement `#[tauri::command]` in the appropriate `src-tauri/src/<module>.rs`.
+2. Add the function to the `tauri::generate_handler![]` list in `src-tauri/src/lib.rs`.
+3. Add a typed wrapper in `src/renderer/src/lib/tauri-api.ts`.
+4. Cover with a unit test in `tests/` (pure logic) and/or a Rust test in the module file.
+
+### State machine
+
+`Idle → Mentoring → Executing → Reviewing → (loop | Finished | Paused | Awaiting Human Review | Error)`
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [timwuhaotian/the-pair](https://github.com/timwuhaotian/the-pair) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
