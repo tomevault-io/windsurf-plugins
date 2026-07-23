@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: Instructions for AI coding agents working on this codebase.
+description: Instructions for Claude Code when working on this codebase.
 ---
 
-# AGENTS.md — Agno
+# CLAUDE.md — Agno
 
-Instructions for AI coding agents working on this codebase.
+Instructions for Claude Code when working on this codebase.
 
 ---
 
@@ -220,4 +220,4 @@ Always follow the PR template in `.github/pull_request_template.md`. Include:
 
 ---
 > Source: [agno-agi/agno](https://github.com/agno-agi/agno) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
