@@ -1,164 +1,96 @@
 ---
 trigger: always_on
-description: Instructions for AI coding agents working in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Instructions for AI coding agents working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Authoritative references
 
-Go RESTful API starter kit built with Gin, GORM, JWT, Redis, MongoDB,
-2FA, email verification, and password recovery. Module path:
-`github.com/pilinux/gorest`. Requires Go 1.25.0+ (`go.mod` declares
-`go 1.25.0`; CI tests against Go 1.25.x and 1.26.x).
+This repo already ships detailed agent docs. Read these before making changes — they
+are the source of truth and far more complete than this file:
 
-## Build and Run Commands
+- `AGENTS.md` — build/lint/test commands, code style, import aliases, layer
+  responsibilities, controller↔handler 1:1 map, config/db/middleware/service APIs.
+- `llms.txt` — machine-readable interface describing repo purpose, capabilities, and constraints.
+- `.agents/skills/<name>/SKILL.md` — task-specific workflow guides (test-runner,
+  ci-orchestrator, migration-helper, config-loader-helper, etc.).
 
-### Build
+## Files to NEVER read or modify
 
-```bash
-go build -v ./...
-```
+Per `.gitignore` (and `AGENTS.md`), these contain secrets, keys, or generated noise.
+Do not open, read, or edit them:
 
-### Tidy Dependencies
+- `.env` and any `*.log` (includes `log.txt`), `*.bak`
+- `keys/`, `tmp/`, `.build/`, `.vscode/`, `vendor/`
+- `coverage.txt`, `coverage_0.txt`
+- `pri*key*.pem`, `pub*key*.pem`
+- `crosscompile*.sh`
 
-```bash
-go mod tidy
-```
-
-### Format
-
-```bash
-go fmt ./...
-```
-
-### Vet
+## Common commands
 
 ```bash
-go vet -v ./...
+source setTestEnv.sh                           # required before running tests locally
+go test -v -cover ./...                        # all tests
+go test -v -run TestHashPass ./lib/...         # single test function
+golangci-lint run ./...                        # lint (CI uses v2.12.2, --timeout 5m)
+go vet -v ./... && go build -v ./...           # vet + build
 ```
 
-### Lint
+CI additionally runs `gosec`, `govulncheck`, and cross-platform `go vet`/build across
+linux/darwin/windows × amd64/arm64. Tests need env vars (CI uses secrets;
+locally `setTestEnv.sh`).
 
-```bash
-golangci-lint run ./...
-revive ./...
+## Architecture (the big picture)
+
+gorest is a reusable Go module (`github.com/pilinux/gorest`), not just an app. It is
+both a library of auth/crypto/middleware/db primitives **and** two example apps that
+wire them together. Requires Go 1.25.0+ (`go.mod` declares `go 1.25.0`; CI tests against Go 1.25.x and 1.26.x).
+
+Request flow follows a strict layered pipeline:
+
+```txt
+controller/  → thin: bind request, call handler, renderer.Render(c, data, status)
+handler/     → business logic + validation; returns (model.HTTPResponse, int)
+service/     → shared utilities: auth, JWT blacklist, email (Postmark), crypto, 2FA
+database/    → connection management for RDBMS (GORM), Redis (radix), MongoDB
+config/      → loads .env → Configuration struct; IsX() feature toggles gate everything
 ```
 
-CI uses golangci-lint v2.12.2 with `--timeout 5m --verbose`.
+Two things make this codebase navigable:
 
-### Test - All
+1. **Controller↔Handler 1:1 mapping.** Every exported `controller` function is a thin
+   wrapper over the identically named `handler` function (19 pairs: registration, login,
+   JWT refresh/logout, password recovery, 2FA lifecycle, email verification/change). See
+   the full table in `AGENTS.md`. Handlers never touch `gin.Context`; controllers never
+   contain business logic.
 
-```bash
-go test -v -cover ./...
-```
+2. **Feature toggles drive behavior.** `config.IsRDBMS()`, `IsRedis()`, `IsMongo()`,
+   `IsJWT()`, `Is2FA()`, `IsCipher()`, `IsEmailVerificationService()`, etc. are checked
+   throughout to conditionally enable subsystems. A feature being "off" in config means
+   its code paths are skipped, so reproducing behavior requires matching env config.
 
-### Test - Single Package
+`example/` is the legacy app; `example2/` is the recommended interface-driven app
+(adds a `repo/` repository layer with DI on top of the same library).
 
-```bash
-go test -v -cover ./lib/...
-go test -v -cover ./config/...
-```
+### Conventions that matter
 
-### Test - Single Test Function
+- Import gorest packages with `g`-prefixed aliases (`gconfig`, `ghandler`,
+  `gmiddleware`, `glib`, `gservice`, ...); logrus as `log`. Full list in `AGENTS.md`.
+- Handlers use named returns with bare `return` for early exits.
+- Errors: `log.WithError(err).Error("error code: XXXX.X")` with numbered codes; never
+  expose internal errors to API consumers — return user-facing text via `httpResponse.Message`.
+- Tests: external test packages (`package lib_test`), table-driven with named structs,
+  `t.Run` subtests, stdlib `t.Errorf` (no assertion library).
+- Sensitive model fields are hidden with `json:"-"`; non-DB fields with `gorm:"-"`.
+  Email is stored encrypted (cipher/nonce/hash columns), not plaintext.
 
-```bash
-go test -v -run TestHashPass ./lib/...
-go test -v -run TestFirewall ./lib/middleware/...
-```
+## Contributing
 
-### Test Environment
-
-Tests require environment variables. In CI these come from secrets.
-Locally, source `setTestEnv.sh` before running tests:
-
-```bash
-source setTestEnv.sh
-```
-
-### Cross-Platform Vet (CI runs all six)
-
-```bash
-GOOS=linux GOARCH=amd64 go vet -v ./...
-GOOS=darwin GOARCH=arm64 go vet -v ./...
-```
-
-## Project Structure
-
-- `config/` - Configuration loading from `.env` files
-- `controller/` - HTTP request handlers (thin layer, calls handler)
-- `handler/` - Business logic layer (called by controller)
-- `service/` - Utility services (auth, security, email)
-- `database/` - DB connection management and models
-- `database/model/` - Shared data models (Auth, HTTPResponse)
-- `database/migrate/` - GORM auto-migration
-- `lib/` - Core utility library (hashing, encryption, validation)
-- `lib/middleware/` - Gin middleware (JWT, CORS, firewall, rate limit)
-- `lib/renderer/` - HTTP response rendering (JSON and HTML)
-- `lib/server/` - Graceful server shutdown
-- `example/` - Legacy example app
-- `example2/` - Recommended example app (interface-driven, DI)
-
-### example2/ Structure (Recommended)
-
-```text
-example2/
-├── cmd/app/main.go          # Entry point
-└── internal/
-    ├── database/
-    │   ├── migrate/migrate.go  # Auto-migration
-    │   └── model/models.go     # App-specific GORM models
-    ├── handler/                # HTTP handlers (Gin context binding)
-    ├── repo/                   # Repository pattern (data access)
-    ├── router/router.go        # Route definitions + middleware setup
-    └── service/                # Business logic
-```
-
-### Layer Responsibilities
-
-| Layer | Package | Responsibility |
-| ----- | ------- | -------------- |
-| Controller | `controller/` | Bind request, call handler, render response |
-| Handler | `handler/` | Business logic, validation, returns `(HTTPResponse, int)` |
-| Service | `service/` | Shared utilities (auth, email, crypto, JWT blacklist) |
-| Repository | `example2/internal/repo/` | Data access abstraction (interface-driven) |
-| Database | `database/` | Connection management (RDBMS, Redis, MongoDB) |
-| Config | `config/` | Load `.env`, expose `GetConfig()`, feature checks |
-
-### Controller-Handler 1:1 Mapping
-
-Every controller function in `controller/` is a thin wrapper that binds
-the HTTP request and calls the corresponding function in `handler/`.
-Controllers use `renderer.Render()` to send the response. There are
-19 exported functions in each package with a 1:1 correspondence. Every
-handler takes a `context.Context` as its first parameter; controllers pass
-`c.Request.Context()` so handlers honor client cancellation/deadlines:
-
-| Controller | Handler | Description |
-| ---------- | ------- | ----------- |
-| `CreateUserAuth` | `CreateUserAuth(ctx, auth model.Auth)` | User registration |
-| `Login` | `Login(ctx, payload model.AuthPayload)` | User login |
-| `Refresh` | `Refresh(ctx, claims middleware.MyCustomClaims)` | Refresh JWT |
-| `Logout` | `Logout(ctx, jtiAccess, jtiRefresh string, expAccess, expRefresh int64)` | Invalidate tokens |
-| `PasswordForgot` | `PasswordForgot(ctx, authPayload model.AuthPayload)` | Send recovery email |
-| `PasswordRecover` | `PasswordRecover(ctx, authPayload model.AuthPayload)` | Reset password |
-| `PasswordUpdate` | `PasswordUpdate(ctx, claims, authPayload)` | Change password |
-| `Setup2FA` | `Setup2FA(ctx, claims, authPayload)` | Generate 2FA secret |
-| `Activate2FA` | `Activate2FA(ctx, claims, authPayload)` | Enable 2FA |
-| `Validate2FA` | `Validate2FA(ctx, claims, authPayload)` | Verify OTP |
-| `Deactivate2FA` | `Deactivate2FA(ctx, claims, authPayload)` | Disable 2FA |
-| `CreateBackup2FA` | `CreateBackup2FA(ctx, claims, authPayload)` | Generate backup codes |
-| `ValidateBackup2FA` | `ValidateBackup2FA(ctx, claims, authPayload)` | Use backup code |
-| `VerifyEmail` | `VerifyEmail(ctx, payload model.AuthPayload)` | Verify email |
-| `CreateVerificationEmail` | `CreateVerificationEmail(ctx, payload model.AuthPayload)` | Resend verification |
-| `VerifyUpdatedEmail` | `VerifyUpdatedEmail(ctx, payload model.AuthPayload)` | Verify email change |
-| `UpdateEmail` | `UpdateEmail(ctx, claims, req model.TempEmail)` | Submit new email |
-| `GetUnverifiedEmail` | `GetUnverifiedEmail(ctx, claims)` | Get pending email |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+PRs target `main`, one commit per task, test before committing, document new features in `README.md`.
 
 ---
 > Source: [pilinux/gorest](https://github.com/pilinux/gorest) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
