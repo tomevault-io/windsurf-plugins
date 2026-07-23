@@ -19,7 +19,7 @@ AI-native development environment for orchestrating agents.
 ## Tech Stack
 
 - Language: TypeScript (strict mode, NodeNext modules) + Rust (Tauri shell, `packages/app-tauri/src-tauri`)
-- Runtime: Node.js 20+ (daemon); Tauri 2 + Electron desktop shells
+- Runtime: Node.js 22+ (daemon); Tauri 2 + Electron desktop shells
 - Package Manager: pnpm workspaces (+ Cargo for the Rust shell)
 - Database: SQLite (better-sqlite3)
 - UI: React + Tailwind v4 in `packages/ui`, shared by the Tauri and Electron shells
@@ -82,4 +82,4 @@ Domain skills (typescript-expert, nodejs-best-practices, vercel-react-best-pract
 
 ---
 > Source: [qlan-ro/mainframe](https://github.com/qlan-ro/mainframe) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
