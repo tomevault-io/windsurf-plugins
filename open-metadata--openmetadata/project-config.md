@@ -1,31 +1,86 @@
 ---
 trigger: always_on
-description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## About OpenMetadata
 
 OpenMetadata is a unified metadata platform for data discovery, data observability, and data governance. This is a multi-module project with Java backend services, React frontend, Python ingestion framework, and comprehensive Docker infrastructure.
 
+For architecture deep dives, entity/repository/resource patterns, and end-to-end checklists for adding new entities or connectors, see [DEVELOPER.md](DEVELOPER.md).
+
 ## Architecture Overview
 
 - **Backend**: Java 21 + Dropwizard REST API framework, multi-module Maven project
-- **Frontend**: React + TypeScript + Ant Design, built with Webpack and Yarn
-- **Ingestion**: Python 3.10-3.12 with Pydantic 2.x, 75+ data source connectors
+- **Frontend**: React + TypeScript, built with Webpack and Yarn; component library via `openmetadata-ui-core-components` (Tailwind CSS v4 with `tw:` prefix, react-aria-components foundation)
+- **Ingestion**: Python 3.10-3.11 with Pydantic 2.x, 75+ data source connectors
 - **Database**: MySQL (default) or PostgreSQL with Flyway migrations
 - **Search**: Elasticsearch 7.17+ or OpenSearch 2.6+ for metadata discovery
 - **Infrastructure**: Apache Airflow for workflow orchestration
+
+## Environment Setup
+
+### Python Virtual Environment (REQUIRED)
+
+**You MUST activate the Python venv before any Python work.** OpenMetadata supports Python 3.10-3.11; 3.11 is recommended.
+
+```bash
+# First-time setup (creates venv at repo root):
+# python3.11 -m venv env
+
+# ALWAYS activate before running Python, make generate, make install_dev, etc:
+source env/bin/activate
+
+# Verify:
+python --version   # Should show Python 3.10.x or 3.11.x
+```
+
+**In worktrees**: When Claude Code creates a Git worktree, the venv from the main repo is NOT copied. You need to either:
+- Create a new venv in the worktree: `python3.11 -m venv env && source env/bin/activate && cd ingestion && make install_dev`
+- Or symlink the main repo's venv: `ln -s /path/to/main-repo/env env`
+
+### Initial Dev Environment Setup
+
+After activating the venv, install all dependencies:
+
+```bash
+source env/bin/activate
+
+# Install ingestion module with all dev dependencies (required before make generate)
+cd ingestion
+make install_dev_env            # Full dev environment (edit mode + all extras)
+# OR for lighter install:
+make install_dev                # Just dev dependencies
+cd ..
+
+# Generate Pydantic models from JSON schemas (required after schema changes)
+make generate
+
+# Install UI dependencies
+make yarn_install_cache
+```
+
+### Other Environment Notes
+
+- **Java**: Java 21 required. Use `mvn` (Maven) for backend builds.
+- **Node/Yarn**: Use `yarn` (not `npm`) for frontend. Frontend root is `openmetadata-ui/src/main/resources/ui/`.
+- **Docker services**: Development services (MySQL, Elasticsearch, etc.) run via `docker/development/docker-compose.yml`:
+  ```bash
+  docker compose -f docker/development/docker-compose.yml up -d
+  ```
 
 ## Essential Development Commands
 
 ### Prerequisites and Setup
 ```bash
 make prerequisites              # Check system requirements
-make install_dev_env           # Install all development dependencies
+source env/bin/activate         # ALWAYS activate venv first
+cd ingestion && make install_dev_env  # Install Python dev dependencies
+make generate                  # Generate Pydantic models from JSON schemas
 make yarn_install_cache        # Install UI dependencies
 ```
 
@@ -40,6 +95,19 @@ yarn playwright:run            # Run E2E tests
 yarn lint                      # ESLint check
 yarn lint:fix                  # ESLint with auto-fix
 yarn build                     # Production build
+```
+
+### Frontend CI Checkstyle (run before PR to match CI)
+```bash
+cd openmetadata-ui/src/main/resources/ui
+yarn ui-checkstyle:changed         # One-shot checkstyle for changed files (excludes tsc)
+yarn organize-imports:cli <files>  # Sort and organize imports
+yarn lint:fix                      # ESLint auto-fix
+yarn pretty:base --write <files>   # Prettier formatting
+yarn license-header-fix <files>    # Add Apache 2.0 license headers
+yarn i18n                          # Sync all 17 locale files with en-us.json
+yarn generate:app-docs             # Regenerate application documentation
+npx tsc --noEmit                   # TypeScript type check (catches errors early)
 ```
 
 ### Backend Development
@@ -62,65 +130,9 @@ make py_format_check           # Verify lint + format (matches CI; catches non-a
 make static-checks             # Run type checking with basedpyright
 ```
 
-### Full Local Environment
-```bash
-./docker/run_local_docker.sh -m ui -d mysql        # Complete local setup with UI
-./docker/run_local_docker.sh -m no-ui -d postgresql # Backend only with PostgreSQL
-./docker/run_local_docker.sh -s true               # Skip Maven build step
-```
-
-### Testing
-```bash
-make run_e2e_tests             # Full E2E test suite
-make unit_ingestion            # Python unit tests with coverage
-yarn test:coverage             # Frontend test coverage
-```
-
-## Code Generation and Schemas
-
-OpenMetadata uses a schema-first approach with JSON Schema definitions driving code generation:
-
-```bash
-make generate                  # Generate all models from schemas
-make py_antlr                  # Generate Python ANTLR parsers
-make js_antlr                  # Generate JavaScript ANTLR parsers
-yarn parse-schema              # Parse JSON schemas for frontend (connection and ingestion schemas)
-```
-
-### Schema Architecture
-- **Source schemas** in `openmetadata-spec/` define the canonical data models
-- **Connection schemas** are pre-processed at build time via `parseSchemas.js` to resolve all `$ref` references
-- **Application schemas** in `openmetadata-ui/.../ApplicationSchemas/` are resolved at runtime using `schemaResolver.ts`
-- JSON schemas with `$ref` references to external files require resolution before use in forms
-
-## Key Directories
-
-- `openmetadata-service/` - Core Java backend services and REST APIs
-- `openmetadata-ui/src/main/resources/ui/` - React frontend application
-- `ingestion/` - Python ingestion framework with connectors
-- `openmetadata-spec/` - JSON Schema specifications for all entities
-- `bootstrap/sql/` - Database schema migrations and sample data
-- `conf/` - Configuration files for different environments
-- `docker/` - Docker configurations for local and production deployment
-
-## Development Workflow
-
-1. **Schema Changes**: Modify JSON schemas in `openmetadata-spec/`, then run `mvn clean install` on openmetadata-spec to update models
-2. **Backend**: Develop in Java using Dropwizard patterns, test with `mvn test`, format with `mvn spotless:apply`
-3. **Frontend**: Use React/TypeScript with Ant Design components, test with Jest/Playwright
-4. **Ingestion**: Python connectors follow plugin pattern, use `make install_dev_env` for development
-5. **Full Testing**: Use `make run_e2e_tests` before major changes
-
-## Frontend Architecture Patterns
-
-### React Component Patterns
-- **File Naming**: Components use `ComponentName.component.tsx`, interfaces use `ComponentName.interface.ts`
-- **State Management**: Use `useState` with proper typing, avoid `any`
-- **Side Effects**: Use `useEffect` with proper dependency arrays
-- **Performance**: Use `useCallback` for event handlers, `useMemo` for expensive computations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [open-metadata/OpenMetadata](https://github.com/open-metadata/OpenMetadata) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
