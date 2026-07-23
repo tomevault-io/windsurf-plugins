@@ -1,97 +1,61 @@
 ---
 trigger: always_on
-description: This file gives LLM coding agents the context they need to contribute to es-toolkit. Read it before making changes, and follow it together with [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md) (and its translations).
+description: Instructions for AI assistants working on es-toolkit.
 ---
 
-# es-toolkit LLM coding agent instructions
+# CLAUDE.md
 
-This file gives LLM coding agents the context they need to contribute to es-toolkit. Read it before making changes, and follow it together with [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md) (and its translations).
+Instructions for AI assistants working on es-toolkit.
 
-## Project overview
+## Language
 
-es-toolkit is a modern, high-performance JavaScript utility library with a small bundle size and strong type annotations. It provides a curated set of utilities that are difficult to write with built-in JavaScript methods but are commonly needed in real-world projects, such as [`delay`](https://es-toolkit.dev/reference/promise/delay.html), [`windowed`](https://es-toolkit.dev/reference/array/windowed.html), [`keyBy`](https://es-toolkit.dev/reference/array/keyBy.html), [`mapValues`](https://es-toolkit.dev/reference/object/mapValues.html), [`camelCase`](https://es-toolkit.dev/reference/string/camelCase.html), and [`toSnakeCaseKeys`](https://es-toolkit.dev/reference/object/toSnakeCaseKeys.html).
+This is a global project with users speaking various languages. When producing non-code output (explanations, reviews, reports), respond in the user's preferred language.
 
-The library is split into two entry points:
-
-- **`es-toolkit`** — the strict, opinionated main library. Focused on the 85% use case with a simple interface, no complex options, and modern JavaScript semantics.
-- **`es-toolkit/compat`** — a Lodash-compatible variant intended to make migration from Lodash easy. Compat is feature-complete; only behavior fixes against Lodash are accepted, not new functions.
-
-es-toolkit is a zero-dependency library and ships with no runtime dependencies.
-
-## Development environment
-
-- **Primary environment**: Node.js v24 (see `.nvmrc` for the exact version)
-- **Recommended editor**: Visual Studio Code
-- **Package manager**: Yarn v4, installed via [Corepack](https://yarnpkg.com/getting-started/install). See [the package manager section in CONTRIBUTING.md](./.github/CONTRIBUTING.md#package-manager) for details.
-
-To get started:
+## Quick Reference
 
 ```bash
-corepack enable
-yarn install
-```
-
-Common commands:
-
-```bash
-yarn vitest run                   # Run all tests
-yarn vitest run src/array/chunk   # Run tests for a specific function
+corepack enable && yarn install   # Setup
+yarn vitest run                   # Tests
+yarn vitest run src/array/chunk   # Test specific function
 yarn lint                         # ESLint
 tsc --noEmit                      # Typecheck
 ```
 
-## Repository structure
+## Structure
 
 ```
-src/
-  {category}/{fn}.ts          Implementation for the main `es-toolkit` library
-  {category}/{fn}.spec.ts     Unit tests (vitest)
-  compat/{category}/{fn}.ts   Lodash-compatible variant under `es-toolkit/compat`
-  index.ts                    Top-level barrel re-exports
-  {category}/index.ts         Per-category barrel re-exports
-docs/
-  reference/{category}/{fn}.md          English reference docs
-  ko/reference/{category}/{fn}.md       Korean reference docs
-  ja/reference/{category}/{fn}.md       Japanese reference docs
-  zh_hans/reference/{category}/{fn}.md  Simplified Chinese reference docs
-benchmarks/                   Vitest benchmark suite
-tests/types/                  Type tests comparing `es-toolkit/compat` with `@types/lodash` (run with `yarn workspace type-tests test`)
-.github/CONTRIBUTING.md       Contribution guide (English / Korean / Simplified Chinese)
-CHANGELOG.md                  User-facing changelog
+src/{category}/{fn}.ts            # Implementation (array, function, math, object, predicate, promise, set, string, util, error, map)
+src/{category}/{fn}.spec.ts       # Tests (vitest)
+src/compat/{category}/{fn}.ts     # Lodash-compatible variant
+tests/types/compat.spec-d.ts      # Type tests against @types/lodash (yarn workspace type-tests test)
+docs/reference/{category}/{fn}.md           # English
+docs/ko/reference/{category}/{fn}.md        # Korean
+docs/ja/reference/{category}/{fn}.md        # Japanese
+docs/zh_hans/reference/{category}/{fn}.md   # Chinese
 ```
 
-Categories include `array`, `function`, `math`, `object`, `predicate`, `promise`, `set`, `string`, `util`, `error`, and `map`.
+## Design Principles
 
-## Principles
+- **Performance**: Must match or beat lodash.
+- **Simplicity**: Simplest interface for the 85% use case. No complex options.
+- **Don't implement**: Functions replaceable by modern JS (`Array.isArray`, `Number.isNaN`, `Math.min`), or TC39 Stage 3+ proposals.
+- **es-toolkit vs compat**: `es-toolkit` is the strict, opinionated API. `es-toolkit/compat` matches lodash behavior exactly for migration. Compat is feature-complete — no new functions are being added. Only behavior inconsistency fixes against lodash are accepted.
 
-es-toolkit values **performance**, **simplicity**, and **detailed documentation** over a wide surface area of features and options.
+## Coding Conventions
 
-- **Performance**: every function should match or beat alternative libraries. New features must come with benchmarks.
-- **Simplicity**: provide the simplest interface for the 85% use case; do not add complex options for every edge case.
-- **Don't reimplement modern JS**: skip functions that are already covered by built-ins (`Array.isArray`, `Number.isNaN`, `Math.min`, `typeof value === 'number'`, etc.) or by TC39 proposals at Stage 3 or above.
-- **Accurate types**: match the inference behavior of TypeScript's `strict` mode.
-- **Two entry points, two policies**: `es-toolkit` is the opinionated API; `es-toolkit/compat` mirrors Lodash for migration. Compat is feature-complete — only behavior fixes against Lodash are accepted, not new functions.
+- `for` loops over `reduce` (local mutation is fine)
+- Built-in JS over custom helpers (`Array.isArray()`, not `isArray()`)
+- Type params: `T` elements, `K` keys, `E` errors
+- `readonly T[]` for array params that aren't mutated
+- Detailed JSDoc with `@template`, `@param`, `@returns`, `@throws`, `@example`
 
-For the full text, see [Section 1 of CONTRIBUTING.md](./.github/CONTRIBUTING.md#1-our-design-principles).
+## New Function Checklist
 
-## Coding conventions
-
-- Prefer `for` loops over `reduce`. Local mutability is fine.
-- Prefer built-in JavaScript over custom helpers (`Array.isArray()` over `isArray()`, `typeof value === 'string'` over `isString()`).
-- Use short type parameter names: `T` for elements, `K` for keys, `E` for errors.
-- Use `readonly T[]` for array parameters that are not mutated.
-- Write detailed JSDoc with `@template`, `@param`, `@returns`, `@throws`, and `@example` blocks.
-
-For the full text, see [Section 2 of CONTRIBUTING.md](./.github/CONTRIBUTING.md#2-coding-conventions).
-
-## Development workflow
-
-When adding or changing a function, follow this order:
-
-1. **Add the implementation** under `src/{category}/{fn}.ts` (or `src/compat/{category}/{fn}.ts` for compat-only fixes). Re-export it from `src/{category}/index.ts` and `src/index.ts`.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. `src/{category}/{fn}.ts` — Implementation
+2. `src/{category}/{fn}.spec.ts` — Tests
+3. Re-export in `src/{category}/index.ts` and `src/index.ts`
+4. Docs in all 4 languages (see `docs/CLAUDE.md` for templates)
 
 ---
 > Source: [toss/es-toolkit](https://github.com/toss/es-toolkit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
