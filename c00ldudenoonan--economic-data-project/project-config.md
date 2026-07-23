@@ -1,92 +1,132 @@
 ---
 trigger: always_on
-description: - `macro_agents/`: Dagster project and AI agents (`src/macro_agents/`), tests in `macro_agents/tests/`.
+description: **Always follow this workflow for ALL code changes, no matter how small:**
 ---
 
-# Repository Guidelines
+# Claude Code Instructions
 
-## Project Structure & Module Organization
-- `macro_agents/`: Dagster project and AI agents (`src/macro_agents/`), tests in `macro_agents/tests/`.
-- `dbt_project/`: dbt models and configs (`models/` for staging, markets, analysis, etc.).
-- `document_extraction/`: dbt-ml project for extracting SEC/FOMC documents into BigQuery.
-- Root `makefile`: common dev, test, lint, and setup commands.
+## Git Workflow
 
-## Build, Test, and Development Commands
-- `make setup-dagster`: install Dagster dependencies via `uv`.
-- `make run-dagster`: start Dagster UI on `:3000`.
-- `make test`: run Dagster tests via `pytest` (uses `uv`).
-- `make ruff`: lint/format Python with Ruff.
-- `make lint` / `make fix`: lint or fix dbt SQL with SQLFluff.
-- `make typecheck-dagster`: run `ty` type-checker over `macro_agents`.
-- `make dbt-deps`: explicitly install locked dbt packages (networked setup step).
-- `make dbt-manifest`: parse dbt project.
-- `cd document_extraction && uv sync`: install the locked dbt-ml environment.
-- `cd document_extraction && uv run dbt-ml compile --target dev`: validate the extraction DAG without materializing data.
+**Always follow this workflow for ALL code changes, no matter how small:**
 
-## Worktrunk Hooks (wt)
-- Project hooks live in `.config/wt.toml`; user hooks live in `~/.config/worktrunk/config.toml`. Project hooks require first-run approval.
-- Hook types include `pre-commit` (formatters/linters/type checks before the merge commit) and `pre-merge` (tests/build verification after rebase, before merge).
-- Hooks run automatically during `wt merge`; manually run with `wt hook pre-commit`, `wt hook pre-merge`, or `wt hook show`. Use `--no-verify` to skip hooks or `--yes` to auto-approve.
-- Recommended alias: add `alias wsc='wt switch --create --execute=claude'` to your shell config, then use `wsc <branch>` or `wsc <branch> -- 'task'` to create/switch a worktree, run hooks, and launch Claude with forwarded args.
+1. Create a feature branch from main
+2. Make commits to the feature branch
+3. Push the branch to origin
+4. Create a Pull Request for review
+5. Only merge to main after PR approval
 
-## Git Worktrees (Recommended For Parallel Sessions)
-- Use a dedicated worktree per Claude session to avoid clobbering edits in the same working directory.
-- Create a new worktree from `main` using an issue-based branch name: `git worktree add -b feat/issue-123-signal-charts ../economic-data-project-full-wt-issue-123 main`
+**Never commit directly to main.** This applies to:
+- New features
+- Bug fixes
+- Test fixes
+- Documentation updates
+- Any other changes
+
+## Branch Naming Convention
+
+- Features: `feat/issue-{number}-{short-description}`
+- Bug fixes: `fix/issue-{number}-{short-description}`
+- Test fixes: `test/{short-description}`
+- Refactoring: `refactor/{short-description}`
+- Documentation: `docs/{short-description}`
+
+## Worktrees For Parallel Sessions
+
+- If multiple Claude sessions are active, use a separate git worktree per session to avoid file conflicts.
+- Create a worktree from `main` using an issue-based branch name: `git worktree add -b feat/issue-123-signal-charts ../economic-data-project-full-wt-issue-123 main`
 - List worktrees: `git worktree list`
 - Remove a worktree when done (from the primary repo): `git worktree remove ../economic-data-project-full-wt-issue-123`
 
-## Dagster `dg` Cheat Sheet
-- `cd macro_agents` before running `dg` commands.
-- Start local Dagster UI: `uv run dg dev`
-- Validate definitions: `uv run dg check --module-name macro_agents.definitions`
-- List jobs/assets: `uv run dg list`
-- Launch a job: `uv run dg launch --module-name macro_agents.definitions --job dspy_analysis_job`
-- Launch selected assets (comma-separated): `uv run dg launch --module-name macro_agents.definitions --job dspy_analysis_job --assets analyze_economy_state,generate_economy_state_charts`
-- Launch with config file: `uv run dg launch --module-name macro_agents.definitions --job dspy_analysis_job --config /tmp/econ_state_charts.yaml`
+# Structuring Your Codebase for LLM Coding Agents
 
-## GitHub CLI (gh) Cheat Sheet
-- Check auth: `gh auth status`
-- List issues: `gh issue list`
-- Create issue: `gh issue create`
-- Create PR: `gh pr create`
-- View PR: `gh pr view`
-- List PRs: `gh pr list`
-- Check PR status: `gh pr checks`
-- Add PR comment: `gh pr comment`
-- Checkout PR: `gh pr checkout <number>`
+## Why This Matters
 
-## Coding Style & Naming Conventions
-- Python: 4-space indentation; use Ruff for formatting/linting (`make ruff`).
-- dbt SQL: SQLFluff enforced style (`make lint`, `make fix`).
-- Naming: keep module names and functions descriptive; follow existing patterns in each subproject.
+LLM coding agents read, re-read, and iterate on your files across multi-step loops. Every file load costs tokens. A single task might load the same file 3-5+ times (read → edit → validate → fix). Your codebase structure directly controls how expensive and effective those loops are.
 
-## Testing Guidelines
-- Framework: `pytest` for Python (`macro_agents`).
-- Run Dagster tests: `cd macro_agents && uv run pytest tests/ -v`.
-- Install dbt packages once with `make dbt-deps`; pytest performs one offline dbt parse per session.
-- Network integration tests are opt-in: `RUN_NETWORK_TESTS=1 uv run pytest -m network`.
-- Test standards:
-  - Prefer behavior-focused assertions (status, metadata, materialized values) over snapshots.
-  - Cover loading, empty, error, and populated states.
-  - Use deterministic fixtures and local resources (temp DuckDB, ephemeral Dagster instances); avoid network calls.
-  - Use `DagsterInstance.ephemeral()` and `build_op_context` as context managers so their database resources are disposed deterministically.
-  - Keep tests isolated and fast; clean up temp files and avoid shared mutable state.
+## File Size and Scoping
 
-## Commit & Pull Request Guidelines
-- Commit messages are typically short and imperative; many use Conventional Commit prefixes (`feat:`, `fix:`, `chore:`).
-- Prefer small, focused commits with clear intent.
-- PRs should include a concise summary, linked issues (if applicable), and screenshots for UI changes.
-- Never merge PRs. Always leave merging to a human reviewer.
-- Add a PR comment tagging `@codex` to request review immediately after opening every PR. Use `gh pr comment <PR_NUMBER> --body "@codex please review this PR."` and mention the review request in the handoff.
+**Target 100-400 lines per file.** This balances token cost per read against navigation overhead.
 
-## Data Request Scoping (Wizard Loop 1)
+- Each file should have a single, clear responsibility
+- If a file requires scrolling through unrelated logic to find what matters, split it
+- If splitting creates files that are always loaded together, keep them combined
+- Cohesion beats small size — 10 tightly coupled 30-line files cost more than one 300-line file because the agent loads all 10 anyway
 
-A GitHub issue is dbt-workable if it involves models, tests, sources, metrics, schema,
-SQL transformations, data quality, or freshness. When scoping a request:
+## Directory Structure
 
+**Make the structure self-documenting.** Agents spend tokens exploring your repo to orient themselves. Reduce that cost.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Use descriptive directory and file names that telegraph contents
+- Group by domain/feature, not by type (e.g., `billing/` over `models/`, `services/`, `utils/`)
+- Keep nesting shallow — 2-3 levels max
+- Place related files close together in the tree
+
+## Reduce Agent Navigation Tokens
+
+- Maintain a project map file (this file, `CLAUDE.md`, `AGENTS.md`, `CONVENTIONS.md`) at the repo root
+- Document non-obvious architecture decisions inline where they apply
+- Use consistent naming conventions so the agent can predict file locations
+- Keep imports explicit — barrel files and re-exports obscure dependency chains
+
+## Code Conventions That Help Agents
+
+- Write clear function and class names that describe behavior
+- Keep functions short and single-purpose (easier to target edits)
+- Use type hints and type annotations — they give agents context without reading implementations
+- Place constants and config near where they're used, not in distant shared files
+- Prefer explicit over clever — agents parse straightforward code faster and more reliably
+
+## What to Avoid
+
+- Monolith files (1000+ lines) — agents pay full token cost even for one-line changes
+- Circular dependencies — agents get stuck in loops trying to resolve context
+- Deep inheritance chains — forces loading many files to understand one class
+- Magic strings and implicit behavior — agents can't infer what they can't see
+- Overly DRY abstractions that scatter logic across many files for a single concept
+
+## Project Map Template
+
+Keep this at your repo root. It gives agents a cheap orientation pass instead of exploratory file reads.
+
+```markdown
+# Project: [Name]
+
+## Quick Reference
+- Language: [e.g., Python 3.12]
+- Framework: [e.g., FastAPI, Next.js]
+- Package manager: [e.g., uv, pnpm]
+- Test runner: [e.g., pytest, vitest]
+
+## Architecture
+[2-3 sentences on how the app is structured]
+
+## Key Directories
+- `src/api/` — Route handlers and request validation
+- `src/core/` — Business logic and domain models
+- `src/db/` — Database models, migrations, queries
+- `src/integrations/` — Third-party service clients
+
+## Common Tasks
+- Run tests: `[command]`
+- Start dev server: `[command]`
+- Run migrations: `[command]`
+
+## Conventions
+- [List project-specific patterns the agent should follow]
+- [e.g., "All API endpoints return Pydantic response models"]
+- [e.g., "Use repository pattern for database access"]
+```
+
+## The Token Math
+
+| Scenario | File Size | Agent Reads | Tokens Used |
+|---|---|---|---|
+| Monolith | 2,000 lines | 4x per task | ~8,000 lines |
+| Well-scoped | 200 lines | 4x per task | ~800 lines |
+| Over-split | 30 lines × 8 files | 4x per task | ~960 lines + navigation overhead |
+
+The well-scoped approach isn't just cheaper — it's more reliable. Smaller, focused context means fewer hallucinations and more accurate edits.
 
 ---
 > Source: [C00ldudeNoonan/economic-data-project](https://github.com/C00ldudeNoonan/economic-data-project) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
