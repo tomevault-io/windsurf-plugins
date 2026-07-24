@@ -1,116 +1,101 @@
 ---
 trigger: always_on
-description: This file is for coding agents working in this repo. Follow it literally.
+description: <laravel-boost-guidelines>
 ---
 
-# <GENEALOGY>
+<laravel-boost-guidelines>
+=== foundation rules ===
 
-This file is for coding agents working in this repo. Follow it literally.
+# Laravel Boost Guidelines
 
-## Project context
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
 
-- **<GENEALOGY> (`https://github.com/MGeurts/genealogy`) is a SaaS app**: a free and open-source family tree PHP application to record family members and their relationships, build with LARAVEL 13.
-- **Operate like a cofounder.** Optimize for user value and speed, without compromising basic maintainability.
+## Foundational Context
 
-## Non‑negotiables
+This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
-- **Do not overwrite user edits.** The user may change code between messages. If something changed, understand _why_ and build on it.
-- **Keep changes simple.** Implement the smallest change that solves the problem (unless you’re writing tests).
-- **Fix root causes.** When debugging, gather enough info to understand the failure and fix it at the source (not via band-aids).
+- php - 8.5.2
+- laravel/fortify (FORTIFY) - v1
+- laravel/framework (LARAVEL) - v12
+- laravel/prompts (PROMPTS) - v0
+- laravel/sanctum (SANCTUM) - v4
+- livewire/livewire (LIVEWIRE) - v4
+- larastan/larastan (LARASTAN) - v3
+- laravel/boost (BOOST) - v2
+- laravel/mcp (MCP) - v0
+- laravel/pint (PINT) - v1
+- laravel/sail (SAIL) - v1
+- pestphp/pest (PEST) - v4
+- phpunit/phpunit (PHPUNIT) - v12
+- tailwindcss (TAILWINDCSS) - v4
 
-## Architecture & structure (Laravel)
+## Skills Activation
 
-- **Prefer small, verb-named Actions.** Avoid generic “Service/Manager/Handler” classes.
-- **Controllers stay thin.** Single-action controllers are preferred.
-- **Avoid events unless necessary.** Keep code flow obvious without jumping between files.
-- **Jobs are thin + idempotent.** Delegate business logic to Actions.
-- **If you create a model, also create a factory + seeder.**
+This project has domain-specific skills available. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
 
-## Code style (PHP)
+- `livewire-development` — Develops reactive Livewire 4 components. Activates when creating, updating, or modifying Livewire components; working with wire:model, wire:click, wire:loading, or any wire: directives; adding real-time updates, loading states, or reactivity; debugging component behavior; writing Livewire tests; or when the user mentions Livewire, component, counter, or reactive UI.
+- `pest-testing` — Tests applications using the Pest 4 PHP framework. Activates when writing tests, creating unit or feature tests, adding assertions, testing Livewire components, browser testing, debugging test failures, working with datasets or mocking; or when the user mentions test, spec, TDD, expects, assertion, coverage, or needs to verify functionality works.
+- `tailwindcss-development` — Styles applications using Tailwind CSS v4 utilities. Activates when adding styles, restyling components, working with gradients, spacing, layout, flex, grid, responsive design, dark mode, colors, typography, or borders; or when the user mentions CSS, styling, classes, Tailwind, restyle, hero section, cards, buttons, or any visual/UI changes.
+- `laravel-backup` — Configure and extend spatie/laravel-backup for database and file backups, cleanup strategies, health monitoring, and notifications. Activates when working with backup configuration, scheduling backups, creating custom cleanup strategies or health checks, customizing notifications, or when the user mentions backups, backup monitoring, backup cleanup, or spatie/laravel-backup.
+- `medialibrary-development` — Build and work with spatie/laravel-medialibrary features including associating files with Eloquent models, defining media collections and conversions, generating responsive images, and retrieving media URLs and paths.
 
-- **Document intent** for non-obvious code (explain _why_, not _what_).
-- **Purpose docblocks are required.** Every class/trait/interface/enum under `app/` must have a top-level PHPDoc block explaining:
-    - why the file exists,
-    - why the logic was extracted there (vs inlining),
-    - what callers should rely on (the “contract”) when it’s non-obvious.
-- **Import namespaces.** Don’t rely on implicit/global imports.
-- **Avoid ambiguous names.** No one-letter variables unless extremely local and obvious.
-- **Use guard clauses** over deep nesting.
-- **No debugging helpers** in committed code (`dd()`, `dump()`, etc.).
-- **Do not use `final`.**
-- **Never use `@`** (PHP error suppression). If you truly must, document why and prefer explicit alternatives.
-- **Default to `protected`** for non-public methods/properties unless there’s a strong reason.
+## Conventions
 
-## Laravel conventions & dependency boundaries
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
 
-- **Do things the Laravel way.** Use helpers/Collections/Facades/attributes.
-- **Do not use dependency injection.** Use Facades, Real-Time Facades, or `app()`.
-- **Do not call `env()`** outside config files.
-- **Prefer named routes** + `route()` over hardcoded URLs (including in app code).
-- **Prefer helpers over Facades** when available (e.g. `session()` over `Session::get()`).
-- **Avoid raw queries.** If unavoidable, parameterize and document why.
+## Verification Scripts
 
-## Data & migrations
+- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
 
-- **Migrations should be reversible** when possible.
-- **Never edit old migrations** after they’ve been merged. Create a new migration.
+## Application Structure & Architecture
 
-## Frontend (Blade + Tailwind + Alpine)
+- Stick to existing directory structure; don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
 
-- **HTML must be tidy, valid, semantic, and accessible.**
-- **Close inline tags** (`<meta />`, `<img />`, `<br />`, …).
-- **Prefer landmarks** (`header`, `nav`, `main`, `footer`) over generic wrappers.
-- **Keep focus outlines.** Focus states should be visible and intentional.
-- **Every input needs a `<label>`** (via `for` + `id`) unless there’s a strong reason.
-- **Icons:** decorative icons get `aria-hidden="true"`; informative icons need an accessible name.
+## Frontend Bundling
 
-### Styling (Tailwind v4)
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
 
-- Prefer Tailwind utilities over custom CSS.
-- If custom CSS is necessary, keep it minimal and document why.
-- Extract repeated UI patterns into Blade components (don’t copy/paste huge class strings).
+## Documentation Files
 
-### Component suite (TallStackUI)
+- You must only create documentation files if explicitly requested by the user.
 
-- **Use <TallStackUI> (`https://tallstackui.com/docs/v3/installation`) as the default suite for Blade components.**
+## Replies
 
-### Interactivity (Alpine.js in Blade)
+- Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
-- Alpine code belongs in the Blade component.
-- Use `x-cloak` to avoid flashes during init.
-- Keep state small and local (avoid hidden global state).
-- Keep ARIA attributes in sync with state (e.g. `aria-expanded`).
+=== boost rules ===
 
-### Readability conventions (Blade)
+# Laravel Boost
 
-- When an element has many attributes, format them one per line.
-- Top-of-file Blade comment blocks use:
-    - `{{--` on its own line,
-    - A capitalized sentence ending in a period,
-    - `--}}` on its own line.
+- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
 
-## Testing (Pest)
+## Artisan
 
-- Test files mirror `./app` structure 1:1 when possible.
-    - If there is no matching `app/` file, only then place tests at the root (e.g. `./tests/Feature`) with a clear justification.
-- Avoid hardcoded hosts/URLs; prefer `route()` / `url()`.
-- Prefer strict fakes over permissive mocks.
-- Tests must be parallel-safe: avoid shared fixed file paths and clean up created files.
-- Import Pest global functions (e.g. `use function Pest\Laravel\actingAs;`).
-- Avoid `$this` in Pest tests; prefer the equivalent global functions.
-- Use Real-Time Facades if you need to mock something resolved from the container.
+- Use the `list-artisan-commands` tool when you need to call an Artisan command to double-check the available parameters.
 
-## Tooling / definition of done
+## URLs
 
-- **Format:** `php vendor/bin/pint --parallel`
-- **Tests:** `php vendor/bin/pest --parallel` (use `--filter` when iterating)
-- **Sanity:** no debug helpers left behind; migrations reversible; UI remains accessible; minimal change set.
+- Whenever you share a project URL with the user, you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain/IP, and port.
 
-## Default review behavior (whenever you touch code)
+## Tinker / Debugging
+
+- You should use the `tinker` tool when you need to execute PHP to debug code or query Eloquent models directly.
+- Use the `database-query` tool when you only need to read from the database.
+- Use the `database-schema` tool to inspect table structure before writing migrations or models.
+
+## Reading Browser Logs With the `browser-logs` Tool
+
+- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
+- Only recent browser logs will be useful - ignore old logs.
+
+## Searching Documentation (Critically Important)
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [MGeurts/genealogy](https://github.com/MGeurts/genealogy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
