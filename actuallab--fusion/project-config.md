@@ -1,150 +1,116 @@
 ---
 trigger: always_on
-description: This file applies to all documentation files in the `docs/` directory and its subdirectories.
+description: <!-- AUTO-GENERATED — DO NOT EDIT. Built by `ai update-md` from AGENTS-Source.md (this folder) + AGENTS-Suffix.md (AgentCli). To change anything below, edit the source file(s) and re-run `ai update-md`. -->
 ---
 
-# Agent instructions for ActualLab.Fusion Documentation
+<!-- AUTO-GENERATED — DO NOT EDIT. Built by `ai update-md` from AGENTS-Source.md (this folder) + AGENTS-Suffix.md (AgentCli). To change anything below, edit the source file(s) and re-run `ai update-md`. -->
 
-## Scope
+# Project-specific Rules for ActualLab.Fusion
 
-This file applies to all documentation files in the `docs/` directory and its subdirectories.
+**YOU MUST READ [CODING_STYLE.md](CODING_STYLE.md) before writing or
+modifying any C# code.** It's not optional. This project
+**deviates from standard .NET conventions** on several points (notably:
+no `Async` suffix on async methods; no XML docs on members; mixed brace
+style). Default instincts from elsewhere will produce code that gets
+rejected. If you haven't opened that file yet in this session, stop and
+read it now.
 
-The documentation in this folder is published to the VitePress website at https://fusion.actuallab.net/
+**You MUST NOT write a single comment, docstring, or XML doc** without
+first reading [CODING_STYLE.md → "Regular comments, docstrings, XML
+documentation comments"](CODING_STYLE.md#regular-comments-docstrings-xml-documentation-comments).
+You have a strong tendency to over-comment and to restate what the code
+already says; that section explains exactly when a comment is justified
+and when it isn't. Re-read it any time you're tempted to add a `//` or `///`.
 
-`../AGENTS.md` (located in the root folder) describes agent instructions for the entire project. 
+# Git workflow — don't branch unless asked
 
-Before you proceed further, you ABSOLUTELY need to read the following files:
-- `index.md` (located in `docs/` folder)
-- `../index.md` (located in the root folder)
-- `../AGENTS.md` (located in the root folder)
+Commit your changes directly to the default branch (`master`). **You typically
+should NOT create a feature branch in this repo unless the user explicitly asks
+for one.** Small, self-contained changes (docs, fixes, tweaks) belong on
+`master`; a needless branch only adds a merge step later.
 
-## General Instructions  
+# Type Catalog — Reuse Existing Abstractions (CRITICAL)
 
-We are migrating the old Fusion documentation located
-in `docs/tutorial/` folder into the new `Part*.md` and `Part*.cs`
-files in `docs/` folder. Our goal is to make it better: 
-easier to read, cleaner, and factually correct - 
-based on the most current source code.
+This codebase is mature. **Reusing what already exists is more important
+than writing something new.** A new helper that duplicates an existing one
+is a defect, not a feature. **Always look first.**
 
-For your reference, `docs/PartF.*` files were generated
-as a request to merge and update `docs/tutorial/PartF.md`-`PartB.md` 
-from the old Fusion documentation.
-YOU MUST ABSOLUTELY SEE THESE FILES before starting to work 
-on a similar task.
+Use [`docs/api-index.md`](docs/api-index.md) to discover existing
+abstractions before writing new code. For the complete list, see
+[`docs/api-index-full.md`](docs/api-index-full.md).
 
-## Documentation Structure
+## Planning rule (mandatory)
 
-- Starting point: `docs/index.md`
-- Main documentation files: `Part*.md` files that contain the core documentation
-- Source code snippets: `Part*.cs` files that are used to generate code examples in the documentation.
-- `docs/.vitepress/` contains the VitePress configuration for the documentation site
-- `docs/diagrams/` contains Mermaid diagrams used in the documentation
-- `docs/img/` contains images used in the documentation
-- `docs/outdated/` contains other outdated documentation that may still be useful. **DO NOT EDIT files in this folder.**
+**Every implementation plan MUST include a "Reuse" section** with two parts:
 
-## Documentation Tools
+1. **Existing abstractions to reuse.** Research first. List the concrete
+   types/functions you intend to call from the indexes above. 
+   If you cannot find a fit, say so explicitly — silence is not acceptable.
 
-- **mdsnippets**: Used to extract code snippets from `*.cs` files and replace their references in `*.md` files
-- **VitePress**: Used to build the documentation site
+2. **Reusability of new components.** For every new component the plan
+   introduces, ask: *is this likely useful elsewhere?* If yes, the plan
+   **must list an option to put it in a shared project** instead of the
+   feature-specific one:
+   - **C#**: `ActualLab.Core`
+   - **TypeScript**: `ts/actuallab-core`.
 
-Code snippet format:
+   The plan should compare the local-vs-shared placement and recommend
+   one. Default to shared when in doubt — promoting later is harder than
+   placing correctly the first time.
 
-The source block in `.cs` file:
-```cs
-#region PartXX_SnippetId
-// This snippet is referenced from AGENTS.md
-#endregion
-```
+If the work is small enough that you skip a written plan, you still owe
+yourself the "look first" step: search the indexes for keywords related
+to what you're about to write.
 
-The reference / embedding block in `.md` file:
-```md
-<!-- snippet: PartXX_SnippetId -->
-```cs
-// This snippet is referenced from .instructions.md
-```
-<!-- endSnippet -->
-```
+# Fusion documentation & source MCP
 
-## Building Documentation
+This repo backs a public, read-only MCP server at
+`https://fusion.actuallab.net/mcp` (see [`docs/mcp-server.md`](docs/mcp-server.md)).
+When it's connected, prefer it over guessing: it can search and read the Fusion
+**docs** (mental model, glossary, API index) and the Fusion **source** — find
+files or declarations by regex and read exact line ranges, or ripgrep across
+`src` / `samples` / `tests`. The individual tools are self-describing once the
+MCP is enabled, so they are not enumerated here.
 
-All the tools & scripts listed below must be started from `docs/` folder. So if you're in the root folder, run `cd Docs` first.
+# Use cross-platform PowerShell
 
-- To update code snippets in the documentation (careful, it will overwrite the `*.md` files!):
-  ```powershell
-  dotnet mdsnippets
-  ```
+`pwsh` (cross-platform PowerShell) command is available on any OS you run, so use it.
 
-- To build and run the documentation site:
-  ```powershell
-  npm run docs:dev
-  ```
+Before starting any task, read AGENTS.md files in every directory starting from the current one and above, up to the root one (project directory).
 
-- To build the documentation for production:
-  ```powershell
-  npm run docs:build
-  ```
+# Execution policy after plan approval
 
-## Running Code Snippets
+Once a plan is approved and the open questions in it have been resolved,
+**push it to completion without stopping for confirmation between steps.**
+Don't ask permission to move from one pre-approved step to the next.
+Don't pause to summarize "I'm about to do X" between pre-agreed phases.
+Don't ask the user to choose when the choice has minimal impact.
 
-The `Docs.csproj` project can execute the code samples from `PartXX.cs` files. Each `PartXX.cs` file contains a class with a static `Run` method that demonstrates the concepts described in the corresponding `PartXX.md` file.
+You stop and ask only when **all** of these are true:
 
-To run specific parts:
-```powershell
-# Run a specific part (e.g., PartF)
-dotnet run --project Docs.csproj -- PartF
+1. You hit a **real obstacle** you can't resolve from context alone.
+2. The choice **likely obsoletes the plan or forces significant rework** —
+   not "minor implementation detail," but "the path branches into two very
+   different futures."
+3. Your best guess at the right answer has a **non-trivial chance of being
+   wrong in a way that's hard to revert**.
 
-# Run multiple parts
-dotnet run --project Docs.csproj -- PartF PartR
+Concretely, do NOT ask when:
+- The next step is a mechanical consequence of an earlier approved step.
+- Two options exist and either is reversible in a few minutes.
+- One option is clearly best (≥ ~80% probability) on the available evidence.
+- You're already mid-plan and the next step is just "keep going."
+- The build is broken between phases and the user already said that's fine.
 
-# Run all parts
-dotnet run --project Docs.csproj -- all
+When in doubt, **act**, then briefly note the choice in the result so the
+user can correct course if needed. A short "I picked X because Y; flag if
+you'd prefer Z" beats a question that stalls progress.
 
-# Interactive mode: run without arguments to see available parts
-dotnet run --project Docs.csproj
-```
+# Building
 
-When run interactively (without arguments), the program will:
-1. Display all available parts (classes starting with "Part")
-2. Prompt you to enter part names (space-separated) or press Enter to run all parts
-
-## Documentation Style Guide
-
-- Do NOT use `---` (horizontal rule) as a separator between sections. The VitePress CSS already adds visual separators before top-level headers (`##`). The only valid use of `---` is for YAML frontmatter at the start of a file.
-- Do NOT use `▶` (U+25B6, BLACK RIGHT-POINTING TRIANGLE) or `◀` (U+25C0, BLACK LEFT-POINTING TRIANGLE) symbols in ASCII diagrams or code blocks. These characters render with inconsistent width in many monospace fonts, breaking diagram alignment. Use `>` and `<` instead.
-- Use clear, concise language
-- Provide practical examples
-- Use relative links for internal documentation references
-- Use consistent formatting for code blocks and commands
-- Include tables where it's helpful
-- For longer code samples (more than 2-3 lines), consider extracting them into code snippets
-- If you edit an existing code snippet, always update both `.md` and `.cs` files
-- Ensure code examples are accurate and up-to-date
-- When adding new documentation, follow the existing structure
-- Update the documentation index if adding new pages.
-
-## Mermaid Diagrams
-
-Mermaid diagrams render directly in markdown with a custom Grafana-inspired theme on an Aurora background.
-
-**Basic usage:**
-````md
-```mermaid
-flowchart TD
-    A[Start] --> B[End]
-```
-````
-
-**Rules:**
-- Do NOT add titles inside mermaid diagrams (no `title:` or subgraph titles like "Fusion Core Abstractions"). Titles should be placed in the markdown document above the diagram using a heading.
-- Keep diagrams simple and focused
-- Use descriptive node labels
-
-**Theme configuration:**
-- Theme files: `.vitepress/config.mts` (mermaidConfig), `.vitepress/theme/mermaid.css`
-- Style: Grafana-inspired dark theme with Inter font
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ActualLab/Fusion](https://github.com/ActualLab/Fusion) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
