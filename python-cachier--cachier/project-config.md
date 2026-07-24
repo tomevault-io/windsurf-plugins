@@ -3,15 +3,15 @@ trigger: always_on
 description: **Cachier** is a Python library providing persistent, stale-free, local and cross-machine caching for Python functions via a decorator API. It supports multiple backends (pickle, memory, MongoDB, SQL, Redis), is thread-safe, and is designed for extensibility and robust cross-platform support.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
 ## 📦 Project Overview
 
 **Cachier** is a Python library providing persistent, stale-free, local and cross-machine caching for Python functions via a decorator API. It supports multiple backends (pickle, memory, MongoDB, SQL, Redis), is thread-safe, and is designed for extensibility and robust cross-platform support.
 
 - **Repository:** [python-cachier/cachier](https://github.com/python-cachier/cachier)
-- **Primary Language:** Python 3.10+
-- **Key Dependencies:** `portalocker`, `watchdog` (optional: `boto3`, `pymongo`, `sqlalchemy`, `redis`)
+- **Primary Language:** Python 3.9+
+- **Key Dependencies:** `portalocker`, `watchdog` (optional: `pymongo`, `sqlalchemy`, `redis`)
 - **Test Framework:** `pytest` with backend-specific markers
 - **Linting:** `ruff` (replaces black/flake8)
 - **Type Checking:** `mypy`
@@ -34,7 +34,6 @@ cachier/
 │   │   ├── mongo.py
 │   │   ├── sql.py
 │   │   ├── redis.py
-│   │   ├── s3.py
 │   │   └── base.py
 │   ├── config.py          # Global/default config
 │   ├── _types.py          # Type definitions
@@ -68,7 +67,7 @@ ______________________________________________________________________
    ```bash
    pytest                           # All tests
    pytest -m "pickle or memory"     # Basic backends only
-   pytest -m "not (mongo or redis or sql)"  # Exclude external service backends
+   pytest -m "not (mongo or sql)"  # Exclude external service backends
    ```
 
 3. **Lint and type-check:**
@@ -104,7 +103,7 @@ ______________________________________________________________________
 
 ### 1. **Code Style & Quality**
 
-- **Python 3.10+** only.
+- **Python 3.9+** only.
 - **Type annotations** required for all new code.
 - **Docstrings:** Use numpy style, multi-line, no single-line docstrings.
 - **Lint:** Run `ruff` before PRs. Use per-line/file ignores only for justified cases.
@@ -115,10 +114,10 @@ ______________________________________________________________________
 ### 2. **Backends**
 
 - **Default:** Pickle (local file cache, `~/.cachier/`)
-- **Others:** Memory, MongoDB, SQL, Redis, S3
+- **Others:** Memory, MongoDB, SQL, Redis
 - **Adding a backend:** Implement in `src/cachier/cores/`, subclass `BaseCore`, add tests with appropriate markers, update docs, and CI matrix if needed.
 - **Optional dependencies:** Code/tests must gracefully skip if backend deps are missing. Install backend-specific deps via `tests/requirements_*.txt`.
-- **Requirements files:** `tests/requirements_mongodb.txt`, `tests/requirements_postgres.txt`, `tests/requirements_redis.txt`, `tests/requirements_s3.txt` for backend-specific dependencies.
+- **Requirements files:** `tests/requirements_mongodb.txt`, `tests/requirements_postgres.txt`, `tests/requirements_redis.txt` for backend-specific dependencies.
 
 ### 3. **Decorator Usage**
 
@@ -129,8 +128,8 @@ ______________________________________________________________________
 ### 4. **Testing**
 
 - **Run all tests:** `pytest`
-- **Backend-specific:** Use markers, e.g. `pytest -m mongo`, `pytest -m redis`, `pytest -m sql`, `pytest -m s3`
-- **Available markers:** `mongo`, `memory`, `pickle`, `redis`, `sql`, `s3`, `maxage` (see `pyproject.toml`)
+- **Backend-specific:** Use markers, e.g. `pytest -m mongo`, `pytest -m redis`, `pytest -m sql`
+- **Available markers:** `mongo`, `memory`, `pickle`, `redis`, `sql`, `maxage` (see `pyproject.toml`)
 - **Requirements:** See `tests/requirements_*.txt` for backend test deps.
 - **CI:** Matrix covers OS/backend combinations. Mongo/SQL/Redis require Dockerized services.
 - **Missing deps:** Tests gracefully skip if optional backend dependencies are missing.
@@ -138,9 +137,13 @@ ______________________________________________________________________
 ### 5. **Documentation**
 
 - **README.rst** is the canonical user/developer doc.
+- **New features/backends:** Update README, add usage example, document config options.
+- **Doc validation:** `python setup.py checkdocs`
+
+### 6. **Error Handling**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [python-cachier/cachier](https://github.com/python-cachier/cachier) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
