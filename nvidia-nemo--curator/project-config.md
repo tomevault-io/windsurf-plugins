@@ -1,91 +1,172 @@
 ---
 trigger: always_on
-description: The project uses **Ruff** for linting and formatting with line length of 119 characters.
+description: NVIDIA NeMo Curator is a generic, pluggable framework for building distributed data processing pipelines using Ray. It provides a unified API for running the same pipeline logic across different Ray orchestration backends.
 ---
 
+# GitHub Copilot Instructions for NVIDIA NeMo Curator
 
-# NeMo Curator Coding Standards
+## Overview
 
-## Linting and Formatting
+NVIDIA NeMo Curator is a generic, pluggable framework for building distributed data processing pipelines using Ray. It provides a unified API for running the same pipeline logic across different Ray orchestration backends.
 
-The project uses **Ruff** for linting and formatting with line length of 119 characters.
+### 🎯 Core Concept
+Enable users to define a data processing pipeline once and execute it using different Ray backends in a multi-node setting (Xenna, Ray Actors, Ray Data) without changing the pipeline logic.
 
-## Key Style Rules
+This scalable data preprocessing tool focuses on data curation pipelines for text, audio, video, and image modalities with support for both CPU and GPU processing.
 
-### Allowed Patterns
+## Development Environment
 
-- ✅ Print statements (T20 ignored)
-- ✅ Boolean arguments in functions (FBT ignored)
-- ✅ `df` as variable name for DataFrames (PD901 ignored)
-- ✅ TODOs without author/link (TD002, TD003 ignored)
-- ✅ Long exception messages (TRY003 ignored)
-- ✅ Accessing private attributes (SLF001 ignored)
-- ✅ Branching after return (RET505-508 ignored)
+### Python Environment
+- **Python Version**: 3.13 (recommended and tested), supports 3.11-3.13
+- **Package Manager**: [uv](https://docs.astral.sh/uv/) for fast, reliable dependency management
+- **Virtual Environment**: Use uv's built-in virtual environment management
 
-### Required Patterns
+### CUDA Environment (Optional)
+- **CUDA Version**: 12.x (12.0+) for GPU acceleration
+- **GPU Requirements**: NVIDIA GPU with Volta™ architecture or higher (compute capability 7.0+)
+- **GPU Libraries**: RAPIDS (cuDF, cuML), PyTorch with CUDA 12 support, CuPy
+- **Note**: GPU features are optional and CPU fallbacks are provided
 
-- ❌ No docstrings required (D ignored)
-- ❌ No pathlib enforcement (PTH ignored)
-- ❌ No logging enforcement (G ignored)
-- ✅ Type annotations for functions (except `*args`, `**kwargs`, special methods)
+## Key Technologies and Frameworks
 
-## File-Specific Exceptions
+### Core Dependencies
+- **PyTorch**: Deep learning framework with CUDA support
+- **Ray**: Distributed computing framework for data processing
+- **Pandas/CuDF**: Data manipulation (CPU/GPU respectively)
+- **Transformers**: Hugging Face transformers library
+- **Loguru**: Structured logging
 
-### `examples/` directory
-- No `__init__.py` required (INP001)
+### Modality-Specific Libraries
+- **Text Processing**: PyTorch, BeautifulSoup, fasttext, sentencepiece, trafilatura
+- **Audio Processing**: NeMo Toolkit ASR components
+- **Video Processing**: OpenCV, PyAV, CvCuda, PyNvVideoCodec
+- **Image Processing**: NVIDIA DALI for optimized data loading
 
-### `tests/` directory
-- Allow assertions (S101)
-- Allow magic values (PLR2004)
-- No return type annotations required (ANN201)
+### Testing Framework
+- **pytest**: Primary testing framework
+- **pytest-asyncio**: Async testing support
+- **pytest-coverage**: Code coverage measurement
+- **GPU Testing**: Use `@pytest.mark.gpu` for GPU-dependent tests
 
-### `tutorials/` directory
-- No `__init__.py` required (INP001)
-- Ignore Unicode complaint (PLE2515)
+## Setup Instructions
 
-## Copyright Header
+### Basic Setup
+```bash
+# Install uv package manager
+pip3 install uv
 
-All non-empty Python files must include the NVIDIA copyright header:
+# Clone and setup development environment
+git clone <repository-url>
+cd Curator
+uv sync
 
-```python
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# For GPU development (requires CUDA 12.x)
+uv sync --extra deduplication_cuda12x
 ```
 
-## Python Version Support
+### Optional Feature Groups
+```bash
+# Text processing capabilities
+uv sync --extra text
 
-Supports Python 3.10, 3.11, and 3.12 (requires >=3.10, <3.13)
+# Video processing with GPU acceleration
+uv sync --extra video --extra video_cuda
 
-## Loguru
-
-NeMo Curator uses loguru for logging:
-
-```python
-from loguru import logger
+# All features (includes CUDA dependencies)
+uv sync --extra all
 ```
 
-Common uses include `logger.info`, `logger.warning`, and `logger.error`.
+## Coding Standards and Patterns
 
-## PyTest Standards
+### Code Quality
+- **Linting**: Ruff with comprehensive rule set (see pyproject.toml)
+- **Line Length**: 119 characters maximum
+- **Type Hints**: Use comprehensive type annotations
+- **Imports**: Follow import sorting conventions
 
-All changes to NeMo Curator's source code must be accompanied with relevant tests. Tests which require a GPU and cannot be run on a CPU-only machine must be marked with `@pytest.mark.gpu`.
+### Module Structure
+- **Stages**: Processing stages organized by modality (`text/`, `video/`, `audio/`, `image/`)
+- **Utils**: Shared utilities for common operations
+- **Datasets**: Data loading and manipulation classes
+- **Modules**: Core processing algorithms
 
-NeMo Curator enforces 80% PyTest coverage within the `nemo_curator/` directory.
+### Error Handling Patterns
+```python
+# Standard error handling for missing dependencies
+try:
+    import required_library
+except ImportError as e:
+    logger.error(f"Required dependency not found: {e}")
+    raise ImportError("Please install the required dependencies")
+```
 
-For straightforward navigation purposes, the `tests/` directory structure matches the `nemo_curator/` directory structure.
+### Configuration Patterns
+- Use YAML configuration files for processing pipelines
+- Support hierarchical configuration (CLI args > env vars > config files > defaults)
+- Follow the configuration structure in `docs/admin/config/`
+
+## Testing Guidelines
+
+### Test Organization
+- **Unit Tests**: Test individual functions and classes
+- **Integration Tests**: Test complete processing pipelines
+- **GPU Tests**: Mark with `@pytest.mark.gpu` decorator
+- **Mock External Dependencies**: Use pytest mocks for external services
+
+### Test Environment Setup
+```python
+# Example GPU test structure
+@pytest.mark.gpu
+def test_gpu_processing():
+    import cudf  # Only import in GPU tests
+    df = cudf.DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
+    assert len(df) == 3
+```
+
+### Test Configuration
+- Tests use a unified Ray cluster configuration via `conftest.py`
+- GPU availability is automatically detected using multiple methods (pynvml, nvidia-ml-py)
+- Tests gracefully handle missing GPU dependencies
+
+### Running Tests
+```bash
+# Run all tests (CPU only by default)
+uv run pytest
+
+# Run GPU tests (requires CUDA environment)
+uv run pytest -m gpu
+
+# Run specific test categories
+uv run pytest -m "not gpu"  # CPU tests only
+
+# Run tests for specific modules
+uv run pytest tests/stages/text/
+uv run pytest tests/stages/image/
+```
+
+## Build and Development
+
+### Development Workflow
+```bash
+# Install development dependencies
+uv sync
+
+# Run linting and formatting
+uv run ruff check .
+uv run ruff format .
+
+# Run tests
+uv run pytest
+
+# Run specific test modules
+uv run pytest tests/utils/test_nvcodec_utils.py
+
+# Local docs dev server (Fern; see fern/README.md)
+make docs
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/NVIDIA-NeMo)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/NVIDIA-NeMo)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [NVIDIA-NeMo/Curator](https://github.com/NVIDIA-NeMo/Curator) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
