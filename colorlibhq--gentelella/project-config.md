@@ -1,85 +1,82 @@
 ---
 trigger: always_on
-description: Cross-tool agent instructions for Gentelella v4. Read by Aider, Cline, Codex, Continue, and any tool following the [agents.md](https://agents.md) convention. Claude Code reads `CLAUDE.md`; Cursor reads `.cursor/rules/`; GitHub Copilot reads `.github/copilot-instructions.md`. Content is intentionally overlapping — each tool only sees its own file.
+description: Admin dashboard template (`4.0.0`) by Colorlib. 58 server-rendered HTML pages in `production/`, built with **Vite 8** (Rolldown). **Vanilla ES2022**, no Bootstrap, no jQuery, no SPA framework. SCSS only. Heavyweight deps — **ECharts 6**, **DataTables.net 2**, **Leaflet 1.9** — are lazy-imported per page. Full reference: `CLAUDE.md`.
 ---
 
-# AGENTS.md
+# GitHub Copilot Instructions — Gentelella v4
 
-Cross-tool agent instructions for Gentelella v4. Read by Aider, Cline, Codex, Continue, and any tool following the [agents.md](https://agents.md) convention. Claude Code reads `CLAUDE.md`; Cursor reads `.cursor/rules/`; GitHub Copilot reads `.github/copilot-instructions.md`. Content is intentionally overlapping — each tool only sees its own file.
+Admin dashboard template (`4.0.0`) by Colorlib. 58 server-rendered HTML pages in `production/`, built with **Vite 8** (Rolldown). **Vanilla ES2022**, no Bootstrap, no jQuery, no SPA framework. SCSS only. Heavyweight deps — **ECharts 6**, **DataTables.net 2**, **Leaflet 1.9** — are lazy-imported per page. Full reference: `CLAUDE.md`.
 
-## What this is
+## Hard rules
 
-Gentelella v4 (`4.0.0`) — free admin dashboard template by Colorlib. 58 server-rendered HTML pages in [production/](production/), built with **Vite 8** (Rolldown). **Vanilla ES2022**, no Bootstrap, no jQuery, no SPA framework. SCSS only. Heavyweight runtime deps are limited to **ECharts 6**, **DataTables.net 2**, and **Leaflet 1.9** — all lazy-imported per page.
+- **Vanilla DOM only.** `querySelector`, `classList`, `addEventListener`. No jQuery, no SPA framework. v4's pitch is "vanilla and small."
+- **Single entry**: `src/main-v4.js`. Page-specific modules are lazy-imported inside it, guarded by DOM presence. Don't add `<script>` tags per page.
+- **Pages auto-discover.** Drop `production/<slug>.html` and `discoverEntries()` in `vite.config.js` picks it up — never edit `rollupOptions.input`.
+- **Shell opt-in**: `<body data-shell="admin" data-page="<key>" data-breadcrumb="Home > …">`. The Vite plugin inlines sidebar/topbar/footer at build/dev time (no FOUC).
+- **NAV is one constant** — `NAV` in `src/v4/shell-render.js`, 7 groups. `key` matches `data-page`. New icons go in the `ICONS` object in the same file.
+- **Overlays go through helpers**: `showModal()`/`showToast()`/`openMenu()`/`openPanel()` from `src/v4/{modal,toast,menus}.js`. Never hand-roll a backdrop, escape handler, or focus return.
+- **CSS custom properties for colors.** Tokens in `src/scss/v4/_tokens.scss` under `:root` and `[data-theme="dark"]`. Charts read them via `getComputedStyle(document.documentElement).getPropertyValue('--…')` so dark-mode redraw is automatic.
+- **Lazy ECharts.** Match the modular import pattern in `src/v4/charts.js`. Don't `import * as echarts`.
+- **Subpath-safe URLs.** `import.meta.env.BASE_URL` in JS, `${base}` in the Vite plugin, relative paths in `production/*.html`. Never hard-code a leading `/`.
+- **Idempotent `init<Name>()` exports.** Every module in `src/v4/` has one. Safe to call when its root element is absent, safe to call twice.
+- **No `console.*` in shipped code.** Terser drops them in production; ESLint flags earlier.
+- **Service worker only in prod** (`import.meta.env.PROD` guard) — keeps HMR working in dev.
 
-Live preview: <https://preview.colorlib.com/theme/gentelella/>.
+## File layout
 
-## Setup
+- `src/main-v4.js` — entry; mounts shell + lazy-loads page modules
+- `src/scss/v4/` — 10 SCSS partials (`_tokens`, `_layout`, `_components`, `_widgets`, `_forms`, `_datatable`, `_pages`, `_apps`, `_auth`, `main`)
+- `src/v4/shell.js` — `mountShell()` runtime (sidebar accordion, theme toggle, mobile drawer)
+- `src/v4/shell-render.js` — `NAV` + `ICONS` + pure renderers (also imported by Vite plugin)
+- `src/v4/charts.js` — `initCharts()` + ECharts factories
+- `src/v4/tables.js` — `initTables()` + DataTables wrapper
+- `src/v4/command-palette.js` — ⌘K
+- `src/v4/{modal,toast,menus}.js` — overlay helpers
+- `src/v4/{inbox,kanban,calendar,settings,file-manager}.js` — page modules (lazy-loaded)
+- `src/v4/form-controls.js` — date range, multi-select, rich text
+- `production/` — 58 HTML entry pages, auto-discovered
+- `public/` — static assets copied verbatim to `dist/`
+- `types/gentelella.d.ts` — TypeScript declarations for the public JS surface
+- `scripts/new-page.mjs` — page scaffolder (`npm run new -- <slug>`)
+- `scripts/deploy-preview.sh` — R2 deploy with per-file cache headers
+
+## Anti-patterns
+
+- Don't add jQuery, Bootstrap, or a SPA framework.
+- Don't write Vite entry input lists by hand.
+- Don't add `<script>` tags to `production/*.html` for new modules — lazy-import in `src/main-v4.js`.
+- Don't bypass `mountShell()` to wire your own sidebar/topbar.
+- Don't `new bootstrap.Modal(...)` — there is no Bootstrap.
+- Don't hard-code `/` paths in JS/HTML.
+- Don't import all of ECharts — match `src/v4/charts.js`.
+- Don't use hex colors in components — use CSS custom properties.
+- Don't introduce PostCSS, Tailwind, or any pipeline alongside Vite.
+- Don't edit `dist/`, `node_modules/`, or `docs/screenshots/`.
+
+## Commands
 
 ```bash
-npm install
-npm run dev               # Vite dev server on :9173 → opens /production/index.html
+npm run dev                # Vite dev server on :9173 (set PORT to override)
+npm run build              # Production build → dist/
+npm run preview            # Serve dist/ on :9174
+npm run lint               # ESLint over src/
+npm run lint:fix
+npm run format             # Prettier write
+npm run new -- <slug>      # Scaffold a page (use --nav-group, --icon, --title …)
+npm run screenshots        # Playwright capture (22 pages × light+dark)
+npm run smoke              # Boot dev server, hit every page, assert 200
+npm run analyze            # Build + open dist/stats.html
+npm run deploy:preview     # Build + R2 sync with cache headers
 ```
 
-Build / preview / deploy:
+Build under a subpath: `BASE_PATH=/foo/ npm run build`.
 
-```bash
-npm run build             # → dist/
-npm run preview           # serve built dist/ on :9174
-npm run deploy:preview    # build + sync to R2 with cache headers
-```
+## When generating code
 
-## Architecture
-
-- **Single entry** [src/main-v4.js](src/main-v4.js). Imports `scss/v4/main.scss`, mounts the shell, runs `initCharts/initTables/initCommandPalette/initPageActions`, then lazy-imports page-specific modules guarded by DOM presence (`if (document.getElementById('inbox-root')) import(...)`).
-- **Shell injection at build time.** [vite.config.js](vite.config.js)'s `shellInjectionPlugin` inlines sidebar/topbar/footer into every page whose body has `data-shell="admin"`. No FOUC. Runtime [src/v4/shell.js](src/v4/shell.js) `mountShell()` is a fallback for opening raw HTML.
-- **Auto-discovered entries.** `discoverEntries()` in [vite.config.js](vite.config.js) walks `production/*.html` and registers each as a Rollup input. No hand-maintained input list.
-- **Three lazy vendor chunks**: `vendor-echarts` (chart pages), `vendor-tables` (table pages), `vendor-maps` (map page). Everything else ships in the main chunk.
-- **NAV is one constant.** `NAV` in [src/v4/shell-render.js](src/v4/shell-render.js), 7 groups. Pages match into NAV by `data-page` ↔ leaf `key`.
-- **Theming via CSS custom properties.** Tokens in [src/scss/v4/_tokens.scss](src/scss/v4/_tokens.scss) under `:root` and `[data-theme="dark"]`. Pre-paint inline script (in the Vite plugin) sets `data-theme` on `<html>` from `localStorage` before body renders.
-- **PWA.** Service worker registered only in `import.meta.env.PROD`. `site.webmanifest` + meta tags injected into every page by the Vite plugin. Subpath-safe: paths use `import.meta.env.BASE_URL`.
-
-## Directory layout
-
-```text
-src/
-  main-v4.js               # Entry — mounts shell, lazy-loads modules
-  scss/v4/                 # 10 partials, main.scss is the @use'd entry
-  v4/
-    shell.js               # mountShell — runtime shell behavior
-    shell-render.js        # Pure renderers + NAV + ICONS
-    menus.js               # openMenu / openPanel
-    modal.js               # showModal
-    toast.js               # showToast
-    charts.js              # ECharts wrapper + factories
-    tables.js              # DataTables wrapper
-    command-palette.js     # ⌘K
-    page-actions.js
-    inbox.js kanban.js calendar.js settings.js file-manager.js
-    form-controls.js       # Date range, multi-select, rich text
-    details.js markup.js data-adapter.js
-    product-images.js product-mockups.js
-production/                # 58 HTML entry pages (auto-discovered)
-public/                    # Copied verbatim to dist/
-types/gentelella.d.ts      # Type declarations for the public JS surface
-scripts/
-  new-page.mjs             # npm run new -- <slug>
-  screenshots.mjs          # npm run screenshots
-  smoke.mjs                # npm run smoke
-  deploy-preview.sh        # npm run deploy:preview
-examples/                  # Standalone integrations (Express/SQLite, etc.)
-```
-
-## Conventions
-
-1. **Vanilla DOM only.** `querySelector`, `classList`, `addEventListener`. No jQuery, no SPA framework.
-2. **Lazy import per-page modules** with a DOM-presence guard so the main bundle never ships unused code.
-3. **Idempotent `init<Name>()` exports.** Safe to call when the root element is absent; safe to call twice.
-4. **Event delegation on `document`** for common interactions (toggles, todo checkboxes, chart tabs) — see the bottom of [src/main-v4.js](src/main-v4.js). Components that own their state (inbox, kanban, command palette) register on their own root.
-5. **`showModal()` / `showToast()`** ([v4/modal.js](src/v4/modal.js), [v4/toast.js](src/v4/toast.js)) for overlays; **`openMenu()` / `openPanel()`** ([v4/menus.js](src/v4/menus.js)) for dropdowns and slide-outs. Both handle outside-click / escape / focus return.
-6. **CSS custom properties for colors.** Never hex literals in components. Charts read them via `getComputedStyle(document.documentElement).getPropertyValue('--…')` so dark-mode redraw is automatic.
+- **New page** → use `npm run new -- <slug> --nav-group "<Group>"` rather than crafting the HTML by hand. If you do write by hand, copy the head/body pattern from `production/index.html` (specifically the `data-shell`/`data-page`/`data-breadcrumb` triplet and the `<script type="module" src="/src/main-v4.js">` tag).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ColorlibHQ/gentelella](https://github.com/ColorlibHQ/gentelella) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
