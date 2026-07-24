@@ -1,66 +1,147 @@
 ---
 trigger: always_on
-description: Before running Maven, E2E, Proxy startup, database clients, IDE/MCP run configurations, any command likely to output more than 100 lines,
+description: *Professional Guide for AI Programming Assistants - Best Practices for ShardingSphere Code Development*
 ---
 
-# ShardingSphere AI Development Guide
+# CLAUDE.md - ShardingSphere AI Programming Guide
 
-## TOKEN EFFICIENCY ACTION — READ OR REUSE .codex/context/token-efficiency.md
+*Professional Guide for AI Programming Assistants - Best Practices for ShardingSphere Code Development*
 
-Before running Maven, E2E, Proxy startup, database clients, IDE/MCP run configurations, any command likely to output more than 100 lines,
-or any task likely to produce large analysis or review output, I MUST ensure `.codex/context/token-efficiency.md` is available in the active context.
-If this exact file from this repository has already been read in the current session and there is no evidence it changed, reuse the loaded content.
-Otherwise, read it before running the high-output command or producing the large structured output.
-Execute the command according to the Mandatory Execution Contract in that file.
-This file is the repository-local source of truth for token-efficient command classification, log capture, filtered summaries, final reporting, and structured output.
-Paths in this section are relative to the Apache ShardingSphere repository root.
+## 🏗️ ShardingSphere Architecture Overview
 
-This guide is written **for AI coding agents only**. Follow it literally; improvise only when the rules explicitly authorize it.
+### Project Overview
+ShardingSphere is an ecosystem of distributed database solutions with JDBC driver, database proxy, and planned Sidecar modes.
 
-## Core Immutable Principles
+### Core Module Architecture
+```yaml
+module_hierarchy:
+  infrastructure_layer:
+    - shardingsphere-infra: Common utilities, SPI definitions
+    - shardingsphere-parser: SQL parsing (ANTLR4-based)
+  engine_layer:
+    - shardingsphere-mode: Configuration management
+    - shardingsphere-kernel: Core execution engine
+  access_layer:
+    - shardingsphere-jdbc: Java JDBC driver
+    - shardingsphere-proxy: Database proxy
+  feature_layer:
+    - shardingsphere-sharding: Data sharding
+    - shardingsphere-encryption: Data encryption
+    - shardingsphere-readwrite-splitting: Read/write splitting
+```
 
-1. **Quality First**: code quality and system security are non-negotiable.
-2. **Think Before Action**: perform deep analysis and planning before coding.
-3. **Tools First**: prioritize the proven best toolchain.
-4. **Transparent Records**: keep every key decision and change traceable.
-5. **Continuous Improvement**: learn from each execution and keep optimizing.
-6. **Results Oriented**: judge success solely by whether the target is achieved.
-7. **Coding Standards**: `CODE_OF_CONDUCT.md` is the binding “law”; use it as the first reference for rule interpretation and cite relevant lines. See Governance Basics for precedence and session review expectations.
+### Technology Stack Decisions
+- **ANTLR4**: SQL parsing and abstract syntax tree generation
+- **Netty**: High-performance network communication (proxy mode)
+- **Apache Calcite**: Query optimization and execution plans
+- **SPI**: Plugin architecture for hot-pluggable extensions
 
-## Quality Standards
+### JDBC vs Proxy Patterns
+- **JDBC**: Zero invasion, Java-only, highest performance
+- **Proxy**: Language-agnostic, centralized management, advanced features
 
-### Engineering Principles
-- **Architecture**: follow SOLID, DRY, separation of concerns, and YAGNI (build only what you need).
-- **Code Quality**:
-    - Use clear naming and reasonable abstractions.
-    - **Meaningful Code Gate**:
-        - **Purpose traceability**: every added line, identifier, literal, YAML anchor, helper, abstraction, and configuration entry must have a traceable purpose.
-          Before keeping AI-generated code, trace it back to one concrete need: production behavior, public contract, regression protection, user-facing diagnostics,
-          security or safety, readability, or removal of real duplication.
-          If the purpose cannot be explained in one specific sentence, remove it.
-        - **Meaningless code definition**: meaningless code is code that does not change or protect behavior, clarify a real contract,
-          reduce real duplication or complexity, improve diagnostics or safety, or make the code easier to read.
-          Code is also meaningless when it exists only for formal symmetry, complete-looking groups, tidy-looking structure, coverage appearance,
-          or possible future flexibility.
-          Do not keep code merely because it was generated, looks tidy, might be useful later, or makes a diff look more complete.
-        - **YAML anchor rule**: do not add YAML anchors unless they are actually reused in the same file and reduce meaningful duplication.
-          A YAML anchor with no aliases, an anticipatory anchor for possible future reuse, or an anchor that makes nearby YAML harder to read is forbidden.
-          Prefer repeating a small YAML block when repetition is clearer than indirection.
-    - Do not introduce package-private top-level helper types by default.
-      Keep very small, single-owner state or continuation helpers as private nested types, but avoid accumulating multiple nested collaborators inside one class.
-      When a helper has cohesive behavior, multiple callers, direct test value, or enough logic to distract from the owner class, split it into a public top-level type with a clear contract and direct tests.
-      If neither private nor public fits, do not add a helper; keep the implementation in the approved owner or simplify the design within the declared boundary.
-    - Every new public production type must have direct, focused tests.
-      Broad workflow tests do not replace public contract tests unless they explicitly exercise that public type's behavior.
-    - Do not change production code solely for test convenience.
-      Test-only reuse, easier mocking, coverage convenience, fixture sharing, or test-only construction must not justify adding production types,
-      widening visibility, changing constructors, adding overloads, altering signatures, moving test helpers into production, or introducing abstractions.
-      Production changes must have an independent production reason, such as fixing behavior, clarifying a real contract, reducing production duplication,
-      or exposing a construction path that production code legitimately supports.
-      Prefer test-local fixtures, mocks, existing public constructors, factories, builders, SPI loaders, or production APIs when construction is incidental to the behavior under test.
+### Key Concepts
+- **Sharding**: Horizontal data partitioning
+- **DistSQL**: Distributed SQL for dynamic configuration
+- **SPI Extension**: Algorithm, protocol, and execution extensions
+- **Data Pipeline**: Migration and synchronization functionality
+
+### Code Quality Standards
+```yaml
+self_documenting_code:
+  method_naming: "10-15 characters, verb-noun patterns, no comments needed"
+  examples: ["isValidEmailAddress()", "calculateOrderTotal()"]
+  anti_examples: ["proc()", "getData()", "handle()"]
+
+complex_logic:
+  definition: "3+ nested levels or 20+ lines per method"
+  handling: "Extract to meaningful private methods"
+
+mock_boundaries:
+  no_mock: "Simple objects, DTOs, stateless utilities"
+  must_mock: "Database connections, network services, third-party interfaces"
+  judgment: "Mock only with external dependencies or high construction cost"
+```
+
+## 🚀 AI Programming Best Practices
+
+### How to Obtain High-Quality Code
+
+#### 1. Source Code Development Request Template
+```
+Please implement [feature description] for [class name], requirements:
+1. Follow ShardingSphere project coding standards and constraints
+2. Use self-documenting programming, no comments
+3. Extract complex logic into private methods
+4. 100% test coverage unit tests
+5. Pass spotless code formatting checks
+6. Use @RequiredArgsConstructor constructor injection
+```
+
+#### 2. Unit Test Request Templates
+
+**Basic Style-Consistent Testing**:
+```
+Please write unit tests for [class name], requirements:
+1. Use ShardingSphere project testing style
+2. Test method naming with assert*() prefix
+3. Use Hamcrest assertion style assertThat(actual, is(expected))
+4. Use Mockito for Mocking, follow project boundary principles
+5. Maintain clear Given-When-Then structure
+```
+
+**Complex Tests for First-Pass Success**:
+```
+Please write complete unit tests for [complex class name], requirements:
+1. First analyze the dependency relationships and complexity of the class under test
+2. Identify all external dependencies that need Mocking
+3. Gradually build test fixtures, ensure complete Mock chains
+4. Write corresponding test methods for each branch
+5. Use @BeforeEach to set up common Mocks
+6. Use try-with-resources to manage MockedConstruction
+7. Ensure all tests can run independently and pass
+
+If you encounter uncertain dependency relationships, please ask me for confirmation.
+```
+
+**100% Coverage Testing**:
+```
+Please implement 100% test coverage for [specific class name] in shardingsphere-[module] module:
+1. First generate coverage report to check current status:
+   ./mvnw clean test jacoco:report -Djacoco.skip=false -pl [submodule]
+   open [submodule]/target/site/jacoco/index.html
+2. Identify all branches that need testing (red diamond markers)
+3. Write multiple sets of test data for complex conditions
+4. Ensure all exception paths have tests
+5. Verify final coverage reaches 100%:
+   ./mvnw test jacoco:check@jacoco-check -Pcoverage-check -Djacoco.check.class.pattern=[ClassName] -pl [submodule]
+
+If dead code or uncovered branches are found, please explain in detail.
+```
+
+**Special Case Handling Testing**:
+```
+Please write unit tests for [class name], requirements:
+1. Make every effort to achieve 100% coverage
+2. If you encounter the following situations, please report to me:
+   - Truly unreachable dead code (e.g., never-thrown exceptions)
+   - Functions dependent on specific runtime environments (e.g., OS-specific functions)
+   - Features requiring special hardware or network conditions
+   - Protective programming code for extreme cases
+
+Report format:
+- Code location: [class name:line number]
+- Uncoverage reason: [detailed explanation]
+- Suggested solution: [if any]
+
+Let me confirm before skipping coverage requirements for these codes.
+```
+
+**SQL Generation Class Testing**:
+```
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apache/shardingsphere](https://github.com/apache/shardingsphere) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
