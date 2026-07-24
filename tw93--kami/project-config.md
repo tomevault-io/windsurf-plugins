@@ -1,78 +1,56 @@
 ---
 trigger: always_on
-description: Typeset professional documents and product landing pages: resumes, one-pagers, white papers, letters, portfolios, slide decks, landing pages. Warm parchment, ink-blue accent, serif-led hierarchy. CN uses TsangerJinKai02, EN uses Charter, JA uses YuMincho (best-effort). Triggers on "做 PDF / 排版 / 一页纸 / 白皮书 / 作品集 / 简历 / PPT / slides / Marp / markdown slides / マークダウンのスライド / 落地页 / 官网 / landing page / product page", or "build me a resume / make a one-pager / design a slide deck / turn this into a PDF 
+description: Document-generation skill and template system. Editorial HTML templates + PDF/PPTX/PNG build pipeline.
 ---
 
+# Kami
 
-# kami · 紙
+Document-generation skill and template system. Editorial HTML templates + PDF/PPTX/PNG build pipeline.
 
-**紙 · かみ** - the paper your deliverables land on.
+## 启动前
 
-Good content deserves good paper. One design language across eight document types: warm parchment canvas, ink-blue accent, serif-led hierarchy, tight editorial rhythm.
+- 个人/全局规则可放在仓库外；本文件只记录 Kami 项目内的 Claude Code 入口和维护规则。
+- 仓库地图、Working Rules、Current Risk Areas、Verification Details、Release Flow、Fonts 全在 `AGENTS.md`。
+- 模板设计规范看 `references/design.md`，写作规范看 `references/writing.md`，反模式 checklist 看 `references/anti-patterns.md`。
 
-Part of `Kaku · Waza · Kami` - Kaku writes code, Waza drills habits, **Kami delivers documents**.
+## 常用命令
 
-**Update check (non-blocking).** At the start of a task, run `bash scripts/check-update.sh`. It does a read-only version check at most once per day and prints one line when a newer kami is available; relay that line to the user, then continue. It sends no data, and fails silently when offline, sandboxed, or without `curl`. Never let it block the work.
+```bash
+python3 scripts/build.py                   # 构建所有目标
+python3 scripts/build.py --check           # 快速校验
+python3 scripts/build.py --verify          # 完整验证
+python3 scripts/build.py --check-markdown path/to/filled.pdf  # 检查 Markdown 标记残留
+python3 scripts/build.py --check-content content.json filled.html  # 内容 IR 校验 + 落稿覆盖检查
+python3 scripts/build.py --check-visual path/to/filled.pdf   # 逐页出 PNG + 感知审查清单
+python3 scripts/mcp_server.py              # MCP stdio server：外部 agent 的 render / check / screenshot 入口
+python3 scripts/build_metadata.py --check  # Claude/Codex 插件镜像和 marketplace 漂移检查
+python3 scripts/tests/test_build.py        # 测试套件
+bash scripts/ensure-fonts.sh               # 字体恢复（缺字体或字体被截断时）
+bash scripts/package-skill.sh              # 构建 release 压缩包
+python3 scripts/mermaid_normalize.py raw.svg -o clean.svg  # beautiful-mermaid SVG 重上 Kami 色 + WeasyPrint 安全化（无 Node）
+```
 
-## Step 0 · Load brand profile (if exists)
+## 项目独有硬规则
 
-Check `~/.config/kami/brand.md` (preferred) or `~/.kami/brand.md` (legacy fallback). If found, read `references/brand-profile.md` for the full four-layer application spec (placeholder substitution, session defaults, visual customization, habit notes) and its six guardrails. If no profile exists, continue without interruption.
+与 `AGENTS.md` Working Rules 重叠或冲突时，以 `AGENTS.md` 为准（它是跨 runtime 的单一 source of truth）；本节只是高频速查。
 
-Key rule: explicit prompt > editorial judgment > habit notes > frontmatter defaults > built-in defaults. Profile fills gaps silently; it never overrides the current conversation.
-
-## Step 0.5 · User project style scan (opt-in)
-
-Run this only when the user explicitly references a sibling project as a visual reference: "like my <project> site", "match the style of <repo>", "use the look from <directory>". Skip silently when no such reference exists.
-
-When triggered, before generating:
-
-1. Locate the referenced project's style files:
-   ```bash
-   find <referenced-path> -maxdepth 4 \( -name "*.css" -o -name "tailwind.config.*" -o -name "theme.*" -o -name "tokens.*" \) | head -20
-   ```
-2. Extract: dominant color values (hex / hsl), font stack, spacing scale, border-radius scale. Prefer values declared in CSS variables or design tokens over inline literals.
-3. Merge into the in-session brand profile as Layer C (visual customization), not Layer B (session defaults). Do not override an explicit `--brand` flag or values that the user typed in this turn.
-4. Report back in one line before continuing: "scanned <project>, extracted N colors / M fonts; using as visual reference."
-
-Skip and fall back to the brand profile defaults if the referenced path does not exist, no CSS-like files are found, or the extraction would conflict with the user's explicit values in the current message.
-
----
-
-## Step 1 · Decide the language
-
-**Match the user's language.** Chinese -> `*.html` / `slides-weasy.html`. English -> `*-en.html` / `slides-weasy-en.html`. Japanese -> CJK path (`.html` / `slides-weasy.html`) as best-effort, JP Mincho first, visual QA before shipping. Korean -> dedicated `*-ko.html` / `slides-weasy-ko.html` family as best-effort, visual QA before shipping. Reference docs are shared English specs.
-
-When ambiguous (e.g. a one-word command like "resume"), ask a one-liner rather than guess.
-
-| User language | HTML templates | Slides (PDF default) | Slides (PPTX fallback) |
-|---|---|---|---|
-| Chinese (primary) | `*.html` | `slides-weasy.html` | `slides.py` |
-| English | `*-en.html` | `slides-weasy-en.html` | `slides-en.py` |
-| Japanese (best-effort) | `*.html` | `slides-weasy.html` | `slides.py` |
-| Korean (best-effort) | `*-ko.html` | `slides-weasy-ko.html` | n/a (use `slides-en.py` only if PPTX is required) |
-| Other languages (best-effort) | choose CJK or EN path by script coverage, then verify manually | choose `slides-weasy.html` or `slides-weasy-en.html`, then verify manually | use `slides.py` / `slides-en.py` only if PPTX is required |
-
-> Default to the WeasyPrint HTML path; fall back to PPTX (`slides*.py`) only when the user explicitly needs an editable deck.
-
-Always use `CHEATSHEET.md` and `references/*.md` for design, writing, production, and diagram guidance.
-
-Code blocks with `class="language-*"` are highlighted only when optional `Pygments` is installed in the build environment. Without it, PDFs still render and code blocks stay monochrome.
-
-## Step 1.5 · Intent extraction (silent checklist)
-
-Before choosing a template, verify these four dimensions are clear. Do not ask unless 2+ are missing and cannot be inferred from context.
-
-| Dimension | What to extract | Example |
-|---|---|---|
-| **Purpose** | Why this document exists | Persuade investor vs. align internal team vs. close a candidate |
-| **Audience** | Who reads it, what they already know | Technical CTO (skip basics) vs. non-technical board (explain terms) |
-| **Constraint** | Hard limits on length, format, tone, or delivery | "One page max", "formal English", "print-ready A4" |
-| **Success** | What outcome counts as success | They schedule a meeting / they approve the budget / they understand the architecture |
-
-Rules:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- 改 style 时同步更新 `references/design.md` 和模板 tokens，不要只改单点。
+- 加新模板：从最近的模板复制，对齐 `references/design.md`，加 demo 覆盖。
+- 不要在 docs / template 注释 / 脚本输出里用图形 emoji。脚本状态用 `OK:` / `ERROR:`。
+- 仓库 docs(`README.md`、`index*.html`、`llms.txt`、`AGENTS.md`、`CLAUDE.md` 等)和模板生成产物禁止 em dash(U+2014),用冒号 / 逗号 / 句号 / 括号代替。生成文档侧另见 `references/anti-patterns.md` #27。自检:`grep -rn "$(printf '\342\200\224')" README.md llms.txt index*.html`(`references/anti-patterns.md` 内是教学反例,豁免)。
+- 模板**内联** CSS，不抽公共 partial。修 CSS 漂移时跨模板同步改，不要引入 build-time include。
+- 所有模板注册表都在 `scripts/shared.py`(`HTML_TEMPLATES` 文档 / `SCREEN_TEMPLATES` 浏览器 / `PPTX_TEMPLATES` 可编辑 deck / `DIAGRAM_TEMPLATES` 图),build.py 从中派生。加删模板或图改这一处,不要分别改 build.py。渲染管线单一入口在 `scripts/render.py`,build / verify / MCP 三方共用,不要在别处复制 WeasyPrint 调用。
+- 不打包大体积商业字体到 `dist/kami.zip`，但模板要保留稳定的本机预览路径；ZIP 内必须是顶层 `kami/` skill 文件夹。
+- `dist/kami.zip` 是 tracked release 制品。小修通常刷 latest release 资源即可，不必新 tag。
+- 改 build / packaging 相关代码后，刷新并检查 `dist/kami.zip`；新增 helper/module/reference JSON 后，确认文件已被 Git 跟踪并进入 package。
+- 官网 / AI 可见性改动不只看首页：同步 `index*.html`、README、`llms.txt`、`robots.txt`、`sitemap.xml`、JSON-LD、FAQ、安装 / 版本 / 支持链接，并看 375px / 1280px 真实截图。
+- 改 Codex / Claude 插件 marketplace、版本或安装路径后，不只看 metadata；跑 `python3 scripts/build_metadata.py --check`，必要时用隔离 `CODEX_HOME=/tmp/...` 或 `HOME=/tmp/...` 的 Claude Code 安装路径做真实冒烟。
+- 刷新 release 包或 latest 资源前后，不只看页面大小；下载 `kami.zip`，对比 ZIP entry 列表和每个 entry 的 SHA-256。
+- 不提交一次性的 review 报告或诊断快照；只把稳定规则沉淀到 `AGENTS.md`、`SKILL.md` 或 `references/`。
+- 写 release notes 前先 `gh release view` 上一个正式 release，把它当格式硬模板，不凭记忆重建结构；发布后回读 reaction 确认六个正向表情（+1 / laugh / heart / hooray / rocket / eyes）都在，绝不加 -1 / confused。
+- 排版产物（PDF / README / 官网页）交付前扫临界换行：`--check-orphans` / `--check-density` 管 PDF 孤行和稀疏页，人工扫"差一个词就换行 / 未撑满就提前换行"和非 PDF 面；发现一处即全文档同类全修，优先改内容长度，不动字号间距。
+- Mermaid 图：raw beautiful-mermaid SVG 不能直接进 PDF 模板，先过 `scripts/mermaid_normalize.py`（纯 Python，会重上 Kami 色 + 解析 `color-mix()`；`--check` 会拦未归一化的 `color-mix(` / `foreignObject` / web font）。Kami 不打包 Node：要从 Mermaid 文本出新图，在任意 beautiful-mermaid（如 agents.craft.do/mermaid）里生成 SVG 再跑 normalizer。`xychart` 只走浏览器，PDF 用现有手绘图。细节见 `references/mermaid.md`。
 
 ---
 > Source: [tw93/Kami](https://github.com/tw93/Kami) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
