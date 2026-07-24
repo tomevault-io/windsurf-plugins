@@ -1,117 +1,118 @@
 ---
 trigger: always_on
-description: This file provides repo-specific guidance for AI coding agents (e.g. Claude Code, Codex, Copilot Workspace).
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# GitVersion — AI Agent Instructions
+# CLAUDE.md
 
-This file provides repo-specific guidance for AI coding agents (e.g. Claude Code, Codex, Copilot Workspace).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project overview
 
-GitVersion is a multi-project .NET repository that calculates semantic versions from Git history.
-Primary source code lives under `src/`. CLI examples and documentation live under `docs/`.
-
-## Key files
-
-- `README.md` — project overview and links to documentation
-- `global.json` — SDK version pin (.NET 10) and solution roots (`build`, `new-cli`, `src`)
-- `build.ps1` — primary build entry point (Cake-based); day-to-day work uses `dotnet` CLI directly
-- `src/Directory.Packages.props` — central NuGet package versioning (edit here, not in individual csproj files)
-- `src/GitVersion.slnx` — main solution file
-- `docs/` — CLI usage examples and I/O patterns (JSON stdout, environment outputs)
-- `src/GitVersion.Configuration/ConfigurationFileLocator.cs` — config file lookup logic
-
-## Architecture
-
-The repo has two parallel solution trees:
-
-### `src/` — legacy/stable CLI
-
-| Project                    | Role                                   |
-| -------------------------- | -------------------------------------- |
-| `GitVersion.Core`          | Core version calculation logic         |
-| `GitVersion.Configuration` | Configuration loading and validation   |
-| `GitVersion.App`           | CLI entry point                        |
-| `GitVersion.BuildAgents`   | Platform-specific build agent adapters |
-| `GitVersion.LibGit2Sharp`  | Git repository access                  |
-| `*Tests` projects          | Unit and integration tests             |
-
-Build-agent adapters live in `src/GitVersion.BuildAgents/Agents/`. They write `GitVersion_`-prefixed environment variables — preserve that prefix when reading or writing outputs.
-
-### `new-cli/` — new CLI (actively developed, `new-cli/GitVersion.slnx`)
-
-| Project                          | Role                                       |
-| -------------------------------- | ------------------------------------------ |
-| `GitVersion.Cli`                 | New CLI entry point                        |
-| `GitVersion.Core`                | Core version calculation (new-cli variant) |
-| `GitVersion.Calculation`         | Version calculation plugin                 |
-| `GitVersion.Configuration`       | Configuration plugin                       |
-| `GitVersion.Normalization`       | Normalization plugin                       |
-| `GitVersion.Output`              | Output plugin                              |
-| `GitVersion.Common`              | Shared utilities                           |
-| `GitVersion.Core.Libgit2Sharp`   | Git repository access                      |
-| `GitVersion.Cli.Generator`       | Source generator for CLI commands          |
-| `GitVersion.Cli.Generator.Tests` | Generator tests                            |
-
-The `new-cli/` tree has its own `Directory.Packages.props` for centralized package versions.
+GitVersion is a multi-project .NET repository that calculates semantic versions from Git history. It supports multiple versioning strategies (GitFlow, GitHubFlow, Mainline) and integrates with CI/CD systems (GitHub Actions, Azure Pipelines, TeamCity, etc.).
 
 ## Developer commands
 
 ```bash
-# --- src/ (legacy CLI) ---
-
-# Build the solution
+# Build
 dotnet build ./src/GitVersion.slnx
+dotnet build ./new-cli/GitVersion.slnx
 
-# Run all tests
+# Test
 dotnet test ./src/GitVersion.slnx
-
-# Run tests for a single project
 dotnet test --project ./src/GitVersion.Core.Tests/GitVersion.Core.Tests.csproj
 
 # Run the legacy CLI locally
 dotnet run --project src/GitVersion.App
 
-# Format code
-dotnet format ./src/GitVersion.slnx
-
-# Verify formatting (CI-friendly, non-zero exit if changes needed)
-dotnet format --verify-no-changes ./src/GitVersion.slnx
-
-# --- new-cli/ (new CLI) ---
-
-# Build the new CLI solution
-dotnet build ./new-cli/GitVersion.slnx
-
-# Run tests for the new CLI
-dotnet test ./new-cli/GitVersion.slnx
-
 # Run the new CLI locally
 dotnet run --project new-cli/GitVersion.Cli
+
+# Format
+dotnet format ./src/GitVersion.slnx
+dotnet format --verify-no-changes ./src/GitVersion.slnx   # CI check
+
+# Regenerate schemas (after changing GitVersionVariables or GitVersionConfiguration)
+./build.ps1 -Stage build -Target BuildPrepare
+./build.ps1 -Stage docs -Target GenerateSchemas
 ```
+
+## Architecture
+
+The repo has two parallel solution trees:
+
+### `src/` — legacy/stable CLI (`src/GitVersion.slnx`)
+
+| Project | Role |
+|---|---|
+| `GitVersion.Core` | Core version calculation logic, version calculators, version search strategies |
+| `GitVersion.Configuration` | Config loading/validation (YAML), `ConfigurationFileLocator.cs` |
+| `GitVersion.App` | CLI entry point |
+| `GitVersion.BuildAgents` | Platform adapters; write `GitVersion_`-prefixed env vars — preserve that prefix |
+| `GitVersion.LibGit2Sharp` | Git repository access |
+| `GitVersion.Output` | JSON/env/text output formatters |
+| `GitVersion.MsBuild` | MSBuild task integration |
+| `GitVersion.Testing` | Shared test fixtures and builders |
+
+Key internal directories in `GitVersion.Core`:
+- `VersionCalculation/VersionCalculators/` — deployment-mode calculators (Mainline, ContinuousDeployment, ContinuousDelivery)
+- `VersionCalculation/VersionSearchStrategies/` — strategies for finding a base version in Git history
+- `VersionCalculation/Mainline/` — mainline versioning implementation
+
+### `new-cli/` — new CLI (`new-cli/GitVersion.slnx`, actively developed)
+
+Plugin-based architecture: `GitVersion.Cli`, `GitVersion.Core`, `GitVersion.Calculation`, `GitVersion.Configuration`, `GitVersion.Normalization`, `GitVersion.Output`, `GitVersion.Common`, `GitVersion.Core.Libgit2Sharp`, `GitVersion.Cli.Generator`.
+
+Each tree has its own `Directory.Packages.props` for centralized package versions.
 
 ## Conventions
 
-- **SDK / TFM**: .NET 10 (`global.json`); most projects target `net10.0`.
+- **Package versions**: update `src/Directory.Packages.props` (or `new-cli/Directory.Packages.props`), not individual csproj files. Add packages via `dotnet add package <Package> --version <Version>`.
+- **Config file names**: `GitVersion.yml`, `GitVersion.yaml`, `.GitVersion.yml`, `.GitVersion.yaml` — see `ConfigurationFileLocator.cs` for the lookup order.
+- **Code style**: defined in `.editorconfig`; run `dotnet format` to apply. Nullable reference types and implicit usings are enabled.
 - **C# version**: `LangVersion=latest` (C# 14). Prefer new syntax where it improves clarity:
   - `field` keyword — access auto-property backing field inside the property body instead of a manual backing field
   - Extension members — use the new `extension(Type t) { }` block syntax for extension methods/properties
   - Null-conditional assignment — `x?.Property = value`
   - `params` collections — `params` now works with any collection type, not just arrays
   - Partial properties — analogous to partial methods for source generators
-- **Package versions**: update `src/Directory.Packages.props`, not individual csproj files. Add packages via `dotnet add package <Package> --version <Version>`.
-- **Config file names**: `GitVersion.yml`, `GitVersion.yaml`, `.GitVersion.yml`, `.GitVersion.yaml` — use these names or pass `--configfile`.
-- **Code style**: `.editorconfig` defines style; run `dotnet format` to apply.
 - **Commit style**: prefer atomic commits; rebase onto `main` rather than merging.
-- **Tests**: integration tests live in `src/GitVersion.Core.Tests/IntegrationTests/`. Use `EmptyRepositoryFixture` / `BaseGitFlowRepositoryFixture` and builder patterns (`GitFlowConfigurationBuilder`, `GitHubFlowConfigurationBuilder`).
+- **CLI output changes**: update `docs/` examples and build-agent adapters that parse JSON or env vars.
 
-## Release process
+## Testing
 
-Cutting a release (milestone setup, label validation, creating the GitHub release, monitoring downstream
+Integration tests live in `src/GitVersion.Core.Tests/IntegrationTests/` with a scenario class per branch type (`MainScenarios`, `FeatureBranchScenarios`, `ReleaseScenarios`, etc.). Use `fixture.AssertFullSemver("x.y.z-label.n", configuration)` to assert calculated versions.
+
+```csharp
+using var fixture = new EmptyRepositoryFixture();
+fixture.Repository.MakeATaggedCommit("1.0.0");
+fixture.Repository.CreateBranch("feature/my-feature");
+fixture.Checkout("feature/my-feature");  // use fixture.Checkout(), not fixture.Repository.Checkout()
+fixture.Repository.MakeACommit();
+
+var configuration = GitFlowConfigurationBuilder.New.Build();
+fixture.AssertFullSemver("1.0.1-my-feature.1", configuration);
+```
+
+Test stack: NUnit 4.x, Shouldly assertions, NSubstitute mocks, `EmptyRepositoryFixture` / `BaseGitFlowRepositoryFixture`, config builders (`GitFlowConfigurationBuilder`, `GitHubFlowConfigurationBuilder`, `EmptyConfigurationBuilder`).
+
+<!-- jbcontext-instructions-start -->
+# Tools
+
+## Code discovery: context-explorer first
+
+When a task requires finding or understanding code whose location you don't
+already know, your FIRST code-discovery step MUST be:
+
+Task(subagent_type='context-explorer',
+     description=<short label>,
+     prompt=<1-2 sentence intent describing what to find>)
+
+Start there instead of opening with your own `grep`/`glob`/`bash` searches or
+git history: the subagent runs the semantic exploration in its own context and
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GitTools/GitVersion](https://github.com/GitTools/GitVersion) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
