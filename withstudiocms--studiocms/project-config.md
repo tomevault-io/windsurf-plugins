@@ -1,13 +1,10 @@
 ---
 trigger: always_on
-description: * **No Pull Requests:** Do not create or submit Pull Requests (PRs) under any circumstances.
+description: Strict constraints for AI agents
 ---
 
-# AGENTS.md — StudioCMS
 
-# Agent Policies
-
-## Prohibited Actions (All Agents)
+# AI Agent Constraints
 * **No Pull Requests:** Do not create or submit Pull Requests (PRs) under any circumstances. 
 * **Workflow:** Provide code changes as diffs or full file contents in the chat interface only.
 * **Review Only:** You may provide code reviews or suggestions, but you are prohibited from initiating the merge process or opening new PRs.
@@ -15,80 +12,157 @@ description: * **No Pull Requests:** Do not create or submit Pull Requests (PRs)
   * **Compliance:** Adhere strictly to these constraints to ensure a clear separation of responsibilities between AI agents and human developers.
   * **Human Only:** AI agents are not permitted to generate or modify full code in this repository. All code contributions must be made by human developers based on the guidance provided by AI agents. You may provide code snippets or suggestions, but the final implementation must be done by a human developer.
 
-## Specific Agent Agent Policies
-### @coderabbit / @coderabbitai
-* Allowed to review, and perform programmed actions as allowed in the current config.
+# GitHub Copilot Instructions for StudioCMS
 
-## Project Overview
+This file provides context and guidelines for GitHub Copilot when working with the StudioCMS codebase.
 
-**StudioCMS** is an MIT-licensed, open-source SSR Astro-native CMS built with TypeScript and Effect-ts. It serves as a headless CMS requiring custom frontend development and must run in server-side rendering mode.
+## Project Context
 
-- **Repository**: <https://github.com/withstudiocms/studiocms/>
-- **Documentation**: <https://docs.studiocms.dev>
-- **Website**: <https://studiocms.dev>
-- **Community**: [Discord](https://chat.studiocms.dev)
-- **Translations**: [Crowdin Project](https://crowdin.com/project/studiocms)
-- **Status**: Early development, not production-ready
+StudioCMS is an open-source, SSR Astro-native CMS built with TypeScript and Effect-ts. It's a headless CMS that requires custom frontend development and must run in server-side rendering mode.
 
-## Core Technology Stack
+### Core Technologies
+- **Astro** (SSR mode with adapter required)
+- **TypeScript** (strict typing)
+- **Effect-ts** (functional programming patterns)
+- **Database** via @withstudiocms/kysely (powered by Kysely)
+  - Supports: libSQL, MySQL, PostgreSQL
+- **pnpm** 10.17.0 (preferred package manager)
+- **Node.js** >=22.20.0 required
 
-| Technology | Details | Notes |
-|---|---|---|
-| **Framework** | Astro | Must use SSR mode (`output: 'server'`), never SSG |
-| **Language** | TypeScript | Strict typing enforced |
-| **Database** | @withstudiocms/kysely | Powered by Kysely - supports libSQL, MySQL, PostgreSQL |
-| **Effect System** | Effect-ts | Functional programming patterns |
-| **Markdown** | MarkedJS, MarkDoc, native Astro MD | Extension support |
-| **Auth** | Plugins (GitHub, Discord, Google, Auth0) + built-in username/password | OAuth requires plugin installation |
-| **Package Manager** | pnpm 10.17.0 (preferred) | npm/yarn also supported |
-| **Runtime** | Node.js >=22.20.0 only | Bun and Deno are NOT supported |
+### Project Structure
+- `packages/studiocms/` - Core CMS package
+- Monorepo with plugin architecture
+- Plugin-based OAuth authentication
 
-## Monorepo Structure
+## Code Style & Patterns
 
-```text
-packages/
-├── studiocms/                    # Core CMS package (main)
-├── @studiocms/blog/              # Blog plugin
-├── @studiocms/github/            # GitHub OAuth plugin
-├── @studiocms/discord/           # Discord OAuth plugin
-├── @studiocms/google/            # Google OAuth plugin
-├── @studiocms/auth0/             # Auth0 OAuth plugin
-├── @studiocms/cloudinary-image-service/
-├── @studiocms/s3-storage/
-├── @studiocms/html/              # Content renderer plugins
-├── @studiocms/markdoc/
-├── @studiocms/md/
-├── @studiocms/mdx/
-├── @studiocms/wysiwyg/
-├── @withstudiocms/sdk/           # SDK / internal packages
-├── @withstudiocms/kysely/        # Kysely database layer
-├── @withstudiocms/effect/
-├── @withstudiocms/buildkit/
-├── @withstudiocms/auth-kit/      # Authentication utilities
-├── @withstudiocms/cli-kit/       # CLI toolkit
-├── @withstudiocms/api-spec/      # API specification
-├── @withstudiocms/component-registry/
-├── @withstudiocms/config-utils/
-├── @withstudiocms/internal_helpers/
-├── @withstudiocms/template-lang/
-└── ...other packages
+### TypeScript Guidelines
+- Use strict typing throughout
+- Prefer type safety over convenience
+- Define interfaces for all data structures
+- Use proper Effect-ts patterns for error handling
+
+### Astro-Specific Patterns
+```typescript
+// Astro components should use proper component syntax
+---
+// Component script (TypeScript)
+export interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!-- Component template -->
+<h1>{title}</h1>
 ```
 
-## Dev Environment Setup
+### Effect-ts Patterns
+```typescript
+import { Effect, pipe } from "effect";
 
-### Prerequisites
-- Node.js >=22.20.0 (version specified in `.prototools`)
-- pnpm 10.17.0 (preferred package manager)
-- Database: libSQL (Turso, self-hosted, or local file), MySQL, or PostgreSQL
+// Prefer Effect patterns for async operations and error handling
+const someOperation = pipe(
+  Effect.tryPromise(() => someAsyncOperation()),
+  Effect.catchAll((error) => Effect.fail(new SomeError(error)))
+);
+```
 
-### Environment Variables
+### Database Patterns
+- Database operations are handled internally by StudioCMS core
+- Uses Kysely via @withstudiocms/kysely for type-safe database operations
+- Supports libSQL, MySQL, and PostgreSQL
+- Always handle potential null/undefined values in your code
+
+## Authentication Patterns
+
+### OAuth Provider Plugins
+- Each OAuth provider is a separate plugin package
+- Use consistent naming: `@studiocms/github`, `@studiocms/discord`, etc.
+- Environment variables use `CMS_` prefix: `CMS_GITHUB_CLIENT_ID`
+
+### Built-in Username/Password
+- Always requires `CMS_ENCRYPTION_KEY`
+- Use proper password hashing and validation
+
+## Plugin Development
+
+### Plugin Structure
+```typescript
+import type { StudioCMSPlugin } from 'studiocms/types';
+
+export function myPlugin(options?: MyPluginOptions): StudioCMSPlugin {
+  return {
+    name: 'my-plugin',
+    hooks: {
+      // Plugin hooks
+    },
+  };
+}
+```
+
+### Plugin Registration
+```javascript
+// studiocms.config.mts
+import { defineStudioCMSConfig } from 'studiocms/config';
+import myPlugin from '@studiocms/my-plugin';
+
+export default defineStudioCMSConfig({
+  dbStartPage: false,
+  db: {
+    dialect: 'libsql', // or 'mysql' or 'postgres'
+  },
+  plugins: [
+    myPlugin(),
+  ],
+});
+```
+
+## Common Patterns to Follow
+
+### Error Handling
+```typescript
+// Use Effect-ts for error handling
+import { Effect } from "effect";
+
+const safeOperation = Effect.tryPromise({
+  try: () => riskyOperation(),
+  catch: (error) => new OperationError(error)
+});
+```
+
+### Configuration Management
+- Use proper TypeScript interfaces for all config
+- Validate configuration at runtime
+- Provide sensible defaults
+
+### Internationalization
+```typescript
+// Use the i18n system properly
+import { t } from '../i18n';
+
+const message = t('key.path');
+```
+
+### File Structure
+- Group related functionality together
+- Use consistent naming conventions
+- Separate concerns (auth, database, UI, etc.)
+
+## Environment Variables
+
+### Required
 ```bash
-# Database (Required - Choose ONE option)
+# Authentication (Always Required)
+CMS_ENCRYPTION_KEY="..." # Generate: openssl rand -base64 16
+
+# Database - Choose ONE of the following:
 
 # Option 1: libSQL (Turso, local file, or self-hosted)
 CMS_LIBSQL_URL=libsql://your-database.turso.io
-CMS_LIBSQL_AUTH_TOKEN=your-database-token
-# Optional:
+CMS_LIBSQL_AUTH_TOKEN=your-token
+# Optional for libSQL:
 # CMS_LIBSQL_SYNC_INTERVAL=
 # CMS_LIBSQL_SYNC_URL=
 
@@ -105,31 +179,12 @@ CMS_POSTGRES_USER=your-database-user
 CMS_POSTGRES_PASSWORD=your-database-password
 CMS_POSTGRES_HOST=your-database-host
 CMS_POSTGRES_PORT=5432
+```
 
-# Base Authentication (Required)
-CMS_ENCRYPTION_KEY="..." # Generate: openssl rand -base64 16
-
-# GitHub OAuth (Optional — requires @studiocms/github plugin)
-CMS_GITHUB_CLIENT_ID=
-CMS_GITHUB_CLIENT_SECRET=
-CMS_GITHUB_REDIRECT_URI=http://localhost:4321/studiocms_api/auth/github/callback
-
-# Discord OAuth (Optional — requires @studiocms/discord plugin)
-CMS_DISCORD_CLIENT_ID=
-CMS_DISCORD_CLIENT_SECRET=
-CMS_DISCORD_REDIRECT_URI=http://localhost:4321/studiocms_api/auth/discord/callback
-
-# Google OAuth (Optional — requires @studiocms/google plugin)
-CMS_GOOGLE_CLIENT_ID=
-CMS_GOOGLE_CLIENT_SECRET=
-CMS_GOOGLE_REDIRECT_URI=http://localhost:4321/studiocms_api/auth/google/callback
-
-# Auth0 OAuth (Optional — requires @studiocms/auth0 plugin)
-CMS_AUTH0_CLIENT_ID=
-CMS_AUTH0_CLIENT_SECRET=
+### OAuth (Plugin-specific)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [withstudiocms/studiocms](https://github.com/withstudiocms/studiocms) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
