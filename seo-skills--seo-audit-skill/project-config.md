@@ -1,121 +1,119 @@
 ---
 trigger: always_on
-description: Audit websites for SEO, technical, content, security, JS rendering, and AI readiness using SEOmator CLI. Returns LLM-optimized reports with health scores across 251 rules and 20 categories. Use when analyzing websites, debugging SEO issues, or checking site health.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# SEO Audit Skill
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Audit websites for SEO, technical, content, performance, security, JavaScript rendering, and AI readiness using the SEOmator CLI.
+## Project Overview
 
-SEOmator provides comprehensive website auditing by analyzing website structure and content against **251 rules** across **20 categories**.
+SEOmator is a comprehensive SEO audit tool (`@seomator/seo-audit`) with 251 rules across 20 categories. It ships as both a **CLI tool** (published to npm) and an **Electron desktop app** (local only). It fetches web pages, parses HTML with Cheerio, optionally measures Core Web Vitals via Playwright, and scores pages against SEO best practices.
 
-It provides a list of issues with severity levels, affected URLs, and actionable fix suggestions.
+## Critical Rules (read before making changes)
 
-## Links
+### package.json Dual-Purpose Constraints
 
-* SEOmator npm package: [npmjs.com/package/@seomator/seo-audit](https://www.npmjs.com/package/@seomator/seo-audit)
-* GitHub repository: [github.com/seo-skills/seo-audit-skill](https://github.com/seo-skills/seo-audit-skill)
-* Web UI: [seomator.com/free-seo-audit-tool](https://seomator.com/free-seo-audit-tool)
+The `package.json` serves **both** the npm CLI package and the Electron desktop app. These fields have strict requirements:
 
-## What This Skill Does
+| Field | Value | Why |
+|-------|-------|-----|
+| `main` | `./dist-electron/main/index.js` | **Electron reads this** to find the main process entry. DO NOT change to `./dist/cli.js` or Electron will execute Commander CLI instead of launching the app window. |
+| `exports` | `./dist/cli.js` | **npm/Node.js consumers use this** for programmatic imports. Takes priority over `main` in modern Node.js. |
+| `bin` | `./dist/cli.js` | **npm CLI users use this** (`seomator` command). |
+| `files` | `["dist"]` | **Only `dist/` ships to npm.** This is the firewall — `electron/`, `dist-electron/`, `scripts/` never reach npm users. |
 
-This skill enables AI agents to audit websites for **251 rules** in **20 categories**, including:
+**If you change `main` to anything other than the Electron entry, `npm run electron:dev` will break** — Electron will print Commander help text and exit instead of opening the app window.
 
-- **Core SEO** (19 rules): Canonical URLs, indexing directives, title uniqueness, canonical conflicts/loops
-- **Performance** (22 rules): LCP, CLS, FCP, TTFB, INP, compression, caching, minification, HTTP/2
-- **Links** (19 rules): Broken links, redirect chains, anchor text, orphan pages, localhost/fragment links
-- **Images** (14 rules): Alt text, dimensions, lazy loading, modern formats, alt length, background images
-- **Security** (16 rules): HTTPS, HSTS, CSP, external link safety, leaked secrets, SSL expiry/protocol
-- **Technical SEO** (13 rules): robots.txt, sitemap.xml, URL structure, 404 pages, soft 404s, error codes
-- **Crawlability** (18 rules): Sitemap conflicts, indexability signals, canonical chains, pagination issues
-- **Structured Data** (13 rules): Schema.org markup, Article, Organization, FAQ, Product, Breadcrumb
-- **JavaScript Rendering** (13 rules): Rendered DOM checks, raw vs rendered mismatches, SSR detection
-- **Accessibility** (12 rules): ARIA labels, color contrast, form labels, landmarks, touch targets
-- **Content** (17 rules): Word count, readability, keyword density, duplicate detection, pixel widths
-- **Social** (9 rules): Open Graph tags, Twitter cards, share buttons, profile links
-- **E-E-A-T** (14 rules): Author bylines, citations, trust signals, about/contact pages, YMYL detection
-- **URL Structure** (14 rules): Keyword slugs, stop words, uppercase, underscores, session IDs, tracking params
-- **Redirects** (8 rules): Redirect loops, types (301/302), meta refresh, JavaScript redirects, broken redirects
-- **Mobile** (5 rules): Font sizes, horizontal scroll, intrusive interstitials, viewport issues
-- **Internationalization** (10 rules): lang attribute, hreflang validation (return links, conflicts, mismatches)
-- **HTML Validation** (9 rules): Doctype, charset, head structure, lorem ipsum, multiple titles/descriptions
-- **AI/GEO Readiness** (5 rules): Semantic HTML, AI bot access, llms.txt, schema drift
-- **Legal Compliance** (1 rule): Cookie consent
+### Dependency Split: CLI vs Electron
 
-The audit crawls the website, analyzes each page against audit rules, and returns a comprehensive report with:
-- Overall health score (0-100) with letter grade (A-F)
-- Category breakdowns with pass/warn/fail counts
-- Specific issues with affected URLs grouped by rule
-- Actionable fix recommendations
+- **`dependencies`**: Only CLI packages (cheerio, commander, playwright, better-sqlite3, etc.). These are what npm users install.
+- **`devDependencies`**: Electron-only packages (react, react-dom, react-router-dom, recharts, zustand, electron, electron-vite, tailwindcss, etc.).
+- **Never move react/zustand/recharts/electron packages into `dependencies`** — npm users would download ~15MB of unused Electron UI code.
 
-## When to Use
+### npm Publishing Checklist
 
-Use this skill when you need to:
-- Analyze a website's SEO health
-- Debug technical SEO issues
-- Check for broken links and redirect chains
-- Validate meta tags, canonical URLs, and structured data
-- Audit security headers, SSL, and HTTPS
-- Check accessibility compliance
-- Analyze JavaScript rendering and SSR compatibility
-- Evaluate AI/GEO readiness (semantic HTML, llms.txt, bot access)
-- Detect duplicate content across pages
-- Validate hreflang and internationalization setup
-- Check HTML document structure and validation
-- Generate site audit reports in multiple formats
-- Compare site health before/after changes
+1. Verify `dependencies` contains only CLI packages (no react, zustand, recharts, electron)
+2. Verify `files: ["dist"]` — only CLI build ships
+3. `npm run build` → builds CLI via tsup
+4. `npm pack --dry-run` → confirm only `dist/` files + README + package.json
+5. `npm publish --access public`
+6. The `prepublishOnly` script auto-runs `npm run build` before publish
 
-## Prerequisites
+Published as `@seomator/seo-audit` on npm. Current version: **3.0.0**.
 
-This skill requires the SEOmator CLI to be installed.
+### better-sqlite3 Native Module ABI
 
-### Installation
+`better-sqlite3` is a C++ addon compiled against a specific Node.js ABI. Electron and CLI/Node.js use different ABIs:
 
 ```bash
-npm install -g @seomator/seo-audit
+npx electron-rebuild -f -w better-sqlite3   # Before running Electron
+npm rebuild better-sqlite3                    # Before running CLI tests
 ```
 
-### Verify Installation
+**You must recompile when switching between Electron and CLI.** Failure produces a cryptic `NODE_MODULE_VERSION mismatch` error.
 
-Check that seomator is installed and the system is ready:
+### Zero Modifications to `src/`
+
+The Electron app is **purely additive** — all Electron code lives in `electron/`. The `src/` directory is shared by both CLI and Electron through direct imports (via the `@core` alias in electron-vite config). Never put Electron-specific code in `src/`.
+
+## Build & Development Commands
+
+### CLI
 
 ```bash
-seomator self doctor
+npm run build          # Build with tsup (ESM, single entry: src/cli.ts)
+npm run dev            # Build in watch mode
+npm run test:run       # Run all tests once (vitest)
+npm test               # Run tests in watch mode
 ```
 
-This checks:
-- Node.js version (18+ recommended)
-- npm availability
-- Chrome/Chromium for Core Web Vitals and JS rendering
-- Write permissions for ~/.seomator
-- Local config file presence
+Run locally after building:
+```bash
+./dist/cli.js audit https://example.com --no-cwv
+```
 
-## Setup
+Run a single test file:
+```bash
+npx vitest run src/rules/core/core.test.ts
+```
 
-Running `seomator init` creates a `seomator.toml` config file in the current directory.
+### Electron Desktop App
 
 ```bash
-seomator init                    # Interactive setup
-seomator init -y                 # Use defaults
-seomator init --preset blog      # Blog-optimized config
-seomator init --preset ecommerce # E-commerce config
-seomator init --preset ci        # Minimal CI config
+npx electron-rebuild -f -w better-sqlite3   # Required before first run
+npm run electron:dev   # Dev mode with Vite HMR + Electron hot reload
+npm run electron:build # Production build (main + preload + renderer)
+npm run electron:pack  # Build + package into distributable
 ```
 
-If there is no `seomator.toml` in the directory, CREATE ONE with `seomator init` before running audits.
+## Architecture
 
-## Usage
+### Rule System (the core abstraction)
 
-### AI Agent Best Practices
+The entire audit engine is built on a **self-registering rule pattern**:
 
-**YOU SHOULD always prefer `--format llm`** - it provides token-optimized XML output specifically designed for AI agents (50-70% smaller than JSON).
+1. **`defineRule()`** (`src/rules/define-rule.ts`) - Creates and validates an `AuditRule` object with `id`, `name`, `description`, `category`, `weight`, and `run(context)` function.
 
-When auditing:
-1. **Prefer live websites** over local dev servers for accurate performance and rendering data
+2. **`registerRule()`** (`src/rules/registry.ts`) - Stores rules in a global `Map<string, AuditRule>`. Throws on duplicate IDs.
+
+3. **Category `index.ts` files** (e.g., `src/rules/core/index.ts`) - Import individual rule files and call `registerRule()` for each. This is the registration point.
+
+4. **`src/rules/loader.ts`** - Static-imports all 20 category `index.ts` files. The act of importing triggers side-effect registration. `loadAllRules()` exists for API compat but rules load at import time.
+
+5. **Result helpers**: `pass(ruleId, message, details?)`, `warn(...)`, `fail(...)` return `RuleResult` with scores 100/50/0 respectively.
+
+### Adding a New Rule
+
+1. Create `src/rules/<category>/<rule-name>.ts` exporting a const created via `defineRule()`
+2. Rule ID convention: `<category>-<descriptive-name>` (e.g., `core-canonical-conflicting`)
+3. Import and `registerRule()` in `src/rules/<category>/index.ts`
+4. The `run` function receives `AuditContext` and returns `RuleResult` (or Promise)
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [seo-skills/seo-audit-skill](https://github.com/seo-skills/seo-audit-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
