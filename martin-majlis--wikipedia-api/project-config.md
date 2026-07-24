@@ -1,136 +1,139 @@
 ---
 trigger: always_on
-description: validates that `ATTRIBUTES_MAPPING` in `_base_wikipedia_page.py` is
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Guide for AI agents (and developers) on how to install, build, and test the Wikipedia-API project.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Before You Start
+## Project Overview
 
-**📖 CRITICAL: Always read the design and API documentation first**
+Wikipedia-API is a Python wrapper for the MediaWiki API. It provides both synchronous (`Wikipedia`) and asynchronous (`AsyncWikipedia`) clients. Published on PyPI as `wikipedia-api`. Requires Python 3.10+.
 
-Before making any changes, read these two documents to understand the
-architecture, class hierarchy, and public API:
+## Commands
 
-- **`DESIGN.rst`** — internal architecture, class hierarchy, request
-  lifecycle, dispatch helpers, and a step-by-step guide for adding new
-  API calls.
-- **`API.rst`** — public API reference: every method, property, and
-  attribute available on `Wikipedia`, `AsyncWikipedia`, `WikipediaPage`,
-  `AsyncWikipediaPage`, `WikipediaPageSection`, and the CLI.
+```bash
+# Install all dependencies (uses uv package manager)
+make requirements-all
 
-Skipping this step risks duplicating existing logic, violating
-established conventions, or breaking the sync/async symmetry.
+# Run all tests (unit + CLI verification)
+make run-tests
 
-## Sync / Async Symmetry
+# Run only unit tests
+make run-tests-unit
 
-**🚨 CRITICAL: The sync and async APIs MUST stay in perfect symmetry.**
+# Run a single test file / class / method
+uv run pytest tests/wikipedia_test.py
+uv run pytest tests/wikipedia_test.py::TestWikipedia
+uv run pytest tests/wikipedia_test.py::TestWikipedia::test_method
 
-`WikipediaPage` and `AsyncWikipediaPage` are parallel classes.
-Every public attribute or method on one **must** have the same kind of
-interface on the other:
+# Run tests with coverage (must stay above 90%)
+make run-coverage
 
-| If `WikipediaPage` has …     | then `AsyncWikipediaPage` MUST have …                                            |
-| ---------------------------- | -------------------------------------------------------------------------------- |
-| `@property foo`              | awaitable property `await page.foo` (explicit `@property` returning a coroutine) |
-| plain method `foo()`         | coroutine method `await page.foo()`                                              |
-| plain `@property` (no fetch) | plain `@property` (no fetch)                                                     |
+# Run all pre-commit hooks
+make run-pre-commit
 
-**Never** convert a property to a method (or vice versa) in one class
-without making the matching change in the other. Violations break
-the documented API contract and confuse callers who switch between
-the two clients.
+# Type checking only
+make run-type-check
 
-Examples of correct symmetry currently in place:
+# Linting and formatting check (ruff)
+make run-ruff
 
-- `page.summary`, `page.text`, `page.langlinks`, `page.links`,
-  `page.backlinks`, `page.categories`, `page.categorymembers` —
-  `@property` in sync; explicit `@property` returning a coroutine in async.
-- `page.pageid`, `page.fullurl`, `page.displaytitle`, and all other
-  info attributes — same pattern: `@property` in sync, awaitable
-  `@property` in async.
-- `page.exists()` — plain method in sync; coroutine method
-  `await page.exists()` in async (both use call syntax `()`).
-- `page.sections`, `page.title`, `page.ns`, `page.language`,
-  `page.variant` — plain `@property` in both (no awaiting needed).
+# CLI snapshot tests
+make run-test-cli-verify    # verify against recorded snapshots
+make run-test-cli-record    # re-record snapshots after intentional CLI changes
 
-## Typing Standards
+# Validate ATTRIBUTES_MAPPING is in sync with page properties
+make run-validate-attributes-mappping
 
-**🧠 Prefer explicit type annotations and minimize `Any`.**
+# Full pre-release validation
+make pre-release-check
 
-When writing or updating Python code in this repository:
-
-- Use inline type annotations directly on variables, attributes, parameters,
-  and return values (e.g. `value: dict[str, int] = {}`), instead of legacy
-  `# type:` comments.
-- Avoid `Any` whenever a more specific type can be expressed.
-- Use `Any` only when it is absolutely necessary (for example, dynamic external
-  payloads or framework boundaries where precise typing is not practical).
-- If `Any` is required, keep its scope as small as possible and prefer typed
-  wrappers/conversions at the boundary.
-- Validate typing-related changes by running `make run-pre-commit` before
-  submitting.
-
-## Docstring Standards
-
-**📝 Write descriptive docstrings with consistent structure.**
-
-All functions, methods, classes, and modules must have descriptive docstrings that follow this structure:
-
-### Required Docstring Format
-
-```python
-def example_function(param1: str, param2: int) -> bool:
-    """One-line summary of the function's purpose.
-
-    Detailed description of the function's behavior, including important
-    implementation details, usage patterns, or context.
-
-    Args:
-        param1: Description of the first parameter, including expected format
-            and constraints.
-        param2: Description of the second parameter, including valid ranges
-            or special values.
-
-    Returns:
-        Description of the return value, including its type and meaning.
-        Include possible return values and their significance.
-
-    Raises:
-        ExceptionType: Description of when this exception is raised,
-            including the conditions that trigger it.
-        AnotherException: Description of when this exception occurs.
-
-    Invariants:
-        - Any conditions that remain true before and after execution
-        - State guarantees that the function maintains
-        - Thread safety considerations if applicable
-    """
+# Build package
+make build-package
 ```
 
-### Docstring Requirements
+## Architecture
 
-1. **One-line summary**: Must be a complete sentence ending with a period
-   that concisely describes what the function does.
+The codebase separates two concerns via mixins and multiple inheritance:
 
-2. **Detailed description**: Expand on the summary with implementation details,
-   usage examples, or important context.
+1. **HTTP Transport** (`wikipediaapi/_http_client/`) - sync/async HTTP with retry logic via tenacity + httpx
+2. **API Logic** (`wikipediaapi/_resources/`) - MediaWiki parameter building and response parsing
 
-3. **Parameters section (`Args`)**: Document all parameters with:
-   - Parameter name (matching the function signature)
-   - Description including expected format, constraints, and valid values
-   - Use proper indentation and formatting
+Concrete clients compose one of each:
+```
+Wikipedia(WikipediaResource, SyncHTTPClient)
+AsyncWikipedia(AsyncWikipediaResource, AsyncHTTPClient)
+```
 
-4. **Return values section (`Returns`)**: Document the return value with:
-   - Type information (if not obvious from type hints)
-   - Meaning and significance of different return values
-   - Special cases or conditions
+### Key layers
+
+- `_http_client/` - `BaseHTTPClient` (shared config/retry) -> `SyncHTTPClient` / `AsyncHTTPClient`
+- `_resources/` - `BaseWikipediaResource` (param builders `_*_params`, response parsers `_build_*`, dispatch helpers) -> `WikipediaResource` / `AsyncWikipediaResource`
+- `_wikipedia/` - `Wikipedia` (sync concrete client) / `AsyncWikipedia` (async concrete client)
+- `_page/` - `BaseWikipediaPage` -> `WikipediaPage` (sync, lazy properties) / `AsyncWikipediaPage` (awaitable properties) / `WikipediaPageSection`
+- `_image/` - `BaseWikipediaImage` -> `WikipediaImage` (sync) / `AsyncWikipediaImage` (async)
+- `_types/` - Frozen dataclasses (Coordinate, GeoPoint, SearchResults, etc.)
+- `_params/` - Query parameter dataclasses with `to_api()` and `cache_key()` methods
+- `_enums/` - Strongly-typed enums for API parameters (Namespace, SearchSort, etc.)
+- `exceptions/` - Exception hierarchy (WikiConnectionError, WikiHttpError, WikiRateLimitError, etc.)
+- `cli.py` - Click-based CLI tool
+
+### Dispatch helpers
+
+Four patterns in `BaseWikipediaResource`, each with sync and async variants:
+- `_dispatch_prop` - single-page prop query (extracts, info, langlinks, categories)
+- `_dispatch_prop_paginated` - paginated prop query (links, coordinates, images)
+- `_dispatch_list` - paginated list query requiring a page (backlinks, categorymembers)
+- `_dispatch_standalone_list` - paginated list query without a page
+
+**Warning**: `geosearch`, `random`, and `search` deliberately use a single `_get` call (not `_dispatch_standalone_list`) to avoid infinite loops.
+
+### Page lazy loading
+
+Pages created via `wiki.page(title)` make no network call at construction. Properties (summary, text, links, etc.) fetch on first access and cache the result. `ATTRIBUTES_MAPPING` in `_page/_base_wikipedia_page.py` maps property names to API calls.
+
+`coordinates` and `images` use per-parameter caching via `page._param_cache[name][cache_key]` with a `NOT_CACHED` sentinel.
+
+## Critical Invariants
+
+### Sync/async symmetry is mandatory
+
+Every public attribute/method on `WikipediaPage` must have a matching interface on `AsyncWikipediaPage`:
+- Sync `@property` -> Async `@property` returning a coroutine (`await page.foo`)
+- Sync method -> Async coroutine method
+- Non-fetching `@property` -> Same in both
+
+Both sync and async methods share the same `_*_params` and `_build_*` implementations.
+
+### After every change checklist
+
+1. Update `API.rst` and `DESIGN.rst` if architecture/API changed
+2. Update `index.rst` and `README.rst` (must stay in sync) if user-facing behavior changed
+3. Update `example_sync.py` and `example_async.py`
+4. Update CLI (`cli.py`, `tests/cli/test_cli.sh`, `tests/cli_test.py`, `CLI.rst`)
+5. Update `tests/test_sync_async_symmetry.py` property lists for new page attributes
+6. Run `make run-validate-attributes-mappping` for page property changes
+7. Run `make run-pre-commit` and `make run-coverage`
+8. Add a bullet to the `Unreleased` section in `CHANGES.rst` describing the change and linking the PR
+
+### Testing rules
+
+- All HTTP tests must use `tests/mock_data.py` - never make real HTTP requests in unit tests
+- Test files follow `*_test.py` naming pattern
+- `asyncio_mode = "auto"` is configured for pytest-asyncio
+- Code coverage must stay above 90% (core modules 95%+)
+
+### Code style
+
+- Max line length: 100 characters (enforced by ruff)
+- Explicit type annotations preferred; minimize use of `Any`
+- Use `uv run` to execute scripts (not `.venv/bin/python`)
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [martin-majlis/Wikipedia-API](https://github.com/martin-majlis/Wikipedia-API) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
