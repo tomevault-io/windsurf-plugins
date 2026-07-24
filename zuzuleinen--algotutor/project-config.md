@@ -1,129 +1,108 @@
 ---
 trigger: always_on
-description: algotutor's behaviour lives in `AGENTS.md` and is mirrored to `CLAUDE.md` and
+description: algotutor hosts independent training tracks ("courses"). Each course has its own concepts,
 ---
 
-# Agent setup
+# Algotutor — Multi-Course Training Project
 
-algotutor's behaviour lives in `AGENTS.md` and is mirrored to `CLAUDE.md` and
-`GEMINI.md` by `make sync-agents`. Any AI coding agent that can read files, edit
-files, and run shell commands can drive the workflow once it loads those
-instructions.
+algotutor hosts independent training tracks ("courses"). Each course has its own concepts,
+progress, problems, cards, mistakes, re-solve schedule, and retention. The user is enrolled
+in one or more courses and trains in **one course at a time**.
 
-This page lists per-agent setup tips. Each agent is independent — pick one and go.
+## Active Course Resolution
 
-## Quick reference
+**Always run this before any other flow.**
 
-| Agent             | Loads instructions from                                | Model config              | Permissions                                                              |
-| ----------------- | ------------------------------------------------------ | ------------------------- | ------------------------------------------------------------------------ |
-| Claude Code       | `CLAUDE.md` (auto)                                     | `.claude/settings.json`   | `.claude/settings.local.json`, or run with `--dangerously-skip-permissions` |
-| OpenAI Codex CLI  | `AGENTS.md` (auto)                                     | `~/.codex/config.toml`    | `--sandbox <mode>` / `--ask-for-approval <policy>`                       |
-| Cursor            | `AGENTS.md` (auto, recent builds) or `.cursor/rules/`  | IDE settings              | Auto via Composer / Agent mode                                           |
-| Cline / Roo Code  | `AGENTS.md` (auto) or `.clinerules/`                   | Extension settings        | Extension permissions UI                                                 |
-| OpenCode          | `AGENTS.md` (auto)                                     | `~/.config/opencode/`     | Per-launch flag                                                          |
-| Aider             | `AGENTS.md` via `--read` flag                          | `--model <name>`          | `--yes` for auto-approve                                                 |
-| Gemini CLI        | `GEMINI.md` (auto)                                     | Built-in                  | Per-launch flag                                                          |
+1. Read `state.json` at the repo root. It looks like:
+   ```json
+   {
+     "enrolled": ["algos", "conc"],
+     "active": "algos",
+     "default": "algos",
+     "default_agent": null
+   }
+   ```
+2. The course slug at `state.active` is the **active course**. Throughout this document,
+   `<active>` is a placeholder that means *that slug*. So `courses/<active>/progress.md`
+   resolves to `courses/algos/progress.md` when active is `algos`.
+3. If `state.json` is missing, ask the user to run `make init`. Do not invent state.
+4. If the user types `train <course>`, `review <course>`, `mistakes <course>`, or
+   `reset <course>` with a course slug, **first set `state.active` to that slug** (the slug
+   must be in `state.enrolled`), then continue. Persist the change to `state.json`.
+5. If the user types `train` with no argument and `state.enrolled` has more than one course,
+   resolve to `state.active` (last-used), but tell them in one line which course you're
+   training: "Training `<active>` (say `train conc` to switch)." If they have only one
+   enrolled course, train that one silently.
+6. **Course labels in prose.** When referring to the active course in any user-facing
+   message, use the human-readable **Label**, never the raw slug. The label mapping is
+   defined in `internal/courses/courses.go`:
+   - `algos` → **Algos**
+   - `conc` → **Concurrency**
+   Use the slug only in file paths, `state.json` values, and command examples (e.g.
+   `train conc`). In sentences, write "the Concurrency course" or "Training Concurrency",
+   not "the conc course" or "Active course is `conc`".
 
-## Per-agent setup
+## Project Structure
 
-### Claude Code
-
-```sh
-claude
-# or, to skip per-tool prompts:
-claude --dangerously-skip-permissions
+```
+state.json                       — active course, enrolled list, default agent
+main.go                          — current problem template (active course)
+main_test.go                     — present only when active course is `conc`
+docs/                            — project-wide + shared mechanics docs
+  agents.md                      — per-agent setup
+  cards.md                       — spaced-repetition card format (shared)
+  mix.md                         — mix-mode mechanics (shared)
+  resolve.md                     — re-solve mechanics (shared)
+courses/<slug>/                  — per-course universe
+  progress.md                    — concept levels for this course (user state)
+  progress.template.md           — blank progress (zeros)
+  current.md                     — current problem pointer
+  problems/                      — NNN.md per problem
+  problem-bank.md                — curated problems by concept and level
+  cards.json                     — review cards (auto-created)
+  mistakes.json                  — mistake log (auto-created)
+  resolve.json                   — re-solve schedule (auto-created)
+  retention.json                 — per-concept retention (auto-created)
+  mix.json                       — mix-session state (auto-created)
+  docs/
+    concepts.md                  — concept list with prerequisites (course-specific)
+    go-gotchas.md                — language traps relevant to this course
+    mistakes.md                  — course-specific mistake taxonomy + drill rules
+cmd/
+  init/                          — huh-driven onboarding (`make init`)
+  start/                         — flips active course + launches agent (`make train`)
+  review/                        — review TUI (`make review [course]`)
+internal/
+  courses/                       — state.json read/write, path helpers
+  migrate/                       — one-shot legacy → multi-course migration
+  cards/                         — FSRS card storage
+  review/                        — review TUI Bubble Tea model
 ```
 
-`CLAUDE.md` is auto-loaded on session start. Default model is set in
-`.claude/settings.json` (`claude-sonnet-4-6`). Permission allow-list is in
-`.claude/settings.local.json`.
+When this document references a path like `courses/<active>/progress.md`, substitute
+`<active>` with the active course slug from `state.json`.
 
-### OpenAI Codex CLI
+## Working Files Per Course
 
-```sh
-codex
-# or, to choose permissions for the session:
-codex --sandbox workspace-write --ask-for-approval on-request
-```
+The user works on `main.go` (and `main_test.go` for concurrency) at the **repo root**, not
+inside the course directory. The agent always edits the root files, but reads the problem
+statement from `courses/<active>/problems/NNN.md`.
 
-`AGENTS.md` is auto-loaded from the project root. Model preference goes in
-`~/.codex/config.toml`. Recommend a current reasoning-class model.
+| Active course | Files at root              | Validation (under the hood)   |
+|---------------|----------------------------|-------------------------------|
+| `algos`       | `main.go`                  | `go run .` + `fmt.Println`    |
+| `conc`        | `main.go` + `main_test.go` | `go test -race .`             |
 
-### Cursor
+The user validates with **`make run`** — a single dispatcher that picks the right command
+based on the active course. Tell the user "run `make run` to sanity-check before
+`check`," not the underlying Go command. The agent's `check` flow is the *evaluation*
+(grade, log mistakes, advance levels); `make run` is the *local smoke test* (does it
+compile / pass tests).
 
-Open the project folder in Cursor, switch to Agent / Composer mode, and type
-`train` in the chat. Recent Cursor builds auto-load `AGENTS.md`. If yours doesn't,
-add a one-line `.cursor/rules/main.mdc` containing `@AGENTS.md`.
+When the active course changes, swap the contents of these files to match the new course's
 
-### Cline / Roo Code
-
-Open the project in VS Code with the Cline (or Roo Code) extension installed,
-activate the chat panel, and type `train`. Both extensions auto-load `AGENTS.md`.
-
-### OpenCode
-
-```sh
-opencode
-```
-
-`AGENTS.md` is auto-loaded. Model is configured per-launch or in
-`~/.config/opencode/`.
-
-### Aider
-
-```sh
-aider --read AGENTS.md --model <your-model>
-```
-
-Aider does not auto-discover instruction files — pass `--read AGENTS.md`
-explicitly. Add `--yes` to auto-approve edits.
-
-### Gemini CLI
-
-```sh
-gemini
-```
-
-`GEMINI.md` is auto-loaded (it's a byte-identical mirror of `AGENTS.md`).
-
-## Auto-launch from `make`
-
-If you set a default agent during `make init`, `make train` and `make review` will
-auto-launch it for you with the right prompt. Otherwise they print "Open your agent
-and type `train`" and you do the launching.
-
-## If your agent doesn't auto-load
-
-Type this once at session start:
-
-> Read AGENTS.md and follow it.
-
-After that, all algotutor commands (`train`, `check`, `I don't know`, `mistakes`,
-`review`, `reset`, `I want to solve [X]`) work normally.
-
-## Switching agents mid-session
-
-All state lives on disk in JSON / Markdown files: `progress.md`, `current.md`,
-`cards.json`, `mistakes.json`, `resolve.json`, `mix.json`, `retention.json`. Stop
-one agent, start another in the same directory, and the next `train` picks up
-where you left off — same current problem, same concept levels, same mix /
-re-solve schedule, same mistake log. No re-bootstrap is needed.
-
-The only externally visible difference is response style — Sonnet, GPT-5, and
-Gemini phrase things differently. The workflow, rules, and state are identical.
-
-## Keeping mirrors in sync
-
-`AGENTS.md` is the canonical instruction file. `CLAUDE.md` and `GEMINI.md` are
-byte-identical copies. After editing `AGENTS.md`:
-
-```sh
-make sync-agents    # regenerate the mirrors
-make check-agents   # verify mirrors match (use in CI / pre-commit)
-```
-
-If `check-agents` fails, your mirrors have drifted — run `sync-agents`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zuzuleinen/algotutor](https://github.com/zuzuleinen/algotutor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
