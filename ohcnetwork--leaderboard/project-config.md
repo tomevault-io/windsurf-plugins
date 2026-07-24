@@ -1,178 +1,139 @@
 ---
 trigger: always_on
-description: This document provides specialized workflows for different types of tasks in the leaderboard system. Each agent represents a specific role with its own workflow, considerations, and best practices.
+description: This is a flexible, plugin-based leaderboard system for tracking and visualizing contributor activities across multiple data sources. The system follows a build-time data aggregation pattern with static site generation.
 ---
 
-# Leaderboard Project - Specialized Agent Workflows
+# Leaderboard Project - AI Assistant Rules
 
-This document provides specialized workflows for different types of tasks in the leaderboard system. Each agent represents a specific role with its own workflow, considerations, and best practices.
+## Project Overview
 
----
+This is a flexible, plugin-based leaderboard system for tracking and visualizing contributor activities across multiple data sources. The system follows a build-time data aggregation pattern with static site generation.
 
-## Agent: Plugin Developer
+### Architecture
+- **Pattern**: Plugin-based with static site generation
+- **Data Flow**: Data Sources → Plugin Runner → LibSQL Database → Next.js Build → Static Site
+- **Deployment**: Static export to CDN (Netlify, Vercel, GitHub Pages, etc.)
 
-**Purpose**: Create and test new data source plugins for the leaderboard system.
+### Technology Stack
+- **Language**: TypeScript (strict mode)
+- **Runtime**: Node.js v20+
+- **Package Manager**: pnpm v10+ (monorepo with workspaces)
+- **Frontend**: Next.js 14+ (static export only)
+- **Database**: LibSQL (SQLite-compatible)
+- **Documentation**: Fumadocs (MDX)
+- **UI Components**: shadcn/ui + Tailwind CSS
+- **Testing**: Vitest
+- **Module System**: ESNext (ESM with `.js` extensions required)
 
-### Workflow
+## Monorepo Structure
 
-1. **Scaffold Plugin Project**
+```
+leaderboard/
+├── apps/
+│   └── leaderboard-web/          # Next.js static site
+├── packages/
+│   ├── api/                      # @ohcnetwork/leaderboard-api
+│   ├── plugin-runner/            # @leaderboard/plugin-runner
+│   ├── plugin-dummy/             # @leaderboard/plugin-dummy
+│   ├── create-plugin/            # create-leaderboard-plugin
+│   └── create-data-repo/         # create-leaderboard-data-repo
+├── docs/                         # Documentation (MDX)
+├── scripts/                      # Development scripts
+└── data/                         # Development data repository
+```
 
-   ```bash
-   pnpm create-leaderboard-plugin <path>
-   # Example: pnpm create-leaderboard-plugin ../leaderboard-github-plugin
-   ```
+### Key Packages
 
-   The CLI will prompt for:
-   - Plugin name (e.g., 'github', 'slack', 'jira')
-   - Plugin description
-   - Author name
+1. **@ohcnetwork/leaderboard-api**
+   - Database utilities and abstractions
+   - Plugin type definitions and interfaces
+   - Query builders (contributorQueries, activityQueries, etc.)
+   - Shared types and schemas
 
-   This generates a complete project structure with:
-   - `package.json` with correct dependencies
-   - `tsconfig.json` with proper configuration
-   - `vitest.config.ts` for testing
-   - `src/index.ts` with plugin template
-   - `src/__tests__/plugin.test.ts` with test examples
-   - `README.md` with documentation
+2. **@leaderboard/plugin-runner**
+   - CLI tool for orchestrating data collection
+   - Plugin loading and execution
+   - Import/export functionality
+   - Aggregation and badge evaluation
 
-2. **Implement Setup Method**
+3. **create-leaderboard-plugin**
+   - CLI for scaffolding new plugins
+   - Generates template with tests and docs
 
-   Define activity types in the `setup()` method:
+4. **create-leaderboard-data-repo**
+   - CLI for initializing data repositories
+   - Interactive setup for organization config
+   - Generates proper directory structure
 
-   ```typescript
-   import { activityDefinitionQueries } from "@ohcnetwork/leaderboard-api";
+5. **leaderboard-web**
+   - Next.js application (static export)
+   - Server-side generation at build time
+   - Reads from LibSQL database
 
-   async setup(ctx: PluginContext): Promise<void> {
-     // Define all activity types your plugin will track
-     await activityDefinitionQueries.upsert(ctx.db, {
-       slug: "pr_opened",
-       name: "Pull Request Opened",
-       description: "Opened a pull request",
-       points: 5,
-       meta: { icon: "git-pull-request" },
-     });
+## Coding Conventions
 
-     await activityDefinitionQueries.upsert(ctx.db, {
-       slug: "pr_merged",
-       name: "Pull Request Merged",
-       description: "Had a pull request merged",
-       points: 10,
-       meta: { icon: "git-merge" },
-     });
-   }
-   ```
+### TypeScript
+- **Strict Mode**: Always enabled
+- **Module System**: ESNext with ESM
+- **Type Safety**: Avoid `any` unless absolutely necessary; use `unknown` instead
+- **Interfaces vs Types**: Use `interface` for object shapes, `type` for unions/intersections
 
-3. **Implement Scrape Method**
+### Naming Conventions
+- **Files/Directories**: kebab-case (`activity-loader.ts`, `badge-rules/`)
+- **Functions/Variables**: camelCase (`getUserActivities`, `totalPoints`)
+- **Types/Interfaces/Classes**: PascalCase (`ActivityDefinition`, `PluginContext`)
+- **Constants**: SCREAMING_SNAKE_CASE for true constants (`MAX_RETRIES`)
+- **Private Members**: Prefix with `_` (`_internalCache`)
 
-   Fetch and store activities:
+### File Organization
+- **Source Code**: `src/` directory
+- **Tests**: `src/__tests__/` directory
+- **Test Files**: `{module-name}.test.ts`
+- **Types**: Co-locate with implementation or in `types.ts`
+- **Exports**: Use named exports (avoid default exports except for plugins and Next.js pages)
 
-   ```typescript
-   import { activityQueries, contributorQueries } from "@ohcnetwork/leaderboard-api";
+### Database Patterns
+- **Query Builders**: Always use provided query builders from `@ohcnetwork/leaderboard-api`
+  ```typescript
+  // ✅ Good
+  import { contributorQueries } from "@ohcnetwork/leaderboard-api";
+  const user = await contributorQueries.getByUsername(db, "alice");
+  
+  // ❌ Bad (use only when query builders don't cover the use case)
+  await db.execute("SELECT * FROM contributor WHERE username = ?", ["alice"]);
+  ```
+- **Transactions**: Use `db.batch()` for multiple related operations
+- **Parameterization**: Always use parameterized queries (never string concatenation)
 
-   async scrape(ctx: PluginContext): Promise<void> {
-     const { apiToken, organization } = ctx.config;
+### Error Handling
+- **Async Functions**: Always use try-catch or .catch()
+- **Logging**: Use structured logger provided in context
+  ```typescript
+  try {
+    await riskyOperation();
+  } catch (error) {
+    logger.error("Operation failed", error, { context: "additional-info" });
+    throw error; // Re-throw if caller should handle
+  }
+  ```
+- **User-Facing Errors**: Provide clear, actionable error messages
 
-     // Fetch data from external API
-     const prs = await fetchPullRequests(apiToken, organization);
+## Key Terminology
 
-     for (const pr of prs) {
-       // Ensure contributor exists
-       await contributorQueries.upsert(ctx.db, {
-         username: pr.author.login,
-         name: pr.author.name,
-         role: "contributor", // or determine from your logic
-         avatar_url: pr.author.avatar_url,
-       });
+### Core Concepts
+- **Plugin**: JavaScript/TypeScript module that fetches data from external sources (GitHub, Slack, etc.)
+- **Contributor**: User with a profile stored as Markdown file with YAML frontmatter
+- **Activity**: Single tracked event or contribution (PR, issue, comment, etc.)
+- **Activity Definition**: Type of activity defined by plugins (e.g., "pr_merged", "issue_opened")
+- **Data Repository**: Separate git repository containing config.yaml, contributors/, activities/
+- **Aggregate**: Computed metric (total_activities, activity_count, longest_streak, etc.)
+- **Badge**: Achievement or reward earned based on rule evaluation
+- **Rule**: Badge eligibility criteria (streak, count, total_points)
 
-       // Store activity
-       await activityQueries.create(ctx.db, {
-         slug: `pr-${pr.id}`,
-         contributor: pr.author.login,
-         activity_definition: pr.merged ? "pr_merged" : "pr_opened",
-         title: pr.title,
-         occurred_at: pr.created_at,
-         link: pr.html_url,
-         points: pr.merged ? 10 : 5,
-         meta: {
-           repository: pr.repository,
-           additions: pr.additions,
-           deletions: pr.deletions,
-         },
-       });
-     }
-
-     ctx.logger.info(`Processed ${prs.length} pull requests`);
-   }
-   ```
-
-4. **Implement Aggregate Method (Optional)**
-
-   Compute plugin-specific aggregates after the main leaderboard aggregation:
-
-   ```typescript
-   import { activityQueries, contributorQueries, contributorAggregateQueries } from "@ohcnetwork/leaderboard-api";
-
-   async aggregate(ctx: PluginContext): Promise<void> {
-     const contributors = await contributorQueries.getAll(ctx.db);
-
-     for (const contributor of contributors) {
-       const activities = await activityQueries.getByContributor(ctx.db, contributor.username);
-       const mergedPRs = activities.filter(a => a.activity_definition === "pr_merged");
-
-       await contributorAggregateQueries.upsert(ctx.db, {
-         aggregate: "pr_merged_count",
-         contributor: contributor.username,
-         value: { type: "number", value: mergedPRs.length, format: "integer" },
-         meta: { calculated_at: new Date().toISOString() },
-       });
-     }
-
-     ctx.logger.info("PR merge count aggregates computed");
-   }
-   ```
-
-   > The `aggregate()` method runs after the main leaderboard aggregation, so standard aggregates like `total_activity_points` and `activity_count` are already available.
-
-5. **Use Query Builders**
-
-   Always use provided query builders from the API package:
-   - `contributorQueries`: create, upsert, getByUsername, getAll, etc.
-   - `activityQueries`: create, getByContributor, getByDateRange, etc.
-   - `activityDefinitionQueries`: upsert, getBySlug, getAll, etc.
-
-6. **Write Tests**
-
-   Create comprehensive tests in `src/__tests__/plugin.test.ts`:
-
-   ```typescript
-   import { describe, it, expect, beforeEach, afterEach } from "vitest";
-   import {
-     createDatabase,
-     initializeSchema,
-   } from "@ohcnetwork/leaderboard-api";
-   import plugin from "../index";
-
-   describe("My Plugin", () => {
-     let db: Database;
-
-     beforeEach(async () => {
-       db = createDatabase(":memory:");
-       await initializeSchema(db);
-     });
-
-     afterEach(async () => {
-       await db.close();
-     });
-
-     it("should define activity types in setup", async () => {
-       const ctx = {
-         db,
-         config: {},
-         orgConfig: {
-           /* mock org config */
+### Data Storage
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ohcnetwork/leaderboard](https://github.com/ohcnetwork/leaderboard) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
