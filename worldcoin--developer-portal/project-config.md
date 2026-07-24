@@ -121,4 +121,4 @@ Each test should exercise a **distinct code path** through the handler. If two t
 
 ---
 > Source: [worldcoin/developer-portal](https://github.com/worldcoin/developer-portal) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
