@@ -1,90 +1,63 @@
 ---
 trigger: always_on
-description: Build validated web research processes through self-annealing loops. Takes a research goal, generates search steps, tests against sample companies, scores accuracy, and iterates until 90%+. Use when creating new research workflows, building claygent/agent prompts, or systematizing any web research task.
+description: Factory that produces validated web research processes via self-annealing loops. Takes a research goal, generates search patterns, tests against real companies, scores accuracy, and iterates until 90%+ reliability. Output: portable `.md` process files any agent (Claude, Clay/Claygent, GPT) can follow.
 ---
 
+# research-process-builder
 
-# Research Process Builder
+Factory that produces validated web research processes via self-annealing loops. Takes a research goal, generates search patterns, tests against real companies, scores accuracy, and iterates until 90%+ reliability. Output: portable `.md` process files any agent (Claude, Clay/Claygent, GPT) can follow.
 
-Build validated, step-by-step web research processes through iterative testing. Takes any research goal, generates search patterns, tests them against real companies, scores accuracy, and loops until the process hits 90%+ reliability.
+## What It Produces
 
-This is the factory that produces research agent prompts. The output is a portable .md file with step-by-step instructions that any agent (Claude Code, Clay, custom GPT, browser agent) can follow to reliably surface specific intelligence.
+Two things:
 
-## When To Use
+1. **Research process files** (`processes/find-*/process.md`) — step-by-step search instructions with exact queries, extract specs, stop-if conditions, and kill lists. 20+ processes built (find-profiles, find-competitors, find-funding, find-series-a-daily, etc.).
 
-- Building a new research workflow for any topic (company intel, market sizing, hiring signals, tech stack detection)
-- Creating claygent or web research agent prompts that need to work reliably
-- Systematizing any manual web research you do repeatedly
-- Someone asks "how do I research X about companies?"
+2. **Scheduled monitors** (`monitors/`) — validated processes promoted to daily pipeline runs. Currently: `series-a-daily` (88% GT hit rate, $0.01/run via SerperDev).
 
-## When NOT To Use
+## Install
 
-- Running an existing research process (load the process .md directly)
-- One-off research where you just need the answer
-- Data enrichment at scale (use a dedicated enrichment tool)
+No package manager file exists. Deps are Python stdlib + external APIs. Install manually:
 
----
+```bash
+pip install openai supabase requests
+```
 
-## Interactive Flow
+Required env vars (in `.env` at repo root):
 
-> Reference: leadgrow-hq/company/methodology/interactive-skill-pattern.md
+```
+OPENAI_API_KEY=
+SERPER_API_KEY=
+SUPABASE_URL=
+SUPABASE_KEY=
+```
 
-### Intake
+Domain classifier also reads `DOMAIN_CLASSIFIER_KEY` if present (optional, falls back to conservative rejection).
 
-1. **Ask:** "What do you want to research about companies?" (state the research goal in one sentence)
-   **Default:** none — REQUIRED
-   **Why:** The goal sentence drives pattern generation, scoring criteria, and output template. A vague goal produces vague patterns.
+**Env loading:** Global hook blocks direct `.env` reads. Scripts load via `dotenv` internally.
 
-2. **Ask:** "What does a 'good result' look like? What should the output contain?" (3-5 bullet points)
-   **Default:** none — REQUIRED
-   **Why:** Defines the extraction spec for every search pattern. Without this, Claude can't score Quality — it doesn't know what "good" means for YOUR use case.
+## Pipelines & Monitors
 
-3. **Ask:** "Do you have ground truth examples? Companies where you already KNOW the answer, so we can validate accuracy."
-   **Default:** no, but strongly encouraged. If yes, collect: company name, domain, and the known-good answer for each (3-5 companies ideal).
-   **Why:** Ground truth turns the annealing loop from "does this look right?" to "did we find what we KNOW is there?" Without it, accuracy is subjective. With it, accuracy is measurable.
+- **Series A pipeline:** `py scripts/series_a_pipeline.py` (supports `--dry-run`, `--stage N`, `--tbs qdr:w`, `--skip-enrich`, `--date`)
+- **GT validation:** `py scripts/gt_validation.py --sample 10 --days 14` (add `--apply` to promote)
+- **Domain classifier:** `py scripts/domain_classifier.py --domain example.com`
+- **Prompt scoring:** `py prompts/[name]/score.py --prompt prompts/[name]/candidates/vNNN.json`
+- **Monitors:** Orphan git branches mounted as worktrees. See `MONITORS.md` for setup.
 
-4. **Ask:** "What accuracy target?"
-   **Default:** 90%
-   **Why:** Determines when the iteration loop stops. Lower targets finish faster but produce less reliable processes.
+## Building a New Research Process
 
-5. **Ask:** "Do you have sample companies across size tiers? (enterprise / mid-market / startup)"
-   **Default:** suggest 6-10 from existing client list + well-known companies, ensuring Tier 1 (known), Tier 2 (mid), and Tier 3 (obscure) are represented
-   **Why:** Patterns that work for SpaceX break for startups. Testing across tiers is what makes the process reliable.
+Invoke the SKILL.md methodology (6 phases: define goal → generate 15-20 patterns → test across 3 company size tiers → score quality×consistency → iterate to 90%+ → assemble process file). Output goes to `processes/[name]/process.md`. Update `processes/[name]/STATUS.md` when done.
 
-6. **Ask:** "Is this time-sensitive research? (e.g., recent news vs evergreen profiles)"
-   **Default:** no (evergreen)
-   **Why:** Time-sensitive goals add a Freshness (F) scoring dimension and require `{{current_year}}` variables in all patterns.
+To graduate a validated process to a scheduled monitor, follow `MONITORS.md`.
 
-7. **Ask:** "Where will this process run? (Claude Code / Clay claygent / browser agent / custom)"
-   **Default:** Claude Code
-   **Why:** Output format differs — Clay claygents need specific field mappings, browser agents need URL patterns, Claude Code processes are freeform markdown.
+## Key Conventions
 
-### Gap Detection
-
-| Check | Where to Look | If Missing | Severity |
-|-------|--------------|------------|----------|
-| Research goal is specific enough (not "learn about companies" or "find info") | User input analysis | Ask clarifying questions until goal is one-sentence specific with a clear target | BLOCKING |
-| Desired output is concrete (not "useful info") | User's output description | Show examples from existing processes (e.g., find-competitors output spec), ask user to match that specificity | BLOCKING |
-| Ground truth variables provided | User input | DEGRADED — can still build, but accuracy validation will be weaker. Suggest: "Can you name 3-5 companies where you already know the answer? This dramatically improves the process." | DEGRADED |
-| Sample companies span 3 tiers | User input + existing client list | Auto-suggest from clients and well-known companies. Include at least one ambiguous-name company (Clay, Keep, Harvey). | Auto-resolve |
-| Existing process already covers this goal | `research-process-builder/processes/` | Show the existing process, ask: "This already exists. Extend it, or build a new angle?" | BLOCKING |
-| Ambiguous-name company included in samples | Sample company list | Add one automatically — ambiguous names stress-test disambiguation logic | Auto-resolve |
-
-### Checkpoints
-
-#### CHECKPOINT 1: Goal + Samples Confirmed
-
-**Show:**
-- Formatted research goal (one sentence)
-- Desired output spec (bullet points)
-- Sample companies organized by tier (Tier 1 / Tier 2 / Tier 3)
-- Ground truth variables (if provided) — company name, domain, known answer
-- Accuracy target
-- Scoring dimensions: Quality + Consistency (+ Freshness if time-sensitive) (+ Accuracy if ground truth provided)
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **`py` not `python`** throughout all scripts and docs (Windows default).
+- **Single braces in GPT templates** — extraction prompt uses `.replace("{items}", payload)`, not f-strings. JSON examples inside the template need literal braces. Do not convert to f-string or `.format()`.
+- **1-based local batch idx** in `extract_companies_batch` — model returns local idx, code maps `batch[local_idx-1]["idx"]` back to global. Keep this contract if re-annealing.
+- **Supabase workspace 3 = production.** Always verify you're hitting the right table before any write.
+- Ground truth files: `ground-truth/[company].json` — schema in `ground-truth/schema.json`. Baselines in `baselines/`.
 
 ---
 > Source: [LeadGrowGTM/research-process-builder](https://github.com/LeadGrowGTM/research-process-builder) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
