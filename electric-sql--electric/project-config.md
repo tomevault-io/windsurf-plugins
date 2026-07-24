@@ -1,15 +1,12 @@
 ---
 trigger: always_on
-description: The durable runtime for long-lived agents.
+description: See [AGENTS.md](./AGENTS.md) for project conventions, architecture, and coding guidelines.
 ---
 
+# Claude Code Guidelines
 
-<script setup>
-import OgAgents from '../src/components/og/OgAgents.vue'
-</script>
-
-<OgAgents />
+See [AGENTS.md](./AGENTS.md) for project conventions, architecture, and coding guidelines.
 
 ---
 > Source: [electric-sql/electric](https://github.com/electric-sql/electric) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
