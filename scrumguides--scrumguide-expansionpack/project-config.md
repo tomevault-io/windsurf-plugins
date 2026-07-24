@@ -1,141 +1,149 @@
 ---
 trigger: always_on
-description: > **📖 Main AI Guide**: For comprehensive AI assistant instructions, see [agents.md](../agents.md)
+description: This guide provides instructions for AI assistants (like GitHub Copilot) working with the Scrum Guide Expansion Pack codebase. It outlines the project structure, deployment model, and best practices for assisting developers.
 ---
 
-# GitHub Copilot Instructions for Scrum Guide Expansion Pack
+# 🤖 AI Agent Guide
 
-> **📖 Main AI Guide**: For comprehensive AI assistant instructions, see [agents.md](../agents.md)
+This guide provides instructions for AI assistants (like GitHub Copilot) working with the Scrum Guide Expansion Pack codebase. It outlines the project structure, deployment model, and best practices for assisting developers.
 
-## Quick Reference
+## Project Overview
 
-This is a **Hugo-based static website** (v0.146.0+) hosted on **Azure Static Web Apps**. The site provides guidance for applying Scrum to complex work, AI, and adaptive strategy.
+The **Scrum Guide Expansion Pack** is a Hugo-based static website hosted on Azure Static Web Apps. It provides modern guidance for applying Scrum to complex work, AI, and adaptive strategy.
 
 **Live Sites:**
+
 - **Production**: [scrumexpansion.org](https://scrumexpansion.org)
 - **Preview**: [agreeable-island-0c966e810-preview.centralus.6.azurestaticapps.net](https://agreeable-island-0c966e810-preview.centralus.6.azurestaticapps.net/)
 
-## 🚨 Critical Information
+## 📚 Essential Documentation
 
-### ⚠️ Primary Editing Location
+Before assisting with any task, familiarize yourself with these key documents:
 
-**CRITICAL**: Most edits should be made to `site/content/` only. Other areas require deep knowledge of:
-- Hugo static site generator and Hugo Modules
-- Azure Static Web Apps deployment pipeline
-- Bootstrap 5 and responsive design
-- Multilingual i18n architecture
+| Document | Purpose | Reference When |
+|----------|---------|----------------|
+| [Getting Started](./docs/getting-started.md) | Initial setup and installation | Setting up development environment |
+| [Development Guide](./docs/development.md) | Development workflows and standards | Writing code, creating content, or templates |
+| [Deployment Guide](./docs/deployment.md) | Deployment process and environments | Deployment questions or CI/CD issues |
+| [Content Management](./docs/content-management.md) | Content creation and organization | Creating or editing content |
+| [Contributing Guide](./docs/contributing.md) | Contribution guidelines | Pull request process or contribution questions |
+| [Configuration](./docs/configuration.md) | Hugo and Azure configuration | Configuration changes needed |
+| [Translations](./docs/translations.md) | Internationalization process | Adding or updating translations |
+| [Troubleshooting](./docs/troubleshooting.md) | Common issues and solutions | Debugging problems |
 
-**Safe Editing Zones:**
-- ✅ `site/content/` - Content files (Markdown)
-- ✅ `site/data/contributions/` - Contributor attribution (YAML)
-- ✅ `site/i18n/` - Translation strings (with guidance)
+## 🚀 Deployment Model
 
-**Restricted Zones (Advanced Knowledge Required):**
-- ⚠️ `site/layouts/` - Hugo templates (requires Hugo module understanding)
-- ⚠️ `site/static/` - Assets and CSS (requires Bootstrap 5 knowledge)
-- ⚠️ `.github/workflows/` - GitHub Actions (requires CI/CD expertise)
-- ⚠️ `scripts/` - Automation scripts (requires PowerShell expertise)
-- ⚠️ `site/hugo.yaml` - Configuration (requires Hugo expertise)
+Understanding the deployment model is **critical** for proper development workflow:
 
-### Deployment Model
+### 1. Development Phase
 
-**IMPORTANT**: Understand the deployment workflow before making suggestions:
-
-1. **Fork/Branch** → Make changes → Test locally
-2. **Create PR** → Automatic deployment to PR-specific test site (`...{PullRequestId}.centralus.6.azurestaticapps.net`)
-3. **Merge to Main** → Automatic deployment to **Preview** environment
-4. **Create GitHub Release** with version tag → Automatic deployment to **Production**
-
-**Production Deployment**: Use semantic versioning for releases:
-- **Patch** (v1.0.1): Typo fixes, tiny changes
-- **Minor** (v1.1.0): New sections, content additions
-- **Major** (v2.0.0): Complete document revamp, breaking changes
-
-### Hugo Version Requirement
-
-- **Minimum**: Hugo Extended v0.146.0+
-- **Hugo Modules**: Site uses [HugoGuides module](https://github.com/nkdAgility/HugoGuides/) for base templates
-- **Local templates**: Only overrides and site-specific templates in `layouts/`
-
-### Key File Locations
+**Workflow:**
 
 ```
-site/
-├── content/         # Markdown content
-├── layouts/         # Local template overrides only
-│   ├── index.html  # Homepage override
-│   ├── categories/ # Category templates
-│   ├── creators/   # Creator templates (legacy)
-│   ├── _partials/  # Local partial overrides
-│   └── _markup/    # Render hooks
-│   
-│   # Base templates from Hugo module (NOT in local layouts/):
-│   # - baseof.html, home.html, single.html, list.html
-│   # Provided by: github.com/nkdAgility/HugoGuides/module
-│
-├── static/         # CSS, images, assets
-├── i18n/           # Translations
-└── hugo.yaml       # Main configuration (includes module imports)
+Fork/Branch → Make Changes → Local Testing → Create Pull Request
 ```
 
-## 📚 Documentation References
+**Key Points:**
 
-For detailed information, always reference these documents:
+- Developers work in **feature branches** or **forks**
+- All changes must be **tested locally** before creating a PR
+- Follow the branching strategy in [Contributing Guide](./docs/contributing.md)
 
-| Topic | Document | Purpose |
-|-------|----------|---------|
-| **AI Guide** | [agents.md](../agents.md) | Complete AI assistant instructions |
-| **Getting Started** | [docs/getting-started.md](../docs/getting-started.md) | Setup and installation |
-| **Development** | [docs/development.md](../docs/development.md) | Development workflows, Hugo template system |
-| **Deployment** | [docs/deployment.md](../docs/deployment.md) | Deployment process and environments |
-| **Content** | [docs/content-management.md](../docs/content-management.md) | Content creation, academic references |
-| **Contributing** | [docs/contributing.md](../docs/contributing.md) | Contribution guidelines, PR process |
-| **Translations** | [docs/translations.md](../docs/translations.md) | i18n process, language support |
-| **Troubleshooting** | [docs/troubleshooting.md](../docs/troubleshooting.md) | Common issues and solutions |
+### 2. Pull Request Testing
 
-## 🎯 Quick Guidelines
+**What Happens:**
 
-### Content Writing Style
+```
+Pull Request Created → Automatic deployment to PR-specific test site
+```
 
-- **Formal reference style**, not blog/article
-- Professional, neutral, instructional tone
-- Academic references with footnotes: `[^1]`, `[^2]`
-- High information density, no filler
-- Suitable for Scrum practitioners seeking depth
+**PR Environment Details:**
 
-### References Format
+- **URL Pattern**: `https://agreeable-island-0c966e810-{PullRequestId}.centralus.6.azurestaticapps.net`
+- **Example**: PR #42 → `https://agreeable-island-0c966e810-42.centralus.6.azurestaticapps.net`
+- **Purpose**: Test changes in isolation before merging
+- **Lifecycle**: Automatically created when PR opens, removed when PR closes
+- **Important**: Only PRs to the main repository get deployed (not from forks)
 
-Always use academic format:
+### 3. Preview Deployment
+
+**What Happens:**
+
+```
+PR Merged to Main → Automatic deployment to Preview environment
+```
+
+**Preview Environment Details:**
+
+- **URL**: [agreeable-island-0c966e810-preview.centralus.6.azurestaticapps.net](https://agreeable-island-0c966e810-preview.centralus.6.azurestaticapps.net/)
+- **Branch**: `main`
+- **Purpose**: Pre-production testing and validation
+- **Audience**: Internal team and stakeholders
+- **Configuration**: `staticwebapp.config.preview.json` + `hugo.preview.yaml`
+
+### 4. Production Deployment
+
+**What Happens:**
+
+```
+Create GitHub Release → Tag with version → Automatic deployment to Production
+```
+
+**Production Deployment Details:**
+
+- **URL**: [scrumexpansion.org](https://scrumexpansion.org)
+- **Trigger**: Creating a **GitHub Release** with a **version tag**
+- **Version Strategy**: Semantic versioning
+- **Configuration**: `staticwebapp.config.production.json` + `hugo.yaml`
+
+## 📋 Version Numbering Strategy
+
+When deploying to production via GitHub releases, follow **semantic versioning** principles:
+
+### Version Format: `vMAJOR.MINOR.PATCH`
+
+| Type | When to Use | Example |
+|------|-------------|---------|
+| **Patch** (`v1.0.1`) | Tiny changes: typo fixes, small corrections, minor tweaks | `v1.0.1` → Fix typo in guide |
+| **Minor** (`v1.1.0`) | Minor changes: new section, content additions, feature additions | `v1.1.0` → Add new guide section |
+| **Major** (`v2.0.0`) | Major changes: complete document revamp, breaking changes, restructure | `v2.0.0` → Complete guide overhaul |
+
+### Creating a Release
+
+**Steps:**
+
+1. Navigate to **GitHub → Releases → Draft a new release**
+2. Choose or create a **tag** (e.g., `v1.2.0`)
+3. Select **target branch** (usually `main`)
+4. Add **release title** and **description**
+5. Click **Publish release**
+6. Automatic deployment to production begins
+
+**Example Release Notes:**
+
 ```markdown
-[^1]: Author (Year) 'Article title', *Journal*, Volume(Issue), pp. pages.
+## v1.2.0 - New Psychological Safety Guide
+
+### Added
+- New guide: Psychological Safety in Scrum Teams
+- Translation support for German (DE)
+
+### Changed
+- Updated homepage layout
+- Improved mobile navigation
+
+### Fixed
+- Corrected references in Complexity guide
 ```
-See [content-management.md](../docs/content-management.md) for complete reference formatting guide.
 
-### Hugo Templates
+## 🛠️ Technology Stack
 
-- Use `_partials/` not `partials/`
-- Use `_shortcodes/` not `shortcodes/`
-- Homepage is `home.html` not `index.html`
-- Templates in root `layouts/` not `layouts/_default/`
+### Core Technologies
 
-### Styling
-
-- **Bootstrap 5** for all UI components
-- Custom CSS in `site/static/css/style.css`
-- Mobile-first responsive design
-- Dark theme: Primary `#135289`, Cards `#353535`
-
-### Internationalization
-
-- All content must support multiple languages
-- Use PowerShell script: `.\scripts\Create-TranslationTemplate.ps1`
-- Test all language versions
-
-## 🔄 GitHub Actions Workflows
-
+- **Hugo Extended** (v0.146.0+) - Static site generator
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ScrumGuides/ScrumGuide-ExpansionPack](https://github.com/ScrumGuides/ScrumGuide-ExpansionPack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
