@@ -1,67 +1,106 @@
 ---
 trigger: always_on
-description: This file tracks persistent technical decisions and context for the Brainarr Lidarr plugin so agents and humans share the same memory when evolving CI/CD and code.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS
+# CLAUDE.md
 
-This file tracks persistent technical decisions and context for the Brainarr Lidarr plugin so agents and humans share the same memory when evolving CI/CD and code.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository Snapshot
-- Canonical repository: [RicherTunes/Brainarr](https://github.com/RicherTunes/Brainarr); default branch is `main`.
-- Local checkout uses Git worktrees inside `.worktrees/`; leave them intact when cleaning the repo.
-- Remotes: `origin` (and alias `main`) both point at GitHub. Always sync and push via `origin/main` unless the user states otherwise.
-- Key manifests live in `plugin.json`, `manifest.json`, and `Brainarr.Plugin/Brainarr.Plugin.csproj`.
+## Project Overview
 
-## Branching & Status Discipline
-- Before claiming a change is committed or pushed, run `git status -sb`, `git branch -vv`, and `git remote -v`; quote the real outputs and state explicitly whether a push already happened.
-- Use feature branches for PR work; keep `main` clean and fast-forwardable to `origin/main`.
-- If a user needs publishing guidance, confirm remotes/credentials exist, then share concrete commands (`git add`, `git commit`, `git push origin main`).
-- Do not delete `.worktrees/main`; it underpins local and CI workflows.
+Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 14 different AI providers ranging from privacy-focused local models to powerful cloud services (including 3 subscription providers and 1 CLI provider that reuse existing CLI credentials).
 
-## Local Setup & Build
-- One-command bootstrap: run `./setup.ps1` (Windows/PowerShell) or `./setup.sh` (POSIX) from repo root; they clone or update Lidarr, build it, cache `LIDARR_PATH`, restore the Brainarr solution, and build the plugin. On POSIX run `chmod +x setup.sh` once before invoking it.
-- `setup-lidarr.ps1` remains available for advanced scenarios (alternate branches, `-SkipBuild`); it also records the resolved Lidarr path in `ext/lidarr-path.txt` for reuse.
-- Always build against real Lidarr assemblies; never introduce stubs. The setup scripts ensure `ext/Lidarr/_output/net8.0` exists and set `LIDARR_PATH` automatically.
-- Only set `LIDARR_PATH` manually when Lidarr lives outside `ext/Lidarr/_output/net8.0`; otherwise let the setup tooling manage it.
-- Primary entry points: `build.ps1` / `build.sh` (flags: `-Setup/--setup`, `-Test/--test`, `-Package/--package`, `-Deploy/--deploy`) once Lidarr is prepared.
-- Manual builds happen inside `Brainarr.Plugin/`; run `dotnet build -c Release` only after Lidarr assemblies are present.
+## Runtime & Docker Image Requirements (CRITICAL)
 
-## Safe Cleanup & Troubleshooting
-- Confirm you are in the Brainarr repo (check `Get-Location`, `git status -sb`, `git remote -v`) before running commands, especially ones copied from other projects.
-- When external tooling (npm, docker, etc.) fails, capture the exact error output, summarize it for the user, and pause. Do not guess by deleting directories, removing tracked files, or installing random scripts.
-- To refresh Lidarr assemblies, rerun `./setup.ps1` or `./setup.sh` instead of manually pruning `ext/` or `.worktrees`. Never delete `.worktrees` or tracked directories like `ext/Lidarr` without explicit approval.
-- Avoid adding ad-hoc bootstrap scripts (e.g., `dotnet-install.sh`). Stick to repository-provided tooling; surface missing prerequisites to the user instead.
+**Target framework**: `net8.0` — all plugins MUST target .NET 8.
 
-## Testing & Quality Gates
-- Preferred orchestration: `test-local-ci.ps1` (flags `-SkipDownload`, `-ExcludeHeavy`, `-GenerateCoverageReport`, `-InstallReportGenerator`).
-- Quick loops: `dotnet test` with `--filter Category=Unit`, `Category=Integration`, or `Category=EdgeCase` as needed.
-- Coverage artifacts land in `TestResults/`; regenerate with `scripts/generate-coverage-report.ps1 -InstallTool` when sharing reports.
-- Do not skip suites without explicit user approval; document any skipped tests and why.
+**Lidarr Docker image**: Use ONLY a `.NET 8` plugins-branch image. The current pinned tag is:
 
-## Documentation Map
-- Overview: `README.md`.
-- Build and environment details: `BUILD.md`, `BUILD_REQUIREMENTS.md`, `DEVELOPMENT.md`.
-- Release planning: `CHANGELOG.md`, `docs/ROADMAP.md`.
-- Additional guides live under `docs/` and `wiki-content/`; update both when touching public docs.
+```text
+LIDARR_DOCKER_VERSION=pr-plugins-3.1.2.4913
+```
 
-## Release & Versioning
-- Keep `plugin.json`, `manifest.json`, README badges, and `CHANGELOG.md` aligned when bumping versions.
-- Tag releases from `main` only after CI passes against real Lidarr assemblies.
-- Update provider verification notes in README/docs when changing supported services.
+- Image: `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913`
+- Digest: `sha256:ae0b3b14769fdfeb73fe5d9e61ebcda04edf202244bcbd6323d2fe1381154f57`
+- Pinned in: `.github/lidarr_digest.txt` and `scripts/extract-lidarr-assemblies.sh`
 
-## CI/CD Essentials
-- CI always compiles against Lidarr's `plugins` branch via Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}`; extracted assemblies live in `ext/Lidarr-docker/_output/net8.0/` and feed matrix jobs.
-- Keep `LIDARR_DOCKER_VERSION` current for the plugins branch; note bumps here when they occur.
-- Current default: `pr-plugins-3.1.2.4913` (updated 2025-09-24).
-- Prefer Docker-based extraction everywhere; fall back to tarballs only when Docker is unavailable and versions are pinned.
-- Open CI TODOs: deduplicate build vs security-scan logic. POSIX jobs now default to `shell: bash`, and a fast-fail sanity build exists.
+**NEVER use `pr-plugins-2.x` tags** — those are .NET 6 images. Loading a .NET 8 plugin into a .NET 6 host causes `System.Runtime` assembly load failures and Lidarr crash-loops. The guardrail in `extract-lidarr-assemblies.sh` will catch this (fails if `System.Runtime.dll` major != 8).
 
-## Agent Workflow Guardrails
-- When editing this file, read it once for context, make the required change, and then respond to the user without re-opening AGENTS.md unless they explicitly ask for a review.
+When bumping the Docker image tag, update ALL of these locations:
+- `.github/lidarr_digest.txt`
+- `scripts/extract-lidarr-assemblies.sh` (default fallback)
+- `scripts/snapshots/run-local.sh` and `run-local.ps1`
+- `test-local-ci.sh`
+- `scripts/verify-local.ps1` (`LidarrDockerVersion` default)
+
+## Plugin DLL Naming Contract (CRITICAL)
+
+**The main plugin DLL filename MUST match the glob `Lidarr.Plugin.*.dll`.** Lidarr's PluginLoader (`NzbDrone.Common/Extensions/PathExtensions.cs:334`) scans `/config/plugins/{owner}/{name}/` with `Directory.GetFiles(folder, "Lidarr.Plugin.*.dll")` — any other filename is silently ignored. No error, no warning, no log line; the plugin just never appears in `/api/v1/system/plugins`.
+
+For Brainarr this is satisfied by `<AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>` in `Brainarr.Plugin/Brainarr.Plugin.csproj`. Don't drop that line "to clean up" — it's load-bearing.
+
+## Plugin Packaging Policy (CRITICAL)
+
+**The plugin package MUST contain:**
+- `Lidarr.Plugin.Brainarr.dll` - Main plugin (Common **and** Abstractions are ILRepack-MERGED +
+  internalized into this DLL — the "0 external `Lidarr.Plugin.*` refs" rule + the ecosystem
+  standard post-ALC-fix)
+- `plugin.json`
+- `manifest.json`
+
+`Lidarr.Plugin.Abstractions.dll` and `Lidarr.Plugin.Common.dll` MUST NOT ship as **sidecars** — they
+are merged into the main DLL; a stray sidecar reintroduces the COR_E_INVALIDOPERATION type-identity /
+ALC conflict (see `docs/dev-guide/ALC_MULTIPLUGIN_FIX.md` in Common). They are listed `[FORBIDDEN]` in
+`packaging/expected-contents.txt`.
+
+**The plugin package MUST NOT contain host-provided contract assemblies (type-identity conflicts):**
+- `FluentValidation.dll`
+- `Microsoft.Extensions.DependencyInjection.Abstractions.dll`
+- `Microsoft.Extensions.Logging.Abstractions.dll`
+- `NLog.dll`
+- `System.Text.Json.dll`
+- `Lidarr.*.dll` (non-plugin host assemblies)
+- `NzbDrone.*.dll`
+
+**The plugin must reference host versions of contract packages.** Use the host-version coupling tests to keep NuGet versions aligned with the Lidarr host.
+
+**Do not rely on copying host-provided contract assemblies into the plugin output:**
+
+```xml
+<!-- OK for compile-time (runtime resolves from host); packaging MUST exclude the DLL -->
+<PackageReference Include="FluentValidation" />
+```
+
+**Validation:** Run `./build.ps1 -Package` and verify the zip contains the required DLLs.
+
+## Plugin Registration (CRITICAL — controls Lidarr System→Plugins UI visibility)
+
+Lidarr has **two** distinct `IPlugin` interfaces, and conflating them silently breaks the System→Plugins UI:
+
+| Interface | From | Used by |
+|---|---|---|
+| `NzbDrone.Core.Plugins.IPlugin` | `Lidarr.Core.dll` (host) | `/api/v1/system/plugins` — UI listing, update checks, uninstall |
+| `Lidarr.Plugin.Abstractions.IPlugin` | Common (internalized via ILRepack) | TestKit `PluginSandbox` — never read by the live host |
+
+`BrainarrPluginHost : StreamingPlugin<TModule,TSettings>` satisfies Common's contract for the bridge. It does **not** satisfy the host's `IPlugin`, so without an additional class the plugin loads fine and exposes `/api/v1/importlist/schema` but doesn't appear in System→Plugins (and can't be auto-updated/uninstalled through the UI).
+
+`Brainarr.Plugin/Hosting/BrainarrInstalledPlugin.cs` extends the host's `NzbDrone.Core.Plugins.Plugin` to close the gap:
+
+```csharp
+public sealed class BrainarrInstalledPlugin : NzbDrone.Core.Plugins.Plugin
+{
+    public override string Name => "Brainarr";
+    public override string Owner => "RicherTunes";
+    public override string GithubUrl => "https://github.com/RicherTunes/Brainarr";
+}
+```
+
+DryIoc's `RegisterMany` (in `NzbDrone.Common.Composition.Extensions.AutoAddServices`) auto-discovers this class from the loaded plugin assembly. `InstalledVersion` is derived from `AssemblyInformationalVersionAttribute` via the base class — do **not** hardcode it.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [RicherTunes/Brainarr](https://github.com/RicherTunes/Brainarr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
