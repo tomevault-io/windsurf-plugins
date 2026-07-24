@@ -1,93 +1,56 @@
 ---
 trigger: always_on
-description: AlphaClaw is the ops and setup layer around OpenClaw. It provides a browser-based setup UI, gateway lifecycle management, watchdog recovery flows, and integrations (for example Telegram, Discord, Google Workspace, and webhooks) so users can operate OpenClaw without manual server intervention.
+description: **NEVER** make risky system changes (OpenClaw config, network settings, package installations/updates, source code modifications, etc.) without the user's explicit approval FIRST.
 ---
 
-## Project Overview
+### ⚠️ No YOLO System Changes!
 
-### AlphaClaw Project Context
+**NEVER** make risky system changes (OpenClaw config, network settings, package installations/updates, source code modifications, etc.) without the user's explicit approval FIRST.
 
-AlphaClaw is the ops and setup layer around OpenClaw. It provides a browser-based setup UI, gateway lifecycle management, watchdog recovery flows, and integrations (for example Telegram, Discord, Google Workspace, and webhooks) so users can operate OpenClaw without manual server intervention.
+Always explain:
 
-### Understanding OpenClaw
+1. **What** you want to change
+2. **Why** you want to change it
+3. **What could go wrong**
 
-If you need to understand the internals of OpenClaw, you can inspect the code at `~/Projects/openclaw/src`
+Then WAIT for the user's approval.
 
-### Architecture At A Glance
+### Plan Before You Build
 
-- `bin/alphaclaw.js`: CLI entrypoint and lifecycle command surface.
-- `lib/server`: Express server, authenticated setup APIs, watchdog APIs, channel integrations, and proxying to the OpenClaw gateway.
-- `lib/public`: Setup UI frontend (component-driven tabs and flows for providers, envars, watchdog, webhooks, and onboarding).
-- `lib/setup`: Prompt hardening templates and setup-related assets injected into agent/system behavior.
+Before diving into implementation, share your plan when the work is **significant**. Significance isn't about line count — a single high-impact change can be just as significant as a multi-step refactor. Ask yourself:
 
-Runtime model:
+- Could this break existing behavior or introduce subtle bugs?
+- Does it touch critical paths, shared state, or external integrations?
+- Are there multiple valid approaches worth weighing?
+- Would reverting this be painful?
 
-1. AlphaClaw server starts and manages OpenClaw as a child process.
-2. Setup UI calls AlphaClaw APIs for configuration and operations.
-3. AlphaClaw proxies gateway traffic and handles watchdog monitoring/repair.
+If any of these apply, outline your approach first — what you intend to do, in what order, and any trade-offs you see — then **wait for the user's sign-off** before proceeding. For straightforward, low-risk tasks, just get it done.
 
-### Key Technologies
+### Save and Show Your Work (IMPORTANT)
 
-- Node.js 22.14+ runtime.
-- Express-based HTTP API server.
-- `http-proxy` for gateway proxy behavior.
-- OpenClaw CLI/gateway process orchestration.
-- Preact + `htm` frontend patterns for Setup UI components.
-- Vitest + Supertest for server and route testing.
+Your `.openclaw` directory is version-controlled and this is how work survives container restarts.
 
-## Coding Conventions
+### Persistent Storage Rules
 
-### Change Patterns
+This deployment runs in an ephemeral container. `/tmp`, other temp directories, and files outside `/data` can disappear on restart or redeploy.
 
-- Keep edits targeted and production-safe; favor small, reviewable changes.
-- Preserve existing behavior unless the task explicitly requires behavior changes.
-- Follow existing UI conventions and shared components for consistency.
-- Reuse existing server route and state patterns before introducing new abstractions.
-- Update tests when behavior changes in routes, watchdog flows, or setup state.
-- Before running tests in a fresh checkout, run `npm install` so `vitest` (devDependency) is available for `npm test`.
+Anything that must survive redeploys must live under `/data/.openclaw`.
 
-### Code Structure
+For plugins and other durable artifacts:
 
-- Avoid monolithic implementation files for new features. For new UI areas and new API areas, start with a decomposed structure (focused components/hooks/utilities for UI; focused route modules/services/helpers for server) rather than building one large file first and splitting later.
-- When adding a new feature area, follow the existing project patterns from day one (for example feature folders with `index.js` plus `use-*` hooks in UI, and route + service separation on server) so code stays maintainable as the feature grows.
-- When continuing to build on a file that is growing large or accumulating unrelated concerns, stop and decompose it before adding more code rather than letting it drift into a monolith.
+- Prefer normal `openclaw plugins install <spec>` flows for persistent installs.
+- If you must stage or unpack a local plugin first, stage it under `/data/.openclaw/...`, not `/tmp/...`.
+- Never persist `plugins.load.paths` entries that point at temp directories.
 
-### Networking and Fetching
+Anytime you add, edit, or remove workspace files, openclaw.json, cron.json, skills, or external resources (third-party pages, databases, integrations), **commit and push your changes to git**. Never force push; always pull first if there might be remote changes.
 
-- Prefer the shared cache primitives in `lib/public/js/lib/api-cache.js` for backend reads:
-  - `cachedFetch(...)` for imperative fetch paths.
-  - `getCached(...)` / `setCached(...)` / `invalidateCache(...)` for cache lifecycle.
-- For component-level read requests, prefer `useCachedFetch` from `lib/public/js/hooks/use-cached-fetch.js` over ad-hoc `useEffect(() => fetchX())` mount loads.
-- Treat the API URL (including query params) as the canonical cache key for GET-style payloads.
-- Keep cache in-memory for fast tab switches; do not add persistent storage caching unless explicitly required by product behavior.
-- Do not keep route panes mounted via `display:none` just to preserve data. Prefer conditional rendering + cache-backed remounts.
-- Use `usePolling` for recurring refreshes and always pass a stable `cacheKey` when poll results should hydrate remounts.
-- Keep `pauseWhenHidden` behavior enabled for polling unless a specific flow requires background polling while the browser tab is hidden.
-- Tune polling intervals conservatively; avoid 1-2s polling unless there is a clear real-time requirement.
-- For app-shell status streams, prefer SSE (`/api/events/status`) where available and keep polling as fallback behavior.
-- After write/mutation APIs (POST/PUT/DELETE), refresh or invalidate relevant cached keys so the UI does not show stale data.
+Whenever you do this, end your message with a **Changes committed** summary. Use workspace-relative paths for local files.
 
-### OpenClaw Config Access
-
-- When reading `openclaw.json` in server code, use the shared helper in `lib/server/openclaw-config.js` (`readOpenclawConfig`) instead of ad-hoc `JSON.parse(fs.readFileSync(...))` blocks.
-
-### Where To Put Agent Guidance
-
-- **This file (`AGENTS.md`):** Project-level guidance for coding agents working on the AlphaClaw codebase — architecture, conventions, release flow, UI patterns, etc.
-- **`lib/setup/core-prompts/AGENTS.md`:** Runtime prompt injected into the OpenClaw agent's system prompt. Only write there when the guidance is meant for the deployed agent's behavior, not for coding on this project.
-
-## Operations
-
-### Release Flow (Beta -> Production)
-
-Use this release flow when promoting tested beta builds to production:
-
-1. Ensure `main` is clean and synced, and tests pass.
-2. Publish beta iterations as needed:
-   - `npm version prerelease --preid=beta`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```
+Changes committed ([abc1234](commit url)): <-- linked abbreviated hash, no backticks
+• path/or/resource (new|edit|delete) — brief description
+```
 
 ---
 > Source: [chrysb/alphaclaw](https://github.com/chrysb/alphaclaw) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
