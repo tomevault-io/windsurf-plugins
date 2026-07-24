@@ -38,4 +38,4 @@ This repository is a Laravel package expressive for building new packages. Prese
 
 ---
 > Source: [WendellAdriel/laravel-expressive](https://github.com/WendellAdriel/laravel-expressive) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
