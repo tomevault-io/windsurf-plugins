@@ -1,93 +1,146 @@
 ---
 trigger: always_on
-description: Use when sequential user actions hit multiple endpoints needing the same data within seconds.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# React Best Practices
+# CLAUDE.md
 
-**Version 0.1.0**  
-Vercel Engineering  
-January 2026
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Note:**  
-> This document is mainly for agents and LLMs to follow when maintaining,  
-> generating, or refactoring React and Next.js codebases at Vercel. Humans  
-> may also find it useful, but guidance here is optimized for automation  
-> and consistency by AI-assisted workflows.
+## Repository Overview
 
----
+AgileKit is an open-source online planning poker tool for Scrum teams. The project is a modern Next.js/Convex stack with a whiteboard-style interface using React Flow.
 
-## Abstract
+## Git Workflow Rules
 
-Comprehensive performance optimization guide for React and Next.js applications, designed for AI agents and LLMs. Contains 40+ rules across 8 categories, prioritized by impact from critical (eliminating waterfalls, reducing bundle size) to incremental (advanced patterns). Each rule includes detailed explanations, real-world examples comparing incorrect vs. correct implementations, and specific impact metrics to guide automated refactoring and code generation.
+**IMPORTANT**: Always ask the user before committing or pushing changes, even if bypass permissions are enabled. Do not assume permission to commit or push based on tool access alone.
 
----
+## Development Commands
 
-## Table of Contents
+```bash
+# Development (run both in separate terminals)
+npm run dev              # Start Next.js dev server (http://localhost:3000)
+npx convex dev           # Start Convex backend
 
-1. [Eliminating Waterfalls](#1-eliminating-waterfalls) — **CRITICAL**
-   - 1.1 [Defer Await Until Needed](#11-defer-await-until-needed)
-   - 1.2 [Dependency-Based Parallelization](#12-dependency-based-parallelization)
-   - 1.3 [Prevent Waterfall Chains in API Routes](#13-prevent-waterfall-chains-in-api-routes)
-   - 1.4 [Promise.all() for Independent Operations](#14-promiseall-for-independent-operations)
-   - 1.5 [Strategic Suspense Boundaries](#15-strategic-suspense-boundaries)
-2. [Bundle Size Optimization](#2-bundle-size-optimization) — **CRITICAL**
-   - 2.1 [Avoid Barrel File Imports](#21-avoid-barrel-file-imports)
-   - 2.2 [Conditional Module Loading](#22-conditional-module-loading)
-   - 2.3 [Defer Non-Critical Third-Party Libraries](#23-defer-non-critical-third-party-libraries)
-   - 2.4 [Dynamic Imports for Heavy Components](#24-dynamic-imports-for-heavy-components)
-   - 2.5 [Preload Based on User Intent](#25-preload-based-on-user-intent)
-3. [Server-Side Performance](#3-server-side-performance) — **HIGH**
-   - 3.1 [Cross-Request LRU Caching](#31-cross-request-lru-caching)
-   - 3.2 [Minimize Serialization at RSC Boundaries](#32-minimize-serialization-at-rsc-boundaries)
-   - 3.3 [Parallel Data Fetching with Component Composition](#33-parallel-data-fetching-with-component-composition)
-   - 3.4 [Per-Request Deduplication with React.cache()](#34-per-request-deduplication-with-reactcache)
-   - 3.5 [Use after() for Non-Blocking Operations](#35-use-after-for-non-blocking-operations)
-4. [Client-Side Data Fetching](#4-client-side-data-fetching) — **MEDIUM-HIGH**
-   - 4.1 [Deduplicate Global Event Listeners](#41-deduplicate-global-event-listeners)
-   - 4.2 [Use SWR for Automatic Deduplication](#42-use-swr-for-automatic-deduplication)
-5. [Re-render Optimization](#5-re-render-optimization) — **MEDIUM**
-   - 5.1 [Defer State Reads to Usage Point](#51-defer-state-reads-to-usage-point)
-   - 5.2 [Extract to Memoized Components](#52-extract-to-memoized-components)
-   - 5.3 [Narrow Effect Dependencies](#53-narrow-effect-dependencies)
-   - 5.4 [Subscribe to Derived State](#54-subscribe-to-derived-state)
-   - 5.5 [Use Functional setState Updates](#55-use-functional-setstate-updates)
-   - 5.6 [Use Lazy State Initialization](#56-use-lazy-state-initialization)
-   - 5.7 [Use Transitions for Non-Urgent Updates](#57-use-transitions-for-non-urgent-updates)
-6. [Rendering Performance](#6-rendering-performance) — **MEDIUM**
-   - 6.1 [Animate SVG Wrapper Instead of SVG Element](#61-animate-svg-wrapper-instead-of-svg-element)
-   - 6.2 [CSS content-visibility for Long Lists](#62-css-content-visibility-for-long-lists)
-   - 6.3 [Hoist Static JSX Elements](#63-hoist-static-jsx-elements)
-   - 6.4 [Optimize SVG Precision](#64-optimize-svg-precision)
-   - 6.5 [Prevent Hydration Mismatch Without Flickering](#65-prevent-hydration-mismatch-without-flickering)
-   - 6.6 [Use Activity Component for Show/Hide](#66-use-activity-component-for-showhide)
-   - 6.7 [Use Explicit Conditional Rendering](#67-use-explicit-conditional-rendering)
-7. [JavaScript Performance](#7-javascript-performance) — **LOW-MEDIUM**
-   - 7.1 [Batch DOM CSS Changes](#71-batch-dom-css-changes)
-   - 7.2 [Build Index Maps for Repeated Lookups](#72-build-index-maps-for-repeated-lookups)
-   - 7.3 [Cache Property Access in Loops](#73-cache-property-access-in-loops)
-   - 7.4 [Cache Repeated Function Calls](#74-cache-repeated-function-calls)
-   - 7.5 [Cache Storage API Calls](#75-cache-storage-api-calls)
-   - 7.6 [Combine Multiple Array Iterations](#76-combine-multiple-array-iterations)
-   - 7.7 [Early Length Check for Array Comparisons](#77-early-length-check-for-array-comparisons)
-   - 7.8 [Early Return from Functions](#78-early-return-from-functions)
-   - 7.9 [Hoist RegExp Creation](#79-hoist-regexp-creation)
-   - 7.10 [Use Loop for Min/Max Instead of Sort](#710-use-loop-for-minmax-instead-of-sort)
-   - 7.11 [Use Set/Map for O(1) Lookups](#711-use-setmap-for-o1-lookups)
-   - 7.12 [Use toSorted() Instead of sort() for Immutability](#712-use-tosorted-instead-of-sort-for-immutability)
-8. [Advanced Patterns](#8-advanced-patterns) — **LOW**
-   - 8.1 [Store Event Handlers in Refs](#81-store-event-handlers-in-refs)
-   - 8.2 [useLatest for Stable Callback Refs](#82-uselatest-for-stable-callback-refs)
+# Code Quality
+npm run lint             # Run ESLint
+npm run lint:fix         # Fix linting errors
+npm run ts:check         # TypeScript type checking
 
----
+# Testing
+npm run test:e2e            # Run Playwright tests (starts servers automatically)
+npm run test:e2e:ui         # Run with Playwright UI for debugging
+npm run test:e2e:headless   # Run in headless mode (CI)
 
-## 1. Eliminating Waterfalls
+# Run a single test file
+npx playwright test tests/room/room-creation.spec.ts
 
-**Impact: CRITICAL**
+# Run tests matching a pattern
+npx playwright test -g "should create a new room"
+```
 
+> Requires Node.js 20+
+
+## Architecture
+
+### Tech Stack
+
+- **Frontend**: Next.js 15 (App Router), React 19, TypeScript
+- **Backend**: Convex (serverless TypeScript functions with real-time reactivity)
+- **Auth**: BetterAuth with anonymous sessions (see [docs/authentication.md](docs/authentication.md))
+- **Styling**: shadcn/ui, Tailwind CSS 4
+- **UI Primitives**: Base UI (`@base-ui/react`) - NOT Radix UI. Components like Dialog, DropdownMenu, etc. use Base UI primitives. Base UI does not support `asChild` pattern; use `render` prop instead (e.g., `<DropdownMenuItem render={<Link href="..." />}>`).
+- **Canvas**: @xyflow/react for the whiteboard interface
+
+### Convex Backend Pattern
+
+The backend uses a two-layer architecture:
+
+```
+convex/
+├── rooms.ts           # API layer - thin handlers with validation
+├── model/
+│   └── rooms.ts       # Domain logic - business rules and data access
+```
+
+**API layer** (`convex/*.ts`): Defines mutations/queries with argument validation and auth guards, delegates to model layer.
+
+**Model layer** (`convex/model/*.ts`): Contains business logic, database operations, and helper functions.
+
+**Auth guards** (`convex/model/auth.ts`): Every mutation must enforce authorization. Use `requireRoomMember(ctx, roomId)` for room-scoped mutations (returns `{ user }` for identity checks). Use `requireAuth(ctx)` for global mutations. Never trust client-supplied `userId` without verifying `user._id === args.userId`. See [docs/authentication.md](docs/authentication.md) for full patterns.
+
+Example usage in frontend:
+
+```typescript
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+
+const room = useQuery(api.rooms.get, { roomId });
+const createRoom = useMutation(api.rooms.create);
+```
+
+### Canvas Node System
+
+The room canvas (`src/components/room/`) uses React Flow with custom node types:
+
+- **Node types** defined in `src/components/room/nodes/` (PlayerNode, SessionNode, TimerNode, VotingCardNode, ResultsNode, StoryNode, NoteNode)
+- **Type definitions** in `src/components/room/types.ts` - defines `CustomNodeType` union
+- **Node state** synced via Convex (`canvasNodes` table)
+- **Layout logic** in `useCanvasLayout.ts`, state management in `useCanvasNodes.ts`
+
+### Database Schema
+
+Schema defined in `convex/schema.ts`. Key tables:
+
+- `rooms` - Room configuration and state
+- `users` - Global user identity (linked to BetterAuth via `authUserId`)
+- `roomMemberships` - User participation in rooms (spectator status, join time)
+- `votes` - User votes (sanitized based on reveal state)
+- `issues` - Issue tracking with vote statistics
+- `canvasNodes` - Persisted node positions and data
+
+See [docs/authentication.md](docs/authentication.md) for details on the user/membership data model.
+
+### E2E Testing Pattern
+
+Tests use Page Object Model pattern:
+
+```
+tests/
+├── pages/              # Page objects (HomePage, RoomPage, JoinRoomPage)
+├── utils/              # Helper functions (room-helpers.ts, test-helpers.ts)
+├── fixtures/           # Test fixtures
+└── *.spec.ts           # Test files
+```
+
+### Design Tokens
+
+The project uses semantic design tokens defined in `src/app/globals.css`. These tokens ensure consistent theming across light and dark modes.
+
+**Surface Tokens** - For layered UI elements (stacking depth: 1=base, 2=elevated, 3=highest):
+
+- `surface-1`: Primary containers (cards, panels)
+- `surface-2`: Secondary/elevated containers
+- `surface-3`: Interactive elements (handles, hover states)
+
+**Status Tokens** - For contextual feedback with `-bg` (background) and `-fg` (foreground) variants:
+
+- `status-info-*`: Informational states (blue)
+- `status-success-*`: Success states (green)
+- `status-warning-*`: Warning states (amber)
+- `status-error-*`: Error states (red)
+
+**Usage in Tailwind**:
+
+```tsx
+// Surface tokens
+className = "bg-white dark:bg-surface-1";
+className = "hover:bg-gray-100 dark:hover:bg-surface-3";
+
+// Status tokens
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [spokvulcan/poker-planning](https://github.com/spokvulcan/poker-planning) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
