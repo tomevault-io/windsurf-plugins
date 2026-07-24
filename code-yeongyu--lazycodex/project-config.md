@@ -1,60 +1,73 @@
 ---
 trigger: always_on
-description: Conventions for human contributors and AI agents working on this repository.
+description: > Anthropic's AI assistant. Warm terracotta accent, clean editorial layout.
 ---
 
-# Repository Conventions
+# Design System Inspired by Claude (Anthropic)
 
-Conventions for human contributors and AI agents working on this repository.
+> Category: AI & LLM
+> Anthropic's AI assistant. Warm terracotta accent, clean editorial layout.
 
-## Stack
+## 1. Visual Theme & Atmosphere
 
-- Node >=20 runtime.
-- npm package manager.
-- TypeScript 6 strict mode.
-- Biome 2 linting and formatting.
-- Vitest 4 test runner.
+Claude's interface is a literary salon reimagined as a product page — warm, unhurried, and quietly intellectual. The entire experience is built on a parchment-toned canvas (`#f5f4ed`) that deliberately evokes the feeling of high-quality paper rather than a digital surface. Where most AI product pages lean into cold, futuristic aesthetics, Claude's design radiates human warmth, as if the AI itself has good taste in interior design.
 
-## Forbidden
+The signature move is the custom Anthropic Serif typeface — a medium-weight serif with generous proportions that gives every headline the gravitas of a book title. Combined with organic, hand-drawn-feeling illustrations in terracotta (`#c96442`), black, and muted green, the visual language says "thoughtful companion" rather than "powerful tool." The serif headlines breathe at tight-but-comfortable line-heights (1.10–1.30), creating a cadence that feels more like reading an essay than scanning a product page.
 
-- No `as any` or `as unknown`.
-- No `@ts-ignore` or `@ts-expect-error`.
-- No enums.
-- No non-null assertions.
-- No default exports. `vitest.config.ts` is exempt because the framework requires that shape.
+What makes Claude's design truly distinctive is its warm neutral palette. Every gray has a yellow-brown undertone (`#5e5d59`, `#87867f`, `#4d4c48`) — there are no cool blue-grays anywhere. Borders are cream-tinted (`#f0eee6`, `#e8e6dc`), shadows use warm transparent blacks, and even the darkest surfaces (`#141413`, `#30302e`) carry a barely perceptible olive warmth. This chromatic consistency creates a space that feels lived-in and trustworthy.
 
-## File Ceiling
+**Key Characteristics:**
+- Warm parchment canvas (`#f5f4ed`) evoking premium paper, not screens
+- Custom Anthropic type family: Serif for headlines, Sans for UI, Mono for code
+- Terracotta brand accent (`#c96442`) — warm, earthy, deliberately un-tech
+- Exclusively warm-toned neutrals — every gray has a yellow-brown undertone
+- Organic, editorial illustrations replacing typical tech iconography
+- Ring-based shadow system (`0px 0px 0px 1px`) creating border-like depth without visible borders
+- Magazine-like pacing with generous section spacing and serif-driven hierarchy
 
-- Keep each `src/` TypeScript file under 250 pure LOC.
-- Split by responsibility before a file reaches the ceiling.
+## 2. Color Palette & Roles
 
-## Test Discipline
+### Primary
+- **Anthropic Near Black** (`#141413`): The primary text color and dark-theme surface — not pure black but a warm, almost olive-tinted dark that's gentler on the eyes. The warmest "black" in any major tech brand.
+- **Terracotta Brand** (`#c96442`): The core brand color — a burnt orange-brown used for primary CTA buttons, brand moments, and the signature accent. Deliberately earthy and un-tech.
+- **Coral Accent** (`#d97757`): A lighter, warmer variant of the brand color used for text accents, links on dark surfaces, and secondary emphasis.
 
-- Use Vitest with nested `describe` names in `#given`, `#when`, and `#then` form, or inline `// given`, `// when`, and `// then` comments.
-- Never use Arrange-Act-Assert comments.
-- Keep fixtures in `test/fixtures/`.
+### Secondary & Accent
+- **Error Crimson** (`#b53333`): A deep, warm red for error states — serious without being alarming.
+- **Focus Blue** (`#3898ec`): Standard blue for input focus rings — the only cool color in the entire system, used purely for accessibility.
 
-## Layout
+### Surface & Background
+- **Parchment** (`#f5f4ed`): The primary page background — a warm cream with a yellow-green tint that feels like aged paper. The emotional foundation of the entire design.
+- **Ivory** (`#faf9f5`): The lightest surface — used for cards and elevated containers on the Parchment background. Barely distinguishable but creates subtle layering.
+- **Pure White** (`#ffffff`): Reserved for specific button surfaces and maximum-contrast elements.
+- **Warm Sand** (`#e8e6dc`): Button backgrounds and prominent interactive surfaces — a noticeably warm light gray.
+- **Dark Surface** (`#30302e`): Dark-theme containers, nav borders, and elevated dark elements — warm charcoal.
+- **Deep Dark** (`#141413`): Dark-theme page background and primary dark surface.
 
-- `src/boulder-reader.ts`: reads `.omo/boulder.json`, resolves the active work for the session, re-exports `getPlanChecklist`/`PlanChecklist` from `plan-checklist.ts`. `readContinuationState` returns null only when the plan has no readable top-level checklist (`total === 0`).
-- `src/plan-checklist.ts`: `PlanChecklist` (`completed`/`remaining`/`total`/`nextTaskLabel`) and `getPlanChecklist`/`parsePlanChecklist`. Counts structured `## TODOs` rows (`N. <title>`) and `## Final Verification Wave` rows (`F<number>. <title>`); falls back to simple top-level `- [ ]`/`- [x]` checkboxes. Skips fenced blocks and respects `#`/`##` section boundaries.
-- `src/codex-hook.ts`: Stop/SubagentStop hook; fills `REMAINING_COUNT`/`TOTAL_COUNT`/`NEXT_TASK_LABEL` from the checklist into `directive.md`.
-- `directive.md`: directive template with placeholders, applied per invocation.
+### Neutrals & Text
+- **Charcoal Warm** (`#4d4c48`): Button text on light warm surfaces — the go-to dark-on-light text.
+- **Olive Gray** (`#5e5d59`): Secondary body text — a distinctly warm medium-dark gray.
+- **Stone Gray** (`#87867f`): Tertiary text, footnotes, and de-emphasized metadata.
+- **Dark Warm** (`#3d3d3a`): Dark text links and emphasized secondary text.
+- **Warm Silver** (`#b0aea5`): Text on dark surfaces — a warm, parchment-tinted light gray.
 
-## Build and Hooks
+### Semantic & Accent
+- **Border Cream** (`#f0eee6`): Standard light-theme border — barely visible warm cream, creating the gentlest possible containment.
+- **Border Warm** (`#e8e6dc`): Prominent borders, section dividers, and emphasized containment on light surfaces.
+- **Border Dark** (`#30302e`): Standard border on dark surfaces — maintains the warm tone.
+- **Ring Warm** (`#d1cfc5`): Shadow ring color for button hover/focus states.
+- **Ring Subtle** (`#dedc01`): Secondary ring variant for lighter interactive surfaces.
+- **Ring Deep** (`#c2c0b6`): Deeper ring for active/pressed states.
 
-- Build output goes to `dist/`.
-- `hooks/hooks.json` registers Codex `Stop` and `SubagentStop` hooks.
-- Hook commands run `node ${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js hook stop` and `node ${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js hook subagent-stop`.
+### Gradient System
+- Claude's design is **gradient-free** in the traditional sense. Depth and visual richness come from the interplay of warm surface tones, organic illustrations, and light/dark section alternation. The warm palette itself creates a "gradient" effect as the eye moves through cream → sand → stone → charcoal → black sections.
 
-## Constraints
+## 3. Typography Rules
 
-- Never let the hook block a Codex turn because of malformed input.
-- Never make a network call from the hook.
-- Keep the directive in `directive.md`. Do not inline it into TypeScript files.
-- The hook only continues sessions listed in `.omo/boulder.json` as `codex:<session_id>`.
-- The hook continues while the plan has a readable top-level checklist (`total > 0`). A fully-checked plan still blocks Stop until the final gate runs and the Boulder work is marked completed; an unreadable or empty checklist yields no output.
+### Font Family
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [code-yeongyu/lazycodex](https://github.com/code-yeongyu/lazycodex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
