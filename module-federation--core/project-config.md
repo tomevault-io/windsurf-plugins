@@ -1,229 +1,154 @@
 ---
 trigger: always_on
-description: How AI coding agents should operate in this repository.
+description: - **ALWAYS PARALLELIZE**: Break down ANY task into multiple parallel sub-tasks
 ---
 
-# AGENTS.md
+# Claude Task Parallelization & Development Guidelines
 
-How AI coding agents should operate in this repository.
+## Core Principles
 
-> **Important migration note (Turborepo):**
-> Nx orchestration has been removed from this repository. Prefer Turbo + package scripts for all build/test/lint workflows.
+### Maximum Parallelization Strategy
+- **ALWAYS PARALLELIZE**: Break down ANY task into multiple parallel sub-tasks
+- **IMMEDIATE EXECUTION**: Launch parallel Task agents immediately without asking questions
+- **NO CLARIFICATION**: Skip asking about implementation details unless absolutely critical
+- **CONTEXT EFFICIENCY**: Each task handles only its specific scope to minimize token usage
 
-## Scope and Precedence
+## Universal Parallel Task Patterns
 
-- Scope: this file applies to the full repository root.
-- Precedence: a deeper `AGENTS.md` overrides this file for its subtree.
-- This is an agent-operations document, not a contributor tutorial.
+### For Any Codebase Task
+Analyze the request and immediately split into parallel tasks based on:
 
-## Source of Truth (in priority order)
+1. **File Type Separation**
+   - Source code files
+   - Test files
+   - Configuration files
+   - Documentation files
+   - Build/deployment files
 
-1. GitHub Actions workflows in `.github/workflows/*.yml` and `.github/workflows/*.yaml`
-2. Local CI parity runner in `tools/scripts/ci-local.mjs`
-3. Root scripts in `package.json` as wrappers/convenience entrypoints
+2. **Functional Separation**
+   - Core implementation
+   - Helper/utility functions
+   - Integration points
+   - Data models/schemas
+   - External interfaces
 
-If prose docs conflict with workflows (for example `README.md` or `CONTRIBUTING.md`), follow the workflow commands.
+3. **Directory-Based Separation**
+   - Different modules/packages
+   - Frontend vs backend
+   - Library vs application code
+   - Public vs private APIs
 
-## Environment Parity
+### Dynamic Task Allocation Examples
 
-- Node.js: `24` (from `.nvmrc` and workflow setup)
-- pnpm: `10.28.0` (from `package.json` `packageManager`)
-- Package manager: pnpm only
+#### Example 1: Feature Implementation (5-7 parallel tasks)
+- Task 1: Core feature logic
+- Task 2: Supporting utilities/helpers
+- Task 3: Tests (if applicable)
+- Task 4: Integration with existing code
+- Task 5: Configuration updates
+- Task 6: Type definitions (if typed language)
+- Task 7: Remaining changes and coordination
 
-Recommended setup for agents:
+#### Example 2: Bug Investigation (3-10 parallel tasks)
+- Task 1: Search for error patterns in logs/code
+- Task 2: Analyze related test files
+- Task 3: Check recent commits/changes
+- Task 4: Investigate similar issues in codebase
+- Task 5: Review documentation/comments
 
-```bash
-corepack enable
-pnpm install --frozen-lockfile
+#### Example 3: Refactoring (4-6 parallel tasks)
+- Task 1: Identify all usage locations
+- Task 2: Plan new structure
+- Task 3: Update core implementations
+- Task 4: Update dependent code
+- Task 5: Update tests
+- Task 6: Verify no breaking changes
+
+#### Example 4: Codebase Analysis (5-8 parallel tasks)
+- Task 1: Analyze file structure
+- Task 2: Review core business logic
+- Task 3: Map dependencies
+- Task 4: Identify patterns/conventions
+- Task 5: Review configuration
+- Task 6: Analyze build system
+- Task 7: Check documentation
+- Task 8: Security/performance patterns
+
+### Adaptive Parallelization Rules
+1. **Minimum 3 tasks**: Even simple requests should use at least 3 parallel tasks
+2. **Maximum 10 tasks**: Avoid over-fragmentation; combine related work
+3. **File count based**: 
+   - 1-5 files: 3-4 tasks
+   - 6-20 files: 5-7 tasks
+   - 20+ files: 7-10 tasks
+4. **Complexity based**:
+   - Simple changes: 3-4 tasks
+   - Medium complexity: 5-7 tasks
+   - High complexity: 7-10 tasks
+
+### Post-Execution Coordination
+Always include a final review task that:
+- Synthesizes findings from all parallel tasks
+- Resolves any conflicts or overlaps
+- Runs verification commands (lint, test, build)
+- Provides unified summary of changes
+
+## Context Optimization Strategies
+
+### Code Reading Rules
+- **STRIP COMMENTS**: Remove all comments when analyzing existing code
+- **FOCUSED SCOPE**: Each task reads ONLY files relevant to its specific responsibility
+- **MINIMIZE CONTEXT**: Avoid loading unnecessary files to preserve token efficiency
+
+### File Management
+- **PREFER MODIFICATION**: Always edit existing files over creating new ones
+- **MINIMAL CHANGES**: Make the smallest possible changes to achieve functionality
+- **PRESERVE PATTERNS**: Maintain existing code style and architectural patterns
+
+## Implementation Guidelines
+
+### Critical Rules
+1. **PRESERVE ARCHITECTURE**: Never change existing patterns without explicit request
+2. **FOLLOW CONVENTIONS**: Match existing naming, file organization, and code style
+3. **REUSE COMPONENTS**: Use existing utilities, hooks, and components before creating new ones
+4. **ATOMIC CHANGES**: Each task makes self-contained, non-conflicting modifications
+5. **TEST COVERAGE**: Maintain or improve test coverage with changes
+6. **BACKWARDS COMPATIBILITY**: Ensure changes don't break existing functionality
+7. **PERFORMANCE AWARE**: Consider performance implications of changes
+8. **SECURITY CONSCIOUS**: Never introduce security vulnerabilities
+
+### Efficiency Practices
+- Launch all tasks in a single message using multiple tool invocations
+- Each task should have clear, non-overlapping responsibilities
+- Consolidate small related changes into Task 7 to prevent over-fragmentation
+
+### Error Handling
+- Each task should handle its own errors gracefully
+- If a task encounters blockers, it should document them clearly
+- The review task should identify and resolve integration issues
+- Always provide actionable error messages
+- Suggest fixes for common errors encountered
+- Log errors with context for debugging
+- Fail fast but provide recovery options
+
+## Parallelization Examples
+
+### Example: "Fix the login bug"
+```
+Claude: [Launches 5 parallel tasks immediately]
+- Task 1: Search for login-related code and error patterns
+- Task 2: Check recent commits touching authentication
+- Task 3: Analyze login tests and error logs
+- Task 4: Review auth configuration and dependencies
+- Task 5: Investigate similar issues and edge cases
 ```
 
-Worktree safety rule:
-
-- In git worktree contexts, prefer running Turbo/package scripts directly (`pnpm exec turbo ...` / `pnpm --filter ... run ...`).
-
-### Worktree Mode (Required in Worktrees)
-
-Use these rules whenever the checkout is a git worktree (typically `git rev-parse --git-dir` differs from `git rev-parse --git-common-dir`):
-
-1. Setup/install via:
-
-```bash
-corepack enable
-pnpm install --frozen-lockfile
+### Example: "Add a new API endpoint"
 ```
-
-2. Run workspace tasks via Turbo/package scripts:
-
-```bash
-pnpm exec turbo run <task>
-pnpm --filter <package-name> run <script>
-```
-
-
-## CI-Aligned Command Matrix
-
-Use these as defaults unless the task explicitly requires something else.
-
-### Turbo Task Primer (How to Run Tasks)
-
-- List effective tasks:
-
-```bash
-pnpm exec turbo run build --dry=json
-```
-
-- Run a task across the workspace:
-
-```bash
-pnpm exec turbo run <task>
-```
-
-- Run a task for packages only:
-
-```bash
-pnpm exec turbo run <task> --filter=./packages/**
-```
-
-- Run a task for one package:
-
-```bash
-pnpm exec turbo run <task> --filter=@module-federation/<pkg>
-```
-
-- Run a package script directly (bypasses workspace fanout):
-
-```bash
-pnpm --filter @module-federation/<pkg> run <script>
-```
-
-- Disable cache for validation/debug runs:
-
-```bash
-pnpm exec turbo run <task> --force
-```
-
-- Common Turbo tasks defined in `turbo.json`:
-  - `build`
-  - `test` (depends on `^build`)
-  - `lint`
-  - `e2e` / `test:e2e` / `test:e2e:production`
-
-### Formatting
-
-- CI-equivalent format gate:
-
-```bash
-pnpm exec prettier --check .
-```
-
-- Local format fix:
-
-```bash
-pnpm exec prettier --write .
-```
-
-Wrapper script also exists: `pnpm run lint-fix`.
-
-### Package Pipeline Parity
-
-- Package build (Turbo cache handled automatically):
-
-```bash
-pnpm run build:packages
-```
-
-- Package tests:
-
-```bash
-pnpm run test:packages
-```
-
-- Package lint:
-
-```bash
-pnpm run lint:packages
-```
-
-Root build/lint scripts delegate to the package pipeline scripts.
-
-### Metro Pipeline Parity
-
-- Build pkg + metro:
-
-```bash
-pnpm run build:packages
-```
-
-- Metro tests:
-
-```bash
-pnpm exec turbo run test --filter=@module-federation/metro --filter=@module-federation/metro-plugin-rnef --filter=@module-federation/metro-plugin-rock --filter=@module-federation/metro-plugin-rnc-cli
-```
-
-- Metro lint:
-
-```bash
-pnpm exec turbo run lint --filter=@module-federation/metro --filter=@module-federation/metro-plugin-rnef --filter=@module-federation/metro-plugin-rock --filter=@module-federation/metro-plugin-rnc-cli
-```
-
-### E2E Parity via Local CI Runner
-
-- List available jobs:
-
-```bash
-pnpm run ci:local --list
-```
-
-- Run a single job:
-
-```bash
-pnpm run ci:local --only=<job>
-```
-
-- Current job names (from `tools/scripts/ci-local.mjs`):
-  - `build-and-test`
-  - `build-metro`
-  - `e2e-modern`
-  - `e2e-runtime`
-  - `e2e-manifest`
-  - `e2e-node`
-  - `e2e-next-dev`
-  - `e2e-next-prod`
-  - `e2e-treeshake`
-  - `e2e-modern-ssr`
-  - `e2e-router`
-  - `e2e-shared-tree-shaking`
-  - `devtools`
-  - `bundle-size`
-  - `actionlint` (listed, CI-only skip)
-  - `bundle-size-comment` (listed, CI-only skip)
-
-## Task-to-Checks Decision Table
-
-Run the smallest deterministic set that matches the change type.
-
-| Change type | Required checks | Optional checks |
-| --- | --- | --- |
-| Docs-only (no code/config behavior change) | none by default; run only checks explicitly requested by user | `pnpm exec prettier --check .` |
-| Package code in `packages/*` (non-metro) | `pnpm exec prettier --check .`; package build; package tests | targeted project test/build commands |
-| Metro package code (`packages/metro-*`) | metro parity set (build pkg+metro, metro tests, metro lint) | E2E metro job via `ci:local` when relevant |
-| App/E2E-related changes in `apps/*` or E2E scripts/workflows | `pnpm run ci:local --only=<matching-job>` | additional related `ci:local` jobs |
-| Release workflow/release tooling changes | release sanity commands only, no publish | package/metro builds if impacted |
-
-Release sanity commands (no publish):
-
-```bash
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm --filter @changesets/assemble-release-plan run build
-```
-
-For every handoff, agents must report:
-
-- Exactly which commands were run
-- Which expected checks were skipped
+Claude: [Launches 6 parallel tasks immediately]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [module-federation/core](https://github.com/module-federation/core) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
