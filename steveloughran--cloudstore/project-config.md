@@ -25,4 +25,4 @@ description: Licensed to the Apache Software Foundation (ASF) under one
 
 ---
 > Source: [steveloughran/cloudstore](https://github.com/steveloughran/cloudstore) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
