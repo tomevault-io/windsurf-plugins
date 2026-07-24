@@ -1,23 +1,74 @@
 ---
 trigger: always_on
-description: Gemini is an automatic randomized testing suite for
+description: Generates random CQL statements (INSERT, UPDATE, DELETE, SELECT) for a given table with
 ---
 
 # Gemini Project
 
-Gemini is an automatic randomized testing suite for
-the Scylla database. It operates by generating random mutations (INSERT, UPDATE, DELETE) and
-verifying them (SELECT) using the CQL protocol across two clusters:
-a system under test (SUT) and a test oracle.
+Gemini is an automated randomized testing suite for ScyllaDB and Apache Cassandra.
+It generates random CQL mutations (INSERT, UPDATE, DELETE) and applies them to two clusters
+simultaneously: an **oracle** (source of truth) and a **system under test** (SUT).
+It then runs SELECT queries on both clusters and compares results row-by-row.
+Any difference indicates a bug in the SUT.
+
+## How Gemini Works
+
+1. **Schema**: Generated from a random seed or loaded from JSON. Defines keyspace, tables,
+   partition/clustering keys, columns, indexes, materialized views, and UDTs.
+2. **Partitions**: A pool of partition key values is initialized with a configurable statistical
+   distribution (uniform, zipfian, sequential, lognormal) that controls access patterns.
+3. **Warmup** (optional): Write-only phase with no deletes to populate initial data.
+4. **Main phase**: Runs in one of four modes:
+   - `mixed` (default) -- concurrent mutation + validation workers
+   - `write` -- mutation workers only
+   - `read` -- validation workers only
+   - `warmup` -- writes without deletes
+5. **Workers**: Per-table pools managed by `errgroup`:
+   - `mutationConcurrency` Mutation workers generate random INSERT/UPDATE/DELETE statements
+   - `readConcurrency` Validation workers run SELECT queries and compare results
+6. **Mutations**: Applied to both clusters in parallel with retry and exponential backoff.
+   Each cluster is retried independently.
+7. **Validation**: Rows loaded from both clusters in parallel, sorted by PK+CK, compared via
+   `CompareCollectedRows`. List values are deduplicated (LWT retry artifact workaround).
+8. **Delete tracking**: Deleted partitions are tracked in time buckets via a min-heap.
+   After configurable delays, they are re-validated (expecting zero rows on both clusters).
+9. **Error budget**: When max errors reached, workers stop gracefully via `stop.Flag`.
 
 ## Project Structure
 
-- `pkg/` contains everything that is needed for `gemini` project
-- `docs/` contain project documentation and always keep it up to date, especially the architecture diagrams and if
-  something is new, add it to the documentation
-- `scripts/` contain useful scripts for development and testing
-- `docker/` contains dockerfiles for building the project, and it contains `docker-compose` files for easy development
-  environment setup, also used in CI
+- `pkg/` -- all packages for the gemini project
+- `docs/` -- project documentation (architecture, partitions, metrics, etc.)
+- `scripts/` -- development and testing scripts
+- `docker/` -- Dockerfiles and docker-compose files for dev environment and CI
+
+### Key Packages
+
+| Package | Purpose |
+|---|---|
+| `pkg/cmd` | CLI entry point, flag parsing, root command |
+| `pkg/jobs` | Mutation/Validation worker orchestration |
+| `pkg/store` | Dual-cluster CQL operations and row comparison |
+| `pkg/partitions` | Thread-safe partition pool with distributions |
+| `pkg/statements` | CQL statement generation with cached queries |
+| `pkg/stmtlogger` | Async statement logging framework |
+| `pkg/stmtlogger/scylla` | ScyllaDB + file statement writer |
+| `pkg/typedef` | Core types: Schema, Table, Column, Type interface, Stmt |
+| `pkg/builders` | Schema builder pattern |
+| `pkg/distributions` | Statistical distributions for partition selection |
+| `pkg/status` | Global ops/error counters |
+| `pkg/stop` | Graceful shutdown flag (soft/hard) |
+| `pkg/metrics` | Prometheus metric definitions |
+| `pkg/joberror` | Structured error types with comparison results |
+| `pkg/utils` | Backoff, timers, file helpers |
+| `pkg/random` | Goroutine-safe random number generation |
+| `pkg/replication` | Replication strategy configuration |
+| `pkg/murmur` | Murmur3 hash for token-aware routing |
+| `pkg/inflight` | In-flight request tracking |
+| `pkg/tableopts` | Table options for CQL CREATE TABLE |
+| `pkg/schema` | Schema generation from seeds |
+| `pkg/services` | Supporting services (pprof, etc.) |
+| `pkg/benchmarks` | Performance benchmarks |
+| `pkg/testutils` | Test helpers (ScyllaDB containers, etc.) |
 
 ## Language & Framework
 
@@ -26,7 +77,7 @@ a system under test (SUT) and a test oracle.
 - **Database**: Scylla/Cassandra using CQL protocol
 - **Testing**: Randomized testing with statistical distributions
 
-## Go instructions (1.24, 1.25)
+## Go Instructions (1.24, 1.25)
 
 1. Always use `for range` instead of `for` with `i++` when iterating, this is the new syntax from Go 1.25
    Example: `for i := 0; i < 10; i++` should be replaced with `for i := range 10`. If the `i` is not needed it can be
@@ -46,36 +97,9 @@ a system under test (SUT) and a test oracle.
 11. Use `go test -race` to detect data races.
 12. Always use in tests for context `t.Context()` and for benchmarking `b.Context()`, there are new go 1.24 function,
     and they better and avoid linting errors.
-13. Use `t.Cleanup()` to register cleanup functions in tests instead of `defer` to ensure proper execution order.
-14. Use `t.Parallel()` to run tests in parallel.
 
-## Vet & Static Checks
-
-Always run go vet ./... and address:
-
-- waitgroup analyzer: fix misplaced (*sync.WaitGroup).Add calls.
-- hostport analyzer: replace fmt.Sprintf("%s:%d", host, port) with net.JoinHostPort(host, strconv.Itoa(port)).
-
-## Testing instructions
-
-1. IMPORTANT THING: Always use `-tags testing` and `-race` when running tests locally and in CI.
-    * `go test -tags testing -race ./pkg/...`
-2. When writing new tests, always use `t.Context()` for context in tests
-3. IMPORTANT THING: Running tests locally and in CI should be deterministic, so use environment variables to set up
-   ScyllaDB clusters
-    * ```GEMINI_ORACLE_CLUSTER_IP=192.168.100.2 GEMINI_TEST_CLUSTER_IP=192.168.100.3 GEMINI_USE_DOCKER_SCYLLA=true```
-
-<!-- CODEGRAPH_START -->
-## CodeGraph
-
-In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
-
-- **MCP tools** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them. `codegraph_node` returns one symbol's source + callers, or reads a whole file with line numbers. If the tools are listed but deferred, load them by name via tool search.
-- **Shell** (always works): `codegraph explore "<symbol names or question>"` and `codegraph node <symbol-or-file>` print the same output.
-
-If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
-<!-- CODEGRAPH_END -->
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [scylladb/gemini](https://github.com/scylladb/gemini) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
