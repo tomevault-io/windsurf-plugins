@@ -111,4 +111,4 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ---
 > Source: [tudorr89/info-firme](https://github.com/tudorr89/info-firme) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
