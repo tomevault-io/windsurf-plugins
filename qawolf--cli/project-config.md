@@ -1,94 +1,21 @@
 ---
 trigger: always_on
-description: CLI for agents, CI, and humans to interact with QA Wolf. TypeScript, Bun runtime, Commander.js framework.
+description: Path-scoped rules are in `.claude/rules/` and load automatically when editing matching files.
 ---
 
-# @qawolf/cli — Agent Instructions
+@AGENTS.md
 
-CLI for agents, CI, and humans to interact with QA Wolf. TypeScript, Bun runtime, Commander.js framework.
+## Claude Code
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for human contributor setup.
+Path-scoped rules are in `.claude/rules/` and load automatically when editing matching files.
 
-## Commands
+After editing a file, run:
 
 ```bash
-bun install                        # install dependencies
-bun run dev                        # run CLI in development
-bun run dev -- <args>              # pass args to CLI (e.g. -- --help)
-bun run build                      # JS bundle → dist/cli.js + dist/cli.js.map (uses --outdir; bun rejects --sourcemap=external with --outfile)
-bun run build:binary               # standalone binary → dist/qawolf
-bun run typecheck                  # tsc --noEmit
-bun run lint                       # oxlint
-bun run lint:fix                   # oxlint with auto-fix
-bun run format:check               # oxfmt check
-bun run format                     # oxfmt write
-bun run knip                       # dead-code / unused-dep detection
-bun run test                       # bun test
-bun run test:watch                 # bun test --watch
+bun run lint:fix
+bun run format
 ```
-
-## Testing
-
-Tests use Bun's test runner. Run a single test file with `bun run test <path>`. Place test files next to the code they test, named `*.test.ts`.
-
-## Project Structure
-
-```
-src/
-├── main.ts              # Entry point — createProgram().parse()
-├── core/                # Pure functions and types — zero I/O
-│   ├── androidTargets.ts # Android target parsing helpers
-│   ├── batchMap.ts      # bounded-concurrency async map
-│   ├── errors.ts        # errorMessage, isNoEntError
-│   ├── flowMeta.ts      # extractFlowMeta, targetToBrowser, flowBasename
-│   ├── messages/        # user-facing strings (auth, doctor, flows, init, install, runner)
-│   ├── paths.ts         # getConfigDir
-│   ├── patternArgs.ts   # CLI pattern argument parsing
-│   ├── pluralize.ts     # pluralize
-│   ├── sleep.ts         # sleep
-│   └── types.ts         # BrowserName, VideoMode, TraceMode, HarMode, TestCounts
-├── shell/               # I/O executors — process spawning, UI, API clients
-│   ├── appium/          # Android emulator + Appium server lifecycle
-│   ├── commandContext.ts # CommandContext, CommandResult types
-│   ├── exit.ts          # exitCodes, exit
-│   ├── fs.ts            # filesystem helpers
-│   ├── logger.ts        # pino-based structured logger
-│   ├── manifest/        # bundle manifest read/lookup
-│   ├── platform/        # tRPC client, getIdentity, signed-URL/bundle download, team storage
-│   ├── playwright.ts    # resolvePlaywrightCli
-│   ├── reporter/        # Reporter interface, console + JUnit + composite reporters
-│   ├── resolveExport.ts # ESM export resolution
-│   ├── signals/         # SignalRegistry for graceful shutdown
-│   ├── spawn.ts         # defaultSpawn, SpawnFn
-│   ├── testkit.ts       # configureTestkit
-│   ├── ui/              # createUI, detectOutputMode, OutputMode (clack + renderers)
-│   └── workerCommand.ts # worker-subprocess command wiring
-├── domains/             # Business logic — one directory per bounded context
-│   ├── auth/            # resolveApiKey, validateApiKey, saveApiKey
-│   ├── config/          # loadConfig (not yet wired)
-│   ├── doctor/          # runChecks, renderResults
-│   ├── emails/          # configureEmails (not yet wired)
-│   ├── flows/           # expandPatterns, peekFlowMeta, flowsList, pull/
-│   ├── init/            # init handler + templates
-│   ├── install/         # installBrowsers, installBrowserList
-│   └── runner/          # flowsRun, runWebFlow, runAndroidFlow, worker dispatch + pool
-└── commands/            # Thin CLI glue — Commander registration + composite root
-    ├── context.ts       # withContext() Commander action wrapper
-    ├── program.ts       # createProgram() factory
-    ├── auth/            # login, logout, whoami handlers
-    ├── doctor/          # doctor handler
-    ├── flows/           # flows run/list/pull handlers; runDefaults composite root
-    ├── init/            # init handler
-    └── install/         # install browsers/android handlers
-```
-
-The codebase is organized into four strict layers. **`core/`** holds pure functions and types with zero I/O. **`shell/`** holds I/O executors (process spawning, Playwright, UI rendering, API clients). **`domains/`** holds bounded-context business logic; each domain may import `core/` and `shell/` but never a sibling domain. **`commands/`** is the composite root: thin Commander registration plus `runDefaults.ts`, which bridges multiple domains to assemble the `flows run` command. oxlint enforces these boundaries via per-layer `no-restricted-imports` overrides in `.oxlintrc.json`.
-
-API clients (tRPC for the QA Wolf platform, GitHub REST) live in `src/shell/platform/` and `src/shell/` respectively — one module per auth boundary.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [qawolf/cli](https://github.com/qawolf/cli) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
