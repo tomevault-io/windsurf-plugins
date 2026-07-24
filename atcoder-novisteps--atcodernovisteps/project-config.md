@@ -1,105 +1,18 @@
 ---
 trigger: always_on
-description: A web service for tracking submissions on AtCoder and other competitive programming sites, which are graded by difficulty (Q11-D6).
+description: - Path-specific rules are in `.claude/rules/`
 ---
 
-# AtCoder NoviSteps
+# CLAUDE.md
 
-A web service for tracking submissions on AtCoder and other competitive programming sites, which are graded by difficulty (Q11-D6).
+@AGENTS.md
 
-## Guidelines
+## Claude Code Specific
 
-Always prefer simplicity over pathological correctness. YAGNI, KISS, DRY. No backward-compat shims or fallback paths unless they come free without adding cyclomatic complexity.
-
-**When implementing:**
-
-1. Use `/writing-plans` to generate a phased plan (lower risk → higher risk order). Store the plan at `docs/dev-notes/YYYY-MM-DD/{task-name-en}/plan.md`. Split into `phase-N.md` files when the plan exceeds 200 lines or has 5+ phases. Each plan must include: overview, design rationale, rejected alternatives, and a per-phase summary. Write plans in Japanese; source code comments in English. Verify each task before starting:
-   - Which layer? (prisma / server / zod / types / fixtures / services / utils / stores / routes / components) — split if 2+ layers
-   - Single responsibility: one purpose per task
-   - Existing util/service/type? Search before creating
-   - Test name: state it in the task description
-2. Before writing a new function, search `src/lib/utils/`, `src/lib/services/`, `src/features/*/utils/` and `src/features/*/services/` for existing implementations; extract shared logic there when it appears in 2+ places
-3. Write tests first, then implement production code, then verify with `pnpm test:unit`
-4. Review critically after implementing: flag YAGNI violations, over-abstraction, missing tests
-5. After all phases complete (feature and refactor branches only — not hotfixes or dependency bumps): run a mandatory refactor cycle. Write to `plan.md`: novel lessons (implementation blockers, non-obvious patterns not already in rules) and remaining tasks. Discard `phase-N.md` files. Run `coderabbit review --plain`; write all findings of `critical` / `high` / `potential_issue` (medium) to a `## CodeRabbit Findings` section in `plan.md`. The user decides which to fix before opening a PR; do not fix any finding unilaterally. `nitpick` findings defer to PR CI.
-6. Run `/session-close` at the end of feature and refactor branches (not hotfixes, deps bumps, or single-session fixes): updates plan checklist, proposes rule/skill additions, checks for bloat, and detects repeated instructions
-
-**Plan Approval ≠ Implementation Start:** Generating a plan (`/writing-plans`) does NOT authorize implementation. Always:
-
-- Wait for explicit user consent ("let's start", "implement", etc.)
-- Use AskUserQuestion before starting if requirements are ambiguous (data model, preferences, test scope, etc.)
-
-## Working with the User
-
-### Communication
-
-- **No social pleasantries:** Skip opening remarks like "お疲れ様です", "了解しました", "ありがとうございます"
-- **Direct & concise:** Lead with substance (findings, next steps, decisions)
-- **Task-focused:** Avoid flattery, apologizing, or performative agreement
-- **Respect the work:** Speak plainly about tradeoffs and real issues; don't sugar-coat
-
-### Responding to Feedback
-
-- **Verify before accepting:** Check for misunderstanding, missing context, or counterpoints
-- **Question, don't defer:** Ask clarifying questions or offer alternatives with reasoning—don't blindly follow
-
-### Critical Review as Default
-
-When proposing approaches, designs, or solutions:
-
-- **Lead with the proposal:** State the recommendation clearly
-- **Then critique it:** Point out tradeoffs, risks, limitations, and when it fails
-- **Offer alternatives:** Present 2–3 viable options with reasoning for each
-- **Let user decide:** Don't pretend one option is obviously best if it isn't
-
-## Tech Stack
-
-SvelteKit 2 + Svelte 5 (Runes) + TypeScript | PostgreSQL + Prisma | Flowbite Svelte + Tailwind 4 | Vitest + Playwright | oxlint (JS/TS) + ESLint (Svelte)
-
-## Commands
-
-```bash
-pnpm dev              # Start dev server (localhost:5174)
-pnpm build            # Build for production
-pnpm test             # Run all tests
-pnpm test:unit        # Vitest unit tests
-pnpm test:e2e         # Playwright E2E tests
-pnpm coverage         # Report test coverage
-pnpm lint             # Prettier + oxlint (JS/TS) + ESLint (.svelte) check
-pnpm format           # Prettier format
-pnpm check            # Svelte type check
-pnpm exec prisma generate           # Generate Prisma client
-pnpm exec prisma migrate dev --name # Create migration (with description)
-pnpm db:seed          # Seed database
-```
-
-## Project Structure
-
-```md
-src/routes/ # SvelteKit file-based routing
-src/lib/
-├── actions/ # SvelteKit actions
-├── clients/ # External API clients (AtCoder Problems, AOJ)
-├── components/ # Svelte components
-├── constants/
-├── server/ # Server-only (auth.ts, database.ts)
-├── services/ # Business logic
-├── stores/ # Svelte stores (.svelte.ts with Runes)
-├── types/ # TypeScript types
-├── utils/ # Pure utility functions
-└── zod/ # Validation schemas
-src/features/ # Feature-scoped code (single domain)
-├── {feature}/
-│ ├── components/ # Feature UI (list/, detail/, shared/)
-│ ├── fixtures/ # Test data
-│ ├── services/ # Feature business logic (CRUD via Prisma)
-│ │ └── _.test.ts # Tests co-located next to source (not in src/test/)
-│ ├── stores/ # Feature stores
-│ ├── types/ # Feature types
-│ └── utils/ # Feature utilities
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Path-specific rules are in `.claude/rules/`
+- Run `pnpm format` before committing
+- When uncertain about project conventions, see existing code in `src/lib/`
 
 ---
 > Source: [AtCoder-NoviSteps/AtCoderNoviSteps](https://github.com/AtCoder-NoviSteps/AtCoderNoviSteps) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
