@@ -1,49 +1,112 @@
 ---
 trigger: always_on
-description: This is a monorepo. Development and test environments live in `/dev`, packages live in `/packages`.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-## Structure
+# CLAUDE.md
 
-This is a monorepo. Development and test environments live in `/dev`, packages live in `/packages`.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Packages are:
+## Build & Development Commands
 
--   `framer-motion`: For React-specific code. More of this should be refactored to `motion-dom` where possible.
--   `motion`: Re-export of `framer-motion`.
--   `motion-dom`: Vanilla/JS animation library.
--   `motion-utils`: Pure functions and easing functions.
+```bash
+# Install dependencies (use make bootstrap for first-time setup)
+make bootstrap
 
-## Tests
+# Build all packages (ALWAYS run from repo root, not from individual packages)
+yarn build           # or: make build
 
-There are three types of test suites in Motion.
+# Watch mode for development
+yarn watch           # or: make watch
 
-1. Jest (unit) tests
-2. Cypress e2e tests
-3. Playwright e2e tests
+# Run tests
+yarn test            # Unit tests (Jest) for all packages
+yarn test-playwright # Playwright E2E tests
 
-### Jest
+# Run tests for a specific package
+cd packages/framer-motion && yarn test-client  # Client-side Jest tests
+cd packages/framer-motion && yarn test-server  # SSR Jest tests
 
-Structure code to be unit testable where possible. Co-locate a unit test in a `__tests__` folder. Name the unit tests for a file `<filename>.test.ts(x)`.
+# Lint
+yarn lint            # or: make lint
 
-Run with `yarn test`.
+# Run E2E tests
+make test-e2e        # Runs all E2E tests (Next.js, HTML, React, React 19, Playwright)
+make test-single     # Run a single Cypress test (edit spec path in Makefile)
+```
 
-### Cypress
+## Package Architecture
 
-The Cypress test suite is for testing React code in a browser environment.
+This is a Yarn workspaces monorepo managed by Turborepo and Lerna.
 
-When a piece of UI is interactable, or we rely on browser APIs, write a Cypress test. The UI files should live in `dev/react/src/tests` and the test files to run against them live in `packages/framer-motion/cypress/integration`.
+### Core Packages (packages/)
 
-Run with `yarn test-e2e`.
+- **motion** - Main public package (`npm install motion`). Re-exports from framer-motion with cleaner entry points (`motion/react`, `motion/mini`)
+- **framer-motion** - Core implementation for React. Contains all animation logic, components, hooks, and features
+- **motion-dom** - DOM-specific animation utilities (animate, scroll, gestures, effects). Framework-agnostic
+- **motion-utils** - Shared utilities (easing, math helpers, error handling). No dependencies
 
-### Playwright
+### Development Apps (dev/)
 
-The Cypress test suite is for testing vanilla JS code in a browser environment.
+- **dev/react** - React 18 development/test app (port 9990)
+- **dev/react-19** - React 19 development/test app (port 9991)
+- **dev/next** - Next.js development/test app (port 3000)
+- **dev/html** - Vanilla JS/HTML test pages (port 8000)
 
-The UI files live in `dev/html/public/playwright` and the test files live in `/tests`.
+### Package Dependency Flow
 
-Run with `yarn test-playwright`.
+```
+motion-utils (base utilities)
+    ↓
+motion-dom (DOM animation engine)
+    ↓
+framer-motion (React integration)
+    ↓
+motion (public API)
+```
+
+## Key Source Directories (packages/framer-motion/src/)
+
+- **animation/** - Animation system (animators, sequences, optimized-appear)
+- **components/** - React components (AnimatePresence, LayoutGroup, LazyMotion, Reorder)
+- **context/** - React contexts (MotionContext, PresenceContext, LayoutGroupContext)
+- **gestures/** - Gesture handling (drag, pan, tap, hover, focus)
+- **motion/** - Core motion component and feature system
+- **projection/** - Layout animation projection system (FLIP animations)
+- **render/** - Rendering pipeline (HTML, SVG, DOM utilities)
+- **value/** - Motion values and hooks (useMotionValue, useSpring, useScroll, useTransform)
+
+## Writing Tests
+
+**IMPORTANT: Always write tests for every bug fix AND every new feature.** Write a failing test FIRST before implementing, to ensure the issue is reproducible and the fix is verified.
+
+**"Failing test" means a test that reproduces the reported bug.** The test should assert the expected behavior and fail because of the bug — not because your planned code doesn't exist yet. A TypeScript compile error for an API you're about to add is not a failing test. Write the test against the existing codebase, see it fail for the right reason, then implement the fix.
+
+### Test types by feature
+
+- **Unit tests (Jest)**: For pure logic, value transformations, utilities. Located in `__tests__/` directories alongside source. **JSDOM does not support WAAPI** (`Element.animate()`), so Jest tests only cover the JS animation fallback path.
+- **E2E tests (Cypress)**: For UI behavior that involves DOM rendering, scroll interactions, gesture handling, or WAAPI animations. Test specs in `packages/framer-motion/cypress/integration/`, test pages in `dev/react/src/tests/`.
+- **E2E tests (Playwright)**: For cross-browser testing and HTML/vanilla JS tests. Specs in `tests/`, test pages in `dev/html/public/playwright/`.
+
+### When to escalate from unit tests to Cypress
+
+**If a bug is reported with a reproduction but your unit test passes, do NOT conclude "already works."** JSDOM lacks WAAPI, real layout, and real browser rendering. The bug is likely in the browser code path. You MUST:
+
+1. Create a Cypress E2E test that matches the reporter's reproduction as closely as possible.
+2. Verify the Cypress test fails before implementing a fix.
+3. If the bug involves `opacity`, `transform`, React.lazy/Suspense, scroll, layout animations, or any visual behavior — **start with Cypress**, skip the unit test entirely.
+
+### Creating Cypress E2E tests
+
+1. **Create a test page** in `dev/react/src/tests/<test-name>.tsx` exporting a named `App` component. It's automatically available at `?test=<test-name>`.
+2. **Create a spec** in `packages/framer-motion/cypress/integration/<test-name>.ts`.
+3. **Verify WAAPI acceleration** using `element.getAnimations()` in Cypress callbacks — but **only for compositor properties** (opacity, transform). `getAnimations()` won't return WAAPI animations for non-compositor properties like height/width in Electron. Don't use it for those.
+
+### Cypress animation testing patterns
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [motiondivision/motion](https://github.com/motiondivision/motion) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
