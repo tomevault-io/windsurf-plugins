@@ -1,214 +1,242 @@
 ---
 trigger: always_on
-description: > This document is mainly for agents and LLMs to follow when maintaining,
+description: Guidelines for creating component documentation in the Kanpeki project.
 ---
 
-# React Composition Patterns
+# Component Documentation Guidelines
 
-**Version 1.0.0**  
-Engineering  
-January 2026
+Guidelines for creating component documentation in the Kanpeki project.
 
-> **Note:**  
-> This document is mainly for agents and LLMs to follow when maintaining,  
-> generating, or refactoring React codebases using composition. Humans  
-> may also find it useful, but guidance here is optimized for automation  
-> and consistency by AI-assisted workflows.
+## File Structure
 
+Component documentation files are located in `src/content/docs/components/` and follow this pattern:
+
+- `<component-name>.mdx` - Main documentation file
+- Example components in `src/registry/examples/<component-name>/`
+- Registry entries in `src/registry/examples/<component-name>/_registry.ts`
+
+**Important**: After creating, updating, or deleting any component or file inside `src/registry/`:
+
+1. Validate your changes:
+
+   ```bash
+   bun run registry:validate
+   ```
+
+2. If validation passes, rebuild the registry:
+   ```bash
+   bun run registry:build
+   ```
+
+This ensures your changes follow naming conventions before rebuilding the registry.
+
+## MDX Frontmatter
+
+```yaml
 ---
-
-## Abstract
-
-Composition patterns for building flexible, maintainable React components. Avoid boolean prop proliferation by using compound components, lifting state, and composing internals. These patterns make codebases easier for both humans and AI agents to work with as they scale.
-
+title: ComponentName
+description: Brief description of what the component displays or does.
+links:
+  docs: https://react-aria.adobe.com/ComponentName
+  api: https://react-aria.adobe.com/ComponentName#props
 ---
-
-## Table of Contents
-
-1. [Component Architecture](#1-component-architecture) — **HIGH**
-   - 1.1 [Avoid Boolean Prop Proliferation](#11-avoid-boolean-prop-proliferation)
-   - 1.2 [Use Compound Components](#12-use-compound-components)
-2. [State Management](#2-state-management) — **MEDIUM**
-   - 2.1 [Decouple State Management from UI](#21-decouple-state-management-from-ui)
-   - 2.2 [Define Generic Context Interfaces for Dependency Injection](#22-define-generic-context-interfaces-for-dependency-injection)
-   - 2.3 [Lift State into Provider Components](#23-lift-state-into-provider-components)
-3. [Implementation Patterns](#3-implementation-patterns) — **MEDIUM**
-   - 3.1 [Create Explicit Component Variants](#31-create-explicit-component-variants)
-   - 3.2 [Prefer Composing Children Over Render Props](#32-prefer-composing-children-over-render-props)
-4. [React 19 APIs](#4-react-19-apis) — **MEDIUM**
-   - 4.1 [React 19 API Changes](#41-react-19-api-changes)
-
----
-
-## 1. Component Architecture
-
-**Impact: HIGH**
-
-Fundamental patterns for structuring components to avoid prop
-proliferation and enable flexible composition.
-
-### 1.1 Avoid Boolean Prop Proliferation
-
-**Impact: CRITICAL (prevents unmaintainable component variants)**
-
-Don't add boolean props like `isThread`, `isEditing`, `isDMThread` to customize
-
-component behavior. Each boolean doubles possible states and creates
-
-unmaintainable conditional logic. Use composition instead.
-
-**Incorrect: boolean props create exponential complexity**
-
-```tsx
-function Composer({
-  onSubmit,
-  isThread,
-  channelId,
-  isDMThread,
-  dmId,
-  isEditing,
-  isForwarding,
-}: Props) {
-  return (
-    <form>
-      <Header />
-      <Input />
-      {isDMThread ? (
-        <AlsoSendToDMField id={dmId} />
-      ) : isThread ? (
-        <AlsoSendToChannelField id={channelId} />
-      ) : null}
-      {isEditing ? (
-        <EditActions />
-      ) : isForwarding ? (
-        <ForwardActions />
-      ) : (
-        <DefaultActions />
-      )}
-      <Footer onSubmit={onSubmit} />
-    </form>
-  )
-}
 ```
 
-**Correct: composition eliminates conditionals**
+**Notes**:
 
-```tsx
-// Channel composer
-function ChannelComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Attachments />
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+- `title` (required): Max 32 characters
+- `description` (required): Max 256 characters
+- `links` (optional): Object with `docs` and/or `api` URLs
 
-// Thread composer - adds "also send to channel" field
-function ThreadComposer({ channelId }: { channelId: string }) {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <AlsoSendToChannelField id={channelId} />
-      <Composer.Footer>
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+### Documentation Link Suggestions
 
-// Edit composer - different footer actions
-function EditComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.CancelEdit />
-        <Composer.SaveEdit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+When adding the `links.docs` field, verify the URL exists before including it. Common documentation sources:
+
+- **React Aria Components**: `https://react-aria.adobe.com/ComponentName`
+- **Base UI**: `https://base-ui.com/react/components/component-name`
+
+You can link to any relevant documentation - these are just common options.
+
+### Verifying Documentation Links
+
+Before adding documentation links, verify they exist using these tools:
+
+**React Aria Components**
+
+- Use the `react-aria` MCP server to search component docs
+- If not installed: `claude mcp add react-aria npx @react-aria/mcp@latest`
+- MCP docs: https://react-aria.adobe.com/mcp
+
+**Base UI**
+
+- Use WebFetch with their llms.txt: `https://base-ui.com/llms.txt`
+- Use the Context7 MCP server to search Base UI documentation
+- Example: `mcp__context7__resolve-library-id` then `mcp__context7__get-library-docs`
+- Or search the docs directly
+
+**Any documentation**
+
+- Use WebFetch or WebSearch tools to verify the URL exists
+
+## Document Structure
+
+### 1. Preview (First Section)
+
+Start with a component preview showcasing the default/demo example:
+
+```mdx
+<ComponentPreview name="component-demo" />
 ```
 
-Each variant is explicit about what it renders. We can share internals without
+**Important**: `ComponentPreview` only accepts a `name` prop, no `description` prop.
 
-sharing a single monolithic parent.
+### 2. Installation
 
-### 1.2 Use Compound Components
+Use `Tabs.Root`, `Tabs.List`, `Tabs.Trigger`, and `Tabs.Content` (NOT the singular `Tabs` component):
 
-**Impact: HIGH (enables flexible composition without prop drilling)**
+````mdx
+## Installation
 
-Structure complex components as compound components with a shared context. Each
+<Tabs.Root>
 
-subcomponent accesses shared state via context, not props. Consumers compose the
+<Tabs.List>
+  <Tabs.Trigger id="cli">CLI</Tabs.Trigger>
+  <Tabs.Trigger id="manual">Manual</Tabs.Trigger>
+</Tabs.List>
+<Tabs.Content id="cli">
 
-pieces they need.
+```bash
+npx shadcn@latest add @kanpeki/component-name
+```
+````
 
-**Incorrect: monolithic component with render props**
+</Tabs.Content>
+
+<Tabs.Content id="manual">
+
+<Steps>
+
+<Step>Copy and paste the following code into your project.</Step>
+
+<ComponentSource name="component-name" />
+
+<Step>Update the import paths to match your project setup.</Step>
+
+</Steps>
+
+</Tabs.Content>
+
+</Tabs.Root>
+
+````
+
+**Key patterns**:
+- Use `npm` for package manager commands (not `bun`)
+- CLI command: `npx shadcn@latest add @kanpeki/component-name`
+- Manual installation uses `<Steps>` component
+- First step: "Copy and paste the following code into your project."
+- Second step: "Update the import paths to match your project setup."
+
+### 3. Anatomy
+
+Use `## Anatomy` (NOT `## Usage`):
+
+```mdx
+## Anatomy
 
 ```tsx
-function Composer({
-  renderHeader,
-  renderFooter,
-  renderActions,
-  showAttachments,
-  showFormatting,
-  showEmojis,
-}: Props) {
-  return (
-    <form>
-      {renderHeader?.()}
-      <Input />
-      {showAttachments && <Attachments />}
-      {renderFooter ? (
-        renderFooter()
-      ) : (
-        <Footer>
-          {showFormatting && <Formatting />}
-          {showEmojis && <Emojis />}
-          {renderActions?.()}
-        </Footer>
-      )}
-    </form>
-  )
-}
+import { Component } from "~/components/ui/component";
+
+<Component />;
+````
+
+````
+
+For components with multiple import patterns, use tabs:
+
+```mdx
+## Anatomy
+
+<Tabs.Root>
+
+<Tabs.List>
+  <Tabs.Trigger id="single">Single import</Tabs.Trigger>
+  <Tabs.Trigger id="multiple">Multiple imports</Tabs.Trigger>
+</Tabs.List>
+<Tabs.Content id="single">
+
+```tsx
+import { Component } from "~/components/ui/component";
+
+<Component.Root>
+  <Component.Item />
+</Component.Root>;
+````
+
+</Tabs.Content>
+
+<Tabs.Content id="multiple">
+
+```tsx
+import { ComponentRoot, ComponentItem } from "~/components/ui/component";
+
+<ComponentRoot>
+  <ComponentItem />
+</ComponentRoot>;
 ```
 
-**Correct: compound components with shared context**
+</Tabs.Content>
 
-```tsx
-const ComposerContext = createContext<ComposerContextValue | null>(null)
+</Tabs.Root>
 
-function ComposerProvider({ children, state, actions, meta }: ProviderProps) {
-  return (
-    <ComposerContext value={{ state, actions, meta }}>
-      {children}
-    </ComposerContext>
-  )
-}
+````
 
-function ComposerFrame({ children }: { children: React.ReactNode }) {
-  return <form>{children}</form>
-}
+### 4. Examples
 
-function ComposerInput() {
-  const {
-    state,
+**Important**: Do NOT repeat the demo example shown at the top of the page.
+
+Each example should:
+- Have a descriptive heading (e.g., `### File`, `### Disabled`, `### With Label`)
+- Use `<ComponentPreview name="component-example-name" />`
+
+```mdx
+## Examples
+
+### Variant Name
+
+<ComponentPreview name="component-variant" />
+````
+
+## Inline Code Syntax Highlighting
+
+When referencing components, props, or attributes in prose, use the `{:tsx}` suffix for syntax highlighting:
+
+**Component references:**
+
+- ✅ `<Component>{:tsx}` or `<Component.Item>{:tsx}`
+- ❌ `Component` or `Component.Item`
+
+**Props and attributes:**
+
+- ✅ `variant{:tsx}`, `isInvalid{:tsx}`, `data-invalid{:tsx}`, `aria-label{:tsx}`
+- ❌ `variant`, `isInvalid`, `data-invalid`, `aria-label`
+
+**Prop values:**
+
+- ✅ `variant="primary"{:tsx}`, `role="dialog"{:tsx}`
+- ❌ `variant="primary"`, `role="dialog"`
+
+Examples:
+
+```mdx
+Use `<TextField>{:tsx}` with the `isInvalid{:tsx}` prop.
+
+Set `orientation="horizontal"{:tsx}` on `<Field.Root>{:tsx}`.
+
+Add `aria-label{:tsx}` for accessibility.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [fellipeutaka/kanpeki](https://github.com/fellipeutaka/kanpeki) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
