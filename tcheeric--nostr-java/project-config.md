@@ -3,7 +3,7 @@ trigger: always_on
 description: - https://github.com/nostr-protocol/nips/blob/master/01.md
 ---
 
-# Repo Guidelines
+# Repository Instructions for Copilot
 
 ## NIPs
 
@@ -97,10 +97,9 @@ description: - https://github.com/nostr-protocol/nips/blob/master/01.md
 - https://github.com/nostr-protocol/nips/blob/master/C0.md
 - https://github.com/nostr-protocol/nips/blob/master/C7.md
 
-## Description
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tcheeric/nostr-java](https://github.com/tcheeric/nostr-java) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
