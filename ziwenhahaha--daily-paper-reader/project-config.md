@@ -140,4 +140,4 @@ description: > 本文件为 AI 助手（Claude / Codex 等）提供项目上下�
 
 ---
 > Source: [ziwenhahaha/daily-paper-reader](https://github.com/ziwenhahaha/daily-paper-reader) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
