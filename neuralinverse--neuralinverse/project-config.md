@@ -1,164 +1,113 @@
 ---
 trigger: always_on
-description: Void is an open-source VS Code fork focused on AI-powered coding assistance. It enables AI agents to work directly on codebases with features like checkpointing, change visualization, and local model support. The codebase is a fork of VS Code with AI-specific additions in `src/vs/workbench/contrib/void/`.
+description: This is the **GitHub Copilot Chat** extension for Visual Studio Code - a VS Code extension that provides conversational AI assistance, a coding agent with many tools, inline editing capabilities, and advanced AI-powered features for VS Code.
 ---
 
-# Void Codebase AI Agent Instructions
+# GitHub Copilot Chat Extension - Copilot Instructions
 
-## Overview
-Void is an open-source VS Code fork focused on AI-powered coding assistance. It enables AI agents to work directly on codebases with features like checkpointing, change visualization, and local model support. The codebase is a fork of VS Code with AI-specific additions in `src/vs/workbench/contrib/void/`.
+## Project Overview
 
-## Architecture
+This is the **GitHub Copilot Chat** extension for Visual Studio Code - a VS Code extension that provides conversational AI assistance, a coding agent with many tools, inline editing capabilities, and advanced AI-powered features for VS Code.
 
-### Core Structure
-- **Browser Process** (`src/vs/workbench/contrib/void/browser/`): UI components, React-based interfaces, editor integrations
-- **Common** (`src/vs/workbench/contrib/void/common/`): Shared services and types used by both processes
-- **Electron Main** (`src/vs/workbench/contrib/void/electron-main/`): Backend services, LLM communication, file system operations
+### Key Features
+- **Chat Interface**: Conversational AI assistance with chat participants, variables, and slash commands
+- **Inline Chat**: AI-powered editing directly in the editor with `Ctrl+I`
+- **Agent Mode**: Multi-step autonomous coding tasks
+- **Edit Mode**: Natural language to code
+- **Inline Suggestions**: Next edit suggestions and inline completions
+- **Language Model Integration**: Support for multiple AI models (GPT-4, Claude, Gemini, etc.)
+- **Context-Aware**: Workspace understanding, semantic search, and code analysis
 
-### Key Services
-All Void services follow the VS Code singleton pattern:
-```typescript
-registerSingleton(IServiceName, ServiceClass, InstantiationType.Eager);
-```
+### Tech Stack
+- **TypeScript**: Primary language (follows VS Code coding standards)
+- **TSX**: Prompts are built using the @vscode/prompt-tsx library
+- **Node.js**: Runtime for extension host and language server features
+- **WebAssembly**: For performance-critical parsing and tokenization
+- **VS Code Extension API**: Extensive use of proposed APIs for chat, language models, and editing
+- **ESBuild**: Bundling and compilation
+- **Vitest**: Unit testing framework
+- **Python**: For notebooks integration and ML evaluation scripts
 
-Essential services include:
-- `IEditCodeService`: Handles code modifications and diff visualization
-- `ILLMMessageService`: Manages AI provider communication
-- `IVoidSettingsService`: Stores provider configs, model selections, and Void preferences
-- `IVoidModelService`: Handles file writing and model operations
+## Validating changes
 
-### AI Integration
-- LLM requests routed through main process to bypass browser CSP restrictions
-- Supports Anthropic, OpenAI, Ollama, Mistral, Google GenAI providers
-- Messages use structured types: `LLMChatMessage[]` with role/content format
-- Streaming responses handled via event hooks (`onText`, `onFinalMessage`, `onError`)
+You MUST check compilation output before running ANY script or declaring work complete!
 
-## Development Workflow
+1. **ALWAYS** check the `start-watch-tasks` watch task output for compilation errors
+2. **NEVER** use the `compile` task as a way to check if everything is working properly
+3. **FIX** all compilation errors before moving forward
 
-### Building
-Use npm scripts with deemon for persistent watching:
-```bash
-npm run watch-clientd      # Watch core TypeScript compilation
-npm run watch-extensionsd  # Watch extension compilation
-npm run watchreactd        # Watch React UI components
-```
+### TypeScript compilation steps
+- Monitor the `start-watch-tasks` task outputs for real-time compilation errors as you make changes
+- This task runs `npm: watch:typecheck-extension`,`npm: watch:typecheck-extension-web`, `npm: watch:typecheck-simulation-workbench`, and `npm: watch:esbuild` to incrementally compile the project
+- Start the task if it's not already running in the background
 
-React components require custom build script:
-```bash
-cd src/vs/workbench/contrib/void/browser/react/
-node build.js --watch
-```
+## Project Architecture
 
-### Running
-```bash
-./scripts/code.sh          # Launch development instance
-./scripts/code-server.sh   # Run code server
-```
+### Top-Level Directory Structure
 
-### Testing
-```bash
-npm run test               # Run test suite
-./scripts/test.sh          # Integration tests
-```
+#### Core Source Code (`src/`)
+- **`src/extension/`**: Main extension implementation, organized by feature
+- **`src/platform/`**: Shared platform services and utilities
+- **`src/util/`**: Common utilities, VS Code API abstractions, and service infrastructure
 
-## Code Modification Patterns
+#### Build & Configuration
+- **`.esbuild.mts`**: Build configuration for bundling extension, web worker, and simulation workbench
+- **`tsconfig.json`**: TypeScript configuration extending base config with React JSX settings
+- **`vite.config.ts`**: Test configuration for Vitest unit tests
+- **`package.json`**: Extension manifest with VS Code contributions, dependencies, and scripts
 
-### Apply System
-Void uses two code modification approaches:
+#### Testing & Simulation
+- **`test/`**: Comprehensive test suite including unit, integration, and simulation tests
+- **`script/simulate.sh`**: Test runner for scenario-based testing
+- **`notebooks/`**: Jupyter notebooks for performance analysis and ML experiments
 
-**Fast Apply** (preferred):
-- Uses search-replace blocks with conflict markers:
-```typescript
-<<<<<<< ORIGINAL
-// existing code
-=======
-// replacement code
->>>>>>> UPDATED
-```
-- Enables precise, incremental changes
-- Supports streaming diffs during AI generation
+#### Assets & Documentation
+- **`assets/`**: Icons, fonts, and visual resources
+- **`CONTRIBUTING.md`**: Architecture documentation and development guide
 
-**Slow Apply**:
-- Rewrites entire file contents
-- Used when Fast Apply fails or for complete file transformations
+### Key Source Directories
 
-### File Operations
-- Write to `ITextModel` instances via URI, not direct file I/O
-- Use `IVoidModelService` for model operations
-- Changes trigger automatic diff zone creation and visualization
+#### `src/extension/` - Feature Implementation
 
-### UI Components
-- React components bundled for browser process
-- Mount via VS Code's webview system
-- Use `mountCtrlK()` pattern for component integration
+**Core Chat & Conversation Features:**
+- **`conversation/`**: Chat participants, agents, and conversation flow orchestration
+- **`inlineChat/`**: Inline editing features (`Ctrl+I`) and hints system
+- **`inlineEdits/`**: Advanced inline editing capabilities with streaming edits
 
-## Communication Patterns
+**Context & Intelligence:**
+- **`context/`**: Context resolution for code understanding and workspace analysis
+- **`contextKeys/`**: VS Code context key management for UI state
+- **`intents/`**: Chat participant/slash command implementations
+- **`prompts/`**: Prompt engineering and template system
+- **`prompt/`**: Common prompt utilities
+- **`typescriptContext/`**: TypeScript-specific context and analysis
 
-### Main ↔ Browser IPC
-- Services communicate via channels (e.g., `sendLLMMessageChannel`)
-- Browser requests route to main process for privileged operations
-- Events flow back through registered hooks
+**Search & Discovery:**
+- **`search/`**: General search functionality within the extension
+- **`workspaceChunkSearch/`**: Chunked workspace search for large codebases
+- **`workspaceSemanticSearch/`**: Semantic search across workspace content
+- **`workspaceRecorder/`**: Recording and tracking workspace interactions
 
-### Service Dependencies
-Services inject via decorators:
-```typescript
-constructor(
-  @ILLMMessageService private readonly llmMessageService: ILLMMessageService,
-  @IVoidSettingsService private readonly settingsService: IVoidSettingsService,
-) {}
-```
+**Authentication & Configuration:**
+- **`authentication/`**: GitHub authentication and token management
+- **`configuration/`**: Settings and configuration management
+- **`byok/`**: Bring Your Own Key (BYOK) functionality for custom API keys
 
-## Key Files & Directories
+**AI Integration & Endpoints:**
+- **`endpoint/`**: AI service endpoints and model selection
+- **`tools/`**: Language model tools and integrations
+- **`api/`**: Core API abstractions and interfaces
+- **`mcp/`**: Model Context Protocol integration
 
-### Core Services
-- `editCodeService.ts`: Code modification and diff handling
-- `sendLLMMessageService.ts`: AI provider abstraction
-- `voidSettingsService.ts`: Configuration management
-- `voidModelService.ts`: File/model operations
+**Development & Testing:**
+- **`testing/`**: Test generation and execution features
+- **`test/`**: Extension-specific test utilities and helpers
 
-### UI Components
-- `react/`: React-based UI components
-- `sidebarPane.ts`: Main AI chat interface
-- `quickEditActions.ts`: Ctrl+K inline editing
-
-### Backend
-- `electron-main/llmMessage/`: Provider implementations
-- `sendLLMMessage.impl.ts`: SDK integrations (Anthropic, OpenAI, etc.)
-
-### Configuration
-- `modelCapabilities.ts`: Model specifications and capabilities
-- `voidSettingsTypes.ts`: TypeScript interfaces for settings
-
-## Best Practices
-
-### Service Registration
-- Register all services in `void.contribution.ts`
-- Use `InstantiationType.Eager` for critical services
-- Import service files to trigger registration
-
-### Error Handling
-- LLM operations use try/catch with `onError` callbacks
-- Network failures handled at provider level
-- User-facing errors displayed via `INotificationService`
-
-### State Management
-- Settings persisted via `IVoidSettingsService`
-- UI state managed through React components
-- File changes tracked via diff zones and snapshots
-
-### Performance
-- Use streaming for large AI responses
-- Debounce UI updates during rapid changes
-- Background compilation with deemon watchers
-
-## Common Patterns
-
-### Adding New Providers
-1. Add provider types to `voidSettingsTypes.ts`
-2. Implement in `sendLLMMessage.impl.ts`
+**User Interface & Experience:**
+- **`commands/`**: Service for working with VS Code commands
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [NeuralInverse/neuralinverse](https://github.com/NeuralInverse/neuralinverse) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
