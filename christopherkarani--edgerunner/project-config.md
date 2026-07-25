@@ -1,148 +1,104 @@
 ---
 trigger: always_on
-description: Autonomous optimization loop targeting maximum autoregressive decode tokens/sec
+description: Guidance for Claude Code (and other AI assistants) working in this repository.
 ---
 
-# EdgeRunner Agent Instructions
+# CLAUDE.md
 
-## Autoresearch: Inference Optimization Agent
+Guidance for Claude Code (and other AI assistants) working in this repository.
 
-Autonomous optimization loop targeting maximum autoregressive decode tokens/sec
-on Qwen 3 0.6B Q8_0 (pinned GGUF size: 639,446,688 bytes). Follows the Karpathy autoresearch pattern:
-RESEARCH → MODIFY → BUILD → BENCHMARK → KEEP/ROLLBACK → REPEAT.
+EdgeRunner is a from-scratch LLM inference engine for Apple Silicon, written in Swift 6.2 with custom Metal compute kernels. It targets fast on-device decode of quantized GGUF models (primarily Qwen3-0.6B Q8_0). See `AGENTS.md` for the autoresearch optimization loop — that file is the source of truth for performance-tuning work and takes precedence over this file when they disagree on benchmarking.
 
-### Current Benchmark Ground Rules
-
-- Primary metric: **Publishable benchmark** (128-token greedy decode, TTFT separated, release build)
-- Command: `swift test -c release --filter "PublishableBenchmark/fullBenchmark"`
-- Model: Qwen 3 0.6B Q8_0 at `/tmp/edgerunner-models/Qwen3-0.6B-Q8_0.gguf` (expected size: **639,446,688** bytes)
-- Contract source of truth: `benchmarks/pinned_qwen3_0.6b_q8_0.json`
-- Benchmark harnesses pin the safe decode path with the mega fused GQA kernel disabled until that kernel regains deterministic correctness on the pinned artifact.
-- `QwenBenchmark/decodeBenchmark` is **smoke/regression only** (4 tokens, not apples-to-apples)
-- Cached JSON artifacts in `benchmarks/` are for record-keeping only; always rerun benchmarks for truth
-- Metal 4: available on macOS 26+, but the optimized Metal 3 decode path remains the default. Use `EDGERUNNER_DECODE_PREFER_METAL4=1` to compare Metal 4 against the default path.
-
-### The Loop
+## Repository Layout
 
 ```
-1. READ latest benchmark results (rerun if stale) → publishable benchmark JSON
-2. RESEARCH → find optimization (see Optimization Patterns below)
-3. MODIFY → edit Sources/EdgeRunner/Models/LlamaLanguageModel.swift
-4. BUILD → swift build 2>&1 | tail -5
-   - If fails → FIX or ROLLBACK: git checkout -- <files>
-5. BENCHMARK → swift test -c release --filter "PublishableBenchmark/fullBenchmark" 2>&1 | tail -15
-   - Parse: publishable decode metrics (p50 decode tok/s is canonical)
-6. EVALUATE:
-   - IMPROVED + correctness PASSED → git add + commit
-   - REGRESSED or correctness FAILED → git checkout -- <files>
-7. LOG → append to benchmarks/experiment_log.md
-8. REPEAT
+Package.swift              # SwiftPM manifest — do NOT modify dependencies
+README.md                  # Public-facing overview and quick start
+AGENTS.md                  # Autoresearch / optimization loop rules (PRECEDENCE for perf work)
+TROUBLESHOOTING.md         # Common build / load / runtime issues
+CLAUDE.md                  # This file
+docs/
+  ROADMAP.md               # Phased roadmap and perf context
+  EdgeRunner-Framework-Deep-Documentation.md
+  arch/                    # Architecture references (pipeline, kernels, API, memory)
+Sources/
+  EdgeRunnerSharedTypes/   # C header shims shared with Metal shaders
+  EdgeRunnerMetal/         # Metal kernels + wrappers (GPU hot path)
+    Shaders/               # *.metal source files (compiled as package resource)
+  EdgeRunnerIO/            # Model loading: GGUF, SafeTensors, NPY/NPZ, dequant kernels
+    GGUF/                  # GGUF parser + memory-mapped file
+    Protocols/             # LoadableModel protocol
+  EdgeRunnerCore/          # Tensors, sampling, tokenization, graph, structured generation
+    Sampling/              # Greedy / temperature / top-k / top-p / min-p / rep-penalty
+    Tokenizer/             # BPE, SentencePiece, chat templates, pre-tokenizer
+    Graph/                 # ComputeGraph + FusionEngine + TensorOp
+    Generation/            # SpeculativeDecoder
+    StructuredGeneration/  # JSON schema / grammar-constrained decoding
+  EdgeRunner/              # Public façade + high-level API
+    Models/                # LlamaLanguageModel (primary), GPT2*
+    Transformer/           # Generic transformer block scaffolding
+    Module/                # nn-module-style wrappers (Linear, Sequential, TensorBox)
+    Backends/              # Backend factory, local backend, Foundation Models backend
+    Streaming/             # TokenStream + GenerationSession
+    ToolCalling/           # Tool protocol, parser, executor, tool choice
+    Chat/                  # ChatMessage, ChatViewModelState, ModelInfo
+    Metrics/               # Perplexity
+    Documentation.docc/    # DocC catalog
+  ANEInteropIO/            # C code for ANE / IOSurface interop
+  EspressoEdgeRunner/      # Experimental ANE/Espresso backend (weight conversion, RoPE bridge)
+Tests/
+  EdgeRunnerMetalTests/    # Kernel-level tests + KV cache / memory benchmarks
+  EdgeRunnerIOTests/       # Loader / dequant tests
+  EdgeRunnerCoreTests/     # Sampling, tokenizer, graph, structured generation
+  EdgeRunnerTests/         # Integration, parity, publishable/framework benchmarks
+  EspressoEdgeRunnerTests/
+Examples/
+  EdgeRunnerChat/          # SwiftUI sample chat app
+benchmarks/
+  pinned_qwen3_0.6b_q8_0.json  # Canonical contract — source of truth
+  experiment_log.md             # Append-only experiment history
+  baseline.json
+  run_long_prompt_framework_benchmark.py
 ```
 
-### What You Can Modify
+## Module Dependency Graph
 
-- `Sources/EdgeRunner/Models/LlamaLanguageModel.swift` — primary target
-- `Sources/EdgeRunnerMetal/*.swift` — Metal kernel wrappers
-- `Sources/EdgeRunnerIO/Dequant*.swift` — dequantization kernels
-- `Sources/EdgeRunnerCore/Sampling/*.swift` — sampling pipeline
+Layered from bottom up (each depends only on layers below):
 
-### What You MUST NOT Modify
-
-- Benchmark harness semantics (`Tests/EdgeRunnerTests/PublishableBenchmark.swift`, `Tests/EdgeRunnerTests/QwenBenchmark.swift`) without intentional, documented changes
-- `Package.swift` — no dependency changes
-
-### Correctness Guard
-
-Canonical publishable benchmark guard: greedy prefix must start with `[1, 1479, 35]`.
-Canonical publishable runs also enforce the pinned full-token hash for the 128-token harness.
-If the publishable benchmark loses determinism, the prefix changes, or the canonical token hash changes on the pinned GGUF, treat it as a correctness regression.
-
-### Commit Protocol
-
-```bash
-git commit -m "perf: <what changed> — <old> → <new> tok/s (+<pct>%)"
+```
+EdgeRunnerSharedTypes  (C headers — scalar type defs shared with Metal)
+        │
+EdgeRunnerMetal        (Metal kernels, buffer cache, residency, KV cache)
+        │
+EdgeRunnerIO           (GGUF/SafeTensors loaders, dequantization kernels)
+        │
+EdgeRunnerCore         (Tensors, sampling, tokenizers, graph, structured gen)
+        │
+EdgeRunner             (Public façade: EdgeRunner actor, LlamaLanguageModel, streaming)
 ```
 
-### Experiment Log Format
+`EspressoEdgeRunner` is a parallel experimental target layered on `EdgeRunnerIO + EdgeRunnerMetal + ANEInteropIO`. `ANEInteropIO` is C-only with `IOSurface` linkage.
 
-Append to `benchmarks/experiment_log.md`:
+## Platform & Toolchain
 
-```markdown
-### Experiment N: <title>
-- **Hypothesis:** <what you expect to improve>
-- **Change:** <description>
-- **Result:** <before> → <after> tok/s (+/- pct%)
-- **Status:** KEPT / ROLLED BACK
-```
+- Swift tools 6.2, platforms: `.iOS(.v26)`, `.macOS(.v26)`
+- Requires Apple Silicon (M1+), Xcode 26 beta or newer
+- `@_exported import` surface lives in `Sources/EdgeRunner/EdgeRunner.swift` (re-exports Core, IO, Metal, SharedTypes)
 
----
+## Key Entry Points
 
-## Optimization Patterns (from llama.cpp + MLX)
-
-### Pattern 1: Single-Token Decode Path (5-100x)
-
-EdgeRunner recomputes the FULL sequence every decode step. llama.cpp and MLX
-separate prefill (n_tokens > 1) from decode (n_tokens == 1).
-
-For decode: only process the NEW token. Use KV cache for all previous K/V.
-
-```swift
-func logits(for tokenIDs: [Int]) async throws -> [Float] {
-    if tokenIDs.count == cachedPosition + 1 {
-        // DECODE: only process last token
-        return try await decodeSingleToken(tokenID: tokenIDs.last!, position: cachedPosition)
-    } else {
-        // PREFILL: process all, populate KV cache
-        kvCache.reset()
-        return try await prefillTokens(tokenIDs)
-    }
-}
-```
-
-### Pattern 2: Batched Projections via GEMM (10-50x)
-
-Replace per-token GEMV loop with single GEMM call:
-
-```swift
-// BEFORE: seqLen × command buffers
-for t in 0..<seqLen {
-    let q = try await gemvKernel.execute(a: wq, x: token[t], M: qDim, K: dim, ...)
-}
-
-// AFTER: 1 command buffer
-// C[qDim, seqLen] = A[qDim, dim] × B[dim, seqLen]
-```
-
-### Pattern 3: Single Command Buffer (2-5x)
-
-Each kernel call creates its own MTLCommandBuffer. llama.cpp encodes ALL ops
-into a single command buffer and commits once.
-
-```swift
-let commandBuffer = commandQueue.makeCommandBuffer()!
-// Encode ALL layer ops into this buffer
-for layer in 0..<layerCount {
-    // RMSNorm, Q/K/V, RoPE, Attention, FFN — all same buffer
-}
-commandBuffer.commit()
-await commandBuffer.completed()  // ONE GPU round-trip
-```
-
-### Pattern 4: Fused Dequant+GEMV (2-3x)
-
-EdgeRunner already uses fused Q8_0 decode kernels in the hot path.
-The remaining work is to profile and tighten the highest-cost fused kernels rather than re-introducing float materialization.
-
-### Pattern 5: GPU LM Head (2-5x for 151K vocab)
-
-The active path already keeps the LM head on GPU. Current work should focus on:
-- avoiding host logits materialization for greedy decode
-- profiling the fused final norm + LM head cost
-- improving kernel occupancy if LM head remains dominant
-
+| Type | File | Purpose |
+|---|---|---|
+| `EdgeRunner` (actor) | `Sources/EdgeRunner/EdgeRunnerFacade.swift` | High-level public API — `init(modelPath:)`, `stream(_:)`, `generate(_:)` |
+| `EdgeRunnerLanguageModel` (protocol) | `Sources/EdgeRunner/EdgeRunnerLanguageModel.swift` | Contract for model implementations |
+| `LlamaLanguageModel` | `Sources/EdgeRunner/Models/LlamaLanguageModel.swift` | **Primary inference engine** — hot path for all optimization work |
+| `ModelLoader` | `Sources/EdgeRunner/ModelLoader.swift` | Dispatches GGUF/SafeTensors loading |
+| `GGUFLoader` / `GGUFParser` | `Sources/EdgeRunnerIO/GGUF/` | Memory-mapped GGUF parsing |
+| `MetalBackend` | `Sources/EdgeRunnerMetal/MetalBackend.swift` | Device / command queue / shader library |
+| `KVCache` | `Sources/EdgeRunnerMetal/KVCache.swift` | GPU-resident K/V cache for incremental decode |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [christopherkarani/EdgeRunner](https://github.com/christopherkarani/EdgeRunner) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
