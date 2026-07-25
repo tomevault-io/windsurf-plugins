@@ -1,0 +1,94 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Java Version
+
+Tests require Java 11. Set `JAVA_HOME` before running Maven:
+
+```bash
+# Temurin 11 (installed via brew install --cask temurin@11 or sdkman)
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home
+
+# Or use java_home helper on macOS
+export JAVA_HOME=$(/usr/libexec/java_home -v 11)
+
+mvn test
+```
+
+## Build and Test Commands
+
+This is a Maven multi-module project. Run from the repo root:
+
+```bash
+# Build and install all modules
+mvn install
+
+# Run all tests
+mvn test
+
+# Run tests for the main library only
+cd fixedformat4j && mvn test
+
+# Run a single test class
+mvn test -pl fixedformat4j -Dtest=TestBigDecimalFormatter
+
+# Run a single test method
+mvn test -pl fixedformat4j -Dtest=TestBigDecimalFormatter#testSomeMethod
+```
+
+## Project Structure
+
+Four Maven modules:
+- `fixedformat4j/` — the core library (main artifact)
+- `fixedformat4j-processor/` — optional compile-time annotation processor (since 1.9.0); mirrors the statically decidable subset of the runtime validation via the mirror API. Any change to `FieldValidator`/`PatternValidator` checks must be mirrored in the processor's `FieldChecker`/`RecordValidator`, and vice versa.
+- `fixedformat4j-micrometer/` — optional Micrometer instrumentation module (since 1.9.0); decorator-based, no changes to the core artifact; never add Micrometer hooks to core.
+- `samples/` — usage examples
+
+**Version synchronisation:** none of the modules declare a `<parent>`. When bumping the project version, update the `<version>` element in **every** module pom.xml (`fixedformat4j/pom.xml`, `fixedformat4j-processor/pom.xml`, `fixedformat4j-micrometer/pom.xml`, `samples/pom.xml`) in addition to the root `pom.xml`.
+
+Core production source is under `fixedformat4j/src/main/java/com/ancientprogramming/fixedformat4j/`.
+
+## Architecture
+
+The library maps Java POJOs annotated with `@Record` and `@Field` to/from fixed-width flat-file strings.
+
+**Entry point:** `FixedFormatManager` interface, implemented by `FixedFormatManagerImpl`. Two operations:
+- `load(Class<T>, String data)` — parses a fixed-width string into a new instance of the annotated class
+- `export(T instance)` / `export(String template, T instance)` — serializes an annotated instance to a fixed-width string
+
+`FixedFormatManagerImpl` additionally implements `FixedFormatIntrospector` (since 1.9.0): `introspect(Class<?>)` exposes the field layout as public immutable `FieldInfo` descriptors, ordered by offset. The interface is deliberately separate from `FixedFormatManager` (ISP; keeps third-party manager implementations compatible).
+
+**Annotation layer** (`annotation/` package):
+- `@Record` — marks a class as a fixed-format record; declares total length and padding char
+- `@Field` — placed on getter methods (or record components, since 1.9.0); declares `offset` (1-based), `length`, `align`, `paddingChar`, and optional `formatter`
+- `@Fields` — groups multiple `@Field` annotations on one getter (for multi-format fields)
+- `@FixedFormatNumber`, `@FixedFormatDecimal`, `@FixedFormatBoolean`, `@FixedFormatPattern` — supplementary annotations on getters to control number signs, decimal handling, boolean values, and date/time patterns
+
+**Formatter layer** (`format/` and `format/impl/` packages):
+- `FixedFormatter<T>` — interface with `parse(String, FormatInstructions)` and `format(T, FormatInstructions)`
+- `AbstractFixedFormatter<T>` — base class that handles padding/alignment; subclasses implement `asObject()` and `asString()`
+- `ByTypeFormatter` — default formatter; dispatches to the appropriate typed formatter based on the field's Java type (String, Integer, Long, Short, Double, Float, BigDecimal, Boolean, Character, Date)
+- Individual formatters in `format/impl/`: `StringFormatter`, `IntegerFormatter`, `LongFormatter`, `ShortFormatter`, `DoubleFormatter`, `FloatFormatter`, `BigDecimalFormatter`, `BooleanFormatter`, `CharacterFormatter`, `DateFormatter`
+- `AbstractNumberFormatter` and `AbstractDecimalFormatter` — shared logic for numeric types
+
+**Data objects** (`format/data/` package): Immutable value objects (`FixedFormatBooleanData`, `FixedFormatDecimalData`, `FixedFormatNumberData`, `FixedFormatPatternData`) that carry parsed annotation configuration into formatter calls.
+
+**Context objects:**
+- `FormatContext<T>` — carries the field offset, data type, and formatter class
+- `FormatInstructions` — carries length, alignment, padding char, and the four data objects above
+- `FixedFormatUtil` — static helpers for slicing the data string (`fetchData`) and instantiating formatters via reflection
+
+**Recursive record support:** If a field's type is itself annotated with `@Record`, `FixedFormatManagerImpl` recursively loads/exports that nested type.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [jeyben/fixedformat4j](https://github.com/jeyben/fixedformat4j) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
