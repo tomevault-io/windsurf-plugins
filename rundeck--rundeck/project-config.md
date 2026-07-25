@@ -1,103 +1,103 @@
 ---
 trigger: always_on
-description: These best practices should be applied:
+description: Detailed conventions and guidance organized by topic:
 ---
 
-These best practices should be applied:
+# Project Conventions
 
-# Product Naming Guidelines
+## Documentation
 
-Always use the correct product names in descriptions, documentation, and API specifications:
+Detailed conventions and guidance organized by topic:
 
-- **Open Source Product**: "Rundeck"
-- **Commercial Product**: "Runbook Automation"
-- **Combined Reference**: "Rundeck / Runbook Automation" (preferred for API titles, descriptions, and user-facing text)
+### Architecture & Setup
+- **`.claude/docs/architecture.md`** — Project structure, module organization, technology stack
+- **`.claude/docs/build-commands.md`** — All build, test, and plugin commands with examples
+- **`.claude/docs/file-locations.md`** — Where to find controllers, services, components, etc.
 
-## Examples:
-- ✅ **Correct**: "Rundeck / Runbook Automation API", "Rundeck / Runbook Automation Server"
-- ❌ **Incorrect**: "Rundeck Pro API", "Rundeck Pro Server"
+### Development
+- **`.claude/docs/development-guidelines.md`** — Code standards, Groovy conventions, Git workflows
+- **`.claude/docs/code-formatting.md`** — Code formatting rules, Spotless configuration
+- **`.claude/docs/plugin-development.md`** — Plugin creation, CI, publishing
 
-## Technical Elements (keep as-is):
-- API headers: `X-Rundeck-Auth-Token` (maintain for compatibility)
-- Internal identifiers: `rundeckApiToken`, `rundeckAuth` (technical references)
-- Documentation URLs: `docs.rundeck.com` (legitimate technical URLs)
+### Testing
+- **`.claude/docs/testing-guidelines.md`** — Complete testing guide (unit, API, functional, integration)
+- **`.claude/docs/jest-testing-guidelines.md`** — Frontend testing (Jest + Vue), Priority 1 & 2 rules
+- **`.claude/docs/selenium-best-practices.md`** — E2E testing, Page Object patterns, wait strategies
 
-## API Documentation Specifics
+### API & Agent
+- **`.claude/docs/api-guidelines.md`** — OpenAPI specs, DTOs, i18n
+- **`.claude/docs/agent-conventions.md`** — Agent behavior patterns, artifact paths, verification requirements
 
-### API Endpoint Descriptions:
-- No need to include product names ("Rundeck" or "Runbook Automation") in API endpoint descriptions
-- API consumers are already using the product API - product names are redundant and create unnecessary noise
-- Focus descriptions on functionality, authorization requirements, and behavior
-- Example: ✅ "Creates a native/local user with a password for use with the built-in authentication system"
-- Example: ❌ "Creates a native/local Rundeck user..." or "Creates a Runbook Automation user..."
+## Code Conventions
 
-### Commercial-Only Features:
-- Mark commercial-only endpoints with `[Enterprise]` tag in the summary
-- Example: `summary = 'Create A Local User [Enterprise]'`
+### Compilation Mode
+Use `@CompileStatic` on all classes (or `@GrailsCompileStatic` for Grails artifacts). Use `@CompileDynamic` only on specific methods requiring dynamic typing.
 
-This ensures consistent branding across all user-facing elements while maintaining technical compatibility.
+### Documentation
+All new/modified code requires Javadoc or Groovydoc comments.
 
-# All Java and Groovy Code (general instructions)
+### Property Access
+Groovy auto-generates getters/setters — do NOT implement them explicitly unless custom logic is needed.
 
-New or modified code should include appropriate Javadoc or Groovydoc comments. The comments should explain the purposes of the classes, methods, etc.
+### Security
+Avoid command injection, XSS, SQL injection. Use parameterized queries and escape user input.
 
-# Groovy code
+### Simplicity
+Only make changes that are directly requested or clearly necessary. Don't add features, refactor code, or make "improvements" beyond what was asked.
 
-Groovy code should use the `@CompileStatic` (or `@GrailsCompileStatic` for Grails aretefacts like Controllers, Services, etc.) on all classes.  
-If some methods of a class require using Groovy dynamic typing, the `@CompileDynamic` annotation can be applied to those methods, but it is preferable if possible to convert them to use static typing.
-If a class was already not using `@CompileStatic`, and the PR only changes/adds a few methods, then the `@CompileDynamic` should be added to those methods where possible.
+## Dependency Management
 
-Groovy classes do not need to explicitly implement getters and setters, like Java, so avoid that if possible.
+- All dependency versions defined in root `gradle.properties`
+- Reference in `build.gradle` using `${propertyName}` syntax
+- Never hardcode version numbers in build files
 
-# Testing
+## Git & PR Conventions
 
-Changes to most groovy and Java code should be accompanied by updated or added Unit tests using the Spock testing framework.
+### PR Title
+Format: `[RUN-XXXX] Description` when linked to an issue (recommended), or a clear description.
 
-If existing Junit tests need to be modified, it is preferred to convert them into Spock tests if possible.
+## Rules
 
-Changes to front-end code (javascript, and typescript) should have accompanying Jest unit tests.
+Context-aware rules that load automatically based on file patterns:
 
-Changes that add or significantly change features of the application user interface, should have Selenium based tests added in the pro-functional-test module.
+- **`.claude/rules/selenium.md`** — Selenium test requirements
+- **`.claude/rules/jest.md`** — Jest test compliance (references `jest-testing-guidelines.md`)
+- **`.claude/rules/vue.md`** — Vue component standards (Options API, scoped styles, component placement)
+- **`.claude/rules/database-migrations.md`** — Database migration rules (Liquibase, multi-DB support)
+- **`.claude/rules/okhttp-client-response.md`** — OkHttp response cleanup in functional/Selenium tests
 
-## Selenium Testing Guidelines
+## Skills
 
-Selenium tests must follow the Page Object Model pattern and these strict guidelines:
+Available skills for common workflows:
 
-### Wait Strategies
-- **AVOID using `Thread.sleep()`** - Prefer explicit waits when possible. Only use `Thread.sleep()` with `WaitingTime` constants for special cases like external system initialization where explicit waits cannot be used.
-- **Implicit waits are globally configured** - The framework sets a global implicit wait in the `BasePage` constructor and uses `implicitlyWait(2000)` in `go()` methods. This is an established pattern. However, for specific element interactions, **ALWAYS prefer explicit waits** to ensure reliability and avoid unpredictable behavior.
-- **ALWAYS use explicit waits** provided by the Page Object base classes:
-  - `waitForElementVisible()` - Wait for element to be present AND visible
-  - `waitForElementToBeClickable()` - Wait for element to be visible AND enabled
-  - `waitForElementAttributeToChange()` - Wait for specific attribute changes
-  - `waitForNumberOfElementsToBeMoreThan()` - Wait for multiple elements to be present
-  - `waitForNumberOfElementsToBe()` - Wait for the number of elements to match a specific count
-  - `waitForTextToBePresentInElement()` - Wait for specific text to appear in an element
-  - `waitForUrlToContain()` - Wait for the current URL to contain a specific substring
-  - `waitForAttributeContains()` - Wait for an element's attribute to contain a specific value
-  - `waitIgnoringForElementVisible()` - Wait for element to be visible, ignoring certain exceptions
-  - `waitIgnoringForElementToBeClickable()` - Wait for element to be clickable, ignoring certain exceptions
+**Development:**
+- **`create-code`** — Generate Java/Groovy/TypeScript code following Rundeck standards
+- **`create-api-endpoint`** — Create REST API endpoints with OpenAPI annotations and versioning
+- **`create-test`** — Create backend tests (Spock unit, API, functional)
+- **`write-jest-tests`** — Create frontend tests (Jest + Vue Test Utils)
+- **`create-plugin`** — Create Rundeck plugins with proper build configuration
+- **`i18n-vue-template`** — Internationalize Vue component templates (replace hardcoded strings with `$t()`)
 
-### Page Object Model
-- **NEVER put CSS/XPath selectors directly in test files** - All selectors belong in Page Object classes
-- **Define selectors as `By` fields** at the top of Page Object classes:
-  ```groovy
-  By nodeDetailsTableBy = By.cssSelector(".popover-content .node-details-simple")
-  By parameterKeyBy = By.cssSelector(".key")
-  ```
-- **Create getter methods** that include appropriate waits:
-  ```groovy
-  WebElement getNodeDetailsTable() {
-      waitForPopoverToAppear()
-      waitForElementVisible nodeDetailsTableBy
-      el nodeDetailsTableBy
-  }
-  ```
-- **Encapsulate interactions** - Complex operations should be methods in Page Objects, not inline in tests
+**Documentation:**
+- **`generate-entity-context`** — Generate standardized CONTEXT.md files for features
 
+**Workflows:**
+- **`cve-remediation`** — Verify and fix security vulnerabilities (CVEs)
+- **`backport-pr`** — Cherry-pick a merged PR onto a release/maintenance branch
+- **`onboard-contributor`** — Guide a new contributor through the repo setup and conventions
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Use the Skill tool to invoke: `Skill(skill_name="skill-name")`
+
+## Critical Rules
+
+1. **Always verify build succeeds locally** before considering work complete: `./gradlew build -x check` (4-8 min)
+2. **Never modify database migrations** without explicit approval (see `.claude/rules/database-migrations.md`)
+3. **Always verify work** — don't claim completion without running verification commands
+
+## Compaction Note
+
+When compacting, preserve the documentation structure above and the critical rules.
 
 ---
 > Source: [rundeck/rundeck](https://github.com/rundeck/rundeck) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
