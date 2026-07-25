@@ -1,0 +1,130 @@
+---
+trigger: always_on
+description: IoTempower is an IoT framework for rapid deployment and management of wireless sensor/actuator networks using ESP8266/ESP32 microcontrollers. It provides device drivers, MQTT integration, OTA updates, and a configuration-based deployment system.
+---
+
+# GitHub Copilot Instructions for IoTempower
+
+## Repository Overview
+
+IoTempower is an IoT framework for rapid deployment and management of wireless sensor/actuator networks using ESP8266/ESP32 microcontrollers. It provides device drivers, MQTT integration, OTA updates, and a configuration-based deployment system.
+
+## Key Architecture Concepts
+
+### System Hierarchy
+```
+IoT System (e.g., ~/iot-systems/my-home/)
+├── system.conf              # System-wide configuration (WiFi, MQTT broker)
+└── node-name/               # Each microcontroller has its own folder
+    ├── node.conf            # Board type and node-specific settings
+    ├── setup.cpp            # Device configuration (sensors/actuators)
+    ├── key.txt              # Security key for OTA updates
+    └── build/               # Auto-generated PlatformIO project (transient)
+```
+
+**Important**: Nodes and devices are defined declaratively in `setup.cpp` using a high-level C++ DSL. The system automatically handles MQTT topics, networking, security, and OTA updates.
+
+## Directory Structure
+
+### Documentation (`/doc`)
+- `quickstart-pi.rst` - Quick start guide for Raspberry Pi image
+- `architecture.rst` - System architecture overview
+- `architecture-quick-reference.rst` - Quick reference for key concepts
+- `first-node.rst` / `second-node.rst` - Essential tutorials
+- `device-architecture.rst` - Device framework details
+- `deployment-process.rst` - Build and deployment workflow
+- `node_help/` - Device command references
+- `projects_help/` - Project configuration help
+
+### System Management (`/bin`)
+- `compile` - Compiles node firmware
+- `deploy` - Deploys firmware (serial or OTA)
+- `command_checker.py` - Detects which device drivers are needed
+- `create_node_template` - Creates new node folders
+- Other gateway management scripts (accesspoint, MQTT, etc.)
+
+### MCU Device Drivers (`/lib/node_types/esp/src`)
+**Critical**: This folder contains the base device drivers and uses an **implicit inheritance structure** through symbolic links:
+
+- `device.h/.cpp` - Base Device class (all devices inherit from this)
+- `dev_*.h/.cpp` - Individual device drivers (sensors, actuators, I2C devices, etc.)
+- `devices.ini` - Device metadata and dependencies
+- `main.cpp` - Main loop (handles polling, MQTT, OTA)
+- `setup.cpp` - Template that includes user's `setup.cpp` as `setup.h` (via symbolic link in build directory)
+
+**Implicit Inheritance via Symbolic Links**:
+Board-specific folders inherit from parent folders through `base` symbolic links:
+- `esp32/base` → `esp` (ESP32 inherits from esp)
+- `m5stickc/base` → `esp32` (M5StickC inherits from esp32, which inherits from esp)
+- `esp8266/base` → `esp` (ESP8266 inherits from esp)
+- `nodemcu/base` → `esp8266` (NodeMCU inherits from esp8266, which inherits from esp)
+- `wemos_d1_mini/base` → `nodemcu` (Wemos D1 Mini inherits from nodemcu → esp8266 → esp)
+
+During deployment, files are copied following this inheritance chain, with board-specific files overriding parent files.
+
+When `deploy` is called, the system:
+1. Analyzes the node's `setup.cpp` to detect which devices are used
+2. Generates `devices_generated.h` with required includes
+3. Assembles a complete PlatformIO project in `node-folder/build/`
+4. Copies source files following the symbolic link inheritance structure (board-specific files override parent files)
+5. Creates a symbolic link from user's `setup.cpp` to `setup.h` in the build directory
+6. Compiles and uploads firmware
+
+## Writing setup.cpp Files
+
+### Device Naming Convention
+**Do NOT quote device names** - they come from command auto-expansion:
+```cpp
+// Correct - device names are NOT strings
+output(blue_led, ONBOARDLED).off();
+input(button1, D3, "up", "down");
+analog(temp_sensor).with_threshold(30, "hot", "cold");
+
+// Incorrect - do not use quoted names
+// output("blue_led", ONBOARDLED);  // WRONG
+```
+
+### MQTT is Automatic
+**Do NOT manually configure MQTT** - the system handles it automatically:
+- MQTT topics follow the folder hierarchy where the node is located
+- For a node at path `a/b/c/node.conf`, the base topic is `a/b/c/`
+- A device `blue_led` publishes to `a/b/c/blue_led` and receives commands at `a/b/c/blue_led/set`
+- Multi-value devices add subtopics: `a/b/c/climate/temperature`, `a/b/c/climate/humidity`
+- Note: System name (top-level folder) is NOT included in MQTT topics
+- WiFi credentials and MQTT broker are configured in `system.conf`
+
+### Device Declaration Patterns
+Look at `/examples` to understand patterns:
+```cpp
+// Simple devices
+output(relay, RELAIS1).off();
+led(status, ONBOARDLED).invert().off();
+input(button, D3).invert().debounce(10);
+
+// Sensors with callbacks
+analog(moisture)
+    .with_threshold(100, "wet", "dry")
+    .with_on_change_callback([] {
+        if(IN(moisture).value().equals("wet")) {
+            IN(relay).on();
+        }
+    });
+
+// Complex devices with filters
+input(touch1, BUTTON1)
+    .filter_click_detector(20, 800, 1000, 2500)
+    .on_change([] (Device& dev) {
+        if(dev.is("click")) {
+            IN(relay).toggle();
+        }
+        return true;
+    });
+```
+
+### Device Access
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [iotempire/iotempower](https://github.com/iotempire/iotempower) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
