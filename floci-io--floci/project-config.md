@@ -1,163 +1,218 @@
 ---
 trigger: always_on
-description: Review pull requests in the Floci repository with AWS compatibility as the primary concern.
+description: Guidance for AI coding agents working in the Floci repository.
 ---
 
-# Copilot Instructions for Pull Request Review
+Guidance for AI coding agents working in the Floci repository.
 
-Review pull requests in the Floci repository with AWS compatibility as the primary concern.
+This file defines repository-specific operating rules for autonomous or semi-autonomous coding agents. Follow these instructions unless a maintainer explicitly tells you otherwise.
 
-Floci is a Java-based local AWS emulator built on Quarkus. Its goal is to match AWS SDK and AWS CLI behavior through real AWS wire protocols, not convenience APIs or custom abstractions.
+---
 
-## Review Priorities
+## Project Overview
 
-Evaluate changes in this order:
+Floci is a Java-based local AWS emulator built on Quarkus.
+
+Its goal is full AWS SDK and AWS CLI compatibility through real AWS wire protocols, not convenience APIs or simplified abstractions.
+
+Floci acts as an open-source alternative to LocalStack Community.
+
+- Port: 4566
+- Stack:
+  - Java 25
+  - Quarkus 3.32.3
+  - JUnit 5
+  - RestAssured
+  - Jackson
+  - Docker integrations for Lambda, RDS, and ElastiCache
+
+---
+
+## First Principles
+
+When making changes, follow these priorities:
 
 1. Preserve AWS protocol compatibility
-2. Match AWS SDK and AWS CLI behavior
+2. Match AWS SDK and CLI behavior
 3. Reuse existing Floci patterns
 4. Prefer correctness over convenience
-5. Keep changes focused and testable
+5. Keep changes narrow and testable
 
-## What to Flag
+Critical rules:
 
-Raise concerns when a PR introduces any of the following without strong justification:
+- Do not introduce custom endpoint shapes
+- Do not change request or response formats for convenience
+- Do not perform broad refactors unless the task explicitly requires them
+- Keep behavior aligned with AWS expectations and existing Floci conventions
 
-- Non-AWS endpoint shapes
-- Request or response format changes made for convenience
-- Broad refactors unrelated to the PR goal
-- New service patterns where an existing Floci pattern should be reused
-- Direct storage implementation usage instead of `StorageFactory`
+---
 
-## Architecture Expectations
+## Architecture
 
 Floci follows a layered design:
 
-- Controllers / handlers parse AWS protocol input and produce AWS-compatible responses
-- Services contain business logic and should throw `AwsException`
-- Models hold domain data
+- **Controller / Handler**
+  - Parses AWS protocol input
+  - Produces AWS-compatible responses
 
-Core infrastructure commonly relevant in reviews:
+- **Service**
+  - Contains business logic
+  - Throws `AwsException`
+
+- **Model**
+  - Domain objects
+
+### Core Infrastructure
 
 - `EmulatorConfig`
 - `ServiceRegistry`
-- `StorageFactory`
-- `AwsQueryController`
+- `StorageBackend` + `StorageFactory`
 - `AwsJson11Controller`
-- `AwsException`
-- `AwsExceptionMapper`
+- `AwsQueryController`
+- `AwsException` + `AwsExceptionMapper`
 - `EmulatorLifecycle`
 
-Check that controllers stay thin, business logic remains in services, and new changes fit existing repository patterns.
+---
 
-## Protocol Review Rules
+## Package Layout
 
-Floci implements real AWS wire protocols. Review protocol-affecting changes carefully.
+- `io.github.hectorvent.floci.config`
+- `io.github.hectorvent.floci.core.common`
+- `io.github.hectorvent.floci.core.storage`
+- `io.github.hectorvent.floci.lifecycle`
+- `io.github.hectorvent.floci.services.<service>`
 
-- Query services should keep form-encoded POST requests with `Action` and XML responses
-- JSON 1.1 services should keep `X-Amz-Target` requests and AWS-style JSON responses
-- REST JSON and REST XML services should stay aligned with AWS path and payload conventions
-- TCP-based services should not drift into HTTP-style abstractions
+Typical service structure:
 
-Pay extra attention to these cases:
+- `services/<svc>/`
+  - `*Controller.java`
+  - `*Service.java`
+  - `model/`
 
-- CloudWatch Metrics supports both Query and JSON 1.1 and both paths must stay aligned
-- SQS and SNS may have multiple compatibility paths that must not drift
+Rule:
+Copy an existing service pattern before introducing a new one.
+
+---
+
+## AWS Protocol Rules
+
+Floci must implement real AWS wire protocols.
+
+| Protocol | Services | Request Format | Response Format | Implementation |
+|----------|----------|----------------|-----------------|----------------|
+| Query | SQS, SNS, IAM, STS, RDS, ElastiCache, CloudFormation, CloudWatch Metrics | form-encoded POST + `Action` | XML | `AwsQueryController` |
+| JSON 1.1 | SSM, EventBridge, CloudWatch Logs, Kinesis, KMS, Cognito, Secrets Manager, ACM | POST + `X-Amz-Target` | JSON | `AwsJson11Controller` |
+| REST JSON | Lambda, API Gateway, SES V2 | REST paths | JSON | JAX-RS |
+| REST XML | S3 | REST paths | XML | JAX-RS |
+| TCP | ElastiCache, RDS | raw protocol | native | proxies |
+
+### Important exceptions
+
+- CloudWatch Metrics supports both Query and JSON 1.1; handlers must remain aligned
+- SQS and SNS may expose multiple compatibility paths; do not let them drift
 - Cognito well-known endpoints are OIDC REST JSON endpoints, not AWS management APIs
-- Management APIs should ideally be validated with AWS SDK clients, not only handcrafted HTTP
+- Data-plane protocols may use raw TCP sockets
+- Management APIs should be validated with AWS SDK clients, not only handcrafted HTTP requests
 
-## XML and JSON Rules
+---
 
-Flag PRs that:
+## XML / JSON Rules
 
-- Ignore `AwsNamespaces` constants
-- Return JSON errors that do not follow AWS error structures
-- Change controller return types in ways that may break reflection or native-image compatibility
+- Use `XmlBuilder` for XML responses
+- Use `XmlParser` for XML parsing; do not use regex
+- Use `AwsNamespaces` constants
+- JSON errors must follow AWS error structures
+- Types returned directly from controllers must remain compatible with native-image reflection requirements
 
-## Config and Storage Review
+---
 
-When a PR changes configuration or persistence behavior, verify the change is wired consistently.
+## Storage Rules
 
-Check for updates to:
-
-- `EmulatorConfig`
-- main `application.yml`
-- test `application.yml`
-- `StorageFactory`
-- lifecycle hooks when relevant
-
-Supported storage modes include:
+Supported storage modes:
 
 - `memory`
 - `persistent`
 - `hybrid`
 - `wal`
 
-Treat repository YAML as the source of truth for runtime behavior unless the PR explicitly changes configuration semantics.
+Rules:
 
-## Testing Expectations
+- Always use `StorageFactory`
+- Do not instantiate storage implementations directly inside services
+- Respect lifecycle hooks for load and flush behavior
 
-Expect automated coverage for changes that affect:
+Important nuance:
 
-- request parsing
-- response shape
-- error handling
-- persistence semantics
-- URL generation
-- service enablement
+Configuration interfaces may declare fallback defaults, but `application.yml` defines effective runtime behavior. Treat repository YAML as the source of truth unless a task explicitly changes configuration semantics.
 
-Prefer:
+When adding storage-related behavior:
 
-- AWS SDK-based validation over raw HTTP-only testing
-- integration tests for compatibility-sensitive behavior
-- existing naming conventions such as `*ServiceTest.java` and `*IntegrationTest.java`
+1. Update `EmulatorConfig`
+2. Update main `application.yml`
+3. Update test `application.yml`
+4. Wire through `StorageFactory`
+5. Verify lifecycle integration
 
-If behavior changes without automated coverage, call that out explicitly.
+---
 
-## Review Checklist
+## Configuration Rules
 
-When analyzing a PR, check:
+Configuration lives under `floci.*`.
 
-- Is the change focused?
-- Does it preserve AWS-compatible wire behavior?
-- Does it reuse an existing Floci pattern?
-- Are controllers thin and services responsible for domain logic?
-- Are `AwsException` and existing error-mapping patterns used correctly?
-- Are config and YAML updates complete?
-- Are storage changes wired through `StorageFactory`?
-- Are tests added or updated where compatibility is affected?
-- Are docs updated when user-facing behavior changes?
+When adding config:
 
-## How to Write Feedback
+1. Add it to `EmulatorConfig`
+2. Add it to main `application.yml`
+3. Add it to test `application.yml` if needed
+4. Update documentation if user-facing
+5. Follow `FLOCI_*` environment variable conventions
 
-Write review comments that are:
+Critical areas:
 
-- specific
-- repository-aware
-- grounded in AWS compatibility risk
+- `base-url`
+- `hostname`
+- region and account defaults
+- port ranges
+- persistence paths
+- Docker networking
 
-Use severity when helpful:
+---
 
-- `high`: likely breaks AWS SDK / CLI compatibility or protocol behavior
-- `medium`: inconsistent with Floci architecture, wiring, or testing expectations
-- `low`: maintainability, clarity, or minor convention issue
+## Build & Run
 
-Prefer comments that explain:
+    ./mvnw quarkus:dev
+    ./mvnw test
+    ./mvnw clean package
+    ./mvnw clean package -DskipTests
 
-- what is risky
-- why it matters in Floci
-- which existing pattern should be followed instead
+### Focused tests
 
-## If Behavior Is Unclear
+    ./mvnw test -Dtest=SsmIntegrationTest
+    ./mvnw test -Dtest=SsmIntegrationTest#putParameter
 
-Use this fallback order:
+---
 
-1. Prefer AWS behavior
-2. Then existing Floci behavior
-3. Then compatibility test expectations
+## Compatibility Project
 
-If correctness would require a broader architectural change, call out the tradeoff instead of suggesting blind refactoring.
+Compatibility test suite: `./compatibility-tests/`
+
+Guidelines:
+
+- Prefer AWS SDK clients over raw HTTP for management-plane validation
+- Use this suite when changes may affect real SDK behavior
+
+---
+
+## Testing Rules
+
+### Conventions
+
+- Unit tests: `*ServiceTest.java`
+- Integration tests: `*IntegrationTest.java`
+- Prefer package-private constructors for testability
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [floci-io/floci](https://github.com/floci-io/floci) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
