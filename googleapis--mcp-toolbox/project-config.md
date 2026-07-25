@@ -1,121 +1,97 @@
 ---
 trigger: always_on
-description: This file (symlinked as `CLAUDE.md`, `AGENTS.md`, and `.gemini/styleguide.md`) provides context and guidelines for AI agents working on the MCP Toolbox for Databases project. It summarizes key information from `CONTRIBUTING.md` and `DEVELOPER.md`.
+description: >
 ---
 
-# MCP Toolbox Context & Style Guide
 
-This file (symlinked as `CLAUDE.md`, `AGENTS.md`, and `.gemini/styleguide.md`) provides context and guidelines for AI agents working on the MCP Toolbox for Databases project. It summarizes key information from `CONTRIBUTING.md` and `DEVELOPER.md`.
+## About
 
-## Project Overview
+Google Gemini provides state-of-the-art embedding models that convert text into
+high-dimensional vectors.
 
-**MCP Toolbox for Databases** is a Go-based project designed to provide Model Context Protocol (MCP) tools for various data sources and services. It allows Large Language Models (LLMs) to interact with databases and other tools safely and efficiently.
+### Authentication
 
+Toolbox supports two authentication modes:
 
-## Tech Stack
+1.  **Google AI (API Key):** Used if you
+    provide `apiKey` (or set `GOOGLE_API_KEY`/`GEMINI_API_KEY` environment
+    variables). This uses the [Google AI Studio][ai-studio] backend.
+2.  **Vertex AI (ADC):** Used if provided `project` and `location` (or set
+    `GOOGLE_CLOUD_PROJECT`/`GOOGLE_CLOUD_LOCATION` environment variables). This uses [Application
+    Default Credentials (ADC)][adc].
 
--   **Language:** Go (1.23+)
--   **Documentation:** Hugo (Extended Edition v0.146.0+)
--   **Containerization:** Docker
--   **CI/CD:** GitHub Actions, Google Cloud Build
--   **Linting:** `golangci-lint`
+We recommend using an API key for quick testing and using Vertex AI with ADC for
+production environments.
 
-## Key Directories
+[adc]: https://cloud.google.com/docs/authentication#adc
+[api-key]: https://ai.google.dev/gemini-api/docs/api-key#api-keys
+[ai-studio]: https://aistudio.google.com/app/apikey
 
--   `cmd/`: Application entry points.
--   `internal/sources/`: Implementations of database sources (e.g., Postgres, BigQuery).
--   `internal/tools/`: Implementations of specific tools for each source.
--   `tests/`: Integration tests.
--   `docs/en`: Project documentation. Separated logically into:
-    - `documentation/`: Documentation and concepts (Section I).
-    - `integrations/`: Reference architectures for DB connectivity and tools (Section II).
-    - `samples/`: Tutorials and code samples (Section III).
-    - `reference/`: CLI info and FAQs (Section IV).
+## Behavior
 
-## Development Workflow
+### Automatic Vectorization
 
-### Prerequisites
+When a tool parameter is configured with `embeddedBy: <your-gemini-model-name>`,
+the Toolbox intercepts the raw text input from the client and sends it to the
+Gemini API. The resulting numerical array is then formatted before being passed
+to your database source.
 
--   Go 1.23 or later.
--   Docker (for building container images and running some tests).
--   Access to necessary Google Cloud resources for integration testing (if applicable).
+### Dimension Matching
 
-### Building and Running
+The `dimension` field must match the expected size of your database column
+(e.g., a `vector(768)` column in PostgreSQL). This setting is supported by newer
+models since 2024 only. You cannot set this value if using the earlier model
+(`models/embedding-001`). Check out [available Gemini models][modellist] for
+more information.
 
-1.  **Build Binary:** `go build -o toolbox`
-2.  **Run Server:** `go run .` (Listens on port 5000 by default)
-3.  **Run with Help:** `go run . --help`
-4.  **Test Endpoint:** `curl http://127.0.0.1:5000`
+[modellist]:
+  https://docs.cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings#supported-models
 
-### Testing
+## Example
 
--   **Unit Tests:** `go test -race -v ./cmd/... ./internal/...`
--   **Integration Tests:**
-    -   Run specific source tests: `go test -race -v ./tests/<source_dir>`
-    -   Example: `go test -race -v ./tests/alloydbpg`
-    -   Add new sources to `.ci/integration.cloudbuild.yaml`
--   **Linting:** `golangci-lint run --fix`
+### Using Google AI
 
+Google AI uses API Key for authentication. You can get an API key from [Google
+AI Studio][ai-studio].
 
-## Developing Documentation
+```yaml
+kind: embeddingModel
+name: gemini-model
+type: gemini
+model: gemini-embedding-001
+apiKey: ${GOOGLE_API_KEY}
+dimension: 768
+```
 
-### Prerequisites
+### Using Vertex AI
 
--   Hugo (Extended Edition v0.146.0+)
--   Node.js (for `npm ci`)
+Vertex AI uses Application Default Credentials (ADC) for authentication. Learn
+how to set up ADC [here][adc].
 
-### Running Local Server
+```yaml
+kind: embeddingModel
+name: gemini-model
+type: gemini
+model: gemini-embedding-001
+project: ${GOOGLE_CLOUD_PROJECT}
+location: us-central1
+dimension: 768
+```
 
-1.  Navigate to `.hugo` directory: `cd .hugo`
-2.  Install dependencies: `npm ci`
-3.  **Generate Search Index:** Because Pagefind requires physical files, `hugo server` alone will not populate the search bar. Build the local index first (using the development environment to block analytics) by running:
-    `hugo --environment development && npx pagefind --site public --output-path static/pagefind`
-4.  Start server: `hugo server`
+[adc]: https://docs.cloud.google.com/docs/authentication/provide-credentials-adc
 
-### Versioning Workflows
+{{< notice tip >}} Use environment variable replacement with the format
+${ENV_NAME} instead of hardcoding your secrets into the configuration file.
+{{< /notice >}}
 
-Documentation builds automatically generate standard HTML alongside AI-friendly text files (`llms.txt` and `llms-full.txt`).
+## Reference
 
-There are 6 workflows in total, handling parallel deployments to both GitHub Pages and Cloudflare Pages. **All deployment workflows automatically execute `npx pagefind --site public` to generate version-scoped search indexes.**
-
-1.  **Deploy In-development docs**: Commits merged to `main` deploy to the `/dev/` path. Automatically defaults to version `Dev`.
-2.  **Deploy Versioned Docs**: New GitHub releases deploy to `/<version>/` and the root path. The release tag is automatically injected into the build as the documentation version. *(Note: Developers must manually add the new version to the `[[params.versions]]` dropdown array in `hugo.toml` prior to merging a release PR).*
-3.  **Deploy Previous Version Docs**: A manual workflow to rebuild older versions by explicitly passing the target tag via the GitHub Actions UI.
-
-## Coding Conventions
-
-### Tool Naming
-
--   **Tool Name:** `snake_case` (e.g., `list_collections`, `run_query`).
-    -   Do *not* include the product name (e.g., avoid `firestore_list_collections`).
--   **Tool Type:** `kebab-case` (e.g., `firestore-list-collections`).
-    -   *Must* include the product name.
-
-### Branching and Commits
-
--   **Branch Naming:** `feat/`, `fix/`, `docs/`, `chore/` (e.g., `feat/add-gemini-md`).
--   **Commit Messages:** [Conventional Commits](https://www.conventionalcommits.org/) format.
-    -   Format: `<type>(<scope>): <description>`
-    -   Example: `feat(source/postgres): add new connection option`
-    -   Types: `feat`, `fix`, `docs`, `chore`, `test`, `ci`, `refactor`, `revert`, `style`.
-
- ### PR Title Format
-
-Format: `<type>[optional scope]: <description>`
-
-- **Example:** `feat(source/postgres): add support for "new-field" field`
-- **Example (Breaking Change):** `fix(tool/sql)!: change default parameter value`
-
-#### Types
-
-| Type | Description | Version change affected |
-| :--- | :--- | :--- |
-| **BREAKING CHANGE** | Anything with this type or a `!` after the type/scope introduces a breaking API change. E.g. `fix!: description` or `feat!: description`. | major |
-| **feat** | Adding a new feature to the codebase. | minor |
-| **fix** | Fixing a bug or typo in the codebase. | patch |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| **field**   | **type** | **required** | **description**                                                                                                                                      |
+| ----------- | :------: | :----------: | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| type        |  string  |     true     | Must be `gemini`.                                                                                                                                    |
+| model       |  string  |     true     | The Gemini model ID to use (e.g., `gemini-embedding-001`).                                                                                             |
+| dimension   | integer  |    false     | The number of dimensions in the output vector (e.g., `768`).                                                                                         |
 
 ---
 > Source: [googleapis/mcp-toolbox](https://github.com/googleapis/mcp-toolbox) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
