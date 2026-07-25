@@ -1,122 +1,168 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The Google AI provider enables PentAGI to use Google's Gemini language models through the Generative AI API. This provider supports advanced features like function calling, streaming responses, and competitive pricing.
 ---
 
-# CLAUDE.md
+# Google AI (Gemini) Provider
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+The Google AI provider enables PentAGI to use Google's Gemini language models through the Generative AI API. This provider supports advanced features like function calling, streaming responses, and competitive pricing.
 
-## Core Interaction Rules
+## Features
 
-1. **Always use English** for all interactions, responses, explanations, and questions with users.
-2. **Password Complexity Requirements**: For all password-related development (registration, password reset, API token generation, etc.), the following rules must be enforced:
-   - Minimum 12 characters
-   - Must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character
-   - Common weak passwords (e.g., `password`, `123456`) are prohibited
-   - Both backend and frontend validation must be implemented; do not rely on frontend validation alone
+- **Multi-model Support**: Access to Gemini 2.5 Flash, Gemini 2.5 Pro, and other Google AI models
+- **Function Calling**: Full support for tool usage and function calls
+- **Streaming Responses**: Real-time response streaming for better user experience
+- **Competitive Pricing**: Cost-effective inference with transparent pricing
+- **Proxy Support**: HTTP proxy support for enterprise environments
+- **Advanced Configuration**: Fine-tuned parameters for different agent types
 
-## Project Overview
+## Configuration
 
-**PentAGI** is an automated security testing platform powered by AI agents. It runs autonomous penetration testing workflows using a multi-agent system (Researcher, Developer, Executor agents) that coordinates LLM providers, Docker-sandboxed tool execution, and a persistent vector memory store.
+### Environment Variables
 
-The application is a monorepo with:
-- **`backend/`** — Go REST + GraphQL API server
-- **`frontend/`** — React + TypeScript web UI
-- **`observability/`** — Optional monitoring stack configs
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GEMINI_API_KEY` | - | Your Google AI API key (required) |
+| `GEMINI_SERVER_URL` | `https://generativelanguage.googleapis.com` | Google AI API base URL |
 
-## Build & Development Commands
+### Getting API Key
 
-### Backend (run from `backend/`)
+1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key
+3. Set it as `GEMINI_API_KEY` environment variable
+
+## Available Models
+
+| Model | Context Window | Max Output | Input Price* | Output Price* | Best For |
+|-------|----------------|------------|--------------|---------------|----------|
+| gemini-2.5-flash | 1M tokens | 65K tokens | $0.15 | $0.60 | General tasks, fast responses |
+| gemini-2.5-pro | 1M tokens | 65K tokens | $2.50 | $10.00 | Complex reasoning, analysis |
+| gemini-2.0-flash | 1M tokens | 8K tokens | $0.15 | $0.60 | High-frequency tasks |
+| gemini-1.5-flash | 1M tokens | 8K tokens | $0.075 | $0.30 | Legacy model (deprecated) |
+| gemini-1.5-pro | 2M tokens | 8K tokens | $1.25 | $5.00 | Legacy model (deprecated) |
+
+*Prices per 1M tokens (USD)
+
+## Agent Configuration
+
+Each agent type is optimized with specific parameters for Google AI models:
+
+### Basic Agents
+- **Simple**: General-purpose tasks with balanced settings
+- **Simple JSON**: Structured output generation with JSON formatting
+- **Primary Agent**: Core reasoning with moderate creativity
+- **Assistant (A)**: User interaction with contextual responses
+
+### Specialized Agents
+- **Generator**: Creative content with higher temperature
+- **Refiner**: Content improvement with focused parameters
+- **Adviser**: Strategic guidance with extended context
+- **Reflector**: Analysis and evaluation tasks
+- **Searcher**: Information retrieval with precise settings
+- **Enricher**: Data enhancement and augmentation
+- **Coder**: Programming tasks with minimal temperature
+- **Installer**: System setup with deterministic responses
+- **Pentester**: Security testing with balanced creativity
+
+## Usage Examples
+
+### Basic Setup
 
 ```bash
-go mod download                              # Install dependencies
-go build -trimpath -o pentagi ./cmd/pentagi  # Build main binary
-go test ./...                                # Run all tests
-go test ./pkg/foo/... -v -run TestName       # Run specific test
-golangci-lint run --timeout=5m               # Lint
+# Set environment variables
+export GEMINI_API_KEY="your_api_key_here"
+export GEMINI_SERVER_URL="https://generativelanguage.googleapis.com"
 
-# Code generation (run after schema changes)
-go run github.com/99designs/gqlgen --config ./gqlgen/gqlgen.yml  # GraphQL resolvers
-swag init -g ../../pkg/server/router.go -o pkg/server/docs/ --parseDependency --parseInternal --parseDepth 2 -d cmd/pentagi  # Swagger docs
+# Test the provider
+docker run --rm \
+  -v $(pwd)/.env:/opt/pentagi/.env \
+  vxcontrol/pentagi /opt/pentagi/bin/ctester -type gemini
 ```
 
-### Frontend (run from `frontend/`)
+### Custom Configuration
+
+```yaml
+# gemini-custom.yml
+simple:
+  model: "gemini-2.5-pro"
+  temperature: 0.3
+  top_p: 0.4
+  max_tokens: 8000
+  price:
+    input: 2.50
+    output: 10.00
+
+coder:
+  model: "gemini-2.5-flash"
+  temperature: 0.05
+  top_p: 0.1
+  max_tokens: 16000
+  price:
+    input: 0.15
+    output: 0.60
+```
+
+### Docker Usage
 
 ```bash
-npm ci                    # Install dependencies
-npm run dev               # Dev server on http://localhost:8000
-npm run build             # Production build
-npm run lint              # ESLint check
-npm run lint:fix          # ESLint auto-fix
-npm run prettier          # Prettier check
-npm run prettier:fix      # Prettier auto-format
-npm run test              # Vitest
-npm run test:coverage     # Coverage report
-npm run graphql:generate  # Regenerate GraphQL types from schema
+# Using pre-configured Gemini provider
+docker run --rm \
+  -v $(pwd)/.env:/opt/pentagi/.env \
+  vxcontrol/pentagi /opt/pentagi/bin/ctester \
+  -config /opt/pentagi/conf/gemini.provider.yml
+
+# Using custom configuration
+docker run --rm \
+  -v $(pwd)/.env:/opt/pentagi/.env \
+  -v $(pwd)/gemini-custom.yml:/opt/pentagi/gemini-custom.yml \
+  vxcontrol/pentagi /opt/pentagi/bin/ctester \
+  -type gemini \
+  -config /opt/pentagi/gemini-custom.yml
 ```
 
-### Docker (run from repo root)
+## Integration with PentAGI
+
+### Environment File (.env)
 
 ```bash
-docker compose up -d                                                          # Start core services
-docker compose -f docker-compose.yml -f docker-compose-observability.yml up -d  # + monitoring
-docker compose -f docker-compose.yml -f docker-compose-langfuse.yml up -d       # + LLM analytics
-docker compose -f docker-compose.yml -f docker-compose-graphiti.yml up -d       # + knowledge graph
-docker build -t local/pentagi:latest .                                        # Build image
+# Google AI Configuration
+GEMINI_API_KEY=your_api_key_here
+GEMINI_SERVER_URL=https://generativelanguage.googleapis.com
+
+# Optional: Proxy settings
+PROXY_URL=http://your-proxy:port
 ```
 
-The full stack runs at `https://localhost:8443` when using Docker Compose. Copy `.env.example` to `.env` and fill in at minimum the database and at least one LLM provider key.
+### Provider Selection
 
-## Architecture
+The Google AI provider is automatically available when `GEMINI_API_KEY` is set. You can use it for:
 
-### Backend Package Structure
+- **Flow Execution**: Autonomous penetration testing workflows
+- **Assistant Mode**: Interactive chat and analysis
+- **Custom Tasks**: Specialized security assessments
+- **API Integration**: Programmatic access to Google AI models
 
-| Package | Role |
-|---|---|
-| `cmd/pentagi/` | Main entry point; initializes config, DB, server |
-| `pkg/config/` | Environment-based config parsing |
-| `pkg/server/` | Gin router, middleware, auth (JWT/OAuth2/API tokens), Swagger |
-| `pkg/controller/` | Business logic for REST endpoints |
-| `pkg/graph/` | gqlgen GraphQL schema (`schema.graphqls`) and resolvers |
-| `pkg/database/` | GORM models, SQLC queries, goose migrations |
-| `pkg/providers/` | LLM provider adapters (OpenAI, Anthropic, Gemini, Bedrock, Ollama, etc.) |
-| `pkg/tools/` | Penetration testing tool integrations |
-| `pkg/docker/` | Docker SDK wrapper for sandboxed container execution |
-| `pkg/terminal/` | Terminal session and command execution management |
-| `pkg/queue/` | Async task queue |
-| `pkg/csum/` | Chain summarization for LLM context management |
-| `pkg/graphiti/` | Knowledge graph (Neo4j via Graphiti) integration |
-| `pkg/observability/` | OpenTelemetry tracing, metrics, structured logging |
+## Best Practices
 
-Database migrations live in `backend/migrations/sql/` and run automatically via goose at startup.
+### Model Selection
+- Use **gemini-2.5-flash** for general tasks and fast responses
+- Use **gemini-2.5-pro** for complex reasoning and detailed analysis
+- Avoid deprecated models (1.5 series) for new projects
 
-### Frontend Structure
+### Performance Optimization
+- Set appropriate `max_tokens` limits based on your use case
+- Use lower `temperature` values for deterministic tasks
+- Configure `top_p` to balance creativity and consistency
 
-```
-frontend/src/
-├── app.tsx / main.tsx     # Entry points and router setup
-├── pages/                 # Route-level page components
-│   ├── flows/             # Flow management UI
-│   └── settings/          # Provider, prompt, token settings
-├── components/
-│   ├── layouts/           # App shell layouts
-│   └── ui/                # Base Radix UI components
-├── graphql/               # Auto-generated Apollo types (do not edit)
-├── hooks/                 # Custom React hooks
-├── lib/                   # Apollo client, HTTP utilities
-└── schemas/               # Zod validation schemas
-```
+### Cost Management
+- Monitor token usage through PentAGI's cost tracking
+- Use cheaper models for simple tasks
+- Implement request batching where possible
 
-State is managed primarily through Apollo Client (GraphQL) with real-time updates via GraphQL subscriptions over WebSocket.
-
-### Data Flow
-
-1. User creates a "flow" (penetration test) via the UI or REST API.
-2. The backend queues the flow and spawns agent goroutines.
+### Security Considerations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [vxcontrol/pentagi](https://github.com/vxcontrol/pentagi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
