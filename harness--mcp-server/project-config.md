@@ -1,122 +1,107 @@
 ---
 trigger: always_on
-description: > You are building a production-grade MCP (Model Context Protocol) server that wraps the Harness.io REST API, enabling AI agents (Claude, Cursor, Windsurf, etc.) to interact with Harness CI/CD pipelines, services, environments, connectors, and platform entities through standardized tools and resources.
+description: This extension connects Gemini CLI to the Harness Platform through 11 consolidated MCP tools that cover 202 resource types across 33 default toolsets.
 ---
 
-# CLAUDE.md — Harness.io MCP Server
+# Harness MCP Server — Gemini CLI Context
 
-> You are building a production-grade MCP (Model Context Protocol) server that wraps the Harness.io REST API, enabling AI agents (Claude, Cursor, Windsurf, etc.) to interact with Harness CI/CD pipelines, services, environments, connectors, and platform entities through standardized tools and resources.
+This extension connects Gemini CLI to the Harness Platform through 11 consolidated MCP tools that cover 202 resource types across 33 default toolsets.
 
----
+## How This Server Works
 
-## Project Identity
+Unlike traditional MCP servers with one tool per API endpoint, this server uses a **registry-based dispatch** pattern. You interact through generic verb-based tools and specify the `resource_type` you want to work with.
 
-- **Name**: `harness-mcp-server`
-- **Runtime**: TypeScript (Node.js 20+)
-- **SDK**: `@modelcontextprotocol/sdk` (v1.27+)
-- **Transport**: Stdio (local) + Streamable HTTP (remote)
-- **Schema Validation**: Zod v4 (import from `zod/v4`)
-- **Build**: `tsc` with ES2022 target, ESM output
-- **Package Manager**: pnpm
+**Start with discovery:**
+- `harness_describe` — Browse all available resource types (no API call, instant)
+- `harness_describe` with `search_term` — Find resource types by keyword
+- `harness_describe` with `resource_type` — Get full detail on a specific type
 
----
+**Then use CRUD tools:**
+- `harness_list` — List resources with filtering and pagination
+- `harness_get` — Get a single resource by ID
+- `harness_create` — Create a resource (elicits confirmation when supported by the MCP client)
+- `harness_update` — Update a resource (elicits confirmation when supported by the MCP client)
+- `harness_delete` — Delete a resource (destructive; blocked if confirmation cannot be obtained)
 
-## Workflow Orchestration
+**Specialized tools:**
+- `harness_execute` — Run pipelines, toggle feature flags, test connectors, sync GitOps apps; pass `wait: true` for server-side pipeline run/retry polling
+- `harness_search` — Search across multiple resource types at once
+- `harness_diagnose` — Diagnose pipelines, connectors, delegates, and GitOps applications
+- `harness_status` — Project health overview: failed, running, and recent executions
+- `harness_schema` — Fetch bundled pipeline/template schemas, named YAML examples, and scope-aware entity schemas for connectors, environments, services, secrets, and infrastructure
 
-### 1. Plan Mode Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately — don't keep pushing
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
-- Map every new tool to a specific Harness API endpoint before writing code
+`harness_list` returns strict structured content for MCP clients: array-like Harness responses are normalized into `{ "items": [...], "total": <count>, "page": <page> }`, while the text payload still contains compact JSON.
 
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One task per subagent for focused execution
-- Use subagents for: API endpoint discovery, Zod schema generation, test writing
+## Available Capabilities
 
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
+### CI/CD & Pipelines
+- List, view, create, update, and delete pipelines
+- Execute pipelines with runtime inputs, retry failed executions, interrupt running ones
+- View execution history and download execution logs
+- Manage pipeline triggers and input sets
+- Pipeline run shorthand support: `branch`, `tag`, `pr_number`, and `commit_sha` auto-expand into CI build input structures (unless `inputs.build` is already provided explicitly)
+- Pipeline run/retry wait mode returns terminal status fields or `_wait` recheck hints without requiring a client-side polling loop
 
-### 4. Verification Before Done
-- Never mark a task complete without proving it works
-- Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this?"
-- Run tests, check logs, demonstrate correctness
-- For every MCP tool: test with `npx @modelcontextprotocol/inspector`
+### Services & Environments
+- CRUD operations on services and environments
+- Manage infrastructure definitions
+- Move environment and infrastructure configs between scopes
 
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
-- Skip this for simple, obvious fixes — don't over-engineer
-- Challenge your own work before presenting it
+### Connectors & Secrets
+- List, create, update, and test connectors
+- Browse the connector catalogue
+- View secret metadata (values are never exposed)
 
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding
-- Point at logs, errors, failing tests — then resolve them
-- Zero context switching required from the user
-- Go fix failing CI tests without being told how
+### Cloud Cost Management (CCM)
+- Analyze costs with perspectives, breakdowns, and time series
+- Access optimization recommendations with savings estimates
+- Detect and manage cost anomalies
+- Track commitment coverage, utilisation, and savings
 
----
+### Security & Compliance
+- Security Test Orchestration (STO): manage issues, create exemptions, and approve or reject exemptions with explicit approval scope
+- Supply Chain Security (SCS): track artifacts, compliance, SBOMs, chain of custody
+- Audit trail: registry-dispatched list/get/create/update/delete/execute operations can emit structured events through the default logger-filtered stderr sink, optional durable JSONL/webhook sinks, and optional OpenTelemetry spans
 
-## Task Management
+### GitOps
+- Manage agents, applications, clusters, repositories
+- Sync applications, view resource trees, access pod logs
+- Track application events and managed resources
 
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review section to `tasks/todo.md`
-6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+### Chaos Engineering
+- List and run chaos experiments
+- Create experiments from templates
+- View experiment run results and probe details
+- Manage load tests
 
----
+### Feature Flags
+- List and manage feature flags across environments
+- Toggle flags on/off with environment targeting
 
-## Core Principles
+### Internal Developer Portal (IDP)
+- Manage catalog entities and scorecards
+- Track developer experience scores and checks
+- Execute IDP workflows, search tech docs
 
-- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
-- **Type Safety**: Every tool input/output must be fully typed with Zod 4 schemas. No `any`. Import via `import * as z from "zod/v4"`.
-- **Fail Loudly**: Never swallow errors. Surface Harness API errors with full context.
-- **Idempotent Reads**: All read tools must be safe to call repeatedly with identical results.
+### Templates & Dashboards
+- Browse and use pipeline, stage, and step templates
+- Access custom dashboards and data exports
 
----
+### Infrastructure as Code Management (IaCM)
+- Default-enabled toolset for Terraform workspaces, resources, module registry entries, workspace costs, and activity resource changes
+- Workspace, resource, cost, and activity-change APIs require org/project scope; the module registry is account-scoped
+- Use `iacm_workspace` to find `workspace_id`; `iacm_activity_resource_change` requires both `activity_id` and `workspace_id`
+- IaCM `page_count` values count the current page only; paginate while `has_more` is true when a total is needed
 
-## Architecture
+### Ansible
+- Opt-in toolset for Ansible inventories, playbooks, hosts, and activity history
+- Enable with `HARNESS_TOOLSETS=+ansible`; Ansible APIs require org/project scope
 
-### Directory Structure
-```
-harness-mcp-server/
-├── src/
-│   ├── index.ts                    # Server entrypoint + transport setup
-│   ├── config.ts                   # Env var validation (Zod)
-│   ├── client/
-│   │   ├── harness-client.ts       # Core HTTP client (auth, base URL, retry)
-│   │   ├── types.ts                # Shared Harness API response types
-│   │   └── pagination.ts           # Generic paginator for list endpoints
-│   ├── tools/
-│   │   ├── index.ts                # Tool registry (auto-discovers all tools)
-│   │   ├── pipelines.ts            # Pipeline CRUD + execution tools
-│   │   ├── executions.ts           # Execution history, logs, status
-│   │   ├── connectors.ts           # Connector management
-│   │   ├── services.ts             # Service entity tools
-│   │   ├── environments.ts         # Environment entity tools
-│   │   ├── projects.ts             # Project + Org tools
-│   │   ├── secrets.ts              # Secret management (read-only metadata)
-│   │   ├── triggers.ts             # Pipeline trigger management
-│   │   ├── delegates.ts            # Delegate health + status
-│   │   ├── feature-flags.ts        # FF toggles and status
-│   │   └── logs.ts                 # Execution log retrieval
-│   ├── resources/
-│   │   ├── index.ts                # Resource registry
-│   │   ├── pipeline-yaml.ts        # Pipeline YAML as resource
+### Database DevOps (DbOps)
+- Manage database schemas and instances with create/update/delete support
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [harness/mcp-server](https://github.com/harness/mcp-server) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
