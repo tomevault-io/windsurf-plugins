@@ -7,6 +7,17 @@ description: This file provides guidance to Claude Code (claude.ai/code) when wo
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## View architecture (RView → Element split, completed)
+
+The RView → Element/NativeElement refactoring has **landed**; the codebase builds. `RView` no
+longer exists. See [MIGRATION.md](MIGRATION.md) for the rationale and historical migration notes.
+
+**The model in effect:**
+- `Element` (interface) + `NativeElement` (platform implementation) replace the old `RView`
+- `ElementContext` replaces `RContext`
+- `ElementWriter` replaces `ViewWriter` and enforces modifier ordering at compile time
+- Modifier order enforced by the type system: `alignment → weight → shownWhen → sizing → theme → scrolling → element`
+
 ## Project Overview
 
 KiteUI is a Kotlin Multiplatform UI framework inspired by Solid.js that uses native view components on each platform (Android, iOS, JVM, JS/Web). It emphasizes small binary sizes, fine-grained reactivity, semantic theming, and URL-based navigation for web compatibility.
@@ -51,7 +62,7 @@ This is a multi-module Gradle project:
 
 ### Testing
 
-See **[docs/RUNNING_TESTS.md](docs/RUNNING_TESTS.md)** for the full guide including prerequisites, gotchas, and how to write tests.
+See **[docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md)** for the full guide including prerequisites, gotchas, and how to write tests.
 
 ```bash
 # Fastest — no external tools needed
@@ -109,7 +120,7 @@ Pages implement the `Page` interface and are annotated with `@Routable`:
 ```kotlin
 @Routable("your/path")
 object YourPage : Page {
-    override fun ViewWriter.render(): Unit = run {
+    override fun ElementWriter.CanAddTheme.render(): Unit = run {
         // UI code
     }
 }
@@ -119,13 +130,13 @@ For pages with parameters:
 ```kotlin
 @Routable("items/{id}")
 class ItemDetailPage(val id: String) : Page {
-    override fun ViewWriter.render(): Unit = run {
+    override fun ElementWriter.CanAddTheme.render(): Unit = run {
         // Access id parameter
     }
 }
 ```
 
-Navigate using `pageNavigator.navigate(SomePage)` or use `link` components.
+Navigate using `context.pageNavigator.navigate(SomePage)` or use `link` components.
 
 ### ViewWriter and Component Creation
 
@@ -168,37 +179,9 @@ val email = Property("")
 textInput { content bind email }
 ```
 
-**Reactive functions** - Auto-update when dependencies change:
-```kotlin
-text {
-    ::content { "Email: ${email()}" }
-}
-```
-
-**shared** - Cached computed value:
-```kotlin
-val fullName = shared { "${firstName()} ${lastName()}" }
-```
-
-**LazyProperty** - Computed value that can be overridden:
-```kotlin
-val calculated = LazyProperty { base() * multiplier() }
-calculated.value = 100.0  // Override
-calculated.reset()        // Back to calculation
-```
-
-**LateInitProperty** - For values not available at declaration:
-```kotlin
-val userData = LateInitProperty<UserData>()
-// Components show loading until value is set
-userData.value = fetchedData
-```
-
-### Theming
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lightningkite/kiteui](https://github.com/lightningkite/kiteui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
