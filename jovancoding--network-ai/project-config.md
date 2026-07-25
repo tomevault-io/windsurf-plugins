@@ -1,96 +1,77 @@
 ---
 trigger: always_on
-description: Shared coordination state written by scripts/blackboard.py (project root). Contains task results, grant tokens, status flags, and TTL-scoped cache entries. Access should be restricted to the local user running the swarm.
+description: This file is read automatically by Gemini CLI when working in this repository
 ---
 
+# GEMINI.md — Project Instructions for Gemini CLI
 
-# Swarm Orchestrator Skill
+This file is read automatically by Gemini CLI when working in this repository
+(and when the Network-AI extension is installed).
 
-> **Scope:** The bundled Python scripts (`scripts/*.py`) make **no network calls**, use only the Python standard library, and have **zero third-party dependencies**. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`).
+## What Network-AI Is
 
-> **Advisory tokens notice:** Grant tokens issued by `check_permission.py` are **advisory scoring outputs only** — the caller-supplied `--agent` identity is not cryptographically verified. Downstream systems must not treat these tokens as authenticated credentials without adding a separate identity-verification step or human approval gate, especially for PAYMENTS, DATABASE, and FILE_EXPORT resources.
+Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state,
+guardrails, budgets, and cross-framework coordination. When installed as a
+Gemini CLI extension, the Network-AI MCP server loads automatically and exposes
+coordination tools (`blackboard_read`, `blackboard_write`, `budget_status`,
+`token_create`, `audit_query`, and more) directly inside Gemini CLI.
 
-> **Data-flow notice (host platform — not this skill):** This skill does NOT implement, invoke, or control `sessions_send` or any inter-agent messaging. All bundled Python scripts are local-only tools (budget guard, blackboard, permission scorer, context manager). If your platform has a `sessions_send` built-in, whether and how it is used is entirely the **host platform’s** responsibility and is outside this skill’s scope. If you need to prevent external network calls, disable or reroute delegation in your **platform settings** before installing this skill.
+## Using the MCP Tools
 
-> **Context file integrity:** The `context_manager.py inject` command now validates `data/project-context.json` for injection patterns and oversized fields before printing the context block. Review any warnings printed to stderr before passing the output to an agent system prompt.
+- **Blackboard** — shared state between agents. Always write through
+  `blackboard_write` with your `agent_id`; never assume exclusive access.
+  Reads via `blackboard_read` / `blackboard_list`.
+- **Budgets** — `budget_status` before spending, `budget_spend` to record
+  token usage. Respect the federated ceiling.
+- **Permissions** — `token_create` issues an HMAC/Ed25519-signed grant for a
+  resource; `token_validate` checks one. Request permission before sensitive
+  resource access.
+- **Audit** — every write, grant, and state transition is logged. Query with
+  `audit_query`.
 
-> **PII / sensitive-data warning:** The `justification` field in permission requests and the audit log (`data/audit_log.jsonl`) store free-text strings provided by agents. **Do not include PII, secrets, or credentials in justification text.** Consider restricting file permissions on `data/` or running this skill in an isolated workspace.
-
-## Setup
-
-**No pip install required.** All 6 scripts use Python standard library only — zero third-party packages.
-
-> **Note on `requirements.txt`:** The file exists for documentation purposes only — it lists the stdlib modules used and has **no required packages**. All listed deps are commented out as optional. You do not need to run `pip install -r requirements.txt`.
+## Build & Test Commands (when working on this repo)
 
 ```bash
-# Prerequisite: python3 (any version ≥ 3.8)
-python3 --version
-
-# That's it. Run any script directly:
-python3 scripts/blackboard.py list
-python3 scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
-
-# Optional: for cross-platform file locking on Windows production hosts
-pip install filelock  # only needed if you see locking issues on Windows
+npm install                   # Install dependencies
+npx tsc --noEmit              # Type-check (zero errors expected)
+npm run test:all              # Run the full test suite
+npm test                      # Core orchestrator tests only
+npm run test:adapters         # All framework adapter tests
 ```
 
-The `data/` directory is created automatically on first run. No configuration files, environment variables, or credentials are required.
+All tests must pass before any commit. No test should be skipped or marked `.only`.
 
-> **Multi-environment support (v5.4.0):** All five Python scripts now read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state.
->
-> ```bash
-> # Run against the dev environment
-> NETWORK_AI_ENV=dev python3 scripts/blackboard.py list
-> python3 scripts/check_permission.py --active-grants --env dev
-> ```
+## Project Structure
 
-Multi-agent coordination system for complex workflows requiring task delegation, parallel execution, and permission-controlled access to sensitive APIs.
+- `index.ts` — Core engine: SwarmOrchestrator, AuthGuardian, FederatedBudget, QualityGateAgent
+- `security.ts` — SecureTokenManager, InputSanitizer, RateLimiter, DataEncryptor, SecureAuditLogger
+- `lib/locked-blackboard.ts` — LockedBlackboard with atomic propose → validate → commit
+- `lib/auth-guardian.ts` — Weighted permission scoring (justification 40%, trust 30%, risk 30%)
+- `lib/a2a-server.ts` — A2AServer: expose the orchestrator as a Google A2A agent (agent card + tasks)
+- `adapters/` — 32 framework adapters, including `GeminiAdapter` (Gemini Developer API)
+  and `VertexAIAdapter` (Vertex AI / Gemini on GCP)
+- `bin/mcp-server.ts` — the MCP server this extension launches (stdio transport)
 
-## 🎯 Orchestrator System Instructions
+## Gemini-Specific Integration Points
 
-**You are the Orchestrator Agent** responsible for decomposing complex tasks, delegating to specialized agents, and synthesizing results. Follow this protocol:
+- **`GeminiAdapter`** (`adapters/gemini-adapter.ts`) — BYOC adapter for the
+  Gemini Developer API (`generativelanguage.googleapis.com`). Supports a
+  supplied `@google/genai`-compatible client or a built-in fetch path with
+  `GEMINI_API_KEY`.
+- **`VertexAIAdapter`** (`adapters/vertex-ai-adapter.ts`) — enterprise path via
+  Google Cloud Vertex AI (function calling, multi-modal).
+- **A2A protocol** — Network-AI speaks Google's Agent2Agent protocol in both
+  directions: `A2AAdapter` calls remote A2A agents; `A2AServer` exposes this
+  orchestrator as an A2A agent at `/.well-known/agent.json`.
 
-### Core Responsibilities
+## Code Conventions
 
-1. **DECOMPOSE** complex prompts into 3 specialized sub-tasks
-2. **DELEGATE** using the budget-aware handoff protocol
-3. **VERIFY** results on the blackboard before committing
-4. **SYNTHESIZE** final output only after all validations pass
-
-### Task Decomposition Protocol
-
-When you receive a complex request, decompose it into exactly **3 sub-tasks**:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     COMPLEX USER REQUEST                        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│  SUB-TASK 1   │   │  SUB-TASK 2   │   │  SUB-TASK 3   │
-│ data_analyst  │   │ risk_assessor │   │strategy_advisor│
-│    (DATA)     │   │   (VERIFY)    │   │  (RECOMMEND)  │
-└───────────────┘   └───────────────┘   └───────────────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                              ▼
-                    ┌───────────────┐
-                    │  SYNTHESIZE   │
-                    │ orchestrator  │
-                    └───────────────┘
-```
-
-**Decomposition Template:**
-```
-TASK DECOMPOSITION for: "{user_request}"
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- TypeScript strict mode, target ES2022; no `any` types
+- JSDoc on all exported functions and classes
+- No new runtime dependencies without explicit approval
+- Adapters are self-contained (BYOC — bring your own client); no cross-adapter imports
+- All coordination goes through the blackboard — never write shared state directly
 
 ---
 > Source: [Jovancoding/Network-AI](https://github.com/Jovancoding/Network-AI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
