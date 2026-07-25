@@ -1,65 +1,181 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This is an Android application that enables remote control of Android devices via Telegram Bot API. The app is written in Kotlin and uses modern Android development practices.
 ---
 
-# CLAUDE.md
+# GitHub Copilot Instructions for Telegram Remote Control
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Overview
 
-## Project
+This is an Android application that enables remote control of Android devices via Telegram Bot API. The app is written in Kotlin and uses modern Android development practices.
 
-Android app (Kotlin) that exposes the device to a Telegram bot for remote control: SMS relay, USSD, mobile data / Wi-Fi / tethering toggles, dual-SIM switching, beacon presence detection, call log, etc. Most privileged operations go through Shizuku rather than root. Min SDK 29, target/compile SDK 36.
+**Key Technologies:**
+- Language: Kotlin 2.3.0
+- Min SDK: Android 10 (API 29)
+- Target SDK: Android 14+ (API 36)
+- Architecture: Service-based with MMKV for persistent storage
+- Primary Libraries: OkHttp, Gson, Shizuku, Room Database, MMKV
 
-## Build commands
+## Coding Standards and Conventions
 
-The Gradle Kotlin toolchain is JVM 21 (`jvmToolchain(21)` in [app/build.gradle](app/build.gradle)) — BUILD.md still says JDK 17, but JDK 21 is what the build expects.
+### General Guidelines
 
-```bash
-./gradlew assembleDebug              # debug APK -> app/build/outputs/apk/debug/
-./gradlew assembleRelease            # release APK (requires signing env vars)
-./gradlew clean
-./gradlew :app:lint                  # Android lint
-git submodule update --init --recursive   # required after fresh clone
+1. **Language**: All code must be written in Kotlin
+2. **Null Safety**: Leverage Kotlin's null safety features; use `?` and `!!` appropriately
+3. **Code Style**: Follow Android Kotlin Style Guide
+4. **Naming Conventions**:
+   - Classes: PascalCase (e.g., `ChatService`, `MainActivity`)
+   - Functions: camelCase (e.g., `sendMessage`, `getNetworkType`)
+   - Constants: SCREAMING_SNAKE_CASE (e.g., `TAG`, `CHAT_INFO_MMKV_ID`)
+   - Private variables: start with lowercase (e.g., `preferences`, `botToken`)
+
+### Android-Specific Patterns
+
+1. **Context Usage**:
+   - Use `applicationContext` for long-lived operations
+   - Use activity context only when necessary for UI operations
+   - Always pass context as parameter instead of storing static references
+
+2. **Permission Handling**:
+   - Always check permissions before using protected APIs
+   - Use `ActivityCompat.checkSelfPermission()` pattern
+   - Log permission denials with appropriate messages
+
+3. **Background Work**:
+   - Use Services for long-running operations
+   - Implement JobScheduler/WorkManager for scheduled tasks
+   - Always acquire WakeLock and WifiLock when needed
+   - Release locks in `onDestroy()`
+
+4. **Threading**:
+   - Network calls must be on background threads
+   - UI updates must use `runOnUiThread { }`
+   - Use Kotlin Coroutines when appropriate
+
+### Project-Specific Patterns
+
+#### 1. Telegram API Communication
+
+```kotlin
+// Always use this pattern for Telegram API calls
+val requestUri = getUrl(botToken, "sendMessage")
+val requestBody = RequestMessage().apply {
+    chatId = chatID
+    messageThreadId = threadID
+    text = messageText
+    parseMode = "HTML"
+}
+val body = Gson().toJson(requestBody).toRequestBody(Const.JSON)
+val request = Request.Builder().url(requestUri).method("POST", body).build()
 ```
 
-There is no test source set (`app/src/` only has `main`); do not invent test commands.
+#### 2. MMKV Storage Access
 
-Release signing reads from env vars or `-P` properties: `KEYSTORE_PASS`, `ALIAS_NAME`, `ALIAS_PASS`, with keystore expected at `app/keys.jks`. Version is also env-driven: `VERSION_CODE`, `VERSION_NAME`. Release builds are restricted to `arm64-v8a` via `abiFilters`.
+```kotlin
+// Use named MMKV instances for different data types
+val preferences = MMKV.mmkvWithID(Const.SETTINGS_MMKV_ID)
+val chatInfo = MMKV.mmkvWithID(Const.CHAT_INFO_MMKV_ID)
+val statusMMKV = MMKV.mmkvWithID(Const.STATUS_MMKV_ID)
+```
 
-The `luch` (beacon) dependency is fetched from a private GitHub Packages repo (see [build.gradle](build.gradle)) — needs `USERNAME` / `GITHUB_ACCESS_KEY` env vars (or `gpr.user` / `gpr.key` properties) for fresh dependency resolution. There are also two git submodules under `app/src/main/java/com/github/sumimakito/` (AwesomeQrRenderer, CodeauxLibPortable) — code expects them present.
+#### 3. Shizuku Integration
 
-## Architecture
+```kotlin
+// Always check Shizuku availability
+if (Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+    // Use Shizuku APIs
+}
+```
 
-Everything lives in one module under `com.qwe7002.telegram_rc`. There is no MVVM / DI framework — it is service-driven imperative Kotlin with global state in MMKV.
+#### 4. Logging
 
-### Runtime entry points (services and receivers)
+```kotlin
+// Use consistent logging pattern
+Log.d(Const.TAG, "Description: $variable")
+Log.e(Const.TAG, "Error description: ", exception)
+Log.i(Const.TAG, "Info message")
+Log.w(Const.TAG, "Warning message")
+```
 
-- **[ChatService](app/src/main/java/com/qwe7002/telegram_rc/ChatService.kt)** — the heart of the app. Long-poll loop against Telegram `getUpdates`, dispatches commands in a giant `when (command)` switch, and is also invoked by other components to push outbound messages. New bot commands are added here.
-- **BeaconReceiverService** — foreground service (`location` type) that scans BLE beacons and reports presence/absence. Beacon definitions live under [beacon/](app/src/main/java/com/qwe7002/telegram_rc/beacon/) and persisted models in [data_structure/BeaconModel.kt](app/src/main/java/com/qwe7002/telegram_rc/data_structure/BeaconModel.kt).
-- **BatteryService** + **BatteryNetworkJob** — periodic battery / network state push.
-- **NotifyListenerService** — `NotificationListenerService` for forwarding selected app notifications.
-- **SMSReceiver / CallReceiver / BootReceiver / SMSSendResultReceiver** — broadcast receivers that funnel events into ChatService / outbound Telegram requests.
-- **KeepAliveJob / ReSendJob / CcSendJob** — `JobService` schedulers for keep-alive, retry queue, and CC-SMS forwarding.
+#### 5. Message Formatting
 
-Activities (MainActivity, BeaconActivity, CcActivity, SpamActivity, ExtraSwitchActivity, NotifyActivity, QRCodeActivity, ScannerActivity, LogcatActivity, YellowPageSyncActivity) are mostly settings UIs that read/write MMKV; they do not own runtime behavior.
+```kotlin
+// System messages always use this header
+requestBody.text = "${getString(R.string.system_message_head)}\n$actualMessage"
 
-### Cross-cutting layers
+// Use HTML formatting for Telegram
+parseMode = "HTML"
+// Use <code>, <b>, <i> tags as needed
+```
 
-- **`static_class/`** — stateless `object` utilities grouped by domain (Network, Phone, SMS, USSD, Battery, Hotspot, Notify, Other, ServiceManage, DataUsage, ArfcnConverter, MdnsResponder, BeaconDataRepository). Treat these as the canonical helpers; service code calls into them rather than reimplementing logic.
-- **`shizuku_kit/`** — wrappers around system services accessed via Shizuku (`Telephony`, `ISub`, `IPhoneSubInfo`, `SVC` for connectivity toggles, `TetheringManagerShizuku`, `VPNHotspot`, `ShizukuKit`). All privileged telephony / connectivity calls go through here. Always gate with `Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PERMISSION_GRANTED`.
-- **`data_structure/telegram/`** — `RequestMessage`, `PollingJson` Gson payloads. Other data classes (SMSRequestInfo, BeaconModel, GitHubRelease, ScannerJson, OutputMetadata, LogAdapter, CcSendService) sit directly in `data_structure/`.
-- **`MMKV/`** — `MMKVKey.kt` defines the named MMKV instance IDs (chat_info, beacon, status, proxy, resend, upgrade, IMSI, data_plan, update). Use these IDs verbatim — they are the persistent contract between services and activities. `Const.SETTINGS_MMKV_ID` is the default unnamed instance.
-- **`database/yellowpage/`** — Room database (`com.qwe7002.telegram_rc.Room.YellowPage`, version 1) with `Organization` + `PhoneNumber` entities for the contact/yellow-page feature; accessed via `AppDatabase.getDatabase(context)`.
-- **`value/`** — `Const.kt` (`JSON_TYPE`, `SYSTEM_CONFIG_VERSION`, `RESULT_CONFIG_JSON`) and `LogTags.kt` (`TAG = "Telegram-RC"`).
+#### 6. Error Handling
 
-### Networking
+```kotlin
+// Always provide user-friendly error messages
+try {
+    // operation
+} catch (e: Exception) {
+    Log.e(Const.TAG, "operation_name: ", e)
+    runOnUiThread {
+        showErrorDialog("User-friendly error: ${e.message}")
+    }
+}
+```
 
-OkHttp is used everywhere. `Network.getOkhttpObj` builds the client (with optional DNS-over-HTTPS via `cloudflare-dns.com` and proxy/auth from the `proxy` MMKV instance). `Network.getUrl(token, method)` constructs Telegram Bot API URLs. Outbound messages are `Gson().toJson(RequestMessage).toRequestBody(JSON_TYPE)`.
+## File Structure Guidelines
 
+### Activity Classes
+- Implement proper lifecycle methods
+- Clean up resources in `onDestroy()`
+- Use `lateinit var` for views that are initialized in `onCreate()`
+- Request permissions appropriately
+
+### Service Classes
+- Always call `startForeground()` for foreground services
+- Specify service type for Android 14+ (`FOREGROUND_SERVICE_TYPE_*`)
+- Implement `onStartCommand()` to return `START_STICKY` for persistent services
+- Release all locks and resources in `onDestroy()`
+
+### Static Utility Classes
+- Place in `static_class` package
+- Use `object` for singletons
+- Make functions self-contained with all dependencies passed as parameters
+
+### Data Classes
+- Place in `data_structure` package
+- Use `@SerializedName` for Gson serialization
+- Keep data classes simple (no business logic)
+
+## API Integration Guidelines
+
+### Telegram Bot API
+
+1. **Message Sending**:
+   - Always include error handling
+   - Check response codes
+   - Parse error descriptions from response JSON
+   - Log all API calls
+
+2. **Keyboard Markup**:
+   - Use `ReplyMarkupKeyboard.getReplyKeyboardMarkup()` for persistent keyboards
+   - Use `ReplyMarkupKeyboard.getRemoveKeyboardMarkup()` to remove keyboards
+   - Use inline keyboards for temporary actions
+
+3. **Message Threading**:
+   - Support `message_thread_id` for topic-based groups
+   - Always validate topic ID matches configured value
+
+### Shizuku API
+
+1. **Telephony Operations**:
+   - Use `ITelephony` interface via Shizuku
+   - Handle dual-SIM scenarios
+   - Check subscription validity
+
+2. **Network Operations**:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [telegram-sms/telegram-rc](https://github.com/telegram-sms/telegram-rc) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
