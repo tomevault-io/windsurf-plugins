@@ -1,103 +1,71 @@
 ---
 trigger: always_on
-description: Best Practices for writing code:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-<general_rules>
-Best Practices for writing code:
-* DRY and SOLID Principles: Keep the code modular, maintainable, and efficient.
-* Readability and Maintainability: Keep the code concise and readable, add comments to explain complex logic.
-* Declarative and Functional: Prefer declarative configurations, functional paradigms, and immutability to ensure predictable behavior.
-* Error Handling and Security: Ensure the code is secure with proper error handling mechanisms.
-</general_rules>
+# CLAUDE.md
 
-<working_with_llms>
-When calling Large Language Models (LLMs), you should use the package `appl` to build the application (The name on `pypi` is `applang`, so it should be installed with `pip install -U applang`).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-When working with LLMs, you should have clear format instructions to guide the LLMs to generate the desired output, and have appropriate parser to parse the output into the desired format. The format should be designed clear and easy to parse, consider using format like markdown's code block.
+## Project Overview
 
-You should add `stream=True` for tasks that require LLMs to generate a large amount of text.
-</working_with_llms>
+KV-Cache Optimization framework for Vision Language Models (VLMs), specifically Qwen3-VL-8B-Instruct. The project reduces memory consumption during inference by selectively recomputing KV cache entries instead of storing all of them.
 
-<explain_appl>
-APPL is a package that integrates prompts of LLMs into the code.
-- `@ppl` is a decorator that marks a function as a prompt function, the function cannot be a coroutine (async function).
-- Grow your prompt by calling `grow()`, a implicit newline is added between each component. When being asked to be implicit, you can remove the `grow()` function and leave the content inside `grow` as it is, APPL will automatically add the `grow()` function for you during runtime.
-- The docstring of the `@ppl` function will not be counted as a part of the prompt by default. If that part is meant to be the system prompt, you can specified that using `@ppl(docstring_as="system")`.
-- The `gen` function is a wrapper around `litellm.completion`, it returns a future object, it will automatically takes the prompt captured so far as the prompt for the LLM. See the example below for more details. Note that you do not need to wrap `gen` in AIRole() scope to call it for generation.
-- You can use `with role:` to specify the role of the message, for example `with AIRole():` to specify the prompt growed in the scope as the assistant message. The default scope is `user`.
-- To get the result of `gen` immediately, use `str()` to convert it to a string. Otherwise, it is a `Generation` object where you can take the `result` attribute to get the result.
-- Try to delay the time you get the result of `gen` as much as possible, so that the code can be more parallelized. See the example below for more details.
-- When writing multi-line prompt, it is recommended to `grow` the prompt multiple times to utilize the implicit compositor that adds a newline between each component. This way provides a better control over the prompt where you can easily comment out parts of the prompt. But you can also use multi-line string with indentation aligning with the code (it will be dedented similar to docstring before being used in the code).
+## Commands
 
-<example>
+```bash
+# Primary entry point: inference with KV cache recomputation
+python scripts/inference_with_recompute_kv.py --config configs/blink_counting.yaml
 
-```python
-from appl import AIRole, gen, grow, ppl
-from appl.const import NEWLINE
+# Baseline inference (no KV optimization)
+python scripts/run_blink.py --config configs/blink_counting.yaml
 
-
-@ppl(ctx="copy")  # copy the context (prompt) from caller, so that the prompt in different runs are independent
-def get_answer(question: str):
-    grow(question)  # grow the prompt by appending the question
-    # do not need with AIRole() scope here, `gen` is not bind to any role
-    return gen()  # run llm generation with the current prompt, return as a future object
-
-
-@ppl  # marks APPL function
-def answer_questions(quotation: str, questions: list[str]):
-    grow("Extract the name of the author from the quotation below and answer questions.")
-    grow(quotation)  # append to the prompt
-    with AIRole():  # the prompt inside this scope will be used as the assistant message
-        grow("The name of the author is") # specify the prefix
-        response = gen(stop='.') # each stop sequence must contain non-whitespace, could not be '\n' only.
-        grow(response)  # append the response to the prompt
-    return [get_answer(q) for q in questions]  # parallelize calls, result contains a list of futures
-
-
-quotation = '"Simplicity is the ultimate sophistication." -- Leonardo da Vinci'
-questions = [
-    "In what era did the author live?",
-    "What is the most famous painting of the author?",
-]
-for ans in answer_questions(quotation, questions):
-    print(ans) # print the result of the future
+# Simple demo with model patches
+python scripts/qwen3_vlm_inference.py
 ```
 
-The prompt and output for the three `gen` calls will looks like:
+For quick validation, set `num_samples: 5` in the config file.
 
-Prompt:
-```yaml
-- User:
-    Extract the name of the author from the quotation below and answer questions.
-    "Simplicity is the ultimate sophistication." -- Leonardo da Vinci
-- Assistant:
-    The name of the author is 
-```
-Output: Leonardo da Vinci.
+## Architecture
 
-Prompt:
-```yaml
-- User:
-    Extract the name of the author from the quotation below and answer questions.
-    "Simplicity is the ultimate sophistication." -- Leonardo da Vinci
-- Assistant:
-    The name of the author is Leonardo da Vinci.
-- User:
-    In what era did the author live?
-```
-Output: Renaissance era.
+### KV Cache Pipeline (`models/qwen/kv_cache/`)
 
-Prompt:
-```yaml
-- User:
-    Extract the name of the author from the quotation below and answer questions.
-    "Simplicity is the ultimate sophistication." -- Leonardo da Vinci
-- Assistant:
-    The name of the author is Leonardo da Vinci.
+Five-stage optimization pipeline:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. **VLMKVCacheExtractor** (`extractor.py`): Extracts KV cache during prefill, handles mixed image+text inputs, supports chunked prefill with `chunk_k` parameter
+2. **ImportanceScorer** (`importance_scorer.py`): Computes per-position importance scores using `norm`, `entropy`, or `mass` methods
+3. **KVCacheRecomputer** (`recomputer.py`): Selectively recomputes KV at high-importance positions, handles MRoPE and GQA
+4. **KVCacheInference** (`inference.py`): Runs generation with pre-filled + recomputed KV cache
+5. **Image Chunking** (`chunker.py`, `chunk_prefiller.py`): Splits image tokens into k×k chunks for parallel prefill
+
+### Model Patches (`models/qwen/patches/`)
+
+Runtime hooks using context manager protocol to intercept model internals:
+- `VisualPatch`: Captures visual encoder outputs
+- `TextPatch`: Captures language model outputs
+- `AttentionPatch`: Extracts attention weights
+
+### Benchmarks (`benchmarks/`)
+
+BLINK benchmark with 14 visual reasoning tasks (Art Style, Counting, Forensic Detection, etc.).
+
+## Configuration
+
+Edit `configs/blink_counting.yaml`:
+- `model`: HuggingFace model path
+- `cache_dir`: Local HF cache directory
+- `dataset`: BLINK task name (e.g., `blink_artstyle`, `blink_counting`)
+- `recompute_ratio`: Fraction of tokens to recompute (default 0.15)
+- `method`: Scoring method (`norm`, `entropy`, `mass`)
+- `chunk_k`: Image chunk size for parallel prefill
+
+## Coding Conventions
+
+- 4-space indentation, snake_case for functions/variables
+- Lowercase module names, config keys with underscores
+- Commit tags: `[FEAT]`, `[FIX]`, `[INIT]`
+- No formatter configured; match existing style
 
 ---
 > Source: [tsinghua-fib-lab/AutoSOTA](https://github.com/tsinghua-fib-lab/AutoSOTA) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
