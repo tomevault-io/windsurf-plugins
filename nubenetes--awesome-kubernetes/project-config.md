@@ -1,37 +1,102 @@
 ---
 trigger: always_on
-description: This file contains the accumulated instructions and long-term vision for the autonomous maintenance of Nubenetes.com. AI agents must consult this document in every iteration to ensure learning continuity.
+description: This repository uses **Gitflow**. All agents MUST follow this branching model:
 ---
 
-# Nubenetes Intelligent Curation: Meta-Instructions & Learning Roadmap
+# CLAUDE.md — Nubenetes Project Instructions for Claude Code
 
-This file contains the accumulated instructions and long-term vision for the autonomous maintenance of Nubenetes.com. AI agents must consult this document in every iteration to ensure learning continuity.
+## Git Workflow: Gitflow
 
-## 🧠 Core Mandates
+This repository uses **Gitflow**. All agents MUST follow this branching model:
 
-1.  **Information Preservation**: NEVER delete summaries, comments, or stars (🌟) accompanying links. The bot should only update the URL or reorganize the item's position, never delete the descriptive context.
-2.  **Persistent Learning**: Use `src/memory/health_learning.json` to store knowledge about domains (anti-bot blocks, successful strategies) and navigation patterns.
-3.  **Minimum Viable Quality (MVQ)**: For GitHub/GitLab repositories, the bot MUST check the last commit date. If the repository has had NO activity (commits) in more than **4 years**, it must receive a significantly lower `impact_score` and be deprioritized, even if the content remains technically relevant. This ensures Nubenetes stays fresh and focuses on maintained projects.
-4.  **Style Guide (High-Density Summaries)**: All injected summaries MUST follow a **High-Density Descriptive** style. Avoid generic "clickbait". Instead, apply the **Double-Evidence Synthesis Protocol**: contrast 'Curator Insight' with 'Live Grounding' (MCP) to provide a neutral, professional description of architectural value, key features, and technical significance. Summaries should be 2-5 sentences long and support multi-line Markdown formatting (bullet points).
-5.  **Semantic Interlinking**: The bot should identify related categories for each resource. While the full entry is injected into the primary category, a short reference (*"See also: [Title](URL) in [Category]"*) should be added to up to two related categories to improve site navigation.
-6.  **Visual Health Dashboard**: Every curation run MUST generate a local `report.html` (outside the repo) for visual validation of metrics, quality (MVQ), and AI decisions.
-7.  **Total Resilience**: The workflow must be able to continue even if there are individual errors in link or file validations. Prioritize generating a result (PR) even if it is partial.
-8.  **Repository Consolidation & Deep-Link Preservation**: In case of a failure (404) in a deep GitHub/GitLab link, the bot SHOULD try to validate the repository root before considering it dead. However, if a deep link (wiki, PR, tree) is ALIVE, it MUST be preserved. We prefer specific technical context in V1.
-9.  **URL Expansion**: All shortened links (t.co, bit.ly, buff.ly, etc.) MUST be expanded to their original long version before being evaluated or injected. This ensures inventory homogeneity and improves global deduplication precision.
-10. **Linguistic Diversity & Global Access**:
-    - **Primary Language**: English is the official language of the Nubenetes ecosystem.
-    - **Native Preservation (V1 Archive)**: For non-English resources (e.g., Spanish repositories, videos, or articles), the V1 description MUST remain in the **resource's native language** to preserve its original context and cater to native speakers.
-    - **Global Synthesis (V2 Portal)**: To ensure 100% global discoverability, the V2 Elite summaries (`ai_summary`) MUST always be in **Professional English**, regardless of the source language.
-    - **V1 Immutability**: For links already present in the V1 archive, AI agents MUST NOT overwrite manually curated titles, stars, or additional descriptive comments. Only broken URLs or missing metadata fields (like year/language) should be updated.
-    - **Rich Metadata Enrichment**: AI agents SHOULD attempt to extract technical authors, video durations (YouTube), and reading times (Blogs) to populate high-density dimensions in the V2 portal.
-    - **Safety Guard Validation**: Every automated PR MUST undergo syntax validation and a test MkDocs build to prevent broken rendering or security vulnerabilities in the final site.
-    - **Explicit Language Tagging**: All non-English resources in the V2 Portal MUST be explicitly tagged (e.g., `[SPANISH CONTENT]`, `[FRENCH CONTENT]`) at the end of the entry to inform global users before they navigate.
-    - **English-First Exceptions**: Global software projects (even if created by Spanish speakers) that use English as their primary interface should be curated entirely in English. Native preservation is for localized content like blogs, videos, and guides.
-11. **Workflow-Config Synchronization**: The GitHub Actions curation workflow form (`agentic_cron.yml`) MUST remain perfectly synchronized with the curation sources configuration file (`data/curation_sources.yaml`). Any addition, removal, or renaming of topics/categories in the configuration file requires a corresponding update to the workflow's input fields (checkboxes) to ensure users can toggle those sources manually. This maintains consistency between data-driven sources and the UI trigger.
-12. **V2 Elite Maintenance**: The Nubenetes V2 (Agentic Elite) edition is a derived view of the V1 archive. It is managed via the `src/v2_optimizer.py` script and stored in the `v2-docs/` directory.
+### Branches
+- **`master`** — Production. Only receives merges from release branches. Every merge to master gets a **tag** and a **GitHub Release**.
+- **`develop`** — Integration branch. All feature branches merge here first.
+- **`feat/*`** — Feature branches. Created from `develop`, merged back to `develop` via PR.
+- **`release/vX.Y.Z`** — Release branches. Created from `develop` when ready to release, merged to both `master` AND back to `develop`.
+- **`gh-pages`** — Deployment. Never touch directly.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Release Process (mandatory for all releases)
+1. Create feature branch from `develop`: `git checkout -b feat/description develop`
+2. Implement changes, commit, push feature branch
+3. Create PR: `gh pr create --base develop --head feat/description`
+4. Merge PR to develop: `gh pr merge N --merge`
+5. Create release branch: `git checkout -b release/vX.Y.Z develop`
+6. Merge release to master: `git checkout master && git merge release/vX.Y.Z --no-ff`
+7. Tag: `git tag -a vX.Y.Z -m "description"`
+8. Push master + tag: `git push origin master && git push origin vX.Y.Z`
+9. Back-merge master to develop: `git checkout develop && git merge master --no-ff && git push origin develop`
+10. Create GitHub Release: `gh release create vX.Y.Z --title "..." --notes "..."`
+
+### Versioning
+- Current: `v2.9.2`
+- Format: `v{major}.{minor}.{patch}`
+- Major: breaking changes or architectural shifts
+- Minor: new features (like the digest engine, new modules)
+- Patch: bug fixes, config tweaks
+
+### Protected Branches
+`master`, `develop`, and `gh-pages` are NEVER deleted. Branch cleanup runs bi-monthly for merged feature branches.
+
+## Repository Structure
+
+### Key Directories
+- `docs/` — V1 source (exhaustive archive, source of truth)
+- `v2-docs/` — V2 source (AI-curated elite portal, derived from V1)
+- `src/` — Python pipeline source code
+- `data/` — Inventory (YAML + SQL), config files, digest JSON
+- `scripts/` — Utility scripts (backfill, etc.)
+- `.github/workflows/` — CI/CD (15 workflows)
+
+### Key Config Files
+- `v2-mkdocs.yml` — V2 MkDocs Material configuration
+- `mkdocs.yml` — V1 MkDocs configuration
+- `data/inventory.yaml` / `data/inventory.sql` — Unified inventory (18K+ entries)
+- `data/curation_sources.yaml` — RSS feeds and X/Twitter accounts
+- `data/link_rules.yaml` — Curation policies
+- `GEMINI.md` — AI mandates and learning roadmap (read by Gemini agents)
+
+### Pipeline Modules
+- `src/v2_optimizer.py` — Main rendering engine (V2VisionEngine class)
+- `src/news_digest.py` — 26-category temporal digest with Gemini ranking
+- `src/enrichment.py` — CNCF Landscape + GitHub activity + license detection
+- `src/dedup.py` — URL/hash/title deduplication engine
+- `src/agentic_curator.py` — Ingestion pipeline with AI evaluation
+- `src/autonomous_discovery.py` — GitHub trending discovery (14 queries)
+- `src/gemini_utils.py` — Gemini API wrapper with key rotation
+- `src/inventory_manager.py` — Dual YAML+SQL inventory management
+
+## Build and Run
+
+### Local testing (no API keys needed)
+```bash
+pip install -r requirements.txt
+mkdocs serve -f v2-mkdocs.yml          # Preview V2 portal
+mkdocs serve -f mkdocs.yml             # Preview V1 portal
+```
+
+### Pipeline commands
+```bash
+python3 -m scripts.backfill_discovered_at   # Backfill discovered_at field
+python3 -m src.news_digest                   # Generate digest (needs Gemini API key)
+python3 -m src.enrichment                    # CNCF + GitHub enrichment (needs GH_TOKEN)
+python3 -m src.dedup                         # Dedup scan (dry-run by default)
+python3 -m src.v2_optimizer --render-only    # Render V2 portal (no AI calls)
+```
+
+## Coding Conventions
+- All Python exceptions must use `except Exception as e: log_event(f"[WARN] context: {str(e)[:100]}")` — never bare `except: pass`
+- Use `from src.logger import log_event` for logging
+- Use `from src.config import MADRID_TZ` for timezone-aware timestamps
+- Inventory fields: `discovered_at` (ISO), `last_ai_eval` (ISO), `company`, `geo_region` must be preserved during merges
+- The `update_inventory_entry()` function preserves `discovered_at` — never overwrite it with new data
+
+## URL Policy: Clean URLs, No .html Suffix
+Both V1 and V2 MUST use `use_directory_urls: true` in their mkdocs.yml. This produces clean URLs like `/kubernetes/` instead of `/kubernetes.html`. **NEVER** enable the `offline` plugin — it forces `.html` suffixes on all URLs, breaking SEO and existing deep-links. This is a hard rule.
+
+## RSS/Twitter Sources
+RSS feeds are limited to those that actually work (many block bots). Don't add new RSS feeds without testing. Current working feeds are defined in `data/curation_sources.yaml`.
 
 ---
 > Source: [nubenetes/awesome-kubernetes](https://github.com/nubenetes/awesome-kubernetes) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
