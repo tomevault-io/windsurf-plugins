@@ -1,190 +1,112 @@
 ---
 trigger: always_on
-description: This file provides AI coding agents with essential context for working on the nestjs-dynamoose project.
+description: This is a NestJS module that integrates Dynamoose (DynamoDB ODM) with NestJS's dependency injection system. The module provides decorators, providers, and utilities to seamlessly use DynamoDB models in NestJS applications.
 ---
 
-# AGENTS.md - NestJS-Dynamoose Development Guide
-
-This file provides AI coding agents with essential context for working on the nestjs-dynamoose project.
+# NestJS-Dynamoose AI Coding Instructions
 
 ## Project Overview
 
-**nestjs-dynamoose** is a NestJS module that integrates [Dynamoose](https://dynamoosejs.com/) (a DynamoDB ODM) with NestJS's dependency injection system. It provides decorators, providers, and utilities to seamlessly use DynamoDB models in NestJS applications.
+This is a NestJS module that integrates Dynamoose (DynamoDB ODM) with NestJS's dependency injection system. The module provides decorators, providers, and utilities to seamlessly use DynamoDB models in NestJS applications.
 
-**Key Purpose:** Bridge the gap between Dynamoose's ODM functionality and NestJS's module/DI architecture.
-
-## Architecture & Design Patterns
+## Architecture & Key Patterns
 
 ### Module Structure
 
-The project follows NestJS's standard dynamic module pattern with global and feature modules:
+- **Core Module (`DynamooseCoreModule`)**: Global module that handles Dynamoose initialization and configuration
+- **Feature Module (`DynamooseModule`)**: Provides model registration via `forFeature()` and `forFeatureAsync()`
+- **Provider System**: Creates injectable providers for each Dynamoose model using token-based injection
 
-- **`DynamooseCoreModule`** (Global): Handles Dynamoose initialization, AWS configuration, and global setup
-- **`DynamooseModule`** (Feature): Provides model registration via static methods:
-  - `forRoot(options)` / `forRootAsync(options)` - Global configuration
-  - `forFeature(models)` / `forFeatureAsync(factories)` - Model registration per feature module
+### Key Components
 
-### Dependency Injection Pattern
+- **`lib/dynamoose.module.ts`**: Main module with `forRoot()`, `forRootAsync()`, `forFeature()`, `forFeatureAsync()` static methods
+- **`lib/dynamoose-core.module.ts`**: Handles Dynamoose initialization, AWS configuration, and global setup
+- **`lib/dynamoose.providers.ts`**: Creates model providers with proper dependency injection
+- **`lib/common/dynamoose.decorators.ts`**: Exports `@InjectModel(name)` decorator for model injection
+
+### Injection Pattern
 
 Models are injected using a token-based system:
 
 ```typescript
-@InjectModel('User') 
-private userModel: Model<User, UserKey>
+@InjectModel('User') private userModel: Model<User, UserKey>
 ```
 
-The `getModelToken(name)` utility in `lib/common/dynamoose.utils.ts` creates consistent tokens for model providers.
+The `getModelToken()` utility creates consistent tokens for model injection.
 
-### Key Components
+### Transaction Support
 
-| File | Purpose |
-|------|---------|
-| `lib/dynamoose.module.ts` | Main module with static registration methods |
-| `lib/dynamoose-core.module.ts` | Global module handling Dynamoose initialization |
-| `lib/dynamoose.providers.ts` | Creates model providers with proper DI |
-| `lib/common/dynamoose.decorators.ts` | Exports `@InjectModel()` decorator |
-| `lib/common/dynamoose.utils.ts` | Token generation utilities |
-| `lib/interfaces/` | TypeScript interfaces for module options, models, transactions |
+The `TransactionSupport` abstract class in `lib/interfaces/transaction.interface.ts` provides transaction capabilities by wrapping Dynamoose's transaction API.
 
 ## Development Workflows
 
-### Build & Quality Scripts
+### Build & Quality
 
-```bash
-npm run build    # Compile TypeScript (lib/ → dist/)
-npm run lint     # ESLint with Prettier integration
-npm run format   # Prettier formatting for lib/**/*.ts
-```
+- **Build**: `npm run build` - Compiles TypeScript to `dist/` using `tsconfig.json`
+- **Lint**: `npm run lint` - ESLint with TypeScript, Prettier integration
+- **Format**: `npm run format` - Prettier formatting for `lib/**/*.ts`
 
-### Build Configuration
+### Key Build Configuration
 
-- **Source:** `lib/` directory (NOT `src/`)
-- **Output:** `dist/` directory
-- **Entry point:** `index.ts` exports `./dist`
-- **TypeScript:** CommonJS modules, decorators enabled, strict mode
-- **Target:** ES2021, Node.js compatible
+- Source: `lib/` directory, output: `dist/`
+- Entry point: `index.ts` exports `./dist`
+- TypeScript: CommonJS modules, decorators enabled, strict mode
+- ESLint: Relaxed `@typescript-eslint/no-unsafe-*` rules for Dynamoose integration
 
-### CI/CD Pipeline
+### CI/CD
 
-- **GitHub Actions:** Node.js 22.17.1
-- **Steps:** `npm ci` → `npm run lint` → `npm run build`
-- **Pre-commit hooks:** 
-  - `lint-staged` runs Prettier on `*.ts` files
-  - `commitlint` enforces Angular commit conventions
-
-### Commit Message Format
-
-Follow Angular conventions:
-
-```
-<type>(<scope>): <subject>
-
-Examples:
-- feature(core): add support for Dynamoose v4
-- bugfix(providers): fix async model factory injection
-- docs(readme): improve transaction example
-```
-
-Types: `build`, `ci`, `docs`, `feature`, `bugfix`, `perf`, `refactor`, `style`, `test`
+- GitHub Actions workflow runs on Node.js 22.17.1
+- Pipeline: `npm ci` → `npm run lint` → `npm run build`
+- Pre-commit hooks: lint-staged with Prettier, commitlint with Angular conventions
 
 ## Project-Specific Conventions
 
 ### File Organization
 
-```
-lib/
-├── common/               # Decorators & utilities
-├── interfaces/           # TypeScript interfaces with barrel exports
-├── dynamoose.module.ts   # Main module
-├── dynamoose-core.module.ts
-├── dynamoose.providers.ts
-├── dynamoose.constants.ts
-└── index.ts              # Public API
-```
+- All source code in `lib/` (not `src/`)
+- Interfaces grouped in `lib/interfaces/` with barrel exports
+- Common utilities in `lib/common/`
+- Constants in `lib/dynamoose.constants.ts`
 
 ### TypeScript Patterns
 
-**Interface Segregation:** Separate key interfaces from document interfaces
-
-```typescript
-// Key interface (hash/range keys only)
-export interface UserKey {
-  id: string;
-}
-
-// Document interface (all attributes)
-export interface User extends UserKey {
-  name: string;
-  email?: string;
-}
-```
-
-**Type Safety with Dynamoose:** 
-- Extensive use of `any` types for Dynamoose compatibility
-- ESLint rules disabled: `@typescript-eslint/no-unsafe-*`, `@typescript-eslint/no-explicit-any`
-- This is intentional due to Dynamoose's dynamic nature
+- Extensive use of `any` types for Dynamoose compatibility (ESLint rules disabled)
+- Interface segregation: separate `UserKey` (keys) and `User` (full document) interfaces
+- Factory pattern for async module configuration with dependency injection
 
 ### Module Registration Patterns
 
-**Synchronous:**
-```typescript
-DynamooseModule.forFeature([{
-  name: 'User',
-  schema: UserSchema,
-  options: { tableName: 'user' }
-}])
-```
+- **Synchronous**: `forFeature([{ name: 'User', schema: UserSchema, options: {...} }])`
+- **Async with DI**: `forFeatureAsync([{ name: 'User', useFactory: (_, config) => {...}, inject: [ConfigService] }])`
+- First parameter of `useFactory` is reserved (use `_,` to ignore)
 
-**Async with DI:**
-```typescript
-DynamooseModule.forFeatureAsync([{
-  name: 'User',
-  useFactory: (_, configService: ConfigService) => ({
-    schema: UserSchema,
-    options: { tableName: configService.get('USER_TABLE_NAME') }
-  }),
-  inject: [ConfigService]
-}])
-```
+### Testing Considerations
 
-⚠️ **Important:** First parameter of `useFactory` is reserved (ignore with `_,`)
+- No test files in repository (peer dependency focused library)
+- TypeScript excludes `**/*.spec.ts` files
+- Focus on type safety and integration testing in consumer applications
 
-### Transaction Support
+## Integration Points
 
-The `TransactionSupport` abstract class provides transaction capabilities:
+### External Dependencies
 
-```typescript
-@Injectable()
-export class UserService extends TransactionSupport {
-  constructor(
-    @InjectModel('User') private userModel: Model<User, UserKey>,
-    @InjectModel('Account') private accountModel: Model<Account, AccountKey>
-  ) {
-    super();
-  }
+- **Dynamoose**: Core ODM functionality, model creation, transactions
+- **NestJS**: Module system, dependency injection, decorators
+- **AWS SDK**: DynamoDB client configuration (peer dependency)
 
-  async createUserWithAccount(user: User, account: Account) {
-    await this.transaction([
-      this.userModel.transaction.create(user),
-      this.accountModel.transaction.create(account)
-    ]);
-  }
-}
-```
+### Consumer Integration
 
-## Dependencies & Peer Dependencies
+- Consumers use `DynamooseModule.forRoot()` in AppModule for global configuration
+- Feature modules use `DynamooseModule.forFeature()` to register specific models
+- Services inject models using `@InjectModel('ModelName')` decorator
 
-### Core Dependencies
+### Configuration Flow
 
-- **dynamoose:** ^3.2.0 || ^4.0.0 - DynamoDB ODM
-- **@nestjs/common & @nestjs/core:** ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
-- **@aws-sdk/client-dynamodb:** ^3.0.0
-- **rxjs:** ^6.0.0 || ^7.0.0
-- **reflect-metadata:** ^0.1.13 || ^0.2.0
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. `forRoot(options)` → `DynamooseCoreModule.forRoot()` → `initialization()`
+2. AWS/DynamoDB configuration via `aws.ddb.set()`
+3. Model registration via providers created in `dynamoose.providers.ts`
+4. Token-based injection using `getModelToken()` utility
 
 ---
 > Source: [hardyscc/nestjs-dynamoose](https://github.com/hardyscc/nestjs-dynamoose) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
