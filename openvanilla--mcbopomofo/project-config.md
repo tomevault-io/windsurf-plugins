@@ -1,141 +1,77 @@
 ---
 trigger: always_on
-description: This file provides guidance to AI coding assistants when working with dictionary data in this directory.
+description: - Do NOT generate pull request overviews.
 ---
 
-# AGENTS.md
+When reviewing code:
 
-This file provides guidance to AI coding assistants when working with dictionary data in this directory.
+- Do NOT generate pull request overviews.
+- Do NOT generate explainers.
+- Do NOT summarize what a diff chunk does.
+- Only point out issues that are of medium severity or higher.
+- Do point out spelling errors in symbol names such as those of variables, classes, methods, and functions.
+- Do point out spelling or grammar errors in comments.
+- Do point out style issues such as extraneous spaces (for example `a  = b;`).
+- Do point out spelling errors in commit messages.
+- Pay attention when strings cross language boundaries, especially if code point counts are involved.
 
-## Overview
+## Documentation Structure
 
-The `Source/Data/` directory contains all dictionary data files and the build system for generating McBopomofo's language model data. These files define the mapping between Bopomofo phonetic input and Traditional Chinese characters/phrases, along with frequency data and special features like macros and symbols.
+This file provides GitHub Copilot-specific coding instructions. For comprehensive project documentation:
 
-**For comprehensive dictionary development workflows**, see [Wiki: 詞庫開發說明](https://github.com/openvanilla/McBopomofo/wiki/詞庫開發說明). This document provides technical reference for AI assistants.
+- **AGENTS.md**: Master documentation for all AI coding assistants (architecture, build process, workflows)
+- **algorithm.md**: Technical algorithm documentation (Chinese)
+- **Source/Data/AGENTS.md**: Dictionary data development guide
 
-**GitHub Copilot users:** See `.github/instructions/Data.instructions.md` for path-specific Copilot instructions for this directory.
+**Note:** GitHub Copilot does not automatically read AGENTS.md files. Essential guidelines are included below.
 
-**General guidelines** (emoji, date/time format, Conventional Commits, etc.) are defined in the root `AGENTS.md` and `.github/copilot-instructions.md`.
+---
 
-**Key Principles:**
-- In most cases, you'll be **adding** new characters or phrases rather than deleting existing ones
+## General Guidelines
 
-## File Descriptions
+- **Never use emoji** in code, comments, documentation, or generated content outside `Source/Data/`. Emoji are permitted only within dictionary data files in `Source/Data` where mappings include emoji.
+- **Language restriction:** Use only English or Traditional Chinese. Simplified Chinese is prohibited in all documentation, comments, and reviews.
 
-### Source Data Files (Input)
+## Project Context
+- Input method for macOS built with AppKit/IMKit in Swift and bridged Objective-C++, backed by the C++ language model in `Source/Engine`.
+- The app supports two Taiwanese Braille formats: Unicode and ASCII.
+- Build and run with Xcode target `McBopomofo Installer`; Swift front end pulls helper frameworks from the local `Packages/` directory.
+- Dictionary assets and generation scripts live in `Source/Data`; compiled blobs are stored in `Source/Data/bin`.
+- Tests cover both layers: Swift XCTest-style suites in `McBopomofoTests` and GoogleTest cases in `Source/Engine/*Test.cpp` via CMake.
+- Preserve the existing MIT license banner on any new source file.
 
-| File | Purpose | Format |
-|------|---------|--------|
-| `BPMFBase.txt` | Single character Bopomofo mappings | `character bopomofo pinyin tone tag` |
-| `BPMFMappings.txt` | Multi-character phrases (2-6 chars) | `phrase bpmf1 bpmf2 ...` (space-separated) |
-| `BPMFPunctuations.txt` | Punctuation marks mapping | Similar to BPMFBase |
-| `phrase.occ` | Phrase frequency/occurrence data | `phrase frequency` (tab-separated) |
-| `heterophony1.list` | Primary heterophony readings | `character bopomofo` |
-| `heterophony2.list` | Secondary heterophony readings | `character bopomofo` |
-| `heterophony3.list` | Tertiary heterophony readings | `character bopomofo` |
-| `exclusion.txt` | Phrase frequency exclusions | `phrase context_to_exclude` (tab-separated) |
-| `Symbols.txt` | Special symbols (era names, etc.) | `symbol bopomofo score` |
-| `Macros.txt` | Text macros (date/time) | `MACRO@NAME bopomofo score` |
-| `associated-punctuation.txt` | Punctuation for phrase associations | Special format for derive script |
+## Swift & AppKit Guidelines
+- Keep AppKit and IMKit work in Swift classes (`InputMethodController`, `PreferencesWindowController`, etc.) and limit scope with `private`/`fileprivate` helpers.
+- Use the `Preferences` static properties and property wrappers in `Source/Preferences.swift` instead of accessing `UserDefaults` directly; add new keys beside the existing constants.
+- Localize UI strings through `NSLocalizedString("…", comment: "")` and update the `.strings` files under `Base.lproj`, `en.lproj`, and `zh-Hant.lproj` when text changes.
+- Follow the established flow: `InputMethodController` drives menu actions, `KeyHandler` mediates IM events, and `InputState` models state transitions.
+- Perform UI work on the main thread; reuse existing helper methods or notifications rather than introducing ad-hoc dispatch queues.
+- Interact with the engine through `KeyHandler`/`LanguageModelManager` bridges instead of duplicating C++ logic in Swift.
 
-### Generated Output Files
+## State Machine Design
+- Treat `InputState` subclasses as immutable snapshots; always create a new state object when the IM transitions instead of mutating existing instances.
+- Funnel key handling through `KeyHandler` so state transitions originate from one place and UI updates flow from the current state.
+- Keep UI and engine in sync by deriving candidate lists, composing buffers, and menu options from the state object rather than scattered flags.
+- Extend the state machine by adding new `InputState` subclasses plus explicit transitions; avoid adding booleans that bypass the existing states.
 
-| File | Generated By | Purpose |
-|------|--------------|---------|
-| `data.txt` | `make all` | Main language model data for McBopomofo |
-| `data-plain-bpmf.txt` | `make all` | Data for traditional Bopomofo IME mode |
-| `associated-phrases-v2.txt` | `make all` | Associated phrase suggestions |
-| `PhraseFreq.txt` | `make all` | Compiled frequency data |
+## Objective-C++ Bridge Guidelines
+- Manage engine lifetimes in `.mm` files by allocating in `init`, cleaning up in `dealloc`, and wrapping pointers in `std::shared_ptr` when passing to C++ APIs.
+- Surface new engine capabilities by extending bridge classes (`KeyHandler`, `LanguageModelManager`) and declaring them in `McBopomofo-Bridging-Header.h`.
+- Convert between `NSString` and `std::string` with `UTF8Helper`/`NSStringUtils`; avoid hand-written UTF conversions or raw buffers.
+- Keep bridge methods small: forward inputs to the engine and return plain values or Foundation types that Swift can consume.
 
-**Important:** Generated output files are built locally and NOT committed to git (listed in `.gitignore`).
+## C++ Engine Guidelines
+- Stick to the existing C++17 style that uses `std::vector`, `std::unordered_map`, `std::optional`, and `std::string_view` as in `McBopomofoLM.cpp`.
+- Place new engine code inside the current namespaces (`McBopomofo`, `Formosa::Gramambular2`, `Formosa::Mandarin`) and reuse helper classes from `gramambular2`.
+- Reuse the blob readers (`KeyValueBlobReader`, `ParselessPhraseDB`, `PhraseReplacementMap`) when touching serialized resources; prefer augmenting them over inventing new formats.
+- Keep algorithms deterministic and side-effect free; logging and macOS-specific behavior should stay in the Objective-C++ layer.
 
-## Common Commands
-
-```bash
-# Essential Make Targets
-make all           # Generate all output files
-make sort          # Sort all data files with correct C locale
-make check         # Validate data integrity
-make tidy          # Clean up formatting issues
-make clean         # Clean generated files
-
-# Recommended workflow: format, sort, validate, and build
-make tidy sort check all
-```
-
-### Building via Xcode
-
-```bash
-xcodebuild -project ../McBopomofo.xcodeproj -target Data -configuration Debug build
-# Or select "Data" scheme in Xcode and build (⌘+B)
-```
-
-This runs `make all` as part of the Xcode build process. For dictionary development, using `make` directly is recommended.
-
-### Critical: C Locale Sorting
-
-**All data files MUST be sorted with C locale** for binary search compatibility:
-
-```bash
-# Primary data files
-LC_ALL=C sort -o BPMFMappings.txt BPMFMappings.txt
-LC_ALL=C sort -o phrase.occ phrase.occ
-
-# Heterophony lists
-env LANG=C sort -k1 heterophony1.list | uniq > tmp && mv tmp heterophony1.list
-env LANG=C sort -k1 heterophony2.list | uniq > tmp && mv tmp heterophony2.list
-env LANG=C sort -k1 heterophony3.list | uniq > tmp && mv tmp heterophony3.list
-```
-
-## Workflow: Adding/Modifying Phrases
-
-### Adding a New Multi-Character Phrase
-
-1. **Add to BPMFMappings.txt:**
-   ```
-   新詞彙 ㄒㄧㄣ ㄘˊ ㄏㄨㄟˋ
-   ```
-   Format: phrase, then Bopomofo for each character (space-separated)
-
-2. **Add to phrase.occ with frequency:**
-   ```
-   新詞彙	100
-   ```
-   - Frequency must be a positive integer (0 is acceptable, negative values are NOT)
-   - Use tab separator between phrase and frequency
-   - Higher frequency = more common phrase
-
-3. **Sort both files:**
-   ```bash
-   make sort
-   # Or manually:
-   LC_ALL=C sort -o BPMFMappings.txt BPMFMappings.txt
-   LC_ALL=C sort -o phrase.occ phrase.occ
-   ```
-
-4. **Validate and build:**
-   ```bash
-   make check    # Validate integrity
-   make all      # Generate output files
-   ```
-
-### Adding a Single Character
-
-Single characters go into `BPMFBase.txt`:
-
-```
-字 ㄗˋ zi4 -4 big5
-```
-
-Format: `character bopomofo pinyin tone tag`
-
-### Handling Heterophony Characters (破音字)
-
-Do NOT suggest any changes to `heterophony1.list`, `heterophony2.list` or `heterophony3.list`. If a PR contains any changes to those files, highlight them and ask human reviewers to pay attention to them.
-
+## Tests and Tooling
+- Add Swift tests under `McBopomofoTests` using the `Testing` module with `@Suite`, `@Test`, and `#expect` macros; snapshot and restore `UserDefaults` like `PreferencesTests`.
+- Register new engine tests in `Source/Engine/CMakeLists.txt`, include them in the `McBopomofoLMLibTest` target, and use GoogleTest assertions.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openvanilla/McBopomofo](https://github.com/openvanilla/McBopomofo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
