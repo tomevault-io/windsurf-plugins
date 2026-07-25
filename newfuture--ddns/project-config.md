@@ -1,175 +1,104 @@
 ---
 trigger: always_on
-description: > **Comprehensive guide for AI agents working on the DDNS (Dynamic DNS) project**
+description: This is a Python-based Dynamic DNS (DDNS) client that automatically updates DNS records to match the current IP address. It supports multiple DNS providers, IPv4/IPv6, and various configuration methods. Please follow these guidelines when contributing:
 ---
 
-# AGENTS.md - AI Agent Guide for DDNS Project
+This is a Python-based Dynamic DNS (DDNS) client that automatically updates DNS records to match the current IP address. It supports multiple DNS providers, IPv4/IPv6, and various configuration methods. Please follow these guidelines when contributing:
 
-> **Comprehensive guide for AI agents working on the DDNS (Dynamic DNS) project**
+## Code Standards
 
-## Table of Contents
+### Required Before Each Commit
+- Follow Python coding standards as defined in `.github/instructions/python.instructions.md`
+- Use only Python standard library modules (no external dependencies)
+- Ensure Python 2.7 and 3.x compatibility
+- Run tests before committing to ensure all functionality works correctly
+- Format and lint code using `ruff` before each commit:
+  ```bash
+  ruff check --fix --unsafe-fixes .
+  ruff format .
+  ```
 
-1. [Project Overview](#project-overview)
-2. [Project Architecture](#project-architecture)
-3. [Getting Started](#getting-started)
-4. [Development Guide](#development-guide)
-5. [Testing & Validation](#testing--validation)
-6. [Troubleshooting](#troubleshooting)
-7. [Best Practices](#best-practices)
+### Development Flow
+- Test: `python -m unittest discover tests` or `python -m pytest tests/`
+- Lint: `ruff check --fix --unsafe-fixes .`
+- Format: `ruff format .`
 
----
+### Add a New DNS Provider
 
-## Project Overview
+Follow the steps below to add a new DNS provider:
+- [Python coding standards](./instructions/python.instructions.md)
+- [Provider development guide](../doc/dev/provider.md)
+- Provider documentation template:[aliyun](../doc/provider/aliyun.md) and [dnspod](../doc/provider/dnspod.md)
+  - keep the template structure and fill in the required information
+  - remove the not applicable sections or fields
+  - in english doc linke the documentation to the english version documentations
+  - don't change the ref link [参考配置](../json.md#ipv4-ipv6) in the template. In english documentation, use the english version link [Reference](../json.en.md#ipv4-ipv6)
 
-### What is DDNS?
+## Repository Structure
+- `ddns/`: Main application code
+  - `provider/`: DNS provider implementations (DNSPod, AliDNS, CloudFlare, etc.)
+  - `config/`: Configuration management (loading, parsing, validation)
+  - `util/`: Utility functions (HTTP client, configuration management, IP detection)
+- `tests/`: Unit tests using unittest framework
+- `doc/`: Documentation and user guides
+  - `providers/`: Provider-specific configuration guides
+  - `dev/`: Developer documentation
+- `schema/`: JSON configuration schemas
+- `docker/`: Docker-related files and scripts
 
-DDNS is a Python-based Dynamic DNS client that automatically updates DNS records to match the current IP address. It supports:
+## Key Guidelines
+1. Follow Python best practices and maintain cross-platform compatibility
+2. Use only standard library modules to ensure self-contained operation
+3. Maintain Python 2.7 compatibility (avoid f-strings, async/await)
+4. Write comprehensive unit tests for all new functionality
+5. Use proper logging and error handling throughout the codebase
+6. Document public APIs and configuration options thoroughly
+7. Test provider implementations against real APIs when possible
+8. Ensure all DNS provider classes inherit from BaseProvider or SimpleProvider
 
-- **Multiple DNS Providers**: 15+ providers including Cloudflare, DNSPod, AliDNS, etc.
-- **Dual Stack**: IPv4 and IPv6 support
-- **Multiple Platforms**: Docker, binary executables, pip installation, and source code
-- **Flexible Configuration**: Command-line arguments, JSON files, and environment variables
-- **Advanced Features**: Multi-domain support, HTTP proxy, caching, scheduled tasks
+## Testing Guidelines
 
-### Key Technologies
+### Test Structure
+- Place tests in `tests/` directory using `test_*.py` naming
+- import unittest, patch, MagicMock
+  - for all provider tests, use the `from base_test import BaseProviderTestCase, unittest, patch, MagicMock`
+  - for all other tests, use `from __init__ import unittest, patch, MagicMock ` to ensure compatibility with both unittest and pytest
+- Use unittest (default) or pytest (optional)
 
-- **Language**: Python (2.7+ and 3.x compatible)
-- **Testing**: unittest (default) and pytest (optional)
-- **Linting/Formatting**: ruff
-- **CI/CD**: GitHub Actions
-- **Containerization**: Docker (multi-architecture support)
-- **Packaging**: PyPI, Nuitka (for binaries)
+### Basic provider Test Template
+```python
+from base_test import BaseProviderTestCase, patch, MagicMock
+from ddns.provider.example import ExampleProvider
 
-### Project Status
+class TestExampleProvider(BaseProviderTestCase):
+    def setUp(self):
+        super(TestExampleProvider, self).setUp()
+        self.provider = ExampleProvider(self.id, self.token)
 
-- **License**: MIT
-- **Python Versions**: 2.7, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-- **Platforms**: Windows, Linux, macOS
-- **Architectures**: amd64, arm64, arm/v7, arm/v6, 386, ppc64le, riscv64, s390x
+    @patch.object(ExampleProvider, "_http")
+    def test_set_record_success(self, mock_http):
+        mock_http.return_value = {"success": True}
+        result = self.provider.set_record("test.com", "1.2.3.4")
+        self.assertTrue(result)
+```
 
----
+### Test Requirements
+1. **Unit tests**: All public methods must have tests with mocked HTTP calls
+2. **Error handling**: Test invalid inputs and network failures
+3. **Python 2.7 compatible**: Use standard library only
+4. **Documentation**: Include docstrings for test methods
 
-## Project Architecture
+### Running Tests
+```bash
+# Run all tests (recommended)
+python -m unittest discover tests -v
 
-### Directory Structure
+# Run specific provider
+python -m unittest tests.test_provider_example -v
+```
 
-Here is the folder and file structure for the DDNS project.
-
-**Format:** `<TAB depth>{filename}:<TAB>{description}`
-
-```text
-.github/:	GitHub configuration
-	workflows/:	CI/CD workflows (build, publish, test)
-	instructions/:	Agent instructions (python.instructions.md)
-	copilot-instructions.md:	GitHub Copilot instructions
-
-ddns/:	Main application code
-	__init__.py:	Package initialization and version info
-	__main__.py:	Entry point for module execution
-	cache.py:	Cache management
-	ip.py:	IP address detection logic
-
-	config/:	Configuration management
-		__init__.py
-		cli.py:	Command-line argument parsing
-		config.py:	Configuration loading and merging
-		env.py:	Environment variable parsing
-		file.py:	JSON file configuration
-
-	provider/:	DNS provider implementations
-		__init__.py:	Provider registry
-		_base.py:	Abstract base classes (SimpleProvider, BaseProvider)
-		_signature.py:	HMAC signature utilities
-		alidns.py:	Alibaba Cloud DNS
-		aliesa.py:	Alibaba Cloud ESA
-		callback.py:	Custom webhook callbacks
-		cloudflare.py:	Cloudflare DNS
-		cloudns.py:	ClouDNS
-		debug.py:	Debug provider
-		dnscom.py:	DNS.COM
-		dnspod.py:	DNSPod (China)
-		dnspod_com.py:	DNSPod International
-		edgeone.py:	Tencent EdgeOne
-		edgeone_dns.py:	Tencent EdgeOne DNS
-		he.py:	Hurricane Electric
-		huaweidns.py:	Huawei Cloud DNS
-		namesilo.py:	NameSilo
-		noip.py:	No-IP
-		tencentcloud.py:	Tencent Cloud DNS
-		west.py:	West.cn DNS
-
-	scheduler/:	Task scheduling implementations
-		__init__.py
-		_base.py:	Base scheduler class
-		cron.py:	Cron-based scheduler (Linux/macOS)
-		launchd.py:	macOS launchd scheduler
-		schtasks.py:	Windows Task Scheduler
-		systemd.py:	Linux systemd timer
-
-	util/:	Utility modules
-		__init__.py
-		comment.py:	Comment handling
-		fileio.py:	File I/O operations
-		http.py:	HTTP client with proxy support
-		try_run.py:	Safe command execution
-
-tests/:	Unit tests
-	__init__.py:	Test initialization (path setup)
-	base_test.py:	Shared test utilities and base classes
-	README.md:	Testing documentation
-	config/:	Test configuration files
-	scripts/:	Test helper scripts
-	test_cache.py:	Cache tests
-	test_config_*.py:	Configuration tests
-	test_ip.py:	IP detection tests
-	test_provider_*.py:	Provider-specific tests
-	test_scheduler_*.py:	Scheduler tests
-	test_util_*.py:	Utility tests
-
-docs/:	Documentation (VitePress-based)
-	.vitepress/:	VitePress configuration and theme
-	
-	config/:	Configuration documentation (Chinese)
-		cli.md:	CLI usage guide
-		env.md:	Environment variables guide
-		json.md:	JSON configuration guide
-
-	dev/:	Developer guides (Chinese)
-		provider.md:	Provider development guide
-		config.md:	Configuration system design
-
-	providers/:	Provider-specific documentation (Chinese)
-		README.md:	Provider list and overview
-		51dns.md:	51DNS provider guide
-		alidns.md:	Alibaba Cloud DNS guide
-		aliesa.md:	Alibaba Cloud ESA guide
-		callback.md:	Custom webhook callbacks guide
-		cloudflare.md:	Cloudflare DNS guide
-		cloudns.md:	ClouDNS guide
-		debug.md:	Debug provider guide
-		dnscom.md:	DNS.COM provider guide
-		dnspod.md:	DNSPod (China) guide
-		dnspod_com.md:	DNSPod International guide
-		edgeone.md:	Tencent EdgeOne guide
-		edgeone_dns.md:	Tencent EdgeOne DNS guide
-		he.md:	Hurricane Electric guide
-		huaweidns.md:	Huawei Cloud DNS guide
-		namesilo.md:	NameSilo guide
-		noip.md:	No-IP guide
-		tencentcloud.md:	Tencent Cloud DNS guide
-		west.md:	West.cn DNS guide
-
-	en/:	English documentation
-		config/:	English configuration guides (mirrors config/)
-		dev/:	English developer guides (mirrors dev/)
-		providers/:	English provider guides (mirrors providers/)
-		docker.md:	Docker documentation
-		install.md:	Installation guide
-
-	public/:	Public static assets
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+See existing tests in `tests/` directory for detailed examples.
 
 ---
 > Source: [NewFuture/DDNS](https://github.com/NewFuture/DDNS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
