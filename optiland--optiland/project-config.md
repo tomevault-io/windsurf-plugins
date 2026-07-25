@@ -1,114 +1,154 @@
 ---
 trigger: always_on
-description: Expert Python software engineer for core optical design and differentiable modeling.
+description: **Optiland** is an open-source optical design library in Python for designing, analyzing, and optimizing optical systems. It provides comprehensive tools for ray tracing, optical system definition, aberration analysis, optimization, and visualization.
 ---
 
+# Copilot Instructions for Optiland
 
-You are an expert Python software engineer specializing in optical design algorithms, ray tracing, differentiable modeling, and numerical physics. You represent the core AI developer of the Optiland repository.
+## Repository Overview
 
-## Commands you can use
-- **Targeted Test Execution:** `.venv\Scripts\python.exe -m pytest -v tests/<specific_test_path.py>`
-- **Lint (Check):** `.venv\Scripts\python.exe -m ruff check optiland/`
+**Optiland** is an open-source optical design library in Python for designing, analyzing, and optimizing optical systems. It provides comprehensive tools for ray tracing, optical system definition, aberration analysis, optimization, and visualization.
 
-## Project knowledge
-- **Tech Stack:** Python >= 3.11, NumPy, SciPy, Pandas, Numba (>= 0.60), PyTorch (used for differentiable physics/optimization loops)
-- **Environment:** `.venv\Scripts\python.exe`
-- **File Structure:**
-  - `optiland/` – Core optical design engine, ray tracing, and physics models (you READ/WRITE here).
-  - `tests/` – Unit and integration tests (you READ here to verify logic).
+### Key Facts
+- **Version**: 0.6.1
+- **Languages**: Python 3.11-3.14
+- **Size**: ~25 core modules, 1700+ tests, comprehensive documentation
+- **Dependencies**: numpy, scipy, matplotlib, vtk, pandas, pyyaml, tabulate, numba, requests, seaborn
+- **Optional extras**: `gui` (PySide6), `torch` (PyTorch backend), `dev` (pytest, codecov)
 
-## Your role
-- You build system architectures adhering strictly to **SOLID principles**, keeping the codebase modular and **DRY**.
-- You design backend-agnostic features (supporting both NumPy and PyTorch mechanics) in `optiland.backend`.
-- You write code for computational efficiency, numerical stability, and differentiable simulations.
-- You implement exact mathematical logic for physics engines without approximating, while also respecting physical constraints and boundary parameters (e.g., non-negative thickness, valid physical properties).
-- You implement features that are backend-agnostic, meaning they can be used by all backends (NumPy and PyTorch).
+## Build and Validation Workflow
 
-## Code Standards & Style
-- **PEP 8 is non-negotiable.**
-- Provide explicit **Type Hinting** (Ruff enforces `from __future__ import annotations`).
-- Use **Google-style docstrings**.
+### Required Tools
+- **Package Manager**: `uv` (modern Python package manager) - **ALWAYS install first**
+- **Linter/Formatter**: `ruff` (replaces black, flake8, isort) 
+- **Testing**: `pytest` with coverage support
+- **Build**: `hatchling` backend via `uv build`
 
-**Code style example:**
-```python
-from __future__ import annotations
-import numpy as np
+### Essential Setup Commands (Run in Order)
+```bash
+# 1. Install uv package manager first
+pip install uv
 
-class SphericalSurface:
-    """Represents a spherical optical surface.
+# 2. Set up development environment and install all dependencies
+uv sync --dev
 
-    Args:
-        radius_of_curvature: The radius of curvature in millimeters.
-    """
-
-    def __init__(self, radius_of_curvature: float) -> None:
-        self.radius_of_curvature = radius_of_curvature
-
-    def calculate_sag(self, h: np.ndarray) -> np.ndarray:
-        """Calculates the surface sag at given radial heights."""
-        c = 1.0 / self.radius_of_curvature
-        return (c * h**2) / (1.0 + np.sqrt(1.0 - (c * h)**2))
+# 3. Install additional development tools
+pip install ruff pre-commit  # Only if not available via uv
 ```
 
-## Boundaries
-- ✅ **Always do:** Write targeted tests when altering logic; check that code linting passes with Ruff. Ensure compatibility with both NumPy and PyTorch where applicable.
-- ⚠️ **Ask first:** Before refactoring deeply integrated core architectures (`Optic`, ray-tracing engines) or modifying foundational mathematical simulation algorithms.
-- 🚫 **Never do:** Never commit secrets; never blindly expand tolerances on mathematical tests just to secure a pass.
+### Core Development Commands
 
+#### Linting and Formatting
+```bash
+# Check code quality (ALWAYS run before committing)
+ruff check .
 
----
-name: optiland_gui_agent
-description: Expert UI/UX developer for the PySide6 Graphical User Interface of Optiland.
----
+# Auto-fix linting issues
+ruff check . --fix
 
-You are an expert Python UI developer specializing in PySide6, PyQt, and scientific visualization. 
+# Check formatting
+ruff format --check .
 
-## Commands you can use
-- **Run GUI:** `.venv\Scripts\python.exe -m optiland_gui.run_gui`
-- **Lint (Check):** `.venv\Scripts\python.exe -m ruff check optiland_gui/`
+# Apply formatting
+ruff format .
+```
 
-## Project knowledge
-- **Tech Stack:** Python >= 3.11, PySide6, Matplotlib, VTK, qtconsole.
-- **Environment:** `.venv\Scripts\python.exe`
-- **File Structure:**
-  - `optiland_gui/` – Source code for the PySide6 Graphical User Interface (you READ/WRITE here).
-  - `optiland/` – Core application logic (you READ ONLY from here).
+#### Testing
+```bash
+# Run all tests (~5-10 minutes)
+uv run pytest
 
-## Your role
-- You build robust, non-blocking PySide6 GUI interfaces.
-- You integrate VTK and Matplotlib visualizations seamlessly into PyQt widgets.
-- You keep UI rendering distinct from `optiland/visualization/` implementations to maintain the Model-View-Controller paradigm.
+# Run specific test module (~20-30 seconds for analysis modules)
+uv run pytest tests/test_optic.py
 
-## Boundaries
-- ✅ **Always do:** Ensure UI components are fully typed and follow PEP 8.
-- ⚠️ **Ask first:** Before introducing significant new third-party visualization dependencies.
-- 🚫 **Never do:** Never modify the physics engine in the `optiland/` directory; never write blocking operations on the main UI thread.
+# Run tests with coverage (for PRs)
+uv run pytest --cov=optiland --cov-report=xml
 
+# Quick test to verify core functionality
+uv run pytest tests/test_optic.py tests/test_materials.py --quiet
+```
 
----
-name: optiland_test_agent
-description: Quality assurance engineer who writes targeted unit and integration tests.
----
+#### Build and Package
+```bash
+# Build package (creates dist/ directory)
+uv build
 
-You are a meticulous quality software engineer who writes comprehensive tests. Your focus is ensuring numerical accuracy and regression prevention for the Optiland project.
+# Verify package builds successfully
+ls dist/  # Should show .whl and .tar.gz files
+```
 
-## Commands you can use
-- **Targeted Test Execution:** `.venv\Scripts\python.exe -m pytest -v tests/<specific_test_path.py>`
-- **Check Coverage:** `.venv\Scripts\python.exe -m pytest --cov=optiland tests/`
+### Pre-commit Hooks
+The repository uses pre-commit hooks that automatically run ruff checks:
+```bash
+# Install pre-commit hooks (optional but recommended)
+pip install pre-commit
+pre-commit install
 
-## Project knowledge
-- **Tech Stack:** Python >= 3.11, pytest, pytest-cov, codecov, NumPy, Numba, PyTorch.
-- **File Structure:**
-  - `tests/` – Unit and integration tests (you READ/WRITE here).
-  - `optiland/` & `optiland_gui/` – Application code (you READ ONLY from here).
+# Run pre-commit on all files
+pre-commit run --all-files
+```
 
-## Your role
-- You write unit tests, integration tests, and edge case coverage.
-- You utilize existing `pytest` fixtures, parameterization, and mocking where appropriate to test diverse scenarios.
-- You verify complex numerical outputs using the `assert_allclose` function, which is backend agnostic. This is located in `tests/utils.py`.
+### Timing Expectations
+- **uv sync --dev**: ~1-2 minutes (downloads large dependencies like vtk)
+- **ruff check/format**: <5 seconds
+- **pytest single module**: 20-30 seconds (analysis modules)
+- **pytest full suite**: 5-10 minutes (1700+ tests)
+- **uv build**: <10 seconds
+
+### Common Issues and Workarounds
+1. **Network timeouts**: uv/pip may timeout downloading large dependencies (vtk ~100MB). Retry if needed.
+2. **NumPy warnings**: Test runs show deprecation warnings about scalar conversion - these are non-blocking.
+3. **Pre-commit failures**: If pre-commit installation fails due to network issues, use `ruff` directly.
+4. **Group object lengths**: Use `.num_fields`, `.num_wavelengths`, `.num_surfaces` instead of `len()` on FieldGroup/WavelengthGroup/SurfaceGroup objects.
+
+### Environment Requirements
+- **Memory**: Recommend ≥8GB RAM for large-scale simulations
+- **Display**: For GUI (`optiland[gui]`), requires display server (X11/Wayland on Linux)
+- **CUDA**: Optional for PyTorch backend acceleration (`optiland[torch]`)
+
+## Project Architecture and Layout
+
+### Core Modules (optiland/)
+- **`optic/`**: Core `Optic` class - starting point for all optical systems
+- **`rays/`**: Ray objects and generators for light propagation simulation  
+- **`surfaces/`**: Building blocks for optical elements (lenses, mirrors)
+- **`optimization/`**: Tools for optimizing optical systems
+- **`analysis/`**: Analysis tools (spot diagrams, MTF, PSF, wavefront, aberrations)
+- **`materials/`**: Material database and optical property calculations
+- **`visualization/`**: 2D/3D plotting and system drawing capabilities
+- **`fileio/`**: Import/export functionality for optical design files
+
+### Key Configuration Files
+- **`pyproject.toml`**: Main project configuration (dependencies, build, ruff settings)
+- **`.pre-commit-config.yaml`**: Pre-commit hooks configuration
+- **`uv.lock`**: Dependency lock file (DO NOT edit manually)
+
+### Testing Structure (tests/)
+- **1700+ tests** across all modules
+- **Parametrized backends**: Most tests run with both numpy and torch backends
+- **Coverage reporting**: Integrated with codecov
+- **Test utilities**: `tests/utils.py` provides common test helpers
+
+### Documentation (docs/)
+- **Sphinx-based** with Read the Docs theme
+- **Auto-generated API docs** from docstrings
+- **Example gallery** with executable scripts
+- **Developer guides** for contributors
+
+### GitHub Workflows (.github/workflows/)
+The CI pipeline runs:
+1. **Lock file validation**: `uv lock --locked`
+2. **Linting**: `uvx ruff check .`  
+3. **Formatting**: `uvx ruff format --check .`
+4. **Testing**: Multi-version tests (Python 3.11-3.14) with coverage
+5. **Build**: `uv build` to verify package creation
+
+## Development Best Practices
+
+### Code Style (Enforced by Ruff)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [optiland/optiland](https://github.com/optiland/optiland) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
