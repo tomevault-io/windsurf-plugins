@@ -1,109 +1,135 @@
 ---
 trigger: always_on
-description: > Read this first. It is the high-signal map of the repo. For day-to-day code-style rules and
+description: Guidance for working in this repository.
 ---
 
-# Downloader — Codebase Guide
+# CLAUDE.md
 
-> Read this first. It is the high-signal map of the repo. For day-to-day code-style rules and
-> token-efficient navigation, also see the **`code-navigator`** skill in `.claude/skills/`.
+Guidance for working in this repository.
 
-## What this project is
+## Workflow & progress tracking
 
-**Downloader** (`bezzad/Downloader`) is a .NET NuGet library (currently **v5.8.0**) for fast,
-cross-platform multipart file downloads. It supports parallel chunked downloads, pause/resume,
-bandwidth throttling, progress events, custom `HttpClient`/handler injection, and Native AOT.
-Targets **.NET 8, 9, and 10**. The library has **no external runtime dependencies** and is
-`IsAotCompatible = true` (System.Text.Json source-gen, no reflection serialization).
+- **Work directly on `develop`.** Do ALL work on the `develop` branch. Never create
+  feature branches.
+- **Commit frequently** — one commit per logical step, with clear messages — and **push
+  to `develop`** so any machine can pull the latest state.
+- **Never strand work.** If work is unfinished at the end of a session, commit WIP to
+  `develop` anyway with a `wip:` message prefix so nothing is stuck on one machine.
+- **Maintain `PLAN.md` at all times** as the source of truth:
+  - When given tasks, write them into **Todo** first, then start.
+  - Move a task to **Active** and mark it `[~]` when you start it.
+  - Mark it `[x]` and move it to **Done** with a one-line note and the commit hash when
+    finished.
+  - Mark it `[!]` and move it to **Blocked/Failed** with the reason if it fails.
+  - Update **"Last updated"** and **"Now working on"** each time.
+- **Commit `PLAN.md` together with the code change it describes**, on `develop`.
+- **For large backlogs, also keep `TASKS.md` updated** as the full board.
+- **At the START of every session, read `PLAN.md` (and `TASKS.md`) and continue from
+  there.** Never rely on in-session memory surviving across machines — if it matters, it
+  must be in `PLAN.md` and committed.
 
----
+## Packaging
 
-## Repository layout
+- **Always pack the NuGet package in `Release` mode, output to `src/Downloader/bin/nupkg/`.**
+  This is the project's standard package output location.
 
-```
-src/
-  Downloader/                  # Main library (the NuGet package)
-    Exceptions/                # IncompleteDownloadException, FileExistException
-    Extensions/                # ExceptionHelper, FileHelper, UrlHelper
-    Helpers/                   # internal helpers
-  Downloader.Test/             # All tests (xUnit)
-    UnitTests/                 # Component-level tests
-    IntegrationTests/          # End-to-end tests against DummyHttpServer
-    HelperTests/               # Utility/server-endpoint tests
-  Downloader.DummyHttpServer/  # ASP.NET test server used by integration tests
-  Samples/Downloader.Sample/   # Console sample app (download.json drives URLs)
-  .editorconfig                # Authoritative code-style rules (see skill)
-```
-`.editorconfig` lives in `src/`, not the repo root.
+  ```bash
+  dotnet pack src/Downloader/Downloader.csproj -c Release -o src/Downloader/bin/nupkg/
+  ```
 
----
+  This produces `Downloader.<version>.nupkg` (and the symbols package) there. Use this path
+  for any local pack/publish step instead of a temp directory.
 
-## Key source files (`src/Downloader/`)
+## Token-efficient builds & tests (MANDATORY)
 
-| File | Role |
-|---|---|
-| `AbstractDownloadService.cs` | Base class: lifecycle, events, pause/resume/cancel, progress aggregation, `Serializer` |
-| `DownloadService.cs` | Concrete impl: `StartDownload()`, parallel/serial dispatch, auto-resume, terminal-state rule |
-| `DownloadConfiguration.cs` | All settings; `INotifyPropertyChanged`, `ICloneable` |
-| `RequestConfiguration.cs` | Per-request HTTP knobs: headers, proxy, auth, cookies, redirect, user-agent |
-| `Request.cs` | HTTP request model; URL→filename extraction |
-| `SocketClient.cs` | `HttpClient`/`SocketsHttpHandler` wrapper: header fetch, range-support probe, **redirect handling**, file-size + filename extraction |
-| `DownloadPackage.cs` | Live state snapshot: chunks, file size, status, storage handle; `TrySetCompleteState()` |
-| `Chunk.cs` | One file segment: start/end/position, retry counter, timeout |
-| `ChunkHub.cs` | Splits the file into N chunks honoring `MinimumChunkSize` |
-| `ChunkDownloader.cs` | Downloads one chunk: retry/backoff loop, pause support, `ArrayPool` reads, throttle wiring |
-| `ConcurrentStream.cs` | Thread-safe write stream with a background `Watcher` task |
-| `ConcurrentPacketBuffer.cs` | Bounded async queue of `Packet`s (back-pressure for memory cap) |
-| `ThrottledStream.cs` | Enforces per-chunk bandwidth limit |
-| `Bandwidth.cs` | Tracks instantaneous + average speed |
-| `PauseTokenSource.cs` / `PauseToken.cs` | Pause primitive over `SemaphoreSlim` |
-| `DownloadBuilder.cs` | Fluent API: `DownloadBuilder.New().WithUrl(...).Build().StartAsync()` |
-| `Extensions/ExceptionHelper.cs` | `IsMomentumError` (retry classification), `IsRedirectError`, cert validation |
-| `Extensions/UrlHelper.cs` | `EnsurePathEncoded` — normalizes attacker-influenceable URLs before `new Uri()` |
+- **`dotnet build`**: always run with `-v q --nologo`. Only re-run without `-v q` if you need
+  to inspect a specific error in detail.
+- **`dotnet test`**: always run with `-v q --nologo`. On failure, re-run ONLY the failing
+  test(s) with `--filter FullyQualifiedName~<TestName>` instead of the whole suite.
+- **Long-running commands** (`dotnet test`, `dotnet build`, `dotnet pack`, `gh run watch`):
+  run them with `run_in_background: true` and wait for the completion notification — never
+  poll in a `while … sleep` loop, and never dump their full output into context. After
+  completion, read only the tail / failure section of the output.
 
----
+<!-- rtk-instructions v2 -->
+# RTK (Rust Token Killer) - Token-Optimized Commands
 
-## Architecture overview
+## Golden Rule
 
-### Download flow
+**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
 
-```
-DownloadFileTaskAsync(url, path)
-  └── InitialDownloader()            // SocketClient, Request, ChunkHub, semaphores
-  └── StartDownload()
-        ├── GetFileSizeAsync()       // probe via SocketClient (Range: 0-0)
-        ├── IsSupportDownloadInRange()
-        ├── ProvideDownloadOnFile()
-        │     └── TryResumeFromExistingFile()   // read metadata appended to .download file
-        ├── Package.BuildStorage()   // ConcurrentStream over FileStream or MemoryStream
-        ├── ChunkHub.SetFileChunks()
-        ├── ParallelDownload() | SerialDownload()
-        │     └── DownloadChunk() × N → ChunkDownloader.Download()
-        │           └── ReadStream() → ConcurrentStream.WriteAsync()
-        └── SendDownloadCompletionSignal()
-              └── Package.TrySetCompleteState()  // truncate metadata, rename .download → final
+**Important**: Even in command chains with `&&`, use `rtk`:
+```bash
+# ❌ Wrong
+git add . && git commit -m "msg" && git push
+
+# ✅ Correct
+rtk git add . && rtk git commit -m "msg" && rtk git push
 ```
 
-### Producer–consumer for writes
+## RTK Commands by Workflow
 
-`ChunkDownloader` rents buffers from `ArrayPool<byte>.Shared`, wraps them in `Packet`s (buffer +
-position) and pushes to `ConcurrentPacketBuffer`. A single `LongRunning` `Watcher` task in
-`ConcurrentStream` dequeues packets, writes them to the underlying stream in order, and returns the
-buffers. `MaximumMemoryBufferBytes` bounds the queue (back-pressure).
+### Build & Compile (80-90% savings)
+```bash
+rtk cargo build         # Cargo build output
+rtk cargo check         # Cargo check output
+rtk cargo clippy        # Clippy warnings grouped by file (80%)
+rtk tsc                 # TypeScript errors grouped by file/code (83%)
+rtk lint                # ESLint/Biome violations grouped (84%)
+rtk prettier --check    # Files needing format only (70%)
+rtk next build          # Next.js build with route metrics (87%)
+```
 
-### Auto-resume (`.download` files)
+### Test (60-99% savings)
+```bash
+rtk cargo test          # Cargo test failures only (90%)
+rtk go test             # Go test failures only (90%)
+rtk jest                # Jest failures only (99.5%)
+rtk vitest              # Vitest failures only (99.5%)
+rtk playwright test     # Playwright failures only (94%)
+rtk pytest              # Python test failures only (90%)
+rtk rake test           # Ruby test failures only (90%)
+rtk rspec               # RSpec test failures only (60%)
+rtk test <cmd>          # Generic test wrapper - failures only
+```
 
-The library **always** downloads to a temp file with `DownloadFileExtension` (default `.download`),
-then renames on success — independent of `EnableAutoResumeDownload`.
+### Git (59-80% savings)
+```bash
+rtk git status          # Compact status
+rtk git log             # Compact log (works with all git flags)
+rtk git diff            # Compact diff (80%)
+rtk git show            # Compact show (80%)
+rtk git add             # Ultra-compact confirmations (59%)
+rtk git commit          # Ultra-compact confirmations (59%)
+rtk git push            # Ultra-compact confirmations
+rtk git pull            # Ultra-compact confirmations
+rtk git branch          # Compact branch list
+rtk git fetch           # Compact fetch
+rtk git stash           # Compact stash
+rtk git worktree        # Compact worktree
+```
 
-When `EnableAutoResumeDownload = true`:
-- During download (~1 s cadence) `Package` state is serialized (JSON→binary) and **appended after**
-  `TotalFileSize` inside the `.download` file.
-- On resume: bytes past `TotalFileSize` = metadata → deserialize, verify `TotalFileSize` matches the
-  server, restore `Chunks[]`. Any mismatch → discard and download fresh.
+Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
+
+### GitHub (26-87% savings)
+```bash
+rtk gh pr view <num>    # Compact PR view (87%)
+rtk gh pr checks        # Compact PR checks (79%)
+rtk gh run list         # Compact workflow runs (82%)
+rtk gh issue list       # Compact issue list (80%)
+rtk gh api              # Compact API responses (26%)
+```
+
+### JavaScript/TypeScript Tooling (70-90% savings)
+```bash
+rtk pnpm list           # Compact dependency tree (70%)
+rtk pnpm outdated       # Compact outdated packages (80%)
+rtk pnpm install        # Compact install output (90%)
+rtk npm run <script>    # Compact npm script output
+rtk npx <cmd>           # Compact npx command output
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bezzad/Downloader](https://github.com/bezzad/Downloader) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
