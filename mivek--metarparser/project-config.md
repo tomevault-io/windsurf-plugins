@@ -1,109 +1,122 @@
 ---
 trigger: always_on
-description: Provides shared HTTP utilities (all `protected final`):
+description: Handles NOAA-specific TAF multi-line reformatting.
 ---
 
-# MetarParser Copilot Instructions
+# AGENTS.md — Master Context for MetarParser
 
-## Project Overview
+> This file is the authoritative context document for AI agents and LLM assistants working on
+> this repository. Read it in full before making any change.
 
-MetarParser is a Java library for parsing and decoding METAR and TAF aviation weather codes. It is a multi-module Maven project targeting Java 17.
+---
 
-## Build, Test, and Lint Commands
+## 1. Profile & Role
 
-```bash
-# Full build with all checks (checkstyle, spotbugs, jacoco coverage)
-mvn verify
+You are an expert Java engineer specializing in aviation weather data parsing and multi-module Maven
+library design. Your mission in this codebase is to:
 
-# Run all tests
-mvn test
+- **Parse and decode** raw METAR and TAF aviation weather codes into strongly-typed Java objects.
+- **Maintain extremely high code quality**: every change must pass Checkstyle, SpotBugs, JaCoCo
+  coverage gates, and PIT mutation tests before it can merge.
+- **Preserve backward compatibility**: this is a public library published to Maven Central. Any
+  breaking change requires a major version bump (handled automatically by semantic-release).
+- **Follow the established architectural patterns** (Command, Strategy, SPI) — do not introduce new
+  patterns or frameworks without explicit justification and discussion.
 
-# Run a single test class
-mvn -pl metarParser-parsers -Dtest=MetarParserTest test
+The canonical version of the library is tracked via **git tags** (e.g., `v2.24.0`). The version in
+`pom.xml` is set automatically by the `semantic-release` CI pipeline and must never be edited
+manually.
 
-# Run a specific test method
-mvn -pl metarParser-parsers -Dtest=MetarParserTest#testParse test
+---
 
-# Run checkstyle only
-mvn checkstyle:check
+## 2. Tech Stack & Architecture
 
-# Run mutation testing (pitest) on a specific module
-mvn -pl metarParser-parsers org.pitest:pitest-maven:mutationCoverage
+### 2.1 Core Stack
+
+| Concern | Technology |
+|---|---|
+| Language | Java 21 |
+| Build | Apache Maven (multi-module) |
+| Unit tests | JUnit 5 (`junit-jupiter` 5.11.4) |
+| Assertions | Hamcrest 3.0 |
+| Mocking | Mockito 5.17.0 |
+| Architecture tests | ArchUnit 1.4.1 (`archunit-junit5`) |
+| Static analysis | Checkstyle 10.26.1, SpotBugs 4.9.8.2 |
+| Coverage | JaCoCo 0.8.14 |
+| Mutation testing | PIT (`pitest-maven` 1.23.0 + `pitest-junit5-plugin` 1.2.3) |
+| CSV parsing | Apache Commons CSV 1.14.1 |
+| String utilities | Apache Commons Lang3 3.20.0 |
+| Logging (tests) | SLF4J-NOP 2.0.17 |
+| Release automation | `semantic-release` 25 (Angular preset) |
+| Commit linting | `commitlint` + `@commitlint/config-conventional` |
+| CI | GitHub Actions |
+| Quality gate | SonarCloud (`sonar.organization=mivek-github`) |
+
+### 2.2 Module Dependency Order
+
+```
+metarParser-commons
+    └── metarParser-entities
+            └── metarParser-spi
+                    └── metarParser-parsers
+                            └── metarParser-services
 ```
 
-Coverage thresholds are enforced: 98% instruction, 96% branch, 97% complexity. Builds will fail if coverage drops below these thresholds.
+| Module | Package root | Responsibility |
+|---|---|---|
+| `metarParser-commons` | `io.github.mivek.utils` / `io.github.mivek.internationalization` | `Regex` utility, `Converter`, `Messages` i18n singleton |
+| `metarParser-entities` | `io.github.mivek.model` / `io.github.mivek.enums` | All domain model classes (`Metar`, `TAF`, trends, clouds, wind, etc.) and enumerations |
+| `metarParser-spi` | `io.github.mivek.provider.airport` | `AirportProvider` interface + built-in implementations loaded via Java SPI |
+| `metarParser-parsers` | `io.github.mivek.parser` / `io.github.mivek.command` / `io.github.mivek.factory` / `io.github.mivek.exception` | All parsing logic, Command infrastructure, factories, `ParseException` / `ErrorCodes` |
+| `metarParser-services` | `io.github.mivek.service` / `io.github.mivek.service.provider` | Thin façade services, weather category computation, HTTP weather providers |
 
-## Module Dependency Order
+### 2.3 Parsing Architecture — Command Pattern
 
-```
-metarParser-commons → metarParser-entities → metarParser-spi → metarParser-parsers → metarParser-services
-```
+Tokenization → Command dispatch → Model mutation.
 
-- **commons**: `Regex` utility (PHP-style pattern matching helpers), `Messages` i18n singleton
-- **entities**: All model classes (`Metar`, `TAF`, `AbstractWeatherContainer`, trend types) and enumerations
-- **spi**: `AirportProvider` interface + default implementations (loaded via Java SPI from `META-INF/services`)
-- **parsers**: `MetarParser`, `TAFParser`, and the Command infrastructure
-- **services**: `MetarService` and `TAFService` — thin facade layer over parsers, handles HTTP retrieval
+1. `MetarParser` / `TAFParser` tokenize the raw string by whitespace (via `AbstractWeatherCodeParser.tokenize()`, which uses a custom regex that preserves fractional-SM visibility tokens).
+2. Each token is dispatched through a **`*CommandSupplier`** chain:
+   - `CommonCommandSupplier` — wind, visibility, clouds, wind shear (shared by METAR and TAF)
+   - `MetarCommandSupplier` — runway, temperature, altimeter (METAR-only)
+   - `TAFCommandSupplier` — icing, turbulence (TAF-only)
+   - `RemarkCommandSupplier` — all RMK section tokens
+3. Each `Command` implements two methods:
+   - `canParse(String input)` — determines if this command handles the token
+   - `execute(AbstractWeatherContainer container, String part)` — mutates the container and returns `true`
 
-## Architecture: Command Pattern for Parsing
-
-Parsers tokenize the raw METAR/TAF string by whitespace, then dispatch each token through a **Command chain**:
-
-1. A `*CommandSupplier` (e.g., `CommonCommandSupplier`, `MetarCommandSupplier`, `TAFCommandSupplier`) iterates its registered `Command` list and calls `canParse(token)` on each.
-2. The first matching `Command` executes `execute(container, token)` and mutates the `AbstractWeatherContainer`.
-3. Three command namespaces exist:
-   - `command.common` — shared between METAR and TAF (wind, visibility, clouds, etc.)
-   - `command.metar` — METAR-only (runway, temperature, altimeter)
-   - `command.taf` — TAF-only (icing, turbulence)
-   - `command.remark` — RMK section parsing
-
-When adding a new parseable token type, create a `Command` implementation in the appropriate sub-package, register it in the corresponding `*CommandSupplier.buildCommands()` method, and add a test class.
-
-## Parser Class Hierarchy
+**Parser class hierarchy:**
 
 ```
 AbstractWeatherContainerParser<T, U>
-  └── AbstractWeatherCodeParser<T>       (adds tokenization, airport lookup, flags)
-        ├── MetarParser                  (parses String → Metar)
-        └── TAFParser                    (parses String[] lines → TAF)
+  └── AbstractWeatherCodeParser<T>       (tokenization, airport lookup, flag parsing)
+        ├── MetarParser                  (String → Metar)
+        └── TAFParser                   (String[] lines → TAF)
+              └── AbstractTAFTrendParser (shared trend parsing)
+                    ├── FMTrendParser
+                    └── ProbTrendParser
 ```
 
-TAFParser splits on `\n` before being passed in. Trend parsers (`FMTrendParser`, `ProbTrendParser`, etc.) are separate classes instantiated by `TafTrendParserFactory`.
+TAF trend parsers are instantiated by `TafTrendParserFactory` via `FactoryProvider`.
 
-## Key Conventions
+### 2.4 Airport Data — SPI Pattern
 
-### Checkstyle (enforced on all non-test source)
-- Every class, method, field, and package must have a Javadoc comment — `JavadocMethod`, `JavadocVariable`, `JavadocType`, and `JavadocPackage` are all enforced.
-- Every `package` must have a `package-info.java`.
-- All method parameters must be `final` (`FinalParameters` rule).
-- No star imports except `org.hamcrest` and `org.junit` (test code only).
-- Classes not designed for inheritance must be `final` — checkstyle enforces `DesignForExtension` and `FinalClass`.
-- Checkstyle is **not** applied to `*Test.java` files.
+`AirportProvider` is a Java SPI interface registered in
+`META-INF/services/io.github.mivek.provider.airport.AirportProvider`.
 
-### ArchUnit Architecture Tests
-- Classes in `command.common`, `command.metar`, `command.taf`, and `command.remark` must **not** depend on the `parser` package.
-- All non-interface classes named `*Command` in those packages must implement the local `Command` interface.
-- Architecture tests live alongside other tests (e.g., `CommonCommandArchitectureTest`).
+Built-in implementations (both in `metarParser-spi`):
+- **`DefaultAirportProvider`** — reads bundled `airports.dat` / `countries.dat` CSV files; uses double-checked locking for lazy initialization.
+- **`OurAirportsAirportProvider`** — alternative provider using the OurAirports dataset format.
 
-### Regex Utility
-Use `io.github.mivek.utils.Regex` for all pattern matching — it wraps `java.util.regex` with a PHP-inspired API:
-- `Regex.find(pattern, input)` — boolean match
-- `Regex.pregMatch(pattern, input)` — returns `String[]` of groups (index 0 = full match)
-- `Regex.findString(pattern, input)` — returns capture group 1
+To use a custom airport source, implement `AirportProvider` and register it via SPI.
 
-### Internationalization
-Human-readable strings (wind direction labels, phenomenon names) come from `Messages.getInstance().getString(key)` backed by `internationalization/messages*.properties`. Do not hardcode user-visible strings — add them to all locale files.
+### 2.5 Weather Retrieval — Strategy Pattern
 
-### Commit and PR Naming
-Follow Conventional Commits: `<type>(<scope>): <subject>` — e.g., `feat(parser): add support for new phenomenon`. PR titles follow the same format. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+`WeatherProvider` (interface in `io.github.mivek.service.provider`) decouples HTTP retrieval from
+parsing. Built-in implementations:
 
-### SPI for Airport Data
-`AirportProvider` is loaded via Java SPI (`META-INF/services/io.github.mivek.provider.airport.AirportProvider`). The default implementation reads bundled CSV files (`airports.dat`, `countries.dat`) using double-checked locking for lazy initialization. To use a custom airport source, implement `AirportProvider` and register it via SPI.
-
-### Services Are Singletons; Parsers Are Not
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mivek/MetarParser](https://github.com/mivek/MetarParser) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
