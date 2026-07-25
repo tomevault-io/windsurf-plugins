@@ -1,93 +1,87 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This document provides context for the HiDock Next project, a suite of applications for managing HiDock® devices.
 ---
 
-# CLAUDE.md
+# Gemini Project Context: HiDock Next
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## ⛔ CRITICAL: USB Device Safety — READ FIRST
-
-**HiDock USB devices lock up when improperly accessed. The device is NOT corrupted — the USB interface gets stuck in "active" state, rejecting new connections until drained or physically restarted. This has happened multiple times and is UNACCEPTABLE.**
-
-### NEVER DO:
-- **Multiple `open()`/`close()` cycles** in rapid succession
-- **Exploratory USB scripts** ("let me try `findByIds()` and see what happens")
-- **Diagnostic probing** (testing different USB APIs, checking endpoints, dumping descriptors)
-- **Retrying failed connections** — if `LIBUSB_ERROR_ACCESS` appears, STOP IMMEDIATELY
-- **Switching between USB APIs** (WebUSB vs native `usb` vs PyUSB) on the same device
-- **Any USB code that isn't the final, tested implementation**
-- **Using `endpoint.transfer()` in a manual read loop** — causes data loss on Windows due to `BlockingCall` gap in the USB event thread. Use `endpoint.startPoll()` instead (see below).
-
-### ALWAYS DO:
-- **Test ALL USB code with mocks first** — unit tests, never real hardware
-- **ONE clean connection attempt** when code is ready
-- **ONE proper cleanup** (`stopPoll()` → wait for `'end'` → `release(true)` → `close()`)
-- **If `LIBUSB_ERROR_ACCESS`: try drain first** (see recovery below), then ask user to power-cycle only if drain fails
-- **Use `startPoll(3, 32768)` for reading** — keeps 3 transfers pending in the kernel. This is the ONLY correct way to do continuous USB reads with the npm `usb` package on Windows. The `3` means 3 simultaneous transfers; `32768` = `wMaxPacketSize * 64`.
-- **Use `stopPoll()` for disconnect** — cancels all pending transfers cleanly. Listen for the `'end'` event before calling `release()`/`close()`.
-
-### Recovery — USB Drain:
-If the device enters `LIBUSB_ERROR_ACCESS` state, attempt this drain before asking for physical restart:
-```javascript
-dev.open();
-iface.claim();
-epIn.timeout = 1000;
-// Read until timeout error (queue empty)
-epIn.transfer(51200, callback); // repeat until err
-iface.release(true, () => dev.close());
-```
-This clears any pending USB transfers and often recovers the device without power cycle.
-
-### Jensen Protocol — File List Behavior:
-1. Send `CMD_GET_FILE_LIST` (cmd=4)
-2. Device takes **~90 seconds** to prepare and send all data (for 1400 files)
-3. First response: Jensen message (cmd=4) with body starting `0xFF 0xFF` + 4-byte total count + file entries
-4. Subsequent responses: Jensen messages (cmd=4) with more file entries
-5. All responses have valid Jensen headers (`0x12 0x34`)
-6. Final message has `bodyLength=0` = end of list
-7. **Multiple transfers MUST be pending** — use `startPoll(3, 32768)`, not `transfer()`
-8. **Header length field is 24-bit** — upper byte of the 4-byte length field is checksum length, lower 3 bytes are body length. `bodyLen = rawLen & 0x00FFFFFF`
-
-### Why:
-The HiDock USB controller enters a locked state (interface still marked "active") when subjected to rapid open/close cycles or concurrent access attempts from different USB stacks. Once in this state, ALL programs (browser, Python, Node.js, even the official HiNotes site) fail with "Access denied" until drain or physical power cycle. The user has used HiDock for over a year without this issue — every occurrence was caused by AI agents doing USB probing.
-
----
+This document provides context for the HiDock Next project, a suite of applications for managing HiDock® devices.
 
 ## Project Overview
 
-**HiDock Next** is a **universal knowledge hub** - an integrated suite of applications that extracts insights, manages information, and produces results from ANY knowledge source (recordings, PDFs, PPTX, DOCX, MD, notes, calendar, email, Slack, and more).
+HiDock Next is a community-driven, open-source project that provides desktop and web applications for managing files on HiDock® devices. It is not affiliated with the official HiDock brand. The project is a monorepo containing a desktop application, a web application, and an audio analysis tool.
 
-### The Suite Evolution
+The core functionalities include:
+-   **Device File Management**: Browse, download, and organize files from HiDock® devices.
+-   **AI Transcription**: Integrated with over 11 AI providers, including Google Gemini.
+-   **Advanced Audio Player**: Features waveform visualization.
+-   **Calendar Integration**: Correlates audio files with meetings (Windows only).
 
-The project evolved through four iterations, each building toward the ultimate vision:
+### Applications
 
-1. **Desktop App** (`apps/desktop/`) - **First iteration: Device management focused**
-   - Python/CustomTkinter GUI for managing HiDock® devices (H1, H1E, P1 models)
-   - USB communication via Jensen protocol (PyUSB)
-   - File sync, device settings, storage management
-   - **Entry point**: Where users typically discover HiDock Next
-   - **Focus**: Hardware management and basic file operations
+-   **Desktop App**: A full-featured desktop application built with Python and CustomTkinter for Windows, macOS, and Linux.
+-   **Web App**: A modern, browser-based interface built with React and TypeScript, using the WebUSB API for device communication.
+-   **Audio Insights**: A tool for AI-powered analysis and transcription of audio files.
 
-2. **Web App** (`apps/web/`) - **Second iteration: Transcription focused**
-   - React/TypeScript browser interface using WebUSB
-   - AI transcription with multiple providers (Gemini, OpenAI, etc.)
-   - Web-based device access (no drivers needed)
-   - **Focus**: Making recordings accessible and transcribable anywhere
+## Building and Running
 
-3. **Audio Insights** (`apps/audio-insights/`) - **Third iteration: Insights prototype**
-   - AI-powered audio analysis tool
-   - Extracting insights from transcriptions
-   - **Focus**: Proving the concept of knowledge extraction from audio
+### Desktop Application
 
-4. **Electron App** (`apps/electron/`) - **Fourth iteration: The integrated hub** ⭐ **CURRENT FOCUS**
-   - **Vision**: Universal knowledge hub integrating all previous capabilities
-   - **Scope**: Not just audio, but ANY artifact as a knowledge source
-   - Knowledge sources: recordings, PDFs, presentations, documents, markdown, notes, calendar events, emails, Slack messages, etc.
+**Technology Stack:**
+-   **Python**: 3.12+
+-   **GUI**: CustomTkinter
+-   **Device Communication**: PyUSB
+-   **Audio**: Pygame
+-   **Dependencies**: `pyproject.toml`
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Commands:**
+-   **Setup (Windows):** `setup-windows.bat`
+-   **Setup (macOS/Linux):** `./setup-unix.sh`
+-   **Run (Windows):** `run-desktop.bat`
+-   **Run (macOS/Linux):** `./run-desktop.sh`
+-   **Run Tests:** `cd apps/desktop && pytest tests/`
+
+### Web Application
+
+**Technology Stack:**
+-   **Framework**: React 18 with TypeScript
+-   **Build Tool**: Vite
+-   **Styling**: Tailwind CSS
+-   **State Management**: Zustand
+-   **Dependencies**: `package.json`
+
+**Commands:**
+-   **Install Dependencies:** `cd apps/web && npm install`
+-   **Run Dev Server:** `npm run dev`
+-   **Build:** `npm run build`
+-   **Run Tests:** `npm run test`
+
+## Development Conventions
+
+### Code Style
+
+-   **Line Length**: 120 characters for all languages.
+-   **Python**:
+    -   **Formatting**: Black
+    -   **Linting**: Flake8, Pylint
+    -   **Import Sorting**: isort
+    -   **Type Checking**: mypy
+-   **TypeScript/JavaScript**:
+    -   **Linting**: ESLint with React hooks rules.
+
+### Testing
+
+-   The project has a strong emphasis on testing, with over 581 tests.
+-   **Desktop App**:
+    -   Uses `pytest` for unit, integration, performance, and device tests.
+    -   Aims for 80% minimum test coverage.
+-   **Web App**:
+    -   Uses `vitest` and `React Testing Library` for component, service, and integration tests.
+
+### Pre-commit Hooks
+
+The project uses pre-commit hooks to automate code quality checks before commits. These are configured in `.pre-commit-config.yaml` and are installed as part of the developer setup.
 
 ---
 > Source: [sgeraldes/hidock-next](https://github.com/sgeraldes/hidock-next) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
