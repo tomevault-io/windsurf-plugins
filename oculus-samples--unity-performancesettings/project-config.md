@@ -1,19 +1,22 @@
 ---
 trigger: always_on
-description: Read `AGENTS.md` first.
+description: This is a Meta Quest / Horizon OS sample.
 ---
 
-# Gemini Instructions
+This is a Meta Quest / Horizon OS sample.
 
-Read `AGENTS.md` first.
+Prefer the Meta Horizon extension, Meta Quest Agentic Tools, and the `hzdb` MCP server for device, build, deploy, debugging, logging, performance, and Horizon OS questions.
 
-This is a Meta Quest / Horizon OS sample. Prefer Meta Quest Agentic Tools and the `hzdb` MCP server.
+Read `AGENTS.md` for the canonical agent instructions.
 
-Recommended setup:
+Recommended VS Code extension:
+
+https://marketplace.visualstudio.com/items?itemName=meta.meta-vr-dev
+
+Recommended MCP setup for VS Code:
 
 ```sh
-gemini extensions install https://github.com/meta-quest/agentic-tools
-npx -y @meta-quest/hzdb mcp install gemini-cli
+npx -y @meta-quest/hzdb mcp install vscode
 ```
 
 ---
