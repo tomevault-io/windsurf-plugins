@@ -1,0 +1,103 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+`dymon` is a C++17 project that prints labels on DYMO LabelWriter printers (Wireless, 450, 550) by speaking a reverse-engineered TCP protocol (documented in `protocol.md`). It builds three executables:
+
+- `dymon_pbm` — print a P4 PBM bitmap file from the command line.
+- `dymon_srv` — HTTP print server: REST API (`/labels`, `/pbm`) plus a static web UI for printing via a form.
+- `txt2pbm` — convert formatted text into a P4 PBM file.
+
+There are no third-party C/C++ dependencies to install: all libs are vendored under `libs/` (`cjson`, `cpp-httplib`, `argtable3`, `base64`). Fonts are vendored as generated headers under `src/bitmap/fonts/`.
+
+## Build
+
+CMake project (`CMakeLists.txt`, version is the single source of truth via `project(dymon VERSION ...)` → `APP_VERSION`). There is no test suite, linter, or `make test` target.
+
+### Linux
+
+```bash
+cmake -B build/linux
+cmake --build build/linux --parallel
+```
+
+Binaries land in `build/linux/`.
+
+### Windows x64 — cross-compile from Linux
+
+Requires `mingw-w64` (`sudo apt-get install mingw-w64`).
+
+```bash
+cmake -B build/win64 \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/mingw64-linux-cross-toolchain.cmake \
+    -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lpthread -Wl,-Bdynamic"
+cmake --build build/win64 --parallel
+```
+
+### Windows x64 — native build on Windows
+
+With MinGW-w64 on `PATH`:
+
+```bat
+cmake -B build/win64 -G "MinGW Makefiles"
+cmake --build build/win64 --parallel
+```
+
+Binaries land in `build/win64/`. See `build.md` for toolchain file options and automated release details.
+
+## Running locally without hardware
+
+`dymo_wireless_mock.py` listens on TCP 9100 and replies to status requests with 32 zero bytes, emulating a printer. Use it as a `--net` target. Alternatively, run `dymon_srv --dir <DIR>` to write each label to a PBM file instead of printing.
+
+```bash
+python3 dymo_wireless_mock.py            # in one terminal
+./build/dymon_srv --serve www --net 127.0.0.1   # in another
+```
+
+## Architecture
+
+### Transport abstraction (`src/dymon/`)
+
+`Dymon` (`dymon.h`) is an abstract base implementing the protocol state machine (`ping`/`start`/`read_status`/`print`/`end`) and status decoding. The protocol is identical across transports — USB tunnels the same TCP bytes — so only four virtuals (`connect`/`send`/`receive`/`close`) are overridden per backend:
+
+- `DymonNet` — TCP socket to a printer IP. Platform split: `dymon_net_linux.cpp` / `dymon_net_win32.cpp`.
+- `DymonUsb` — USB device. Platform split: `dymon_usb_linux.cpp` / `dymon_usb_win32.cpp` (Windows also pulls in `usbprint_win32.c` to resolve a `vid_xxxx` to a device path).
+- `DymonFile` (`dymon_file.cpp`) — writes labels as PBM files to a directory instead of printing; the `meta` field becomes a PBM comment.
+
+`CMakeLists.txt` selects the `*_linux.cpp` vs `*_win32.cpp` sources via `if(WIN32)`. **macOS uses the Linux sources.** A `lw450flavor` flag changes status-byte interpretation and session handshake for LabelWriter 450-class printers; this is why `--model 450` is often mandatory.
+
+`Dymon::ping(void *arg)` is implemented in the base class: it calls the virtual `connect` + `close` and returns whether the device was reachable. It has no side effects and works across all backends without per-class overrides (`DymonFile` always returns `true`).
+
+### Bitmap generation (`src/bitmap/`, `src/barcode/`)
+
+`bitmap.cpp` is the 1-bpp framebuffer (with 90° rotation for orientation changes). `bitmap_fromText.cpp` is the shared "text processor": it parses the minimal markup language (font size, alignment, horizontal rules, EAN barcodes — see `pbm.md`) using `glyphIterator` + `utf8decoder` and the vendored FreeSans font headers. **Both `txt2pbm` and `dymon_srv` use this same text processor**, so markup behavior is guaranteed consistent between them.
+
+### Server (`src/main_dymon_srv.cpp`)
+
+Built on `cpp-httplib`. HTTP handlers process requests **synchronously** — they block until the operation completes and return an HTTP status code reflecting the actual outcome:
+
+- `200 OK` — success
+- `503 Service Unavailable` — printer unreachable (connect failed)
+- `500 Internal Server Error` — printer was reached but print job failed mid-way
+
+The JSON response body mirrors the status: `{"status":"OK"}`, `{"status":"Service Unavailable"}`, or `{"status":"Internal Server Error"}`.
+
+**`POST /labels`** accepts a JSON object or array. `TextLabel::fromJson` renders each label into a bitmap → `m_print_labels` drives `DymonPrinter` serially. If the first object in the array has no `"text"` field it is treated as a **ping/test request**: `DymonPrinter::ping` is called and `200`/`503` returned without printing.
+
+**`POST /pbm`** accepts a raw binary P4 PBM or newline-separated base64 PBMs. If the body contains no valid PBM it is treated as a **ping/test request**: same `200`/`503` behaviour.
+
+`DymonPrinter` (`main_dymon_srv.cpp`) is a thin wrapper around a `Dymon *` that resolves the `device`/`ip` argument: if a fixed device was set at startup (via `--usb`/`--net`/`--dir`), it always takes precedence over the `ip` field in the request.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [minlux/dymon](https://github.com/minlux/dymon) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
