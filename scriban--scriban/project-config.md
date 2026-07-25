@@ -1,14 +1,14 @@
 ---
 trigger: always_on
-description: Single source of truth: read and follow `AGENTS.md`.
+description: Single source of truth: read and follow `../AGENTS.md`.
 ---
 
-# Claude Instructions
+# GitHub Copilot Instructions
 
-Single source of truth: read and follow `AGENTS.md`.
+Single source of truth: read and follow `../AGENTS.md`.
 
-Do not duplicate instructions here. If anything conflicts, `AGENTS.md` wins.
+Do not duplicate instructions here. If anything conflicts, `../AGENTS.md` wins.
 
 ---
 > Source: [scriban/scriban](https://github.com/scriban/scriban) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
