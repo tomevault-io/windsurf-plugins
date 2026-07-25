@@ -1,116 +1,57 @@
 ---
 trigger: always_on
-description: Cloak is a **VS Code extension** that hides and shows secrets in environment files (`.env`). It manipulates TextMateRules to set the foreground color to transparent, so secrets are invisible while presenting, streaming, or recording.
+description: This is a **VS Code extension** written in TypeScript. The `package.json` `contributes` field is the product spec — commands, settings, menus, and keybindings are all declared there.
 ---
 
-# Cloak — Agent Guide
+# Copilot Instructions — Cloak
 
-Cloak is a **VS Code extension** that hides and shows secrets in environment files (`.env`). It manipulates TextMateRules to set the foreground color to transparent, so secrets are invisible while presenting, streaming, or recording.
+## Project Type
 
-## Repository Structure
+This is a **VS Code extension** written in TypeScript. The `package.json` `contributes` field is the product spec — commands, settings, menus, and keybindings are all declared there.
 
-```
-vscode-cloak/
-├── src/
-│   ├── extension.ts              # Activation entry point, command registration
-│   ├── commands.ts               # Command handlers (hide, show, toggle, restoreDefaults)
-│   ├── statusbar.ts              # Status bar item (eye icon, toggle command)
-│   ├── logging.ts                # Output channel logger
-│   ├── configuration/
-│   │   ├── index.ts              # Re-exports
-│   │   ├── read-configuration.ts # Read VS Code settings and textMateRules
-│   │   └── update-configuration.ts # Write VS Code settings
-│   ├── models/
-│   │   ├── index.ts              # Re-exports + getExtension() helper
-│   │   ├── constants.ts          # extensionShortName, extensionId, utility fns
-│   │   ├── enums.ts              # Commands, Settings, Sections, TextMateRulesNames, TextMateScopeDefaults
-│   │   └── interfaces.ts         # ICommand, IConfiguration, ISettings
-│   └── test/
-│       ├── runTest.ts            # Test runner entry (vscode-test)
-│       ├── coverage.ts           # Istanbul coverage instrumentation
-│       └── suite/
-│           ├── index.ts          # Mocha config (TDD UI, xunit reporter)
-│           ├── basic.test.ts     # Extension activation, command/setting registration tests
-│           ├── extension.test.ts # Placeholder test suite
-│           └── lib/
-│               ├── constants.ts          # Test helpers (executeCommand)
-│               └── setup-teardown-test-suite.ts # Save/restore settings between tests
-├── resources/                    # Extension icon and screenshots
-├── dist/                         # Webpack output (not committed)
-├── .vscode/                      # Dev environment (launch configs, tasks)
-├── webpack.config.js             # Bundles src/extension.ts → dist/extension.js
-├── tsconfig.json                 # TypeScript config (commonjs, es6, strict)
-├── .eslintrc                     # ESLint + TypeScript parser
-├── .prettierrc.js                # Prettier (single quotes, trailing commas, 100 width)
-├── package.json                  # Extension manifest — commands, settings, menus, keybindings
-├── CHANGELOG.md                  # Version history
-├── README.md                     # User-facing docs
-└── LICENSE.md                    # MIT
-```
+## TypeScript Conventions
 
-## Tech Stack
+- Use `strict` mode (enforced by `tsconfig.json`)
+- Prefer `async`/`await` over raw Promises
+- Use the `vscode` namespace for all VS Code API calls — import as `import * as vscode from 'vscode'`
+- Destructure `vscode` submodules at the top of a file when used repeatedly (e.g., `const { commands } = vscode`)
+- Export functions and classes — avoid default exports
+- Use enums for string constants (`Commands`, `Settings`, `Sections`) rather than raw strings
 
-- **Language:** TypeScript
-- **Runtime:** VS Code Extension Host (Node.js)
-- **Bundler:** webpack (ts-loader)
-- **Test runner:** Mocha (TDD UI) via `vscode-test`
-- **Linter:** ESLint with `@typescript-eslint`
-- **Formatter:** Prettier
-- **Coverage:** Istanbul
-- **Extension dependency:** `mikestead.dotenv` (provides TextMate scopes for `.env` files)
+## Extension Patterns
 
-## Build & Run
+- **Command handler pattern:** Each command handler is an exported async function in `src/commands.ts`, registered in `src/extension.ts` via `commands.registerCommand(Commands.enumValue, handler)`
+- **Configuration access:** Always use the helpers in `src/configuration/` — never call `vscode.workspace.getConfiguration()` directly in command handlers
+- **Re-export barrels:** Both `src/models/index.ts` and `src/configuration/index.ts` re-export all members. Import from the barrel (`'./models'`, `'./configuration'`) not from individual files
+- **Status bar:** Single shared instance in `src/statusbar.ts` — left-aligned, uses Codicon `$(eye)`
 
-```bash
-# Install dependencies
-npm install
+## Code Style
 
-# Compile TypeScript + webpack bundle
-npm run webpack
+- **Formatter:** Prettier — single quotes, trailing commas, 100-char line width, 2-space indent (see `.prettierrc.js`)
+- **Linter:** ESLint with `@typescript-eslint` parser (see `.eslintrc`)
+- Lint with `npm run lint`, auto-fix with `npm run lint-fix`
 
-# Production bundle (used by vsce)
-npm run vscode:prepublish
+## Test Conventions
 
-# Watch mode for development
-npm run watch
+- **Runner:** Mocha with TDD UI (`suite`, `test`, `suiteSetup`, `suiteTeardown`)
+- **Host:** Tests run inside a VS Code instance via `vscode-test` — they are integration tests, not unit tests
+- **Test files:** Place tests in `src/test/suite/` with `.test.ts` suffix
+- **Setup/teardown:** Use `setupTestSuite()` and `teardownTestSuite()` from `src/test/suite/lib/setup-teardown-test-suite.ts` to save and restore user settings
+- **Assertions:** Use Node's built-in `assert` module
+- Run with `npm test` (compiles first) or `npm run just-test` (assumes already compiled)
 
-# Package the extension (.vsix)
-npm run package
+## Maintenance Matrix
 
-# Publish to VS Code Marketplace
-npm run publish
-```
-
-To debug locally, press `F5` in VS Code — this launches an Extension Development Host with the extension loaded (see `.vscode/launch.json`).
-
-## Testing
-
-```bash
-# Full test: compile TypeScript → webpack → run Mocha in VS Code host
-npm test
-
-# Run tests only (skip compile, assumes already built)
-npm run just-test
-```
-
-Tests run inside a VS Code instance via `vscode-test`. The test runner opens a `testworkspace` folder with extensions disabled. Tests use Mocha's TDD interface (`suite`, `test`, `suiteSetup`, `suiteTeardown`).
-
-Key test file: `src/test/suite/basic.test.ts` — verifies extension activation, command registration against `package.json`, and setting registration.
-
-## Key Patterns and Conventions
-
-- **`package.json` is the product spec** — all commands, settings, menus, and keybindings are declared in `contributes`. This is the source of truth for what the extension exposes to users.
-- **Command registration chain:** Commands are declared in `package.json` → enum IDs live in `src/models/enums.ts` (`Commands` enum) → handlers are in `src/commands.ts` → registration happens in `src/extension.ts` (`registerCommands()`).
-- **Configuration pattern:** Settings are declared in `package.json` `contributes.configuration` → read via `src/configuration/read-configuration.ts` → written via `src/configuration/update-configuration.ts`. Setting keys are in the `Settings` enum.
-- **TextMateRules mechanism:** Cloak works by injecting/removing TextMateRules into `editor.tokenColorCustomizations`. It sets foreground to `#19354900` (alpha 0 = transparent) to hide values. The scope defaults are in the `TextMateScopeDefaults` enum.
-- **Re-export pattern:** Both `src/models/index.ts` and `src/configuration/index.ts` re-export all members from their submodules.
-- **Status bar:** A left-aligned status bar item with an eye icon, bound to `toggleSecrets`.
-
-## Adding a New Command
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| When this changes... | Also update... |
+|---|---|
+| New command added | `package.json` (`contributes.commands`, `contributes.menus`), `src/models/enums.ts` (`Commands` enum), `src/commands.ts` (handler), `src/extension.ts` (`registerCommands()`), `CHANGELOG.md`, `README.md` (Commands table) |
+| New setting added | `package.json` (`contributes.configuration.properties`), `src/models/enums.ts` (`Settings` enum), `src/models/interfaces.ts` (`ISettings`), `src/configuration/read-configuration.ts`, `src/configuration/update-configuration.ts`, `src/test/suite/lib/setup-teardown-test-suite.ts`, `CHANGELOG.md`, `README.md` (Settings table) |
+| TextMate scope changed | `src/models/enums.ts` (`TextMateScopeDefaults`), `package.json` (`contributes.configuration` defaults), `CHANGELOG.md` |
+| Keybinding added/changed | `package.json` (`contributes.keybindings`), `README.md` |
+| Build/bundler config changed | `webpack.config.js`, `tsconfig.json`, `.github/workflows/ci.yml`, `.github/workflows/copilot-setup-steps.yml` |
+| New dependency added | `package.json`, `CHANGELOG.md` |
+| Extension version bumped | `package.json` (`version`), `CHANGELOG.md` |
 
 ---
 > Source: [johnpapa/vscode-cloak](https://github.com/johnpapa/vscode-cloak) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
