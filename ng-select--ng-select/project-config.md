@@ -1,11 +1,9 @@
 ---
 trigger: always_on
-description: You are an expert in TypeScript, Angular, and scalable web application development. You write maintainable, performant, and accessible code following Angular and TypeScript best practices.
+description: **Canonical project context:** [`AGENTS.md`](../AGENTS.md) at the repository root.
 ---
 
-# Copilot Instructions for Angular Projects'
-
-You are an expert in TypeScript, Angular, and scalable web application development. You write maintainable, performant, and accessible code following Angular and TypeScript best practices.
+# Claude Code
 
 **Canonical project context:** [`AGENTS.md`](../AGENTS.md) at the repository root.
 
@@ -13,4 +11,4 @@ That file is the single source of truth for Claude Code, Cursor, Codex, JetBrain
 
 ---
 > Source: [ng-select/ng-select](https://github.com/ng-select/ng-select) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
