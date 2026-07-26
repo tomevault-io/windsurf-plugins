@@ -1,82 +1,79 @@
 ---
 trigger: always_on
-description: Catalog of all RE tools -- pick the right tool for the job
+description: LLM-friendly static and dynamic analysis toolkit for x86/x64 PE binaries (`.exe` / `.dll`), combining static analysis (`retools`), dynamic analysis (`livetools` via Frida), and D3D9 frame tracing. Work is organized around per-game knowledge base files (`kb.h`) that accumulate discoveries and feed back into richer decompilation.
 ---
 
+# Vibe Reverse Engineering — Agent Instructions
 
-# Tool Catalog
+LLM-friendly static and dynamic analysis toolkit for x86/x64 PE binaries (`.exe` / `.dll`), combining static analysis (`retools`), dynamic analysis (`livetools` via Frida), and D3D9 frame tracing. Work is organized around per-game knowledge base files (`kb.h`) that accumulate discoveries and feed back into richer decompilation.
 
-**BEFORE FIRST USE**: Run `python verify_install.py` from the repo root. Do NOT proceed with any tool until every required check passes. If pyghidra/Ghidra shows as WARN, run `python verify_install.py --setup` to auto-download JDK 21 + Ghidra + pyghidra. Common failures: missing `git lfs pull` (LFS pointer stubs instead of binaries), missing `pip install -r requirements.txt`.
+This file is the canonical, harness-agnostic instruction set. Claude Code loads it via `.claude/CLAUDE.md`; Cursor, Copilot, Codex, and other agents read it directly. Deeper references live under `.claude/` and apply to every harness:
 
-All tools work on PE binaries (`.exe` and `.dll`). `$B` = path to binary, `$VA` = hex address, `$D` = path to minidump `.dmp` file. Check tools help command for more info on usage.
-Always consult this catalog before making any move to take the best decision on what to use with best bang for your buck.
-Run all tools from the repo root directory using `python -m <module>` syntax (e.g. `python -m retools.search`). Do NOT modify files inside `retools/`, `livetools/`, or `graphics/` unless working on the tools themselves.
+- **Tool catalog** (every retools / livetools / dx9tracer command, syntax, caveats): `.claude/references/tool-catalog.md`
+- **Tool dispatch** (which tool for which question; what runs inline vs delegated): `.claude/rules/tool-dispatch.md`
+- **Analysis workflow** (bootstrap ordering, Ghidra backend, index/query, parallel patterns): `.claude/rules/subagent-workflow.md`
+- **Skills** (`dx9-ffp-port`, `dynamic-analysis`): `.claude/skills/` — canonical copies. Non-Claude harnesses self-install them (see "Skill Setup" below).
+- **Custom agents** (`static-analyzer`): `.claude/agents/` — canonical definitions. `.cursor/agents/`, `.github/agents/`, and `.kiro/agents/` hold thin harness-native mirrors that defer to the canonical files, so only the `.claude/agents/` copies get edited.
 
-IMPORTANT: Collecting MORE INFORMATION per command run is encouraged over minor snippets of data/output that don't reveal the whole picture.
+## Skill Setup (do this first on non-Claude harnesses)
 
-## Decision Guide
+Claude Code reads `.claude/skills/` natively — skip this section. Every other harness: check whether the `dx9-ffp-port` and `dynamic-analysis` skills are available to you. If not, install them into your own skills directory before starting work:
 
-### Run Directly (main agent)
+```bash
+npx skills add ./.claude/skills -a <your-agent> -y   # e.g. -a cursor, -a copilot, -a kiro-cli
+```
 
-These are fast (<5s) and allowed inline:
+Omit `-a` to let the CLI auto-detect your harness. The source path must be `./.claude/skills` — a bare `.` finds nothing (the CLI skips the current project's agent directories).
 
-- "What compiler built this?" → `python -m retools.sigdb fingerprint $B`
-- "Is this a known library function?" → `python -m retools.sigdb identify $B $VA`
-- "Get full context before reasoning about a function" → `python -m retools.context assemble $B $VA --project $P`
-- "Clean up decompiler output with known names" → pipe through `python -m retools.context postprocess`
-- "Read a typed value from the PE file" → `python -m retools.readmem $B $VA $TYPE`
-- "What constant flows into this register?" → `python -m retools.dataflow $B $VA --constants`
-- "Trace where this value comes from" → `python -m retools.dataflow $B $VA --slice TARGET_VA:REG`
-- "Build an ASI patch DLL" → `python -m retools.asi_patcher build spec.json`
+If `npx` is unavailable or your harness isn't supported by the CLI, copy manually: each `.claude/skills/<name>/` folder goes verbatim into your harness's skills directory (Cursor: `.cursor/skills/`, Copilot: `.github/skills/`, Kiro: `.kiro/skills/`, `.agents/skills/` for agents following that convention).
 
-### Delegate to `static-analyzer` subagent
+Installed copies land in git-ignored paths (`.agents/`, `.cursor/skills/`, `.github/skills/`, `.kiro/skills/`, `skills-lock.json`) — never commit them, and never edit them: the canonical copies in `.claude/skills/` are the only ones that get edited. Re-install after pulling changes that touch `.claude/skills/`.
 
-Everything else. Tell the subagent WHAT you need, not HOW to run it — it has the full tool catalog.
+## Read-Only Templates
 
-**D3D9-specific questions?** Check the DX analysis scripts section below first — they're faster and more targeted than general retools for D3D API usage, device calls, shader constants, and vertex formats.
+These directories are **shared tooling and templates**. Do not modify them for game-specific work — per-game changes go in `patches/<GameName>/`.
 
-- "What does this function do?" → decompile + callgraph + xrefs + dataflow --constants
-- "Who calls this function?" → xrefs or callgraph --up
-- "What does this function call?" → callgraph --down (add --indirect for vtable calls)
-- "Who calls this virtual method?" → xrefs --indirect + filter by vtable slot offset
-- "What constant reaches this call?" → dataflow --constants or --slice VA:REG
-- "Resolve a switch/jump table" → cfg (auto-resolves MSVC switch patterns)
-- "Find a string and who uses it" → string search with xrefs
-- "Where is this global read/written?" → datarefs
-- "Where is struct field +0x54 used?" → structrefs
-- "What does this struct look like?" → structrefs --aggregate
-- "What C++ class is this vtable?" → RTTI resolution
-- "What type was a caught/thrown exception?" → RTTI throwinfo
-- "Find instructions using a specific constant" → instruction search
-- "What crashed and what was the error message?" → dump diagnosis + throwmap
-- "Map all throw sites to error strings" → throwmap list
-- "First time analyzing a binary?" → bootstrap (2-5 min) + pyghidra analyze (5-15 min) in parallel
-- "Bulk signature scan" → sigdb scan (1-3 min)
-- Any combination of the above
+- `rtx_remix_tools/dx/remix-comp-proxy/` — proxy framework **template** (copied per-game)
+- `rtx_remix_tools/dx/scripts/` — DX9 analysis scripts (shared tooling)
+- `retools/` — static analysis toolkit (shared tooling)
+- `livetools/` — Frida-based dynamic analysis (shared tooling)
+- `graphics/` — DX9 tracer framework (shared tooling)
 
-### Live tools (main agent, requires attached process)
+**Per-game work goes in `patches/<GameName>/`.** When starting a new game, copy `rtx_remix_tools/dx/remix-comp-proxy/` (excluding `build/`) to `patches/<GameName>/` and edit the copy. If the user says "edit remix-comp-proxy code" without specifying, ask whether they mean the template or a game copy.
 
-- "Is this function reached at runtime?" → `livetools trace` or `collect`
-- "What are the actual register values?" → `livetools trace --read` or `bp` + `regs`
-- "How many draw calls happen?" → `livetools dipcnt`
-- "Who writes to this memory address?" → `livetools memwatch`
+Shared tooling can be modified to improve the tools themselves — just not for game-specific customization.
 
-### DX analysis scripts (main agent, fast first-pass)
+## Project Workspace
 
-These are targeted D3D9 scanners under `rtx_remix_tools/dx/scripts/`. They run in seconds and surface D3D-specific patterns that general-purpose retools would take longer to find. **Use these BEFORE retools** when the question is about D3D9 API usage, device calls, shaders, or vertex formats. Run as `python rtx_remix_tools/dx/scripts/<script> <args>`.
+Use `patches/<project_name>/` (git-ignored) for all project-specific artifacts: knowledge base files (`kb.h`), one-off analysis scripts, ASI patch specs and builds, notes, logs, and collected trace data. Create the project subfolder on first use.
 
-- "How does the game use D3D9?" → `find_d3d_calls.py <game.exe>` (imports + call sites)
-- "Which VS constant registers hold matrices?" → `find_vs_constants.py <game.exe>` (SetVertexShaderConstantF call sites with register/count)
-- "Which PS constant registers are used?" → `find_ps_constants.py <game.exe>` (SetPixelShaderConstantF/I/B with register/count)
-- "Where does the game call the D3D device?" → `find_device_calls.py <game.exe>` (vtable call patterns + device pointer refs)
-- "What render states does the game set?" → `find_render_states.py <game.exe>` (SetRenderState args: culling, blending, depth, fog)
-- "How does the texture pipeline work?" → `find_texture_ops.py <game.exe>` (SetTexture stages, TSS ops, sampler filter/address modes)
-- "Which transform types are used?" → `find_transforms.py <game.exe>` (SetTransform: World, View, Projection, Texture)
-- "What surface formats does the game create?" → `find_surface_formats.py <game.exe>` (CreateTexture/RT/DS format extraction)
-- "Does the game use state blocks?" → `find_stateblocks.py <game.exe>` (state block creation/recording/apply)
+### Backups
+
+Before modifying project files (proxy source, kb.h, proxy.ini, build scripts, ASI specs), create a timestamped backup capturing the last known-good state:
+
+```
+patches/<project>/backups/YYYY-MM-DD_HHMM_<short-description-slug>/
+```
+
+Copy ALL files being modified into the backup folder before making changes.
+
+### Knowledge Base
+
+Maintain `patches/<project>/kb.h` while reverse engineering a binary. Format: C types (no prefix), functions (`@` prefix), globals (`$` prefix):
+
+```c
+struct Foo { int x; float y; };
+@ 0x401000 void __cdecl ProcessInput(int key);
+$ 0x7C5548 Object* g_mainObject
+```
+
+Update the KB when you: identify a function's purpose, reconstruct a struct, identify a global, find magic constants (define an enum), or resolve RTTI class names. Always pass `--types patches/<project>/kb.h` to the decompiler once a KB exists.
+
+## Working Method
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Ekozmaster/Vibe-Reverse-Engineering](https://github.com/Ekozmaster/Vibe-Reverse-Engineering) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
