@@ -1,138 +1,240 @@
 ---
 trigger: always_on
-description: **NEVER write code before writing a provable contract.**
+description: The Depyler Agent provides continuous Python-to-Rust transpilation services through the Model Context Protocol (MCP), enabling seamless integration with Claude Code and other AI assistants.
 ---
 
-# CLAUDE.md - Depyler Compiler Implementation Protocol
+# Depyler Background Agent Mode
 
-## CRITICAL: Contract-First Design
+The Depyler Agent provides continuous Python-to-Rust transpilation services through the Model Context Protocol (MCP), enabling seamless integration with Claude Code and other AI assistants.
 
-**NEVER write code before writing a provable contract.**
-
-All code changes MUST have a corresponding contract (YAML in ../provable-contracts/contracts/<project>/ or .pmat-work/<TICKET>/contract.json) BEFORE implementation. This is enforced by `pmat comply` CB-1400.
-
-- Use `pmat comply check` to verify contract coverage
-- Minimum verification level: L1 (recommended L3+)
-- See docs/agent-instructions/provable-contract-first-agents.md for the full workflow
-
-## Prime Directive
-**Generate correct Rust code that compiles on first attempt. Quality is built-in, not bolted-on.**
-
-## Project Context
-Depyler is a Python-to-Rust transpiler focusing on energy-efficient, safe code generation with progressive verification.
-
-## Python Packaging Protocol
-**MANDATORY: Use `uv` for ALL Python operations** (`uv add`, `uv run pytest`, `uv run <script.py>`)
-
-## Code Search (pmat query)
-
-**NEVER use grep or rg for code discovery.** Use `pmat query` instead -- it returns quality-annotated, ranked results with TDG scores and fault annotations.
+## Quick Start
 
 ```bash
-# Find functions by intent
-pmat query "python ast conversion" --limit 10
+# Start the agent in foreground mode
+depyler agent start --foreground
 
-# Find high-quality code
-pmat query "type inference" --min-grade A --exclude-tests
+# Start as background daemon
+depyler agent start --port 3000
 
-# Find with fault annotations (unwrap, panic, unsafe, etc.)
-pmat query "transpilation pass" --faults
+# Check status
+depyler agent status
 
-# Filter by complexity
-pmat query "code generation" --max-complexity 10
-
-# Cross-project search
-pmat query "rust codegen" --include-project ../trueno
-
-# Git history search (find code by commit intent via RRF fusion)
-pmat query "fix type mapping" -G
-pmat query "ast visitor" --git-history
-
-# Enrichment flags (combine freely)
-pmat query "ast visitor" --churn              # git volatility (commit count, churn score)
-pmat query "pattern matcher" --duplicates           # code clone detection (MinHash+LSH)
-pmat query "code emitter" --entropy           # pattern diversity (repetitive vs unique)
-pmat query "transpilation" --churn --duplicates --entropy --faults -G  # full audit
+# Stop the agent
+depyler agent stop
 ```
 
-## Build Environment
-- **Cargo Target**: `/Volumes/LambdaCache/cargo-target` (256GB APFS disk image, 16 jobs, incremental)
-- **DO NOT** create additional RAM disks or use /tmp for transpiler output
+## Features
 
-## Code Standard (A+)
-- Cyclomatic/Cognitive Complexity: **<=10**
-- Function Size: **<=30 lines**
-- Zero SATD (TODO/FIXME/HACK)
-- TDD Mandatory, Coverage: **>=80%** (cargo-llvm-cov)
+### 🚀 MCP Server Integration
+- **PMCP-powered**: High-performance MCP server using the PMCP SDK
+- **6 Transpilation Tools**: Comprehensive Python-to-Rust conversion capabilities
+- **Real-time Monitoring**: File system watching with automatic transpilation
+- **Claude Code Ready**: Direct integration with Claude Desktop and VS Code
 
-## CRITICAL: Never Add -D warnings to Convergence Compilation
+### 🛠️ Available MCP Tools
 
-**File**: `crates/depyler/src/converge/compiler.rs` / `compile_with_cargo()`
+1. **transpile_python_file**: Convert individual Python files to Rust
+2. **transpile_python_directory**: Batch transpilation for entire directories
+3. **monitor_python_project**: Set up continuous monitoring for a project
+4. **get_transpilation_status**: Query transpilation metrics and status
+5. **verify_rust_code**: Validate generated Rust code
+6. **analyze_python_compatibility**: Check Python feature support
 
-Adding `RUSTFLAGS=-D warnings` to convergence cargo build drops rate from 80%+ to ~0%. Generated code has harmless unused imports. Quality is enforced via clippy in CI, NOT during convergence.
+### 📊 Background Daemon Features
+- Process management with PID file tracking
+- Graceful shutdown handling
+- Health checks and automatic recovery
+- Configurable working directory
+- Comprehensive logging
 
-**Regression tests** in `compiler.rs`:
-1. `test_no_d_warnings_flag_in_source`
-2. `test_regression_warnings_must_not_cause_failure`
-3. `test_uses_cargo_when_cargo_toml_exists`
+## Installation & Setup
 
-**If convergence rate near 0%**: Check `compile_with_cargo()` for RUSTFLAGS, run `cargo test -p depyler -- test_no_d_warnings_flag`.
+### 1. Install Depyler
 
-## TDD Protocol
-Any transpiler/codegen bug: HALT -> comprehensive test suites -> failing test BEFORE fix -> validate all features after.
-
-## CLI Validation Gates
-15 gates mandatory for ALL examples: rustc --deny warnings, clippy -D warnings, rustfmt --check, basic compilation, LLVM IR, ASM, MIR, parse, type check, cargo tree, rustdoc, macro expansion, HIR dump, dead code, complexity. **NEVER bypass gates. Fix transpiler, not output.**
-
-## Development Principles
-- **Jidoka**: Never ship incomplete transpilation. Verification-first.
-- **Genchi Genbutsu**: Test against real Rust. Measure actual compilation.
-- **Hansei**: Fix broken functionality before new features.
-- **Kaizen**: Incremental verification. Performance baselines.
-- **Scientific Method**: No assumptions - prove with tests, measure everything, reproduce issues.
-
-## Critical Invariants
-1. Type safety: Must pass `cargo check`
-2. Determinism: Same input -> identical output
-3. Memory safety: No UB or leaks
-
-## Transpilation Workflow
 ```bash
-depyler transpile <input.py>                      # Basic
-depyler transpile <input.py> --verify --gen-tests  # With verification
-rustc --crate-type lib --deny warnings <output.rs> # Validate
+# From source
+cargo install --path crates/depyler
+
+# Or download pre-built binary
+curl -L https://github.com/paiml/depyler/releases/latest/download/depyler-linux-x64 -o depyler
+chmod +x depyler
+sudo mv depyler /usr/local/bin/
 ```
 
-**MANDATORY Header** in all generated .rs files:
-```rust
-// Generated by: depyler transpile <source.py>
-// Source: <source.py>
+### 2. Configure Claude Code
+
+Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "depyler": {
+      "command": "depyler",
+      "args": ["agent", "start", "--foreground"],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
 ```
 
-## Stop the Line: Bug-Fix Protocol
+### 3. Start Using in Claude Code
 
-When ANY defect is found in transpiled output, **STOP ALL WORK IMMEDIATELY**.
+Once configured, Claude will have access to Depyler's transpilation tools. You can:
+- Ask Claude to transpile Python files to Rust
+- Set up project monitoring for automatic transpilation
+- Get compatibility analysis for Python code
+- Verify generated Rust code quality
 
-1. STOP all feature work
-2. Document bug in `docs/bugs/DEPYLER-XXXX-<desc>.md`
-3. Assign sequential ticket number
-4. Root cause analysis (find transpiler bug source)
-5. **Fix the transpiler** (NEVER fix generated output)
-6. Re-transpile ALL affected files
-7. Verify comprehensively (compile, test, quality gates)
-8. Resume work only after 100% verification
+## Configuration
 
-**Severity**: P0 (compilation/type/memory safety) = STOP ALL WORK. P1 (clippy/perf) = BLOCK RELEASE. P2/P3 = TRACK.
+### Configuration File
 
-Full protocol: [docs/processes/stop-the-line.md](docs/processes/stop-the-line.md)
+Create `~/.depyler/agent.json`:
 
-## Testing Strategy
-- **Unit Tests**: >=5 per module, 85% coverage
-- **Property Tests**: >=3 per module, 1000 iterations
-- **Doctests**: >=2 per public function
+```json
+{
+  "agent": {
+    "port": 3000,
+    "debug": false,
+    "auto_transpile": true,
+    "verification_level": "basic"
+  },
+  "transpilation_monitor": {
+    "update_interval": 2,
+    "watch_patterns": ["**/*.py"],
+    "debounce_interval": 500,
+    "max_batch_size": 20,
+    "auto_transpile": true,
+    "verification_level": "basic"
+  },
+  "daemon": {
+    "working_directory": "~/.depyler",
+    "log_file": "~/.depyler/agent.log",
+    "pid_file": "/tmp/depyler_agent.pid",
+    "auto_restart": true,
+    "restart_delay": 5,
+    "max_restarts": 3
+  }
+}
+```
+
+### Environment Variables
+
+- `DEPYLER_PORT`: MCP server port (default: 3000)
+- `DEPYLER_DEBUG`: Enable debug logging
+- `DEPYLER_CONFIG`: Path to configuration file
+- `RUST_LOG`: Logging level (trace, debug, info, warn, error)
+
+## Command Reference
+
+### Start Agent
+
+```bash
+depyler agent start [OPTIONS]
+
+OPTIONS:
+    --port <PORT>           MCP server port [default: 3000]
+    --config <PATH>         Configuration file path
+    --foreground           Run in foreground (don't daemonize)
+    --debug                Enable debug mode
+```
+
+### Monitor Projects
+
+```bash
+# Add project to monitoring
+depyler agent add-project /path/to/project --id my-project
+
+# Remove project
+depyler agent remove-project my-project
+
+# List monitored projects
+depyler agent list-projects
+```
+
+### View Logs
+
+```bash
+# Show last 50 lines
+depyler agent logs
+
+# Show last 100 lines
+depyler agent logs -n 100
+
+# Follow log output
+depyler agent logs --follow
+```
+
+## API Examples
+
+### Using with MCP Clients
+
+```javascript
+// Example MCP client request
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "transpile_python_file",
+    "arguments": {
+      "file_path": "/path/to/script.py",
+      "output_path": "/path/to/output.rs",
+      "verify": true
+    }
+  },
+  "id": 1
+}
+```
+
+### Response Format
+
+```javascript
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [{
+      "type": "text",
+      "text": "✅ Successfully transpiled script.py → output.rs\n..."
+    }],
+    "metadata": {
+      "python_file": "/path/to/script.py",
+      "rust_file": "/path/to/output.rs",
+      "python_lines": 100,
+      "rust_lines": 150,
+      "transpilation_time_ms": 45,
+      "verification": "passed",
+      "warnings_count": 0
+    }
+  },
+  "id": 1
+}
+```
+
+## Architecture
+
+```
+┌─────────────────────┐
+│   Claude Code       │
+│   (MCP Client)      │
+└──────────┬──────────┘
+           │ JSON-RPC
+           ▼
+┌─────────────────────┐
+│  Depyler MCP Server │
+│     (PMCP SDK)      │
+├─────────────────────┤
+│   Tool Handlers     │
+│  - Transpile File   │
+│  - Monitor Project  │
+│  - Verify Code      │
+└──────────┬──────────┘
+           │
+           ▼
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [paiml/depyler](https://github.com/paiml/depyler) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
