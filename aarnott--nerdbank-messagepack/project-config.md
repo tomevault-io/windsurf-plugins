@@ -66,6 +66,18 @@ dotnet run --no-build -c Release
 ```
 Should start web server without errors (web UI testing limited in this environment).
 
+## Performance optimization
+
+* Establish a BenchmarkDotNet baseline before changing a hot path. For primitive integer encoding and decoding, run:
+  ```bash
+  dotnet run --project test/Benchmarks/Benchmarks.csproj -c Release -f net10.0 -- --filter "*IntegerPrimitives*" --job short
+  ```
+* Keep benchmark input distributions explicit and reproducible. `Small`, `Mixed`, and `Large` integer datasets exercise distinct MessagePack encodings and branch-prediction behavior; do not replace them with a single representative input.
+* For branch-sensitive work, use sufficiently large randomized datasets so a branch predictor cannot learn a short repeating sequence. Preserve the fixed random seed unless intentionally changing the workload.
+* Review allocation, generated assembly, branch instructions, and branch mispredictions alongside elapsed time. Hardware counters require an elevated Windows process; an unavailable counter is not evidence of zero misses.
+* Benchmark changes measure behavior; they do not prove correctness. Verify all MessagePack encoding boundaries and error behavior with the relevant tests before accepting an optimization.
+* Prefer narrowly targeted candidates and retain a simple, verified baseline until benchmark results and generated assembly demonstrate a repeatable improvement for the intended distributions.
+
 ## Repository Structure
 
 ### Key Projects (src/)
@@ -104,41 +116,9 @@ Should start web server without errors (web UI testing limited in this environme
 dotnet test --no-build -c Release
 ```
 
-**Run tests for a specific test project**:
-```bash
-dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release
-```
-
-**Run a single test method**:
-```bash
-dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-method ClassName.MethodName
-```
-
-**Run all tests in a test class**:
-```bash
-dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-class ClassName
-```
-
-**Run tests with wildcard matching** (supports wildcards at beginning and/or end):
-```bash
-dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-method "*Pattern*"
-```
-
-**Run tests with a specific trait** (equivalent to category filtering):
-```bash
-dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-trait "TraitName=value"
-```
-
-**Exclude tests with a specific trait** (skip unstable tests):
-```bash
-dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-not-trait "TestCategory=FailsInCloudTest"
-```
-
-**Run tests for a specific framework only**:
-```bash
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [AArnott/Nerdbank.MessagePack](https://github.com/AArnott/Nerdbank.MessagePack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-31 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
