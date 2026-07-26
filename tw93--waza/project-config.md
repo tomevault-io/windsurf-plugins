@@ -1,93 +1,66 @@
 ---
 trigger: always_on
-description: Personal skill collection for Claude Code. Eight skills covering the complete engineering workflow: think, design, check, hunt, write, learn, read, health.
+description: This file is the canonical agent guide for the Waza repository. `CLAUDE.md` is a symlink to it, so Claude Code and Codex see identical content. Edit this file; do not edit `CLAUDE.md`.
 ---
 
-# Waza
+# Waza Agent Guide
 
-Personal skill collection for Claude Code. Eight skills covering the complete engineering workflow: think, design, check, hunt, write, learn, read, health.
+This file is the canonical agent guide for the Waza repository. `CLAUDE.md` is a symlink to it, so Claude Code and Codex see identical content. Edit this file; do not edit `CLAUDE.md`.
 
-## Structure
+## Project
 
-```
-skills/
-├── RESOLVER.md   -- central trigger → skill routing table
-├── check/        -- code review before merging
-│   ├── agents/   -- reviewer-security.md, reviewer-architecture.md
-│   └── references/  -- persona-catalog.md
-├── design/       -- production-grade frontend UI
-├── health/       -- Claude Code config audit
-│   └── agents/   -- inspector-context.md, inspector-control.md
-├── hunt/         -- systematic debugging
-├── learn/        -- research to published output
-├── read/         -- fetch URL or PDF as Markdown
-├── think/        -- design and validate before building
-└── write/        -- natural prose in Chinese and English
-    └── references/  -- write-zh.md, write-en.md
-marketplace.json      -- plugin registry for npx/plugin distribution
-```
+Waza is a skill collection for engineering workflows. The repository contains eight skills: `think`, `ui`, `check`, `hunt`, `write`, `learn`, `read`, and `health`.
 
-Each skill has a `SKILL.md` (loaded on demand by Claude). Supporting content lives in subdirectories. `skills/RESOLVER.md` is the human-readable index of "which trigger goes to which skill"; keep it in sync when you change a skill's scope.
+## Repository Map
 
-## Skill vs Script: Latent vs Deterministic
+- `VERSION` - single source of truth for the lock-step version. Marketplace entries, README install URLs, and installer `WAZA_REF` defaults must agree with this file (codegen-enforced). Per-skill frontmatter carries no version field; the verifier rejects a stale `metadata.version`.
+- `skills/RESOLVER.md` - trigger and routing table for the skill set.
+- `skills/*/SKILL.md` - individual skill entrypoints.
+- `skills/*/agents/` - specialist reviewer or inspector prompts.
+- `skills/*/references/` - supporting references loaded only when needed.
+- `skills/*/scripts/` - deterministic helper scripts.
+- `rules/` - shared writing and behavior rules used by install and validation flows. `rules/durable-context.md` is the shared Durable Context Preflight preamble; codegen copies it into each referencing skill as `skills/<name>/references/durable-context.md` (direct installs get only the skill directory), and the six skills with optional memory context link to that skill-local copy.
+- `.claude-plugin/marketplace.json` - **generated**. Edit `VERSION` or per-skill `SKILL.md` frontmatter and run `make regenerate`; never hand-edit.
+- `.agents/plugins/marketplace.json` - **generated** Codex repo marketplace. Points Codex at `plugins/waza` for plugin installs; never hand-edit.
+- `plugins/waza/` - **generated** Codex plugin tree. Mirrors `skills/` and `rules/` plus `plugins/waza/.codex-plugin/plugin.json`; edit source files and run `make regenerate`.
+- `packaging.allowlist` - default-deny list of paths that ship in `waza.zip`. New shippable assets must be added here explicitly; everything else is excluded.
+- `.github/workflows/` - public test and release automation. `release.yml` runs `make test` before `make package` so the tagged commit is gated by the same suite as PRs.
+- `scripts/build_metadata.py` - codegen for Claude and Codex marketplace metadata, README install URLs, Codex plugin mirror files, skill-local shared assets (update checkers, durable-context copies), installer-script `WAZA_REF` defaults, and update-checker `LOCAL_VERSION`. Run via `make regenerate`; CI checks drift via `make verify-generated`.
+- `scripts/verify_skills.py` - the only validator entrypoint; a driver over the check inventory in `scripts/skill_checks.py` (content, distribution, and routing checks). The facade's import list is the canonical inventory; do not re-enumerate it here.
+- `scripts/package-skill.sh` + `scripts/packaging_filter.py` - build `dist/waza.zip` from `packaging.allowlist`.
+- `scripts/setup-rule.sh` + `scripts/setup-statusline.sh` - public install helpers; `WAZA_REF` defaults are codegen-pinned to the current release tag.
+- `Makefile` - smoke discovery and packaging entrypoints. Adding a `tests/test_<name>.sh` file is enough to create a `smoke-<name>` target automatically.
+- `tests/test_*.sh` - one smoke per surface; sources `tests/test_helpers.sh` for tmpdir / repo-copy / stub-curl / instruction-file fixture factories. `tests/python/` holds the pytest unit layer (`make verify-unit`).
 
-Before adding a new capability, decide which layer it belongs in. Waza's eight skills are all **fat skills** (Markdown carrying judgment). Anything that is pure verification, lookup, or table-driven enforcement belongs in `scripts/` or `rules/`, not in a SKILL.md.
+## Commands
 
-| Question | YES → | NO → |
-|----------|-------|------|
-| Does the user need the model to think, adapt, or ask? | **Skill** | Script / rule |
-| Does the same input always produce the same output? | **Script / rule** | Skill |
-| Does it depend on the user's project environment? | **Skill** | Script / rule |
-| Is it a lookup, list, or status check? | **Script / rule** | Probably skill |
-| Does behavior shift with conversation context? | **Skill** | Script / rule |
-
-Examples in this repo:
-- `verify-skills.sh` = script (frontmatter / references / version parity, all deterministic)
-- `rules/english.md` = rule (applies in every session, no judgment needed)
-- `/think`, `/hunt`, `/check` = skills (each reads the situation and decides)
-- `/health` diagnostics = skill (tier-aware, context-sensitive)
-- Six-layer tier assessment = skill (needs judgment about project size and signals)
-
-Rule of thumb: if you catch yourself writing "if X then Y" enumeration inside a SKILL.md, it probably wants to be a script. If you catch yourself writing "the agent should use good judgment" inside a shell script, that part wants to be a skill.
-
-## Verification
-
-Run `./scripts/verify-skills.sh` before any commit. If the diff is non-trivial, also run `/check`.
-
-## Commit Convention
-
-`{type}: {description}` -- types: feat, fix, refactor, docs, chore
-
-## Release Convention (tw93/Mole style)
-
-- Title: `V{version} {Codename} {emoji}` -- e.g., V3.8.0 Forge 🔨
-- Tag: `v{version}` (lowercase v)
-- Body: Markdown format, structure as follows:
-
-```
-<div align="center">
-  <img src="..." width="120" />
-  <h1>Waza V{version}</h1>
-  <p><em>tagline</em></p>
-</div>
-
-### Changelog
-
-1. **SkillName**: One sentence on what changed and its user effect.
-2. ...
-
-### 更新日志
-
-1. **技能名**: 一句话说清楚改了什么以及对用户的影响。
-2. ...
-
-Update: `npx skills add tw93/Waza@latest` · ⭐ [tw93/Waza](https://github.com/tw93/Waza)
+```bash
+make test             # verify-docs + verify-generated + verify-routing + verify-scripts + verify-unit + all smokes
+make regenerate       # rewrite marketplace.json, README install URLs, update checker copies
+make verify-generated # drift check used by CI; non-zero if regenerate would change anything
+make package          # build dist/waza.zip from packaging.allowlist
 ```
 
-- Each item: `**Label**: one sentence` -- bold label is the skill or module name, description leads with what changed
-- Style: engineer-facing, no marketing language; one-to-one bilingual mapping
-- Footer: update command + star + repo link
+Run `make test` before meaningful changes to skill behavior, packaging, scripts, marketplace metadata, or anything generated. If you edited only frontmatter or VERSION, also run `make regenerate` and commit the resulting `.claude-plugin/marketplace.json` / `README.md` / installer changes together with your source edits.
+
+## Skill Design Rules
+
+Before adding a capability, decide the layer deliberately:
+
+| Question | Yes | No |
+|---|---|---|
+| Does the user need judgment, adaptation, or follow-up questions? | Skill | Script or rule |
+| Does the same input always produce the same output? | Script or rule | Skill |
+| Is it a lookup, list, status check, or invariant check? | Script or rule | Skill |
+| Does behavior shift with conversation context? | Skill | Script or rule |
+
+Examples: `verify_skills.py` is a script; `rules/english.md` and `rules/chinese.md` are rules; `/think`, `/hunt`, `/check`, and `/health` are skills.
+
+- Put adaptive, judgment-heavy workflows in skills.
+- Put deterministic checks, lookups, and table-driven validation in scripts.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tw93/Waza](https://github.com/tw93/Waza) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
