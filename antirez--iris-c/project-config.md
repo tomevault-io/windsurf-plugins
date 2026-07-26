@@ -138,4 +138,4 @@ Base CFG: run transformer twice per step (empty prompt + conditioned prompt):
 
 ---
 > Source: [antirez/iris.c](https://github.com/antirez/iris.c) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
