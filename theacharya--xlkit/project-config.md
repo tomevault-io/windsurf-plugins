@@ -1,133 +1,71 @@
 ---
 trigger: always_on
-description: XLKit is a modern Swift library for creating and manipulating Excel (.xlsx) files on macOS and iOS. Built with Swift 6.0, targeting macOS 12+ and iOS 15+, using modular SPM architecture. iOS support is available and tested in CI/CD, with platform-specific code handling for iOS compatibility.
+description: **See also:** [ARCHITECTURE.md](ARCHITECTURE.md) (structure & conventions), [GUARDRAILS.md](GUARDRAILS.md) (must / must-not), [.cursorrules](.cursorrules).
 ---
 
-# XLKit - Cursor Rules for AI Agents
+# XLKit - AI Agent Development Guide
+
+**See also:** [ARCHITECTURE.md](ARCHITECTURE.md) (structure & conventions), [GUARDRAILS.md](GUARDRAILS.md) (must / must-not), [.cursorrules](.cursorrules).
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+  - [Module Structure](#module-structure)
+  - [Dependencies](#dependencies)
+  - [Test Runner](#test-runner)
+- [Development Standards](#development-standards)
+  - [Code Quality](#code-quality)
+  - [Security Requirements](#security-requirements)
+  - [Security Features](#security-features)
+  - [Testing Strategy](#testing-strategy)
+  - [Documentation](#documentation)
+- [API Reference](#api-reference)
+  - [Core Types](#core-types)
+  - [Sheet Operations](#sheet-operations)
+  - [Workbook Operations](#workbook-operations)
+  - [CSV/TSV Operations](#csvtsv-operations)
+  - [Image Operations](#image-operations)
+- [Recent Improvements](#recent-improvements)
+  - [Comprehensive Demo and Sheet Password Utilities](#comprehensive-demo-and-sheet-password-utilities-2026-06-03-116)
+  - [Swift Testing Migration and CI Updates](#swift-testing-migration-and-ci-updates-2026-07-18-unreleased-117)
+  - [Sheet Visibility and Protection](#sheet-visibility-and-protection-2026-05-30-pr-23)
+  - [iOS Compatibility Fix](#ios-compatibility-fix-2025-07-14)
+  - [Perfect Aspect Ratio Preservation](#perfect-aspect-ratio-preservation-2025-07-07)
+  - [Scaling API Investigation and Fixes](#scaling-api-investigation-and-fixes-2025-07-12)
+- [Implementation Details](#implementation-details)
+  - [XLSX Generation](#xlsx-generation)
+  - [Image Embedding Scaling API](#image-embedding-scaling-api)
+  - [Image Embedding](#image-embedding)
+  - [Error Handling](#error-handling)
+- [Performance & Optimization](#performance--optimization)
+- [Maintenance & Updates](#maintenance--updates)
+
+---
 
 ## Project Overview
-XLKit is a modern Swift library for creating and manipulating Excel (.xlsx) files on macOS and iOS. Built with Swift 6.0, targeting macOS 12+ and iOS 15+, using modular SPM architecture. iOS support is available and tested in CI/CD, with platform-specific code handling for iOS compatibility.
 
-## Architecture & Module Structure
+XLKit is a modern Swift library for creating and manipulating Excel (.xlsx) files on macOS and iOS. Built with Swift 6.0, targeting macOS 12+ and iOS 15+, using modular Swift Package Manager architecture. iOS support is available and tested in CI/CD, with platform-specific code handling for iOS compatibility.
 
-### Core Modules
-- XLKitCore: Core types, data structures, utilities (Workbook, Sheet, Cell, etc.)
-- XLKitFormatters: CSV/TSV import/export functionality
-- XLKitImages: Image processing and embedding utilities
-- XLKitXLSX: XLSX file generation engine
-- XLKit: Main API that re-exports all submodules
+## Architecture
 
-### Module Dependencies
-```
-XLKit (main API)
-├── XLKitCore (core types & utilities)
-├── XLKitFormatters (CSV/TSV import/export)
-├── XLKitImages (image processing & embedding)
-└── XLKitXLSX (XLSX generation engine)
+### Module Structure
 
-XLKitFormatters
-├── XLKitCore
-└── TextFile (swift-textfile)
+The library is organized into five SPM modules:
 
-XLKitImages
-└── XLKitCore
+- **XLKitCore**: Core types, data structures, and utilities
+- **XLKitFormatters**: CSV/TSV import/export functionality  
+- **XLKitImages**: Image processing and embedding utilities
+- **XLKitXLSX**: XLSX file generation engine
+- **XLKit**: Main API that re-exports all submodules
 
-XLKitXLSX
-├── XLKitCore
-├── XLKitFormatters
-└── XLKitImages
-```
-
-### Executable Target
-```
-XLKitTestRunner (executable)
-└── XLKit
-```
-
-### XLKitTestRunner Overview
-
-Purpose: Modular test runner for generating Excel files for testing and demonstration purposes.
-
-Structure:
-```
-Sources/XLKitTestRunner/
-├── main.swift                    # Entry point with command-line interface
-├── ExcelGenerators.swift         # Excel generation functions
-├── ImageEmbedGenerators.swift    # Image embedding tests
-├── Templates/                    # Template files for new tests
-│   └── TestGeneratorTemplate.swift
-└── README.md                     # Documentation
-```
-
-Usage:
-```bash
-# Run specific test types
-swift run XLKitTestRunner no-embeds
-swift run XLKitTestRunner embed
-swift run XLKitTestRunner comprehensive
-swift run XLKitTestRunner help
-
-# Show help
-swift run XLKitTestRunner help
-```
-
-Available Test Types:
-- `no-embeds` / `no-images` - Generate Excel from CSV without images
-- `embed` / `with-embeds` / `with-images` - Generate Excel with embedded images from CSV data
-- `comprehensive` / `demo` - Comprehensive API demonstration with all features
-- `security-demo` / `security` - Demonstrate file path security restrictions
-- `ios-test` / `ios` - Test iOS file system compatibility and platform-specific features
-- `number-formats` / `formats` - Test number formatting (currency, percentage, custom formats)
-- `help` / `-h` / `--help` - Show available commands
-
-Test Features:
-- Security Integration: All tests include security logging and validation
-- CoreXLSX Validation: Generated files are validated for Excel compliance
-- Aspect Ratio Testing: Image embedding tests all 17 professional aspect ratios
-- Performance Testing: Large dataset handling and memory optimization
-- Error Handling: Comprehensive error testing and edge case coverage
-- Platform Testing: iOS compatibility validation and sandbox restrictions testing
-
-Adding New Tests:
-1. Copy template: `cp Sources/XLKitTestRunner/Templates/TestGeneratorTemplate.swift Sources/XLKitTestRunner/YourTestName.swift`
-2. Modify function name and logic
-3. Register in main.swift switch statement
-4. Update help text
-5. Create GitHub Actions workflow if needed
-
-Naming Conventions:
-- Function names: camelCase (e.g., `generateExcelWithImages()`)
-- Test types: kebab-case (e.g., `with-images`, `csv-import`)
-- File names: PascalCase (e.g., `ExcelGenerators.swift`)
-
-Output Structure:
-```
-Test-Workflows/
-├── Embed-Test.xlsx          # From no-embeds test
-├── Embed-Test-Embed.xlsx    # From embed test (with images)
-├── Comprehensive-Demo.xlsx  # From comprehensive test
-├── Number-Format-Test.xlsx  # From number-formats test
-└── [Your-Test].xlsx         # From custom tests
-
-Root Directory:
-├── iOS-Example.xlsx         # From ios-test (iOS compatibility)
-└── [Other-Test].xlsx        # From other platform-specific tests
-```
-
-Security Features in Tests:
-- Rate Limiting: Prevents test abuse and resource exhaustion
-- Security Logging: All test operations are logged for audit trails
-- Input Validation: All test inputs are validated for security
-- File Quarantine: Suspicious test files are automatically quarantined
-- Checksum Verification: Optional file integrity verification (disabled by default)
-
-## File Organization & Paths
-
-### Complete Directory Structure
+### Directory and File Structure
 
 ```
 XLKit/
 ├── AGENT.MD                     # AI agent development guide
+├── ARCHITECTURE.md              # Module stack, save pipeline, conventions
+├── GUARDRAILS.md                # Must / must-not for contributors and agents
 ├── .cursorrules                 # Cursor rules for AI agents
 ├── CHANGELOG.md                 # Version history and changes
 ├── LICENSE                      # MIT license
@@ -139,9 +77,36 @@ XLKit/
 ├── .swift-format                # Swift formatting configuration
 ├── Assets/                      # Project assets
 │   └── XLKit_Icon.png          # Project icon
+├── Sources/                     # Source code modules
+│   ├── XLKit/                  # Main API module
+│   │   ├── XLKit.swift         # Main API exports
+│   │   ├── Sheet+API.swift     # Sheet operations API
+│   │   └── Workbook+API.swift  # Workbook operations API
+│   ├── XLKitCore/              # Core types and utilities
+│   │   ├── CoreTypes.swift     # Core data structures (1253 lines)
+│   │   └── SecurityManager.swift # Security features (282 lines)
+│   ├── XLKitFormatters/        # CSV/TSV functionality
+│   │   └── CSVUtils.swift      # CSV import/export utilities (294 lines, uses swift-textfile)
+│   ├── XLKitImages/            # Image processing
+│   │   ├── ImageUtils.swift    # Image utilities (155 lines)
+│   │   └── ImageSizingUtils.swift # Image sizing logic (191 lines)
+│   ├── XLKitXLSX/              # XLSX generation engine
+│   │   └── XLSXEngine.swift    # XLSX file generation (897 lines)
+│   └── XLKitTestRunner/        # Test runner executable
+│       ├── main.swift          # Command-line interface (91 lines)
+│       ├── ExcelGenerators.swift # Excel generation tests (590 lines)
+│       ├── ImageEmbedGenerators.swift # Image embedding tests (228 lines)
+│       ├── SheetPasswordUtilities.swift # sheet-password CLI output
+│       ├── ComprehensiveDemoProtection.swift # Demo password/salts for comprehensive CLI
+│       ├── README.md           # Test runner documentation
+│       └── Templates/          # Test templates
+│           └── TestGeneratorTemplate.swift # Template for new tests (224 lines)
+├── Documentation/              # User manual (Documentation/Manual/)
+├── Tests/                      # Unit tests
+│   ├── README.md               # Test suite index (80 tests)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TheAcharya/XLKit](https://github.com/TheAcharya/XLKit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
