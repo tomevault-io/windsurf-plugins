@@ -1,13 +1,15 @@
 ---
 trigger: always_on
-description: Airlift is a Python command-line tool for uploading CSV/JSON data with attachments to Airtable. The project uses a modular architecture with clear separation of concerns across data processing, API integration, and file handling components.
+description: This file provides comprehensive guidance for AI agents (Claude, Cursor, etc.) when working with code in this repository.
 ---
 
-# Airlift Development Rules and Guidelines
+# Airlift - AI Agent Documentation
 
-## Project Context
+This file provides comprehensive guidance for AI agents (Claude, Cursor, etc.) when working with code in this repository.
 
-Airlift is a Python command-line tool for uploading CSV/JSON data with attachments to Airtable. The project uses a modular architecture with clear separation of concerns across data processing, API integration, and file handling components.
+## Project Overview
+
+Airlift is a Python-based command-line tool for uploading and merging CSV or JSON data files with attachments to Airtable databases. It uses Dropbox as a temporary storage provider for attachments since Airtable's API doesn't support direct file uploads. The project is built with Poetry for dependency management and uses PyInstaller for cross-platform binary distribution.
 
 ## Quick Reference Commands
 
@@ -28,7 +30,7 @@ Airlift is a Python command-line tool for uploading CSV/JSON data with attachmen
 # Run comprehensive tests (no API tokens required)
 ./scripts/local-test-build.sh --comprehensive-test
 
-# Dev CLI (after --comprehensive-test or full build)
+# Dev CLI (after --comprehensive-test or full build; uses .build/venv/)
 .build/venv/bin/airlift --help
 
 # Prefer the binary for release parity
@@ -37,24 +39,87 @@ Airlift is a Python command-line tool for uploading CSV/JSON data with attachmen
 
 ### Dependency Management
 ```bash
-# Regenerate poetry.lock (use ephemeral Python 3.14.5 in .build/)
+# Regenerate poetry.lock (after pyproject.toml changes)
 ./scripts/local-test-build.sh --lock-only
 
-# Update one package at a time (recommended)
-./scripts/local-test-build.sh --lock-only --update <package>
+# Update one package at a time (recommended; updates lock file)
+./scripts/local-test-build.sh --lock-only --update requests
 ./scripts/local-test-build.sh --comprehensive-test
 
-# Lock + full build for a package
-./scripts/local-test-build.sh --update <package>
+# Update lock then full build
+./scripts/local-test-build.sh --update requests
 
-# Bump all packages within ^ ranges (use sparingly)
+# Update all deps within ^ ranges (use sparingly)
 ./scripts/local-test-build.sh --update-deps
 
-# Show outdated packages
+# Show outdated packages (uses .build/ Poetry)
 ./scripts/local-test-build.sh --show-outdated
 ```
 
-After editing `pyproject.toml`, use the build script—not bare `poetry lock` on system Python.
+Prefer `./scripts/local-test-build.sh` over bare `poetry lock` so resolution uses the
+ephemeral Python 3.14.5 environment in `.build/`.
+
+## Architecture Overview
+
+### Core Components
+
+The project follows a modular architecture with clear separation of concerns:
+
+| Module | Description |
+|--------|-------------|
+| `cli.py` + `cli_args.py` | Command-line interface and argument parsing |
+| `airtable_client.py` + `airtable_upload.py` | Airtable API integration using pyairtable 3.x |
+| `dropbox_client.py` | Dropbox API integration for file storage using SDK 12.x |
+| `csv_data.py` + `json_data.py` | Data file parsing and validation |
+| `utils_exceptions.py` | Shared custom exception hierarchy |
+
+### Data Flow Architecture
+
+1. **Input Processing**: CSV/JSON files are parsed and validated
+2. **Schema Validation**: Airtable table schema is fetched and columns are mapped
+3. **Attachment Handling**: Files are uploaded to Dropbox and sharing URLs generated
+4. **Concurrent Upload**: Data is uploaded to Airtable using ThreadPoolExecutor
+5. **Progress Tracking**: Real-time progress bars and comprehensive logging
+
+### Key Design Patterns
+
+- **Modular Architecture**: Clear separation between data processing, API clients, and CLI
+- **Error Handling**: Custom exception hierarchy with proper error propagation
+- **Concurrent Processing**: ThreadPoolExecutor for parallel uploads with configurable workers
+- **API Integration**: RESTful clients for Airtable and Dropbox with proper authentication
+
+## Key Features
+
+### Data Format Support
+- CSV files with UTF-8 encoding
+- JSON files with array of objects structure
+- Automatic column validation and mapping
+- Support for duplicate column handling
+
+### Airtable Integration
+- Personal access token authentication
+- Base and table ID validation
+- Automatic column creation (configurable)
+- Support for single/multiple select fields
+- Column renaming and copying capabilities
+- Delete all database entries functionality
+
+### Dropbox Operations
+- Empty folder contents without deleting the folder itself
+- Works with both `/Airlift` and `/Marker Data` folders (via `--md` flag)
+- Progress bar for deletion operations
+
+### Attachment Handling
+- Dropbox integration for file storage
+- Multiple attachment column support
+- Column mapping for attachment fields
+- Automatic file path resolution
+
+### Performance Features
+- Multi-threaded upload processing
+- Configurable worker thread count
+- Progress bar with real-time updates
+- Comprehensive logging system
 
 ## Code Organization
 
@@ -69,90 +134,16 @@ After editing `pyproject.toml`, use the build script—not bare `poetry lock` on
 - Use descriptive names that clearly indicate functionality
 - Follow the existing naming pattern: `airlift_*.py` for core modules
 
-## Coding Standards
+## Important Development Guidelines
 
-### Python Style
-- Follow PEP 8 style guidelines strictly
-- Use type hints for all function parameters and return values
-- Implement comprehensive docstrings for public functions and classes
-- Use logging instead of print statements for all output
-- Keep line length under 88 characters (Black formatter standard)
-
-### Error Handling
-- Use custom exception classes from `utils_exceptions.py`
-- Implement proper exception chaining with `raise ... from`
-- Provide meaningful error messages to end users
-- Log detailed error information for debugging
-- Handle both critical and non-critical errors appropriately
-
-### Data Processing
-- Validate input data before processing
-- Use UTF-8 encoding for all file operations
-- Handle missing or malformed data gracefully
-- Implement proper data type conversion and validation
-
-## API Integration Patterns
-
-### Airtable API
-- Use the `new_client` class for all Airtable operations
-- Implement proper authentication with Bearer tokens
-- Handle API rate limits and errors gracefully
-- Use structured JSON payloads for data uploads
-- Validate responses and handle error codes appropriately
-- Use pyairtable 3.x APIs for field creation and schema management
-- Use batch operations for delete (10 records per API call)
-
-### Dropbox API
-- Use the `dropbox_client` class for file operations
-- Implement OAuth2 flow for authentication with explicit scopes
-- Handle refresh token management properly
-- Create organized folder structures for uploads
-- Generate proper sharing URLs for attachments
-- Use Dropbox SDK 12.x for latest API features and security
-
-## CLI Development
-
-### Argument Parsing
-- Use the existing `cli_args.py` structure for argument definitions
-- Group related arguments logically (general, dropbox, column, validation, database options)
-- Provide clear help text for all options
-- Implement proper validation for required arguments in `_validate_required_args()`
-- Use appropriate data types for argument values
-
-### CLI Arguments Structure
-```python
-schema: ArgSchema = {
-    "POSITIONAL": { ... },
-    "general_options": { ... },
-    "dropbox options": { ... },
-    "column_options": { ... },
-    "custom application options": { ... },
-    "validation_options": { ... },
-    "database_options": { ... },  # --delete-all-database-entries, --empty-dropbox-folder
-}
-```
-
-### User Experience
-- Provide clear progress indicators for long operations (tqdm)
-- Use consistent logging levels (INFO, WARNING, ERROR, DEBUG)
-- Implement verbose mode for detailed debugging output
-- Handle user interruptions gracefully (Ctrl+C)
-- Show helpful error messages for missing required arguments
-
-## Performance Considerations
-
-### Concurrency
-- Use ThreadPoolExecutor for parallel upload operations
-- Implement configurable worker thread counts (default: 5)
-- Avoid blocking operations in worker threads
-- Use proper queue management for data distribution
-
-### Memory Management
-- Process data in chunks for large files
-- Avoid loading entire datasets into memory
+### Build System Requirements
+- **ALWAYS** use `./scripts/local-test-build.sh` for building and dependency lock updates
+- The build script is **fully self-contained** under `.build/` (no system Python/Poetry install)
+- Downloads **CPython 3.14.5** via [python-build-standalone](https://github.com/astral-sh/python-build-standalone/releases)
+- PyInstaller is installed separately during build (not in pyproject.toml)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TheAcharya/Airlift](https://github.com/TheAcharya/Airlift) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
