@@ -1,69 +1,51 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: You are reading this because you've been pointed at the `native/desktop-win32` crate (or its Kotlin counterpart at `kotlin-desktop-toolkit/src/main/kotlin/org/jetbrains/desktop/win32/`) and need to navigate, modify, or debug it. Read this file first; it indexes the rest.
 ---
 
-# CLAUDE.md
+# Agent orientation: `desktop-win32`
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+You are reading this because you've been pointed at the `native/desktop-win32` crate (or its Kotlin counterpart at `kotlin-desktop-toolkit/src/main/kotlin/org/jetbrains/desktop/win32/`) and need to navigate, modify, or debug it. Read this file first; it indexes the rest.
 
-## Build and Development Commands
+## What this crate is
 
-### Core Commands
-- `./gradlew build` - Build the entire project including Rust native libraries and Java/Kotlin code
-- `./gradlew test` - Run JUnit tests with native library dependencies  
-- `./gradlew lint` - Run ktlint for Kotlin and clippy/cargo fmt for Rust code
-- `./gradlew autofix` - Auto-format code with ktlint and cargo fmt, apply clippy fixes
+Windows backend of the kotlin-desktop-toolkit. Rust crate (cdylib) exposing a flat C ABI via `cbindgen`, consumed from Kotlin via JExtract-generated bindings plus hand-written wrappers. UI runs on a single thread (`OleInitialize` STA) with a classic `GetMessage` pump in `event_loop.rs`. Composition uses **WinRT `Windows.UI.Composition`** via `ICompositorDesktopInterop` — *not* DirectComposition. Rendering is ANGLE-on-D3D11.
 
-### Native Compilation
-The project uses Rust for native implementations and requires platform-specific compilation:
-- `./gradlew compileNative-<target>-<profile>` - Compile native code for specific platform/profile
-- Profiles: `dev` (debug) and `release`
-- Enable cross-compilation via gradle.properties flags like `enableCrossCompileToLinuxX86_64=true`
+## Start here
 
-### Sample Applications
-- `./gradlew :sample:runSkikoSampleMac` - Run macOS Skiko sample app
-- `./gradlew :sample:runApplicationMenuSampleMac` - Run macOS Application Menu sample
-- `./gradlew :sample:runSkikoSampleLinux` - Run Linux Wayland sample app
-- `./gradlew :sample:runSkikoSampleWin32` - Run Windows sample app
+- **`ARCHITECTURE.md`** — module layout, FFI pipeline, threading and ownership models, error channel, headline data flows.
+- **`FFI_CONVENTIONS.md`** — the `*_api.rs` ↔ Kotlin contract; pointer/array/option type zoo; `ffiDownCall` scoping rule; COM lifecycle.
+- **`SUBSYSTEMS.md`** — per-subsystem reference. Look up the area you're touching.
+- **`TODO.md`** — confirmed bugs, capability gaps, smells, open design questions. Cross-reference before claiming something is "broken" or "missing".
 
-### Packaging
-- `./gradlew :sample:jpackage` - Create macOS .app bundle at `sample/build/dist/SkikoSample.app`
-- `./gradlew :sample:runPackagedMac` - Package and launch the macOS .app bundle
-- The packaged app includes native libraries, JRE, and proper Info.plist with bundle identifier
+## Top things that surprise
 
-## Architecture Overview
+If you only read one section before touching code, read this one.
 
-### Multi-Platform Structure
-This is a Kotlin/Rust hybrid project providing desktop window management APIs for macOS, Linux (Wayland), and Windows:
+0. **This is the Win32-first backend.** Default to Win32 APIs (`CreateWindowExW`, `GetMessageW`, `RegisterDragDrop`, `IFileOpenDialog`, …). Use WinRT only when there's a documented reason — there are exactly four such subsystems today, each justified in `ARCHITECTURE.md` → Scope. **Never propose WinUI 3 or Windows App SDK (`Microsoft.UI.*`, `Microsoft.WindowsAppSDK`) APIs in this crate.** A WinUI 3 backend, if built, lives in a separate crate.
+1. **Composition is `Windows.UI.Composition` (WinRT), not DirectComposition.** They're distinct APIs with different lifetimes and threading. See `ARCHITECTURE.md` → Composition section.
+2. **Single UI thread.** `OleInitialize` STA, `DispatcherQueue` with `DQTYPE_THREAD_CURRENT`, the wndproc, and most state assume one thread. Cross-thread work goes through `application_dispatcher_invoke`. Several pieces are `thread_local!` (key-message stash, exception store).
+3. **Error channel is `anyhow::Result` through `ffi_boundary`, not return codes.** Rust functions return `anyhow::Result<T>`; `ffi_boundary` logs any `Err`, appends the message to thread-local `LAST_EXCEPTION_MSGS`, and returns `R::default()`. Kotlin's `ffiDownCall` polls after every call and throws `NativeError`. Panic catching inside `ffi_boundary` is a safety net for unexpected unwinds, not a designed error path — if Rust code panics, treat it as a bug. **Background-thread errors are lost** (thread-local store).
+4. **`ffiDownCall { ... }` must wrap only the native call.** Not `Arena.use`, not `withPointer`, not helpers (which wrap their own native calls). Wider scopes conflate exception attribution. See `FFI_CONVENTIONS.md`.
+5. **Window starts at `1×1` and is then resized.** Intentional: managed code uses *logical* pixels but the DPI scale only exists once an `HWND` exists (`GetDpiForWindow`). Consequence: creation emits repeated `WM_WINDOWPOSCHANGED` notifications; this crate handles that message and returns `0`, so it does not rely on a downstream `DefWindowProc`-generated `WM_SIZE` path. Size/move handlers must be idempotent.
+6. **Coordinates are mostly logical, but with deliberate physical-pixel exceptions.** Pointer events' `locationOnScreen`, several Window events, drag-drop callbacks, and `screen_map_to_client` carry `PhysicalPoint` / `PhysicalSize`. See `SUBSYSTEMS.md` → Geometry → Exceptions.
+7. **`EnableMouseInPointer(true)` is process-wide and irreversible.** Anything in the same process expecting raw `WM_MOUSE*` will silently break.
+8. **The `borrow` pattern on `RustAllocatedRawPtr`** (ffi_utils.rs) reconstructs and immediately leaks a `Box` per call to produce a `&R`. Sound under the toolkit's single-thread-of-ownership assumption; soundness is by convention. Currently under deferred review.
 
-- **kotlin-desktop-toolkit/** - Main Kotlin API with platform-specific implementations in `org.jetbrains.desktop.{macos,linux,win32}`
-- **native/** - Rust workspace with platform-specific crates:
-  - `desktop-common/` - Shared Rust utilities  
-  - `desktop-macos/` - macOS native implementation
-  - `desktop-linux/` - Linux/Wayland native implementation
-  - `desktop-win32/` - Windows native implementation
+## Watch out for in code reviews / edits
 
-### Platform Bindings
-- Uses JExtract to generate Java bindings from Rust C headers
-- Native libraries are compiled per platform and packaged into platform-specific JARs
-- Each platform provides distinct APIs reflecting OS differences (non-goal to unify APIs)
+- Kotlin `tryRead*` wrappers return `null` only for format-unavailable and throw other clipboard/data-object failures. Use result-bearing FFI for nullable read semantics.
+- COM impls have **no** `// SAFETY:` comments anywhere (and `desktop-common::ffi_utils` has a module-level `#![allow(clippy::missing_safety_doc)]`). Add one when you touch an `unsafe` block.
+- Most clipboard / drag-drop work assumes the OLE STA. There is no thread-affinity assertion at the FFI boundary — the synchronous `Clipboard` API trusts the caller to stay on the dispatcher thread and to handle `DataTransferStatus.Busy` retries itself.
 
-### Key Components per Platform
-- **Application**: Event loop management, screen listing, application lifecycle
-- **Window**: Creation, positioning, sizing, rendering surface setup
-- **Events**: Keyboard, mouse, window lifecycle events
-- **Rendering**: Metal (macOS), OpenGL/Software (Linux), ANGLE (Windows)
-- **System Integration**: Clipboard, drag-and-drop, appearance/theming, notifications (macOS)
+## Working with the human
 
-### Cross-Compilation Settings
-Platform builds are controlled via gradle.properties flags. Only enabled platforms are compiled during build.
+The high-impact conventions for collaborating on this crate:
 
-## Testing
-- Tests require native library compilation for the host platform
-- Each test class runs in separate JVM with native access enabled
-- Native debug logging can be enabled with `kdt.debug=true` system property
+- **Outline before executing** anything multi-file or API-shaping. Wait for confirmation before reaching for `Edit` / `Write`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/JetBrains) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [JetBrains/kotlin-desktop-toolkit](https://github.com/JetBrains/kotlin-desktop-toolkit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
