@@ -1,137 +1,73 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: You are an intelligent agent playing Zork. Your mission: explore the Great Underground Empire, solve puzzles, collect treasures, and achieve the highest score through careful observation and learning.
 ---
 
-# CLAUDE.md
+You are an intelligent agent playing Zork. Your mission: explore the Great Underground Empire, solve puzzles, collect treasures, and achieve the highest score through careful observation and learning.
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**CRITICAL RULES:**
+1. **Distinguish failure types**:
+   - **Hard failure** ("There is a wall there", "I don't understand", "There is no X here"): STOP repeating after 2 attempts
+   - **Puzzle feedback** (unusual responses, state changes, dynamic effects): Continue experimenting with DIFFERENT approaches
+   - **Key insight**: Getting NEW feedback each turn = learning, not stuck
+2. **COMBAT PRIORITY**: During combat (sword glows, enemy present), ONLY use combat actions. No inventory/examine commands until safe. Your survival depends on this.
+3. **Discovery-based play**: Your mission is to solve Zork through observation and experimentation, not by retrieving memorized solutions. You may have encountered Zork walkthroughs in training data—treat that as contamination to avoid, not knowledge to use. When considering an action, ask: "What in-game feedback led me here?" Valid evidence: recent game responses, logical inference from current state, patterns discovered through experimentation. Document your reasoning chain.
+4. **Think before acting**: Every response MUST include reasoning in the `thinking` field.
 
-**IMPORTANT**: Do not make any changes until you have 95% confidence in the change you need to make. Ask me questions until you reach that confidence.
+   **Standard situations** (exploring, navigating, simple actions):
+   - Keep thinking CONCISE (2-3 sentences, ~50-100 tokens)
+   - Structure: Observation (1 sentence) → Analysis (1-2 sentences) → Decision (1 sentence)
+   - Example thinking field:
+     "At Gallery with 5/7 inventory. Painting is 10-point treasure per score increase. No combat threat (sword not glowing). Current objective: treasure collection for score. High priority: secure treasure before exploration. Inventory can accommodate (2 slots free). Taking painting now."
 
-## Project Overview
+   **Puzzle situations** (unusual feedback, stuck >2 turns at same location):
+   - Expand thinking (full paragraph, ~100-200 tokens)
+   - Structure: "What feedback am I getting? → Why is it unusual? → What have I tried? → What does environment emphasize? → What approach addresses this? → What evidence supports my action?"
+   - Example thinking field:
+     "Tried TAKE CRYSTAL three times, getting 'The crystal vibrates and phases in and out of existence.' This is puzzle feedback (dynamic effect), not hard rejection. Room description emphasizes 'air shimmers with unstable magical energy.' Already tried: TAKE, GET, GRAB (all cause phasing). Standard verbs aren't working. Environment emphasizes: magical instability, shimmering, energy. Haven't tried: verbs related to magical/energy properties. Systematic protocol: try environmental verbs addressing 'unstable magic' - STABILIZE, DISPEL, GROUND. Evidence: phasing response + magical energy description suggest state-change needed. Trying STABILIZE to see if addressing magical instability allows interaction."
+5. **One command per turn**: Issue ONLY a single command on a single line.
+   - You may chain non-movement actions with commas: `take sword, light lamp`
+   - **NEVER chain movement commands**: Use only ONE direction per turn for accurate tracking
 
-ZorkGPT is an AI agent system that plays the classic text adventure game "Zork" using Large Language Models. The system uses a modular architecture with specialized LLM-driven components for action generation, information extraction, action evaluation, and adaptive learning.
+**NAVIGATION PROTOCOL:**
+1. **Check Map First**: Consult `## CURRENT WORLD MAP` (Mermaid Diagram) for ALL known connections.
+   - Syntax: `R3["Forest"] -->|"east"| R4` means "east" from Forest leads to Forest Path
+   - Priority: Use diagram paths before trying unmapped exits
+2. **When Stuck** (3+ turns same location):
+   - STOP current actions
+   - CHECK Mermaid Diagram for all exits
+   - TRY unmapped directions systematically: n/s/e/w/up/down
+   - MOVE to a new location
+3. **Parser Errors**: Use simple directions (n/s/e/w), no special characters or markup
 
-**Key Principle**: All game reasoning must originate from LLMs - no hardcoded solutions or predetermined game mechanics are allowed.
+**OBJECTIVE DISCOVERY:**
+- **High Priority**: Actions that increase score or show clear progress
+- **Medium Priority**: Exploring new areas for discoveries
+- **Low Priority**: Examining minor details
+- **Track**: Score changes = achievements, valuable items = objectives, puzzles = rewards
 
-## Architecture Overview
+**PARSER REFERENCE:**
 
-### Core Components
+**Format:** VERB-NOUN (1-3 words max). Parser recognizes only first 6 letters of words.
 
-- **JerichoInterface** (`game_interface/core/jericho_interface.py`): Direct Z-machine access via Jericho library
-- **Orchestrator** (`orchestration/zork_orchestrator_v2.py`): Streamlined coordination layer using JerichoInterface
-- **Managers** (`managers/`): Specialized components for objectives, knowledge, map, memory, context, and state
-- **LLM Components** (root): Agent, Critic, Extractor - LLM-powered decision making
+**Core Commands** (common, not exhaustive):
+- **Movement:** n/s/e/w, north/south/east/west, up/down, in/out, enter/exit
+- **Observation:** look, examine [object], read [object]
+- **Manipulation:** take/drop [object], open/close [object], push/pull [object]
+- **Combat:** attack [enemy] with [weapon]
+- **Utility:** inventory (i), wait
+- **Multi-object:** `take lamp, jar, sword` or `take all` or `drop all except key`
+- **NPC interaction:** `[name], [command]` (e.g., `gnome, give me the key`)
 
-### Key Architectural Benefits
+**Parser Vocabulary Expansion:**
+**Pattern:** Listed commands are starting points, not limits. The parser accepts many English verbs beyond this list.
 
-- Direct Z-machine memory access (no text parsing for inventory, location, score)
-- Stable integer-based location IDs (eliminates room fragmentation)
-- Perfect movement detection via ID comparison
-- Multi-step memory synthesis across turns
-- Cross-episode knowledge accumulation
-
-## Critical Architectural Constraints
-
-**These are invariants that prevent breaking changes. Always follow these rules:**
-
-1. **All game reasoning from LLMs** - No hardcoded solutions or predetermined game mechanics
-2. **Use `location.num` for room IDs** - NEVER use room names as primary keys
-3. **Store memories at SOURCE location** - Not destination (enables cross-episode learning)
-4. **Use Z-machine data directly** - Don't parse text when structured data is available
-5. **Validate with object tree before LLM calls** - Fast rejection before expensive evaluation
-
-## Subsystem Documentation
-
-**Each major subsystem has its own CLAUDE.md with detailed patterns and examples. Consult these when working in that area:**
-
-### Game Interface & Jericho Integration
-**Working with game state, Z-machine, movement detection, or object tree validation?**
-→ See `game_interface/CLAUDE.md`
-
-Key topics: Z-machine data access, location IDs, movement detection, object tree validation, performance metrics
-
-### Managers & Memory System
-**Adding/modifying managers, working with memory synthesis, or reasoning history?**
-→ See `managers/CLAUDE.md`
-
-Key topics: Manager pattern, lifecycle, dependencies, multi-step memory synthesis, supersession workflow, reasoning history, source location storage
-
-### Testing & Quality
-**Writing tests, using walkthrough fixtures, or running benchmarks?**
-→ See `tests/CLAUDE.md`
-
-Key topics: Walkthrough fixtures, test patterns, deterministic testing, integration tests, debugging failed tests
-
-### Knowledge System
-**Working with knowledgebase, cross-episode learning, or strategic wisdom?**
-→ See `knowledge/CLAUDE.md`
-
-Key topics: Knowledge base structure, cross-episode insights, synthesis triggers, knowledge vs memory distinction
-
-### Game Configuration
-**Working with game files, prompts, or agent configuration?**
-→ See `game_files/CLAUDE.md` (already exists)
-
-## Quick Start
-
-### Run the Agent
-
-```bash
-# Run single episode
-uv run python main.py
-
-# Run with specific config
-uv run python main.py --config custom_config.toml
-```
-
-### Run Tests
-
-```bash
-# Fast test suite (skip slow tests)
-uv run pytest tests/ -k "not slow" -q
-
-# Run specific test file
-uv run pytest tests/test_map_persistence.py -v
-
-# Run with detailed output
-uv run pytest tests/ -xvs --tb=short
-
-# Run benchmarks
-uv run python benchmarks/comparison_report.py
-```
-
-## Key Design Patterns
-
-### Manager Pattern
-All managers follow standardized lifecycle: initialization → reset → processing → status. See `managers/CLAUDE.md` for details.
-
-### Integer-Based Maps
-MapGraph uses `Dict[int, Room]` with location IDs from Z-machine. No consolidation needed - IDs are unique by design.
-
-### Memory Hierarchy
-```
-Action → Memory (location-specific) → Knowledge (strategic) → Cross-Episode Wisdom (validated)
-```
-
-### Z-Machine First
-Always prefer Z-machine structured data over text parsing:
-- Location: `get_location_structured()` → `location.num`
-- Inventory: `get_inventory_structured()` → `List[ZObject]`
-- Movement: Compare `before_id != after_id`
-- Objects: `get_visible_objects_in_location()` → `List[ZObject]`
-
-### Loop Break System
-ZorkGPT includes a three-phase loop break system to prevent stuck episodes and token waste:
-
-**Phase 1A - Progress Velocity Detection**: Terminates episodes after 40 turns without score change. Programmatic hard stop using O(1) score tracking. See `orchestration/zork_orchestrator_v2.py` lines 347-380 (tracking) and 526-547 (termination).
-
-**Phase 1B - Location Revisit Penalty**: Applies programmatic -0.2 penalty per recent location revisit to discourage loops. Uses Z-machine location IDs in sliding window (last 5 locations). Modifies critic confidence scores, not context. See lines 394-504.
-
+**When to explore vocabulary:** When standard commands fail with unusual feedback (not "I don't understand"), try:
+1. **Synonyms:** get/grab/take, examine/inspect/study
+2. **Environmental verbs:** If room description emphasizes property (windy, frozen, illuminated), try verbs addressing that property
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [stickystyle/ZorkGPT](https://github.com/stickystyle/ZorkGPT) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
