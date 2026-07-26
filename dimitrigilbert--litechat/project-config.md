@@ -1,16 +1,15 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to opencode when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENT.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to opencode when working with code in this repository.
 
 ## LiteChat Development Commands
 
 ### Development
-
 ```bash
 npm run build              # Build for production with TypeScript compilation
 npm run build:en           # Build English version specifically
@@ -19,7 +18,6 @@ npm run build:all          # Build all language versions
 ```
 
 ### Deployment & Services
-
 ```bash
 npm run deploy             # Deploy to GitHub Pages (gh-pages -d dist)
 npm run to2web             # Build, release, and deploy to web
@@ -32,7 +30,6 @@ npm run update             # Git pull, npm install, and serve (respects LITECHAT
 **⚠️ CRITICAL: NO DYNAMIC IMPORTS UNLESS EXPRESSLY TOLD SO ! NEVER !**
 
 ### Docker
-
 ```bash
 # Manual build
 npm run build && docker build -t litechat .
@@ -47,7 +44,6 @@ docker-compose up -d
 LiteChat is a 100% client-side AI chat application built with a modular, event-driven architecture designed for extensibility and privacy.
 
 ### Core Technology Stack
-
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui
 - **State Management**: Zustand with Immer middleware and domain-specific stores
 - **Data Storage**: Dexie.js (IndexedDB) with ZenFS for virtual file system
@@ -60,17 +56,15 @@ LiteChat is a 100% client-side AI chat application built with a modular, event-d
 LiteChat uses a sophisticated control module architecture with three scopes:
 
 1. **PromptControls**: Input area extensions and prompt manipulation
-2. **ChatControls**: Sidebar panels, headers, and general UI controls
+2. **ChatControls**: Sidebar panels, headers, and general UI controls  
 3. **CanvasControls**: Action buttons and interactions within chat canvas
 
 **Control Module Lifecycle**:
-
 - `initialize()`: Setup phase
 - `register(modApi)`: Registration with mod API
 - `destroy()`: Cleanup and resource deallocation
 
 **Key Directories**:
-
 - `src/controls/modules/`: Control module implementations
 - `src/controls/components/`: UI components for controls
 - `src/store/control.store.ts`: Central control registry
@@ -86,14 +80,12 @@ All inter-system communication uses a centralized event emitter with strongly-ty
 ### State Management Pattern
 
 Domain-specific Zustand stores with consistent patterns:
-
 - **Immer middleware**: Immutable state updates
 - **Event integration**: Automatic event emission on changes
 - **Action handlers**: Exposed for event coordinator registration
 - **Type safety**: Full TypeScript coverage
 
 **Key Stores**:
-
 - `conversation.store.ts`: Chat data and state
 - `settings.store.ts`: Application configuration
 - `provider.store.ts`: AI provider management
@@ -109,7 +101,6 @@ Extensible content rendering with priority-based selection:
 - **Registration**: `src/services/block-renderer.service.ts`
 
 **Example Renderers**:
-
 - `JsRunnableBlockRenderer`: JavaScript execution with safe/unsafe/iframe modes
 - `MermaidBlockRenderer`: Real-time diagram rendering
 - `PythonRunnableBlockRenderer`: Python code execution
@@ -117,7 +108,6 @@ Extensible content rendering with priority-based selection:
 ### Virtual File System (VFS)
 
 Browser-based filesystem using ZenFS + IndexedDB:
-
 - **Full CRUD operations**: Create, read, update, delete files/directories
 - **Git integration**: Clone, commit, push, pull repositories
 - **Project organization**: Hierarchical project structure
@@ -126,7 +116,6 @@ Browser-based filesystem using ZenFS + IndexedDB:
 ### Modding API
 
 Safe, controlled extension interface:
-
 - **Resource management**: Automatic cleanup on mod unload
 - **Sandboxed API**: `createModApi()` provides controlled access
 - **Event system access**: Mods can emit/listen to typed events
@@ -143,9 +132,10 @@ Safe, controlled extension interface:
 
 - **100% client-side**: No server dependencies for core functionality
 - **Local storage**: All data in browser IndexedDB
+- **Code execution**: Multiple isolation levels (QuickJS VM, iframe sandbox, direct eval)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [DimitriGilbert/LiteChat](https://github.com/DimitriGilbert/LiteChat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
