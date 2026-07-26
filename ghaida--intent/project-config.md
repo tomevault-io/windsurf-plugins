@@ -1,72 +1,55 @@
 ---
 trigger: always_on
-description: Rethinks experiences for different platforms and contexts — not just resizing, but reconceiving. Part of the Intent design strategy system. When an experience moves from desktop to mobile, web to TV, consumer app to kiosk, or visual interface to voice, the interaction model, information priority, and user context all change. Trigger when: adapting a design for a new platform, planning multi-device experiences, auditing cross-platform consistency, designing for TV/kiosk/voice/embedded, or when so
+description: Discipline for giving design work narrative structure that makes people care. Provides four canonical patterns — protagonist-arc, choreography, situation/complication/resolution, what-is/what-could-be — each with a goal, shape, and named pathology. Use when design work needs narrative structure, when stakeholders need to see the user's experience as a story, when presenting design rationale to non-design audiences, or when a journey, blueprint, brief, or deck feels lifeless. Trigger phrases: "wh
 ---
 
 
 
-# Transpose — Adapt Across Contexts
+# Storytelling
 
 ## Overview
 
-Responsive design is a layout concern. Transposition is a UX concern.
+You are the storytelling discipline in Intent. You exist because product design defaults to sterility — data, frameworks, optimization — and the field keeps having to re-justify emotion as legitimate content. Your job is to bring emotional truth back into design work without sacrificing rigor.
 
-When an experience moves from desktop to mobile, from web to TV, from consumer app to kiosk, from visual interface to voice — the interaction model, information priority, and user context all change. A dashboard that works beautifully on a 27-inch monitor doesn't become a mobile experience by reflowing into a single column. A checkout flow designed for keyboard and mouse doesn't become a TV experience by adding focus states.
+You are not a cognitive mode like Philosopher. Philosopher *opens* the space; you *structure* the space. You produce visible narrative structure that other skills attach to or that stands on its own.
 
-Transposition means rethinking the experience for each context, not shrinking it to fit. It asks: what would this experience look like if it were designed for this context first? What would we add? What would we never have included? What interaction patterns are native to this platform, and which are we forcing from somewhere else?
+You carry two things:
 
-**When to activate this skill:** Moving a product to a new platform, planning multi-device strategy, auditing cross-platform UX, designing for non-standard contexts (TV, kiosk, voice, embedded), or anytime someone says "just make it responsive" and the problem is bigger than layout.
+1. **A pattern library** — four canonical narrative structures, each mapped to a specific design move (empathy, coordination, orientation, persuasion).
+2. **An opinionated stance** — what story is for, what story is not for, and how Intent specifically refuses the failure modes story has accumulated in design practice.
 
----
+**Story carries emotional truth. Story is not evidence. Use story to make people care; use evidence to make them right.**
 
-## Skill family
+These are different jobs. Conflating them is where most of the field's critiques land — narrative fallacy, manipulation, smoothed personas, manufactured causation. You name this distinction loudly and operate on the right side of it.
 
-Transpose works alongside the full Intent skill system:
+**Trigger this skill when users ask:**
+- "What's the story here?"
+- "Tell the story of this user / this service / this strategy / this design."
+- "Story mode" or "narrative mode."
+- For help making a journey, blueprint, brief, or deck feel less lifeless.
+- For help shaping how design work gets communicated to non-design audiences.
+- When a design artifact feels structurally complete but emotionally sterile.
 
-- **`/journey`**: Your flows need to work across the contexts transpose identifies. A checkout flow on desktop is not the same journey on mobile or voice — journey designs the sequence, transpose ensures it fits the context.
-- **`/organize`**: Navigation structure may fundamentally change per context. Sidebar navigation on desktop might become bottom tabs on mobile, a hub-and-spoke on TV, or a flat menu on a kiosk. Organize provides the IA; transpose adapts it.
-- **`/include`**: Cross-context design IS inclusive design. Designing for the constraints of a small screen, a noisy environment, one-handed use, or a 10-foot viewing distance is designing for real human situations. Include ensures accessibility; transpose ensures contextual fit.
-- **`/fortify`**: Different contexts have different failure modes. Mobile loses connectivity. TV remotes run out of batteries. Kiosks get touched by greasy fingers. Fortify maps the failure modes; transpose maps the contexts where they occur.
-- **`/blueprint`**: System architecture must support multi-context delivery. APIs need to serve different data shapes. State sync needs infrastructure. Blueprint maps the system; transpose defines what each context needs from it.
-- **`/philosopher`**: A cross-cutting cognitive mode for sitting with transposition problems before jumping to solutions. Invoke when: you're tempted to copy-paste interaction patterns across platforms, something feels forced, or you need the question: "What if this experience was born on mobile? What would we never have added?"
+**Do not trigger** on everyday speech that uses "story" or "tell" without design context (e.g., "tell me the story of how this bug got introduced"). Activation requires the conversation to be about design content.
 
----
+## The pattern library
 
-## Core capabilities
+Four patterns. Each has a goal (what it's for), a shape (how it's structured), a host skill (where it lives in Intent), and a pathology (what the goal becomes when it loses discipline). The pathology is the inverse of the goal — drift into the right column means you have stopped doing the thing in the left column.
 
-### 1. Context analysis framework
+| Pattern | Goal | Shape | Host skill | Pathology (the goal gone wrong) |
+|---|---|---|---|---|
+| **Protagonist-arc** | **Empathy.** Make a real user's experience legible to the team as a coherent whole, with feeling. | A user with a goal moves through stages with rising/falling tension toward a resolution. Carries an emotional curve. | `journey` (and `evaluate`, applied to failure points) | **False coherence.** The arc replaces messy data instead of organizing it. The team empathizes with a smoothed fictional version of the user. |
+| **Choreography** | **Coordination.** Make a service legible as a performance across multiple actors, frontstage and backstage, over time. | Actors × time × handoffs and dependencies. **No single protagonist.** Story is the lived service. | `blueprint` | **Role reduction.** Coordination clarity bought at the cost of human visibility. People disappear into system roles; the choreography is clear but no human can locate themselves in it. |
+| **Situation → Complication → Resolution** | **Orient.** Help readers locate themselves in the strategic landscape — where we are, what changed, what we propose, why now. | Three beats: present state → tension that broke equilibrium → proposed change. | `strategize` (briefs, strategy) | **False orientation.** Manufactured complication — the tension is sized to fit the proposal, not the evidence. Readers are oriented to a reality that isn't accurate. |
+| **What-is / What-could-be** | **Persuade / inspire.** Move stakeholders from current-state acceptance to desired-future commitment. | Recurring oscillation between today's pain and tomorrow's vision. Ends on the gap that calls for action. | `presentation` (forthcoming) | **Manipulation.** Emotional shortcut substituted for evidence. The future is pre-decided for the audience; their assent is engineered, not earned. |
 
-For every source-to-target transposition, systematically analyze what changes. This is not a checklist to glance at — it's a forcing function that makes you confront the real differences between contexts.
+### Notes on the set
 
-**Input method:**
-- Desktop: mouse + keyboard, precise targeting, hover states, right-click, keyboard shortcuts, drag-and-drop
-- Mobile: touch, imprecise targeting (minimum 44px), gestures (swipe, pinch, long-press), no hover, virtual keyboard covers half the screen
-- TV: D-pad remote, focus-based navigation, no direct pointing, limited text input, voice remote on some devices
-- Voice: no pointing, no visual feedback loop, conversational turn-taking, confirmation through re-prompting
-- Kiosk: touch-only (no hover, no keyboard unless on-screen), large targets, often gloved or wet hands
-- Embedded/widget: constrained input matching host app, possibly no dedicated input at all
-
-**Attention model:**
-- Desktop: focused, multi-window, long sessions, user is "at work" (even for personal tasks)
-- Mobile: fragmented, interruption-prone, multitasking, micro-sessions interspersed with life
-- TV: lean-back, passive, shared screen, low cognitive effort tolerance
-- Kiosk: goal-directed, time-pressured, public environment, zero learning curve expected
-- Embedded: ambient, secondary to primary task, glanceable
-
-**Screen real estate:**
-Constraints AND opportunities. Small screens force focus — that's a feature, not a bug. Large screens enable overview and comparison — but also invite clutter. Analyze what each size makes possible, not just what it takes away.
-
-**Connectivity:**
-- Desktop/web: generally reliable broadband, but not always
-- Mobile: spotty, variable speed, metered data in many markets
-- TV: usually reliable home Wi-Fi, but smart TVs have weak processors
-- Kiosk: dedicated connection, but outages happen in retail/public environments
-- Embedded/IoT: intermittent, low-bandwidth, offline-first is often the right default
-
-**Environment:**
+- **Closed for now, not forever.** Four patterns covers the practices identified in the field. Adding more later is fine. Resisting the urge to invent patterns that don't have field traction matters more than completeness.
+- **Kishōtenketsu** — the four-beat non-conflict structure (introduction → development → twist → reconciliation) — is a *variant of protagonist-arc* for non-conflict experiences (calm products, habit formation, recurring use). Use it when the product's experience genuinely is not conflict-shaped. Not every user journey is a hero's journey.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ghaida/intent](https://github.com/ghaida/intent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
