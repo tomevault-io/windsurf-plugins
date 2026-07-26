@@ -1,144 +1,94 @@
 ---
 trigger: always_on
-description: Infection is a PHP mutation testing framework that helps developers measure the effectiveness of their test suites. It works by making small modifications (mutations) to your code and checking if your tests can detect these changes.
+description: Operating guide for AI agents contributing to Infection. It is read once per session, so it is
 ---
 
-# Copilot Instructions for Infection
+# AGENTS.md
 
-## About this Repository
+Operating guide for AI agents contributing to Infection. It is read once per session, so it is
+intentionally dense. Each line must help an agent avoid a known mistake. Claims are anchored
+to files - trust the tree over your training data. This codebase was heavily re-architected
+through 2025-2026, so old assumptions can be wrong. When your change makes a line here false
+- a path moves, a version gate shifts, a convention evolves - update that line in the same
+task. If you find a stale line while reading, fix it too.
 
-Infection is a PHP mutation testing framework that helps developers measure the effectiveness of their test suites. It works by making small modifications (mutations) to your code and checking if your tests can detect these changes.
+## What you are working on
 
-## Key Concepts
+Infection is the mutation testing framework for PHP - millions of Packagist installs, and
+PHPUnit, PHP-CS-Fixer, and PHPStan are all developed with it. It parses source into ASTs
+(nikic/php-parser - API
+refresher: `vendor/nikic/php-parser/README.md` and its `doc/` folder), applies
+small mutations, and checks whether the project's tests - and optionally a static analyser -
+notice. A bug here silently corrupts other projects' quality gates. A slowdown here multiplies
+by thousands of mutant processes per user run. Reviewers weigh correctness, memory, and
+per-process overhead equally.
 
-- **Mutation Testing**: A technique to evaluate test quality by introducing small changes to code
-- **Mutants**: Modified versions of the original code with small changes
-- **Mutation Score Indicator (MSI)**: Percentage of mutants killed by tests
-- **Mutators**: Classes that apply specific types of mutations to code
+The project tests itself with Infection: CI runs Infection against this repository with a
+minimum-MSI gate (`.github/workflows/mt.yaml`) and annotates escaped mutants inline on PRs.
+That fact explains most of the coding rules below: code is written so that every mutation of
+it dies.
 
-## Architecture and Structure
+## Vocabulary
 
-- `src/` - Main source code organized by functionality:
-  - `Mutator/` - Contains all mutation operators
-  - `TestFramework/` - Adapters for different testing frameworks (PHPUnit, etc.)
-  - `Configuration/` - Configuration parsing and validation
-  - `Console/` - CLI application commands
-  - `Process/` - Process management for running tests
-  - `Logger/` - Output formatting and logging
-- `tests/` - Comprehensive test suite
-- `resources/` - JSON schema and other resources
-- `bin/infection` - Main executable
+The canonical glossary (with citations to the mutation-testing literature) is transcluded
+below. Use its terms in code, tests, and PR titles; reviewers rename code that does not.
+Two Infection-specific notes on top of it: a `Mutation` object is a *serializable*
+description of a change (created during analysis, applied later, possibly in another
+process), and a mutator is concretely `canMutate()` + `mutate()`.
 
-## Technology Stack
+@doc/nomenclature.md
 
-- **PHP 8.3+** - Modern PHP with strict typing
-- **Symfony Components** - Console, Process, Filesystem, Finder
-- **nikic/php-parser** - For PHP code parsing and manipulation
-- **PHPUnit** - Primary testing framework
-- **Composer** - Dependency management
+## The execution pipeline
 
-## Development Workflow
+One pass, phase by phase (diagram: `doc/nomenclature.md#execution-phases`):
 
-### Setup
-```bash
-composer install
-```
+1. **CLI entry** - `bin/infection`, `src/Command/RunCommand.php`. Parses options, then binds
+   them into the container via `Container::withValues(...)`.
+2. **Container** - `src/Container/Container.php` (~1,260 lines). One flat registry of lazy
+   closure factories plus a typed getter per service. It is built on `sanmai/di-container`.
+3. **Engine** - `src/Engine.php` orchestrates everything below.
+4. **Source collection** - `src/Source/` (`SourceCollector` implementations, including the
+   git-diff collector); `src/Configuration/PositionalPathsClassifier.php` classifies
+   positional CLI paths into source vs test files.
+5. **Artefact collection** - initial test run with coverage
+   (`src/Process/OriginalPhpProcess.php` re-enables xdebug/pcov for exactly this child).
+   Then coverage-xml + junit.xml are ingested into lazy `Trace` objects
+   (`src/TestFramework/Coverage/`, `src/TestFramework/Tracing/`).
+6. **AST parsing + enrichment** - `src/PhpParser/NodeTraverserFactory.php` runs a single
+   ordered visitor stack. It labels eligibility, resolves names, connects parents and next
+   statements, attaches reflection and lazy covering-test lookups, and marks unchanged,
+   user-ignored, or untested code as ineligible.
+7. **Mutation generation + heuristic suppression** - `src/Mutation/FileMutationGenerator.php`,
+   `src/Mutator/NodeMutationGenerator.php`; mutators live under `src/Mutator/<Category>/`.
+8. **Mutant materialisation + evaluation** - `src/Mutant/MutantCodeFactory.php` splices the
+   replacement node by token positions and prints a minimal diff.
+   `src/Process/Runner/ParallelProcessRunner.php` streams mutant processes at N threads. An
+   escaped mutant may get a follow-up static-analysis process
+   (`src/StaticAnalysis/` - PHPStan and Mago adapters).
+9. **Reporting** - metrics in `src/Metrics/` (Welford-based running variance for timings),
+   loggers/reporters in `src/Logger/` and `src/Reporter/` (legacy) plus the newer
+   `src/Report/` framework that is gradually replacing them.
 
-### Quality Assurance
-```bash
-make autoreview                                      # Run majority of tools needed before pushing
-make cs                                              # Automatically fix code styles (use before pushing)
-vendor/bin/phpunit                                   # Run tests
-vendor/bin/phpunit --filter=MutatorGenerator        # Run specific test (replace MutatorGenerator with any file name)
-```
+## Repo map
 
-### Key Configuration Files
-- `infection.json5` - Infection's own configuration
-- `phpunit.xml.dist` - PHPUnit configuration
-- `.php-cs-fixer.php` - Code style rules
+- `src/` - production code. PSR-4 `Infection\`. Nothing under `src/` may depend on `tests/`
+  or benchmarks (PHPat-enforced); shipped test helpers live in `src/Testing/` for
+  this reason.
+- `tests/phpunit/` - unit/integration tests, mirroring `src/` one-to-one. Every concrete
+  source class must have a canonical test named after it (PHPat rule).
+- `tests/Architecture/PHPat/` - architecture and convention fitness rules (finality, `@internal`, canonical
+  tests, IO-vs-`integration`-group, event conventions, src-not-depending-on-tests). They run
+  under PHPStan via `devTools/phpstan.neon`, not under PHPUnit. The selectors' own tests are
+  in `tests/phpunit/Architecture/`.
+- `tests/phpunit/AutoReview/` - convention tests run by `phpunit_autoreview.xml`: mutator
+  API shape, Definition presence, env-var hygiene, Makefile consistency, no mutable public
+  properties (DTO whitelist in `tests/phpunit/AutoReview/ProjectCode/ProjectCodeProvider.php`).
+- `tests/e2e/` - one directory per scenario; anatomy, the `tests/e2e_tests` runner, and the
+  `tests/add_new_e2e` scaffold are covered by CONTRIBUTING.md, transcluded at the end of
+  this section. On top of that: fixtures pin `"threads"` (usually 1 - parallel output is
 
-## Coding Standards
-
-- **PSR-12** compliant code style
-- **Strict typing** - Always use declare(strict_types=1)
-- **Comprehensive tests** - New features require tests, bug fixes must include regression tests
-- **Immutable objects** - Prefer readonly properties and value objects
-- **Type safety** - Use type hints, avoid mixed types
-
-## Testing Philosophy
-
-- Unit tests for individual components
-- Integration tests for component interactions
-- End-to-end tests for CLI functionality
-- Mutation testing on itself (dogfooding)
-- Tests must be deterministic and fast
-
-## Common Patterns
-
-### Mutator Implementation
-```php
-final class SomeMutator implements Mutator
-{
-    public function canMutate(Node $node): bool
-    {
-        // Check if node can be mutated
-    }
-
-    public function mutate(Node $node): iterable
-    {
-        // Return mutations
-    }
-}
-```
-
-### Value Objects
-```php
-final readonly class SomeValue
-{
-    public function __construct(
-        public string $property,
-    ) {}
-}
-```
-
-### Configuration Classes
-Use readonly classes with clear validation and meaningful error messages.
-
-## When Contributing
-
-- Target the `master` branch
-- Include tests for new behaviors
-- Fixed bugs MUST have regression tests
-- Run `make cs` before committing
-- Consider opening an issue for major features first
-- Follow existing patterns for consistency
-
-## Common Issues to Avoid
-
-- Don't break backward compatibility without discussion
-- Avoid adding dependencies unnecessarily
-- Don't skip tests - they're critical for a testing tool
-- Be careful with performance - mutations can be CPU intensive
-- Maintain Windows compatibility where possible
-
-## Key Files to Understand
-
-- `src/Engine.php` - Main execution engine
-- `src/Configuration/` - Configuration system
-- `src/Mutator/` - All mutation operators
-- `src/TestFramework/` - Test framework integrations
-- `src/Process/` - Process execution logic
-
-## Performance Considerations
-
-- Infection processes many files and runs many test executions
-- Memory efficiency is important for large codebases
-- Parallel execution is used extensively
-- File I/O should be minimized
-- Consider caching where appropriate
-
-This is a mature, production-ready tool used by many PHP projects. Code quality and reliability are paramount.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [infection/infection](https://github.com/infection/infection) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
