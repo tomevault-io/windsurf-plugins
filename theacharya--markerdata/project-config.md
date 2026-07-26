@@ -1,67 +1,86 @@
 ---
 trigger: always_on
-description: You are working in the **Marker Data** repository: a macOS Swift/SwiftUI app that extracts Final Cut Pro marker metadata (via MarkersExtractor), optionally renders images and color swatches, and uploads to Notion/Airtable via bundled CLIs. It also includes a Final Cut Pro Workflow Extension and Share Destination integration.
+description: This repository contains **Marker Data**, a macOS Swift/SwiftUI app that extracts Final Cut Pro marker metadata (via `MarkersExtractor`), optionally renders images/palettes, and can upload results to Notion/Airtable via bundled CLIs. It also ships a **Final Cut Pro Workflow Extension** and a **Share Destination** integration.
 ---
 
-# Marker Data – Cursor rules
+# AGENT.md
 
-You are working in the **Marker Data** repository: a macOS Swift/SwiftUI app that extracts Final Cut Pro marker metadata (via MarkersExtractor), optionally renders images and color swatches, and uploads to Notion/Airtable via bundled CLIs. It also includes a Final Cut Pro Workflow Extension and Share Destination integration.
+## Purpose
+This repository contains **Marker Data**, a macOS Swift/SwiftUI app that extracts Final Cut Pro marker metadata (via `MarkersExtractor`), optionally renders images/palettes, and can upload results to Notion/Airtable via bundled CLIs. It also ships a **Final Cut Pro Workflow Extension** and a **Share Destination** integration.
 
-## Required reading
-- **`AGENT.md`** — entry points, build/CI, settings checklist, “when you change X, also change Y”, pitfalls, definition of done
-- **`ARCHITECTURE.md`** — modules, persistence layout, extract/queue/upload/FCP flows, notification contracts, directory map
+This `AGENT.md` is guidance for humans and AI agents working in this repo: how to build, where to look, what to avoid, and how changes should be made.
 
-Keep these three files consistent when architecture or agent guidance changes.
+For deeper module/data-flow detail, see **`ARCHITECTURE.md`**. For short agent guardrails, see **`.cursorrules`**.
 
-## Project layout
-- Main app: `Source/Marker Data/Marker Data/`
-- Workflow Extension: `Source/Marker Data/Workflow Extension/`
-- Uninstaller: `Source/Marker Data/Marker Data Uninstaller/` (target **Uninstall Marker Data**; product `Uninstall Marker Data.app`; bundle ID `co.theacharya.MarkerData.Uninstaller`)
-- FCP Share Destination (Swift + Obj‑C): `Source/Marker Data/Marker Data/FCP Share Destination/`
-- Bundled binaries (do not modify internals): `Source/Marker Data/Marker Data/Resources/airlift`, `csv2notion_neo`
-- Build: open `Source/Marker Data/Marker Data.xcodeproj`, scheme **Marker Data**, **Apple Silicon** (`arm64`) only
-- CI: `macos-26` runners with **Xcode 26.6.0**; Workflow Extensions SDK from `SDK/Workflow_Extensions_1.0.3.dmg`
+## What you’re working on
 
-## Swift / SwiftUI conventions
-- Format Swift with SwiftFormat (see `CONTRIBUTING.md`).
-- Models that drive UI are `@MainActor` and mutate on main; extraction/upload use `Task` / `TaskGroup` with cancellation (including terminating child `Process`es).
+| Area | Path |
+|------|------|
+| Main app (SwiftUI) | `Source/Marker Data/Marker Data/` |
+| Workflow Extension | `Source/Marker Data/Workflow Extension/` |
+| Uninstaller (SwiftUI) | `Source/Marker Data/Marker Data Uninstaller/` — target **Uninstall Marker Data**; product `Uninstall Marker Data.app`; display name “Marker Data Uninstaller”; bundle ID `co.theacharya.MarkerData.Uninstaller` |
+| Share Destination install UI | `Source/Marker Data/Marker Data/FCP Share Destination/Install View/` |
+| Share Destination scripting (Obj‑C) | `Source/Marker Data/Marker Data/FCP Share Destination/Objective-C Code/` |
+| Bundled helper CLIs (opaque) | `Source/Marker Data/Marker Data/Resources/airlift`, `.../csv2notion_neo` |
+| Distribution / DMG / Sparkle | `Distribution/` |
+| CI | `.github/workflows/` |
 
-## Settings system (required for preference changes)
-- Read **AGENT.md → Settings system** and **ARCHITECTURE.md → Settings system** before adding or changing persisted preferences.
-- Active settings: `~/Library/Application Support/Marker Data/preferences.json`. Named presets: `Configurations/*.json`. Schema: `SettingsStore` (`SettingsStore.swift`; `static let version` currently **8**).
-- `SettingsContainer` holds the active `store`, auto-saves on change, and manages configuration CRUD.
-- **Unique configuration names:** add / rename / duplicate must throw `ConfigurationSaveError.nameAlreadyExists` — never overwrite `{name}.json` silently. Rename prefills the current name; sheets dismiss only on success.
-- On launch, `SettingsVersioningManager.updateAll()` migrates JSON **before** decode — dict-based `upgradeVersion(...)`, one step per version increment.
-- UI binds via `@EnvironmentObject SettingsContainer` and `$settings.store.<property>`.
-- Export pipeline reads settings through `SettingsStore.markersExtractorSettings(fcpxmlFileUrl:)` → `MarkersExtractor.Settings` — wire new export-related fields there. Roles are reloaded from disk inside that method.
-- `RolesManager` reads/writes `preferences.json` directly (Workflow Extension sync via DistributedNotification `.rolesChanged`) — keep `roles` compatible.
-- **Any new/changed/renamed persisted `SettingsStore` property:**
-  1. Bump `SettingsStore.version`
-  2. Add migration `case` for the previous version
-  3. Add UI binding
-  4. Wire `markersExtractorSettings` if export-related
-  5. Never remove/rename JSON keys without a migration
+**Xcode project:** `Source/Marker Data/Marker Data.xcodeproj`  
+**Scheme:** **Marker Data** builds the main app (embeds Workflow Extension) and the Uninstall Marker Data target.
 
-## Key runtime flows (see ARCHITECTURE.md for detail)
-- **Extract:** `ExtractionModel` → MarkersExtractor → optional `ColorPaletteRenderer` → optional `DatabaseUploader`
-- **Queue:** scans for `extract_info.json` (written only for Notion/Airtable extracts with a JSON manifest) → parallel re-upload
-- **Workflow Extension:** writes `~/Movies/Marker Data Cache/WorkflowExtensionExport.fcpxml`, opens `/Applications/Marker Data.app`, posts DistributedNotification `.workflowExtensionFileReceived`
-- **Share Destination:** `OSAScriptingDefinition.sdef` + Obj‑C `MakeCommand` → Movies cache → local `FCPShareStart` → Apple Event open → `.openFile`
+## Key entry points (start here)
 
-## Pitfalls to avoid
-- Do not remove or rename persisted settings keys without a migration.
-- Do not assume behavior of `airlift` / `csv2notion_neo` beyond CLI usage in `DatabaseUploader` (and Dropbox setup in `DropboxSetupModel`).
-- Do not break Share Destination scripting (`Resources/OSAScriptingDefinition.sdef` + Obj‑C) or Workflow Extension disk/DNC contracts.
-- The app warns if not run from `/Applications`; do not remove that check (extension opens that path).
-- SwiftUI `.alert` icons: Dock uses Icon Composer (`Marker-Data.icon`), which often yields a blank document glyph. After every `.alert`, chain `.appDialogIcon()` (`Views/Extensions/DialogIcon.swift` → PNG `AppIconSingle`).
-- Database models use property name `plaform` — keep consistent unless intentionally migrating.
-- If adding new on-disk paths the app uses, update `MarkerDataUninstaller` cleanup paths too.
+| Concern | File |
+|---------|------|
+| `@main` app | `Source/Marker Data/Marker Data/Marker_DataApp.swift` — constructs `SettingsContainer`, `DatabaseManager`, `ExtractionModel`, `QueueModel`; menu commands; Failed Tasks + Pagemaker windows |
+| AppKit / Sparkle delegate | `Source/Marker Data/Marker Data/ApplicationDelegate.swift` |
+| Sidebar navigation | `Source/Marker Data/Marker Data/Views/Main/ContentView.swift` (`MainViews` enum) |
+| Extract UI | `Source/Marker Data/Marker Data/Views/Main/ExtractView.swift` |
+| Extraction orchestration | `Source/Marker Data/Marker Data/Models/Extract/Extraction Model/ExtractionModel.swift` |
+| External handoffs (open / Workflow Extension) | `.../ExtractionModel_EventHandlers.swift` |
+| Queue scan/upload | `Source/Marker Data/Marker Data/Models/Queue/QueueModel.swift` |
+| Database uploads | `Source/Marker Data/Marker Data/Models/Extract/DatabaseUploader.swift` |
+| Settings schema | `Source/Marker Data/Marker Data/Models/Settings/SettingsStore.swift` (`static let version` — currently **8**) |
+| Settings container / configs | `Source/Marker Data/Marker Data/Models/Settings/SettingsContainer.swift` |
+| Settings migrations | `Source/Marker Data/Marker Data/Models/Settings/SettingsVersioningManager.swift` |
+| Canonical disk paths | `Source/Marker Data/Marker Data/Utilities/Extensions/URLExtension.swift` |
+| Notification names | `Source/Marker Data/Marker Data/Utilities/Extensions/NotificationNameExtension.swift` |
+| Alert dialog icon helper | `Source/Marker Data/Marker Data/Views/Extensions/DialogIcon.swift` (`.appDialogIcon()`) |
 
-## Definition of done for code changes
-- App builds (Debug and Release) for arm64.
+## Build & run (local)
+1. Open `Source/Marker Data/Marker Data.xcodeproj`.
+2. Select the **Marker Data** scheme.
+3. Build/run for **Apple Silicon** (`arm64`). Do not target Intel.
+
+CI installs the Workflow Extensions SDK from `SDK/Workflow_Extensions_1.0.3.dmg` before `xcodebuild`. Locally you need the same SDK installed under `/Library/Developer/SDKs/WorkflowExtensionSDK.sdk` to build the extension target.
+
+**SwiftFormat** (courtesy, not CI-enforced): from repo root, `swiftformat .` — see `CONTRIBUTING.md`.
+
+## CI / release basics
+
+| Fact | Value |
+|------|--------|
+| Runner | `macos-26` |
+| Xcode (workflows) | **`Xcode_26.6.0`** (`sudo xcode-select -s /Applications/Xcode_26.6.0.app/...`) |
+| Architecture | `arch=arm64`, `EXCLUDED_ARCHS=x86_64` |
+| PR/push build | `.github/workflows/build.yml` |
+| Test (notarized) builds | `test_build.yml`, `test_build_debug.yml` |
+| Full release + Sparkle appcast | `release_github.yml` |
+| Release without appcast | `release_github_non-appcast.yml` |
+| Refresh bundled CLIs / Pagemaker | `update_airlift_binary.yml`, `update_csv2notion_neo_binary.yml`, `update_pagemaker.yml` |
+
+Release flow (high level):
+1. Build **Marker Data** scheme (main app + Uninstall Marker Data).
+2. Copy `Marker Data.app` and `Uninstall Marker Data.app` into `latest-build/`.
+3. Codesign: Workflow Extension → Sparkle framework/XPC helpers → main app → Uninstaller.
+4. Notarize; package DMG with `appdmg` + `Distribution/dmg-builds/build-marker-data-dmg.json`.
+5. Sparkle: feed is `appcast.xml`; updated by `Distribution/dmg-builds/sparkle/generate_appcast_script.py`.
+
+Shipping philosophy: distribute the **Derived Data Release `.app`**, not an Archive (debuggability / reproducibility — see `CONTRIBUTING.md`).
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TheAcharya/MarkerData](https://github.com/TheAcharya/MarkerData) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
