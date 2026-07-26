@@ -188,4 +188,4 @@ configs/
 
 ---
 > Source: [kubricate/kubricate](https://github.com/kubricate/kubricate) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
