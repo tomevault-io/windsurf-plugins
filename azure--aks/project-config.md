@@ -1,185 +1,208 @@
 ---
 trigger: always_on
-description: > **Scope**: Repository-wide standards, conventions, and Microsoft style guide.
+description: > **Scope**: File-specific patterns for blog post Markdown files.
 ---
 
-# AKS Repository - GitHub Copilot Instructions
 
-> **Scope**: Repository-wide standards, conventions, and Microsoft style guide.  
-> **Module-Specific**: See `AGENTS.md` files in subdirectories.  
-> **File-Specific**: See `.github/instructions/*.instructions.md` for targeted patterns.
+# AKS Blog Post Content Guidelines
 
+> **Scope**: File-specific patterns for blog post Markdown files.  
+> **Module Context**: See `website/AGENTS.md` for architecture and workflows.  
+> **Repo Standards**: See `.github/copilot-instructions.md` for general conventions.
+
+## Front Matter (Required)
+
+Every blog post MUST include:
+
+```yaml
 ---
-
-## Part 1: Repository Standards
-
-### Repository Overview
-
-This repository contains resources, examples, and documentation for the Azure Kubernetes Service (AKS) Engineering team:
-
-- **Production Website**: <https://blog.aks.azure.com> (Docusaurus blog in `website/`)
-- **Examples**: Real-world AKS scenarios, troubleshooting guides, and configurations
-- **VHD Notes**: Node image release notes for AKS Ubuntu, Windows, Mariner, and Azure Linux
-- **AI Conformance**: AKS service version compliance profiles
-- **Community**: Open-source collaboration with AKS users and contributors
-
-#### Repository Structure
-
-```text
-AKS/
-├── .github/
-│   ├── copilot-instructions.md          # This file (repo-wide standards)
-│   └── instructions/                    # File-specific patterns
-│       └── website.blog.instructions.md # Blog post guidelines
-├── website/                             # Docusaurus blog site
-│   ├── AGENTS.md                       # Website module guide
-│   ├── blog/                           # Blog posts
-│   ├── src/                            # React components
-│   └── package.json
-├── examples/                            # AKS configuration examples
-│   ├── fleet/                          # Azure Kubernetes Fleet Manager
-│   ├── istio-based-service-mesh/       # Service mesh examples
-│   ├── kube-prometheus/                # Monitoring setup
-│   └── vnet/                           # Networking examples
-├── vhd-notes/                          # Node image release notes
-│   ├── aks-ubuntu/
-│   ├── AKSMariner/
-│   ├── AKSWindows/
-│   └── AzureLinux/
-├── README.md
-└── LICENSE.MD
+title: "Descriptive Post Title"
+date: YYYY-MM-DD
+description: "SEO-optimized summary (150-160 characters)"
+authors: [author-key]  # From blog/authors.yml
+tags: [tag1, tag2]     # From blog/tags.yml
+draft: false            # Optional: set to true to hide from production
+---
 ```
 
+**Validation Checklist**:
+
+- [ ] `title`: Clear, descriptive, under 60 chars
+- [ ] `date`: Valid format, can be future-dated for future publishing
+- [ ] `description`: 150-160 chars, includes keywords
+- [ ] `authors`: Valid keys from `blog/authors.yml`
+- [ ] `tags`: Valid keys from `blog/tags.yml`
+
+### Blog Post Date
+
+The publish date is determined by the **folder name** (e.g., `2025-12-19-my-post/index.md`). Docusaurus extracts the date from folder/filename patterns like `YYYY-MM-DD-slug` or `YYYY/MM/DD/slug`. If you specify a `date` in front matter, it **overrides** the folder-derived date.
+
+**Important**: Unlike Jekyll, Docusaurus does **NOT** hide future-dated posts. All posts are published immediately when deployed, regardless of date. To prevent premature publishing:
+
+- Use `draft: true` in front matter to exclude from production builds (visible only in dev)
+- Use `unlisted: true` to hide from listings but keep accessible via direct link
+- Alternatively, keep the post in a separate branch until ready
+
+**Before merging**: If PR review takes longer than expected and the folder date becomes stale, update the folder name (or add a `date` override in front matter) to reflect the actual publish date. Posts should show the date readers will see them, not when they were originally drafted.
+
+## Content Structure
+
+### Required Pattern
+
+```markdown
+---
+title: "..."
+date: YYYY-MM-DD
+description: "..."
+authors: [...]
+tags: [...]
 ---
 
-### Code Style and File Naming
+[Opening paragraph: Hook the reader, set context, preview content]
 
-#### Code Style
-- **Markdown**: Follow CommonMark spec
-- **YAML**: 2-space indentation, no tabs
-- **Shell scripts**: Use shellcheck-compliant bash with `set -euo pipefail`
-- **TypeScript**: Follow TypeScript ESLint recommended rules
-- **React**: Functional components with hooks (no class components)
+<!-- truncate -->
 
-#### File Naming
-| Type | Convention | Example |
-|:---|:---|:---|
-| Markdown | `kebab-case.md` | `getting-started.md` |
-| TypeScript/React components | `PascalCase.tsx` | `BlogPost.tsx` |
-| TypeScript utilities | `camelCase.ts` | `analytics.ts` |
-| CSS | `kebab-case.css` or `ComponentName.module.css` | `blog-post.module.css` |
-| YAML | `kebab-case.yaml` or `.yml` | `deployment.yaml` |
-| Shell scripts | `kebab-case.sh` | `remediate.sh` |
-| VHD notes | `YYYYMMDD.VV.V.txt` | `202401.03.0.txt` |
+![Hero Image](./hero-image.png)
 
----
+## Section 1: Problem/Context
+[Describe the challenge or background...]
 
-### Build and Development
+## Section 2: Solution/Details
+[Explain the approach or feature...]
 
-#### Website (`website/`)
+## Section 3: Implementation
+[Step-by-step guide or examples...]
 
-See `website/AGENTS.md` for detailed build instructions and troubleshooting.
+## Conclusion
+[Summarize key takeaways...]
+```
 
+### Critical Elements
+
+1. **Truncation marker**: `<!-- truncate -->` after 2-3 intro paragraphs (shows on listing page)
+2. **Hero image**: Use `./hero-image.png` for same-directory assets
+3. **Heading hierarchy**: H2 (`##`) for major sections, H3 (`###`) for subsections
+4. **Alt text**: All images MUST have descriptive alt text
+
+## Writing Style
+
+### Target Audience
+
+- **Primary**: AKS users, Kubernetes practitioners, platform engineers
+- **Level**: Intermediate to advanced technical knowledge
+- **Expectation**: Practical, actionable content with examples
+
+### Tone Guidelines
+
+- ✅ Follows the Microsoft Style Guide
+- ✅ Professional yet approachable
+- ✅ Direct and concise
+- ✅ Technical but accessible
+- ❌ No marketing fluff or buzzwords
+- ❌ No unexplained jargon
+- ❌ No passive voice (prefer active)
+
+### Content Requirements
+
+- **Length**: 800-1500 words (longer acceptable if high-value)
+- **Paragraphs**: 3-4 sentences max per paragraph
+- **Lists**: Use bullets/numbers liberally to break up text
+- **Examples**: Include code snippets, commands, or diagrams
+- **Links**: External references to docs, GitHub, or related posts
+- **Originality**: Must be original content (cite sources if adapted)
+
+## Formatting Patterns
+
+### Headings
+
+```markdown
+## Major Section (H2)
+
+### Subsection (H3)
+
+#### Detail Point (H4 - use sparingly)
+```
+
+**Rules**:
+
+- Title (H1) auto-generated from front matter
+- Use H2 for main sections
+- Use H3 for subsections
+- Avoid H4+ (indicates over-complexity)
+
+### Code Blocks
+
+**Always specify language**:
+
+````markdown
 ```bash
-cd website
-npm install        # Install dependencies
-npm start          # Dev server with hot reload
-npm run build      # Production build (must succeed)
-npm run typecheck  # TypeScript validation
+kubectl get pods -n production
 ```
-
-#### Examples
-
-Most examples are standalone YAML files or scripts:
-
-```bash
-# Validate Kubernetes YAML
-kubectl apply --dry-run=client -f examples/fleet/kuard/deployment.yaml
-
-# Run example script
-bash examples/kernel-1095-issue/remediate.sh
-```
-
-**Shell script template**:
-```bash
-#!/bin/bash
-set -euo pipefail  # Exit on error, undefined vars, pipe failures
-
-# Check prerequisites
-if ! command -v kubectl &> /dev/null; then
-    echo "Error: kubectl not found" >&2
-    exit 1
-fi
-
-# Use environment variables with defaults
-CLUSTER_NAME="${CLUSTER_NAME:-my-aks-cluster}"
-RESOURCE_GROUP="${RESOURCE_GROUP:-my-resource-group}"
-```
-
-#### VHD Notes
-
-Text files documenting node image changes. No build process required.
-
-1. Locate directory: `vhd-notes/{image-type}/`
-2. Create/edit file: `YYYYMMDD.VV.V.txt`
-3. List changes chronologically with package versions
-4. Commit with: `docs(vhd-notes): update {image-type} {version}`
-
----
-
-### Git Workflow
-
-#### Branch Strategy
-- **master**: Main branch, stable code (protected)
-- **Feature branches**: Short-lived, descriptive names (`add-fleet-examples`, `fix-blog-typo`)
-
-#### Commit Messages
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```text
-<type>(<scope>): <subject>
-```
-
-| Type | Use for |
-|:---|:---|
-| `feat` | New feature or post |
-| `fix` | Bug fix (broken links, typos, build errors) |
-| `docs` | Documentation changes (examples, README, VHD notes) |
-| `style` | Formatting (no functional change) |
-| `refactor` | Code restructuring |
-| `chore` | Maintenance tasks |
-
-**Scope examples**: `website`, `examples`, `vhd-notes`, `blog`, `github-actions`
-
-**Examples**:
-```text
-feat(website): add AKS MCP server blog post
-docs(examples): add Fleet Manager multi-cluster setup guide
-fix(website): correct broken link in webinar metadata
-```
-
-#### Pull Requests
-- **Title**: Follows conventional commit format
-- **Description**: What changed and why, link to related issues
-- **Testing**: Describe validation (e.g., "npm run build passed")
-- **Screenshots**: Include for UI changes
-
----
-
-### Azure/Kubernetes Best Practices
-
-#### YAML Manifests
 
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: example-pod
-  labels:
+  name: example
+```
+
+```typescript
+export function handleRequest(): void {
+  // Implementation
+}
+```
+````
+
+**Best Practices**:
+
+- Include comments for complex code
+- Show realistic examples (not `foo`/`bar`)
+- Keep snippets under 30 lines (link to gists for longer)
+
+### Links
+
+```markdown
+✅ [Azure Kubernetes Service documentation](https://learn.microsoft.com/azure/aks)
+✅ See the [AKS roadmap](https://github.com/orgs/Azure/projects/685) for planned features.
+
+❌ Click [here](https://example.com) for more info.
+❌ Check out https://example.com
+```
+
+**Rules**:
+
+- Descriptive link text (not "click here" or "this link")
+- No bare URLs (always use `[text](url)` syntax)
+- Prefer Microsoft Learn for Azure docs
+
+### Images
+
+```markdown
+![Descriptive alt text explaining the image](./image-filename.png)
+```
+
+**Requirements**:
+
+- Images in same directory as `index.md`
+- Use relative paths: `./image.png`
+- Descriptive alt text (accessibility + SEO)
+- Optimize before commit (compress PNGs/JPGs)
+- Max 500KB per image
+
+### Emphasis
+
+```markdown
+**Important term or concept** (bold - use sparingly)
+*Subtle emphasis* (italic - rare)
+`code or technical term` (inline code)
+```
+
+### Blockquotes
+
+```markdown
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Azure/AKS](https://github.com/Azure/AKS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
