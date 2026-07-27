@@ -1,82 +1,108 @@
 ---
 trigger: always_on
-description: Guidelines for using PocketFlow, Agentic Coding
+description: Guidelines for using PocketFlow, Utility Function, Text-to-Speech
 ---
 
-# DOCUMENTATION FIRST POLICY
+# Text-to-Speech
 
-**CRITICAL INSTRUCTION**: When implementing a Pocket Flow app:
+| **Service**          | **Free Tier**         | **Pricing Model**                                            | **Docs**                                                            |
+|----------------------|-----------------------|--------------------------------------------------------------|---------------------------------------------------------------------|
+| **Amazon Polly**     | 5M std + 1M neural   | ~$4 /M (std), ~$16 /M (neural) after free tier               | [Polly Docs](https://aws.amazon.com/polly/)                         |
+| **Google Cloud TTS** | 4M std + 1M WaveNet  | ~$4 /M (std), ~$16 /M (WaveNet) pay-as-you-go                | [Cloud TTS Docs](https://cloud.google.com/text-to-speech)           |
+| **Azure TTS**        | 500K neural ongoing  | ~$15 /M (neural), discount at higher volumes                 | [Azure TTS Docs](https://azure.microsoft.com/products/cognitive-services/text-to-speech/) |
+| **IBM Watson TTS**   | 10K chars Lite plan  | ~$0.02 /1K (i.e. ~$20 /M). Enterprise options available       | [IBM Watson Docs](https://www.ibm.com/cloud/watson-text-to-speech)   |
+| **ElevenLabs**       | 10K chars monthly    | From ~$5/mo (30K chars) up to $330/mo (2M chars). Enterprise  | [ElevenLabs Docs](https://elevenlabs.io)                            |
 
-1. **ALWAYS REQUEST MDC FILES FIRST** - Before writing any code, request and review all relevant MDC documentation files. This doc provides an explaination of the documents.
-2. **UNDERSTAND THE FRAMEWORK** - Gain comprehensive understanding of the Pocket Flow framework from documentation
-3. **AVOID ASSUMPTION-DRIVEN DEVELOPMENT** - Do not base your implementation on assumptions or guesswork. Even if the human didn't explicitly mention pocket flow in their request, if the code you are editing is using pocket flow, you should request relevant docs to help you understand best practice as well before editing.
+## Example Python Code
 
-**VERIFICATION**: Begin each implementation with a brief summary of the documentation you've reviewed to inform your approach.
+### Amazon Polly
+```python
+import boto3
 
-# Agentic Coding: Humans Design, Agents code!
+polly = boto3.client("polly", region_name="us-east-1",
+                     aws_access_key_id="YOUR_AWS_ACCESS_KEY_ID",
+                     aws_secret_access_key="YOUR_AWS_SECRET_ACCESS_KEY")
 
-> If you are an AI agent involved in building LLM Systems, read this guide **VERY, VERY** carefully! This is the most important chapter in the entire document. Throughout development, you should always (1) start with a small and simple solution, (2) design at a high level (`docs/design.md`) before implementation, and (3) frequently ask humans for feedback and clarification.
-{: .warning }
+resp = polly.synthesize_speech(
+    Text="Hello from Polly!",
+    OutputFormat="mp3",
+    VoiceId="Joanna"
+)
 
-## Agentic Coding Steps
+with open("polly.mp3", "wb") as f:
+    f.write(resp["AudioStream"].read())
+```
 
-Agentic Coding should be a collaboration between Human System Design and Agent Implementation:
+### Google Cloud TTS
+```python
+from google.cloud import texttospeech
 
-| Steps                  | Human      | AI        | Comment                                                                 |
-|:-----------------------|:----------:|:---------:|:------------------------------------------------------------------------|
-| 1. Requirements | ★★★ High  | ★☆☆ Low   | Humans understand the requirements and context.                    |
-| 2. Flow          | ★★☆ Medium | ★★☆ Medium |  Humans specify the high-level design, and the AI fills in the details. |
-| 3. Utilities   | ★★☆ Medium | ★★☆ Medium | Humans provide available external APIs and integrations, and the AI helps with implementation. |
-| 4. Data          | ★☆☆ Low    | ★★★ High   | AI designs the data schema, and humans verify.                            |
-| 5. Node          | ★☆☆ Low   | ★★★ High  | The AI helps design the node based on the flow.          |
-| 6. Implementation      | ★☆☆ Low   | ★★★ High  |  The AI implements the flow based on the design. |
-| 7. Optimization        | ★★☆ Medium | ★★☆ Medium | Humans evaluate the results, and the AI helps optimize. |
-| 8. Reliability         | ★☆☆ Low   | ★★★ High  |  The AI writes test cases and addresses corner cases.     |
+client = texttospeech.TextToSpeechClient()
+input_text = texttospeech.SynthesisInput(text="Hello from Google Cloud TTS!")
+voice = texttospeech.VoiceSelectionParams(language_code="en-US")
+audio_cfg = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
 
-1. **Requirements**: Clarify the requirements for your project, and evaluate whether an AI system is a good fit. 
-    - Understand AI systems' strengths and limitations:
-      - **Good for**: Routine tasks requiring common sense (filling forms, replying to emails)
-      - **Good for**: Creative tasks with well-defined inputs (building slides, writing SQL)
-      - **Not good for**: Ambiguous problems requiring complex decision-making (business strategy, startup planning)
-    - **Keep It User-Centric:** Explain the "problem" from the user's perspective rather than just listing features.
-    - **Balance complexity vs. impact**: Aim to deliver the highest value features with minimal complexity early.
+resp = client.synthesize_speech(input=input_text, voice=voice, audio_config=audio_cfg)
 
-2. **Flow Design**: Outline at a high level, describe how your AI system orchestrates nodes.
-    - Identify applicable design patterns (e.g., [Map Reduce], [Agent], [RAG]).
-      - For each node in the flow, start with a high-level one-line description of what it does.
-      - If using **Map Reduce**, specify how to map (what to split) and how to reduce (how to combine).
-      - If using **Agent**, specify what are the inputs (context) and what are the possible actions.
-      - If using **RAG**, specify what to embed, noting that there's usually both offline (indexing) and online (retrieval) workflows.
-    - Outline the flow and draw it in a mermaid diagram. For example:
-      ```mermaid
-      flowchart LR
-          start[Start] --> batch[Batch]
-          batch --> check[Check]
-          check -->|OK| process
-          check -->|Error| fix[Fix]
-          fix --> check
-          
-          subgraph process[Process]
-            step1[Step 1] --> step2[Step 2]
-          end
-          
-          process --> endNode[End]
-      ```
-    - > **If Humans can't specify the flow, AI Agents can't automate it!** Before building an LLM system, thoroughly understand the problem and potential solution by manually solving example inputs to develop intuition.  
-      {: .best-practice }
+with open("gcloud_tts.mp3", "wb") as f:
+    f.write(resp.audio_content)
+```
 
-3. **Utilities**: Based on the Flow Design, identify and implement necessary utility functions.
-    - Think of your AI system as the brain. It needs a body—these *external utility functions*—to interact with the real world:
-        
+### Azure TTS
+```python
+import azure.cognitiveservices.speech as speechsdk
 
-        - Reading inputs (e.g., retrieving Slack messages, reading emails)
-        - Writing outputs (e.g., generating reports, sending emails)
-        - Using external tools (e.g., calling LLMs, searching the web)
-        - **NOTE**: *LLM-based tasks* (e.g., summarizing text, analyzing sentiment) are **NOT** utility functions; rather, they are *core functions* internal in the AI system.
-    - For each utility function, implement it and write a simple test.
+speech_config = speechsdk.SpeechConfig(
+    subscription="AZURE_KEY", region="AZURE_REGION")
+audio_cfg = speechsdk.audio.AudioConfig(filename="azure_tts.wav")
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+synthesizer = speechsdk.SpeechSynthesizer(
+    speech_config=speech_config,
+    audio_config=audio_cfg
+)
+
+synthesizer.speak_text_async("Hello from Azure TTS!").get()
+```
+
+### IBM Watson TTS
+```python
+from ibm_watson import TextToSpeechV1
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+
+auth = IAMAuthenticator("IBM_API_KEY")
+service = TextToSpeechV1(authenticator=auth)
+service.set_service_url("IBM_SERVICE_URL")
+
+resp = service.synthesize(
+    "Hello from IBM Watson!",
+    voice="en-US_AllisonV3Voice",
+    accept="audio/mp3"
+).get_result()
+
+with open("ibm_tts.mp3", "wb") as f:
+    f.write(resp.content)
+```
+
+### ElevenLabs
+```python
+import requests
+
+api_key = "ELEVENLABS_KEY"
+voice_id = "ELEVENLABS_VOICE"
+url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
+
+json_data = {
+    "text": "Hello from ElevenLabs!",
+    "voice_settings": {"stability": 0.75, "similarity_boost": 0.75}
+}
+
+resp = requests.post(url, headers=headers, json=json_data)
+
+with open("elevenlabs.mp3", "wb") as f:
+    f.write(resp.content)
+```
 
 ---
 > Source: [The-Pocket/PocketFlow](https://github.com/The-Pocket/PocketFlow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
