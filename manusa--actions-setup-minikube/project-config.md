@@ -1,106 +1,89 @@
 ---
 trigger: always_on
-description: Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+description: Extends: `undici.Dispatcher`
 ---
 
-# Setup Minikube GitHub Action - AI Agents Instructions
+# Agent
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+Extends: `undici.Dispatcher`
 
-This file provides guidance to AI coding agents (GitHub Copilot, Claude Code, etc.) when working with code in this repository.
+Agent allow dispatching requests against multiple different origins.
 
-## Project Overview
+Requests are not guaranteed to be dispatched in order of invocation.
 
-A GitHub Action that sets up a single-node Kubernetes cluster using Minikube in CI workflows. It downloads and installs Minikube with specified versions of Kubernetes, supporting multiple drivers (`none`, `docker`) and container runtimes (`docker`, `cri-o`, `containerd`). Built with Node.js 24 using GitHub Actions toolkit libraries.
+## `new undici.Agent([options])`
 
-## Working Effectively
+Arguments:
 
-### Bootstrap and Setup
-```shell
-npm install
-```
+* **options** `AgentOptions` (optional)
 
-### Build Commands
+Returns: `Agent`
 
-This is a GitHub Action - no build step required. The action runs directly from `src/index.js`.
+### Parameter: `AgentOptions`
 
-### Testing
+Extends: [`PoolOptions`](Pool.md#parameter-pooloptions)
 
-**Unit tests (fast, ~2s):**
-```shell
-npm test
-```
+* **factory** `(origin: URL, opts: Object) => Dispatcher` - Default: `(origin, opts) => new Pool(origin, opts)`
+* **maxRedirections** `Integer` - Default: `0`. The number of HTTP redirection to follow unless otherwise specified in `DispatchOptions`.
+* **interceptors** `{ Agent: DispatchInterceptor[] }` - Default: `[RedirectInterceptor]` - A list of interceptors that are applied to the dispatch method. Additional logic can be applied (such as, but not limited to: 302 status code handling, authentication, cookies, compression and caching). Note that the behavior of interceptors is Experimental and might change at any given time.
 
-**Format check:**
-```shell
-npm run format-check
-```
+## Instance Properties
 
-**IMPORTANT**: E2E tests run only in GitHub Actions workflows. They cannot be run locally as they require the GitHub Actions environment and actually provision Minikube clusters.
+### `Agent.closed`
 
-### Running the Application
+Implements [Client.closed](Client.md#clientclosed)
 
-This is a GitHub Action and cannot be run directly. Test locally by:
-1. Running unit tests: `npm test`
-2. Pushing to a branch and observing the CI workflow
+### `Agent.destroyed`
 
-## Architecture
+Implements [Client.destroyed](Client.md#clientdestroyed)
 
-### Technical Structure
+## Instance Methods
 
-```
-src/
-  index.js              # Entry point - orchestrates the setup process
-  check-environment.js  # Validates Ubuntu version (18, 20, 22, 24)
-  check-kubernetes-version.js # Validates K8s version against Minikube's supported list
-  configure-environment.js # Prepares system (apt packages, Docker, CNI plugins)
-  download.js           # Downloads binaries from GitHub releases (Minikube, CNI plugins, crictl, cri-dockerd)
-  error-handler.js      # Global error handling
-  exec.js               # Shell command execution utilities
-  github.js             # GitHub API request utility (authenticated/unauthenticated)
-  install.js            # Installs and starts Minikube
-  load-inputs.js        # Loads action inputs via @actions/core
-  __tests__/            # Jest unit tests (mirror src/ structure)
+### `Agent.close([callback])`
 
-action.yml              # GitHub Action definition (outputs: `force`)
-.github/workflows/
-  check.yml             # CI: format check + unit tests
-  runner.yml            # E2E tests: runs action against multiple K8s versions
-```
+Implements [`Dispatcher.close([callback])`](Dispatcher.md#dispatcherclosecallback-promise).
 
-### Design Patterns
+### `Agent.destroy([error, callback])`
 
-- **Modular pipeline**: `index.js` orchestrates: `checkEnvironment()` → `loadInputs()` → `configureEnvironment(inputs)` → `download.downloadMinikube(inputs)` → `install(downloadedFile, inputs)`. Note: binary downloads for CNI plugins, crictl, and cri-dockerd happen inside `configureEnvironment()`, not as a separate pipeline step.
-- **GitHub Actions toolkit**: Uses `@actions/core` for inputs/outputs, `@actions/tool-cache` for downloads
-- **GitHub API integration**: `src/github.js` provides a `gitHubRequest` utility wrapping Axios for authenticated/unauthenticated GitHub API calls. Used by `download.js` and `check-kubernetes-version.js`.
-- **Driver-specific logic**: Different setup paths for `none` vs `docker` drivers (none requires CNI plugins, crictl, cri-dockerd)
-- **Kubernetes version validation**: `check-kubernetes-version.js` checks if the requested K8s version is in Minikube's built-in supported list. If not, it verifies the version exists as a GitHub release and returns `UNSUPPORTED` (triggering `--force` flag). If the version doesn't exist at all, it throws an error.
+Implements [`Dispatcher.destroy([error, callback])`](Dispatcher.md#dispatcherdestroyerror-callback-promise).
 
-### Key Dependencies
+### `Agent.dispatch(options, handler: AgentDispatchOptions)`
 
-**npm packages (in `package.json`):**
-- `@actions/core` - Action inputs, outputs, and logging
-- `@actions/github` - GitHub context utilities
-- `@actions/io` - File system operations
-- `@actions/tool-cache` - Binary downloads and caching
-- `axios` - HTTP requests to GitHub API (via `src/github.js`)
+Implements [`Dispatcher.dispatch(options, handler)`](Dispatcher.md#dispatcherdispatchoptions-handler).
 
-**Binary dependencies (pinned versions in `src/download.js`):**
-- **CNI plugins** (`containernetworking/plugins`) - Required by cri-dockerd and recent Minikube releases for container networking
-- **cri-tools / crictl** (`kubernetes-sigs/cri-tools`) - CRI CLI tool for interacting with container runtimes
-- **cri-dockerd** (`Mirantis/cri-dockerd`) - CRI shim for Docker Engine
+#### Parameter: `AgentDispatchOptions`
 
-These binaries are downloaded at runtime from GitHub releases. Their versions are hardcoded as `const tag = '...'` values in `src/download.js` (not in `package.json`).
+Extends: [`DispatchOptions`](Dispatcher.md#parameter-dispatchoptions)
 
-### SHA256 Verification
+* **origin** `string | URL`
+* **maxRedirections** `Integer`.
 
-Every binary downloaded by `src/download.js` is SHA256-verified before use. Two helpers funnel all downloads — **no bare `tc.downloadTool` call should appear in this module**:
+Implements [`Dispatcher.destroy([error, callback])`](Dispatcher.md#dispatcherdestroyerror-callback-promise).
 
-- **`downloadGitHubArtifact(...)`** — for release-asset downloads. Requires exactly one of:
-  - **`verifyWithCompanionSha256: true`** — looks up the `<asset.name>.sha256` companion asset in the same release, fetches its body via `gitHubRequest` (with `responseType: 'text'`), parses the leading hex token, validates the format with `assertSha256Hex`, and aborts on mismatch. Used for **minikube**, **CNI plugins**, and **crictl** — all three upstreams publish `.sha256` companions.
+### `Agent.connect(options[, callback])`
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+See [`Dispatcher.connect(options[, callback])`](Dispatcher.md#dispatcherconnectoptions-callback).
+
+### `Agent.dispatch(options, handler)`
+
+Implements [`Dispatcher.dispatch(options, handler)`](Dispatcher.md#dispatcherdispatchoptions-handler).
+
+### `Agent.pipeline(options, handler)`
+
+See [`Dispatcher.pipeline(options, handler)`](Dispatcher.md#dispatcherpipelineoptions-handler).
+
+### `Agent.request(options[, callback])`
+
+See [`Dispatcher.request(options [, callback])`](Dispatcher.md#dispatcherrequestoptions-callback).
+
+### `Agent.stream(options, factory[, callback])`
+
+See [`Dispatcher.stream(options, factory[, callback])`](Dispatcher.md#dispatcherstreamoptions-factory-callback).
+
+### `Agent.upgrade(options[, callback])`
+
+See [`Dispatcher.upgrade(options[, callback])`](Dispatcher.md#dispatcherupgradeoptions-callback).
 
 ---
 > Source: [manusa/actions-setup-minikube](https://github.com/manusa/actions-setup-minikube) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
