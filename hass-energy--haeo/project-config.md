@@ -1,111 +1,88 @@
 ---
 trigger: always_on
-description: HAEO project context and agent behavioral rules - always applied
+description: Documentation standards
 ---
 
 
-# GitHub Copilot Instructions
+# Documentation standards
 
-This repository contains **HAEO** (Home Assistant Energy Optimizer) - a Python 3.13+ Home Assistant custom component for energy network optimization using linear programming.
+See [documentation-guidelines.md](../../docs/developer-guide/documentation-guidelines.md) for comprehensive guidelines.
 
-## Project overview
+## Formatting tools
 
-HAEO optimizes energy usage across battery storage, grid import/export, loads, and generators using linear programming.
-The integration provides real-time optimization based on energy prices, forecasts, and system constraints.
+- **Markdown**: mdformat for consistent formatting
+- **JSON**: Prettier for consistent formatting
 
-### Core components
+## Core principles
 
-The integration follows a layered architecture:
+- **DRY**: Link to source code instead of duplicating implementation details
+- **Guide, don't duplicate**: Explain concepts and locations, not line-by-line code
+- **Link to Home Assistant**: Reference [HA docs](https://developers.home-assistant.io/) for standard concepts
 
-- **Model layer** (`core/model/`): LP formulation with elements, constraints, and cost functions
-- **Elements layer** (`elements/`, `core/schema/`, `core/adapters/`): Element registry, schemas, and adapters
-- **Coordinator** (`coordinator.py`): Orchestrates data loading, optimization, and result extraction
-- **Sensors** (`sensors/`): Expose optimization results to Home Assistant
-- **Config flows** (`flows/`): Subentry-based configuration for hub and elements
+## Semantic line breaks
 
-See [architecture guide](../docs/developer-guide/architecture.md) for detailed component interactions.
+Use one sentence per line following [SemBr specification](https://sembr.org/):
 
-### Project structure
-
-```
-custom_components/haeo/     # Home Assistant integration
-├── core/                   # Core infrastructure (no HA dependencies)
-│   ├── model/              # LP model (constraints, variables, optimization)
-│   ├── data/               # Data loading utilities
-│   ├── schema/             # Element schemas, field types, sections, migrations
-│   └── adapters/           # Element adapters (model_elements, outputs)
-├── elements/               # Element registry and availability
-├── flows/                  # Hub, options, and element config flows
-│   └── elements/           # Per-element flow implementations
-├── sensors/                # Sensor implementations
-└── translations/           # i18n strings (en.json)
-tests/scenarios/            # End-to-end scenario tests
-docs/                       # Documentation
+```markdown
+All human beings are born free and equal in dignity and rights.
+They are endowed with reason and conscience.
 ```
 
-Tests are colocated with source code in `tests/` subdirectories within each package.
+Break lines at semantic boundaries:
 
-## Development tools
+- **Required**: After sentences (., !, ?)
+- **Recommended**: After independent clauses (,, ;, :, —)
+- **Optional**: After dependent clauses for clarity
 
-- **Package manager**: uv (use `uv sync` for dependencies, `uv run` to execute tools)
-- **Testing**: pytest (scenarios require `-m scenario` marker and are skipped in CI)
-- **Linting/Formatting**: Ruff (Python), Prettier (JSON), mdformat (Markdown)
-- **Type checking**: Pyright
+**Never break lines based on column count.**
 
-## Agent behavioral rules
+## Formatting
 
-These rules apply to all AI agent interactions with this codebase:
+- Use backticks for: file paths, filenames, variable names, field entries
+- Sentence case for all headings
+- American English spelling
 
-### Design principles
+## Diagrams
 
-**Convention over configuration**: Prefer uniform patterns that work the same everywhere over configurable options that require case-by-case logic.
-When code paths diverge based on metadata flags or configuration, ask whether the divergence is necessary.
-Often, a single convention that handles all cases uniformly is simpler and more maintainable.
+Use mermaid for all diagrams:
 
-- Derive behavior from existing structure rather than adding metadata flags
-- Make all instances of a pattern work the same way - no special cases
-- Let upstream validation (e.g., config flows) enforce constraints so downstream code can assume valid data
-- Config flows use `vol.Required()` and `vol.Optional()` to enforce required fields at entry time
-- Downstream code (coordinator, adapters) can assume required fields are present because config flow guarantees it
-- For optional values, if they are missing or None, skip them uniformly throughout processing
+- Flowcharts for network topology
+- XY charts for time series data
+- State diagrams for operational modes
 
-**Composition over complexity**: Build features by composing simple, focused components rather than adding conditional logic to existing code.
-Each component should do one thing well without needing to know about the internals of other components.
+## Next steps sections
 
-- Separate concerns: validation happens at config flow boundaries, processing assumes valid input
-- Avoid "check if X then do Y else do Z" patterns - instead, make X and Y go through the same code path
-- When adding a feature, prefer creating new simple components over adding branches to existing ones
-- Runtime code uses the result of schema validation, not the schema itself - the schema's job is done at configuration time
+All user-facing pages must end with a **Next steps** section (heading `## Next steps`) using Material grid cards:
 
-### Clean changes
+```markdown
+## Next steps
 
-When making changes, don't leave behind comments describing what was once there.
-Comments should always describe code as it exists without reference to former code.
+<div class="grid cards" markdown>
 
-### Commit messages
+-   :material-battery:{ .lg .middle } **Configure battery**
 
-Use plain English commit messages without conventional commit prefixes (`feat:`, `fix:`, `refactor:`, etc.).
-Write a short summary line in imperative mood, followed by a blank line and bullet points if needed.
+    ---
 
-### API evolution
+    Set up battery storage for your network.
 
-When making changes, don't leave behind backwards-compatible interfaces for internal APIs.
-There should always be a complete clean changeover.
+    [:material-arrow-right: Battery setup](elements/battery.md)
 
-### Error context
+</div>
+```
 
-The main branch is always clean with no errors or warnings.
-Any errors, warnings, or test failures you encounter are directly related to recent changes in the current branch/PR.
-These issues must be fixed as part of the work - they indicate problems introduced by the changes being made.
+## Cross-references
 
-### Property access
+- Use descriptive link text: "See the [Forecasts guide](forecasts.md)"
+- Reference specific sections when helpful
+- User guides link to reference docs, not vice versa
 
-Always assume that accessed properties/fields which should exist do exist directly.
-Rely on errors occurring if they do not when they indicate a coding error and not a possibly None value.
-This is especially true in tests where you have added entities and then must access them later.
+## What to avoid
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Duplicating implementation details from code
+- Quantitative performance claims without benchmarks
+- Line-by-line code explanations
+- Plain text file names without links when mentioning specific files
 
 ---
 > Source: [hass-energy/haeo](https://github.com/hass-energy/haeo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
