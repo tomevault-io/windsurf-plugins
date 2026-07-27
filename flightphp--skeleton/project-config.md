@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This document provides guidelines and best practices for structuring and developing a project using the Flight PHP framework.
+description: This document provides guidelines and best practices for structuring and developing a project using the FlightPHP framework.
 ---
 
-# Flight Skeleton Project Instructions
+# FlightPHP Skeleton Project Instructions
 
-This document provides guidelines and best practices for structuring and developing a project using the Flight PHP framework.
+This document provides guidelines and best practices for structuring and developing a project using the FlightPHP framework.
 
 ## Instructions for AI Coding Assistants
 
@@ -83,4 +83,4 @@ Refer to the Runway documentation for details on creating and using custom comma
 
 ---
 > Source: [flightphp/skeleton](https://github.com/flightphp/skeleton) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
