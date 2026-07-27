@@ -1,92 +1,245 @@
 ---
 trigger: always_on
-description: we are in the middle of bringing the rust binding back into this repo because the external split has caused too many issues
+description: High-level Agent class that wraps the agent loop with state management.
 ---
 
-# AGENTS.md
 
-we are in the middle of bringing the rust binding back into this repo because the external split has caused too many issues
-## Where To Start
-- `README.md` — onboarding, install, examples, and current package usage notes.
-- `docs/ARCHITECTURE.md` — module responsibilities, event flow, quality gates, technical-debt policy.
-- `docs/api/README.md` — API reference index.
-- `docs/releasing-alchemy-binding.md` — current release workflow and migration notes for wheels that ship `tinyagent._alchemy`.
-- `HARNESS.md` — critical enforcement document for this repo: pre-commit hooks, ratchets, and rule entry points.
-- `tests/architecture/test_import_boundaries.py` — enforced layer contract for the Python package.
+# Agent Module
 
-## Repository Map
-- `tinyagent/` — published Python package.
-  - `__init__.py` — public exports.
-  - `agent.py` — high-level `Agent` API and state management.
-  - `agent_loop.py` — orchestration loop.
-  - `agent_tool_execution.py` — concurrent tool execution.
-  - `agent_types.py` — shared message, event, and state models.
-  - `alchemy_provider.py` — Python bridge for the `tinyagent._alchemy` provider path.
-  - `proxy.py`, `proxy_event_handlers.py` — proxy streaming path.
-  - `caching.py` — prompt caching helpers.
-- `tests/` — unit and contract tests.
-- `tests/architecture/` — import-boundary enforcement.
-- `docs/api/` — per-module reference docs.
-- `docs/harness/tool_call_types_harness.py` — live typed tool-call harness.
-- `rules/` — ast-grep rules for `docs/harness/`.
-- `scripts/` — custom lint/consistency checks and smoke scripts.
-- `examples/` — runnable usage examples.
-- `static/images/` — repo assets used by docs/README.
+High-level Agent class that wraps the agent loop with state management.
 
-## Commands
-- `uv run pytest`
-- `uv run mypy --ignore-missing-imports --exclude "lint_file_length\\.py$" .`
-- `python3 scripts/lint_architecture.py`
-- `.venv/bin/python -m pytest tests/architecture/test_import_boundaries.py -x -q`
-- `uv run vulture --min-confidence 80 tinyagent`
-- `uv run pylint --disable=all --enable=duplicate-code tinyagent`
-- `python3 scripts/lint_debt.py`
-- `python3 scripts/check_release_binding.py`
-- `python3 scripts/check_release_binding.py --require-present` — run before building/publishing wheels that are expected to ship `_alchemy`
-- `uv run python docs/harness/tool_call_types_harness.py`
-- `sg scan -r rules/harness_no_duck_typing.yml docs/harness/`
-- `sg scan -r rules/harness_no_thin_protocols.yml docs/harness/`
+## Agent
 
-## Boundaries
-- Layer order is enforced in `tests/architecture/test_import_boundaries.py`:
-  - Layer 3: `agent`
-  - Layer 2: `agent_loop`, `proxy`
-  - Layer 1: `agent_tool_execution`, `alchemy_provider`, `proxy_event_handlers`, `caching`
-  - Layer 0: `agent_types`
-- `agent_types.py` must remain the leaf module among governed TinyAgent modules.
-- Rust binding implementation work is allowed in this repo as part of the migration back from the external split.
-- Keep Rust binding changes isolated from the core Python layer boundaries unless a cross-layer change is required.
-- `tinyagent/__init__.py` is the public package surface; keep exports aligned with `scripts/lint_architecture.py` constraints.
+```python
+class Agent:
+    def __init__(self, opts: AgentOptions | None = None)
+```
 
-## Sources Of Truth
-- Product overview and examples: `README.md`
-- Architecture and repo policies: `docs/ARCHITECTURE.md`
-- API details: `docs/api/README.md`, `docs/api/*.md`
-- Alchemy wheel-release workflow: `docs/releasing-alchemy-binding.md`
-- Packaging/build config for this repo: `pyproject.toml`
-- Critical repo enforcement harness: `HARNESS.md`
-- Enforced checks: `.pre-commit-config.yaml`, `scripts/*.py`
-- Import boundaries: `tests/architecture/test_import_boundaries.py`
-- Harness-specific rules: `rules/README.md`, `rules/*.yml`
-- Historical external binding repo: `https://github.com/alchemiststudiosDOTai/alchemy-rs`
-- Do not file binding/runtime issues against `tunahorse/tinyagent-alchemy`; use `alchemiststudiosDOTai/alchemy-rs` if an external alchemy issue is needed during migration
+The main agent class. Manages conversation state, event subscription, and provides synchronous-style methods for interaction.
 
-## Change Guardrails
-- Do not add `.env` loading or `dotenv` imports inside `tinyagent/`.
-- Provider modules must not mutate `os.environ`.
-- No free-form `TODO`/`FIXME`/`HACK`/`XXX`/`DEBT` markers; use the ticketed format documented in `docs/ARCHITECTURE.md` and enforced by `scripts/lint_debt.py`.
-- Keep docs in this repo aligned with the Python package and the in-repo Rust binding migration status.
-- Rust-binding source, build steps, and release rules may now live in this repo when they are part of restoring the binding here.
-- During the migration, prefer keeping the Python-facing `tinyagent._alchemy` contract stable even if the build/release internals change.
-- Treat `HARNESS.md` and the enforcement harness it describes as critical repo infrastructure. They are not optional process notes.
-- If a codebase rule matters, record it in `HARNESS.md` and back it with a typed check, hook, script, test, or rule file.
-- Prefer code-level enforcement over prose-only policy. Important rules should be enforced in `.pre-commit-config.yaml`, `scripts/*.py`, `tests/architecture/`, or `rules/` whenever practical.
-- If you add or rename a governed package module, update `tests/architecture/test_import_boundaries.py`.
-- If you change `docs/harness/`, rerun the ast-grep rules in `rules/`.
+### Configuration Methods
 
+#### set_system_prompt
+```python
+def set_system_prompt(self, value: str) -> None
+```
+Set the system prompt sent to the LLM.
+
+#### set_model
+```python
+def set_model(self, model: Model) -> None
+```
+Configure the LLM model to use.
+
+#### set_tools
+```python
+def set_tools(self, tools: list[AgentTool]) -> None
+```
+Set available tools the LLM can invoke.
+
+### Prompt Methods
+
+#### prompt
+```python
+async def prompt(
+    self,
+    input_data: str | AgentMessage | list[AgentMessage],
+    images: list[ImageContent] | None = None,
+) -> AgentMessage
+```
+
+Send a prompt and return the complete assistant message.
+
+**Parameters**:
+- `input_data`: String, single message, or list of messages
+- `images`: Optional list of image content blocks
+
+**Returns**: The final `AssistantMessage`
+
+**Raises**:
+- `RuntimeError`: If agent is already streaming or no model configured
+
+**Example**:
+```python
+response = await agent.prompt("Explain quantum computing")
+print(response.content[0].text)
+```
+
+#### prompt_text
+```python
+async def prompt_text(
+    self,
+    input_data: str | AgentMessage | list[AgentMessage],
+    images: list[ImageContent] | None = None,
+) -> str
+```
+
+Convenience method that returns just the text content.
+
+#### continue_
+```python
+async def continue_(self) -> AgentMessage
+```
+
+Continue from current context without adding a new message. Used for retries after errors.
+
+**Raises**:
+- `RuntimeError`: If last message is from assistant (nothing to respond to)
+
+### Streaming Methods
+
+#### stream
+```python
+def stream(
+    self,
+    input_data: str | AgentMessage | list[AgentMessage],
+    images: list[ImageContent] | None = None,
+) -> AsyncIterator[AgentEvent]
+```
+
+Stream all agent events for a prompt.
+
+**Yields**: `AgentEvent` objects (message_start, message_update, tool_execution_start, etc.)
+
+**Example**:
+```python
+async for event in agent.stream("Tell me a story"):
+    if event.type == "message_update":
+        print(".", end="", flush=True)
+    elif event.type == "tool_execution_start":
+        print(f"\nUsing tool: {event.tool_name}")
+```
+
+#### stream_text
+```python
+def stream_text(
+    self,
+    input_data: str | AgentMessage | list[AgentMessage],
+    images: list[ImageContent] | None = None,
+) -> AsyncIterator[str]
+```
+
+Stream just the text deltas. Useful for simple streaming UIs.
+
+**Example**:
+```python
+async for delta in agent.stream_text("Write a poem"):
+    print(delta, end="", flush=True)
+```
+
+### Message Queue Methods
+
+#### steer
+```python
+def steer(self, message: AgentMessage) -> None
+```
+
+Queue a steering message to redirect the current run. The message is injected at the next turn boundary (after a tool batch completes, or immediately on turns without tools).
+
+**Use Case**: User types a new message while the agent is still processing.
+
+#### follow_up
+```python
+def follow_up(self, message: AgentMessage) -> None
+```
+
+Queue a message to be processed after the current agent run completes.
+
+**Use Case**: Automatic follow-up questions or chained prompts.
+
+#### clear_steering_queue
+```python
+def clear_steering_queue(self) -> None
+```
+Remove all pending steering messages.
+
+#### clear_follow_up_queue
+```python
+def clear_follow_up_queue(self) -> None
+```
+Remove all pending follow-up messages.
+
+### Event Subscription
+
+#### subscribe
+```python
+def subscribe(self, fn: Callable[[AgentEvent], None]) -> Callable[[], None]
+```
+
+Subscribe to all agent events. Returns an unsubscribe function.
+
+**Example**:
+```python
+def log_event(event):
+    logger.info(f"Agent event: {event.type}")
+
+unsubscribe = agent.subscribe(log_event)
+# ... later
+unsubscribe()
+```
+
+### State Management
+
+#### clear_messages
+```python
+def clear_messages(self) -> None
+```
+Clear all messages (keeps system prompt and tools).
+
+#### reset
+```python
+def reset(self) -> None
+```
+Reset agent to initial state (clears messages, queues, errors).
+
+### Control Methods
+
+#### abort
+```python
+def abort(self) -> None
+```
+Signal the current run to abort. The agent will stop at the next cancellation point.
+
+#### wait_for_idle
+```python
+async def wait_for_idle(self) -> None
+```
+Wait for the current prompt/stream to complete.
+
+### Properties
+
+#### state
+```python
+@property
+def state(self) -> AgentState
+```
+Current agent state (read-only reference).
+
+#### session_id
+```python
+@property
+def session_id(self) -> str | None
+```
+Session ID used for provider caching.
+
+## AgentOptions
+
+```python
+@dataclass
+class AgentOptions:
+    initial_state: AgentState | None = None
+    convert_to_llm: ConvertToLlmCallback | None = None
+    transform_context: TransformContextCallback | None = None
+    steering_mode: str = "one-at-a-time"  # "all" or "one-at-a-time"
+    follow_up_mode: str = "one-at-a-time"  # "all" or "one-at-a-time"
+    stream_fn: StreamFn | None = None
+    session_id: str | None = None
+    get_api_key: ApiKeyResolverCallback | None = None
+    thinking_budgets: ThinkingBudgets | None = None
+    enable_prompt_caching: bool = False
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [alchemiststudiosDOTai/tinyAgent](https://github.com/alchemiststudiosDOTai/tinyAgent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
