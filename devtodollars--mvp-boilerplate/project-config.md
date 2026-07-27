@@ -1,0 +1,147 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Repository Overview
+
+This is a production MVP boilerplate for building SaaS applications with multiple frontend options (Flutter and Next.js) sharing a common Supabase backend. The architecture supports cross-platform development with integrated payments (Stripe), authentication (Supabase), analytics (PostHog), and transactional emails (Postmark).
+
+### Project Structure
+
+- **`nextjs/`** - Next.js web application (App Router, TypeScript, Tailwind)
+- **`flutter/`** - Flutter cross-platform app (iOS, Android, Web, macOS, Linux, Windows)
+- **`supabase/`** - Supabase backend configuration, migrations, and edge functions
+- **`docs/`** - Comprehensive documentation for setup and configuration
+
+## Common Commands
+
+### Next.js Development
+
+```bash
+cd nextjs
+pnpm install                    # Install dependencies
+pnpm dev                        # Start development server with Turbopack
+pnpm build                      # Production build
+pnpm lint                       # Run ESLint
+pnpm prettier-fix               # Format code with Prettier
+```
+
+### Flutter Development
+
+```bash
+cd flutter
+flutter run -d chrome --dart-define-from-file=env.json  # Run web app
+flutter run -d macos --dart-define-from-file=env.json   # Run macOS app
+flutter pub get                                          # Install dependencies
+flutter test                                             # Run tests
+```
+
+### Supabase Local Development
+
+```bash
+# From root directory
+cd nextjs
+pnpm supabase:start             # Start local Supabase (runs Docker containers)
+pnpm supabase:stop              # Stop local Supabase
+pnpm supabase:status            # View connection info and URLs
+pnpm supabase:restart           # Stop and restart Supabase
+pnpm supabase:reset             # Reset database (destructive)
+
+# Generate TypeScript types from database schema
+pnpm supabase:generate-types    # Generates types_db.ts in both nextjs/ and supabase/functions/
+
+# Database migrations
+pnpm supabase:generate-migration  # Create migration from schema diff
+pnpm supabase:push              # Push migrations to remote
+pnpm supabase:pull              # Pull migrations from remote
+```
+
+### Supabase Edge Functions
+
+```bash
+cd supabase
+# Serve functions locally
+supabase functions serve --env-file .env.local --import-map functions/deno.json
+
+# Set secrets for production
+supabase secrets set --env-file .env
+
+# Deploy functions
+supabase functions deploy --import-map functions/deno.json
+
+# Sync Stripe products/prices to database
+deno run -A functions/_scripts/sync-stripe.ts
+```
+
+**Available edge functions:**
+- `get_stripe_url` - Returns Stripe checkout or billing portal URLs
+- `stripe_webhook` - Handles Stripe webhook events (syncs subscriptions)
+- `on_user_modify` - Triggered on user creation/deletion (PostHog events)
+
+### Stripe Integration (Local Development)
+
+```bash
+cd nextjs
+pnpm stripe:login               # Authenticate with Stripe CLI
+pnpm stripe:listen              # Forward webhooks to local Supabase function
+pnpm stripe:fixtures            # Load test products/prices from fixtures/stripe-fixtures.json
+```
+
+## Architecture
+
+### Authentication Flow
+
+- Supabase Auth handles all authentication (email/password, OAuth providers)
+- Next.js uses Server Components with `@supabase/ssr` for server-side auth
+- Flutter uses `supabase_flutter` with session persistence
+- On user creation, `handle_new_user()` trigger creates entry in `users` table
+- On user modify, `on_user_modify` edge function logs events to PostHog
+
+### Payment Flow
+
+1. User initiates checkout from frontend (Flutter or Next.js)
+2. Frontend calls `get_stripe_url` edge function with price ID
+3. Edge function creates Stripe checkout session, returns URL
+4. User completes payment in Stripe
+5. Stripe sends webhook to `stripe_webhook` edge function
+6. Webhook handler syncs subscription data to `subscriptions` table
+7. Frontend polls or refreshes to show updated subscription status
+
+**Database tables:**
+- `customers` - Maps Supabase user IDs to Stripe customer IDs
+- `products` - Synced from Stripe via webhooks
+- `prices` - Synced from Stripe via webhooks
+- `subscriptions` - User subscription status, synced from Stripe
+
+### Next.js Structure
+
+- **App Router** with React Server Components
+- **Supabase client creation:**
+  - `utils/supabase/server.ts` - Server Component client
+  - `utils/supabase/client.ts` - Client Component client
+  - `utils/supabase/middleware.ts` - Middleware client for auth refresh
+  - `utils/supabase/api.ts` - Route handler client
+- **Components:**
+  - `components/ui/` - shadcn/ui components (Radix UI primitives)
+  - `components/landing/` - Landing page sections
+  - `components/misc/` - Miscellaneous shared components
+- **API Routes:**
+  - `app/api/` - Next.js route handlers for server-side operations
+- **PostHog:** `app/PostHogPageView.tsx` tracks pageviews, `app/providers.tsx` initializes PostHog
+
+### Flutter Structure
+
+- **State Management:** Riverpod with code generation (`riverpod_annotation`)
+- **Routing:** `go_router` configured in `lib/services/router_notifier.dart`
+- **Key Services:**
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [devtodollars/mvp-boilerplate](https://github.com/devtodollars/mvp-boilerplate) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
