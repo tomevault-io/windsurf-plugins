@@ -1,54 +1,375 @@
 ---
 trigger: always_on
-description: iFace is a Vite React 19 + TypeScript app. Main code lives in `src/`:
+description: AI Agent 和普通聊天机器人最大的区别是什么？
 ---
 
-# Repository Guidelines
+# Agent架构测试一下
 
-## Project Structure & Module Organization
+## agent-001
 
-iFace is a Vite React 19 + TypeScript app. Main code lives in `src/`:
+### Q1 single | Agent 定义
 
-- `src/pages/` contains route screens such as `Dashboard`, `Practice`, and `QuestionDetail`.
-- `src/components/layout/` holds shell UI; `src/components/ui/` holds reusable widgets.
-- `src/store/` contains app stores, and `src/hooks/` contains React hooks.
-- `src/lib/` contains IndexedDB, question loading, and sync helpers.
-- `src/types/` and `src/data/` hold shared types and schemas.
-- `public/questions/` stores bundled question JSON assets by category.
-- `api/auth.js` is the Vercel auth endpoint.
+AI Agent 和普通聊天机器人最大的区别是什么？
 
-Keep generated or temporary source material in `tmp/` unless it becomes product content.
+- [ ] A. Agent 只能回答固定 FAQ。
+- [x] B. Agent 围绕目标感知、决策并执行动作，而不只是生成回复。
+- [ ] C. 聊天机器人一定不能使用 LLM。
+- [ ] D. Agent 不需要状态和工具。
 
-## Build, Test, and Development Commands
+**解释**：Agent 的关键是目标驱动、行动能力、状态管理和闭环执行。
 
-Use Bun for package and script commands.
+### Q2 multiple | Agent 能力
 
-- `bun install` installs dependencies from `bun.lock`.
-- `bun dev` starts the Vite dev server at `http://localhost:5173`.
-- `bun run build` runs TypeScript checks and creates the production Vite build.
-- `bun run preview` serves the built app.
-- `bun run check` runs Biome without writing changes.
-- `bun run lint` runs `biome check --write .` and may modify files.
-- `bun run format` formats files with Biome.
+哪些能力更常见于 Agent 系统？
 
-## Coding Style & Naming Conventions
+- [x] A. 工具调用
+- [x] B. 任务分解
+- [x] C. 状态管理
+- [x] D. 执行结果观察和验证
+- [ ] E. 只返回固定文案
 
-Biome is the source of truth. Use 2-space indentation, 100-character lines, single quotes, no required semicolons, trailing commas in JavaScript/TypeScript, and no trailing commas in JSON. Name components and pages in `PascalCase`, hooks as `useSomething`, and stores as `useSomethingStore`. Keep route screens in `src/pages/` and reusable pieces in `src/components/`.
+**解释**：Agent 不只是“会说”，还要“知道下一步做什么、做完没有”。
 
-## Testing Guidelines
+### Q3 multiple | 不必用 Agent
 
-There is no dedicated test runner configured. Before submitting changes, run `bun run check` and `bun run build`. For UI changes, manually verify importing bundled questions, practicing, viewing details, settings, and AI configuration paths. If adding tests, place them near the code under test and add a package script.
+哪些场景通常不需要复杂 Agent？
 
-## Commit & Pull Request Guidelines
+- [x] A. 简单 FAQ 问答
+- [x] B. 单次文本摘要
+- [x] C. 固定规则转换
+- [ ] D. 跨多个系统完成任务
+- [ ] E. 需要失败恢复的多步流程
 
-Git history and README use Conventional Commits, for example `feat: update content and fix lint build issues`, `fix: fix synchronization issues`, and `chore: refactor gistSync`. Keep messages imperative and scoped to one concern.
+**解释**：Agent 带来能力也带来复杂度，简单任务不应过度架构化。
 
-Pull requests should include a short summary, validation commands run, linked issues when applicable, and screenshots for visible UI changes. Mention data migration, IndexedDB, localStorage, or bundled question JSON changes explicitly.
+## agent-002
 
-## Security & Configuration Tips
+### Q1 single | LLM 应用边界
 
-Do not commit secrets. Use `.env.example` as the public template, and keep API keys in local browser settings or environment-specific configuration. Treat imported question JSON as untrusted input and validate changes against the existing schema before publishing.
+AI Agent 和普通 LLM 应用的边界更接近哪项？
+
+- [ ] A. 只要用 LLM 就一定是 Agent。
+- [x] B. Agent 强调持续状态、任务分解、工具协同和行动闭环。
+- [ ] C. RAG 问答一定是多 Agent。
+- [ ] D. 普通 LLM 应用不能有 Prompt。
+
+**解释**：边界不在是否用模型，而在是否围绕目标持续行动和闭环。
+
+### Q2 multiple | 更像 Agent
+
+哪些特征说明系统更接近 Agent？
+
+- [x] A. 多步执行
+- [x] B. 根据观察结果调整下一步
+- [x] C. 调用外部系统
+- [x] D. 维护任务状态
+- [ ] E. 单次生成一段解释
+
+**解释**：Agent 是连续任务链路，普通 LLM 应用常是一次输入一次输出。
+
+### Q3 multiple | 工程判断
+
+哪些任务更适合普通 LLM 应用而非 Agent？
+
+- [x] A. 单篇文章摘要
+- [x] B. 一次性分类
+- [x] C. 简单字段抽取
+- [ ] D. 多系统审批流
+- [ ] E. 失败后需要自动恢复的任务
+
+**解释**：只要不需要多步行动闭环，就不必默认上 Agent。
+
+## agent-003
+
+### Q1 single | Agent Loop
+
+最基础的 Agent 执行循环通常包含什么？
+
+- [ ] A. 只生成一次自然语言回答。
+- [x] B. 接收目标、读状态、决策、行动、观察、更新并判断是否结束。
+- [ ] C. 只做向量检索。
+- [ ] D. 只维护聊天历史。
+
+**解释**：Agent Loop 的核心是行动后的观察和状态更新。
+
+### Q2 multiple | 循环步骤
+
+哪些步骤通常属于 Agent loop？
+
+- [x] A. Goal
+- [x] B. Decide
+- [x] C. Act
+- [x] D. Observe
+- [ ] E. 永不终止
+
+**解释**：循环必须有终止判断，否则容易无限执行。
+
+### Q3 multiple | 明确循环的价值
+
+为什么要显式设计 Agent loop？
+
+- [x] A. 便于调试
+- [x] B. 便于监控
+- [x] C. 便于失败恢复
+- [ ] D. 让所有工具自动安全
+- [ ] E. 取消状态管理
+
+**解释**：循环越清晰，系统越容易回放、定位和治理。
+
+## agent-004
+
+### Q1 single | Planning
+
+Agent 中的 Planning 是什么？
+
+- [ ] A. 直接随机调用工具。
+- [x] B. 在执行前把目标拆分成可操作步骤或子任务。
+- [ ] C. 删除用户目标。
+- [ ] D. 只生成最终答案。
+
+**解释**：Planning 降低复杂任务的一次性决策难度。
+
+### Q2 multiple | Planning 收益
+
+Planning 能带来哪些收益？
+
+- [x] A. 减少遗漏步骤
+- [x] B. 便于阶段性检查
+- [x] C. 便于失败重试
+- [ ] D. 保证所有计划一定正确
+- [ ] E. 消除工具权限风险
+
+**解释**：计划提高可控性，但仍要执行、观察和修正。
+
+### Q3 multiple | 规划粒度
+
+关于规划粒度，哪些判断合理？
+
+- [x] A. 过粗容易遗漏关键步骤
+- [x] B. 过细会增加成本和延迟
+- [x] C. 可用滚动规划而非一次性长计划
+- [ ] D. 计划越长越稳定
+- [ ] E. 所有任务都必须先写完整计划
+
+**解释**：规划是权衡，不是越详细越好。
+
+## agent-005
+
+### Q1 single | Memory
+
+Agent memory 和普通多轮对话历史有什么区别？
+
+- [ ] A. memory 就是保存所有原始消息。
+- [x] B. memory 关注对后续行动有价值的状态、事实和中间结果。
+- [ ] C. memory 不需要权限隔离。
+- [ ] D. memory 越多越好。
+
+**解释**：Agent memory 是任务状态管理，不是无限堆聊天记录。
+
+### Q2 multiple | Memory 内容
+
+哪些信息可能适合进入 Agent memory？
+
+- [x] A. 当前任务进度
+- [x] B. 用户确认的偏好或约束
+- [x] C. 关键工具结果摘要
+- [x] D. 待恢复的中间状态
+- [ ] E. 所有无关闲聊原文
+
+**解释**：memory 要保留高价值、可复用、可治理的信息。
+
+### Q3 multiple | Memory 风险
+
+Agent memory 设计要注意哪些风险？
+
+- [x] A. 过期信息污染决策
+- [x] B. 错误记忆被持续复用
+- [x] C. 权限和隐私隔离
+- [ ] D. 保存越多越可靠
+- [ ] E. 不需要删除策略
+
+**解释**：memory 必须有写入、更新、过期和删除策略。
+
+## agent-006
+
+### Q1 single | 工具调用
+
+为什么 Agent 架构通常需要工具调用？
+
+- [ ] A. 因为模型不能生成文字。
+- [x] B. 因为工具能提供实时查询、精确计算和外部执行能力。
+- [ ] C. 因为工具可以替代所有推理。
+- [ ] D. 因为工具越多越安全。
+
+**解释**：模型负责理解和决策，工具负责确定性能力和外部动作。
+
+### Q2 multiple | 工具价值
+
+工具调用通常能提升哪些方面？
+
+- [x] A. 实时信息获取
+- [x] B. 可审计性
+- [x] C. 外部系统执行
+- [x] D. 精确计算或查询
+- [ ] E. 自动免除权限控制
+
+**解释**：工具增强能力，同时也带来权限和执行风险。
+
+### Q3 multiple | 工具风险
+
+接入工具后需要重点关注什么？
+
+- [x] A. 参数校验
+- [x] B. 权限控制
+- [x] C. 幂等和回滚
+- [x] D. 审计日志
+- [ ] E. 让模型自由执行所有动作
+
+**解释**：Agent 能行动后，安全边界必须更强。
+
+## agent-007
+
+### Q1 single | 单 Agent / 多 Agent
+
+单 Agent 和多 Agent 的选择，哪项更合理？
+
+- [ ] A. 多 Agent 永远更好。
+- [x] B. 单 Agent 更简单，多 Agent 适合职责清晰、任务异构或需要并行协作的场景。
+- [ ] C. 单 Agent 不能调用工具。
+- [ ] D. 多 Agent 不需要通信协议。
+
+**解释**：多 Agent 带来分工，也带来协调和排障成本。
+
+### Q2 multiple | 多 Agent 适合
+
+哪些场景更适合多 Agent？
+
+- [x] A. 规划、执行、审查职责明确
+- [x] B. 子任务领域差异大
+- [x] C. 可并行处理多个独立任务
+- [ ] D. 一个简单 FAQ
+- [ ] E. 只需要单次摘要
+
+**解释**：多 Agent 的收益来自分工和并行，不是概念炫技。
+
+### Q3 multiple | 多 Agent 成本
+
+多 Agent 可能带来哪些隐性成本？
+
+- [x] A. 通信开销
+- [x] B. 协调复杂度
+- [x] C. 失败归因更难
+- [x] D. 状态一致性问题
+- [ ] E. 自动降低所有延迟
+
+**解释**：多 Agent 系统最难的往往不是单个 Agent，而是协作边界。
+
+## agent-008
+
+### Q1 single | 状态管理
+
+为什么状态管理是 Agent 架构的核心问题？
+
+- [ ] A. Agent 只需要无状态问答。
+- [x] B. 状态决定 Agent 知道什么、做到哪一步、下一步做什么和何时结束。
+- [ ] C. 状态只用于 UI 展示。
+- [ ] D. 状态越混乱越灵活。
+
+**解释**：Agent 是连续执行系统，状态混乱会直接导致行动错误。
+
+### Q2 multiple | 状态内容
+
+Agent 状态通常包括哪些内容？
+
+- [x] A. 任务进度
+- [x] B. 工具结果
+- [x] C. 中间结论
+- [x] D. 异常信息
+- [ ] E. 只包括最后一句用户输入
+
+**解释**：状态是任务执行的结构化事实，不只是聊天历史。
+
+### Q3 multiple | 稳定状态设计
+
+稳定状态设计能支持哪些能力？
+
+- [x] A. 可恢复
+- [x] B. 可回放
+- [x] C. 可调试
+- [x] D. 可审计
+- [ ] E. 自动取消终止条件
+
+**解释**：状态结构清晰，Agent 才能可靠恢复和定位问题。
+
+## agent-009
+
+### Q1 single | Observation
+
+为什么 Agent 需要 observation 阶段？
+
+- [ ] A. 为了重复生成同一段话。
+- [x] B. 为了读取动作结果，并据此决定下一步或修正计划。
+- [ ] C. 为了跳过工具返回。
+- [ ] D. 为了让系统永不终止。
+
+**解释**：没有观察，Agent 无法知道工具执行是否成功、结果是否符合预期。
+
+### Q2 multiple | 观察内容
+
+observation 阶段通常要关注哪些信息？
+
+- [x] A. 工具返回结果
+- [x] B. 错误码或异常
+- [x] C. 外部状态变化
+- [x] D. 是否满足终止条件
+- [ ] E. 忽略执行结果
+
+**解释**：观察是闭环执行的反馈来源。
+
+### Q3 multiple | 跳过观察的风险
+
+如果 Agent 连续执行而不观察，可能导致什么？
+
+- [x] A. 重复执行
+- [x] B. 基于错误假设继续行动
+- [x] C. 无法及时失败恢复
+- [ ] D. 一定降低成本
+- [ ] E. 自动提高准确率
+
+**解释**：观察缺失会让 Agent 变成盲目执行器。
+
+## agent-010
+
+### Q1 single | Reflection
+
+Reflection 在 Agent 架构中的作用是什么？
+
+- [ ] A. 让 Agent 永远重复执行。
+- [x] B. 对已有步骤或结果进行自我检查、总结和修正。
+- [ ] C. 删除所有工具调用。
+- [ ] D. 替代权限控制。
+
+**解释**：Reflection 用于提升质量和发现错误，但不是万能保证。
+
+### Q2 multiple | Reflection 价值
+
+Reflection 可能带来哪些价值？
+
+- [x] A. 发现计划遗漏
+- [x] B. 检查输出是否满足要求
+- [x] C. 总结失败原因
+- [x] D. 改进下一步动作
+- [ ] E. 自动消除所有幻觉
+
+**解释**：反思是质量改进手段，仍需外部验证和成本控制。
+
+### Q3 multiple | Reflection 代价
+
+使用 Reflection 时要注意哪些代价？
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dogxii/iFace](https://github.com/dogxii/iFace) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
