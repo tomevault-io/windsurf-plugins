@@ -1,170 +1,114 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Rules for writing features in apps/dashboard
 ---
 
-# CLAUDE.md
+# Reusable Core UI Components
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+- Always import from the central UI library under `@/components/ui/*` – e.g. `import { Button } from "@/components/ui/button"`.
+- Prefer composable primitives over custom markup: `Button`, `Input`, `Select`, `Tabs`, `Card`, `Sidebar`, `Separator`, `Badge`.
+- Use `NavLink` (`@/components/ui/NavLink`) for internal navigation so active states are handled automatically.
+- Layouts should reuse `SidebarLayout` / `FullWidthSidebarLayout` (`@/components/blocks/SidebarLayout`).
+- For notices & skeletons rely on `AnnouncementBanner`, `GenericLoadingPage`, `EmptyStateCard`.
+- Icons come from `lucide-react` or the project-specific `…/icons` exports – never embed raw SVG.
+- Group related components in their own folder and expose a single barrel `index.ts` where necessary.
+- Keep components pure; fetch data outside (server component or hook) and pass it down via props.
 
-## Development Commands
+# Styling
 
-### Package Management
+- Tailwind CSS is **the** styling system – avoid inline styles or CSS modules.
+- Merge class names with `cn` from `@/lib/utils` to keep conditional logic readable.
+- Stick to design-tokens: background (`bg-card`), borders (`border-border`), muted text (`text-muted-foreground`) etc.
+- Use the `container` class with a `max-w-7xl` cap for page width consistency.
+- Spacing utilities (`px-*`, `py-*`, `gap-*`) are preferred over custom margins.
+- Responsive helpers follow mobile-first (`max-sm`, `md`, `lg`, `xl`).
+- Never hard-code colors – always go through Tailwind variables.
+- Add `className` to the root element of every component for external overrides.
 
-- Use `pnpm install` (or `pnpm install --ignore-scripts` on Windows)
-- Monorepo managed with Turborepo and pnpm workspaces
+# Creating a new Component
 
-### Building
+- Place the file close to its feature: `feature/components/MyComponent.tsx`.
+- Name files after the component in **PascalCase**; append `.client.tsx` when interactive.
+- Client components must start with `'use client';` before imports.
+- Accept a typed `props` object and export a **named** function (`export function MyComponent()`).
+- Reuse core UI primitives; avoid re-implementing buttons, cards, modals.
+- Combine class names via `cn`, expose `className` prop if useful.
+- Local state or effects live inside; data fetching happens in hooks.
+- Provide a Storybook story (`MyComponent.stories.tsx`) or unit test alongside the component.
 
-```bash
-# Build all packages
-pnpm build
+# When to use Server Side Rendering (Server Components)
 
-# Build specific packages with dependencies
-turbo run build --filter=./packages/*
+- Reading cookies/headers with `next/headers` (`getAuthToken()`, `cookies()`).
+- Accessing server-only environment variables or secrets.
+- Heavy data fetching that should not ship to the client (e.g. analytics, billing).
+- Redirect logic using `redirect()` from `next/navigation`.
+- Building layout shells (`layout.tsx`) and top-level pages that mainly assemble data.
+- Export default async functions without `'use client';` – they run on the Node edge.
+- Co-locate data helpers under `@/api/**` and mark them with `"server-only"`.
 
-# Development with watch mode
-pnpm dev                    # Core thirdweb package
-pnpm dashboard              # Run dashboard + dependencies
-pnpm playground             # Run playground + dependencies
-pnpm portal                 # Run portal docs + dependencies
+# When to use Client Side Rendering (Client Components)
+
+- Interactive UI that relies on hooks (`useState`, `useEffect`, React Query, wallet hooks).
+- Components that listen to user events, animations or live updates.
+- When you need access to browser APIs (localStorage, window, IntersectionObserver etc.).
+- Pages requiring fast transitions where data is prefetched on the client.
+- Anything that consumes hooks from `@tanstack/react-query` or thirdweb SDKs.
+
+# Fetching Authenticated Data – Server
+
+```ts
+import "server-only";
+import { API_SERVER_URL } from "@/constants/env";
+import { getAuthToken } from "@/app/(app)/api/lib/getAuthToken";
+
+export async function getProjects(teamSlug: string) {
+  const token = await getAuthToken();
+  if (!token) return [];
+  const res = await fetch(`${API_SERVER_URL}/v1/teams/${teamSlug}/projects`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.ok ? (await res.json()).result : [];
+}
 ```
 
-### Testing
+Guidelines:
 
-```bash
-# Run all tests
-pnpm test
+- Always call `getAuthToken()` to get the JWT from cookies.
+- Prefix files with `import "server-only";` so they never end up in the client bundle.
+- Pass the token in the `Authorization: Bearer` header – never embed it in the URL.
+- Return typed results (`Project[]`, `User[]`, …) – avoid `any`.
 
-# Interactive testing (thirdweb package)
-cd packages/thirdweb && pnpm test:devr
+# Fetching Authenticated Data – Client
 
-# Test specific file
-pnpm test:dev <path-to-test-file>
+```ts
+import { useQuery } from "@tanstack/react-query";
+import { fetchJson } from "@/lib/fetch-json";
 
-# E2E testing (dashboard)
-cd apps/dashboard && pnpm playwright
+export function useProjects(teamSlug: string) {
+  return useQuery({
+    queryKey: ["projects", teamSlug],
+    queryFn: () => fetchJson(`/api/projects?team=${teamSlug}`), // internal API route handles token
+    staleTime: 60_000,
+  });
+}
 ```
 
-### Code Quality
+Guidelines:
 
-```bash
-# Lint all packages
-pnpm lint
+- Use **React Query** (`@tanstack/react-query`) for all client data fetching.
+- Create light wrappers (e.g. `fetchJson`) that automatically attach the JWT from cookies/session when calling internal API routes.
+- Keep `queryKey` stable and descriptive for cache hits.
+- Prefer API routes or server actions to keep tokens secret; the browser only sees relative paths.
+- Configure `staleTime` / `cacheTime` according to freshness requirements.
 
-# Auto-fix linting issues
-pnpm fix
+# Analytics Event Reporting
 
-# Format code
-turbo run format
-
-# Biome is the primary linter/formatter
-```
-
-### Development Workflow
-
-```bash
-# Start development server for dashboard
-pnpm dashboard
-
-# Start playground for SDK testing
-pnpm playground
-
-# Generate changeset for releases
-pnpm changeset
-
-# Version packages
-pnpm version-packages
-```
-
-## Repository Architecture
-
-### Monorepo Structure
-
-This is a Turborepo monorepo with the main thirdweb v5 SDK consolidated into `/packages/thirdweb/`. Legacy packages are in `/legacy_packages/`.
-
-### Core Package (`/packages/thirdweb/`)
-
-**Main Modules:**
-
-- `client/` - ThirdwebClient foundation
-- `chains/` - 50+ supported blockchain definitions
-- `contract/` - Contract interaction with automatic ABI resolution
-- `transaction/` - Transaction management and execution
-- `wallets/` - Comprehensive wallet integration system
-- `extensions/` - Modular contract extensions (ERC20, ERC721, etc.)
-- `auth/` - SIWE authentication and signature verification
-- `pay/` - Fiat and crypto payment infrastructure
-- `storage/` - IPFS integration for decentralized storage
-- `rpc/` - Low-level blockchain communication
-
-**Exports Structure:**
-The SDK uses modular exports from `src/exports/` including:
-
-- `thirdweb.ts` - Core client and utilities
-- `chains.ts` - Chain definitions
-- `wallets.ts` - Wallet connectors
-- `react.ts` - React hooks and components
-- `extensions/` - Contract standards and protocols
-
-### Applications (`/apps/`)
-
-- **dashboard** - Web-based developer console (Next.js, Chakra UI)
-- **playground-web** - Interactive SDK testing environment
-- **portal** - Documentation site with MDX
-- **nebula** - Account abstraction and smart wallet management
-- **wallet-ui** - Wallet interface and testing
-
-### Key Packages (`/packages/`)
-
-- **thirdweb** - Main SDK (TypeScript, React, React Native)
-- **engine** - thirdweb Engine API client
-- **insight** - Analytics and data APIs
-- **nebula** - Account abstraction client
-- **service-utils** - Shared utilities across services
-
-## Development Practices
-
-### GitHub Workflow & Pull Requests
-
-- **PR titles**: Must start with affected workspace in brackets (e.g. `[SDK]`, `[Dashboard]`, `[Portal]`, `[Playground]`)
-- **PR descriptions**: Begin with one-sentence summary, add checklist of changes, reference issues with `Fixes #123`
-- **Commits**: Keep small and topical – one logical change per commit
-- **Branch naming**: Use `area/brief-topic` format (e.g. `sdk/fix-gas-estimate`). Avoid personal names
-- **Reviews**: Request at least one core maintainer review. Do not self-merge unless sole package owner
-- **CI requirements**: All checks (type-check, Biome, tests) must pass before merging
-
-### Code Quality & Formatting
-
-- **Biome**: Primary linter/formatter (rules in `biome.json`)
-- **Pre-commit**: Run `pnpm biome check --apply` before committing
-- **Build verification**: Run `pnpm build` after each file change to ensure everything builds
-- Avoid editor-specific configs; rely on shared settings
-
-### TypeScript Guidelines
-
-- **Style**: Write idiomatic TypeScript with explicit function declarations and return types
-- **File structure**: Limit each file to one stateless, single-responsibility function for clarity
-- **Types**: Re-use shared types from `@/types` or local `types.ts` barrels
-- **Interfaces vs Types**: Prefer type aliases over interface except for nominal shapes
-- **Type safety**: Avoid `any` and `unknown` unless unavoidable; narrow generics when possible
-- **Architecture**: Choose composition over inheritance; leverage utility types (`Partial`, `Pick`, etc.)
-
-### Testing Strategy
-
-- **Co-location**: Place tests alongside code: `foo.ts` ↔ `foo.test.ts`
-- **Test approach**: Use real function invocations with stub data; avoid brittle mocks
-- **Network mocking**: Use Mock Service Worker (MSW) for fetch/HTTP call interception
-- **Test quality**: Keep tests deterministic and side-effect free
-- **Running tests**: `cd packages/thirdweb && pnpm test:dev <filename>`
-- **Test accounts**: Predefined accounts in `test/src/test-wallets.ts`
-- **Chain forking**: Use `FORKED_ETHEREUM_CHAIN` for mainnet interactions, `ANVIL_CHAIN` for isolated tests
-
-### SDK Development (`packages/thirdweb`)
-
+- **Add events intentionally** – only when they answer a concrete product/business question.
+- **Event name**: human-readable `<subject> <verb>` phrase (e.g. `"contract deployed"`).
+- **Reporting helper**: `report<Subject><Verb>` (PascalCase); all live in `src/@/analytics/report.ts`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [thirdweb-dev/js](https://github.com/thirdweb-dev/js) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
