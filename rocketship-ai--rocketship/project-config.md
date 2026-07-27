@@ -1,127 +1,163 @@
 ---
 trigger: always_on
-description: This file provides guidance to AI coding agents (including this Codex CLI assistant) when working with code in this repository.
+description: AI-powered testing using Claude for browser control, verification, and multi-step workflows.
 ---
 
-# AGENTS.md
+# Agent Plugin
 
-This file provides guidance to AI coding agents (including this Codex CLI assistant) when working with code in this repository.
+AI-powered testing using Claude for browser control, verification, and multi-step workflows.
 
-> **Versioning note:** Rocketship is still pre-1.0. There is **no backwards-compatibility requirement** for any interface, schema, or behaviour. Optimise for the current epic even if it means breaking past behaviour; do not preserve legacy code paths for compatibility unless the user explicitly asks.
+## Quick Start
 
-## Rocketship Cloud v1 Snapshot
-
-- Product focus: hosted cloud with GitHub SSO (device flow for CLI, OAuth for web) backed by our controlplane that mints Rocketship JWTs. Engine + worker still run tests via Temporal.
-- Tenancy: **Org → Project**. Projects reference repo URL, default branch, and `path_scope` globs for mono-repo isolation. No “workspace” layer.
-- Roles: project-level **Read** (view only) and **Write** (run/edit). Org Admins inherit Write on all projects. Tokens must carry explicit roles; missing roles are rejected.
-- Git-as-SoT: UI/CLI can run uncommitted edits immediately (flagged as `config_source=uncommitted`). Approvals/merges happen in GitHub; Rocketship can optionally open PRs or commits if the user has push rights.
-- Tokens: user JWT + refresh issued by controlplane; CI tokens are opaque secrets scoped per project with explicit permissions + TTL. Engine tags runs with `initiator`, `environment`, `config_source`, `commit_sha`/`bundle_sha` for auditability.
-- Controlplane persists orgs/users/memberships in Postgres. Fresh logins return `pending` roles until the user creates or joins an org via `POST /api/orgs`.
-- Guardrails: enforce path scopes, reject unknown RPCs in auth, clarify uncommitted runs, prefer minikube Helm flow for reproducible clusters.
-
-## Architecture Overview
-
-Rocketship is an open-source testing framework for browser and API testing that uses Temporal for durable execution. The system is built with Go and follows a plugin-based architecture.
-
-There are 3 "server" components that make up the Rocketship system: Temporal, Engine, and Worker. The CLI is meant to communicate with the engine. There are three ways to run Rocketship:
-
-1. **Minikube stack**: `scripts/install-minikube.sh` provisions Temporal + Rocketship inside an isolated cluster per branch.
-2. **Self-hosted cluster**: Deploy the Helm charts to your own Kubernetes environment and connect the CLI remotely.
-3. **Local processes**: Use `rocketship start server` / `rocketship run -af` for quick experiments without Kubernetes.
-
-**Key Components:**
-
-- **CLI (`cmd/rocketship/`)**: Main entry point that wraps the engine and worker binaries
-- **Engine (`cmd/engine/`)**: gRPC server that orchestrates test execution via Temporal workflows
-- **Worker (`cmd/worker/`)**: Temporal worker that executes test workflows using plugins
-- **Plugins (`internal/plugins/`)**: Extensible system for different protocols (HTTP, delay, AWS services)
-- **DSL Parser (`internal/dsl/`)**: Parses YAML test specifications into executable workflows
-- **Orchestrator (`internal/orchestrator/`)**: Engine implementation that manages test runs and streaming logs
-
-**Test Flow:**
-
-1. YAML spec is parsed by DSL parser
-2. Engine creates Temporal workflows for each test
-3. Worker executes test steps using appropriate plugins
-4. Results are streamed back via gRPC to CLI
-
-## Development Commands
-
-### Build and Install
-
-```bash
-make install        # Build CLI with embedded binaries and install CLI to $GOPATH/bin
+```yaml
+- name: "Verify login page"
+  plugin: agent
+  config:
+    prompt: |
+      Navigate to {{ .env.FRONTEND_URL }}/login and verify:
+      - Login form is visible
+      - Email and password fields exist
+      - Submit button is present
 ```
 
-### Testing and Quality
+## Prerequisites
 
 ```bash
-make lint && make test    # lint and test
+# Set Anthropic API key
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
 ```
 
-### Embedded Binaries
+## Configuration
 
-The CLI embeds engine and worker binaries. Always run `make install` after modifying engine/worker code.
+### Required Fields
 
-### Protocol Buffers
+| Field    | Description                      | Example                                    |
+| -------- | -------------------------------- | ------------------------------------------ |
+| `prompt` | Natural language task for Claude | `"Click login button and verify redirect"` |
 
-```bash
-make proto          # Regenerate protobuf code from proto/engine.proto
+### Optional Fields
+
+| Field       | Description               | Default     |
+| ----------- | ------------------------- | ----------- |
+| `max_turns` | Max agent loop iterations | unlimited   |
+| `timeout`   | Max execution time        | unlimited   |
+
+## Common Use Cases
+
+### Login Flow
+
+```yaml
+- name: "Complete login"
+  plugin: agent
+  config:
+    prompt: |
+      Navigate to {{ .env.FRONTEND_URL }}/login and login with:
+      - Email: {{ .env.TEST_EMAIL }}
+      - Password: {{ .env.TEST_PASSWORD }}
+
+      Verify you land on the dashboard page.
+    timeout: "2m"
 ```
 
-### Documentation
+### Multi-Step Workflows
 
-```bash
-make docs-serve     # Start local documentation server
-make docs           # Build documentation
+```yaml
+- name: "Complete checkout"
+  plugin: agent
+  config:
+    prompt: |
+      Complete a checkout flow:
+      1. Add product ID {{ product_id }} to cart
+      2. Navigate to cart
+      3. Click checkout
+      4. Fill shipping form with test data
+      5. Verify order summary shows {{ product_id }}
+    max_turns: 15
+    timeout: "3m"
+  save:
+    - json_path: ".result"
+      as: "checkout_result"
 ```
 
-## Debugging and Logging
+### Data Extraction
 
-### Debug Logging
-
-All processes (CLI, engine, worker) use unified structured logging from `internal/cli/logging.go`:
-
-```bash
-rocketship run --debug -af test.yaml    # Full debug output
-rocketship run -af test.yaml            # Info level (default)
-ROCKETSHIP_LOG=ERROR rocketship run -af test.yaml    # Errors only
+```yaml
+- name: "Extract pricing"
+  plugin: agent
+  config:
+    prompt: |
+      Go to /pricing and extract all plan names and prices.
+      Return as JSON: [{"name": "...", "price": "..."}]
+  save:
+    - json_path: ".result"
+      as: "pricing_plans"
 ```
 
-Debug logging shows:
+### Combining with Database
 
-- Process lifecycle (start, stop, cleanup)
-- Temporal connections and workflow execution
-- Plugin execution details
-- gRPC server initialization
+```yaml
+- name: "Get expected count from database"
+  plugin: supabase
+  config:
+    operation: "select"
+    table: "vehicles"
+    select:
+      columns: ["id"]
+  save:
+    - json_path: ". | length"
+      as: "vehicle_count"
 
-DEBUG LOGGING IS EXTREMELY USEFUL DURING DEVELOPMENT.
+- name: "Verify UI matches database"
+  plugin: agent
+  config:
+    prompt: |
+      Navigate to /fleet and verify:
+      - Map displays {{ vehicle_count }} vehicle markers
+      - Vehicle cards show {{ vehicle_count }} vehicles
+```
 
-### Advanced Debugging Techniques
+## Complete Example
 
-When debugging complex issues with plugins or workflow state:
+```yaml
+name: "Login Test"
+tests:
+  - name: "Agent-powered login flow"
+    steps:
+      - name: "Login and verify"
+        plugin: agent
+        config:
+          prompt: |
+            1. Navigate to {{ .env.FRONTEND_URL }}/login
+            2. Fill email: {{ .env.TEST_EMAIL }}
+            3. Fill password: {{ .env.TEST_PASSWORD }}
+            4. Click login button
+            5. Verify you're on the dashboard page
+          max_turns: 10
+          timeout: "2m"
+```
 
-```bash
-# Run with debug logging and save to file for analysis
-rocketship run --debug -af test.yaml --env-file .env 2>&1 > /tmp/debug.log
+## Best Practices
 
-# Search for specific plugin activity logs
-cat /tmp/debug.log | grep -A 10 "SUPABASE Activity"
+- **Be specific**: `"Click 'Add to Cart' for product 123"` not `"Add something"`
+- **Set timeouts**: 30s (simple), 2m (multi-step), 5m (complex)
+- **Use variables**: Pass dynamic data via `{{ variable_name }}`
+- **Handle dynamic content**: `"Wait for spinner to disappear, then verify..."`
+- **Clear prompts**: Break complex tasks into numbered steps
 
-# Find logs for a specific step by Activity ID
-cat /tmp/debug.log | grep -A 5 "ActivityID 47"
+## Troubleshooting
 
-# Search for save/state-related logs
-cat /tmp/debug.log | grep -E "(Processing save|saved values|State after step)"
+| Issue             | Solution                                        |
+| ----------------- | ----------------------------------------------- |
+| Agent timeout     | Increase `timeout` or reduce task complexity    |
+| Task fails        | Simplify prompt, add more specific instructions |
+| Connection errors | Verify ANTHROPIC_API_KEY is set                 |
 
-# Find all logs for a specific workflow step
-cat /tmp/debug.log | grep -A 20 "step 2:"
+## See Also
 
-# Check for variable replacement issues
-cat /tmp/debug.log | grep -E "(undefined variables|failed to parse template)"
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- [Playwright Plugin](playwright.md) - Deterministic browser automation
+- [Browser Use Plugin](browser-use.md) - Alternative AI browser automation
+- [Variables](../features/variables.md) - Passing data to agent prompts
 
 ---
 > Source: [rocketship-ai/rocketship](https://github.com/rocketship-ai/rocketship) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
