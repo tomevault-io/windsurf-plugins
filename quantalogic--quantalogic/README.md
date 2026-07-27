@@ -1,8 +1,6 @@
 # quantalogic
 
-> Tome by [quantalogic](https://github.com/quantalogic/quantalogic) — distributed by [TomeVault](https://tomevault.io)
-
-Quantalogic ReAct Agent - Coding Agent Framework - Gives a ⭐️ if you like the project
+> Tome by [quantalogic](https://github.com/quantalogic/quantalogic), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
