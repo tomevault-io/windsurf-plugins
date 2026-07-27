@@ -1,153 +1,113 @@
 ---
 trigger: always_on
-description: Shop at Home is a full-stack shopping list application that lets customers securely add, edit, view, and remove grocery and household items. The project is designed as a learning resource for Azure Static Web Apps and Azure Container Apps, providing **four frontend implementations** (Angular, React, Svelte, Vue) backed by **two API options** (Azure Functions and Fastify).
+description: - Use `const` and `let` — never `var`.
 ---
 
-# Shop at Home — Contributor & Agent Guide
+# Copilot Instructions — Shop at Home
 
-## Project Overview
+## Language & Framework Conventions
 
-Shop at Home is a full-stack shopping list application that lets customers securely add, edit, view, and remove grocery and household items. The project is designed as a learning resource for Azure Static Web Apps and Azure Container Apps, providing **four frontend implementations** (Angular, React, Svelte, Vue) backed by **two API options** (Azure Functions and Fastify).
+### JavaScript / TypeScript
 
-Live demos: [angular.shopathome.dev](https://angular.shopathome.dev) · [react.shopathome.dev](https://react.shopathome.dev) · [svelte.shopathome.dev](https://svelte.shopathome.dev) · [vue.shopathome.dev](https://vue.shopathome.dev)
+- Use `const` and `let` — never `var`.
+- Prefer arrow functions for callbacks and inline functions.
+- Use template literals for string interpolation.
+- Use `async`/`await` over raw Promises where possible.
+- TypeScript (Angular and Svelte apps): use explicit types for function parameters and return values. Avoid `any`.
 
----
+### Angular (angular-app)
 
-## Repository Structure
+- Follow Angular CLI conventions: one component per file, `*.component.ts` / `*.service.ts` / `*.module.ts` suffixes.
+- Use NgRx for state management — actions, reducers, effects, selectors follow the NgRx pattern in `src/app/`.
+- Use Angular's dependency injection for services.
+- Router configuration lives in `src/app/router.ts`.
+- Templates use Angular template syntax with structural directives (`*ngIf`, `*ngFor`).
+- Lint with TSLint (`tslint.json` at `src/tslint.json`).
 
-```
-shopathome/
-├── angular-app/          # Angular 18 frontend (NgRx state management)
-│   ├── src/app/          # Components, services, routing, store
-│   └── package.json
-├── react-app/            # React 17 frontend (Redux + Redux-Saga)
-│   ├── src/              # Components, store, product views
-│   └── package.json
-├── svelte-app/           # Svelte 4 frontend (Vite build, TypeScript)
-│   ├── src/              # Components, store, models
-│   └── package.json
-├── vue-app/              # Vue 3 frontend (Vuex state management)
-│   ├── src/              # Components, views, store, router
-│   └── package.json
-├── api/                  # Azure Functions API (serverless)
-│   ├── products-get/     # GET /api/products
-│   ├── products-post/    # POST /api/products
-│   ├── products-put/     # PUT /api/products
-│   ├── products-delete/  # DELETE /api/products
-│   ├── discounts-get/    # GET /api/discounts
-│   └── shared/           # Shared data layer (in-memory)
-├── fastify-api-server/   # Fastify 4 API (containerized)
-│   └── src/
-│       ├── server.js     # Server entry point (port 3000)
-│       ├── routes/       # Route handlers (products, discounts)
-│       └── shared/       # Shared data layer (in-memory)
-├── .devcontainer/        # Dev container config (Svelte + API)
-├── .github/workflows/    # Azure Static Web Apps deploy workflows
-├── CONTRIBUTING.md       # Contribution guidelines
-└── README.md             # Project overview and deployment guide
-```
+### React (react-app)
 
----
+- Class components are **not** used — prefer functional components.
+- State management uses Redux with Redux-Saga for side effects (see `src/store/`).
+- Follow the Airbnb ESLint configuration (`.eslintrc.json` extends `react-app`).
+- Format with Prettier (`.prettierrc`).
+- Router uses `react-router-dom` v6.
 
-## Tech Stack
+### Svelte (svelte-app)
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| **Angular frontend** | Angular, NgRx, TypeScript, Karma/Jasmine | Angular 18, TS ~5.4 |
-| **React frontend** | React, Redux, Redux-Saga, JavaScript | React 17 |
-| **Svelte frontend** | Svelte, TypeScript, Vite | Svelte 4, Vite 4 |
-| **Vue frontend** | Vue 3, Vuex, Vue Router, JavaScript | Vue 3 |
-| **Azure Functions API** | Azure Functions (Node.js) | v4 runtime |
-| **Fastify API** | Fastify, CORS, Helmet | Fastify 4 |
-| **CSS** | Bulma, SCSS, Font Awesome | Bulma 0.9 |
-| **Runtime** | Node.js | ≥ 20 |
-| **Package manager** | npm | (lockfiles present per app) |
-| **Deployment** | Azure Static Web Apps, Azure Container Apps | — |
-| **Dev tools** | Prettier, ESLint, TSLint (Angular), SWA CLI | — |
+- Use TypeScript in Svelte components (`<script lang="ts">`).
+- Styling uses SCSS imported globally from `src/styles.scss`.
+- Build with Vite (`vite.config.ts`).
+- Check types with `npm run check` (svelte-check).
+- Store module in `src/store/` — uses Svelte writable stores.
+
+### Vue (vue-app)
+
+- Single-File Components (`.vue`) with `<template>`, `<script>`, `<style>` sections.
+- State management via Vuex (`src/store/`).
+- Routing via Vue Router (`src/router.js`).
+- Follow Vue ESLint + Airbnb + Prettier rules (`.eslintrc.js`).
+- Component filenames use kebab-case.
+
+### API — Azure Functions (api/)
+
+- Each function is a directory with `function.json` (bindings) and `index.js` (handler).
+- Handlers receive `(context, req)` and set response via `context.res`.
+- Shared data logic lives in `api/shared/`.
+- Routes are defined declaratively in `function.json`, not in code.
+
+### API — Fastify (fastify-api-server/)
+
+- Plain JavaScript (CommonJS `require`).
+- Routes are Fastify plugins registered in `src/routes/index.js`.
+- Route prefix is `/api` (set in `src/server.js`).
+- Security middleware: `@fastify/cors` and `@fastify/helmet`.
 
 ---
 
-## Build & Run
+## Test Conventions
 
-Each frontend app and each API is an independent npm project. Install and run them separately.
-
-### Prerequisites
-
-- Node.js ≥ 20
-- [Azure Functions Core Tools](https://docs.microsoft.com/azure/azure-functions/functions-run-local) (for the Azure Functions API)
-- [SWA CLI](https://www.npmjs.com/package/@azure/static-web-apps-cli) (for local integration)
-
-### Install dependencies (per app)
-
-```bash
-cd angular-app && npm install
-cd react-app && npm install
-cd svelte-app && npm install
-cd vue-app && npm install
-cd api && npm install
-cd fastify-api-server && npm install
-```
-
-### Run a frontend with the Azure Functions API
-
-```bash
-# Example: Svelte + Azure Functions
-cd svelte-app
-npm run start-svelte-func-swa
-```
-
-### Run a frontend with the Fastify API
-
-```bash
-# Example: Svelte + Fastify
-cd svelte-app
-npm run start-svelte-fastify
-```
-
-### Build a frontend
-
-```bash
-cd angular-app && npm run build     # ng build --configuration production
-cd react-app && npm run build       # react-scripts build
-cd svelte-app && npm run build      # vite build
-cd vue-app && npm run build         # vue-cli-service build
-```
-
-### Run the Fastify API standalone
-
-```bash
-cd fastify-api-server && npm start  # Starts on http://localhost:3000
-```
-
-### Run the Azure Functions API standalone
-
-```bash
-cd api && npm start                 # func start (port 7071)
-```
+- **Angular**: Karma + Jasmine. Test files: `*.spec.ts` co-located with source. Run: `cd angular-app && npm test`.
+- **React**: Jest via react-scripts. Test files: `*.test.js` co-located with source. Run: `cd react-app && npm test`.
+- **Svelte / Vue / APIs**: No test setup currently exists.
+- When adding new components or features, add corresponding tests in apps that have test infrastructure (Angular, React).
+- Test names should describe the behavior, not the implementation.
 
 ---
 
-## Testing
+## Code Style
 
-| App | Test Runner | Command |
-|-----|-------------|---------|
-| angular-app | Karma + Jasmine | `cd angular-app && npm test` |
-| react-app | Jest (via react-scripts) | `cd react-app && npm test` |
-| svelte-app | No test setup | — |
-| vue-app | No test setup | — |
-| api | No test setup | — |
-| fastify-api-server | No test setup | — |
-
-When adding new features, add tests to the Angular and React apps at minimum. Follow existing patterns:
-
-- **Angular**: Test files use `*.spec.ts` alongside components in `src/app/`.
-- **React**: Test files use `*.test.js` alongside components in `src/`.
+- **Prettier** is configured in Angular, React, Svelte, and Vue apps (`.prettierrc` files). Format code before committing.
+- **ESLint** is configured in React (Airbnb) and Vue (Airbnb + Vue plugin). Run `npm run lint` where available.
+- **TSLint** is configured in Angular (`tslint.json`). Run `cd angular-app && npm run lint`.
+- SCSS follows Bulma conventions — use Bulma utility classes where possible, custom SCSS for overrides only.
 
 ---
 
+## Asset and Content Rules
+
+- Static assets (images, icons, fonts) live in each app's `public/` or `src/assets/` directory.
+- All apps use **Font Awesome** for icons — do not add other icon libraries.
+- All apps use **Bulma** for CSS — do not introduce another CSS framework.
+- Product images and globe assets are stored in `src/` alongside components that use them.
+
+---
+
+## Maintenance Matrix
+
+| Change Made | Files to Update |
+|---|---|
+| **New product field added** | `api/shared/product-data.js`, `fastify-api-server/src/shared/product-data.js`, all four frontend product components/views, all four frontend store/state modules |
+| **New API endpoint added** | `api/{endpoint}/function.json` + `api/{endpoint}/index.js`, `fastify-api-server/src/routes/{resource}.js`, `fastify-api-server/src/routes/index.js` (register route), corresponding frontend service/store calls in all four apps |
+| **New shared data function** | `api/shared/product-data.js` AND `fastify-api-server/src/shared/product-data.js` (keep in sync) |
+| **New UI component added** | Create in all four frontend apps (`angular-app/src/app/`, `react-app/src/components/`, `svelte-app/src/components/`, `vue-app/src/components/`) |
+| **Styling changes** | `src/styles.scss` in the affected app(s). If changing shared look-and-feel, update all four apps. |
+| **New frontend app added** | Root `README.md` table, `AGENTS.md` repository structure and tech stack, add Azure SWA workflow in `.github/workflows/` |
+| **Node.js version updated** | `engines.node` in all 6 `package.json` files, `.devcontainer/devcontainer.json`, `.github/copilot-setup-steps.yml`, CI workflows |
+| **New dependency added** | `package.json` in the specific app, re-run `npm install` to update `package-lock.json` |
+| **Build or tooling changed** | Relevant `package.json` scripts, `.github/workflows/*.yml`, `.github/copilot-setup-steps.yml`, `AGENTS.md` build section |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [johnpapa/shopathome](https://github.com/johnpapa/shopathome) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
