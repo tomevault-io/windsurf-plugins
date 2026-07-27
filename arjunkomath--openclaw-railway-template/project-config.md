@@ -150,4 +150,4 @@ Check logs for:
 
 ---
 > Source: [arjunkomath/openclaw-railway-template](https://github.com/arjunkomath/openclaw-railway-template) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
