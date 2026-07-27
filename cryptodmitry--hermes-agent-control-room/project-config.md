@@ -1,163 +1,167 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: pip install -r requirements.txt
 ---
 
-# CLAUDE.md
+# Agent Build Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Repository Overview
-
-This is the Ralph for Claude Code repository - an autonomous AI development loop system that enables continuous development cycles with intelligent exit detection and rate limiting.
-
-**Version**: v0.9.8 | **Tests**: 276 passing (100% pass rate) | **CI/CD**: GitHub Actions
-
-## Core Architecture
-
-The system consists of four main bash scripts and a modular library system:
-
-### Main Scripts
-
-1. **ralph_loop.sh** - The main autonomous loop that executes Claude Code repeatedly
-2. **ralph_monitor.sh** - Live monitoring dashboard for tracking loop status
-3. **setup.sh** - Project initialization script for new Ralph projects
-4. **create_files.sh** - Bootstrap script that creates the entire Ralph system
-5. **ralph_import.sh** - PRD/specification import tool that converts documents to Ralph format
-   - Uses modern Claude Code CLI with `--output-format json` for structured responses
-   - Implements `detect_response_format()` and `parse_conversion_response()` for JSON parsing
-   - Backward compatible with older CLI versions (automatic text fallback)
-
-### Library Components (lib/)
-
-The system uses a modular architecture with reusable components in the `lib/` directory:
-
-1. **lib/circuit_breaker.sh** - Circuit breaker pattern implementation
-   - Prevents runaway loops by detecting stagnation
-   - Three states: CLOSED (normal), HALF_OPEN (monitoring), OPEN (halted)
-   - Configurable thresholds for no-progress and error detection
-   - Automatic state transitions and recovery
-
-2. **lib/response_analyzer.sh** - Intelligent response analysis
-   - Analyzes Claude Code output for completion signals
-   - **JSON output format detection and parsing** (with text fallback)
-   - Supports both flat JSON format and Claude CLI format (`result`, `sessionId`, `metadata`)
-   - Extracts structured fields: status, exit_signal, work_type, files_modified
-   - **Session management**: `store_session_id()`, `get_last_session_id()`, `should_resume_session()`
-   - Automatic session persistence to `.claude_session_id` file with 24-hour expiration
-   - Session lifecycle: `get_session_id()`, `reset_session()`, `log_session_transition()`, `init_session_tracking()`
-   - Session history tracked in `.ralph_session_history` (last 50 transitions)
-   - Session auto-reset on: circuit breaker open, manual interrupt, project completion
-   - Detects test-only loops and stuck error patterns
-   - Two-stage error filtering to eliminate false positives
-   - Multi-line error matching for accurate stuck loop detection
-   - Confidence scoring for exit decisions
-
-3. **lib/date_utils.sh** - Cross-platform date utilities
-   - ISO timestamp generation for logging
-   - Epoch time calculations for rate limiting
-
-## Key Commands
-
-### Installation
+## Project Setup
 ```bash
-# Install Ralph globally (run once)
-./install.sh
+# Install dependencies (example for Node.js project)
+npm install
 
-# Uninstall Ralph
-./install.sh uninstall
+# Or for Python project
+pip install -r requirements.txt
+
+# Or for Rust project  
+cargo build
 ```
 
-### Setting Up a New Project
+## Running Tests
 ```bash
-# Create a new Ralph-managed project (run from anywhere)
-ralph-setup my-project-name
-cd my-project-name
-```
-
-### Running the Ralph Loop
-```bash
-# Start with integrated tmux monitoring (recommended)
-ralph --monitor
-
-# Start without monitoring
-ralph
-
-# With custom parameters and monitoring
-ralph --monitor --calls 50 --prompt my_custom_prompt.md
-
-# Check current status
-ralph --status
-
-# Circuit breaker management
-ralph --reset-circuit
-ralph --circuit-status
-
-# Session management
-ralph --reset-session    # Reset session state manually
-```
-
-### Monitoring
-```bash
-# Integrated tmux monitoring (recommended)
-ralph --monitor
-
-# Manual monitoring in separate terminal
-ralph-monitor
-
-# tmux session management
-tmux list-sessions
-tmux attach -t <session-name>
-```
-
-### Running Tests
-```bash
-# Run all tests (165 tests)
+# Node.js
 npm test
 
-# Run specific test suites
-npm run test:unit
-npm run test:integration
+# Python
+pytest
 
-# Run individual test files
-bats tests/unit/test_cli_parsing.bats
-bats tests/unit/test_json_parsing.bats
-bats tests/unit/test_cli_modern.bats
+# Rust
+cargo test
 ```
 
-## Ralph Loop Configuration
-
-The loop is controlled by several key files and environment variables:
-
-- **PROMPT.md** - Main prompt file that drives each loop iteration
-- **@fix_plan.md** - Prioritized task list that Ralph follows
-- **@AGENT.md** - Build and run instructions maintained by Ralph
-- **status.json** - Real-time status tracking (JSON format)
-- **logs/** - Execution logs for each loop iteration
-
-### Rate Limiting
-- Default: 100 API calls per hour (configurable via `--calls` flag)
-- Automatic hourly reset with countdown display
-- Call tracking persists across script restarts
-
-### Modern CLI Configuration (Phase 1.1)
-
-Ralph uses modern Claude Code CLI flags for structured communication:
-
-**Configuration Variables:**
+## Build Commands
 ```bash
-CLAUDE_OUTPUT_FORMAT="json"           # Output format: json (default) or text
-CLAUDE_ALLOWED_TOOLS="Write,Bash(git *),Read"  # Allowed tool permissions
-CLAUDE_USE_CONTINUE=true              # Enable session continuity
-CLAUDE_MIN_VERSION="2.0.76"           # Minimum Claude CLI version
+# Production build
+npm run build
+# or
+cargo build --release
 ```
 
-**CLI Options:**
-- `--output-format json|text` - Set Claude output format (default: json)
-- `--allowed-tools "Write,Read,Bash(git *)"` - Restrict allowed tools
+## Development Server
+```bash
+# Start development server
+npm run dev
+# or
+cargo run
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Key Learnings
+- Update this section when you learn new build optimizations
+- Document any gotchas or special setup requirements
+- Keep track of the fastest test/build cycle
+
+## Feature Development Quality Standards
+
+**CRITICAL**: All new features MUST meet the following mandatory requirements before being considered complete.
+
+### Testing Requirements
+
+- **Minimum Coverage**: 85% code coverage ratio required for all new code
+- **Test Pass Rate**: 100% - all tests must pass, no exceptions
+- **Test Types Required**:
+  - Unit tests for all business logic and services
+  - Integration tests for API endpoints or main functionality
+  - End-to-end tests for critical user workflows
+- **Coverage Validation**: Run coverage reports before marking features complete:
+  ```bash
+  # Examples by language/framework
+  npm run test:coverage
+  pytest --cov=src tests/ --cov-report=term-missing
+  cargo tarpaulin --out Html
+  ```
+- **Test Quality**: Tests must validate behavior, not just achieve coverage metrics
+- **Test Documentation**: Complex test scenarios must include comments explaining the test strategy
+
+### Git Workflow Requirements
+
+Before moving to the next feature, ALL changes must be:
+
+1. **Committed with Clear Messages**:
+   ```bash
+   git add .
+   git commit -m "feat(module): descriptive message following conventional commits"
+   ```
+   - Use conventional commit format: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, etc.
+   - Include scope when applicable: `feat(api):`, `fix(ui):`, `test(auth):`
+   - Write descriptive messages that explain WHAT changed and WHY
+
+2. **Pushed to Remote Repository**:
+   ```bash
+   git push origin <branch-name>
+   ```
+   - Never leave completed features uncommitted
+   - Push regularly to maintain backup and enable collaboration
+   - Ensure CI/CD pipelines pass before considering feature complete
+
+3. **Branch Hygiene**:
+   - Work on feature branches, never directly on `main`
+   - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
+   - Create pull requests for all significant changes
+
+4. **Ralph Integration**:
+   - Update @fix_plan.md with new tasks before starting work
+   - Mark items complete in @fix_plan.md upon completion
+   - Update PROMPT.md if development patterns change
+   - Test features work within Ralph's autonomous loop
+
+### Documentation Requirements
+
+**ALL implementation documentation MUST remain synchronized with the codebase**:
+
+1. **Code Documentation**:
+   - Language-appropriate documentation (JSDoc, docstrings, etc.)
+   - Update inline comments when implementation changes
+   - Remove outdated comments immediately
+
+2. **Implementation Documentation**:
+   - Update relevant sections in this AGENT.md file
+   - Keep build and test commands current
+   - Update configuration examples when defaults change
+   - Document breaking changes prominently
+
+3. **README Updates**:
+   - Keep feature lists current
+   - Update setup instructions when dependencies change
+   - Maintain accurate command examples
+   - Update version compatibility information
+
+4. **AGENT.md Maintenance**:
+   - Add new build patterns to relevant sections
+   - Update "Key Learnings" with new insights
+   - Keep command examples accurate and tested
+   - Document new testing patterns or quality gates
+
+### Feature Completion Checklist
+
+Before marking ANY feature as complete, verify:
+
+- [ ] All tests pass with appropriate framework command
+- [ ] Code coverage meets 85% minimum threshold
+- [ ] Coverage report reviewed for meaningful test quality
+- [ ] Code formatted according to project standards
+- [ ] Type checking passes (if applicable)
+- [ ] All changes committed with conventional commit messages
+- [ ] All commits pushed to remote repository
+- [ ] @fix_plan.md task marked as complete
+- [ ] Implementation documentation updated
+- [ ] Inline code comments updated or added
+- [ ] AGENT.md updated (if new patterns introduced)
+- [ ] Breaking changes documented
+- [ ] Features tested within Ralph loop (if applicable)
+- [ ] CI/CD pipeline passes
+
+### Rationale
+
+These standards ensure:
+- **Quality**: High test coverage and pass rates prevent regressions
+- **Traceability**: Git commits and @fix_plan.md provide clear history of changes
+- **Maintainability**: Current documentation reduces onboarding time and prevents knowledge loss
+- **Collaboration**: Pushed changes enable team visibility and code review
+- **Reliability**: Consistent quality gates maintain production stability
+- **Automation**: Ralph integration ensures continuous development practices
+
+**Enforcement**: AI agents should automatically apply these standards to all feature development tasks without requiring explicit instruction for each task.
 
 ---
 > Source: [CryptoDmitry/hermes-agent-control-room](https://github.com/CryptoDmitry/hermes-agent-control-room) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
