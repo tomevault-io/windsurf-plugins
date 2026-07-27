@@ -1,199 +1,154 @@
 ---
 trigger: always_on
-description: This file provides guidelines for AI agents working in this repository.
+description: Creates an agent, providing functionality identical to the official Langchain `create_agent`, but extends the model specification via string.
 ---
 
-# Agentic Coding Guidelines for langchain-dev-utils
+# Agent Module API Reference Documentation
 
-This file provides guidelines for AI agents working in this repository.
+## create_agent
 
-## Project Overview
+Creates an agent, providing functionality identical to the official Langchain `create_agent`, but extends the model specification via string.
 
-A Python utility library for LangChain and LangGraph development. Uses hatchling build system, uv for package management, ruff for linting, and pytest for testing.
+### Function Signature
 
-**Current Version:** 1.4.6
-
----
-
-## Build/Lint/Test Commands
-
-### Package Management (uv)
-```bash
-# Install dependencies
-uv sync
-
-# Install with optional dependencies
-uv sync --extra standard
-
-# Install dev dependencies
-uv sync --group dev
-
-# Install test dependencies
-uv sync --group tests
-
-# Install docs dependencies
-uv sync --group docs
+```python
+def create_agent(  # noqa: PLR0915
+    model: str,
+    tools: Sequence[BaseTool | Callable | dict[str, Any]] | None = None,
+    *,
+    system_prompt: str | SystemMessage | None = None,
+    response_format: ResponseFormat[ResponseT] | type[ResponseT] | None = None,
+    middleware: Sequence[AgentMiddleware[StateT_co, ContextT]] = (),
+    state_schema: type[AgentState[ResponseT]] | None = None,
+    context_schema: type[ContextT] | None = None,
+    checkpointer: Checkpointer | None = None,
+    store: BaseStore | None = None,
+    interrupt_before: list[str] | None = None,
+    interrupt_after: list[str] | None = None,
+    debug: bool = False,
+    name: str | None = None,
+    cache: BaseCache | None = None,
+) -> CompiledStateGraph[
+    AgentState[ResponseT], ContextT, _InputAgentState, _OutputAgentState[ResponseT]
+]:
 ```
 
-### Linting & Formatting (ruff)
-```bash
-# Check linting
-uv run ruff check .
+### Parameters
 
-# Check specific file
-uv run ruff check src/langchain_dev_utils/path/to/file.py
+| Parameter | Type | Required | Default | Description |
+|------|------|------|--------|------|
+| model | str | Yes | - | Model identifier string that can be loaded by `load_chat_model`. Can be specified in "provider:model-name" format |
+| tools | Sequence[BaseTool \| Callable \| dict[str, Any]] \| None | No | None | List of tools available to the agent |
+| system_prompt | str \| SystemMessage \| None | No | None | Custom system prompt for the agent |
+| middleware | Sequence[AgentMiddleware[AgentState[ResponseT], ContextT]] | No | () | Middleware for the agent |
+| response_format | ResponseFormat[ResponseT] \| type[ResponseT] \| None | No | None | Response format for the agent |
+| state_schema | type[AgentState[ResponseT]] \| None | No | None | State schema for the agent |
+| context_schema | type[ContextT] \| None | No | None | Context schema for the agent |
+| checkpointer | Checkpointer \| None | No | None | Checkpointer for state persistence |
+| store | BaseStore \| None | No | None | Store for data persistence |
+| interrupt_before | list[str] \| None | No | None | Nodes to interrupt before execution |
+| interrupt_after | list[str] \| None | No | None | Nodes to interrupt after execution |
+| debug | bool | No | False | Enable debug mode |
+| name | str \| None | No | None | Agent name |
+| cache | BaseCache \| None | No | None | Cache |
 
-# Fix auto-fixable issues
-uv run ruff check --fix .
 
-# Format code
-uv run ruff format .
+### Notes
 
-# Format specific file
-uv run ruff format src/langchain_dev_utils/path/to/file.py
-```
+This function provides functionality identical to the official `langchain` `create_agent`, but extends model selection. The main difference is that the `model` parameter must be a string loadable by the `load_chat_model` function, allowing for more flexible model selection using registered model providers.
 
-### Testing (pytest)
-```bash
-# Run all tests
-uv run pytest
+### Example
 
-# Run with verbose output
-uv run pytest -v
-
-# Run specific test file
-uv run pytest tests/test_agent.py
-
-# Run specific test function
-uv run pytest tests/test_agent.py::test_prebuilt_agent
-
-# Run specific test class
-uv run pytest tests/test_chat_models.py::TestImageProcessing
-
-# Run with asyncio support (automatically configured)
-uv run pytest -s
-
-# Run tests matching pattern
-uv run pytest -k "test_load"
-```
-
-### Build
-```bash
-# Build package
-uv build
-
-# Build wheel only
-uv build --wheel
-```
-
-### Documentation
-```bash
-# Serve docs locally
-mkdocs serve
-
-# Build docs
-mkdocs build
-
-# Deploy docs
-mkdocs gh-deploy
+```python
+agent = create_agent(model="vllm:qwen2.5-7b", tools=[get_current_time])
 ```
 
 ---
 
-## Code Style Guidelines
+## wrap_agent_as_tool
 
-### Imports
-- Use absolute imports for external packages
-- Use relative imports within the package (e.g., `from ..chat_models import ...`)
-- Group imports: stdlib → third-party → local
-- Ruff handles import sorting automatically
+Wraps an agent as a tool.
 
-### Type Hints
-- Use type hints for all function parameters and return types
-- Use `Optional[Type]` or `Type | None` for nullable types (both acceptable)
-- Use `Any` sparingly and only when necessary
-- Use `Sequence`, `Mapping` for generic collections
-- Use generics with TypeVars where appropriate
+### Function Signature
 
-### Naming Conventions
-- `snake_case` for functions, methods, variables
-- `PascalCase` for classes
-- `UPPER_CASE` for constants
-- `_leading_underscore` for private/internal functions
-- Leading double underscore for name mangling when needed
-
-### Docstrings
-- Use Google-style docstrings
-- Include Args, Returns, Raises sections for public functions
-- Include Examples section for complex functions
-- Keep docstrings under 100 characters per line when possible
-
-### Code Structure
-- Maximum line length: 88 characters (ruff enforces, E501 ignored)
-- Use trailing commas in multi-line structures
-- Two blank lines between top-level functions/classes
-- One blank line between methods
-
-### Error Handling
-- Use specific exception types, not bare `except:`
-- Provide descriptive error messages with f-strings
-- Use `raise ValueError(msg)` pattern with descriptive messages
-- Avoid bare `raise` statements
-
-### Async Code
-- Use `pytest.mark.asyncio` for async test functions
-- Use `async`/`await` consistently
-- Prefer `asyncio` primitives from standard library
-
-### Ruff Configuration
-- Enabled rules: E, F, I, PGH003, T201
-- Import sorting (I) is enforced
-- No print statements in production code (T201)
-
----
-
-## Testing Guidelines
-
-- Tests live in `tests/` directory
-- Test files named `test_*.py`
-- Test functions named `test_*`
-- Use pytest fixtures for setup/teardown
-- Use `pytest.mark.asyncio` for async tests
-- Mock external API calls in unit tests
-- Integration tests use actual APIs (marked implicitly by test names)
-- Tests use `langchain-tests` for standard integration test suites
-
----
-
-## Project Structure
-
+```python
+def wrap_agent_as_tool(
+    agent: CompiledStateGraph,
+    tool_name: Optional[str] = None,
+    tool_description: Optional[str] = None,
+    pre_input_hooks: Optional[
+        tuple[
+            Callable[[str, ToolRuntime], str | dict[str, Any]],
+            Callable[[str, ToolRuntime], Awaitable[str | dict[str, Any]]],
+        ]
+        | Callable[[str, ToolRuntime], str | dict[str, Any]]
+    ] = None,
+    post_output_hooks: Optional[
+        tuple[
+            Callable[[str, dict[str, Any], ToolRuntime], Any],
+            Callable[[str, dict[str, Any], ToolRuntime], Awaitable[Any]],
+        ]
+        | Callable[[str, dict[str, Any], ToolRuntime], Any]
+    ] = None,
+) -> BaseTool:
 ```
-langchain-dev-utils/
-├── src/langchain_dev_utils/      # Source code
-│   ├── agents/                   # Agent utilities
-│   │   ├── factory.py            # Agent creation functions
-│   │   ├── wrap.py               # Agent wrapping utilities
-│   │   └── middleware/           # Agent middleware components
-│   │       ├── format_prompt.py      # Format prompt middleware
-│   │       ├── handoffs.py           # Multi-agent handoff middleware
-│   │       ├── model_fallback.py     # Model fallback middleware
-│   │       ├── model_router.py       # Model routing middleware
-│   │       ├── plan.py               # Planning middleware
-│   │       ├── summarization.py      # Message summarization middleware
-│   │       ├── tool_call_repair.py   # Tool call repair middleware
-│   │       ├── tool_emulator.py      # LLM tool emulator middleware
-│   │       └── tool_selection.py     # LLM tool selector middleware
-│   ├── chat_models/              # Chat model utilities
-│   │   ├── base.py               # Base chat model classes
-│   │   ├── types.py              # Type definitions
-│   │   └── adapters/             # Model provider adapters
-│   ├── embeddings/               # Embedding utilities
-│   │   ├── base.py               # Base embedding classes
-│   │   └── adapters/             # Embedding provider adapters
-│   ├── graph/                    # Graph utilities
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|------|------|------|--------|------|
+| agent | CompiledStateGraph | Yes | - | The agent |
+| tool_name | Optional[str] | No | None | Tool name |
+| tool_description | Optional[str] | No | None | Tool description |
+| pre_input_hooks | - | No | None | Agent input preprocessing function |
+| post_output_hooks | - | No | None | Agent output post-processing function |
+
+
+### Example
+
+```python
+tool = wrap_agent_as_tool(agent)
+```
+
+---
+
+## wrap_all_agents_as_tool
+
+Wraps all agents as a single tool.
+
+### Function Signature
+
+```python
+def wrap_all_agents_as_tool(
+    agents: list[CompiledStateGraph],
+    tool_name: Optional[str] = None,
+    tool_description: Optional[str] = None,
+    pre_input_hooks: Optional[
+        tuple[
+            Callable[[str, ToolRuntime], str | dict[str, Any]],
+            Callable[[str, ToolRuntime], Awaitable[str | dict[str, Any]]],
+        ]
+        | Callable[[str, ToolRuntime], str | dict[str, Any]]
+    ] = None,
+    post_output_hooks: Optional[
+        tuple[
+            Callable[[str, dict[str, Any], ToolRuntime], Any],
+            Callable[[str, dict[str, Any], ToolRuntime], Awaitable[Any]],
+        ]
+        | Callable[[str, dict[str, Any], ToolRuntime], Any]
+    ] = None,
+) -> BaseTool:
+```
+
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|------|------|------|--------|------|
+| agents | list[CompiledStateGraph] | Yes | - | List of agents (must contain at least 2, and each agent must have a unique name) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TBice123123/langchain-dev-utils](https://github.com/TBice123123/langchain-dev-utils) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
