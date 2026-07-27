@@ -1,100 +1,100 @@
 ---
 trigger: always_on
-description: See `.github/copilot-instructions.md` for code style and patterns.
+description: PowerShell Pester testing best practices based on Pester v5 conventions
 ---
 
-# CosmosDB PowerShell Module — Agent Instructions
 
-See `.github/copilot-instructions.md` for code style and patterns.
+# PowerShell Pester v5 Testing Guidelines
 
-## Layout
+This guide provides PowerShell-specific instructions for creating automated tests using PowerShell Pester v5 module. Follow PowerShell cmdlet development guidelines in [powershell.instructions.md](./powershell.instructions.md) for general PowerShell scripting best practices.
 
-```text
-source/
-├── Public/<resource-type>/    # Cmdlets: one file per function
-├── Private/<resource-type>/   # Internal helpers (mirrors Public)
-├── Private/utils/             # Invoke-CosmosDbRequest.ps1 (core REST wrapper)
-├── classes/CosmosDB/          # C# types → CosmosDB.dll (netstandard2.0)
-├── prefix.ps1                 # Module init (Az imports, type loading)
-├── CosmosDB.psd1              # Manifest (auto-updated by build — do not edit version)
-├── CosmosDB.psm1              # Generated — do not edit
-tests/
-├── Unit/CosmosDB.<type>.Tests.ps1
-├── Integration/
-├── TestHelper/                # Fixtures, Bicep templates, auth setup
-docs/                          # PlatyPS markdown → external help XML
-output/CosmosDB/<version>/     # Build output (versioned)
-```
+## File Naming and Structure
 
-## Commands
+- **File Convention:** Use `*.Tests.ps1` naming pattern
+- **Placement:** Place test files next to tested code or in dedicated test directories
+- **Import Pattern:** Use `BeforeAll { . $PSScriptRoot/FunctionName.ps1 }` to import tested functions. Use `$PSScriptRoot` or `$PSCommandPath` to locate scripts — do NOT use `$MyInvocation.MyCommand.Path` inside `BeforeAll` (it does not work in Pester v5).
+- **No Direct Code:** Put ALL code inside `It`, `BeforeAll`, `BeforeEach`, `AfterAll`, or `AfterEach`. Code placed directly in a `Describe` or `Context` body outside these blocks runs during **Discovery**, not during test execution — its state is NOT available when tests run. Use `BeforeDiscovery` for code that must explicitly run during Discovery.
 
-> **Local builds:** GitVersion 6.x outputs INFO lines to stdout, which breaks the
-> default `build.ps1` invocation. Use `.build-local.ps1` instead — it wraps
-> `gitversion` to strip log noise and remap `NuGetVersionV2` for Sampler compatibility.
-> After running unit tests, `CosmosDB.dll` is locked in the current session; subsequent
-> builds should be run in a new PowerShell process (for example, restart your `pwsh` session) to avoid file locking.
+## Test Structure Hierarchy
 
 ```powershell
-# Bootstrap (first time or after clean)
-./build.ps1 -ResolveDependency -Tasks noop
-
-# Build (compile C#, assemble module, generate help)
-./.build-local.ps1 -Tasks build
-
-# Unit tests only (no Azure required)
-./.build-local.ps1 -Tasks test -PesterScript tests/Unit
-
-# All tests (unit + integration — requires Azure credentials)
-./.build-local.ps1 -Tasks test
-
-# Package for publishing
-./.build-local.ps1 -Tasks pack
+BeforeAll { # Import tested functions }
+Describe 'FunctionName' {
+    Context 'When condition' {
+        BeforeAll { # Setup for context }
+        It 'Should behavior' { # Individual test }
+        AfterAll { # Cleanup for context }
+    }
+}
 ```
 
-**C# classes only:**
+## Discovery and Run
+
+Pester v5 runs test files in two phases: **Discovery** (collecting tests) and **Run** (executing tests).
+
+- `Describe` and `Context` scriptblocks are invoked during **Discovery** to collect tests — all other scriptblocks (`It`, `BeforeAll`, etc.) are saved and invoked during **Run**
+- Code placed directly in a `Describe` or `Context` body (outside sub-blocks) runs during Discovery — its results are NOT available during Run
+- Variables set in `BeforeAll` are NOT available in `-TestCases`/`-ForEach` or `-Skip` conditions — these are evaluated during Discovery before `BeforeAll` runs
+- Use `BeforeDiscovery { }` for code that must run during Discovery (e.g., building test case data from external sources)
+- Use `-ForEach` on `Describe`, `Context`, or `It` to pass Discovery-time data into Run-phase blocks
+- `$TestDrive` is only available during Run — it cannot be used in `-ForEach` data
+
 ```powershell
-dotnet build source/classes/CosmosDB/CosmosDB.csproj /p:Configuration=Release
+# WRONG — $items is from BeforeAll (Run phase), not available in -ForEach (Discovery phase)
+Describe 'Example' {
+    BeforeAll {
+        $script:items = @('a', 'b')
+    }
+    It 'test <_>' -ForEach $script:items {  # $script:items is $null here
+        $_ | Should -Not -BeNullOrEmpty
+    }
+}
+
+# CORRECT — use BeforeDiscovery to populate data used during Discovery
+BeforeDiscovery {
+    $items = @('a', 'b')
+}
+Describe 'Example' {
+    It 'test <_>' -ForEach $items {
+        $_ | Should -Not -BeNullOrEmpty
+    }
+}
 ```
 
-## Adding a Cmdlet — Checklist
+## Core Keywords
 
-1. Create `source/Public/<resource-type>/Verb-CosmosDb<Noun>.ps1`
-1. Include `Context` and `Account` parameter sets (see existing cmdlets)
-1. Call `Invoke-CosmosDbRequest` with correct `-ResourceType` / `-ResourcePath`
-1. Add unit test in `tests/Unit/CosmosDB.<resource-type>.Tests.ps1`
-1. Add integration test if the cmdlet hits the live API
-1. Create/update `docs/Verb-CosmosDb<Noun>.md` (PlatyPS format)
-1. Run `./.build-local.ps1 -Tasks build` — must succeed
-1. Run `./.build-local.ps1 -Tasks test -PesterScript tests/Unit` — must pass
+- **`Describe`**: Top-level grouping, typically named after function being tested
+- **`Context`**: Sub-grouping within Describe for specific scenarios
+- **`It`**: Individual test cases, use descriptive names
+- **`Should`**: Assertion keyword for test validation
+- **`BeforeAll/AfterAll`**: Setup/teardown once per block
+- **`BeforeEach/AfterEach`**: Setup/teardown before/after each test
 
-## CI Pipeline (Azure Pipelines)
+## Setup and Teardown
 
-- **Build**: `./build.ps1 -ResolveDependency -Tasks pack` on Ubuntu; produces versioned artifact
-- **Unit tests**: PS 5.1 + PS 7 matrix on Windows, Ubuntu, macOS
-- **Integration tests**: same matrix with live Cosmos DB account
-- All test stages **must pass**
-- **Code coverage**: ≥ 70% (JaCoCo); build fails if under
-- **Deploy**: tags matching `v*` on `main` publish to PSGallery and GitHub Releases
+- **`BeforeAll`**: Runs once during the **Run** phase at the start of the containing block; shared with all child blocks and tests. Use for expensive operations (importing the tested function, one-time API calls).
+- **`BeforeEach`**: Runs before every `It` in the current or any child block. Use for per-test prerequisites (e.g., creating a fresh file).
+- **`AfterEach`**: Runs after every `It` in the current or any child block, inside a `finally` block — guaranteed to run even if the test or its setup fails. Placement within the block does not affect ordering; it always runs last. Write teardown defensively (e.g., check `Test-Path` before removing a file that may not have been created).
+- **`AfterAll`**: Runs once after the containing `Describe`/`Context` block, guaranteed even on failure. Use for shared cleanup.
+- **Multiple setups/teardowns**: Multiple `BeforeAll`/`BeforeEach` run in definition order; `AfterAll`/`AfterEach` run in the opposite order. There can be only ONE setup and ONE teardown of each kind per block.
+- **Skipped when no tests run**: Setups and teardowns are skipped when filtering excludes all tests in the block tree.
 
-## Conventions
+### Variable Scoping
 
-| Concern | Rule |
-|---------|------|
-| Function naming | `Verb-CosmosDb<Noun>` — approved verbs only |
-| File naming | One function per file, filename matches function name |
-| Generated files | Never edit `CosmosDB.psm1` or version in `CosmosDB.psd1` |
-| Tests | Pester 4.x with `InModuleScope`; one test file per resource type |
-| Line endings | LF; newline at end of file; no trailing whitespace |
-| Encoding | UTF-8 without BOM |
-| Indentation | 4 spaces everywhere (PS, YAML, Markdown) |
-| Do not commit | `output/` directory contents |
+- Variables defined in `BeforeAll` are available (read-only) to all child blocks and tests, but CANNOT be written back — each test runs in its own scope to stay isolated. Assigning to such a variable inside `It` creates a test-local copy only.
+- `BeforeEach`, `It`, and `AfterEach` share the SAME scope — variables defined in `BeforeEach` or `It` are available in `AfterEach` (e.g., to clean up a file path created in the test).
 
-## Permission Boundaries
+## Assertions (Should)
 
-- **Do without asking**: edit source/test/doc files, run build and unit tests
-- **Ask first**: modify `build.yaml`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `RequiredModules.psd1`, or any CI config
-- **Never**: commit secrets, push to `main`, run integration tests against live Azure
+- **Basic Comparisons**: `-Be`, `-BeExactly`, `-Not -Be`
+- **Collections**: `-Contain`, `-BeIn`, `-HaveCount`
+- **Numeric**: `-BeGreaterThan`, `-BeLessThan`, `-BeGreaterOrEqual`
+- **Strings**: `-Match`, `-Like`, `-BeNullOrEmpty`
+- **Types**: `-BeOfType`, `-BeTrue`, `-BeFalse`
+- **Files**: `-Exist`, `-FileContentMatch`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [PlagueHO/CosmosDB](https://github.com/PlagueHO/CosmosDB) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
