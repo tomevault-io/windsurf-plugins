@@ -1,119 +1,106 @@
 ---
 trigger: always_on
-description: <!-- AUTO-GENERATED FILE. DO NOT EDIT MANUALLY. -->
+description: Use when writing, updating, or reviewing docstrings in skforecast source code. Covers NumPy-style format, section order, parameter/return formatting, type annotations, deprecation notices, version tags, and cross-reference conventions.
 ---
 
-<!-- AUTO-GENERATED FILE. DO NOT EDIT MANUALLY. -->
-<!-- Source: tools/ai/llms-base.txt + tools/ai/ai_context_header.md -->
-<!-- Regenerate with: python tools/ai/generate_ai_context_files.py -->
+# Skforecast Docstring Guidelines
 
-# Skforecast: Development Context
+## Format
 
-## For Contributors Working Inside This Repository
+NumPy-style docstrings. Every public class and public method/function must have a docstring.
 
-### Testing
+## Before Modifying a Docstring
 
-```bash
-pytest skforecast/recursive/tests/ -vv            # Run a specific module's tests
-pytest --cov=skforecast --cov-report=html         # Coverage report
-pytest -n auto                                    # Parallel execution (pytest-xdist)
+Before writing or modifying a docstring, **read the existing docstrings** in the same file and the neighboring parameters to match the established style exactly. Do not reformat existing content that you are not changing.
+
+## Common Mistakes — Do NOT
+
+These are the most frequent errors. Violating any of these rules is always wrong in skforecast.
+
+| Wrong | Correct | Why |
+|-------|---------|-----|
+| ` ``True`` ` (double backticks) | `` `True` `` (single backticks) | Skforecast never uses rST double-backtick literals |
+| `pd.Series` | `pandas Series` | Docstring types use readable names, not aliases |
+| `pd.DataFrame` | `pandas DataFrame` | Same as above |
+| `np.ndarray` | `numpy ndarray` | Same as above |
+| `:class:\`OrdinalEncoder\`` | `OrdinalEncoder` | No rST cross-reference directives |
+| Adding `Raises` section | *(omit it)* | Skforecast docstrings never include Raises |
+| Adding `Warnings` section | *(omit it)* | Skforecast docstrings never include Warnings |
+| Adding `See Also` section | *(omit it)* | Skforecast docstrings never include See Also |
+| Adding `Yields` section | *(omit it)* | Skforecast docstrings never include Yields |
+
+**Additional rules:**
+- NEVER use double backticks (`` `` ``) for any inline code or value. Always single backticks.
+- NEVER add docstrings, comments, or type annotations to code you did not change.
+- NEVER invent parameters or attributes that do not exist in the actual code.
+- NEVER use en dashes (–) or em dashes (—) when generating code comments, docstrings, and documentation. Use commas, colons, semicolons, or parentheses for punctuation instead.
+
+## Section Order
+
+Follow this exact section order (omit sections that don't apply):
+
+1. **Summary** — one-line or short paragraph
+2. **Parameters** — constructor or function arguments
+3. **Attributes** — class-level only (after Parameters in classes)
+4. **Returns** — what the method/function returns
+5. **Notes** — implementation details, caveats, behavioral notes
+6. **References** — numbered references using `.. [1]` syntax
+
+## Summary
+
+- First line: concise description of the class/method purpose.
+- Separated from sections by a blank line.
+- For classes: describe what the class does, not how to use it.
+- For methods: describe what the method does, starting with a verb (e.g., "Training Forecaster.", "Predict n steps ahead.").
+
+## Parameters Section
+
+```python
+Parameters
+----------
+y : pandas Series
+    Training time series.
+exog : pandas Series, pandas DataFrame, default None
+    Exogenous variable/s included as predictor/s. Must have the same
+    number of observations as `y` and their indexes must be aligned.
+steps : int, str, pandas Timestamp
+    Number of steps to predict. 
+
+    - If steps is int, number of steps to predict. 
+    - If str or pandas Datetime, the prediction will be up to that date.
 ```
 
-Markers: `@pytest.mark.slow` for long-running tests (skip with `-m "not slow"`).
+### Rules
 
-### Code Style
+- **Type line format**: `name : type[, type[, ...]][, default value]`
+- **Default values**: written as `default None`, `default True`, `default 123`, `default 'auto'` — always on the type line, not in the description.
+- **Description indentation**: 4 spaces from the left margin (one level deeper than the parameter name).
+- **Sub-items** (enumerated options): insert a blank line between the description and the first bullet. Bullets use the same indentation as the description text. Continuation lines for a bullet align with the dash (`-`), **not** indented further to align with the text after the dash. No blank lines between consecutive bullets.
 
-- NumPy-style docstrings
-- Type hints for function signatures
-- PEP 8 compliant (max line length 88, enforced by ruff)
-- Double quotes for strings (ruff `quote-style = "double"`)
-- Relative imports within package
-- When generating code comments, docstrings, and documentation, do not use en dashes (–), or em dashes (—). Use commas, colons, semicolons, or parentheses for punctuation instead.
+  Correct example (inside a class docstring, 4-space base indent from `"""`):
+  ```
+      encoding : str, None, default 'ordinal'
+          Encoding used to identify the different series.
+  ​
+          - If `'ordinal'`, a single column is created with integer values from 0
+          to n_series - 1.
+          - If `'onehot'`, a binary column is created for each series.
+          - If None, no column is created to identify the series. Internally, the
+          series are identified as an integer from 0 to n_series - 1, but no column
+          is created in the training matrices.
+  ```
+  Notice: continuation line `to n_series - 1.` starts at the same column as the `-` dash, not at the column of the text after `- `.
 
-### Dependencies
-
-Core: numpy>=1.26, pandas>=2.1,<3.0, scikit-learn>=1.4, scipy>=1.12, optuna>=4.0, joblib>=1.3, numba>=0.59, tqdm>=4.66, rich>=13.9
-Optional: statsmodels>=0.13,<0.15 (stats), matplotlib>=3.7,<3.11 (plotting), keras>=3.0,<4.0 (deep learning)
-
-### Python environment
-
-Before running any Python command (tests, scripts, notebooks, `pip install`, etc.)
-for the first time in a session, run `conda env list` and ask which environment to
-use. Do not assume the active environment. Once the user confirms an environment,
-reuse it for the rest of the session without asking again.
-
----
-
-# Skforecast: Complete API & Workflow Reference
-
-(The content below is the full `llms-base.txt` and applies to any user of skforecast)
-
-# Skforecast
-
-> Python library for time series forecasting using scikit-learn compatible models, statistical methods, and foundation models
-
-This document is for skforecast v0.23.0+. If you are using an older version, check the documentation at skforecast.org.
-
-Skforecast is a Python library for time series forecasting using scikit-learn compatible models, statistical methods, and foundation models. It works with any estimator compatible with the scikit-learn API (LightGBM, XGBoost, CatBoost, Keras, etc.).
-
-## Quick Info
-
-- Version: 0.23.0
-- License: BSD-3-Clause
-- Python: 3.10, 3.11, 3.12, 3.13, 3.14
-- Repository: https://github.com/skforecast/skforecast
-- Documentation: https://skforecast.org
-- PyPI: https://pypi.org/project/skforecast/
-
-## Installation
-
-```bash
-pip install skforecast
-```
-
-Optional dependencies:
-```bash
-pip install skforecast[stats]        # For ARIMA, SARIMAX, ETS models
-pip install skforecast[plotting]     # For visualization
-pip install skforecast[deeplearning] # For RNN/LSTM models
-```
-
-## Project Structure
-
-```
-skforecast/
-├── base/                    # ForecasterBase - abstract parent class for all forecasters
-├── recursive/               # ForecasterRecursive, ForecasterRecursiveMultiSeries,
-│                            # ForecasterRecursiveClassifier, ForecasterStats, ForecasterEquivalentDate
-├── direct/                  # ForecasterDirect, ForecasterDirectMultiVariate
-├── deep_learning/           # ForecasterRnn, create_and_compile_model
-├── foundation/              # FoundationModel, ForecasterFoundation
-│                            # (zero-shot: Chronos-2, TimesFM 2.5, Moirai-2, TabICL, TabPFN-TS, TFC-T0)
-├── stats/                   # Arima, Sarimax, Ets, Arar, acf, pacf, calculate_lag_autocorrelation
-├── preprocessing/           # TimeSeriesDifferentiator, RollingFeatures, CalendarFeatures,
-│                            # QuantileBinner, ConformalIntervalCalibrator, reshape_* functions
-├── model_selection/         # backtesting_forecaster, grid/random/bayesian search, TimeSeriesFold
-├── feature_selection/       # select_features, select_features_multiseries
-├── metrics/                 # MASE, RMSSE, sMAPE, CRPS, coverage, pinball loss
-├── datasets/                # 30+ built-in datasets (fetch_dataset, load_demo_dataset)
-├── drift_detection/         # RangeDriftDetector, PopulationDriftDetector
-├── utils/                   # Shared validation and transformation functions
-├── exceptions/              # Custom warnings and exceptions
-├── plot/                    # plot_residuals, plot_prediction_intervals, plot_prediction_distribution,
-│                            # plot_multivariate_time_series_corr, set_dark_theme, backtesting_gif_creator
-└── experimental/            # Experimental features (API may change)
-```
-
-### Module Relationships
-
-- **Forecasters inheriting from `ForecasterBase`**: ForecasterRecursive, ForecasterRecursiveMultiSeries, ForecasterRecursiveClassifier, ForecasterDirect, ForecasterDirectMultiVariate, ForecasterRnn
-- **Standalone forecasters (no inheritance)**: ForecasterStats, ForecasterEquivalentDate, ForecasterFoundation
-- Statistical models in `stats/` are wrapped by `ForecasterStats` (in `recursive/`)
-- `ForecasterFoundation` (in `foundation/`) wraps a `FoundationModel`, which delegates to an adapter class (`ChronosAdapter`, `TimesFMAdapter`, `MoiraiAdapter`, `TabICLAdapter`, `TabPFNAdapter`, `T0Adapter`) resolved from the HuggingFace `model_id`
-- `model_selection/` functions work with all forecaster types
+- **Backticks**: always single backticks — never double. Use for parameter names, values, and attribute references (`y`, `None`, `self.last_window_`, `True`, `False`).
+- **Multi-line descriptions**: continuation lines align with the first line of the description (same indent level as description start).
+- **Type naming conventions** (critical — these are the most common source of errors):
+  - `pandas Series`, `pandas DataFrame` — NEVER `pd.Series` or `pd.DataFrame`
+  - `numpy ndarray` — NEVER `np.ndarray`
+  - `str`, `int`, `float`, `bool`, `dict`, `list`, `tuple`, `Callable`, `object`
+  - Union types separated by commas: `int, list, numpy ndarray, range`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [skforecast/skforecast](https://github.com/skforecast/skforecast) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
