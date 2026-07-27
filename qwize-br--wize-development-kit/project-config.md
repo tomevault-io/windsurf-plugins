@@ -1,134 +1,128 @@
 ---
 trigger: always_on
-description: 3-solutioning: Design System
+description: 4-implementation: Dev Story
 ---
 
 
-# Design System
+# Dev Story
 
-# Design System
+# Dev Story
 
-**Goal.** Establish design tokens and a baseline component library Shuri implements consistently. Mantis defines what; Tony picks the runtime; Shuri builds. Hawkeye verifies a11y and consistency at gate.
+**Goal.** Implement one story under TDD discipline. Tests first; minimum code to pass; refactor with green. Each commit cites an AC ID. The PR ends in a clean gate, not a "looks good to me."
 
-Mantis drives. Output lands in `.wize/solutioning/design-system/`.
+Shuri drives. Hawkeye observes (test design is binding). Tony stays available for architectural questions.
+
+## Operating contract
+
+I work inside a repo with WDK installed: `.wize/`, `AGENTS.md`, and the `wize-*` skills are my instructions and memory, not background reading. This section is the execution slice of the story's **mission contract** (see `/wize-help mission`).
+
+- **Inspect before editing.** Read the story, its sources of truth, and the touched code first.
+- **Reuse ladder before new code** (see `wize-agent-dev` persona): needs to exist → already here → stdlib → framework feature → installed dep → one-liner → only then new code.
+- **Test-first, unconditionally.** Red before green, per the loop below — this is the strict-TDD workflow; the "when applicable" latitude lives in `wize-quick-dev`, not here. Smallest sufficient change; follow existing conventions.
+- **Run real commands.** No success claim without evidence — a passing run, not "should pass."
+- **Never stop at planning.** Planning is a step, not a deliverable.
 
 ## Inputs
 
-- `.wize/planning/ux/ux-design/` (every component the specs use)
-- `.wize/planning/nfr-principles.md` (a11y and perf budgets)
-- Overlay playbooks (active):
-  - `web-overlay/playbooks/wcag-aa.md`, `responsive-breakpoints.md`, `semantic-html.md`
-  - `app-overlay/playbooks/apple-hig.md`, `material-design-3.md`, `touch-targets-and-gestures.md`
+- `.wize/solutioning/stories/{epic}/{story}.md`
+- `.wize/solutioning/architecture.md`
+- `.wize/solutioning/design-system/` (use existing components)
+- `.wize/implementation/tea/{epic}/{story}/design.md` (the test contract)
 
 ## Outputs
 
-- `.wize/solutioning/design-system/tokens.json` — single source of truth.
-- `.wize/solutioning/design-system/components/{Component}.md` — one per component.
-- `.wize/solutioning/design-system/README.md` — index + theming guide.
+- Code + tests in the target repo.
+- Commit messages reference AC IDs.
+- Story file updated to `status: ready-for-review`.
 
-## Tokens (the only acceptable way to ship styles)
+## The loop (TDD, story-scoped)
 
-Mantis defines the tokens; Tony picks the runtime (Tailwind, CSS modules, Vanilla Extract, Compose theme, SwiftUI tokens). The names below are framework-agnostic.
+### 1. Read
 
-### Color (semantic + raw scale)
+Story ACs, out-of-scope, notes, `tea-design.md`. Confirm the test split. If the design doesn't match the story (mismatch on test count, mock, environment), ping Hawkeye **before** writing code.
 
-| Semantic | Light | Dark | Contrast pair |
-|---|---|---|---|
-| `surface.base` | #FFFFFF | #0B0F14 | text.primary |
-| `surface.raised` | #F5F7FA | #121821 | text.primary |
-| `text.primary` | #0B0F14 | #E5E7EB | surface.base |
-| `text.secondary` | #4B5563 | #9CA3AF | surface.base |
-| `accent.brand` | #6F49FF | #8B6FFF | text.onAccent |
-| `text.onAccent` | #FFFFFF | #FFFFFF | accent.brand |
-| `success` | #058E5C | #34D399 | text.onSuccess |
-| `warning` | #C9621E | #F59E0B | text.onWarning |
-| `error` | #B42318 | #FCA5A5 | text.onError |
-| `border.default` | #E5E7EB | #2A313A | — |
-| `border.focus` | accent.brand | accent.brand | — |
+### 2. Slice the story into micro-cycles
 
-Validate every pair against WCAG AA (≥ 4.5:1 normal, ≥ 3:1 large). Run before you commit.
+Each cycle is one AC (or part of one) and produces a green test + small code change. Don't try to ship the whole story in one commit.
 
-### Typography
+### 3. Red
 
-| Token | Family | Size | Weight | Line | Letter |
-|---|---|---|---|---|---|
-| `display.l` | Inter Display | clamp(2.5rem, 5vw, 3.5rem) | 700 | 1.05 | -0.02em |
-| `display.m` | Inter Display | clamp(2rem, 4vw, 2.5rem) | 700 | 1.1 | -0.01em |
-| `heading.l` | Inter | clamp(1.5rem, 3vw, 2rem) | 600 | 1.2 | -0.01em |
-| `heading.m` | Inter | 1.25rem | 600 | 1.3 | 0 |
-| `heading.s` | Inter | 1rem | 600 | 1.4 | 0 |
-| `body.l` | Inter | 1.125rem | 400 | 1.6 | 0 |
-| `body.m` | Inter | 1rem | 400 | 1.55 | 0 |
-| `body.s` | Inter | 0.875rem | 400 | 1.5 | 0 |
-| `caption` | Inter | 0.75rem | 500 | 1.4 | 0.01em |
+Write the failing test first. Match the assertion shape in `design.md`. Don't write code yet.
 
-Use rem for body; clamp() for fluid headings (see `responsive-breakpoints.md`).
+```ts
+// red — first run, fails
+test('valid email returns ok', () => {
+  expect(validateInviteEmail('a@b.co')).toEqual({ ok: true });
+});
+```
 
-### Spacing scale (4px base, geometric)
+### 4. Green
 
-`0` 0 · `1` 4 · `2` 8 · `3` 12 · `4` 16 · `5` 24 · `6` 32 · `7` 48 · `8` 64 · `9` 96 · `10` 128
+Before writing anything new, run Shuri's reuse ladder (see `wize-agent-dev` persona): does this need to exist → already in the codebase → stdlib → native/framework feature → installed dependency → one-liner → only then new code. Write the **minimum** code that turns the test green. No anticipated branches; no "just-in-case" handling.
 
-### Radius
+```ts
+// green — minimum to pass
+export const validateInviteEmail = (s: string) => ({ ok: /@/.test(s) });
+```
 
-`none` 0 · `sm` 4 · `md` 8 · `lg` 12 · `xl` 16 · `pill` 999.
+### 5. Refactor
 
-### Elevation
+Now harden, with the test as safety net.
 
-| Token | Light | Dark (tonal) |
+```ts
+// refactor — same green tests, real logic
+import { z } from 'zod';
+const schema = z.string().email();
+export const validateInviteEmail = (s: string) =>
+  schema.safeParse(s).success ? { ok: true } : { ok: false, code: 'invalid_format', field: 'email' };
+```
+
+### 6. Commit
+
+Conventional commits, AC IDs referenced.
+
+```
+feat(invite): validate email per AC-02-1 / AC-02-2
+- add validateInviteEmail with zod
+- add 4 unit tests covering valid + invalid rules
+```
+
+### 7. Repeat
+
+Until every AC has at least one test + minimum code that makes it pass.
+
+### 7.5. Loop verification (auto-check)
+
+Before declaring the loop done, run these checks:
+
+| Check | How | Fail → |
 |---|---|---|
-| `e1` | 0 1px 2px rgba(0,0,0,.06) | surface.raised |
-| `e2` | 0 2px 4px rgba(0,0,0,.08) | surface.raised + 4% |
-| `e3` | 0 4px 12px rgba(0,0,0,.10) | surface.raised + 8% |
-| `e4` | 0 12px 24px rgba(0,0,0,.12) | surface.raised + 12% |
+| **Evidence of iteration** | `git log --oneline` shows ≥2 commits with AC IDs (skip if story has only 1 AC) | Return to step 2 |
+| **AC-to-test mapping** | Every AC in the story file has a corresponding test case name | Return to step 3 (Red) |
+| **All AC tests green** | `npx vitest run --reporter=verbose` (or equivalent) — grep output for each AC's test name | Return to step 4 (Green) |
 
-App overlay: prefer tonal elevation per Material 3.
+**Max-cycles guard.** If the same AC cycles through Red→Green→Refactor 3+ times without staying green, stop and escalate to Wizer: the test design may be wrong, the AC may be mis-sized, or the approach may need Tony.
 
-### Motion
+### 8. Knowledge update (inline, ~60s)
 
-| Token | Duration | Easing |
+Before opening the PR, ask: **did this story touch any of the 5 baseline axes** documented in `.wize/knowledge/document-project/`?
+
+| Axis | Touched when… | File to update |
 |---|---|---|
-| `motion.micro` | 100ms | `ease-out` |
-| `motion.transition` | 200ms | `cubic-bezier(0.2, 0, 0, 1)` |
-| `motion.page` | 300ms | `cubic-bezier(0.4, 0, 0.2, 1)` |
-| `motion.spring.subtle` | (spring) | mass 1, stiff 350, damp 30 |
+| **Architecture** | new component, new sequence, changed data flow | `architecture-snapshot.md` |
+| **Conventions** | new naming/folder/test pattern published as public contract (incl. `testid`) | `conventions.md` |
+| **Risk-spots** | introduced a complexity hot spot OR resolved one | `risk-spots.md` |
+| **Dependencies** | added / removed / upgraded a runtime dep | `dependencies.md` |
+| **Overview** | new user-visible feature a new dev should know about | `overview.md` |
 
-Honor `prefers-reduced-motion`. Replace transforms with fades.
-
-## Components — the baseline set
-
-Each component has its own `.md` doc with: purpose, anatomy, states (default/hover/focus/active/disabled/loading), variants, accessibility, do/don't, snippets.
-
-| Component | Mandatory states | Notes |
-|---|---|---|
-| Button | default, hover, focus, active, disabled, loading | variants: primary, secondary, tertiary, destructive, ghost |
-| Input | default, focus, error, disabled, success | always has visible label |
-| Select | default, open, focus, disabled | native first; custom only when needed |
-| Textarea | as Input | auto-grow optional |
-| Checkbox | unchecked, checked, indeterminate, focus, disabled | native input + custom skin |
-| Radio | unchecked, checked, focus, disabled | grouped under fieldset |
-| Toggle/Switch | off, on, focus, disabled | `role="switch" aria-checked` |
-| Card | default, raised, interactive | elevation tokens |
-| Modal / Dialog | open, closing | focus trap + ESC + restore |
-| Sheet (app) | half / full | drag handle |
-| Tabs | active, inactive, focus | keyboard arrows |
-| Accordion | collapsed, expanded, focus | `<details>` when possible |
-| Toast / Snackbar | info, success, warning, error | `role="status"` or `alert` |
-| Tooltip | hidden, visible | `aria-describedby`, touch alt |
-| Menu | closed, open, focus | keyboard navigation |
-| Dropdown | (synonym of Menu / Combobox) | follow ARIA combobox |
-| Badge | default, success, warning, error | contrast ≥ 4.5:1 |
-| Avatar | image, initials, placeholder | 1:1 ratio, alt text |
-| Skeleton | static, shimmer | respect reduced-motion |
-| Empty state | default | message + primary action |
-| Loading | spinner / progress | accessible announcement |
-
-## Component template (one per component)
+If yes for any axis: open the file and add **1–3 lines** under a new dated bullet — in the same PR.
 
 ```markdown
----
-component: Button
-status: ready
-owner: Mantis
+## 2026-06-12 — E01-S03
+- Conventions: `data-testid="invite-*"` published as public contract; Hawkeye E2E depends on these.
+- Risk: R-1 (mailer) mitigation now confirmed (integration test covers retry policy).
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
