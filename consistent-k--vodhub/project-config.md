@@ -1,132 +1,85 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Error handling patterns, status codes, and logging rules for the backend
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Backend Error Handling Rules
 
-## Project Overview
+## Status Codes
 
-VodHub is a pnpm monorepo with two applications:
-- **Backend** (`apps/backend`): Hono‑based video aggregation API with a CMS proxy system and TMDB metadata integration, providing a unified REST API (categories, search, details, playback). Node.js ≥ 24, ESM.
-- **Frontend** (`apps/frontend`): Vite + React 19 + React Router video player application with Ant Design 6, Zustand state management, multi‑theme support, integrated CMS management, and TMDB metadata integration.
+Always use the constants from `@/constant/code`:
 
-A shared package (`packages/shared`) provides core TypeScript types used by both apps, including video source definitions.
+| Constant | Value | Meaning |
+|---|---|---|
+| `SUCCESS_CODE` | `0` | Successful response |
+| `ERROR_CODE` | `-1` | Business logic error (upstream returned non-success) |
+| `SYSTEM_ERROR_CODE` | `-2` | Exception/catch error |
 
-## Common Development Commands
+## Handler Error Pattern
 
-### Monorepo Commands (from root)
-```bash
-pnpm install              # Install all dependencies
-pnpm dev                  # Start both backend and frontend dev servers
-pnpm dev:backend          # Backend only (tsx watch)
-pnpm dev:frontend         # Frontend only (vite dev)
-pnpm lint                 # Lint all apps
-pnpm lint:fix            # Lint with auto‑fix
-pnpm typecheck           # Type check all apps
-pnpm format              # Prettier write
-pnpm format:check        # Prettier format check
-pnpm commit              # Interactive conventional commit
-pnpm build               # Build all apps (backend + frontend)
-```
+Every handler must follow this structure. Never throw errors to the framework:
 
-### Backend‑Specific Commands
-```bash
-pnpm --filter @vodhub/backend start     # Start backend without watch
-pnpm --filter @vodhub/backend build     # Build backend (tsup)
-pnpm --filter @vodhub/backend lint      # Lint backend only
-pnpm --filter @vodhub/backend lint:fix  # Lint backend with auto‑fix
-pnpm --filter @vodhub/backend typecheck # Type check backend only
-```
-
-### Frontend‑Specific Commands
-```bash
-pnpm --filter @vodhub/frontend build    # Production build
-pnpm --filter @vodhub/frontend preview  # Preview production build
-pnpm --filter @vodhub/frontend lint     # Lint frontend only
-pnpm --filter @vodhub/frontend lint:fix # Lint frontend with auto‑fix
-pnpm --filter @vodhub/frontend typecheck # Type check frontend only
-```
-
-## Backend Architecture
-
-### Route System
-- **URL Pattern**: `GET /api/vodhub/<module>/<action>`
-- **Module Routes**: Explicitly registered in `apps/backend/src/app.tsx` (no auto-discovery)
-- **Three route modules**:
-  1. `/api/vodhub/config` – returns TMDB configuration (enabled status, API token presence)
-  2. `/api/vodhub/cms` – CMS proxy system for custom video sources
-  3. `/api/vodhub/tmdb` – TMDB metadata API (home, search, detail)
-
-### Module Routes
-
-#### Config (`/api/vodhub/config`)
-- `GET /` – Returns `{ tmdb: { enabled: boolean, hasToken: boolean } }`
-
-#### CMS Proxy (`/api/vodhub/cms`)
-- `GET /proxy` – Proxies requests to user‑defined CMS URLs using `x-proxy-target` and `x-proxy-action` headers
-- Supported actions: `home`, `homeVod`, `category`, `detail`, `play`, `search`
-- All actions are GET requests; parameters are passed as query params
-- Custom CMS URL is provided via the `x-proxy-target` header
-- The `x-proxy-action` header determines which CMS handler to invoke
-
-#### TMDB (`/api/vodhub/tmdb`)
-- `GET /home` – Homepage categories (trending, popular movies/TV, now playing, upcoming, top rated, genres)
-- `GET /search` – Multi-type search (`query`, `page` params)
-- `GET /detail` – Movie/TV detail (`id`, `mediaType` params)
-
-### Middleware Order
-1. `cors()` – CORS handling (on cmsApp and tmdbApp)
-2. `trimTrailingSlash()` – trailing slash normalization
-3. `compress()` – response compression
-4. `jsonReturn` – JSON response serialization
-5. `cache` – Redis/memory caching with deduplication
-
-Note: `logger()` is applied globally to the main Hono app. The config route only inherits the global logger.
-
-### Caching System
-- Two‑level cache: memory LRU + optional Redis via Keyv
-- Deduplication: prevents concurrent identical requests
-- Cache key format: `vod‑hub:redis‑cache:${path}${bodyHash}`
-- Error responses: set `Cache‑Control: 'no‑cache'` to prevent caching failures
-- GET requests with `Cache-Control: no-cache` header are not cached
-
-### Error Handling Pattern
-All CMS and TMDB handlers must follow this structure:
 ```typescript
-try {
-    logger.info(`${ACTION_MESSAGE.INFO} ‑ ${namespace.name}`);
-    const res = await someRequest();
-    if (res.code === 1) {  // CMS convention
-        return { code: SUCCESS_CODE, message: ACTION_MESSAGE.SUCCESS, data: […] };
+import { SUCCESS_CODE, ERROR_CODE, SYSTEM_ERROR_CODE } from '@/constant/code';
+import { SEARCH_MESSAGE } from '@/constant/message';
+import logger from '@/utils/logger';
+
+const handler = async (ctx) => {
+    try {
+        logger.info(`${SEARCH_MESSAGE.INFO} - ${namespace.name}`);
+
+        const res = await someRequest(/* ... */);
+
+        if (res.code === 1) {
+            return {
+                code: SUCCESS_CODE,
+                message: SEARCH_MESSAGE.SUCCESS,
+                data: transformData(res)
+            };
+        }
+
+        // Upstream returned non-success
+        logger.error(`${SEARCH_MESSAGE.ERROR} - ${namespace.name} - ${JSON.stringify(res)}`);
+        return {
+            code: ERROR_CODE,
+            message: SEARCH_MESSAGE.ERROR,
+            data: []
+        };
+    } catch (error) {
+        // Exception path — prevent caching failed responses
+        ctx.res.headers.set('Cache-Control', 'no-cache');
+        logger.error(`${SEARCH_MESSAGE.ERROR} - ${namespace.name} - ${error}`);
+        return {
+            code: SYSTEM_ERROR_CODE,
+            message: SEARCH_MESSAGE.ERROR,
+            data: []
+        };
     }
-    logger.error(`${ACTION_MESSAGE.ERROR} ‑ ${namespace.name} ‑ ${JSON.stringify(res)}`);
-    return { code: ERROR_CODE, message: ACTION_MESSAGE.ERROR, data: [] };
-} catch (error) {
-    ctx.res.headers.set('Cache‑Control', 'no‑cache');
-    logger.error(`${ACTION_MESSAGE.ERROR} ‑ ${namespace.name} ‑ ${error}`);
-    return { code: SYSTEM_ERROR_CODE, message: ACTION_MESSAGE.ERROR, data: [] };
-}
+};
 ```
 
-**Status Codes**:
-- `SUCCESS_CODE = 0` – successful response
-- `ERROR_CODE = -1` – business logic error (upstream failure)
-- `SYSTEM_ERROR_CODE = -2` – exception/catch error
+## Key Rules
 
-### Directory Structure
-```
-apps/backend/src/
-├── api/
-│   └── config/           # TMDB config API
-├── modules/
-│   ├── cms/proxy.ts      # CMS proxy router (single entry point for all CMS requests)
-│   └── tmdb/
+- **Never throw** — always return a structured `{ code, message, data }` object
+- **Set no-cache on errors** — `ctx.res.headers.set('Cache-Control', 'no-cache')` in catch blocks to prevent caching failed responses
+- **Log every error** — use `logger.error()` including the namespace name for traceability
+- **Empty data on failure** — always return `data: []` on error
+- **Use message constants** — import from `@/constant/message` (e.g., `HOME_MESSAGE`, `SEARCH_MESSAGE`, `DETAIL_MESSAGE`)
+- **Log info on entry** — `logger.info()` at the start of each handler with the action and namespace name
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## CMS vs Custom Error Handling
+
+- **CMS handlers** (`utils/cms/*/index.ts`): Check `res.code === 1` for success (CMS convention)
+- **Custom handlers**: Implement the same try/catch/return pattern inline in the route file
+
+## Logging
+
+Use the logger from `@/utils/logger` (Winston-based). Available methods:
+- `logger.info()` — normal operations
+- `logger.error()` — all error cases
+- Logger is configured in `src/config/index.ts` with file output and timestamps
 
 ---
 > Source: [consistent-k/VodHub](https://github.com/consistent-k/VodHub) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
