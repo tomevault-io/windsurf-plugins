@@ -1,150 +1,105 @@
 ---
 trigger: always_on
-description: Master context document for AI coding agents contributing to this repository.
+description: These standards apply to ALL bash scripts in the tfscaffold repository. Read
 ---
 
-# Agent Guidelines for tfutils/tfscaffold
+# Bash Coding Standards — tfscaffold
 
-Master context document for AI coding agents contributing to this repository.
-Every agent MUST read this file before starting work.
+These standards apply to ALL bash scripts in the tfscaffold repository. Read
+this entire document BEFORE writing or modifying any bash code.
 
----
+## Mandatory Pre-Write Verification
 
-## Project Overview
+Before writing ANY bash code, verify you understand these rules. Violations
+caught after writing waste time — get it right first.
 
-tfscaffold is a Terraform wrapper framework for controlling multi-environment,
-multi-component, multi-account AWS infrastructure. It handles remote state
-management, variable file layering, bootstrap bucket creation, and component
-execution orchestration.
-
-- **Language:** Bash (main script: `bin/terraform.sh`, ~960 LOC)
-- **Default branch:** `master`
-- **Current release:** v2.3.3 (April 2026)
-- **Maintainer:** Mike Peachey / Jaz (@Zordrak)
-- **Minimal dependencies:** bash, AWS CLI, terraform, GNU getopt
-- **License:** MIT
-
-## Repository Structure
-
-```
-bin/
-  terraform.sh        The tfscaffold script — the core of the project
-  docs.sh             Recursive terraform-docs generation helper
-bootstrap/            Bootstrap Terraform code for creating the S3 state bucket
-                      and DynamoDB lock table
-components/           Terraform "components" — root modules run directly
-  example/            Example component demonstrating conventions
-etc/                  Environment-specific terraform variable files:
-                      env_{region}_{environment}.tfvars
-                      versions_{region}_{environment}.tfvars
-                      global.tfvars, {region}.tfvars, group_{group}.tfvars
-lib/                  Optional libraries (e.g. Jenkins pipeline groovy)
-modules/
-  generic/            Reusable Terraform modules (cognito, iam-role, kms,
-                      lambda, s3bucket, sftp, sns, subnets, vpc)
-  project/            Project-specific modules (empty by default)
-plugin-cache/         Default directory for caching Terraform provider plugins
-.github/              CI workflows, agent definitions, issue templates
-  agents/             Agent definition files (.agent.md)
-  instructions/       Auto-loaded coding standards
-  ISSUE_TEMPLATE/     Structured issue forms
-docs/
-  adr/                Architecture Decision Records
-```
-
----
-
-## Core Principles
-
-### 1. Generated Backend Configuration
-
-tfscaffold generates `backend_tfscaffold.tf` at runtime with the correct S3
-backend configuration because Terraform does not support variable interpolation
-in backend blocks. This file is cleaned up on exit via `trap`. This is
-**intentional** — do NOT attempt to replace it with static configuration.
-See [ADR-0002](docs/adr/0002-generated-backend-configuration.md).
-
-### 2. Variable File Layering
-
-Variable files are loaded in a specific precedence order: global → region →
-group(s) → environment → versions → remote S3 → `-var` overrides. The `-r`
-flag always wins for region. Duplicate variables across files trigger a
-warning but are not an error (intentional overrides are a core feature).
-See [ADR-0003](docs/adr/0003-variable-file-precedence.md).
-
-### 3. Worktree-First
-
-ALL code changes MUST happen in a git worktree under `.worktrees/`. The main
-working tree is shared by all agents and the human — modifying it directly
-risks conflicts. `.worktrees/` is gitignored.
+## Shell Setup
 
 ```bash
-# Create a worktree for your work
-git worktree add .worktrees/fix-123 -b fix/123-description master
-
-# Do all work inside the worktree
-cd .worktrees/fix-123
-
-# Clean up when done (after PR is created)
-cd /path/to/main/tree
-git worktree remove .worktrees/fix-123
+#!/usr/bin/env bash
+set -uo pipefail;
 ```
 
-**Exception:** Read-only operations (searching, reading files) may use the
-main working tree.
+- Shebang: `#!/usr/bin/env bash` (exact format)
+- Strict mode: `set -uo pipefail;` — NEVER use `set -e`
 
-### 4. Quality Over Speed
+## Indentation and Formatting
 
-- Read the diff before pushing
-- Check your own work before calling it done
-- Fix problems when you find them — do not defer
+- 2-space indentation throughout (no tabs)
+- Terminate ALL statements with a semicolon (`;`) where syntactically correct
+- Include vim modeline at end of new scripts:
+  `# vim:set et ts=2 sw=2:`
 
-### 5. Minimal Dependencies
+## Variables
 
-The project deliberately has minimal dependencies: bash, AWS CLI, terraform,
-and GNU getopt. Do NOT add new external tools or packages without explicit
-approval from the maintainer.
+- ALL variable references use braces: `${variable}` (never `$variable`)
+- Script-local variables use lowercase: `${version}`, `${region}`
+- Environment variables use UPPERCASE: `${AWS_DEFAULT_REGION}`, `${TF_VAR_region}`
+- Always quote variable expansions: `"${variable}"`
+- Quote entire strings containing variables: `"${dir}/file"` NOT `"${dir}"/file`
+- Use `${var:-default}` for optional variables (scripts run with `set -u`)
 
-### 6. Auto-Approve is Automatic
+## Quoting
 
-tfscaffold **automatically** adds `-auto-approve=true` to all `apply` actions
-and `-auto-approve` to `destroy` actions (with legacy `-force` fallback for
-Terraform < 0.15). Do NOT pass `-auto-approve` manually — it causes "unknown
-option" errors. If custom terraform arguments are needed, use `--` to end
-tfscaffold argument parsing first.
+- Single-quote strings unless variable expansion is needed
+- Double-quote strings that contain variable expansion
+- NEVER use unescaped `!` inside double-quoted strings (bash history expansion)
 
----
+## Command Substitution
 
-## Branch and PR Workflow
+- Use `$(...)` NOT backticks
 
-1. **Never commit directly to `master`.** Always use a feature branch.
-2. **Branch naming:** `fix/<short-description>` for bugs,
-   `feat/<short-description>` for features, `chore/<short-description>`
-   for maintenance. Reference the issue number where applicable
-   (e.g. `fix/42-unquoted-variable`).
-3. **One logical change per branch/PR.** Do not bundle unrelated fixes.
-4. **PRs target `master`.** There is no develop or staging branch.
-5. **Merge strategy:** The repo uses merge commits (not squash).
-   Do not force-push or rebase shared branches.
+## Error Handling
 
-## Commit Messages
+- NEVER use `set -e` — handle errors explicitly
+- Use the project's existing error patterns:
+  - `error_and_die` for fatal errors with optional exit code:
+    ```bash
+    error_and_die "Something went wrong";
+    error_and_die "Bad input" 2;
+    ```
+  - Inline `||` pattern for simple cases:
+    ```bash
+    some_command || error_and_die "Failed to do thing";
+    ```
 
-Freeform — no conventional commits standard is enforced. Be descriptive.
-Reference issue numbers where applicable (e.g. `Fix #42: ...`).
+## Functions
 
-Historical examples from CHANGELOG:
-- `feat: add multi-group support to terraform.sh`
-- `fix: region flag not being authoritative over tfvars files`
-- `chore: remove deprecated expected_bucket_owner from s3bucket module`
+- Define as: `function name() { ... };`
+- Use `local` for variables inside functions
 
----
+## Cross-Platform Considerations
 
-## Claim Protocol
+- macOS uses BSD `sed`/`grep`/`readlink` — GNU extensions may not be available
+- tfscaffold requires GNU getopt (`brew install gnu-getopt` on macOS)
+- Scripts should work with bash 3.2+ (macOS default) where possible
 
-Before starting work on any issue, an agent MUST claim it:
+## Common Pitfalls
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. **Shell operator precedence:** `cmd1 || cmd2 | cmd3` means
+   `cmd1 || (cmd2 | cmd3)`, not `(cmd1 || cmd2) | cmd3`
+2. **Unquoted variables:** Always quote `"${var}"` — unquoted variables cause
+   word-splitting
+3. **Double-quoted traps:** `trap "rm ${var}" EXIT` expands at definition time.
+   Use functions or single quotes.
+4. **`$@` in for-loops:** Always quote: `for arg in "$@"`
+5. **Regex anchoring:** `^1.1` matches `1.10.x` because `.` is a regex
+   wildcard. Use `^1\.1\.` for exact prefix matching.
+
+## Pre-Submission Checklist
+
+- [ ] `#!/usr/bin/env bash` shebang
+- [ ] `set -uo pipefail;` (not `set -e`)
+- [ ] 2-space indentation, no tabs
+- [ ] All variables use `${braces}`
+- [ ] All variable expansions double-quoted
+- [ ] All statements terminated with `;`
+- [ ] No unescaped `!` in double-quoted strings
+- [ ] `$(...)` for command substitution (no backticks)
+- [ ] `local` used inside functions
+- [ ] Cross-platform compatibility considered
+- [ ] vim modeline at end of file
 
 ---
 > Source: [tfutils/tfscaffold](https://github.com/tfutils/tfscaffold) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
