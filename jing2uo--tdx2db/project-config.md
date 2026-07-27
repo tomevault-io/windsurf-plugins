@@ -1,107 +1,139 @@
 ---
 trigger: always_on
-description: **Updated:** 2026-05-02
+description: **Purpose:** Task execution framework (DAG) + 交易日历 + 任务前置规划 (WorkPlan)
 ---
 
-# PROJECT KNOWLEDGE BASE
+# WORKFLOW EXECUTION FRAMEWORK
 
-**Updated:** 2026-05-02
-**Branch:** main
-
-## OVERVIEW
-通达信(TDX) stock data importer — loads .day/.01/.5 files to DuckDB/ClickHouse, calculates preclose/turnover/market-value (basic), and 后复权因子 (hfq_factor). basic/factor 链路覆盖 stock + ETF (含 LOF/老封基/B股)。
-
-Current schema version: **v3.0** (`model.SchemaMajor=3, SchemaMinor=0`). The `_meta` table stores the schema version; init/cron check major version compatibility at startup.
+**Purpose:** Task execution framework (DAG) + 交易日历 + 任务前置规划 (WorkPlan)
 
 ## STRUCTURE
 ```
-./
-├── calc/       # Financial calculations (basic indicators + 复权因子)
-│   ├── basic.go           # preclose, turnover, floatmv, totalmv
-│   ├── fq_quantaxis.go    # HFQ factor (QUANTAXIS-based)
-│   └── fq_quantaxis_test.go
-├── cmd/        # CLI commands (init, cron, convert)
-├── database/   # DB interface + implementations (duckdb/clickhouse)
-├── model/      # Data models, table registry, view registry
-├── tdx/        # TDX binary format parsing
-├── utils/      # Utilities (cache, pipeline, CSV, download)
-├── workflow/   # Task execution framework (DAG, calendar, work plan)
-└── main.go     # Cobra CLI entry point
+./workflow/
+├── engine.go          # TaskExecutor, Task, TaskArgs (含 Plan), TaskResult, registerTask
+├── task_*.go          # Task definitions (init/update modes) + executors, split by concern
+├── tdx_helper.go      # shared date-range pull helpers for TDX archives
+├── plan.go            # WorkPlan + BuildWorkPlan (cron 启动前的全局规划)
+└── calendar.go        # TradingCalendar (节假日/周末/最近交易日)
 ```
 
 ## WHERE TO LOOK
-| Task | Location | Notes |
-|------|----------|-------|
-| Add new database backend | ./database/ | Implement DataRepository interface |
-| Parse new TDX format | ./tdx/ | Binary format parsers (day, minline, blocks) |
-| Modify basic calculation | ./calc/basic.go | preclose / turnover / market-value |
-| Modify HFQ factor | ./calc/fq_quantaxis.go | 后复权因子算法 |
-| Add CLI command | ./cmd/ + main.go | Cobra subcommand with ctx cancel support |
-| Data model changes | ./model/ | Schema + struct tags + table/view registry |
-| Database queries | ./database/*/dml.go | DB-specific query implementations |
-| Add/modify workflow task | ./workflow/tasks.go | Define task with dependencies |
-| Run specific tasks | ./workflow/engine.go | Use TaskExecutor with task names |
-
-## CODE MAP
-| Symbol | Type | Location | Role |
-|--------|------|----------|------|
-| main | func | main.go:37 | Cobra root + ctx setup |
-| DataRepository | interface | database/interface.go:9 | DB abstraction (Connect/Import/Query) |
-| NewDB | func | database/factory.go:11 | Driver factory (duckdb/clickhouse) |
-| Task | type | workflow/engine.go:46 | Task definition with dependencies |
-| TaskExecutor | type | workflow/engine.go:66 | DAG-based task execution |
-| Init | func | cmd/init.go | Full import via workflow |
-| Cron | func | cmd/cron.go:11 | Incremental update via workflow |
-| Convert | func | cmd/convert.go | TDX to CSV conversion |
-| CalculateBasicDaily | func | calc/basic.go:115 | Core basic calculation (preclose/turnover/MV, stock+ETF) |
-| calculateFullHfq | func | calc/fq_quantaxis.go:86 | Core HFQ factor calculation |
-| BuildWorkPlan | func | workflow/plan.go:34 | 读 holidays + 各表最新日期，决定哪些任务要跑 |
-| TradingCalendar | type | workflow/calendar.go:5 | 节假日/周末判定 + 最近交易日查找 |
-| KlineDay | type | model/schema.go:14 | Raw daily OHLCV |
-| BasicDaily | type | model/schema.go:49 | Calculated basic (preclose/turnover/MV, stock+ETF) |
-| Factor | type | model/schema.go:41 | Adjust factor (hfq_factor) |
-| GbbqData | type | model/schema.go:61 | 股本变迁 data (cat 1=除权, 11=ETF份额折算, 2/3/5/7/8/9/10=股本变动) |
-| ClassifyCode | func | model/classify.go:58 | symbol → stock/index/etf/block/unknown |
-| PriceScale | func | model/classify.go:89 | TDX 原始整数价格换算 (股票=100, ETF/B股=1000) |
-| SchemaFromStruct | func | model/tables.go:54 | Reflect-based table registration |
+| Task | File | Notes |
+|------|------|-------|
+| Add new task | task_*.go | Define task with dependencies and call `registerTask()` in init |
+| Run specific tasks | engine.go | Use TaskExecutor.Run with task names |
+| Modify task logic | task_*.go | Update executor function in the concern-specific file |
+| 调整 cron 跑哪些任务 | plan.go | BuildWorkPlan / NeedXxx 推导 |
+| 节假日判定 | calendar.go | TradingCalendar |
 
 ## CONVENTIONS
 
-**Database URI format:**
-- ClickHouse: `clickhouse://[user[:password]@][host][:port][/database][?http_port=8123]`
-- DuckDB: `duckdb://[path]`
+**Task definition:**
+```go
+TaskUpdateDaily = &Task{
+    Name:      "update_daily",
+    DependsOn: []string{},
+    Executor:  executeUpdateDaily,
+}
+```
 
-**Table naming:**
-- `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_kline_5min, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays)
-- `v_*` — views (v_bfq_daily, v_qfq_daily, v_hfq_daily) — 通过 `raw_symbol_class` 过滤，仅保留 stock + etf
-- `_meta` — schema version metadata (key/value store)
+**Task with dependencies:**
+```go
+TaskCalcBasic = &Task{
+    Name:      "calc_basic",
+    DependsOn: []string{"update_daily", "update_gbbq"},
+    Executor:  executeCalcBasic,
+}
+```
 
-**Table registration:**
-- All tables auto-registered via `SchemaFromStruct()` init-time calls in `model/tables.go`
-- Views registered via `DefineView()` in `model/views.go`
-- Use `model.Table*` / `model.MetaTable` constants for table references (never hardcode table names)
+**Optional task:**
+```go
+TaskUpdate1Min = &Task{
+    Name:      "update_1min",
+    DependsOn: []string{},
+    SkipIf: func(ctx, db, args) bool {
+        return !args.Min
+    },
+    Executor: executeUpdate1Min,
+    OnError: ErrorModeSkip,
+}
+```
 
-**TDX file collection (cmd/common.go):**
-- All .day/.01/.5 files collected by suffix, filtered only by `^(sh|sz|bj)\d+$` regex
-- No prefix whitelist — full ingest of everything TDX provides
-- Symbol classification via `raw_symbol_class` table (rebuilt after each daily import)
+**Plan-driven SkipIf（cron 主链路）：**
+```go
+TaskCalcBasic = &Task{
+    Name: "calc_basic",
+    DependsOn: []string{"update_daily", "update_gbbq"},
+    SkipIf: skipIfPlan(func(p *WorkPlan) bool { return !p.NeedBasic }),
+    Executor: executeCalcBasic,
+}
+```
+`skipIfPlan` 在 `args.Plan == nil` (init 流程) 时不跳过，保持原行为。
 
-**Symbol classification (model/classify.go):**
-- `ClassifyCode(symbol) → stock/index/etf/block/unknown`
-- Rules match by (market, numeric prefix) — longest prefix wins
-- basic/factor calculation uses `GetSymbolsByClass("stock", "etf")` — index/block 仍排除在 calc 输出之外
-- 复权视图 (`v_*fq_daily`) 通过 `raw_symbol_class` 过滤，仅保留 stock + etf
-- B 股 (sh900/sz20) 归为 stock；ETF/LOF 归为 etf
-- `PriceScale(symbol)`：股票/指数/板块 价格单位 0.01 元(=100)，ETF/LOF/B股 0.001 元(=1000)
-- `SymbolFromCode(code)`：6 位裸数字反查市场前缀（仅考虑 stock/etf）
-- Class `unknown` 包括：可转债 (sh11xxxx, sz12xxxx, sz13xxxx), 国债 (sh24xxxx) 等
+**Common abstraction:**
+- `executeDailyImport()` - Shared logic for daily data conversion + import
+- `executeUpdateDaily()` - Downloads data, then calls `executeDailyImport()`
+- `executeInitDaily()` - Uses user-provided directory, then calls `executeDailyImport()`
+- `fetch_gbbq` downloads/extracts gbbq.zip once; `update_gbbq` decodes gbbq and `update_holidays` reads embedded zhb.zip from that extracted directory
+- `prepare_tic` downloads TIC archives and stores valid dates in `args.Extra[ExtraTicValidDates]`; `update_1min` imports only those dates
+- `update_blocks` pulls online block/industry/concept data into raw_tdx_blocks_info/raw_tdx_blocks_member
+- `update_symbol_names` pulls online code names into raw_symbol_name
 
-**Schema versioning (cmd/schema_version.go):**
-- `model.SchemaMajor` / `model.SchemaMinor` define current version
-- DB stores version in `_meta` table via `ReadSchemaVersion()` / `WriteSchemaVersion()`
+**TaskArgs:**
+- `Min` - bool, 设为 true 时 cron 会跑 update_1min
+- `TempDir`, `VipdocDir` - Temp directories
+- `DayFileDir` - User-provided TDX data directory (for init)
+- `Today` - Current date for incremental updates
+- `Plan *WorkPlan` - cron 由 `BuildWorkPlan` 注入；init 留空，`skipIfPlan` 自动放行所有任务
+
+**WorkPlan / TradingCalendar：**
+- `BuildWorkPlan(db, today)`：先读 `raw_holidays`，空表（首次/旧库）→ 强制全流程跑；否则用 `TradingCalendar.LastTradingDayOnOrBefore(today)` 与各表最新日期比较，标记 `NeedDaily/NeedGbbq/NeedBasic/NeedFactor/NeedHolidays`
+- `plan.AnyNeeded() == false` → cron 直接退出
+- `Calendar` 还会回流到 `prepareTdxData`，下载日线 404 时区分"节假日跳过 🎉"/"周末 🌴"/"未发布 ⏳"
+
+**Executor behavior:**
+- `topologicalSort()` and `findReadyTasks()` ignore dependencies that are not in the selected task set, so partial task runs only require in-graph deps
+- Ready tasks are started as soon as their selected deps are completed/skipped; the executor does not wait for a whole dependency layer to finish before launching newly ready tasks
+- On `ErrorModeStop` failure, executor cancels the run context and drains already-started task goroutines before returning the wrapped task error
+
+## ANTI-PATTERNS
+
+**DO NOT:**
+- Modify task dependencies at runtime - dependencies are static
+- Use blocking calls in executor functions - check ctx.Done()
+- Skip error handling in tasks - return proper TaskResult
+
+**NEVER:**
+- Create circular dependencies - topological sort will fail
+- Ignore task results - check TaskResult.State and Error
+- Remove SkipIf for optional tasks - causes errors when args missing
+
+## NOTES
+
+**Task chains:**
+- Update mode includes independent roots: `update_daily`, `fetch_gbbq`, `prepare_tic`, `update_blocks`, `update_symbol_names`
+- Core daily chain: `update_daily + fetch_gbbq → update_gbbq → calc_basic → calc_factor`
+- Holidays chain: `fetch_gbbq → update_holidays`
+- Minute chain: `prepare_tic → update_1min` (only when `--min`)
+- Init mode: `init_daily` (only import daily data from user-provided directory)
+
+**calc_basic and calc_factor run in full recalculation mode** — they truncate the target table and reimport all rows. This is intentional because preclose/factor depend on the entire history chain.
+
+**Error modes:**
+- `ErrorModeStop` - Stop execution on error (default)
+- `ErrorModeSkip` - Continue execution even if task fails (for optional tasks like update_1min, update_holidays)
+
+**Task skipping:**
+- Tasks can be skipped by `SkipIf` condition (e.g., --min not set)
+- Tasks can also return `StateSkipped` when no new data exists (e.g., non-trading day, data already up to date)
+
+**Usage from cmd/init.go:**
+```go
+executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
+args := &workflow.TaskArgs{
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jing2uo/tdx2db](https://github.com/jing2uo/tdx2db) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
