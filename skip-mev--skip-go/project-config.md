@@ -1,137 +1,137 @@
 ---
 trigger: always_on
-description: This document provides comprehensive guidelines for contributing to the Skip Go codebase, with a focus on code organization and wallet integration patterns.
+description: This document provides comprehensive guidelines for working with the Skip Go Explorer codebase.
 ---
 
-# Skip Go Development Guidelines
+# Skip Go Explorer - Agent Guide
 
-This document provides comprehensive guidelines for contributing to the Skip Go codebase, with a focus on code organization and wallet integration patterns.
+This document provides comprehensive guidelines for working with the Skip Go Explorer codebase.
 
-## Table of Contents
-1. [Code Organization and Conventions](#code-organization-and-conventions)
-2. [Wallet Integration](#wallet-integration)
-3. [Contribution Guidance](#contribution-guidance)
-4. [Storage Patterns](#storage-patterns)
-5. [Performance Optimization Patterns](#performance-optimization-patterns)
-6. [Error Handling Patterns](#error-handling-patterns)
-7. [API Integration Patterns](#api-integration-patterns)
-8. [State Management Best Practices](#state-management-best-practices)
-9. [UI/UX Enhancement Patterns](#uiux-enhancement-patterns)
-10. [Development Tools](#development-tools)
-11. [Code Refactoring Guidelines](#code-refactoring-guidelines)
-12. [Pull Request Best Practices](#pull-request-best-practices)
-13. [Changeset Requirements](#changeset-requirements)
-14. [Testing Standards](#testing-standards)
+---
 
-## Code Organization and Conventions
+## 1. Project Overview
 
-### Project Structure
-The codebase follows a modular architecture with clear separation of concerns:
+### What does this project do?
 
-```
-packages/
-├── widget/src/
-│   ├── components/      # Reusable UI components
-│   ├── constants/       # Application constants and configurations
-│   ├── hooks/          # Custom React hooks for business logic
-│   ├── icons/          # Icon components
-│   ├── modals/         # Modal components
-│   ├── pages/          # Page-level components
-│   ├── providers/      # Context providers for different chain types
-│   ├── state/          # State management using Jotai atoms
-│   ├── utils/          # Utility functions organized by purpose
-│   └── widget/         # Main widget entry points
-└── client/             # API client and chain-specific logic
-```
+Skip Go Explorer is a **cross-chain transaction explorer** built with Next.js. It allows users to:
+- Track cross-chain transactions across multiple blockchain ecosystems
+- View detailed transaction status and transfer events
+- Visualize transaction routing through different chains
+- Monitor asset releases and transfers in real-time
+- Debug transactions with raw data inspection
 
-### File and Folder Organization
-- **Feature-based grouping**: Related functionality is grouped together in logical directories
-- **Single responsibility**: Each file has a single, clear purpose
-- **Utility separation**: Utilities are organized by domain (e.g., `fees.ts`, `crypto.ts`, `date.ts`)
+### Tech Stack
 
-### Naming Conventions
-- **Components**: PascalCase (e.g., `SwapPage.tsx`, `AssetInput.tsx`)
-- **Hooks**: camelCase with `use` prefix (e.g., `useCreateCosmosWallets.tsx`, `useGetBalance.ts`)
-- **Constants**: SCREAMING_SNAKE_CASE for constants, camelCase for configuration objects
-- **State atoms**: camelCase with `Atom` suffix (e.g., `cosmosWalletAtom`, `sourceAssetAtom`)
+| Category | Technology |
+|----------|-----------|
+| Framework | Next.js 15.4 (App Router) |
+| Runtime | React 19.1 |
+| Language | TypeScript 5 |
+| State Management | Jotai 2.13 + Jotai-TanStack-Query 0.11 |
+| Data Fetching | TanStack Query (React Query) 5.84 |
+| Styling | styled-components (from widget package) |
+| URL State | nuqs 2.4 |
+| API Client | @skip-go/client (workspace monorepo package) |
+| Error Boundaries | react-error-boundary 6.0 |
+| Utilities | @uidotdev/usehooks 2.4 |
 
-### Import Organization
-```typescript
-// 1. External dependencies
-import { atom } from "jotai";
-import { ChainType } from "@skip-go/client";
+### Main Applications/Services
 
-// 2. Internal absolute imports
-import { mainnetChains } from "@/constants/chains";
-import { useGetAccount } from "@/hooks/useGetAccount";
+This is a **single-page application (SPA)** that serves as a transaction explorer interface for Skip Protocol's cross-chain infrastructure.
 
-// 3. Relative imports
-import { MinimalWallet } from "./types";
-```
+---
 
-### State Management
-The codebase uses Jotai for state management with a clear atom structure:
-- Atoms are defined in the `state/` directory
-- Each domain has its own state file (e.g., `wallets.ts`, `swapPage.ts`)
-- Complex state logic is encapsulated in custom hooks
-
-### Modular Design Patterns
-- **Provider pattern**: Chain-specific providers wrap components with necessary context
-- **Hook composition**: Complex functionality is built by composing smaller, focused hooks
-- **Type safety**: TypeScript interfaces define clear contracts between modules
-
-## Wallet Integration
-
-### Architecture Overview
-Wallet integration follows a modular adapter pattern that supports multiple blockchain types:
+## 2. Project Structure
 
 ```
-providers/
-├── CosmosProvider.tsx    # Cosmos chain wallet provider
-├── EVMProvider.tsx       # Ethereum/EVM wallet provider
-└── SolanaProvider.tsx    # Solana wallet provider
+apps/explorer/
+├── src/
+│   ├── app/                          # Next.js App Router pages
+│   │   ├── page.tsx                  # Main transaction explorer page
+│   │   ├── layout.tsx                # Root layout with metadata
+│   │   ├── template.tsx              # Client-side providers wrapper
+│   │   └── globals.css               # Global styles
+│   ├── components/                   # UI components
+│   │   ├── Badge.tsx                 # Status badges
+│   │   ├── Bridge.tsx                # Bridge visualization
+│   │   ├── ChainSelector.tsx         # Chain selection dropdown
+│   │   ├── ErrorCard.tsx             # Error display
+│   │   ├── Navbar.tsx                # Navigation bar
+│   │   ├── QueryProvider.tsx         # React Query provider
+│   │   ├── SearchButton.tsx          # Search trigger
+│   │   ├── SuccessfulTransactionCard.tsx  # Success state
+│   │   ├── TokenDetails.tsx          # Token information display
+│   │   ├── TransactionDetails.tsx    # Transaction metadata
+│   │   ├── TransferEventCard.tsx     # Individual transfer event
+│   │   ├── TxHashInput.tsx           # Transaction hash input
+│   │   └── modals/
+│   │       ├── SearchModal.tsx       # Mobile search modal
+│   │       └── ViewRawDataModal.tsx  # Raw JSON viewer
+│   ├── constants/
+│   │   ├── chainIdsSortedToTop.ts    # Chain priority sorting
+│   │   └── modal.tsx                 # Modal identifiers
+│   ├── hooks/                        # Custom React hooks
+│   │   ├── useGetTransferAssetReleaseAsset.ts
+│   │   ├── useOverallStatusLabelAndColor.ts
+│   │   ├── useTheme.ts               # Theme detection
+│   │   └── useTransactionHistoryItemFromUrlParams.ts
+│   ├── icons/                        # SVG icon components
+│   │   ├── BridgeIcon.tsx
+│   │   ├── ClockIcon.tsx
+│   │   ├── CoinsIcon.tsx
+│   │   ├── RightArrowIcon.tsx
+│   │   ├── SearchIcon.tsx
+│   │   └── TopRightArrowIcon.tsx
+│   ├── jotai.ts                      # Jotai re-exports
+│   ├── mixins/
+│   │   └── styledScrollbar.ts        # Scrollbar styling
+│   ├── types/
+│   │   └── theme.d.ts                # Theme type definitions
+│   └── utils/
+│       ├── denomUtils.ts             # Denomination transformations
+│       └── skipClientConfig.ts       # Skip API client setup
+├── public/                           # Static assets
+│   ├── logo.svg                      # Dark theme logo
+│   ├── logo-light.svg                # Light theme logo
+│   ├── dark-bg.svg                   # Dark background
+│   ├── light-bg.svg                  # Light background
+│   └── skip-*.png                    # Favicons & manifest icons
+├── declarations.d.ts                 # TypeScript declarations
+├── eslint.config.mjs                 # ESLint configuration
+├── next.config.ts                    # Next.js configuration
+├── package.json                      # Dependencies & scripts
+└── tsconfig.json                     # TypeScript configuration
 ```
 
-### Wallet State Management
-Centralized wallet state is managed through Jotai atoms:
+### Key Configuration Files
 
-```typescript
-// Core wallet types
-export type MinimalWallet = {
-  walletName: string;
-  walletPrettyName: string;
-  walletChainType: ChainType;
-  walletInfo: { logo?: string };
-  connect: (chainId?: string) => Promise<void>;
-  disconnect: () => Promise<void>;
-  isWalletConnected: boolean;
-  getAddress?: (props: AddressProps) => Promise<AddressResult>;
-};
-```
+| File | Purpose |
+|------|---------|
+| `next.config.ts` | Next.js configuration, webpack aliases, remote image patterns |
+| `tsconfig.json` | TypeScript compiler options, path aliases to widget package |
+| `eslint.config.mjs` | Linting rules for Next.js and TypeScript |
+| `package.json` | Dependencies, scripts, workspace references |
 
-### Chain-Specific Wallet Hooks
-Each chain type has dedicated hooks for wallet creation and management:
-- `useCreateCosmosWallets.tsx` - Handles Cosmos ecosystem wallets
-- `useCreateEvmWallets.tsx` - Manages EVM-compatible wallets
-- `useCreateSolanaWallets.tsx` - Supports Solana wallet integration
+### Entry Points
 
-### Wallet Connection Flow
-1. **Provider Initialization**: Chain-specific providers wrap the application
-2. **Wallet Discovery**: Available wallets are detected based on browser extensions
-3. **Connection Management**: Hooks handle connection state and chain switching
-4. **Address Resolution**: Unified interface for getting addresses across chain types
+1. **Application Entry**: `src/app/layout.tsx` - Root layout with metadata
+2. **Main Page**: `src/app/page.tsx` - Transaction explorer UI
+3. **Client Providers**: `src/app/template.tsx` - Jotai, React Query, NiceModal providers
+4. **API Client**: `src/utils/skipClientConfig.ts` - Skip client initialization
 
-### Error Handling
-- Asynchronous operations use try-catch blocks with specific error handling
-- Wallet connection failures trigger appropriate user feedback
-- Chain switching errors are handled gracefully with fallback options
+---
 
-### Testing Wallet Features
-- Mock wallet providers for unit tests
-- Integration tests verify wallet connection flows
+## 3. Build Commands
+
+All commands should be run from the **monorepo root** or from the `apps/explorer` directory:
+
+| Command | Description | Location |
+|---------|-------------|----------|
+| `yarn dev` | Start development server (http://localhost:3000) | `apps/explorer` |
+| `yarn build` | Build production bundle | `apps/explorer` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [skip-mev/skip-go](https://github.com/skip-mev/skip-go) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
