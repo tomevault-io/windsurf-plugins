@@ -1,25 +1,92 @@
 ---
 trigger: always_on
-description: - Our backend is in Python and in the app/ subfolder. The app needs to be started from that directory.
+description: - **Backend**: Python in `app/` subfolder - ALL backend commands run from `haiven/` directory
 ---
 
-## Backend
-- Our backend is in Python and in the app/ subfolder. The app needs to be started from that directory.
-- The backend tests are in app/tests/
-- When running tests or the application, the virtual environment in app/.venv first needs to be activated
-- We're using constructor dependency injections to make our code more testable. Pass dependencies in via constructors, do not initialise them inside of a class.
-- When we wrap up a backend change, make sure to remind me to start up the whole application, to make sure that it's all well-integrated.
+# Haiven Development Guidelines
 
-## Frontend
-- Our frontend is in JavaScript, React, Next, in the ui/ subfolder, code in ui/src/, tests in ui/src/__tests__. Make sure to navigate into the ui/ subfolder before executing yarn tasks.
-- We're using Next in "client only" mode, NO server-side features, because we're distributing the frontend code as static resources that call a Python API for data
-- We're using vitest for testing
-- We're using the "prettier" library for formatting
-- Always use remix icons for icons
-- Do not create JSDocs
-- Our components currently go in the ui/app folder, and the file naming convention is _name_of_component.js
-- Never use innerHTML in combination with useRef, consider React state instead, it is more secure
+## Project Structure
+- **Backend**: Python in `app/` subfolder - ALL backend commands run from `haiven/` directory
+- **Frontend**: React/Next.js in `ui/` subfolder - navigate to `ui/` before yarn commands  
+- **Tests**: Backend `app/tests/`, Frontend `ui/src/__tests__`
+- **Virtual env**: `app/.venv` must be activated before running tests/app
+
+### Running Application
+```bash
+# Backend (from haiven/ directory)
+poetry run init
+poetry run app
+
+# Frontend 
+cd ui && yarn copy              # Build UI
+cd ui && yarn dev               # Hot reload (optional)
+```
+
+### Testing
+```bash
+poetry run test                 # Backend tests (from haiven)
+cd ui && yarn test && cd ..     # Frontend tests
+```
+
+## TDD Workflow (MANDATORY)
+**Always follow this sequence when building features:**
+1. Write test first
+2. Run test to see it fail (RED)
+3. Write minimal code to pass
+4. Run test to see it pass (GREEN)
+5. Refactor while keeping tests green
+
+## Pre-commit Hooks
+```bash
+pre-commit install              # Setup hooks
+pre-commit run --all-files      # Run all hooks
+```
+
+## Code Standards
+
+### Backend (Python)
+- Use constructor dependency injection (pass deps via constructors)
+- Use type hints for parameters and return types
+- snake_case for functions/variables, PascalCase for classes
+- Keep functions under 20 lines
+
+### Frontend (React/Next.js)
+- Components in `ui/app/` with naming `_component_name.js`
+- Use Remix icons exclusively
+- Next.js in "client only" mode (NO server-side features)
+- Use pre-commit hooks to fix formatting issues after changes 
+- No JSDocs
+
+## Git Workflow
+- Commit format: `type(scope): description` (e.g., `feat(ui): add chat component`)
+- **NEVER FORCE PUSH** to remote repositories
+- **ENFORCE** running pre-commit hooks before committing
+- After backend changes: remind to start full application for integration testing
+
+## Key Commands
+```bash
+# Poetry commands (from haiven/)
+poetry run init                 # Install backend dependencies
+poetry run app                  # Run backend
+poetry run test                 # Run tests for backend
+
+# Frontend commands (from ui/)
+yarn install                    # Install dependencies  
+yarn copy                       # Build UI code
+yarn dev                        # Development server
+yarn test                       # Run tests
+```
+
+## Environment
+- Copy appropriate `.env` template: `app/.env.azure.template` → `app/.env`
+- Set `AUTH_SWITCHED_OFF=true` for development
+- Knowledge packs: clone `haiven-sample-knowledge-pack` or `haiven-tw-demo-knowledge-pack`
+
+## Integration Notes
+- Frontend connects to backend API on localhost:8080
+- After backend changes, always test full application integration
+- Use `poetry run pytest -m 'not integration' tests/` for unit tests only
 
 ---
 > Source: [tw-haiven/haiven](https://github.com/tw-haiven/haiven) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
