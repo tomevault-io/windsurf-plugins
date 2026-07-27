@@ -1,109 +1,79 @@
 ---
 trigger: always_on
-description: - Surge Web Dashboard (formerly YASD) is a React 19 single-page app for controlling Surge instances through the Surge HTTP API.
+description: Use when sequential user actions hit multiple endpoints needing the same data within seconds.
 ---
 
-# AGENTS.md
+# React Best Practices
 
-## Project overview
+**Version 1.0.0**  
+Vercel Engineering  
+January 2026
 
-- Surge Web Dashboard (formerly YASD) is a React 19 single-page app for controlling Surge instances through the Surge HTTP API.
-- The app authenticates against a selected Surge host, then sends API traffic to that host's `/v1` endpoints.
-- Remembered profiles and language/theme preferences are stored locally in the browser.
+> **Note:**  
+> This document is mainly for agents and LLMs to follow when maintaining,  
+> generating, or refactoring React and Next.js codebases. Humans  
+> may also find it useful, but guidance here is optimized for automation  
+> and consistency by AI-assisted workflows.
 
-## Tooling and environment
+---
 
-- Node `24` is the expected runtime (`.node-version` is `24`, `package.json` requires `>=24 <25`).
-- Package manager: `pnpm` (`packageManager: pnpm@10.32.1`).
-- Vite Plus (`vp`) powers the dev server, linting, formatting, and tests.
-- Path alias: `@/*` maps to `src/*`.
-- TypeScript is strict and uses Emotion's JSX runtime (`jsxImportSource: @emotion/react`).
+## Abstract
 
-## Common commands
+Comprehensive performance optimization guide for React and Next.js applications, designed for AI agents and LLMs. Contains 40+ rules across 8 categories, prioritized by impact from critical (eliminating waterfalls, reducing bundle size) to incremental (advanced patterns). Each rule includes detailed explanations, real-world examples comparing incorrect vs. correct implementations, and specific impact metrics to guide automated refactoring and code generation.
 
-```bash
-pnpm start                     # dev server
-pnpm start:profile             # dev server with profiling enabled
-pnpm lint                      # type-aware lint
-pnpm lint:fix                  # auto-fix lint issues
-pnpm test:types                # TypeScript typecheck
-pnpm test                      # run Vitest once
-pnpm test -- src/path/to.spec.ts
-pnpm test:watch                # watch mode
-pnpm test:coverage             # coverage report
-pnpm verify-translation        # ensure zh keys match en baseline
-pnpm build                     # Vercel-style production build with service worker
-pnpm build:release             # CI release build + tarball bundle
-pnpm build:surge               # Surge built-in bundle under /web
-```
+---
 
-## Architecture
+## Table of Contents
 
-### App shell and routing
-
-- `src/index.tsx` is the browser entrypoint: it loads global styles, initializes i18n, renders the router, and conditionally registers the service worker.
-- `src/router/router.tsx` wraps the route tree with `AppContainer` and `App`, then creates either a browser router or hash router based on `VITE_HASH_ROUTER`.
-- `src/routes.tsx` is the route map. Most feature pages are lazy-loaded; `routeOptions` control fullscreen pages and safe-area behavior.
-- `AppContainer` wires Redux, Helmet, theme state, UI confirmation dialogs, safe-area support, and bootstrap-time initialization.
-- `App.tsx` owns app-level SWR config, the page layout shell, traffic polling hookup, network failure modal, and version update checks.
-
-### State and data flow
-
-- Redux in `src/store` is intentionally small:
-  - `history`: remembered Surge profiles from local storage
-  - `profile`: the currently selected Surge target
-  - `traffic`: rolling traffic stats used by the dashboard charts
-- `profileActions.update` is the key handoff point: it calls `setServer(...)` in `src/utils/fetcher.ts`, which reconfigures the shared Axios client with the selected host, port, TLS mode, and `x-key` header.
-- Most server reads use SWR on top of that shared Axios client (`src/utils/fetcher.ts`, `src/data/api.ts`, plus page-local hooks).
-- `src/bootstrap/Bootstrap.tsx` restores remembered profile history and last-used language before rendering the app.
-
-### Feature layout
-
-- `src/pages/*` contains route-level screens: Landing, Home, Policies, Requests, Traffic, Modules, Scripting, DNS, Devices, and Profiles.
-- `src/components/*` contains shared UI, providers, and cross-page building blocks.
-- `src/components/ui/*` holds shadcn/ui-style primitives.
-- `src/types/index.ts` is the central place for API response and domain types.
-
-### Styling and UI stack
-
-- The codebase uses a hybrid styling approach:
-  - Tailwind CSS v4 + shadcn tokens in `src/styles/shadcn.css`
-  - global CSS in `src/styles/global.css`
-  - Emotion `css`/`styled` in many page and shared components
-- When editing UI, match the surrounding style instead of forcing a single styling system.
-
-### i18n
-
-- i18n lives under `src/i18n` and lazy-loads locale JSON files.
-- English (`src/i18n/en/translation.json`) is the baseline; `scripts/verify-translations.mjs` checks that `zh` contains every key from `en`.
-- If you add or rename translation keys, run `pnpm verify-translation`.
-
-### Build and runtime modes
-
-- `scripts/build.mjs` drives release builds and post-processing.
-- Important env toggles used by the app/build:
-  - `VITE_HASH_ROUTER`
-  - `VITE_RUN_IN_SURGE`
-  - `VITE_URL_PATH_PREFIX`
-  - `VITE_USE_SW`
-  - `VITE_PROFILE`
-  - local-dev connection helpers: `VITE_PROTOCOL`, `VITE_HOST`, `VITE_PORT`
-- `pnpm build` targets the standalone/Vercel deployment flow.
-- `pnpm build:release` and `pnpm build:surge` switch to hash-routing and bundle artifacts for release distribution.
-
-## CI and commit conventions
-
-- GitHub Actions runs on Node 24 and currently executes `pnpm build`, `pnpm verify-translation`, and `pnpm test`.
-- Commit messages follow Angular-style commitlint rules with a 72-character header limit.
-
-<!--VITE PLUS START-->
-
-# Using Vite+, the Unified Toolchain for the Web
-
-This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, but it invokes Vite through `vp dev` and `vp build`.
-
-## Vite+ Workflow
-
+1. [Eliminating Waterfalls](#1-eliminating-waterfalls) — **CRITICAL**
+   - 1.1 [Defer Await Until Needed](#11-defer-await-until-needed)
+   - 1.2 [Dependency-Based Parallelization](#12-dependency-based-parallelization)
+   - 1.3 [Prevent Waterfall Chains in API Routes](#13-prevent-waterfall-chains-in-api-routes)
+   - 1.4 [Promise.all() for Independent Operations](#14-promiseall-for-independent-operations)
+   - 1.5 [Strategic Suspense Boundaries](#15-strategic-suspense-boundaries)
+2. [Bundle Size Optimization](#2-bundle-size-optimization) — **CRITICAL**
+   - 2.1 [Avoid Barrel File Imports](#21-avoid-barrel-file-imports)
+   - 2.2 [Conditional Module Loading](#22-conditional-module-loading)
+   - 2.3 [Defer Non-Critical Third-Party Libraries](#23-defer-non-critical-third-party-libraries)
+   - 2.4 [Dynamic Imports for Heavy Components](#24-dynamic-imports-for-heavy-components)
+   - 2.5 [Preload Based on User Intent](#25-preload-based-on-user-intent)
+3. [Server-Side Performance](#3-server-side-performance) — **HIGH**
+   - 3.1 [Authenticate Server Actions Like API Routes](#31-authenticate-server-actions-like-api-routes)
+   - 3.2 [Avoid Duplicate Serialization in RSC Props](#32-avoid-duplicate-serialization-in-rsc-props)
+   - 3.3 [Cross-Request LRU Caching](#33-cross-request-lru-caching)
+   - 3.4 [Hoist Static I/O to Module Level](#34-hoist-static-io-to-module-level)
+   - 3.5 [Minimize Serialization at RSC Boundaries](#35-minimize-serialization-at-rsc-boundaries)
+   - 3.6 [Parallel Data Fetching with Component Composition](#36-parallel-data-fetching-with-component-composition)
+   - 3.7 [Per-Request Deduplication with React.cache()](#37-per-request-deduplication-with-reactcache)
+   - 3.8 [Use after() for Non-Blocking Operations](#38-use-after-for-non-blocking-operations)
+4. [Client-Side Data Fetching](#4-client-side-data-fetching) — **MEDIUM-HIGH**
+   - 4.1 [Deduplicate Global Event Listeners](#41-deduplicate-global-event-listeners)
+   - 4.2 [Use Passive Event Listeners for Scrolling Performance](#42-use-passive-event-listeners-for-scrolling-performance)
+   - 4.3 [Use SWR for Automatic Deduplication](#43-use-swr-for-automatic-deduplication)
+   - 4.4 [Version and Minimize localStorage Data](#44-version-and-minimize-localstorage-data)
+5. [Re-render Optimization](#5-re-render-optimization) — **MEDIUM**
+   - 5.1 [Calculate Derived State During Rendering](#51-calculate-derived-state-during-rendering)
+   - 5.2 [Defer State Reads to Usage Point](#52-defer-state-reads-to-usage-point)
+   - 5.3 [Do not wrap a simple expression with a primitive result type in useMemo](#53-do-not-wrap-a-simple-expression-with-a-primitive-result-type-in-usememo)
+   - 5.4 [Don't Define Components Inside Components](#54-dont-define-components-inside-components)
+   - 5.5 [Extract Default Non-primitive Parameter Value from Memoized Component to Constant](#55-extract-default-non-primitive-parameter-value-from-memoized-component-to-constant)
+   - 5.6 [Extract to Memoized Components](#56-extract-to-memoized-components)
+   - 5.7 [Narrow Effect Dependencies](#57-narrow-effect-dependencies)
+   - 5.8 [Put Interaction Logic in Event Handlers](#58-put-interaction-logic-in-event-handlers)
+   - 5.9 [Subscribe to Derived State](#59-subscribe-to-derived-state)
+   - 5.10 [Use Functional setState Updates](#510-use-functional-setstate-updates)
+   - 5.11 [Use Lazy State Initialization](#511-use-lazy-state-initialization)
+   - 5.12 [Use Transitions for Non-Urgent Updates](#512-use-transitions-for-non-urgent-updates)
+   - 5.13 [Use useRef for Transient Values](#513-use-useref-for-transient-values)
+6. [Rendering Performance](#6-rendering-performance) — **MEDIUM**
+   - 6.1 [Animate SVG Wrapper Instead of SVG Element](#61-animate-svg-wrapper-instead-of-svg-element)
+   - 6.2 [CSS content-visibility for Long Lists](#62-css-content-visibility-for-long-lists)
+   - 6.3 [Hoist Static JSX Elements](#63-hoist-static-jsx-elements)
+   - 6.4 [Optimize SVG Precision](#64-optimize-svg-precision)
+   - 6.5 [Prevent Hydration Mismatch Without Flickering](#65-prevent-hydration-mismatch-without-flickering)
+   - 6.6 [Suppress Expected Hydration Mismatches](#66-suppress-expected-hydration-mismatches)
+   - 6.7 [Use Activity Component for Show/Hide](#67-use-activity-component-for-showhide)
+   - 6.8 [Use defer or async on Script Tags](#68-use-defer-or-async-on-script-tags)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
