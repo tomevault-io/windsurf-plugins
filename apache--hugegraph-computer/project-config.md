@@ -9,58 +9,9 @@ This file provides guidance to AI coding assistants when working with code in th
 
 ## Repository Overview
 
-This is the Apache HugeGraph-Computer repository containing two distinct graph computing systems:
-
-1. **computer** (Java/Maven): A distributed BSP/Pregel-style graph processing framework that runs on Kubernetes or YARN
-2. **vermeer** (Go): A high-performance in-memory graph computing platform with master-worker architecture
-
-Both integrate with HugeGraph for graph data input/output.
+Vermeer is a high-performance in-memory graph computing platform written in Go. It features a single-binary deployment model with master-worker architecture, supporting 20+ graph algorithms and seamless HugeGraph integration.
 
 ## Build & Test Commands
-
-### Computer (Java)
-
-**Prerequisites:**
-- JDK 11 for building/running
-- JDK 8 for HDFS dependencies
-- Maven 3.5+
-- For K8s module: run `mvn clean install` first to generate CRD classes under computer-k8s
-
-**Build:**
-```bash
-cd computer
-mvn clean compile -Dmaven.javadoc.skip=true
-```
-
-**Tests:**
-```bash
-# Unit tests
-mvn test -P unit-test
-
-# Integration tests
-mvn test -P integrate-test
-```
-
-**Run single test:**
-```bash
-# Run specific test class
-mvn test -P unit-test -Dtest=ClassName
-
-# Run specific test method
-mvn test -P unit-test -Dtest=ClassName#methodName
-```
-
-**License check:**
-```bash
-mvn apache-rat:check
-```
-
-**Package:**
-```bash
-mvn clean package -DskipTests
-```
-
-### Vermeer (Go)
 
 **Prerequisites:**
 - Go 1.23+
@@ -68,7 +19,6 @@ mvn clean package -DskipTests
 
 **First-time setup:**
 ```bash
-cd vermeer
 make init  # Downloads supervisord and protoc binaries, installs Go deps
 ```
 
@@ -101,6 +51,17 @@ make clean-all  # Also remove downloaded tools
 ./vermeer.sh start worker
 ```
 
+**Tests:**
+```bash
+# Run with build tag vermeer_test
+go test -tags=vermeer_test -v
+
+# Specific test modes
+go test -tags=vermeer_test -v -mode=algorithms
+go test -tags=vermeer_test -v -mode=function
+go test -tags=vermeer_test -v -mode=scheduler
+```
+
 **Regenerate protobuf (if proto files changed):**
 ```bash
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
@@ -112,56 +73,96 @@ vermeer/tools/protoc/linux64/protoc vermeer/apps/protos/*.proto --go-grpc_out=ve
 
 ## Architecture
 
-### Computer (Java) - BSP/Pregel Framework
+### Directory Structure
 
-**Module Structure:**
-- `computer-api`: Public interfaces for graph processing (Computation, Vertex, Edge, Aggregator, Combiner, GraphFactory)
-- `computer-core`: Runtime implementation (WorkerService, MasterService, messaging, BSP coordination, managers)
-- `computer-algorithm`: Built-in algorithms (PageRank, LPA, WCC, SSSP, TriangleCount, etc.)
-- `computer-driver`: Job submission and driver-side coordination
-- `computer-k8s`: Kubernetes deployment integration
-- `computer-yarn`: YARN deployment integration
-- `computer-k8s-operator`: Kubernetes operator for job management
-- `computer-dist`: Distribution packaging
-- `computer-test`: Integration and unit tests
+```
+vermeer/
+├── main.go              # Single binary entry point
+├── algorithms/          # Algorithm implementations
+│   ├── algorithms.go    # AlgorithmMaker registry
+│   ├── pagerank.go
+│   ├── louvain.go
+│   └── ...
+├── apps/
+│   ├── master/          # Master service
+│   │   ├── services/    # HTTP handlers
+│   │   ├── workers/     # Worker management (WorkerManager, WorkerClient)
+│   │   ├── tasks/       # Task scheduling
+│   │   ├── schedules/   # Task scheduling strategies
+│   │   └── graphs/      # Graph metadata management
+│   ├── worker/          # Worker service entry
+│   ├── compute/         # Worker-side compute logic
+│   │   ├── api.go       # Algorithm interface definition
+│   │   ├── task.go      # Compute task execution
+│   │   └── ...
+│   ├── graphio/         # Graph I/O (HugeGraph, CSV, HDFS)
+│   │   └── hugegraph.go # HugeGraph integration
+│   ├── protos/          # gRPC definitions
+│   ├── common/          # Utilities, logging, metrics
+│   ├── structure/       # Graph data structures
+│   ├── storage/         # Persistence layer
+│   └── bsp/             # BSP coordination helpers
+├── config/              # Configuration templates
+├── tools/               # Binary dependencies (supervisord, protoc)
+└── ui/                  # Web dashboard
+```
 
-**Key Design Patterns:**
+### Key Design Patterns
 
-1. **API/Implementation Separation**: Algorithms depend only on `computer-api` interfaces; `computer-core` provides runtime implementation. Algorithms are dynamically loaded via config.
+**1. Maker/Registry Pattern**
 
-2. **Manager Pattern**: `WorkerService` composes multiple managers (MessageSendManager, MessageRecvManager, WorkerAggrManager, DataServerManager, SortManagers, SnapshotManager, etc.) with lifecycle hooks: `initAll()`, `beforeSuperstep()`, `afterSuperstep()`, `closeAll()`.
+Graph loaders and writers register themselves via `init()`:
 
-3. **BSP Coordination**: Explicit barrier synchronization via etcd (EtcdBspClient). Each superstep follows:
-   - `workerStepPrepareDone` → `waitMasterStepPrepareDone`
-   - Local compute (vertices process messages)
-   - `workerStepComputeDone` → `waitMasterStepComputeDone`
-   - Aggregators/snapshots
-   - `workerStepDone` → `waitMasterStepDone` (master returns SuperstepStat)
+```go
+func init() {
+    LoadMakers[LoadTypeHugegraph] = &HugegraphMaker{}
+}
+```
 
-4. **Computation Contract**: Algorithms implement `Computation<M extends Value>`:
-   - `compute0(context, vertex)`: Initialize at superstep 0
-   - `compute(context, vertex, messages)`: Process messages in subsequent supersteps
-   - Access to aggregators, combiners, and message sending via `ComputationContext`
+Master selects loader by type from the registry. Algorithms follow the same pattern in `algorithms/algorithms.go`.
 
-**Important Files:**
-- Algorithm contract: `computer/computer-api/src/main/java/org/apache/hugegraph/computer/core/worker/Computation.java`
-- Runtime orchestration: `computer/computer-core/src/main/java/org/apache/hugegraph/computer/core/worker/WorkerService.java`
-- BSP coordination: `computer/computer-core/src/main/java/org/apache/hugegraph/computer/core/bsp/Bsp4Worker.java`
-- Example algorithm: `computer/computer-algorithm/src/main/java/org/apache/hugegraph/computer/algorithm/centrality/pagerank/PageRank.java`
+**2. Master-Worker Architecture**
 
-### Vermeer (Go) - In-Memory Computing Engine
+- **Master**: Schedules LoadPartition tasks to workers, manages worker lifecycle via WorkerManager/WorkerClient, exposes HTTP endpoints for graph/task management
+- **Worker**: Executes compute tasks, reports status back to master via gRPC
+- Communication: Master uses gRPC clients to workers (apps/master/workers/); workers connect to master on startup
 
-**Directory Structure:**
-- `algorithms/`: Go algorithm implementations (pagerank.go, sssp.go, louvain.go, etc.)
-- `apps/`:
-  - `bsp/`: BSP coordination helpers
-  - `graphio/`: HugeGraph I/O adapters (reads via gRPC to store/pd, writes via HTTP REST)
-  - `master/`: Master scheduling, HTTP endpoints, worker management
-  - `compute/`: Worker-side compute logic
-  - `protos/`: Generated protobuf/gRPC definitions
+**3. HugeGraph Integration**
+
+Implementation in `apps/graphio/hugegraph.go`:
+
+1. **Metadata Query**: Queries HugeGraph PD (metadata service) via gRPC for partition information
+2. **Data Loading**: Streams vertices/edges from HugeGraph Store via gRPC (`ScanPartition`)
+3. **Result Writing**: Writes computed results back via HugeGraph HTTP REST API (adds vertex properties)
+
+The loader queries PD first (`QueryPartitions`), then creates LoadPartition tasks for each partition, which workers execute by calling `ScanPartition` on store nodes.
+
+**4. Algorithm Interface**
+
+Algorithms implement the interface defined in `apps/compute/api.go`. Each algorithm must register itself in `algorithms/algorithms.go` by appending to the `Algorithms` slice.
+
+**5. Single Binary Entry Point**
+
+`main.go` loads config from `config/{env}.ini`, then starts either master or worker based on `run_mode` parameter. The `--env` flag specifies which config file to use (e.g., `--env=master` loads `config/master.ini`).
+
+## Important Files
+
+- Entry point: `main.go`
+- Algorithm interface: `apps/compute/api.go`
+- Algorithm registry: `algorithms/algorithms.go`
+- HugeGraph integration: `apps/graphio/hugegraph.go`
+- Master scheduling: `apps/master/tasks/tasks.go`
+- Worker management: `apps/master/workers/workers.go`
+- HTTP endpoints: `apps/master/services/http_master.go`
+- Scheduler: `vermeer/apps/master/bl/scheduler_bl.go`
+
+## Development Workflow
+
+**Adding a New Algorithm:**
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apache/hugegraph-computer](https://github.com/apache/hugegraph-computer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
