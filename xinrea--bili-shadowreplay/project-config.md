@@ -1,151 +1,327 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: BiliBili ShadowReplay 集成了基于 LangChain 的 AI Agent，用于内容分析、总结和智能辅助。Agent 实现位于 `src/lib/agent/` 目录。
 ---
 
-# CLAUDE.md
+# AI Agent
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 概述
 
-## Project Overview
+BiliBili ShadowReplay 集成了基于 LangChain 的 AI Agent，用于内容分析、总结和智能辅助。Agent 实现位于 `src/lib/agent/` 目录。
 
-BiliBili ShadowReplay is a Tauri-based desktop application for caching live streams and performing real-time editing and submission. It supports multiple streaming platforms including Bilibili, Douyin (TikTok China), Huya, Kuaishou, and TikTok.
+## 技术栈
 
-**Architecture**: Hybrid application with Svelte 3 frontend and Rust backend, using Tauri 2 for desktop integration.
+- **LangChain Core** (@langchain/core): 核心框架
+- **LangChain DeepSeek** (@langchain/deepseek): DeepSeek LLM 集成
+- **LangChain Ollama** (@langchain/ollama): Ollama 本地模型支持
 
-## Development Commands
+## 架构
 
-### Frontend Development
-- `yarn dev` - Start Vite development server (frontend only)
-- `yarn build` - Build production frontend
-- `yarn check` - Run TypeScript and Svelte type checking
+```mermaid
+graph LR
+    UI[用户界面] --> Agent[AI Agent]
+    Agent --> LangChain[LangChain Core]
+    LangChain --> DeepSeek[DeepSeek API]
+    LangChain --> Ollama[Ollama 本地]
+    Agent --> Tools[工具集]
+    Tools --> Invoker[Tauri Invoker]
+    Invoker --> Backend[Rust 后端]
+```
 
-### Full Application Development
-- `yarn tauri dev` - Start Tauri development with hot reload (recommended for full-stack development)
-- `yarn tauri build` - Build production desktop application
+## 主要功能
 
-### Rust Backend
-- `cd src-tauri && cargo check` - Check Rust code without building
-- `cd src-tauri && cargo test` - Run all Rust tests
-- `cd src-tauri && cargo test <test_name>` - Run specific test
+### 1. 内容分析
 
-### Platform-Specific Builds
-- **Windows CPU**: `yarn tauri dev` (default)
-- **Windows CUDA**: `yarn tauri dev --features cuda` (requires CUDA Toolkit and LLVM)
-- **macOS**: Requires `SDKROOT` and `CMAKE_OSX_DEPLOYMENT_TARGET=13.3` environment variables
-- **Linux**: No special configuration needed
+分析直播录播内容，提取关键信息：
 
-### Documentation
-- `yarn docs:dev` - Start VitePress documentation server
-- `yarn docs:build` - Build documentation site
-- `yarn docs:preview` - Preview built documentation
+```typescript
+import { analyzeContent } from '$lib/agent';
 
-### Version Management
-- `yarn bump` - Run version bump script
+const analysis = await analyzeContent({
+  recordingId: 'xxx',
+  transcript: '直播文字记录...',
+});
 
-## Architecture Overview
+// 返回结果
+{
+  summary: '直播内容总结',
+  highlights: ['精彩片段1', '精彩片段2'],
+  tags: ['游戏', '娱乐'],
+  suggestedTitle: '建议的标题'
+}
+```
 
-### Frontend (Svelte 3 + TypeScript)
+### 2. 智能切片建议
 
-**Entry Points**:
-- `src/main.ts` - Main application entry
-- `src/main_clip.ts` - Clip editing interface
-- `src/main_live.ts` - Live streaming interface
+基于内容分析，建议切片时间点：
 
-**Key Directories**:
-- `src/page/` - Page components (Room, Task, AI, etc.)
-- `src/lib/components/` - Reusable UI components
-- `src/lib/stores/` - Svelte stores for global state management
-- `src/lib/agent/` - AI agent implementation using LangChain
-- `src/lib/db.ts` - Frontend database interface
+```typescript
+import { suggestClips } from '$lib/agent';
 
-**Styling**: Tailwind CSS with Flowbite components
+const suggestions = await suggestClips({
+  recordingId: 'xxx',
+  transcript: '...',
+  danmaku: [...], // 弹幕数据
+});
 
-### Backend (Rust + Tauri 2)
+// 返回建议的切片区间
+[
+  { start: 120, end: 300, reason: '精彩操作' },
+  { start: 1200, end: 1500, reason: '搞笑片段' }
+]
+```
 
-**Main Entry**: `src-tauri/src/main.rs`
+### 3. 标题和描述生成
 
-**Core Modules**:
-- `src-tauri/src/recorder_manager.rs` - Main recording orchestration
-- `src-tauri/src/handlers/` - Tauri command handlers (frontend-backend bridge)
-- `src-tauri/src/database/` - SQLite database operations using sqlx
-- `src-tauri/src/subtitle_generator/` - AI-powered subtitle generation with Whisper
-- `src-tauri/src/ffmpeg/` - FFmpeg integration for video processing
-- `src-tauri/src/progress/` - Progress tracking for recording tasks
-- `src-tauri/src/http_server/` - HTTP server for streaming
-- `src-tauri/src/migration/` - Database schema migration system
+为切片生成标题和描述：
 
-**Custom Workspace Crates**:
-- `src-tauri/crates/danmu_stream/` - Danmaku (bullet comment) stream processing library
-- `src-tauri/crates/recorder/` - Core recording functionality with platform-specific implementations
+```typescript
+import { generateMetadata } from '$lib/agent';
 
-**Platform Support** (`src-tauri/crates/recorder/src/platforms/`):
-- `bilibili/` - Bilibili live stream recording
-- `douyin/` - Douyin (TikTok China) recording
-- `huya/` - Huya platform support
-- `kuaishou/` - Kuaishou platform support
-- `tiktok/` - TikTok international support
+const metadata = await generateMetadata({
+  clipContent: '切片内容描述',
+  context: '直播背景信息',
+});
 
-### Key Technologies
+// 返回
+{
+  title: '生成的标题',
+  description: '生成的描述',
+  tags: ['标签1', '标签2']
+}
+```
 
-**Frontend**:
-- Svelte 3 with TypeScript
-- Vite for build tooling
-- Tailwind CSS + Flowbite for UI
-- LangChain for AI features (@langchain/core, @langchain/deepseek, @langchain/ollama)
-- WaveSurfer.js for audio visualization
-- Socket.io for real-time communication
+## LLM 配置
 
-**Backend**:
-- Tauri 2 for desktop integration
-- SQLite with sqlx (async runtime, WAL mode)
-- FFmpeg via async-ffmpeg-sidecar
-- Whisper-rs for speech-to-text (with optional CUDA/Metal acceleration)
-- M3U8-rs for HLS stream processing
-- Tokio async runtime
-- Axum for HTTP server
-- Socketioxide for WebSocket support
+### DeepSeek 配置
 
-### Database Architecture
+```typescript
+import { ChatDeepSeek } from '@langchain/deepseek';
 
-- **Primary Storage**: SQLite with Write-Ahead Logging (WAL mode)
-- **Location**: `src-tauri/data/data_v2.db`
-- **Migration System**: Automatic schema updates via `src-tauri/src/migration.rs`
-- **Data Models**: Recording metadata, room configurations, task status, user preferences
+const model = new ChatDeepSeek({
+  apiKey: 'your-api-key',
+  model: 'deepseek-chat',
+  temperature: 0.7,
+});
+```
 
-### AI Features
+### Ollama 本地模型
 
-**Whisper Integration**:
-- Local speech-to-text transcription
-- Platform-specific acceleration:
-  - Windows: Optional CUDA support via `cuda` feature flag
-  - macOS: Metal acceleration enabled by default
-  - Linux: CPU-based inference
+```typescript
+import { Ollama } from '@langchain/ollama';
 
-**LangChain Integration**:
-- AI agent for content analysis and summarization
-- Support for multiple LLM providers (DeepSeek, Ollama)
-- Located in `src/lib/agent/` directory
+const model = new Ollama({
+  baseUrl: 'http://localhost:11434',
+  model: 'llama2',
+});
+```
 
-## Development Guidelines
+## Agent 实现
 
-### Frontend Development
+### 基础 Agent 结构
 
-- Use Svelte 3 syntax with `<script>` tags
-- Prefer reactive statements with `$:` for derived state
-- Use stores from `src/lib/stores/` for global state
-- Follow TypeScript strict mode configuration
-- Use Tailwind CSS classes for styling
+```typescript
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { RunnableSequence } from '@langchain/core/runnables';
 
-### Rust Backend Development
+// 创建提示模板
+const prompt = ChatPromptTemplate.fromMessages([
+  ['system', '你是一个直播内容分析助手...'],
+  ['human', '{input}'],
+]);
 
-- Follow workspace structure with custom crates
-- Use async/await with Tokio runtime
-- Implement proper error handling with thiserror
-- Use prepared statements for SQL to prevent injection
+// 创建处理链
+const chain = RunnableSequence.from([
+  prompt,
+  model,
+  outputParser,
+]);
+
+// 执行
+const result = await chain.invoke({
+  input: '分析这段直播内容...'
+});
+```
+
+### 带工具的 Agent
+
+```typescript
+import { DynamicStructuredTool } from '@langchain/core/tools';
+import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents';
+
+// 定义工具
+const tools = [
+  new DynamicStructuredTool({
+    name: 'get_recording_info',
+    description: '获取录播信息',
+    schema: z.object({
+      recordingId: z.string(),
+    }),
+    func: async ({ recordingId }) => {
+      const info = await invoke('get_recording', { recordingId });
+      return JSON.stringify(info);
+    },
+  }),
+  new DynamicStructuredTool({
+    name: 'get_danmaku',
+    description: '获取弹幕数据',
+    schema: z.object({
+      recordingId: z.string(),
+      startTime: z.number().optional(),
+      endTime: z.number().optional(),
+    }),
+    func: async ({ recordingId, startTime, endTime }) => {
+      const danmaku = await invoke('get_danmaku', {
+        recordingId,
+        startTime,
+        endTime,
+      });
+      return JSON.stringify(danmaku);
+    },
+  }),
+];
+
+// 创建 Agent
+const agent = await createOpenAIFunctionsAgent({
+  llm: model,
+  tools,
+  prompt,
+});
+
+// 创建执行器
+const executor = new AgentExecutor({
+  agent,
+  tools,
+});
+
+// 执行任务
+const result = await executor.invoke({
+  input: '分析录播 xxx 的内容并建议切片'
+});
+```
+
+## 提示工程
+
+### 内容分析提示
+
+```typescript
+const ANALYSIS_PROMPT = `你是一个专业的直播内容分析助手。
+
+任务：分析给定的直播录播内容，提取关键信息。
+
+输入信息：
+- 直播标题：{title}
+- 直播时长：{duration}
+- 文字记录：{transcript}
+- 弹幕数据：{danmaku}
+
+请提供：
+1. 内容总结（100字以内）
+2. 3-5个精彩片段的时间点和描述
+3. 5个相关标签
+4. 建议的切片标题
+
+输出格式：JSON
+`;
+```
+
+### 切片建议提示
+
+```typescript
+const CLIP_SUGGESTION_PROMPT = `基于直播内容分析，建议值得制作成切片的片段。
+
+考虑因素：
+1. 弹幕密度突然增加的时间段
+2. 文字记录中的关键词（如"精彩"、"哈哈"、"牛"等）
+3. 情绪高涨的片段
+4. 完整的故事或事件
+
+每个建议包括：
+- 开始时间
+- 结束时间
+- 片段描述
+- 推荐理由
+- 预估热度（1-10分）
+
+输出格式：JSON数组
+`;
+```
+
+## 流式输出
+
+对于长文本生成，使用流式输出提升用户体验：
+
+```typescript
+import { writable } from 'svelte/store';
+
+export const streamingText = writable('');
+
+async function generateWithStreaming(input: string) {
+  streamingText.set('');
+
+  const stream = await chain.stream({ input });
+
+  for await (const chunk of stream) {
+    streamingText.update(text => text + chunk.content);
+  }
+}
+```
+
+在组件中使用：
+
+```svelte
+<script>
+  import { streamingText } from '$lib/agent';
+</script>
+
+<div class="streaming-output">
+  {$streamingText}
+</div>
+```
+
+## 错误处理
+
+```typescript
+async function safeAgentCall<T>(
+  agentFunc: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await agentFunc();
+  } catch (error) {
+    console.error('Agent call failed:', error);
+
+    // 检查是否是 API 限流
+    if (error.message.includes('rate limit')) {
+      throw new Error('API 调用频率过高，请稍后再试');
+    }
+
+    // 检查是否是网络错误
+    if (error.message.includes('network')) {
+      throw new Error('网络连接失败，请检查网络设置');
+    }
+
+    // 返回默认值
+    return fallback;
+  }
+}
+```
+
+## 性能优化
+
+### 1. 缓存结果
+
+```typescript
+const analysisCache = new Map<string, any>();
+
+async function analyzeWithCache(recordingId: string) {
+  if (analysisCache.has(recordingId)) {
+    return analysisCache.get(recordingId);
+  }
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Xinrea/bili-shadowreplay](https://github.com/Xinrea/bili-shadowreplay) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
