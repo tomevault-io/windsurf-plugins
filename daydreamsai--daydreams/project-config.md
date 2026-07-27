@@ -1,178 +1,254 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with
+description: [**@daydreamsai/core**](./api-reference.md)
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with
-code in this repository.
+[**@daydreamsai/core**](./api-reference.md)
 
-## Common Development Commands
+***
 
-### Package Management
+[@daydreamsai/core](./api-reference.md) / Agent
 
-- `pnpm install` - Install all dependencies (uses pnpm workspaces)
-- `./scripts/build.sh` - Build all packages
-- `./scripts/build.sh --watch` - Build packages in watch mode
-- `./scripts/clean.sh` - Clean build artifacts
-- `./scripts/clean.sh --dry-run` - Preview what would be cleaned
+# Interface: Agent\<TContext\>
 
-### Testing
+Defined in: [packages/core/src/types.ts:672](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L672)
 
-- `bun run packages/core` - Run core package tests (primary test command)
+Represents an agent with various configurations and methods for handling contexts, inputs, outputs, and more.
 
-### Documentation
+## Template
 
-- `cd docs && bun run dev` - Run documentation development server
-- `cd docs && bun run docs:build` - Build documentation
+The type of memory used by the agent.
 
-### Code Quality
+## Extends
 
-- `pnpx prettier --check packages` - Check code formatting
-- `pnpx prettier --write packages` - Format code
-- `knip` - Find unused dependencies and exports
+- `AgentDef`\<`TContext`\>
 
-## Project Architecture
+## Type Parameters
 
-This is **Daydreams**, a TypeScript framework for building stateful AI agents.
-The architecture is designed around:
+### TContext
 
-### Core Components (`packages/core/`)
+`TContext` *extends* [`AnyContext`](./AnyContext.md) = [`AnyContext`](./AnyContext.md)
 
-- **Agent (`dreams.ts`)**: Main orchestrator managing lifecycle, context state,
-  and execution
-- **Context System (`context.ts`)**: Type-safe isolated state management for
-  conversations/tasks
-- **Memory System (`memory/`)**: Dual-tier storage (working memory + persistent
-  storage)
-- **Task Runner (`task.ts`)**: Async operation management with concurrency
-  control
-- **Engine (`engine.ts`)**: Execution engine processing inputs and coordinating
-  actions
+The type of context used by the agent.
 
-### Package Structure
+## Properties
 
-- **`packages/core/`** - Core framework with agent, context, memory, and task
-  systems
-- **`packages/*`** - Extensions for platforms (discord, twitter, telegram),
-  storage (supabase, chroma, mongo), chains (hyperliquid, defai), utilities
-  (cli, create-agent, synthetic)
-- **`examples/`** - Working examples organized by use case (basic, chains,
-  games, social platforms)
-- **`clients/example-ui/`** - React frontend demonstrating agent capabilities
-- **`docs/`** - Next.js documentation site
+### actions
 
-### Key Concepts
+> **actions**: [`Action`](./Action.md)\<`any`, `any`, `unknown`, [`AnyContext`](./AnyContext.md), `Agent`\<`TContext`\>, [`ActionState`](./ActionState.md)\<`any`\>\>[]
 
-- **Context**: Isolated stateful environment (like a chat session) with
-  type-safe args and memory
-- **Working Memory**: Temporary execution state (inputs, outputs, calls,
-  results, thoughts)
-- **Actions**: Type-safe functions agents can execute
-- **Extensions**: Plugin architecture for platforms, storage, and custom
-  features
+Defined in: [packages/core/src/types.ts:638](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L638)
 
-### Memory Architecture
+An array of actions available to the agent.
 
-The system uses a two-tier memory approach:
+#### Inherited from
 
-1. **Working Memory**: Temporary state during execution (logs, calls, results)
-2. **Persistent Storage**: Long-term memory via pluggable stores (KV, Vector)
+`AgentDef.actions`
 
-Context state is automatically persisted and restored between sessions.
+***
 
-### Context System
+### container
 
-Each context maintains isolated state identified by `type:key`. Contexts can
-have:
+> **container**: `Container`
 
-- Custom creation logic (`create`)
-- Schema validation for arguments (`schema`)
-- Setup/teardown hooks (`setup`, `onStep`, `onRun`, `onError`)
-- Custom save/load logic (`save`, `load`)
+Defined in: [packages/core/src/types.ts:595](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L595)
 
-## Development Notes
+The container used by the agent.
 
-### Writing Documentation
+#### Inherited from
 
-Follow `.cursor/rules/write-docs.mdc` guidelines:
+`AgentDef.container`
 
-- Avoid marketing language ("powerful", "built-in", "complete")
-- Focus on technical details over benefits
-- Address engineers directly with nuts-and-bolts information
-- Use frontmatter in MDX tutorials
-- Extract meaningful content from examples, not just copy code
+***
 
-### Monorepo Structure
+### context?
 
-- Uses **pnpm workspaces** with Lerna for package management
-- TypeScript configuration shared via `tsconfig.json` at root
-- Build system uses `tsup` for individual packages
-- Dependencies managed via catalog pattern in `package.json`
+> `optional` **context**: `TContext`
 
-### Testing Approach
+Defined in: [packages/core/src/types.ts:585](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L585)
 
-- Primary testing runs through `bun run packages/core`
-- Tests are co-located with source files (`*.test.ts`)
-- Uses Vitest as the test runner
+The current context of the agent.
 
-### Extension Development
+#### Inherited from
 
-New extensions should follow the pattern:
+`AgentDef.context`
 
-- Implement extension interface with optional `inputs`, `outputs`, `actions`,
-  `services`
-- Provide `install` hook for setup
-- Register contexts if the extension adds new context types
+***
 
-## Complete Data Flow Architecture
+### debugger
 
-### 1. Agent Creation and Initialization
+> **debugger**: [`Debugger`](./Debugger.md)
 
-When you create an agent with `createDreams()`:
+Defined in: [packages/core/src/types.ts:590](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L590)
 
-```
-createDreams(config) → Agent instance
-├── Container (dependency injection)
-├── TaskRunner (concurrency management)
-├── Memory (store + vector)
-├── Registry (contexts, actions, outputs, inputs)
-└── Context tracking maps (contextIds, contexts, contextsRunning)
-```
+Debugger function for the agent.
 
-The agent maintains:
+#### Inherited from
 
-- **contextIds**: Set of all known context IDs
-- **contexts**: Map of context ID → ContextState
-- **contextsRunning**: Map of context ID → running execution state
-- **workingMemories**: Map of context ID → WorkingMemory
+`AgentDef.debugger`
 
-### 2. Message Processing Flow
+***
 
-When a user sends a message via `agent.send()`:
+### emit()
 
-```
-1. Create InputRef → wraps user input with metadata
-2. Call agent.run() with InputRef in chain
-3. Get/Create ContextState for the conversation
-4. Get/Create WorkingMemory for the context
-5. Create Engine instance for this execution
-6. Process through Engine's router system
-7. Generate LLM response with structured XML parsing
-8. Handle outputs and persist state
-```
+> **emit**: (...`args`) => `void`
 
-### 3. Engine: The Execution Core
+Defined in: [packages/core/src/types.ts:706](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L706)
 
-The Engine (`engine.ts`) orchestrates all execution:
+Emits an event with the provided arguments.
 
-```
-Engine State:
-├── step: Current execution step number
+#### Parameters
+
+##### args
+
+...`any`[]
+
+Arguments to pass to the event handler.
+
+#### Returns
+
+`void`
+
+***
+
+### events
+
+> **events**: `Record`\<`string`, `z.ZodObject`\>
+
+Defined in: [packages/core/src/types.ts:633](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L633)
+
+A record of event schemas for the agent.
+
+#### Inherited from
+
+`AgentDef.events`
+
+***
+
+### exports?
+
+> `optional` **exports**: [`ExportManager`](./ExportManager.md)
+
+Defined in: [packages/core/src/types.ts:711](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L711)
+
+Export manager for episodes
+
+***
+
+### exportTrainingData?
+
+> `optional` **exportTrainingData**: `boolean`
+
+Defined in: [packages/core/src/types.ts:650](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L650)
+
+Whether to export training data for episodes
+
+#### Inherited from
+
+`AgentDef.exportTrainingData`
+
+***
+
+### inputs
+
+> **inputs**: `Record`\<`string`, [`InputConfig`](./InputConfig.md)\<`any`, [`AnyContext`](./AnyContext.md), `Agent`\<`TContext`\>\>\>
+
+Defined in: [packages/core/src/types.ts:623](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L623)
+
+A record of input configurations for the agent.
+
+#### Inherited from
+
+`AgentDef.inputs`
+
+***
+
+### logger
+
+> **logger**: `Logger`
+
+Defined in: [packages/core/src/types.ts:570](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L570)
+
+#### Inherited from
+
+`AgentDef.logger`
+
+***
+
+### memory
+
+> **memory**: [`MemorySystem`](./MemorySystem.md)
+
+Defined in: [packages/core/src/types.ts:580](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L580)
+
+The memory store and vector store used by the agent.
+
+#### Inherited from
+
+`AgentDef.memory`
+
+***
+
+### model?
+
+> `optional` **model**: `LanguageModel`
+
+Defined in: [packages/core/src/types.ts:605](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L605)
+
+The primary language model used by the agent.
+
+#### Inherited from
+
+`AgentDef.model`
+
+***
+
+### modelSettings?
+
+> `optional` **modelSettings**: `object`
+
+Defined in: [packages/core/src/types.ts:610](https://github.com/dojoengine/daydreams/blob/612e9304717c546d301f9cac8c204de734cac957/packages/core/src/types.ts#L610)
+
+Model settings for the agent.
+
+#### Index Signature
+
+\[`key`: `string`\]: `any`
+
+#### maxTokens?
+
+> `optional` **maxTokens**: `number`
+
+#### providerOptions?
+
+> `optional` **providerOptions**: `Record`\<`string`, `any`\>
+
+#### stopSequences?
+
+> `optional` **stopSequences**: `string`[]
+
+#### temperature?
+
+> `optional` **temperature**: `number`
+
+#### topK?
+
+> `optional` **topK**: `number`
+
+#### topP?
+
+> `optional` **topP**: `number`
+
+#### Inherited from
+
+`AgentDef.modelSettings`
+
+***
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [daydreamsai/daydreams](https://github.com/daydreamsai/daydreams) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
