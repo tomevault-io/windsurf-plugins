@@ -1,139 +1,162 @@
 ---
 trigger: always_on
-description: 3-solutioning: Create Epics and Stories
+description: 2-plan: Create PRD
 ---
 
 
-# Create Epics and Stories
+# Create PRD
 
-# Create Epics and Stories
+# Create PRD
 
-**Goal.** Slice the PRD + architecture into **epics** (each ships value end-to-end) and **stories** (each is one focused PR-sized unit Shuri can implement and Hawkeye can test).
+**Goal.** Turn brief + research + trigger map into a Product Requirements Document the team can build from. The PRD names *what* and *why* with measurable boundaries. Mantis, Fury, Tony will read it. Shuri ships against the acceptance criteria.
 
-Tony drives. Output lands in `.wize/solutioning/epics/` and `.wize/solutioning/stories/`.
+Maria Hill drives. Peggy edits prose. Output lands in `.wize/planning/prd.md`.
 
 ## Inputs
 
-Read central docs first, then expand by dependency — don't load unrelated files for padding:
-
-- `AGENTS.md` + `.wize/config/project.toml` — active profiles, languages, conventions.
-- `.wize/planning/prd.md` — the AC source (never reword ACs downstream).
-- `.wize/solutioning/architecture.md`
-- `.wize/planning/ux/ux-design/` (every story references one or more screens)
-- `.wize/knowledge/document-project/` — brownfield baseline, if present.
+- `.wize/planning/brief.md` (vision, audience, success criteria).
+- `.wize/planning/research.md` (when present).
+- `.wize/planning/ux/trigger-map.md` (every PRD goal references rows of this map).
+- `.wize/planning/prfaq.md` (when present — PRD scope mirrors FAQ Q5 "what's in/out").
 
 ## Outputs
 
-- `.wize/solutioning/epics/{NN}-{slug}.md`
-- `.wize/solutioning/stories/{epic-NN}/{story-id}.md`
+- `.wize/planning/prd.md`
+- `.wize/solutioning/epics/` — coarse epic outlines Tony refines later.
 
-## Epic shape
+## Steps
 
-An epic:
-- Ships **value** on its own (a user can do the thing after this epic, even if the next one improves it).
-- Lasts 1–3 sprints when in flight.
-- Has 3–10 stories.
-- Has a single trigger-map row as its anchor.
+### 1. Goals (3–5)
 
-Epic file:
+Pull the success criteria from the brief; restate as PRD goals. Each goal is:
+- One sentence.
+- Measurable (named metric + target + deadline).
+- Tied to a trigger-map row.
 
-```markdown
----
-epic_id: 01-onboarding
-status: ready
-owner: Tony Stark + Maria Hill
-linked_prd: E01
-trigger_map_row: 1
-priority: 1
-estimate: M
----
+Example: *"Reduce signup time from 3.5min to 1min by Q3 (signal: `signup_completed` median; row 1)."*
 
-# Epic 01: Sign-up + first invite
+### 2. Scope — in / out (explicit)
 
-## Outcome
-A first-time team admin signs up, lands in onboarding, and invites at least one teammate within 5 minutes (trigger-map row 1 + 2).
-
-## Stories
-- E01-S01: Sign-up empty + happy path (AC-01-1, AC-01-2)
-- E01-S02: Sign-up error states (AC-01-3, AC-01-4)
-- E01-S03: Onboarding step 1 — invite first teammate (AC-02-1, AC-02-2)
-- E01-S04: Email delivery + retry (AC-02-3)
-- E01-S05: Team list empty + with first member (AC-03-1, AC-03-2)
-
-## Dependencies
-- Design tokens by Mantis (S0 — already done)
-- Resend account configured (Tony, before S04)
-
-## Success
-All ACs of all stories PASS gate. Telemetry shows `teammate_invited` ≥ 80% of `signup_completed` users within 24h in the beta cohort.
-```
-
-## Story shape — INVEST
-
-Each story passes:
-- **I**ndependent — can be implemented without waiting for another in-flight story.
-- **N**egotiable — wording can move; intent stays.
-- **V**aluable — a real outcome to a real user (or a clear test path that proves a slice).
-- **E**stimable — Tony can size: S/M/L/XL.
-- **S**mall — fits in one PR (≤ 1 day for an experienced dev, including tests).
-- **T**estable — every AC is observable.
-
-If a story is XL, slice it before merging it to `stories/`.
-
-## Slicing patterns (Tony's defaults)
-
-| Pattern | When |
+| In | Out (for now) |
 |---|---|
-| Walking skeleton | When you need the full user path to exist (even with stubs) before going deep on any single screen. |
-| By user role | Admin vs member often slice naturally. |
-| By acceptance criterion | One AC = one PR when ACs are independent. |
-| By happy / error path | Ship happy path first; error states next story. |
-| By back-end / front-end | Avoid unless the back-end can ship usable without UI; otherwise it bundles. |
-| By feature flag | When a story partially ships, use a flag and write the flag retirement story now. |
+| First-team signup flow | Multi-team admin roles |
+| Self-serve invite | SSO via SAML |
+| English (US) | Other locales |
 
-## Story file template
+If a stakeholder asked for it and it isn't here, they will ask again at gate review. Put their item in **Out** with a one-line reason, not silence.
+
+### 3. User stories backbone
+
+Coarse stories that map to scope items. "As a {role}, I want to {action}, so that {outcome}." Each story will be sliced finer by Tony in `wize-create-epics-and-stories`.
+
+Use the trigger-map rows as backbone:
+- Row 1 (Sign up) → "As a team admin, I want to sign up with my work email, so that I can invite my team within 5 minutes."
+
+### 4. Acceptance criteria per scope item
+
+For every In-scope item, write 3–7 ACs Hawkeye can test.
+
+Format: `Given … When … Then …` or a numbered behavioral list.
+
+ACs are **observable**. ✓ "If the user enters an invalid email, the input shows error text within 200ms." ✗ "The form validates emails correctly."
+
+Each AC gets an ID: `AC-{epic}-{n}`. Hawkeye references these in `tea-trace.md`.
+
+### 5. Constraints + assumptions
+
+Pull constraints from the brief. Add:
+- **Assumptions** that, if wrong, change scope.
+- **Dependencies** on other teams/services with name + deadline.
+
+Each assumption is one line + verification plan. *"Assumption: Stripe Connect onboarding average 7 days. Verification: confirm with Stripe by 2026-07-01."*
+
+### 6. NFR pointer
+
+Don't redefine NFRs in the PRD. Reference `.wize/planning/nfr-principles.md` (Fury's) once. Note any project-specific tightening.
+
+### 7. Open questions
+
+What still needs deciding before solutioning starts. Each with an owner + deadline. Blockers can't carry into Phase 3.
+
+### 8. Hand off
+
+- Mark `status: ready-for-validation`.
+- Run `wize-validate-prd` (Maria Hill + Mantis + Fury sign-off).
+- Then Mantis starts `wize-ux-scenarios`.
+
+## Output template
 
 ```markdown
 ---
-story_id: E01-S03
-epic: 01-onboarding
-status: ready-for-dev
-priority: 2
-estimate: M
-linked_screens: [onboarding-step-1, invite-modal]
-linked_acs: [AC-02-1, AC-02-2]
+status: draft | ready-for-validation | validated
+owner: Maria Hill
+created: YYYY-MM-DD
 ---
 
-# Story: Onboarding step 1 — invite first teammate
+# PRD — {{project_name}}
 
-## Context
-Comes right after sign-up. The user lands here with no team yet. The screen is the moment-of-truth from S1: if the user invites a teammate here, the product earned its value moment.
+## Goals
+1. {{goal}} (metric: …, target: …, deadline: …, trigger-map row: …)
+2. …
 
-## Sources of truth (Shuri reads before coding)
-- `AGENTS.md` + `.wize/config/project.toml` · `.wize/knowledge/document-project/*`.
-- `prd.md` (AC source) · `architecture.md` · `ux-design/onboarding-step-1.md` · parent epic `01-onboarding.md`.
-- The TEA test contract for this story · related code + tests already on this path.
+## Scope
+
+### In scope
+- {{item}} — {{2–3 lines of detail}}
+
+### Out of scope
+- {{item}} — {{one-line reason: not now / not us / not yet}}
+
+## Backbone (coarse stories)
+- E01: As a {{role}}, I want to {{action}}, so that {{outcome}}.
+- E02: …
 
 ## Acceptance criteria
-- **AC-02-1:** Given a new admin on `/onboarding`, When they enter a valid email and click "Send invite", Then a `teammate_invited` event fires and the screen advances to "Invite sent" within 1s.
-- **AC-02-2:** Given an invalid email, When the user blurs the field, Then error text appears (200ms) identifying which rule failed.
 
-## Restrictions
-- **Out of scope:** bulk invite → E01-S07; custom invite message → E02-S03.
-- **Protected behaviors:** existing sign-up + session flow must not change.
-- **Compatibility:** `(team_id, email)` idempotency key — don't break existing invite rows.
-- **Security:** validate email at the server boundary; auth context required on `inviteTeammate`.
+### E01 — Sign-up
+- **AC-01-1:** Given a new visitor on `/signup`, When they submit a valid work email + password, Then an account is created and they land on `/onboarding` within 1.5s.
+- **AC-01-2:** Given an invalid email, When the user blurs the field, Then error text appears within 200ms identifying which rule failed.
+- **AC-01-3:** Given a duplicate email, When the user submits, Then they see a "Sign in instead?" CTA and the request returns HTTP 409.
+- …
 
-## Notes for Shuri (Dev)
-- Touch points: `app/(onboarding)/invite/page.tsx`, new server action `inviteTeammate`, `lib/email/send-invite.ts`.
-- Reuse `Button`, `Input`, `Banner` from design system.
-- Add `data-testid="invite-form"`, `"invite-email"`, `"invite-cta"` (Hawkeye depends on these).
+## Constraints
+- Deadline: …
+- Budget: …
+- Compliance: GDPR, LGPD, SOC2.
 
-## Validation contract
-- **AC → test:** AC-02-1 → E2E `invite happy path` + unit `validateInviteEmail`; AC-02-2 → unit `invalid email` + component error-state.
-- **Required checks:** the unit/integration/E2E split Hawkeye declares below, plus lint, format, type-check, build. Authz asserted on the server action.
-- **States:** loading, empty, error rendered and asserted.
+## Assumptions
+- Stripe Connect onboarding ≤ 7 days avg. — verify by …
+- Auth0 free tier sufficient for first 6 months. — verify by …
 
+## Dependencies
+- Design system tokens from Mantis by {{date}}.
+- Database from infra team by {{date}}.
+
+## NFR pointer
+See `.wize/planning/nfr-principles.md`. Project tightening: p95 LCP ≤ 2.0s (vs. global 2.5s) on signup pages.
+
+## Open questions
+- [ ] (blocker) Pricing tier exposed pre-payment? — *owner: NAME, by: DATE*
+- [ ] (important) Brazil-only beta or global launch? — *owner: NAME, by: DATE*
+```
+
+## INVEST checklist (per AC group)
+
+Maria Hill validates every story's ACs against INVEST:
+
+- **I**ndependent: no implicit dependency on another story being built first.
+- **N**egotiable: details can move; intent can't.
+- **V**aluable: a real outcome to a real user.
+- **E**stimable: Tony can size it.
+- **S**mall: ≤ 1 PR worth (sliced finer in Phase 3 if not).
+- **T**estable: every AC is observable.
+
+If any letter fails, fix the story before it leaves Plan.
+
+## Anti-patterns Maria Hill rejects
+
+- **PRD as wishlist.** Pages of "the system shall…" with no Out-of-Scope. Force the cut.
+- **ACs as descriptions.** "The form is responsive." → no. *"At 360px, the form fits in the viewport with no horizontal scroll."*
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
