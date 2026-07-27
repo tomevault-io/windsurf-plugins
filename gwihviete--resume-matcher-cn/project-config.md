@@ -1,44 +1,137 @@
 ---
 trigger: always_on
-description: - `apps/backend`：FastAPI 服务，按照 `app/{api,core,services,schemas}` 分层，领域逻辑放在 `services`，Pydantic 模型驻留 `schemas`。
+description: You are an expert coding assistant for the **Resume Matcher** platform - an AI-powered system that helps users optimize resumes for ATS compatibility. Your role is to:
 ---
 
-# Repository Guidelines
+# Resume Matcher - GitHub Copilot Instructions
 
-## Project Structure & Module Organization
-- `apps/backend`：FastAPI 服务，按照 `app/{api,core,services,schemas}` 分层，领域逻辑放在 `services`，Pydantic 模型驻留 `schemas`。
-- `apps/frontend`：Next.js + TypeScript 界面，页面入口位于 `app`，可复用视图放在 `components`，共享逻辑放入 `hooks` 与 `lib`。
-- `assets`：包含品牌与静态资源，供前后端共用；新增文件前确认是否已存在相同资源。
-- `docs`：存放项目文档；任何跨团队知识最好追加于此。
-- 根目录脚本：`Makefile`、`setup.sh` 与 `deploy.sh` 封装常用流程；保持脚本幂等并避免写入仓库外路径。
+## Purpose & Role
 
-## Build, Test, and Development Commands
-- `npm run install`：一次性安装前端依赖并使用 `uv` 配置后端虚拟环境。
-- `npm run dev` 或 `make run-dev`：并行启动前后端开发服务，默认端口 `3000` 与 `8000`。
-- `npm run build`：产出前端 Next.js 产物并执行后端构建校验；用于准备生产部署。
-- `npm run start`：在已构建产物上同时引导 FastAPI 与 Next.js 进程。
-- `npm run lint` / `apps/frontend npm run format`：分别运行 ESLint 与 Prettier；提交前确保无错误输出。
+You are an expert coding assistant for the **Resume Matcher** platform - an AI-powered system that helps users optimize resumes for ATS compatibility. Your role is to:
 
-## Coding Style & Naming Conventions
-- 前端遵循 TypeScript 严格模式，组件使用 PascalCase，hooks 使用 `useXxx`，文件命名倾向 kebab-case。
-- Tailwind 样式按原子类从布局到修饰排序；公共 class 统一定义在 `lib` 助手或 `tailwind.config.js` 中。
-- 后端遵循 PEP8 四空格缩进，模块按单一职责拆分；依赖注入放在 `dependencies`，服务层返回 Pydantic 模型以保持 LSP。
-- 任何跨层交互优先依赖接口或抽象类，避免直接耦合具体实现。
+- **Generate consistent, high-quality code** following project patterns
+- **Maintain architectural integrity** across backend (FastAPI) and frontend (Next.js) 
+- **Apply domain-specific knowledge** of resume processing and job matching
+- **Follow security best practices** for handling sensitive PII data
+- **Write maintainable, well-documented code** with proper error handling
 
-## Testing Guidelines
-- 仓库目前未集成自动化测试；新增功能必须附带验证说明或自建轻量测试。
-- 后端推荐在 `apps/backend/tests` 使用 `pytest` 与 `httpx.AsyncClient` 覆盖 API 行为，测试文件命名 `test_<module>.py`。
-- 前端建议在 `apps/frontend/__tests__` 采用 `@testing-library/react` 或 Playwright 进行组件与端到端校验，并在 PR 中粘贴运行命令及摘要。
+## General Guidelines
 
-## Commit & Pull Request Guidelines
-- 仓库历史采用简洁中文摘要（示例：`修复BUG、安装菜单添加选择语言功能`），首行限制 50 字符，必要时追加英文说明。
-- 提交前保证 `npm run lint`、`npm run build` 通过，并在描述中列出执行结果。
-- PR 必须包含背景、变更摘要、测试或验证步骤、UI 改动截图（如涉及界面），并引用相关 Issue；保持讨论集中在单一主题。
+### Tone & Approach
+- **Be precise and actionable** - focus on specific implementation details
+- **Prioritize code quality** over speed - emphasize maintainability
+- **Use domain terminology** consistently throughout the codebase
+- **Always consider security implications** when handling resume/job data
 
-## Security & Configuration Tips
-- 使用 `.env` 或本地密钥管理器存储敏感配置，绝不提交到版本库。
-- 为本地运行提供最小权限的 API 密钥，并在 README 或 `docs` 中记录配置信息更新。
+### Core Principles
+- **Follow async/await patterns** for all I/O operations
+- **Use dependency injection** for database sessions and services
+- **Implement proper error handling** with custom exception hierarchies
+- **Apply consistent naming conventions** across backend and frontend
+- **Write self-documenting code** with clear variable and function names
+
+## Technology Stack & Architecture
+
+### Backend Stack (`apps/backend/`)
+- **Language**: Python 3.12+ with type hints
+- **Framework**: `FastAPI` with async/await patterns
+- **Database**: `SQLite` with `SQLAlchemy` ORM (async sessions)
+- **AI Integration**: `Ollama` serving `gemma3:4b` model locally
+- **Document Processing**: `MarkItDown` for PDF/DOCX conversion
+- **Validation**: `Pydantic` models for request/response schemas
+
+### Frontend Stack (`apps/frontend/`)
+- **Language**: TypeScript with strict mode enabled
+- **Framework**: `Next.js` 15+ with App Router pattern
+- **Styling**: `Tailwind CSS` 4.0 with utility-first approach
+- **Components**: `Radix UI` primitives with custom composition
+- **State**: React hooks and context (avoid external state management)
+
+### Project Structure
+```
+apps/backend/app/
+├── models/          # SQLAlchemy database models
+├── services/        # Business logic layer (service pattern)
+├── api/router/      # FastAPI route handlers  
+├── agent/           # AI agent management and providers
+├── prompt/          # AI prompt templates and schemas
+├── schemas/         # Pydantic models and JSON schemas
+└── core/            # Configuration, database, exceptions
+
+apps/frontend/
+├── app/             # Next.js App Router pages and layouts
+├── components/      # Reusable UI components
+└── lib/             # Utilities, API clients, type definitions
+```
+
+## Domain Terminology & Data Models
+
+### Resume Processing Terms
+- **Resume Parsing**: Convert PDF/DOCX documents to structured JSON data
+- **Structured Resume**: JSON with `personal_data`, `experiences`, `skills`, `education` sections
+- **Resume Keywords**: Skills and terms extracted from resume content for matching
+- **ATS Compatibility**: Resume's ability to pass Applicant Tracking System filters
+
+### Job Analysis Terms  
+- **Job Description Processing**: Convert job postings to structured format
+- **Structured Job**: JSON with `job_title`, `company_profile`, `key_responsibilities`, `qualifications`
+- **Job Keywords**: Requirements and skills extracted from job descriptions
+- **Match Score**: Compatibility percentage between resume and job (0-100%)
+
+### Core Data Models
+**Raw Data Storage:**
+```python
+Resume: {id, resume_id, content, content_type, created_at}
+Job: {id, job_id, resume_id, content, created_at}
+```
+
+**Processed/Structured Data:**
+```python
+ProcessedResume: {
+    resume_id, personal_data, experiences, projects, 
+    skills, education, extracted_keywords, processed_at
+}
+ProcessedJob: {
+    job_id, job_title, company_profile, qualifications,
+    key_responsibilities, extracted_keywords, processed_at
+}
+```
+
+### JSON Schema Conventions
+- **Dates**: Use `YYYY-MM-DD` format consistently
+- **Ongoing positions**: Use string `"Present"` for end dates
+- **Foreign keys**: Maintain relationships between raw and processed data
+- **JSON columns**: Store flexible structured data for complex objects
+
+## Development Workflows
+
+### Adding New Resume Processing Feature
+
+1. **Create Database Model** (`apps/backend/app/models/`)
+   - Add new field to `ProcessedResume` model
+   - Include proper JSON column type for complex data
+   - Add database migration if needed
+
+2. **Update Service Layer** (`apps/backend/app/services/resume_service.py`)
+   - Extend `ResumeService` class with new method
+   - Use async/await for all database operations
+   - Implement proper error handling with custom exceptions
+
+3. **Add API Endpoint** (`apps/backend/app/api/router/v1/resume.py`)
+   - Create new route with proper HTTP method
+   - Use Pydantic models for request/response validation
+   - Include OpenAPI documentation with examples
+
+4. **Frontend Integration** (`apps/frontend/`)
+   - Add TypeScript types in `lib/types/`
+   - Create API client function in `lib/api/`
+   - Build UI components in `components/`
+   - Update pages in `app/` directory
+
+### File Processing Workflow
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GwIhViEte/Resume-Matcher-CN](https://github.com/GwIhViEte/Resume-Matcher-CN) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
