@@ -1,185 +1,221 @@
 ---
 trigger: always_on
-description: This document provides high-level guidelines for AI agents working with the core-pkgs repository. For detailed information on specific topics, see the `.skills/` directory.
+description: This document provides a quick reference for AI agents working with the cross-platform service management system in core-pkgs.
 ---
 
-# Agent Guide for core-pkgs
+# Agent Guide for Cross-Service Interface
 
-This document provides high-level guidelines for AI agents working with the core-pkgs repository. For detailed information on specific topics, see the `.skills/` directory.
+This document provides a quick reference for AI agents working with the cross-platform service management system in core-pkgs.
 
-**Quick access to detailed guides:**
-- [`.skills/cmake.md`](.skills/cmake.md) - CMake build system
-- [`.skills/meson.md`](.skills/meson.md) - Meson build system
-- [`.skills/packaging.md`](.skills/packaging.md) - Packaging conventions
-- [`.skills/validation.md`](.skills/validation.md) - Validation and testing
-- [`.skills/porting.md`](.skills/porting.md) - Porting from nixpkgs
+## Overview
 
-## Package Organization
+The `services/` directory provides a **unified service interface** that works across multiple service managers:
+- **systemd** (Linux - user & system services)
+- **launchd** (macOS - user agents & system daemons)
+- **runit** (Linux/containers - simple supervision)
+- **BSD rc.d** (FreeBSD/OpenBSD/NetBSD/DragonFly)
 
-### Automatic Package Scope Registration
+Services are defined once using common options, then automatically translated to platform-specific formats.
 
-Packages in `pkgs/` and `pkgs-many/` are automatically added to the `pkgs.*` package scope based on their directory name.
-
-#### `pkgs/` Directory
-
-Individual packages are placed in `pkgs/<package-name>/default.nix`. The package is automatically available as `pkgs.<package-name>` without requiring an explicit entry in `top-level.nix`.
-
-**Example:**
-```
-pkgs/
-  libxslt/
-    default.nix
-    77-Use-a-dedicated-node-type-to-maintain-the-list-of-cached-rv-ts.patch
-```
-
-This package is automatically available as `pkgs.libxslt`.
-
-**When to add an explicit entry in `top-level.nix`:**
-- Only add an explicit entry if the **inputs deviate** from the inputs declared in the nix expression
-- Or if you need to override default arguments
-- Or if you need to provide additional configuration
-
-**Example of explicit entry (when needed):**
-```nix
-# In top-level.nix
-libxslt = callPackage ./pkgs/libxslt {
-  # Override default inputs
-  pythonSupport = false;
-  cryptoSupport = true;
-};
-```
-
-#### `pkgs-many/` Directory
-
-Packages that produce multiple variants should use the `mkManyVariants` paradigm and be placed in `pkgs-many/`.
-
-**Example structure:**
-```
-# Uses mkManyVariants to create python39, python310, python311, etc.
-pkgs-many/python/default.nix  
-```
-
-The variants are automatically available in the package scope (e.g., `pkgs.python39`, `pkgs.python310`).
-
-## Packaging Conventions
-
-### Meta Attributes
-
-**Always set `meta.maintainers` to an empty list:**
+## Service Definition Structure
 
 ```nix
-meta = {
-  description = "Example package";
-  license = lib.licenses.mit;
-  maintainers = [ ];  # Always empty
-  platforms = lib.platforms.linux;
-};
+{
+  services.my-service = {
+    # Common options (work everywhere)
+    enable = true;
+    description = "My Service";
+    command = "${pkgs.python3}/bin/python3";
+    args = [ "-m" "http.server" "8080" ];
+    user = "myuser";
+    workingDirectory = "/var/lib/myservice";
+    environment = { PORT = "8080"; };
+    restartPolicy = "always";  # or "on-failure", "never"
+    preStart = "echo 'Starting...'";
+    postStop = "echo 'Stopped'";
+
+    # Platform-specific extensions (optional)
+    systemd = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
+      serviceConfig = {
+        PrivateTmp = true;
+        NoNewPrivileges = true;
+      };
+    };
+
+    launchd = {
+      label = "com.example.my-service";
+      keepAlive = true;
+      runAtLoad = true;
+    };
+
+    runit = {
+      logScript = ''
+        #!/bin/sh
+        exec svlogd -tt /var/log/my-service
+      '';
+    };
+
+    rcd = {
+      variant = "freebsd";  # or "openbsd", "netbsd", "dragonfly"
+      rcRequire = [ "NETWORKING" ];
+    };
+  };
+}
 ```
 
-**Detailed guide:** See [`.skills/packaging.md`](.skills/packaging.md) for complete meta attribute documentation.
+## Integration with ekaos
 
-### Testing
+ekaos modules use the same service interface. Services are defined at `services.*` and automatically translated to systemd units.
 
-**Key points:**
-- `doCheck = false;` is the default - don't set it explicitly
-- Prefer `passthru.tests` for unit tests
-- Only enable `doCheck = true;` for critical packages
+**Example ekaos module:**
+```nix
+{ config, pkgs, ... }:
 
-**Detailed guide:** See [`.skills/packaging.md`](.skills/packaging.md#testing) for testing patterns.
+{
+  services.my-app = {
+    enable = true;
+    command = "${pkgs.myapp}/bin/myapp";
+    restartPolicy = "always";
 
-### Build Systems
-
-**CMake packages:**
-
-Include `cmake.configurePhaseHook` in nativeBuildInputs.
-
-**Detailed guide:** See [`.skills/cmake.md`](.skills/cmake.md) for complete CMake documentation.
-
-**Meson packages:**
-
-Include `meson.configurePhaseHook` and `ninja` in nativeBuildInputs, specify `mesonBuildType`.
-
-**Detailed guide:** See [`.skills/meson.md`](.skills/meson.md) for complete Meson documentation.
-
-
-## Validation Requirements
-
-All added or edited package attributes **must** pass three validation steps:
-
-### 1. Evaluation Check
-
-```bash
-nix-instantiate -A <package-name>
+    systemd = {
+      wantedBy = [ "multi-user.target" ];
+    };
+  };
+}
 ```
 
-Verifies the Nix expression evaluates correctly.
+**Location:** Service modules are in `ekaos/modules/services/`
 
-### 2. Build Check
+## ekaos Service Module Conventions
 
-```bash
-nix-build -A <package-name>
-```
+When creating ekaos service modules:
 
-Verifies the package builds successfully.
+1. **Standard service options** - Always include:
+   - `enable` (bool)
+   - `description` (str, default provided)
+   - `command` (str, internal/automatic)
+   - `args` (list of str, internal/automatic)
+   - `user` (str, defaults to appropriate user)
+   - `restartPolicy` (str, usually "always")
+   - `systemd` (attrset for systemd-specific options)
 
-### 3. Format Check
+2. **Application-specific settings** - Use `settings` submodule:
+   ```nix
+   services.openssh.settings = {
+     ports = 22;
+     permitRootLogin = "prohibit-password";
+     passwordAuthentication = true;
+   };
+   ```
 
-```bash
-nix fmt <path-to-file>
-```
+3. **Service definition** - Set in config section:
+   ```nix
+   config = mkIf cfg.enable {
+     services.openssh = {
+       command = "${pkgs.openssh}/bin/sshd";
+       args = [ "-D" "-f" "${sshdConfig}" ];
+       user = "root";
+       restartPolicy = "always";
 
-Ensures code follows formatting standards.
+       systemd = {
+         after = [ "network.target" ];
+         wantedBy = [ "multi-user.target" ];
+       };
+     };
+   };
+   ```
 
-**Detailed guide:** See [`.skills/validation.md`](.skills/validation.md) for complete validation procedures, troubleshooting, and advanced validation techniques.
+## Porting Services from nixpkgs
 
-## Common Patterns
+When porting service modules from nixpkgs to ekaos, refactor them to use the reusable services interface.
 
-### Checking if Dependencies Exist
+### Refactoring Pattern
 
-Before porting a package, verify that all required dependencies are available in core-pkgs.
+**ekaos reusable style:**
+```nix
+{ config, lib, pkgs, ... }:
 
-**Use `nix-instantiate` to check if a dependency exists:**
+let
+  cfg = config.services.myservice;
+in
 
-```bash
-nix-instantiate -A <dependency-name>
-```
+{
+  options.services.myservice = {
+    enable = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Whether to enable My Service.";
+    };
 
-If the dependency exists, you'll see the derivation path. If it doesn't exist, you'll get an error.
+    description = mkOption {
+      type = types.str;
+      default = "My Service";
+      description = "Service description";
+    };
 
-**Example - checking multiple dependencies:**
-```bash
-for dep in acl lzo cmocka libuuid util-linux zlib zstd; do
-  echo -n "$dep: "
-  nix-instantiate -A $dep >/dev/null 2>&1 && echo "✓ available" || echo "✗ missing"
-done
-```
+    command = mkOption {
+      type = types.str;
+      internal = true;
+      description = "Command to run (set automatically)";
+    };
 
-**Output:**
-```
-acl: ✓ available
-lzo: ✓ available
-cmocka: ✓ available
-libuuid: ✓ available
-util-linux: ✓ available
-zlib: ✓ available
-zstd: ✓ available
-```
+    args = mkOption {
+      type = types.listOf types.str;
+      internal = true;
+      default = [];
+      description = "Command arguments (set automatically)";
+    };
 
-**Important:** Do NOT search `top-level.nix` with grep to check for dependencies. Packages in `pkgs/` and `pkgs-many/` are automatically registered and may not appear in `top-level.nix`. Always use `nix-instantiate` to verify availability.
+    user = mkOption {
+      type = types.str;
+      default = "myservice";
+      description = "User to run service as";
+    };
 
-**NOTE:** For non derivation attrs, use `nix-instantiate --eval -A <dep>` which can evaluate to non derivations
+    restartPolicy = mkOption {
+      type = types.str;
+      default = "always";
+      description = "Restart policy";
+    };
 
-### Porting from nixpkgs
+    systemd = mkOption {
+      type = types.attrsOf types.anything;
+      default = {};
+      description = "Systemd-specific options";
+    };
 
-When porting a package from nixpkgs:
+    settings = mkOption {
+      type = types.submodule {
+        options = {
+          port = mkOption {
+            type = types.port;
+            default = 8080;
+            description = "Port to listen on";
+          };
+          # Other application-specific options
+        };
+      };
+      default = {};
+      description = "Application-specific configuration";
+    };
+  };
 
-1. **Check dependencies first** - use `nix-instantiate -A <dep>` to verify all dependencies exist
-2. **Copy the package files** to the appropriate directory (`pkgs/` or `pkgs-many/`)
-3. **Remove/clear `meta.maintainers`** field
-4. **Remove update scripts** (e.g., `updateScript = gnome.updateScript { ... }`)
+  config = mkIf cfg.enable {
+    # Define using cross-platform interface
+    services.myservice = {
+      command = "${pkgs.myservice}/bin/myservice";
+      args = [ "--port" (toString cfg.settings.port) ];
+      user = cfg.user;
+      restartPolicy = "always";
+
+      systemd = {
+        after = [ "network.target" ];
+        wantedBy = [ "multi-user.target" ];
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ekala-project/corepkgs](https://github.com/ekala-project/corepkgs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
