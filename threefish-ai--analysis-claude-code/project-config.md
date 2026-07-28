@@ -1,129 +1,246 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: enableSteering: boolean;
 ---
 
-# CLAUDE.md
+# Agent类型系统定义 - 自然语言实现规范
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 1. 模块概述
 
-## Repository Overview
+### 1.1 功能定位
+Agent类型系统是Claude Code分层多Agent架构的核心类型定义模块，提供完整的TypeScript类型声明和接口规范，确保整个Agent系统的类型安全和接口一致性。
 
-This is a research repository containing reverse engineering analysis of Claude Code v1.0.33. The repository focuses on understanding the architecture, mechanisms, and implementation patterns of modern AI Agent systems through systematic analysis of obfuscated source code.
+### 1.2 核心职责
+- Agent类型定义：定义nO主Agent、I2A交互Agent、UH1用户处理Agent、KN5知识处理Agent的完整类型
+- 接口规范制定：制定Agent间通信、状态管理、生命周期管理的标准接口
+- 类型安全保障：通过严格的类型检查确保Agent系统的可靠性和可维护性
+- 扩展性支持：提供灵活的类型扩展机制，支持新Agent类型的快速集成
+- 性能优化：通过类型推断和编译时优化提升运行时性能
 
-## Project Structure
+### 1.3 设计目标
+实现100%类型覆盖率、零运行时类型错误、完整的IDE智能提示支持、高性能的类型推断和清晰的类型文档。
 
-### Main Analysis Workspace
-- `claude_code_v_1.0.33/stage1_analysis_workspace/` - Complete analysis results for v1.0.33
-- `chunks/` - Deobfuscated code chunks (102 files) split from the main CLI file
-- `docs/` - Comprehensive technical documentation and analysis reports
-- `scripts/` - Analysis tools and utilities for processing obfuscated code
+## 2. 接口定义
 
-### Key Directories
-- `analysis_results/merged-chunks/` - Optimized and merged code blocks
-- `docs/Open-Claude-Code/` - Open source reconstruction project template
-- `work_doc_for_this/` - Project methodology and standard operating procedures
+### 2.1 输入输出规范
 
-## Common Commands
+#### 核心Agent接口
+```typescript
+// 基础Agent接口
+interface IAgent {
+  readonly id: string;
+  readonly type: AgentType;
+  readonly capabilities: AgentCapability[];
+  readonly status: AgentStatus;
+  readonly metadata: AgentMetadata;
+  
+  // 生命周期方法
+  initialize(config: AgentConfiguration): Promise<void>;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  dispose(): Promise<void>;
+  
+  // 状态管理
+  getStatus(): AgentStatus;
+  getHealth(): Promise<AgentHealth>;
+  getMetrics(): AgentMetrics;
+  
+  // 配置管理
+  updateConfiguration(config: Partial<AgentConfiguration>): Promise<void>;
+  getConfiguration(): AgentConfiguration;
+}
 
-Based on the analysis workspace structure, the following commands are commonly used:
-
-### Code Analysis and Processing
-```bash
-# Beautify and format obfuscated code
-node scripts/beautify.js source/cli.mjs
-
-# Split large files into manageable chunks
-node scripts/split.js cli.beautify.mjs
-
-# Merge and improve code chunks
-node scripts/merge-again.js
-
-# LLM-assisted analysis of code segments
-node scripts/llm.js
+// Agent工厂接口
+interface IAgentFactory {
+  createAgent(type: AgentType, config: AgentConfiguration): Promise<IAgent>;
+  destroyAgent(agentId: string): Promise<void>;
+  listAgents(filter?: AgentFilter): Promise<IAgent[]>;
+  getAgentById(id: string): Promise<IAgent | null>;
+}
 ```
 
-### Development Commands (Open-Claude-Code Project)
-```bash
-# Build TypeScript project
-npm run build
+### 2.2 参数验证规则
+- agentId: 必须是UUID v4格式，长度36字符
+- AgentType: 枚举值，限定为'nO'|'I2A'|'UH1'|'KN5'
+- AgentConfiguration: 必须包含必填字段和有效的配置值
+- AgentCapability: 字符串数组，每个能力标识符长度1-50字符
+- AgentMetrics: 数值类型必须非负，性能指标必须在合理范围内
 
-# Run tests with coverage
-npm run test:coverage
+### 2.3 返回格式定义
+```typescript
+// Agent状态返回格式
+interface AgentStatusResponse {
+  success: boolean;
+  data: AgentStatus;
+  timestamp: number;
+  metadata?: Record<string, any>;
+}
 
-# Performance benchmarking
-npm run benchmark
-
-# Code quality checks
-npm run lint
-npm run validate
-
-# Development mode
-npm run dev
+// Agent操作结果格式
+interface AgentOperationResult<T = any> {
+  success: boolean;
+  data?: T;
+  error?: AgentError;
+  duration: number;
+  metadata: OperationMetadata;
+}
 ```
 
-## Architecture Insights
+## 3. 核心逻辑
 
-### Core Technical Discoveries
+### 3.1 处理流程描述
 
-1. **h2A Async Message Queue System** - Real-time steering mechanism with dual-buffer architecture
-2. **Multi-layered Agent Architecture** - Main agent loop (nO), sub-agents (I2A), and task-specific agents
-3. **Intelligent Context Management** - 92% threshold auto-compression with wU2 compressor
-4. **6-Layer Security Framework** - From UI validation to execution sandboxing
+#### Agent类型层次结构
+```typescript
+// Agent类型枚举
+enum AgentType {
+  MAIN = 'nO',           // 主Agent循环
+  INTERACTION = 'I2A',   // 交互Agent
+  USER_HANDLER = 'UH1',  // 用户处理Agent
+  KNOWLEDGE = 'KN5'      // 知识处理Agent
+}
 
-### Key Components Analyzed
+// Agent状态枚举
+enum AgentStatus {
+  CREATED = 'created',
+  INITIALIZING = 'initializing',
+  READY = 'ready',
+  RUNNING = 'running',
+  BUSY = 'busy',
+  PAUSED = 'paused',
+  ERROR = 'error',
+  STOPPING = 'stopping',
+  STOPPED = 'stopped',
+  DISPOSED = 'disposed'
+}
 
-- **Agent Loop System** - Asynchronous generator-based core scheduler
-- **Tool Execution Framework** - 6-stage pipeline with concurrency control
-- **Memory Management** - Dynamic context compression and token optimization
-- **Security Framework** - Multi-layer permission validation and sandboxing
+// Agent能力类型
+type AgentCapability = 
+  | 'natural_language_processing'
+  | 'task_planning'
+  | 'tool_execution'
+  | 'user_interaction'
+  | 'knowledge_retrieval'
+  | 'context_management'
+  | 'error_handling'
+  | 'performance_monitoring';
+```
 
-## Analysis Methodology
+### 3.2 关键算法说明
 
-### Static Code Analysis
-1. **Code Preprocessing** - Deobfuscation and formatting
-2. **Intelligent Chunking** - Breaking large files into analyzable segments
-3. **LLM-Assisted Pattern Recognition** - Using AI to identify architectural patterns
-4. **Cross-Validation** - Multiple rounds of verification for accuracy
+#### Agent状态转换逻辑
+```typescript
+// Agent状态机定义
+class AgentStateMachine {
+  private static readonly VALID_TRANSITIONS: Record<AgentStatus, AgentStatus[]> = {
+    [AgentStatus.CREATED]: [AgentStatus.INITIALIZING, AgentStatus.ERROR],
+    [AgentStatus.INITIALIZING]: [AgentStatus.READY, AgentStatus.ERROR],
+    [AgentStatus.READY]: [AgentStatus.RUNNING, AgentStatus.STOPPING],
+    [AgentStatus.RUNNING]: [AgentStatus.BUSY, AgentStatus.PAUSED, AgentStatus.STOPPING, AgentStatus.ERROR],
+    [AgentStatus.BUSY]: [AgentStatus.RUNNING, AgentStatus.ERROR],
+    [AgentStatus.PAUSED]: [AgentStatus.RUNNING, AgentStatus.STOPPING],
+    [AgentStatus.ERROR]: [AgentStatus.READY, AgentStatus.STOPPING],
+    [AgentStatus.STOPPING]: [AgentStatus.STOPPED],
+    [AgentStatus.STOPPED]: [AgentStatus.DISPOSED],
+    [AgentStatus.DISPOSED]: []
+  };
+  
+  static isValidTransition(from: AgentStatus, to: AgentStatus): boolean {
+    return this.VALID_TRANSITIONS[from]?.includes(to) ?? false;
+  }
+}
+```
 
-### Documentation Standards
-- All technical assertions must have source code location references
-- Cross-document consistency validation required
-- Minimum 95% accuracy threshold for final reports
-- Complete lifecycle coverage from UI to execution
+### 3.3 数据结构定义
 
-## Research Focus Areas
+#### 核心数据结构
+```typescript
+// Agent基础元数据
+interface AgentMetadata {
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  capabilities: AgentCapability[];
+  dependencies: string[];
+  configuration: AgentConfiguration;
+}
 
-1. **Real-time Message Processing** - h2A dual-buffer mechanisms
-2. **Agent Orchestration** - Multi-agent coordination patterns  
-3. **Context Management** - Intelligent compression and memory optimization
-4. **Security Architecture** - Layered protection and sandboxing
-5. **Tool Integration** - Plugin-based execution framework
+// Agent配置类型
+interface AgentConfiguration {
+  // 基础配置
+  id: string;
+  type: AgentType;
+  name: string;
+  description?: string;
+  
+  // 性能配置
+  performance: {
+    maxConcurrency: number;
+    timeout: number;
+    retryAttempts: number;
+    memoryLimit: number;
+    cpuLimit: number;
+  };
+  
+  // 通信配置
+  communication: {
+    messageQueueSize: number;
+    heartbeatInterval: number;
+    communicationTimeout: number;
+    enableSteering: boolean;
+  };
+  
+  // 工具配置
+  tools: {
+    enabled: string[];
+    disabled: string[];
+    permissions: ToolPermissionMatrix;
+  };
+  
+  // 日志配置
+  logging: {
+    level: LogLevel;
+    enableMetrics: boolean;
+    enableTracing: boolean;
+  };
+}
+```
 
-## Important Files
+## 4. 状态管理
 
-- `Claude_Code_Agent系统完整技术解析.md` - Complete technical analysis
-- `FINAL_VALIDATION_REPORT.md` - Comprehensive validation results
-- `实时Steering机制完整技术文档.md` - Real-time steering mechanism details
-- `分层多Agent架构完整技术文档.md` - Multi-agent architecture analysis
+### 4.1 内部状态定义
 
-## Development Guidelines
+#### Agent状态管理器
+```typescript
+// Agent状态接口
+interface AgentState {
+  id: string;
+  type: AgentType;
+  status: AgentStatus;
+  currentTask?: TaskReference;
+  assignedTasks: TaskReference[];
+  performance: PerformanceMetrics;
+  health: HealthMetrics;
+  lastActivity: Date;
+  uptime: number;
+  
+  // 状态变更历史
+  statusHistory: StatusChangeEvent[];
+  
+  // 错误信息
+  lastError?: AgentError;
+  errorCount: number;
+}
 
-When working with this repository:
+// 性能指标
+interface PerformanceMetrics {
 
-1. **Analysis Work** - Follow the established SOP in `work_doc_for_this/`
-2. **Code Quality** - Maintain high standards for any new analysis scripts
-3. **Documentation** - All findings must be properly documented with source references
-4. **Validation** - Cross-verify technical claims across multiple documents
-5. **Research Ethics** - This is for educational and research purposes only
-
-## Notes
-
-- This repository contains research analysis, not production code
-- The analysis is based on obfuscated source code with inherent limitations
-- All findings should be considered approximations for educational purposes
-- The Open-Claude-Code project provides TypeScript implementations based on analysis
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ThreeFish-AI/analysis_claude_code](https://github.com/ThreeFish-AI/analysis_claude_code) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
