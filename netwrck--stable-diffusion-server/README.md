@@ -5,12 +5,12 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [Netwrck/stable-diffusion-server](https://github.com/Netwrck/stable-diffusion-server).
+Original source: `CLAUDE.md` in [Netwrck/stable-diffusion-server](https://github.com/Netwrck/stable-diffusion-server).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
