@@ -102,4 +102,4 @@ Convex Type  | TS/JS type  |  Example Usage         | Validator for argument val
 
 ---
 > Source: [get-convex/better-auth](https://github.com/get-convex/better-auth) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
