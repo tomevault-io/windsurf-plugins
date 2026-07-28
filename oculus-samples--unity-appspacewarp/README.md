@@ -5,13 +5,13 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [oculus-samples/Unity-AppSpaceWarp](https://github.com/oculus-samples/Unity-AppSpaceWarp).
+Original source: `.cursor/rules/*.mdc` in [oculus-samples/Unity-AppSpaceWarp](https://github.com/oculus-samples/Unity-AppSpaceWarp).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **Cursor** — `project-config.mdc`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
