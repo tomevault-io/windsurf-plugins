@@ -5,13 +5,13 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [photo-cli/photo-cli](https://github.com/photo-cli/photo-cli).
+Original source: `.cursor/rules/*.mdc` in [photo-cli/photo-cli](https://github.com/photo-cli/photo-cli).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **Cursor** — `project-config.mdc`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
