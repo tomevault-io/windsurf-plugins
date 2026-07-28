@@ -1,112 +1,41 @@
 ---
 trigger: always_on
-description: System-level AI agent with full computer control via CLI wrapping (claude, codex, gemini).
+description: This repository is a Node.js ESM orchestration runtime for boss/employee dispatch, Web UI, browser/CDP automation, Telegram/Discord channels, memory, heartbeat, and PABCD orchestration.
 ---
 
-# cli-jaw
+# CLI-JAW Claude Guide
 
-System-level AI agent with full computer control via CLI wrapping (claude, codex, gemini).
+This repository is a Node.js ESM orchestration runtime for boss/employee dispatch, Web UI, browser/CDP automation, Telegram/Discord channels, memory, heartbeat, and PABCD orchestration.
 
-## Repository Structure
+## Documentation Map
 
-```
-lidge-jun/cli-jaw              ← public (this repo)
-├── skills_ref/  (submodule)   ← lidge-jun/cli-jaw-skills (public, 107 skills)
-├── devlog/      (submodule)   ← lidge-jun/cli-jaw-internal (private)
-└── .npmignore                 ← npm publish 시 submodules 제외
-```
+- Start at `structure/INDEX.md` for the current architecture map.
+- Keep `README.md`, `AGENTS.md`, this file, and `structure/AGENTS.md` aligned when command/API/orchestration behavior changes.
+- Do not use the old `devlog/structure/` path for architecture docs; the active folder is `structure/`.
 
-### Clone
+## Build & Deploy Contract
 
-```bash
-# 코드만
-git clone https://github.com/lidge-jun/cli-jaw.git
+- The running server executes compiled `dist/` (`jaw serve` → `dist/server.js`), never the TS sources. After changing `server.ts`/`src/**`/`bin/**`, run `npm run build` before telling anyone to restart; frontend changes additionally need `npm run build:frontend`. Full rules: `AGENTS.md` § Build & Deploy Contract.
 
-# 코드 + skills + devlog (private 권한 필요)
-git clone --recursive https://github.com/lidge-jun/cli-jaw.git
-```
+## Current Runtime Notes
 
-### Submodule Update
+- PABCD entry is explicit: `jaw orchestrate`, `/orchestrate`, or `/pabcd`. Resume is explicit `/continue`; natural-language “continue/계속/이어서” remains a normal prompt.
+- Workflow helper slash commands are `/plan`, `/interview`, `/deliberate`, `/planaudit`, `/review`, `/search`, `/goal`, `/goalplan`, `/team`, `/task`, `/fork`, and `/gd`. Dynamic `/skill:<id>` injects an active skill on CLI/Web. `/plan` is a compatibility guide for users expecting a plan command; it maps to PABCD P and does not create another planning mode. `/planaudit` is the canonical remote-safe spelling; `/plan-audit` is not registered. `/search <query>` forces the active search skill policy, rewrites focused queries, discovers candidate URLs, and uses browser commands only for evidence verification after candidates exist. Bounded automation is a `/goal run ...` subcommand family, not a separate top-level `/autopilot` command; current `/goal run` controls are tracking-oriented runtime gates.
+- `/goal plan [hint]`, `/goalplan [hint]`, and `cli-jaw goal plan [hint]` create a pending plan-mode goal. The raw hint is stored separately as `planHint`, not as the durable objective. Agents must refine with `/goal refine <specific objective>`, `cli-jaw goal refine "<specific objective>"`, or `/api/goal` `refine-objective` before checkpoints are accepted.
+- Agent pause is a two-tap audited gate. After the first `--agent --audit` attempt, the goal remains persisted as `active` but status/API surfaces expose derived `pauseGate: { armed: true, reason: "pause_gate_pending" }`; one audit/finalizer goal-continuation may run, and if that turn exits with the gate still armed it emits `goal_pause_gate_pending` without scheduling another kick. A second audited pause pauses the goal; a productive checkpoint clears the gate.
+- PABCD forward transitions require `jaw orchestrate <phase> --attest '{"from","to","did",...}'` (C→D also `checkOutput`/`exitCode`). Goal mode self-advances but still uses attestation as proof-of-work. See `structure/prompt_flow.md`.
+- Optimization/score-maximization goals follow the optimization-loop discipline (LOOP-PHASE-DEATH/CONTINUITY/CANDIDATE-ANCHOR/INSTANCE-CHECK + GATE-ORACLE-VALIDITY):
+  classify candidate changes, ban a class after 3 consecutive discards, force evaluator-gate work on repeated D-phase deaths.
+  Canonical: dev-pabcd §10, dev-testing §9.5; injected via orchestration template and goal continuation.
+- Pre-prompt context hooks: optional `~/.cli-jaw/context-hooks.json`, scopes `main`/`heartbeat`, `cli-jaw hooks inspect`. See `docs/dev/pre-prompt-context-hooks.md`.
+- **Telegram Hub** (P0–P4): forum-topic routing via Dashboard `/api/dashboard/telegram-hub`; hub commands `/setthread` `/threads` `/hubhelp`; per-topic `model`/`systemPrompt` overrides (P4). One bot token → one long-poller. See `structure/telegram.md`.
+- Bounded local search (prompt-injected): Grep/Glob from one known file or narrow directory only; external/Korean search via `/search` / active search skill. See `structure/prompt_flow.md`.
+- `npm test` runs `tests/run.mts` (programmatic driver, `isolation:'process'`). See `structure/infra.md`.
+- `/review` is a project-dir review workflow: it uses configured `projectDirs` or a validated recent-context git repo, never JAW_HOME/`process.cwd()` fallback, treats `/review [focus]` user text as the highest-priority scope signal, resolves the review scope from the current conversation focus plus recent goal/chat context and commit history/diffs/worktree/untracked files, saves a Markdown report with scope evidence, and scopes `--fix` to Critical/High findings as new working-tree patches on top of current `HEAD` without rewriting commits. Git ranges are evidence for the conversation-selected work item, not permission to include unrelated recent commits.
+- Korean promotional/content writing (홍보 쓰레드, 인스타 카드뉴스, 링크드인, 웹/블로그 게시물, 윤문) is owned by the active private runtime `k-writing` skill, not free-form prose or the retired `k-thread-gen` label. Route by channel first, then run the mandatory workflow: pre-search, content-type detection, 3-candidate hook scoring, tone/module formatting, and anti-AI-tell plus 인간다움 checks before output.
 
-서브모듈 수정 후 반드시 메인 레포에서도 ref 커밋:
-
-```bash
-cd devlog  # 또는 skills_ref
-git add -A && git commit -m "update" && git push
-cd ..
-git add devlog && git commit -m "chore: update devlog ref" && git push
-```
-
-### devlog 접근
-
-`devlog/` 는 private 레포입니다. 접근 필요 시 [Issue](https://github.com/lidge-jun/cli-jaw/issues)에서 collaborator 권한을 요청하세요.
-
-### Kanban
-
-프로젝트 보드: https://github.com/users/lidge-jun/projects/2/views/1
-
-### Line Count Format (`str_func.md`)
-
-File tree の行数は **`(NNNL)`** 형식으로 기재. 두 가지 변형 허용:
-
-```
-├── server.js          ← 설명 (757L)           ← 단순 형식
-├── chat.js            ← 설명 (3모드, ..., 843L) ← 다중 메타 형식
-```
-
-- 숫자 + `L` + `)` 또는 `,` 로 끝나야 detection 가능
-- 검증: `bash devlog/structure/verify-counts.sh` (exit code = 불일치 수)
-- 자동 수정: `bash devlog/structure/verify-counts.sh --fix`
-- **파일 수정 후 반드시 verify-counts 실행해서 문서 동기화**
-
-### Devlog Archive (`devlog/_fin/`)
-
-- 완료된 phase 폴더는 `devlog/_fin/`으로 이동 (folder-per-phase, 단독 `.md` 금지)
-- 계획/구현대기 문서는 `devlog/_plan/`으로 이동 (`_fin`에 두지 않음)
-- `devlog/` 루트에는 진행 중인 폴더만 유지
-- 후순위 작업은 `269999_` 접두사로 표시
-- Reference bundles (skill packages, test fixtures)은 반드시 phase 폴더 안에 포함
-- 전체 규칙: [`devlog/_fin/HYGIENE.md`](devlog/_fin/HYGIENE.md)
-- 점검: `bash devlog/structure/audit-fin-status.sh`
-- 자동 분리: `bash devlog/structure/audit-fin-status.sh --move-planning`
-
-### Phase Document Frontmatter
-
-```yaml
----
-created: 2026-MM-DD
-status: planning | active | blocked | done | deferred
-tags: [cli-jaw, ...]
----
-# (fin) Phase Title    ← 구현 완료 시 (fin) 접두사
-```
-
-- `status:` 필드 필수 — `planning`, `active`, `blocked`, `done`, `deferred` 중 택 1
-- Legacy prose forms (`> Status:`, `**Status**:`) remain readable during migration,
-  but new/updated phase docs must use YAML frontmatter.
-- 구현 완료된 문서 제목에 `(fin)` 접두사 추가
-
-### OfficeCLI
-
-OfficeCLI is available for Office document operations (.docx, .xlsx, .pptx). Single binary, no Office install needed.
-
-```bash
-officecli create file.docx                                          # create blank
-officecli view file.docx text                                       # view content
-officecli add file.docx /body --type paragraph --prop text="..."    # add content
-officecli set data.xlsx /Sheet1/A1 --prop value="42"                # set cell
-officecli add deck.pptx / --type slide --prop title="Title"         # add slide
-officecli validate file.docx                                        # validate
-officecli get file.docx / --json                                    # JSON output
-echo '[...]' | officecli batch data.xlsx --json                     # batch ops
-```
-
-- Install: `bash scripts/install-officecli.sh`
-- Smoke test: `bash tests/smoke/test_officecli_integration.sh`
-- Binary selection: smoke test prefers `OFFICECLI_BIN`, then global `officecli` on PATH, then `officecli/build-local/officecli` as fallback
-- CJK-enhanced binary: global install defaults to `lidge-jun/OfficeCLI`; repo-local `officecli/build-local/officecli` is fallback/dev-only
-- Full docs: [`docs/officecli-integration.md`](docs/officecli-integration.md)
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lidge-jun/cli-jaw](https://github.com/lidge-jun/cli-jaw) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
