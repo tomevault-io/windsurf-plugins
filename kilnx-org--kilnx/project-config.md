@@ -1,223 +1,57 @@
 ---
 trigger: always_on
-description: Kilnx language — complete reference for generating and editing .kilnx files
+description: > Agentic loop running as a `claude` CLI subprocess.
 ---
 
+# `agent`
 
-# Kilnx Language Reference
+> Agentic loop running as a `claude` CLI subprocess.
 
-Kilnx is a declarative backend language that compiles `.kilnx` files to a standalone Go binary. Zero JavaScript, zero runtime deps. SQLite and PostgreSQL built in. Designed for htmx.
+| | |
+|---|---|
+| **Kind** | Keyword |
+| **Since** | `0.1.3` |
 
-Full references:
-- [GRAMMAR.md](mdc:GRAMMAR.md) — complete syntax spec
-- [FEATURES.md](mdc:FEATURES.md) — runnable examples
-- [PRINCIPLES.md](mdc:PRINCIPLES.md) — 11 design rules
-- [llms-full.txt](mdc:llms-full.txt) — single-file concat for LLM context
+## Syntax
 
----
-
-## Hard rules
-
-- Keywords are **finite**. Do not invent syntax. If the grammar is silent on a construct, it does not exist — propose an RFC instead.
-- **No JavaScript** in generated apps. htmx only for interactivity.
-- **No external runtime deps** in user code. One `.kilnx` file, optionally split via `import`.
-- **Security is built-in**: CSRF protection, bcrypt hashing, session HMAC, HTML escaping, SQL binding. Never reimplement these.
-- SQL uses **named parameters** (`:name`). Never concatenate user input into SQL strings.
-- **`richtext` is unescaped** — only use with trusted content.
-
----
-
-## Top-level blocks
-
-| Block | Purpose |
-|-------|---------|
-| `config` | Database, port, secrets, app name |
-| `model` | Data model → database table (auto-migrated) |
-| `auth` | Authentication config (login/register/logout) |
-| `permissions` | Role-based access control |
-| `layout` | Page wrapper template |
-| `page` | GET route returning full HTML |
-| `action` | POST/PUT/DELETE mutation route |
-| `fragment` | Partial HTML for htmx swaps |
-| `api` | JSON endpoint |
-| `stream` | Server-Sent Events |
-| `socket` | Bidirectional WebSocket |
-| `webhook` | External event receiver |
-| `job` | Async background job |
-| `schedule` | Timed/cron background task |
-| `test` | Declarative test case |
-
----
-
-## Field types
-
-| Type | Notes |
-|------|-------|
-| `text` | String. Maps to TEXT. |
-| `email` | String with format validation. |
-| `int` | Integer. |
-| `float` | Floating point. |
-| `bool` | Boolean. Stored as 0/1 in SQLite. |
-| `timestamp` | Date/time. Use `auto` for auto-now-on-insert. |
-| `password` | Auto-hashed with bcrypt on INSERT. Never stored plaintext. |
-| `richtext` | Unescaped HTML. Use only with trusted content. |
-| `option` | Enum: `status: option [draft, published, archived]` |
-| `image` | File path for uploaded images. |
-| `phone` | Phone number with format validation. |
-
-## Constraints
-
-`required` `unique` `default <val>` `auto` `min <n>` `max <n>`
-
-Model-level directives: `unique (field_a, field_b, ...)` for composite UNIQUE (2+ fields); `index (field_a, field_b, ...)` for non-unique indexes (1+ fields). References resolve to `_id` columns.
-
----
-
-## Syntax examples
-
-### Minimal config
-
-```kilnx
-config
-  database: env DATABASE_URL default "sqlite://app.db"
-  port: env PORT default 8080
-  secret: env SECRET_KEY required
+```
+agent
 ```
 
-### Model
+## Description
 
-```kilnx
-model user
-  name: text required min 2 max 100
-  email: email unique required
-  password: password required
-  role: option [admin, user] default "user"
-  created: timestamp auto
-```
+Block-form attribute inside `llm`. Spawns the official `claude` CLI (min v2.0.0) per request and streams `stream-json` envelopes back. Requires `max-budget-usd`. The `claude` CLI must be on PATH at runtime; `kilnx run` validates this at startup when any `agent` block is declared.
 
-### Auth
+Inside a `job` or `schedule`, the agent runs on the worker rather than an HTTP handler. Attach an [`on progress`](../attributes/on-progress.md) block-form child to react to each progress event (typically a `query` or `broadcast`); a failing handler is logged and does not abort the agent.
 
-```kilnx
-auth
-  table: user
-  identity: email
-  password: password
-  login: /login
-  after login: /dashboard
-```
+## Children
 
-### Permissions
+- [`cwd`](../attributes/cwd.md)
+- [`tools`](../attributes/tools.md)
+- [`max-turns`](../attributes/max-turns.md)
+- [`max-budget-usd`](../attributes/max-budget-usd.md)
+- [`permission-mode`](../attributes/permission-mode.md)
+- [`mcp`](../attributes/mcp.md)
+- [`pool`](../attributes/pool.md)
+- [`pool-idle-ttl`](../attributes/pool-idle-ttl.md)
+- [`show-tools`](../attributes/show-tools.md)
+- [`resume`](../attributes/resume.md)
+- [`on-progress`](../attributes/on-progress.md)
 
-```kilnx
-permissions
-  admin can read write user post
-  user can read post
-  user can read write post where author_id = current_user
-```
+## See also
 
-### Layout
+- [`llm`](llm.md)
 
-```kilnx
-layout main
-  html
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>{page.title}</title>
-        {kilnx.js}
-      </head>
-      <body>{page.content}</body>
-    </html>
-```
+## Provenance
 
-### Page with query
+> ⚠ **Implementation touched after spec.** Source code changed on `2026-05-21`, but this entity's spec was last edited on `2026-05-20`. The description may be out of date.
 
-```kilnx
-page /dashboard requires auth
-  layout main
-  title Dashboard
-  query stats: SELECT count(*) as total FROM user
-  html
-    <h1>Total users: {stats.total}</h1>
-```
-
-### Action (mutation)
-
-```kilnx
-action /posts POST requires auth
-  validate post
-  query: INSERT INTO post (title, body, author_id) VALUES (:title, :body, :current_user)
-  on success: redirect /posts
-  on error: redirect /posts/new?error=1
-```
-
-### Fragment (htmx target)
-
-```kilnx
-fragment /contacts/search
-  query contacts: SELECT * FROM contact WHERE name LIKE :q ORDER BY name
-  html
-    {{each contacts}}<div>{name} — {email}</div>{{end}}
-```
-
-### JSON API
-
-```kilnx
-api /api/posts requires auth
-  query posts: SELECT id, title, created FROM post WHERE author_id = :current_user
-  respond posts
-```
-
-### Server-Sent Events
-
-```kilnx
-stream /events/inbox every 3s
-  query msgs: SELECT id, body FROM message WHERE recipient_id = :current_user ORDER BY created DESC LIMIT 20
-```
-
-### Background job
-
-```kilnx
-job send-welcome
-  retry 3
-  query u: SELECT email, name FROM user WHERE id = :user_id
-  send email to {u.email}
-```
-
-### Schedule
-
-```kilnx
-schedule cleanup every 24h
-  query: DELETE FROM session WHERE expires < datetime('now')
-```
-
-### Test
-
-```kilnx
-test "homepage returns 200"
-  GET /
-  expect status 200
-
-test "create post requires auth"
-  POST /posts
-  expect status 302
-  expect redirect /login
-```
-
----
-
-## Template syntax (inside `html` blocks)
-
-| Syntax | Effect |
-|--------|--------|
-| `{field}` | Interpolate — HTML-escaped |
-| `{query.field}` | Query result field |
-| `{field \| filter}` | Apply filter |
-| `{{each query}}`...`{{end}}` | Loop over query rows |
-| `{{if field}}`...`{{end}}` | Conditional (truthy check) |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| | |
+|---|---|
+| **Spec last touched** | `36bcf1b` (2026-05-20) |
+| **Source last touched** | `c01c7b5` (2026-05-21) |
+| **Source files** | `internal/parser/parser.go`, `internal/runtime/scheduler.go`, `internal/runtime/server.go` |
 
 ---
 > Source: [kilnx-org/kilnx](https://github.com/kilnx-org/kilnx) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
