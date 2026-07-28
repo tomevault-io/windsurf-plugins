@@ -1,96 +1,168 @@
 ---
 trigger: always_on
-description: ================================================
+description: Agent is a powerful design pattern in which nodes can take dynamic actions based on the context.
 ---
 
-================================================
-File: docs/guide.md
-================================================
 
----
+# Agent
 
-layout: default
-title: "Agentic Coding"
+Agent is a powerful design pattern in which nodes can take dynamic actions based on the context.
 
----
+<div align="center">
+  <img src="https://github.com/the-pocket/.github/raw/main/assets/agent.png?raw=true" width="350"/>
+</div>
 
-# Agentic Coding: Humans Design, Agents code!
+## Implement Agent with Graph
 
-> If you are an AI agents involved in building LLM Systems, read this guide **VERY, VERY** carefully! This is the most important chapter in the entire document. Throughout development, you should always (1) start with a small and simple solution, (2) design at a high level (`docs/design.md`) before implementation, and (3) frequently ask humans for feedback and clarification.
-> {: .warning }
+1. **Context and Action:** Implement nodes that supply context and perform actions.
+2. **Branching:** Use branching to connect each action node to an agent node. Use action to allow the agent to direct the [flow](../core_abstraction/flow.md) between nodes—and potentially loop back for multi-step.
+3. **Agent Node:** Provide a prompt to decide action—for example:
 
-## Agentic Coding Steps
+```typescript
+`
+### CONTEXT
+Task: ${task}
+Previous Actions: ${prevActions}
+Current State: ${state}
 
-Agentic Coding should be a collaboration between Human System Design and Agent Implementation:
+### ACTION SPACE
+[1] search
+  Description: Use web search to get results
+  Parameters: query (str)
 
-| Steps             |   Human    |     AI     | Comment                                                                                        |
-| :---------------- | :--------: | :--------: | :--------------------------------------------------------------------------------------------- |
-| 1. Requirements   |  ★★★ High  |  ★☆☆ Low   | Humans understand the requirements and context.                                                |
-| 2. Flow           | ★★☆ Medium | ★★☆ Medium | Humans specify the high-level design, and the AI fills in the details.                         |
-| 3. Utilities      | ★★☆ Medium | ★★☆ Medium | Humans provide available external APIs and integrations, and the AI helps with implementation. |
-| 4. Node           |  ★☆☆ Low   |  ★★★ High  | The AI helps design the node types and data handling based on the flow.                        |
-| 5. Implementation |  ★☆☆ Low   |  ★★★ High  | The AI implements the flow based on the design.                                                |
-| 6. Optimization   | ★★☆ Medium | ★★☆ Medium | Humans evaluate the results, and the AI helps optimize.                                        |
-| 7. Reliability    |  ★☆☆ Low   |  ★★★ High  | The AI writes test cases and addresses corner cases.                                           |
+[2] answer
+  Description: Conclude based on the results
+  Parameters: result (str)
 
-1. **Requirements**: Clarify the requirements for your project, and evaluate whether an AI system is a good fit.
+### NEXT ACTION
+Decide the next action based on the current context.
+Return your response in YAML format:
 
-   - Understand AI systems' strengths and limitations:
-     - **Good for**: Routine tasks requiring common sense (filling forms, replying to emails)
-     - **Good for**: Creative tasks with well-defined inputs (building slides, writing SQL)
-     - **Not good for**: Ambiguous problems requiring complex decision-making (business strategy, startup planning)
-   - **Keep It User-Centric:** Explain the "problem" from the user's perspective rather than just listing features.
-   - **Balance complexity vs. impact**: Aim to deliver the highest value features with minimal complexity early.
+\`\`\`yaml
+thinking: <reasoning process>
+action: <action_name>
+parameters: <parameters>
+\`\`\``;
+```
 
-2. **Flow Design**: Outline at a high level, describe how your AI system orchestrates nodes.
+The core of building **high-performance** and **reliable** agents boils down to:
 
-   - Identify applicable design patterns (e.g., [Map Reduce](./design_pattern/mapreduce.md), [Agent](./design_pattern/agent.md), [RAG](./design_pattern/rag.md)).
-     - For each node in the flow, start with a high-level one-line description of what it does.
-     - If using **Map Reduce**, specify how to map (what to split) and how to reduce (how to combine).
-     - If using **Agent**, specify what are the inputs (context) and what are the possible actions.
-     - If using **RAG**, specify what to embed, noting that there's usually both offline (indexing) and online (retrieval) workflows.
-   - Outline the flow and draw it in a mermaid diagram. For example:
+1. **Context Management:** Provide _relevant, minimal context._ For example, rather than including an entire chat history, retrieve the most relevant via [RAG](./rag.md).
 
-     ```mermaid
-     flowchart LR
-         start[Start] --> batch[Batch]
-         batch --> check[Check]
-         check -->|OK| process
-         check -->|Error| fix[Fix]
-         fix --> check
+2. **Action Space:** Provide _a well-structured and unambiguous_ set of actions—avoiding overlap like separate `read_databases` or `read_csvs`.
 
-         subgraph process[Process]
-           step1[Step 1] --> step2[Step 2]
-         end
+## Example Good Action Design
 
-         process --> endNode[End]
-     ```
+- **Incremental:** Feed content in manageable chunks instead of all at once.
+- **Overview-zoom-in:** First provide high-level structure, then allow drilling into details.
+- **Parameterized/Programmable:** Enable parameterized or programmable actions.
+- **Backtracking:** Let the agent undo the last step instead of restarting entirely.
 
-   - > **If Humans can't specify the flow, AI Agents can't automate it!** Before building an LLM system, thoroughly understand the problem and potential solution by manually solving example inputs to develop intuition.  
-     > {: .best-practice }
+## Example: Search Agent
 
-3. **Utilities**: Based on the Flow Design, identify and implement necessary utility functions.
+This agent:
 
-   - Think of your AI system as the brain. It needs a body—these _external utility functions_—to interact with the real world:
-       <div align="center"><img src="https://github.com/the-pocket/.github/raw/main/assets/utility.png?raw=true" width="400"/></div>
+1. Decides whether to search or answer
+2. If searches, loops back to decide if more search needed
+3. Answers when enough context gathered
 
-     - Reading inputs (e.g., retrieving Slack messages, reading emails)
-     - Writing outputs (e.g., generating reports, sending emails)
-     - Using external tools (e.g., calling LLMs, searching the web)
-     - **NOTE**: _LLM-based tasks_ (e.g., summarizing text, analyzing sentiment) are **NOT** utility functions; rather, they are _core functions_ internal in the AI system.
+````typescript
+interface SharedState {
+  query?: string;
+  context?: Array<{ term: string; result: string }>;
+  search_term?: string;
+  answer?: string;
+}
 
-   - For each utility function, implement it and write a simple test.
-   - Document their input/output, as well as why they are necessary. For example:
-     - `name`: `getEmbedding` (`src/utils/getEmbedding.ts`)
-     - `input`: `string`
-     - `output`: a vector of 3072 numbers
-     - `necessity`: Used by the second node to embed text
-   - Example utility implementation:
+class DecideAction extends Node<SharedState> {
+  async prep(shared: SharedState): Promise<[string, string]> {
+    const context = shared.context
+      ? JSON.stringify(shared.context)
+      : "No previous search";
+    return [shared.query || "", context];
+  }
 
-     ```typescript
+  async exec([query, context]: [string, string]): Promise<any> {
+    const prompt = `
+Given input: ${query}
+Previous search results: ${context}
+Should I: 1) Search web for more info 2) Answer with current knowledge
+Output in yaml:
+\`\`\`yaml
+action: search/answer
+reason: why this action
+search_term: search phrase if action is search
+\`\`\``;
+    const resp = await callLlm(prompt);
+    const yamlStr = resp.split("```yaml")[1].split("```")[0].trim();
+    return yaml.load(yamlStr);
+  }
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+  async post(
+    shared: SharedState,
+    _: [string, string],
+    result: any
+  ): Promise<string> {
+    if (result.action === "search") {
+      shared.search_term = result.search_term;
+    }
+    return result.action;
+  }
+}
+
+class SearchWeb extends Node<SharedState> {
+  async prep(shared: SharedState): Promise<string> {
+    return shared.search_term || "";
+  }
+
+  async exec(searchTerm: string): Promise<string> {
+    return await searchWeb(searchTerm);
+  }
+
+  async post(shared: SharedState, _: string, execRes: string): Promise<string> {
+    shared.context = [
+      ...(shared.context || []),
+      { term: shared.search_term || "", result: execRes },
+    ];
+    return "decide";
+  }
+}
+
+class DirectAnswer extends Node<SharedState> {
+  async prep(shared: SharedState): Promise<[string, string]> {
+    return [
+      shared.query || "",
+      shared.context ? JSON.stringify(shared.context) : "",
+    ];
+  }
+
+  async exec([query, context]: [string, string]): Promise<string> {
+    return await callLlm(`Context: ${context}\nAnswer: ${query}`);
+  }
+
+  async post(
+    shared: SharedState,
+    _: [string, string],
+    execRes: string
+  ): Promise<undefined> {
+    shared.answer = execRes;
+    return undefined;
+  }
+}
+
+// Connect nodes
+const decide = new DecideAction();
+const search = new SearchWeb();
+const answer = new DirectAnswer();
+
+decide.on("search", search);
+decide.on("answer", answer);
+search.on("decide", decide); // Loop back
+
+const flow = new Flow(decide);
+await flow.run({ query: "Who won the Nobel Prize in Physics 2024?" });
+````
 
 ---
 > Source: [The-Pocket/PocketFlow-Typescript](https://github.com/The-Pocket/PocketFlow-Typescript) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
