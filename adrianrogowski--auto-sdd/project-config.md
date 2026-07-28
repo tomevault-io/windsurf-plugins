@@ -1,136 +1,92 @@
 ---
 trigger: always_on
-description: Specs-driven development workflow with design system integration
+description: When to use subagents (Task tool) for parallel work in SDD commands
 ---
 
 
-# Specs-Driven Development Workflow
+# Subagent Patterns for SDD
 
-This project uses a specs-driven workflow. The `.specs/` directory contains:
-- `strategy.md` - Business strategy: target customer, buying motion, value prop
-- `constitution.md` - Non-negotiable constraints: security, data handling, errors
-- `migrations.md` - Database migration playbook: tool, conventions, reversibility (created by /infer-migrations)
-- `features/` - Gherkin feature specifications with ASCII mockups
-- `personas/` - User personas that inform every spec
-- `test-suites/` - Documentation of what each test file covers
-- `design-system/` - Design tokens and component patterns
-- `learnings/` - Cross-cutting patterns by category
-- `mapping.md` - Links features ↔ tests ↔ components ↔ design
+When executing SDD commands, use subagents (the Task tool) to parallelize independent work. This applies to both interactive commands and the build loop.
 
----
+## When to Fan Out
 
-## Command Triggers
+### During /spec-first
+- **Parallel reads**: Load strategy, constitution, personas, design tokens, learnings index, and search for existing spec simultaneously (up to 6 parallel explore subagents)
+- **Component stub creation**: If mockup references 3+ new components, create stubs in parallel
 
-When the user says any of these phrases, **automatically invoke `/spec-first`**:
+### During /tdd
+- **Post-GREEN validation**: Run build check, lint check, and test check simultaneously (3 parallel shell subagents)
+- **Drift check + compound**: After refactor, drift check and compound can start reading files in parallel (drift checks code, compound reads learnings index)
 
-| User says | Action |
-|-----------|--------|
-| "spec first" | Run `/spec-first {feature}` |
-| "spec-first" | Run `/spec-first {feature}` |
-| "write a spec for" | Run `/spec-first {feature}` |
-| "create a spec" | Run `/spec-first {feature}` |
-| "spec this out" | Run `/spec-first {feature}` |
-| "spec out" | Run `/spec-first {feature}` |
-| "plan this feature" | Run `/spec-first {feature}` |
-| "write the spec" | Run `/spec-first {feature}` |
-| "create spec" | Run `/spec-first {feature}` |
-| "update the spec for" | Run `/spec-first {feature}` (update mode) |
-| "update spec" | Run `/spec-first {feature}` (update mode) |
+### During /build-next
+- **Context loading**: Read strategy, vision, personas, constitution, design tokens, related specs, and learnings index in parallel (7 parallel reads)
+- **Post-build phases**: If drift check and code review are both enabled, they read independent file sets — run simultaneously
 
-When the user says any of these after a spec is shown, **invoke `/tdd`**:
+### During /check-coverage
+- **Parallel analysis**: Check spec coverage, test coverage, and mapping consistency as 3 independent subagents
 
-| User says | Action |
-|-----------|--------|
-| "tdd" | Run `/tdd {feature}` |
-| "go ahead" | Run `/tdd` with current spec |
-| "build it" | Run `/tdd` with current spec |
-| "implement it" | Run `/tdd` with current spec |
-| "ship it" | Run `/tdd` with current spec |
+### During /catch-drift
+- **Multi-spec drift scan**: When scanning multiple specs, batch 3-5 specs per subagent instead of one at a time
 
-Extract the feature description from the rest of their message.
+### During /guide
+- **Parallel gathering**: Read all feature specs, codebase files, and learnings in parallel batches
 
-When the user says any of these, **invoke the corresponding ralph/utility command**:
+### During /ralph-run
+- **Pre-flight checks**: Validate CLI, check ports, read roadmap simultaneously
 
-| User says | Action |
-|-----------|--------|
-| "ralph setup", "set up ralph", "configure ralph" | Run `/ralph-setup` |
-| "ralph run", "run ralph", "start the loop", "run the loop" | Run `/ralph-run` |
-| "clean slate", "kill everything", "restart everything", "nuke localhost" | Run `/clean-slate` |
-| "generate guide", "update guide", "how to use guide" | Run `/guide` |
+## When NOT to Fan Out
 
-When the user says any of these, **invoke `/strategy`**:
+- **Sequential dependencies**: Spec must complete before tests, tests before implementation
+- **Git operations**: Only one agent should touch git at a time (commits, branches, merges)
+- **Roadmap updates**: Single writer to avoid race conditions on roadmap.md
+- **Small tasks**: If the total work is < 10 seconds, the subagent overhead isn't worth it
 
-| User says | Action |
-|-----------|--------|
-| "strategy" | Run `/strategy` |
-| "product strategy" | Run `/strategy` |
-| "business strategy" | Run `/strategy` |
-| "shape this" | Run `/strategy` |
-| "who are we selling to" | Run `/strategy` |
-| "business model" | Run `/strategy` |
+## How to Fan Out
 
-When the user says any of these, **invoke `/gtm`**:
+Use the Task tool with appropriate subagent types:
 
-| User says | Action |
-|-----------|--------|
-| "gtm playbook" | Run `/gtm` |
-| "marketing plan" | Run `/gtm` |
-| "how do we get users" | Run `/gtm` |
-| "distribution plan" | Run `/gtm` |
-| "growth plan" | Run `/gtm` |
-| "channel strategy" | Run `/gtm` |
-| "launch plan" | Run `/gtm` |
-| "outreach plan" | Run `/gtm` |
+```
+# For file reading / exploration
+subagent_type: "explore" with model: "fast"
 
-When the user says any of these, **invoke `/find-early-users`**:
+# For shell commands (build, test, lint)
+subagent_type: "shell" with model: "fast"
 
-| User says | Action |
-|-----------|--------|
-| "find early users" | Run `/find-early-users` |
-| "find users" | Run `/find-early-users` |
-| "find prospects" | Run `/find-early-users` |
-| "find people" | Run `/find-early-users` |
-| "who should I talk to" | Run `/find-early-users` |
-| "find beta testers" | Run `/find-early-users` |
-| "find feedback" | Run `/find-early-users` |
-| "prospect list" | Run `/find-early-users` |
-| "who's complaining about" | Run `/find-early-users` |
-| "find my first users" | Run `/find-early-users` |
+# For complex analysis (drift check, code review)
+subagent_type: "generalPurpose"
+```
 
-When the user says any of these, **invoke `/constitution`**:
+### Pattern: Parallel Reads Then Sequential Write
 
-| User says | Action |
-|-----------|--------|
-| "constitution" | Run `/constitution` |
-| "project constraints" | Run `/constitution` |
-| "security rules" | Run `/constitution` |
-| "invariants" | Run `/constitution` |
-| "non-negotiables" | Run `/constitution` |
-| "audit specs" | Run `/constitution --audit` |
+```
+1. Fan out: explore subagents read strategy, constitution, personas, tokens, learnings, existing specs
+2. Collect results
+3. Sequential: Write the spec using all gathered context
+```
 
-When the user says any of these, **invoke `/infer-migrations`**:
+### Pattern: Parallel Validation
 
-| User says | Action |
-|-----|-----|
-| "infer migrations" | Run `/infer-migrations` |
-| "migration strategy" | Run `/infer-migrations` |
-| "migration playbook" | Run `/infer-migrations` |
-| "how do we do migrations" | Run `/infer-migrations` |
-| "document our migrations" | Run `/infer-migrations` |
-| "schema change strategy" | Run `/infer-migrations` |
+```
+1. Agent completes implementation
+2. Fan out: shell subagent runs tests, shell subagent runs build, shell subagent runs lint
+3. Collect results
+4. If all pass → continue
+5. If any fail → fix sequentially (failures may be related)
+```
 
-**Create vs Update**: `/spec-first` auto-detects whether to create or update: searches `.specs/features/` for a matching spec (by path or frontmatter `feature:`). Match found → update existing spec. No match → create new spec. With `--full`, both paths continue through the full Red-Green-Refactor TDD cycle.
+### Pattern: Batch Processing
 
-**Specs are state, not deltas**: a spec always describes the entire expected behavior of the feature as it exists now — "add three fields to the form" is a commit message, not a spec. Updates rewrite affected scenarios to the new truth (removing superseded ones) instead of appending change notes; the delta lives in git history.
+For commands that process multiple items (drift-scan, doc-loop, check-coverage):
+```
+1. Gather list of items to process
+2. Chunk into batches of PARALLEL_FEATURES (default: 3)
+3. Fan out: one subagent per chunk
+4. Collect and merge results
+```
 
-### Full Mode Triggers
+## Build Loop Integration
 
-If user includes "full", "auto", "no stops", or "don't pause":
-- Add `--full` flag to the command
-- Example: "spec first user auth, full mode" → `/spec-first user auth --full`
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+The `BRANCH_STRATEGY=parallel` mode in `build-loop-local.sh` already handles script-level parallelism (multiple agent processes in separate worktrees). Within each agent process, use the patterns above for command-level parallelism.
 
 ---
 > Source: [AdrianRogowski/auto-sdd](https://github.com/AdrianRogowski/auto-sdd) — distributed by [TomeVault](https://tomevault.io).
