@@ -1,0 +1,154 @@
+---
+trigger: always_on
+description: Integration tests (`#[Group('target-version')]`) require Docker to pull and run
+---
+
+# CLAUDE.md — Project Notes for Claude Code
+
+## Environment Setup
+
+### Starting dockerd for integration tests
+
+Integration tests (`#[Group('target-version')]`) require Docker to pull and run
+PHP target images (`php:7.3-zts`, `php:8.4-cli`, etc.).  
+**Always start dockerd at the beginning of the session** if you plan to run
+integration tests or need to `docker pull`:
+
+```bash
+dockerd --storage-driver=vfs --bridge=none --iptables=false --ip6tables=false &
+```
+
+Wait a few seconds for dockerd to be ready before running tests.
+
+### Proxy settings for Docker pulls
+
+If `docker pull` fails with network errors, check whether HTTP proxy environment
+variables are set and pass them to the daemon or configure
+`/etc/systemd/system/docker.service.d/proxy.conf`.  Common variables:
+
+```bash
+export http_proxy=...
+export https_proxy=...
+export no_proxy=localhost,127.0.0.1
+```
+
+When `docker pull` keeps failing, retry a few times — transient network issues
+are common in sandboxed CI-like environments.
+
+### Running integration tests
+
+```bash
+# Run all integration tests for a specific PHP target
+RELI_TEST_PHP_TARGETS=v73_zts php vendor/bin/phpunit --group target-version
+
+# Run a specific test class
+RELI_TEST_PHP_TARGETS=v74 php vendor/bin/phpunit --filter 'MemoryCompareCommandIntegrationTest'
+```
+
+### Sandbox-only ptrace failures
+
+If `tests/Lib/Process/Exec/TraceeExecutorTest` (or anything else that calls
+`PTRACE_TRACEME` from a forked child) returns `EPERM` here, that is a
+seccomp/yama restriction in the sandbox container — the test is green on
+`0.12.x` upstream. Don't chase it as a regression. `strace -e ptrace` on the
+phpunit run will show the EPERM if you're unsure.
+
+## Profiling reli (dogfooding)
+
+reli is itself a PHP process, so you can profile it with another reli. Useful
+when you suspect a hot path inside reli's own code.
+
+### Standard recipe
+
+```bash
+# Inner reli runs against the real target; bigger sample interval (1 ms here)
+# keeps the rbt manageable.
+php ./reli inspector:trace -p "$TARGET_TID" \
+    --php-regex='.*/libphp\.so$' \
+    --libpthread-regex='.*/libc\.so.*' \
+    > /tmp/inner.out 2>&1 &
+INNER=$!
+
+# Outer reli profiles the inner and writes a binary trace.
+php ./reli inspector:trace -p "$INNER" \
+    -F rbt -o /tmp/profile.rbt \
+    -s 1000000 \
+    > /dev/null 2>&1 &
+OUTER=$!
+
+# Wait for inner to do its thing, then INT both. Send INT, not KILL — the rbt
+# is finalised on graceful shutdown only; SIGKILL leaves the file empty or
+# truncated and `rbt:analyze` will bail with "Unexpected end of stream while
+# decoding varint".
+sleep 5
+kill -INT $OUTER $INNER
+wait
+```
+
+Variant: profile reli **from the very first PHP frame** (catches startup +
+autoload too) by letting the outer reli launch the inner as a child:
+
+```bash
+php ./reli inspector:trace \
+    -F rbt -o /tmp/profile.rbt -s 100000 \
+    -E /tmp/inner.err -O /tmp/inner.out \
+    -- php ./reli inspector:trace -p "$TARGET_TID" \
+        --php-regex='.*/libphp\.so$' --libpthread-regex='.*/libc\.so.*'
+```
+
+### Analyzing the rbt
+
+Use `rbt:analyze`, not `converter:folded` + ad-hoc `awk`. The folded format
+collapses identical stacks into a single line with a count column at the end,
+so `wc -l` and `sort | uniq -c` both undercount samples. `rbt:analyze` does the
+right summation and surfaces self-time / total-time / callers / callees in one
+shot:
+
+```bash
+# Reads from stdin
+php ./reli rbt:analyze --top=15 --no-line --crop=140 < /tmp/profile.rbt
+
+# Filter to a code path (PCRE matched against any frame in each stack)
+php ./reli rbt:analyze --match='findGlobals|loadResolver' \
+    --top=15 --no-line --crop=140 < /tmp/profile.rbt
+
+# Who calls X?
+php ./reli rbt:analyze --sections=callers --callers='^FFI::string$' \
+    --no-line --crop=200 < /tmp/profile.rbt
+```
+
+### Sampling-resolution gotchas
+
+- The PHP-frame sampler does **not** cover time the target spends in C-only
+  code (FFI calls, syscalls). If `rbt:analyze` looks dominated by
+  `time_nanosleep`, that is the post-cold-attach sampling loop sleeping —
+  not a real hot spot. Filter cold-attach with `--match='findGlobals|...'`
+  to focus on the relevant samples.
+- The outer reli has its own startup cost (~1 s on this sandbox), so it can
+  miss the **first** ~1 s of the inner reli's life when both are launched
+  back-to-back. The `-- cmd` form above sidesteps that by having the outer
+  fork the inner.
+- The first attach to a fresh `libphp.so` is slower than subsequent
+  ones (parses the dynamic symbol table, brute-forces TLS, etc.).
+  Sub-second on a normal box, a few seconds on this sandbox. Don't
+  `timeout 5s` the first run when investigating unfamiliar binaries.
+
+## Project-Specific Pitfalls
+
+### FrankenPHP cold attach reality
+
+FrankenPHP is the canonical "this should be daemon-mode" target. A few
+non-obvious things bite single-shot `inspector:trace -p` users:
+
+- **`php-main` is the bootstrap thread, not a worker.** It matches `^php-`
+  but does not host requests; memory commands fail with "failed to find
+  ZendMM main chunk" and trace samples are useless. The recommended regex
+  everywhere is `^php-[0-9a-f]+$`.
+- **Hex-named workers can be uninitialised.** A worker that has never
+  served a request leaves `_tsrm_ls_cache` zeroed, so brute force returns
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [reliforp/reli-prof](https://github.com/reliforp/reli-prof) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
