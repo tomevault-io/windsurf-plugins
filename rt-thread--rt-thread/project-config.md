@@ -1,91 +1,163 @@
 ---
 trigger: always_on
-description: RT-Thread is a real-time operating system (RTOS) for embedded devices. When working with RT-Thread code, please follow these guidelines to ensure high-quality contributions.
+description: Use when firmware exposes SCMI only through EL3 traps (no separate mailbox IP).
 ---
 
-# GitHub Copilot Instructions for RT-Thread / RT-Thread GitHub Copilot 指南
+@page page_device_scmi_agent SCMI agent transports
 
-## Overview / 概述
+# SCMI agent layer
 
-RT-Thread is a real-time operating system (RTOS) for embedded devices. When working with RT-Thread code, please follow these guidelines to ensure high-quality contributions.
+Overview and protocol drivers: @ref page_device_scmi.
 
-RT-Thread 是一个面向嵌入式设备的实时操作系统（RTOS）。在处理 RT-Thread 代码时，请遵循以下指南以确保高质量的贡献。
+Implementation directory: **`components/drivers/firmware/arm_scmi/`**.
 
-**When reviewing Pull Requests (PRs), you MUST check all items in the PR Review Checklist section and provide feedback according to the PR Review Instructions. / 在审查 Pull Request (PR) 时，必须检查 PR 审查清单部分中的所有项目，并根据 PR 审查指令提供反馈。**
+The **agent** is the only piece that knows how to move a `struct rt_scmi_msg` across the SoC boundary. Every `rt_scmi_device` on the SCMI bus shares the same **`struct scmi_agent`** instance created during platform **`scmi_probe`**.
 
-## Code Review Guidelines / 代码审查指南
+---
 
-### Language Requirements / 语言要求
+## Agent object (`agent.h`)
 
-When reviewing code, provide feedback in **both English and Chinese** to ensure accessibility for all contributors.
+```c
+struct scmi_agent_ops {
+    const char *name;
+    rt_err_t (*setup)(struct scmi_agent *agent, struct rt_device *dev);
+    rt_err_t (*process_msg)(struct scmi_agent *agent, struct rt_scmi_msg *msg);
+};
 
-在审查代码时，请同时使用**英文和中文**提供反馈，以确保所有贡献者都能理解。
+struct scmi_agent {
+    const struct scmi_agent_ops *ops;
+    void *priv;   /* transport state (mailbox, SMC, virtio) */
+};
+```
 
-### Review Focus Areas / 审查重点领域
+| Callback | When it runs |
+| --- | --- |
+| `setup` | Once per SCMI controller: parse DT, map shmem, request mailbox channel / program SMC |
+| `process_msg` | Every `rt_scmi_process_msg()` — serialize request, wait for reply, fill `out_msg` |
 
-1. **Real-Time Performance / 实时性能**
-   - Verify interrupt handling efficiency / 验证中断处理效率
-2. **Memory Management / 内存管理**
-   - Detect memory leaks / 检测内存泄漏
-   - Verify proper memory allocation/deallocation / 验证正确的内存分配/释放
-   - Check stack usage optimization / 检查栈使用优化
-3. **Code Style / 代码风格**
-   - Follow RT-Thread coding standards / 遵循 RT-Thread 编码标准
-   - Maintain consistent naming conventions / 保持一致的命名约定
-   - Ensure proper code comments (not documentation) / 确保适当的代码注释（而非文档）
-4. **PR Review Checklist / PR 审查清单**
-   - **PR Title Review / PR 标题审查**：
-     - Check if PR title has proper prefix format / 检查 PR 标题是否有正确的前缀格式
-     - Verify prefix follows pattern: `[module/vendor][subsystem]` or `[module/vendor]` in lowercase / 验证前缀遵循格式：小写的 `[模块/厂商][子系统]` 或 `[模块/厂商]`
-     - Verify title describes changes based on modified files / 验证标题基于修改的文件描述变更
-     - Check if title is specific enough (avoid vague terms like "fix bug", "optimize code") / 检查标题是否足够具体（避免模糊术语如"修复问题"、"代码优化"）
-     - If title lacks prefix or uses incorrect format, suggest: "PR title should follow format: `[module][subsystem] Description`. Example: `[stm32][drivers] Fix UART interrupt handling issue`" / 如果标题缺少前缀或格式错误，建议："PR 标题应遵循格式：`[模块][子系统] 描述`。示例：`[stm32][drivers] Fix UART interrupt handling issue`"
-   - **PR Description Review / PR 内容审查**：
-     - Check if PR description provides overview of modified files / 检查 PR 描述是否提供了修改文件的总概
-     - Verify description explains: What (what changes), Why (why needed), How (which files modified) / 验证描述是否说明：What（做了什么修改）、Why（为什么需要）、How（修改了哪些文件）
-     - If description is missing or insufficient, suggest adding description with modified files list / 如果描述缺失或不充分，建议添加包含修改文件列表的描述
-   - **PR File Modification Review / PR 修改文件审查**：
-     - Check if PR contains multiple unrelated features / 检查 PR 是否包含多个不相关的特性
-     - If PR mixes multiple features, suggest splitting into separate PRs / 如果 PR 混杂多个特性，建议拆分为多个 PR
-     - Verify all file changes are related to the same feature/bug fix / 验证所有文件修改是否与同一功能/错误修复相关
-   - **PR Commit Review / PR Commit 审查**：
-     - Check commit message format (should follow PR title format) / 检查 commit 消息格式（应遵循 PR 标题格式）
-     - Verify if commits are properly organized / 验证 commit 是否组织得当
-     - If routine changes (style fixes, minor bugs, docs, typos) are split into multiple commits, suggest squashing them / 如果常规修改（风格修复、小错误、文档、拼写）被拆分为多个 commit，建议压缩它们
-     - Important commits (major features, refactoring, critical bugs) can remain separate / 重要提交（主要功能、重构、关键错误）可以保持独立
-     - If commit messages don't follow format, suggest: "Commit message should follow format: `[module][subsystem] Description`. Consider squashing routine changes into one commit." / 如果 commit 消息不符合格式，建议："Commit 消息应遵循格式：`[模块][子系统] 描述`。考虑将常规修改压缩为一个 commit。"
+`rt_scmi_process_msg()` (`agent.c`) sets `msg->sdev` and calls `agent->ops->process_msg`.
 
-### PR Review Instructions / PR 审查指令
+---
 
-**When reviewing a PR, you MUST systematically check the following items and provide feedback for any violations / 审查 PR 时，必须系统性地检查以下项目，并对任何违规行为提供反馈：**
+## Platform driver registration (`agent.c`)
 
-#### Step 1: PR Title Check / 步骤 1：PR 标题检查
+```c
+static const struct rt_ofw_node_id scmi_ofw_ids[] = {
+#ifdef RT_FIRMWARE_ARM_SCMI_TRANSPORT_MAILBOX
+    { .compatible = "arm,scmi", .data = &scmi_agent_mailbox_ops },
+#endif
+#ifdef RT_FIRMWARE_ARM_SCMI_TRANSPORT_SMC
+    { .compatible = "arm,scmi-smc", .data = &scmi_agent_smc_ops },
+    /* arm,scmi-smc-param, qcom,scmi-smc */
+#endif
+#ifdef RT_FIRMWARE_ARM_SCMI_TRANSPORT_VIRTIO
+    { .compatible = "arm,scmi-virtio", .data = &scmi_agent_virtio_ops },
+#endif
+    { /* sentinel */ },
+};
 
-1. **Check prefix format / 检查前缀格式**:
-   - Extract the PR title from the PR / 从 PR 中提取 PR 标题
-   - Verify if it starts with `[module][subsystem]` or `[module]` pattern in lowercase / 验证是否以小写的 `[模块][子系统]` 或 `[模块]` 格式开头
-   - Check if prefix matches the modified files (e.g., if files are in `bsp/stm32/drivers/`, prefix should be `[stm32][drivers]` or similar) / 检查前缀是否与修改的文件匹配（例如，如果文件在 `bsp/stm32/drivers/`，前缀应为 `[stm32][drivers]` 或类似）
-   - If prefix is missing, incorrect case (e.g., `[STM32]`), or doesn't match files, provide feedback / 如果前缀缺失、大小写错误（如 `[STM32]`）或不匹配文件，提供反馈
-   - **Feedback template / 反馈模板**:
-     ```
-     🟡 [PR Title/PR 标题]: Missing or incorrect prefix format / 缺少或错误的前缀格式
-     
-     English: PR title should follow format: `[module][subsystem] Description` in lowercase. 
-     Current title: `{current_title}`. 
-     Based on modified files, suggested title: `{suggested_title}`.
-     
-     中文：PR 标题应遵循格式：小写的 `[模块][子系统] 描述`。
-     当前标题：`{current_title}`。
-     基于修改的文件，建议标题：`{suggested_title}`。
-     ```
+static struct rt_platform_driver scmi_driver = {
+    .name = "arm-scmi",
+    .ids = scmi_ofw_ids,
+    .probe = scmi_probe,
+};
+INIT_SUBSYS_EXPORT(scmi_drv_register);
+```
 
-2. **Check title specificity / 检查标题具体性**:
-   - Analyze modified files to understand what changes were made / 分析修改的文件以了解所做的更改
-   - Verify if title accurately describes changes based on modified files / 验证标题是否基于修改的文件准确描述更改
-   - Check for vague terms: "fix bug", "optimize code", "update", "modify", etc. / 检查模糊术语："修复问题"、"代码优化"、"更新"、"修改"等
+**`scmi_probe`** sequence:
+
+1. `agent_ops = pdev->id->data` — transport selected by `compatible`.
+2. `agent_ops->setup(agent, &pdev->parent)` — transport private state in `agent->priv`.
+3. **`scmi_channels_setup`**: for each available child of the controller node, read **`reg`** → `protocol_id`, allocate `rt_scmi_device`, set `sdev->agent`, `rt_scmi_device_register(sdev)`.
+4. Register an extra device for **`SCMI_PROTOCOL_ID_BASE`** (common protocol) on the same agent.
+
+Protocol drivers attach later via the SCMI bus (see main SCMI page).
+
+---
+
+## Shared memory (`shmem.c` / `shmem.h`)
+
+Mailbox and SMC transports place the SCMI frame in **`struct scmi_shared_mem`**:
+
+- `channel_status` — **FREE** / **ERROR** bits; writer clears FREE before sending.
+- `msg_header` — built with `scmi_header(message_id, type, protocol_id, token)` from `scmi.h`.
+- `msg_payload[]` — command input; reply read back into `msg->out_msg`.
+
+| API | Role |
+| --- | --- |
+| `scmi_shmem_msg_write(shmem, msg)` | Pack header + `in_msg`, mark channel busy |
+| `scmi_shmem_msg_read(shmem, msg)` | Copy reply after firmware marks channel free |
+| `scmi_shmem_clear_channel(shmem)` | Reset channel after TX done (mailbox) |
+
+DT **`shmem`** phandle must point at a node with **`compatible = "arm,scmi-shmem"`**; address is **`rt_ioremap`**’d in agent `setup`.
+
+Ensure the mapping matches firmware expectations (often **device / non-cacheable**). If the region is cacheable, flush or invalidate around access per your BSP / TRM.
+
+---
+
+## Mailbox transport (`agent-mailbox.c`)
+
+Depends on **`RT_USING_MBOX`** and `RT_FIRMWARE_ARM_SCMI_TRANSPORT_MAILBOX`.
+
+**Setup**
+
+- Count **`mboxes`** and **`shmem`** phandles; pick channel index when multiple mailboxes exist (e.g. high vs low priority).
+- `rt_mbox_request_by_index()` with client callbacks:
+  - **`tx_prepare`** → `scmi_shmem_msg_write()`
+  - **`tx_done`** → `scmi_shmem_clear_channel()` on success
+  - **`rx_callback`** → optional `msg->rx_callback` for async use
+
+**`process_msg`**
+
+- Spinlock around `rt_mbox_send(chan, msg, timeout)` (30 ticks in tree).
+- Mailbox driver completes the round trip and fills output via shmem read path.
+
+Typical DT:
+
+```dts
+scmi {
+    compatible = "arm,scmi";
+    mboxes = <&firmware_mbox 0>;
+    shmem = <&scmi_shmem>;
+};
+```
+
+See @ref page_device_mailbox and @ref page_device_mailbox_dm.
+
+---
+
+## SMC transport (`agent-smc.c`)
+
+Depends on **`RT_FIRMWARE_ARM_SCMI_TRANSPORT_SMC`**.
+
+**Setup**
+
+- **`arm,smc-id`** — SMC function number for SCMI.
+- Map **`shmem`** like mailbox; optional **`interrupts`** — ISR sets `done` flag.
+- Variants with **`arm,scmi-smc-param`** use page/offset fields in `struct scmi_agent_smc` for shared memory location passed in registers.
+
+**`process_msg`**
+
+- Writes message to shmem, issues **`smccc`** call, waits for IRQ or polling `done`, reads reply from shmem.
+
+Use when firmware exposes SCMI only through EL3 traps (no separate mailbox IP).
+
+---
+
+## Virtio transport (`virtio-scmi.c`)
+
+Enabled when **`RT_VIRTIO_SCMI`** / `RT_FIRMWARE_ARM_SCMI_TRANSPORT_VIRTIO` is on. **`compatible = "arm,scmi-virtio"`** selects `scmi_agent_virtio_ops` — SCMI over a virtio queue instead of SoC mailbox/SMC. Typical in guest / hypervisor scenarios.
+
+---
+
+## Error handling
+
+| Return | Meaning |
+| --- | --- |
+| `-RT_*` from `setup` / `process_msg` | RT-Thread transport failure (ENOMEM, EIO, mbox timeout, …) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [RT-Thread/rt-thread](https://github.com/RT-Thread/rt-thread) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
