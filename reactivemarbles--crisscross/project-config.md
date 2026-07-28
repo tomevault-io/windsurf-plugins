@@ -1,0 +1,165 @@
+---
+trigger: always_on
+description: This file is the single source of truth for AI/agent assistance in this repository (Claude Code, GitHub Copilot, and other coding agents). It consolidates build/test commands, architecture context, coding standards, and AOT guidance.
+---
+
+# agent.md
+
+This file is the single source of truth for AI/agent assistance in this repository (Claude Code, GitHub Copilot, and other coding agents). It consolidates build/test commands, architecture context, coding standards, and AOT guidance.
+
+If there is any conflict between other agent instruction files and this file, follow **agent.md**.
+
+---
+
+## Repository Orientation
+
+- **Repository root**
+- **Primary working directory for build/test:** `./src`
+- **Main solution:** `src/CrissCross.slnx`
+
+### Full Clone Required
+
+**CRITICAL:** Use a full, recursive clone. Shallow clones can fail because build/versioning relies on git history. If a clone has already been done you must use the unshallow commit command in git.
+
+```bash
+git clone --recursive https://github.com/reactivemarbles/CrissCross.git
+````
+
+---
+
+## Solution Format: SLNX
+
+This repository uses **SLNX** (XML-based solution format) instead of legacy `.sln`.
+
+* Introduced in Visual Studio 2022 17.10+
+* Rider 2024.1+ support
+* Works with `dotnet build/test` the same way `.sln` does
+* Main file: `src/CrissCross.slnx`
+
+---
+
+## Build Environment Requirements
+
+### Required SDKs
+
+* .NET **8.0**, **9.0**, **10.0** SDKs (all required)
+
+### Workload Restore (Required)
+
+**CRITICAL:** Platform workloads must be restored or the build will fail. Run from the `./src` directory.
+
+```powershell
+dotnet --info
+
+cd src
+dotnet workload restore
+cd ..
+```
+
+### Restore & Build
+
+**CRITICAL:** Run build/test commands from `./src` unless the command explicitly uses `src/`-prefixed paths.
+
+```powershell
+cd src
+
+dotnet restore CrissCross.slnx
+
+dotnet build CrissCross.slnx -c Release
+dotnet build CrissCross.slnx -c Release -warnaserror
+
+dotnet clean CrissCross.slnx
+```
+
+### Windows Requirements
+
+Building the full solution requires **Windows** due to Windows-only target frameworks (WPF, WinUI, .NET Framework). Non-Windows builds may fail; this is expected. In non-Windows environments, focus on documentation, targeted library changes, or analysis that does not require full compilation.
+
+---
+
+## Testing: Microsoft Testing Platform (MTP) + TUnit
+
+This repo uses **Microsoft Testing Platform (MTP)** with **TUnit**. This differs from VSTest.
+
+* MTP is configured via `global.json`
+* Additional test settings in `testconfig.json`
+* Test projects enable `TestingPlatformDotnetTestSupport` in `Directory.Build.props`
+
+**Key rule:** TUnit/MTP arguments go **after** `--`.
+
+### Testing Best Practices
+
+* **Do NOT use `--no-build`**. Always build before testing to avoid stale binaries.
+* To see test output, use `--output Detailed` **before** `--`.
+* Repository configuration runs tests **non-parallel** (`"parallel": false` in `testconfig.json`) to avoid interference.
+
+### Test Commands (run from `./src`)
+
+```powershell
+cd src
+
+# Run all tests
+dotnet test --solution CrissCross.slnx -c Release
+
+# Run tests for a specific project
+dotnet test --project tests/CrissCross.Tests/CrissCross.Tests.csproj
+
+# Run with code coverage (Microsoft Code Coverage)
+dotnet test --solution CrissCross.slnx --coverage --coverage-output-format cobertura
+
+# Detailed output (place BEFORE --)
+dotnet test --solution CrissCross.slnx -- --output Detailed
+dotnet test --solution CrissCross.slnx --coverage --coverage-output-format cobertura -- --report-trx --output Detailed
+
+# List tests
+dotnet test --project tests/CrissCross.Tests/CrissCross.Tests.csproj -- --list-tests
+
+# Fail fast
+dotnet test --solution CrissCross.slnx -- --fail-fast
+
+# Limit parallelism if needed (even though repo defaults non-parallel)
+dotnet test --solution CrissCross.slnx -- --maximum-parallel-tests 4
+```
+
+### TUnit `--treenode-filter` Syntax
+
+Pattern: `/{AssemblyName}/{Namespace}/{ClassName}/{TestMethodName}`
+
+Examples:
+
+```powershell
+# Single test
+dotnet test --project tests/CrissCross.Tests/CrissCross.Tests.csproj -- --treenode-filter "/*/*/*/MyTestMethod"
+
+# All tests in class
+dotnet test --project tests/CrissCross.Tests/CrissCross.Tests.csproj -- --treenode-filter "/*/*/MyClassName/*"
+
+# All tests in namespace
+dotnet test --project tests/CrissCross.Tests/CrissCross.Tests.csproj -- --treenode-filter "/*/MyNamespace/*/*"
+
+# Filter by property (e.g., Category)
+dotnet test --solution CrissCross.slnx -- --treenode-filter "/*/*/*/*[Category=Integration]"
+```
+
+See: [https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-test?tabs=dotnet-test-with-mtp](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-test?tabs=dotnet-test-with-mtp)
+TUnit flags reference: [https://tunit.dev/docs/reference/command-line-flags](https://tunit.dev/docs/reference/command-line-flags)
+
+---
+
+## Key Configuration Files
+
+* `src/global.json` — sets `"Microsoft.Testing.Platform"` runner
+* `src/testconfig.json` — test execution settings (parallel false, coverage format, etc.)
+* `src/Directory.Build.props` — repository-wide build configuration (incl. `TestingPlatformDotnetTestSupport`)
+* `.github/copilot-instructions.md` — may exist, but should defer to this `agent.md`
+
+---
+
+## Architecture Overview
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [reactivemarbles/CrissCross](https://github.com/reactivemarbles/CrissCross) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
