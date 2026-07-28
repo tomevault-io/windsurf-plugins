@@ -1,171 +1,149 @@
 ---
 trigger: always_on
-description: Repository: https://github.com/elizaos/eliza
+description: ElizaOS Architecture
 ---
 
-# ElizaOS 1.0.0 Development Rules
+> You are an expert in ElizaOS v2, system architecture documentation, technical writing, and software engineering best practices. You focus on creating clear, comprehensive, and maintainable documentation that enables developers to understand, contribute to, and extend the ElizaOS ecosystem.
 
-Repository: https://github.com/elizaos/eliza
+## ElizaOS Documentation Architecture Flow
 
-## Package structure
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Arch Overview  │    │  Component Docs  │    │  Integration    │
+│  - System Flow  │───▶│  - Actions       │───▶│  - API Specs    │
+│  - Core Modules │    │  - Providers     │    │  - Plugin Guide │
+│  - Data Flow    │    │  - Evaluators    │    │  - Examples     │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Development    │    │  Deployment      │    │  Contribution   │
+│  - Setup Guide  │    │  - Environments  │    │  - Guidelines   │
+│  - Dev Workflow │    │  - Configuration │    │  - Code Style   │
+│  - Testing      │    │  - Monitoring    │    │  - PR Process   │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
 
-packages/core - @elizaos/core - the runtime and types
-packages/client - The frontend GUI that is displayed by the CLI running
-packages/app - The desktop and mobile application, built in Tauri, wrapping the core GUI and CLI
-packages/cli - The CLI which contains the agent runtime and starts up the REST API, GUI, and loads agents and projects
--> This is what runs in most 'bun run test' and 'bun run start' cases, etc
--> 'elizaos' command is from here
-packages/plugin-bootstrap - Default event handlers, actions and providers
-packages/plugin-sql - DatabaseAdapter for Postgres and PGLite, soon others
+## Project Structure
 
-There are others but they are not as important
+```
+eliza/
+├── docs/
+│   ├── architecture/
+│   │   ├── overview.md           # System overview
+│   │   ├── core-concepts.md      # Core concepts and terminology
+│   │   ├── data-flow.md          # Data flow diagrams
+│   │   ├── plugin-system.md      # Plugin architecture
+│   │   └── security.md           # Security considerations
+│   ├── components/
+│   │   ├── actions/              # Action documentation
+│   │   ├── providers/            # Provider documentation
+│   │   ├── evaluators/           # Evaluator documentation
+│   │   └── runtime/              # Runtime documentation
+│   ├── guides/
+│   │   ├── getting-started.md    # Quick start guide
+│   │   ├── development.md        # Development setup
+│   │   ├── deployment.md         # Deployment guide
+│   │   └── troubleshooting.md    # Common issues
+│   ├── api/
+│   │   ├── core/                 # Core API reference
+│   │   ├── plugins/              # Plugin API reference
+│   │   └── examples/             # API usage examples
+│   └── contributing/
+│       ├── guidelines.md         # Contribution guidelines
+│       ├── code-style.md         # Code style guide
+│       └── review-process.md     # Review process
+├── packages/core/
+│   └── README.md                 # Core package documentation
+├── plugins/
+│   └── */README.md               # Plugin-specific documentation
+└── README.md                     # Main project documentation
+```
 
-## Core Development Principles
+## Core Documentation Patterns
 
-### 1. Flow - Always Plan First
+### System Architecture Documentation
 
-- **Bug Fixes**: First identify the bug, research ALL related files, create complete change plan
-- **Impact Analysis**: Identify all possible errors and negative outcomes from changes
-- **Documentation**: Create thorough PRD and implementation plan BEFORE writing any code
-- **Identify risks and approaches**: Thoroughly outline all risks and offer multiple possible approaches, choosing your favorite
-- **Just do it**: Once the plan is in place, start writing code. Don't wait for response from the user.
+```markdown
+# ✅ DO: Comprehensive architecture overview
 
-### 2. No Stubs or Incomplete Code
+# ElizaOS v2 System Architecture
 
-- **Never** use stubs, fake code, or incomplete implementations
-- **Always** continue writing until all stubs are replaced with finished, working code
-- **No POCs**: Never deliver proof-of-concepts - only finished, detailed code
-- **Iteration**: Work on files until they are perfect, looping testing and fixing until all tests pass
+## Overview
 
-### 3. Test-Driven Development
+ElizaOS v2 is a modular agent framework designed for building autonomous AI agents that can interact across multiple platforms and maintain persistent memory and context.
 
-- Models hallucinate frequently - thorough testing is critical
-- Verify tests are complete and passing before declaring changes correct
-- First attempts are usually incorrect - test thoroughly
-- Write tests before implementation when possible
+## Core Architecture
 
-## Testing Infrastructure
+The ElizaOS v2 architecture is centered around the `AgentRuntime`, a powerful orchestrator that manages the entire lifecycle of an AI agent. It integrates a modular plugin system, a persistent memory system via a database adapter, and a flexible service layer to create highly capable and extensible agents.
 
-### Command Structure
+```mermaid
+graph TD
+    subgraph AgentRuntime
+        A[Character Config] --> B(Initialization);
+        B --> C{Plugin System};
+        B --> D{Memory System};
+        B --> E{Service Layer};
+        B --> F{Event System};
 
-- **Main Command**: `elizaos test` (run from packages/cli)
-- **Test Framework**: vitest
-- **Subcommands**:
-  - `component`: Run component tests using Vitest
-  - `e2e`: Run end-to-end runtime tests
-  - `all`: Run both component and e2e tests (default)
+        C -- registers --> G[Actions];
+        C -- registers --> H[Providers];
+        C -- registers --> I[Evaluators];
+        
+        D -- uses --> J[IDatabaseAdapter];
+        J -- driver for --> K[Postgres/PGLite];
 
-### Test Types
+        E -- manages --> L[Services];
+    end
 
-- **E2E Tests**:
-  - Use actual runtime
-  - Cannot use vitest state (interferes with internal elizaos vitest instance)
-  - Test real integrations and workflows
-- **Unit Tests**:
-  - Use vitest with standard primitives
-  - Test individual components in isolation
+    subgraph "External Interactions"
+        M[User Message] --> AgentRuntime;
+        AgentRuntime -- uses --> N[LLM/Model Providers];
+        AgentRuntime -- interacts via --> O[Platform Connectors];
+    end
 
-## Architecture Details
+    AgentRuntime -- Manages --> P[Agent State];
+    P -- persists via --> D;
 
-### Core Dependencies
+    style AgentRuntime fill:#f9f,stroke:#333,stroke-width:2px
+```
 
-- **Central Dependency**: Everything depends on @elizaos/core or packages/core
-- **No Circular Dependencies**: Core cannot depend on other packages
-- **Import Pattern**: Use @elizaos/core in package code, packages/core in internal references
+## Core Concepts
 
-### Key Files
+### Agent Runtime
+The central orchestrator that manages the agent's lifecycle, coordinates between components, and maintains the execution context.
 
-- **Types**: `packages/core/src/types.ts` - All core type definitions
-- **Runtime**: `packages/core/src/runtime.ts` - Main runtime implementation
-- **Plugin Compatibility**: Shim everything through /specs (currently defaulting to v2)
+**Key Responsibilities:**
+- Character configuration management
+- Plugin lifecycle management
+- Message processing coordination
+- State management and persistence
 
-### Abstraction Layers
+### Plugin System
+A modular architecture that allows extending agent capabilities through plugins.
 
-- **Channel → Room Mapping**:
-  - Discord/Twitter/GUI channels become "rooms"
-  - All IDs swizzled with agent's UUID into deterministic UUIDs
-  - Maintains consistency across platforms
-- **Server → World Mapping**:
-  - Servers become "worlds" in agent memory
-  - Some connectors (MMO games) may use "world" on both sides
-- **Messaging Server Abstractions**:
-  - CLI uses: server, channel, user
-  - Frontend client unaware of worlds/rooms
-  - These are purely agent-side abstractions
+**Plugin Types:**
+- **Actions**: Define what the agent can do (e.g., send messages, make API calls)
+- **Providers**: Supply context and data (e.g., recent messages, external APIs)
+- **Evaluators**: Assess situations and provide scoring (e.g., sentiment analysis)
 
-### Service Architecture
+### Memory System
+Manages persistent storage and retrieval of conversation history and context.
 
-- Services maintain system state
-- Access pattern: `getService(serviceName)`
-- Services can call each other
-- Actions can access services
+**Components:**
+- **Memory Manager**: Interface for creating and retrieving memories
+- **Vector Database**: Stores embeddings for semantic search
+- **State Composer**: Builds context from multiple providers
 
-## Component Specifications
+## Data Flow
 
-### Actions
+### Message Processing Flow
 
-**Purpose**: Define agent capabilities and response mechanisms
-
-**Decision Flow**:
-
-1. Message received
-2. Agent evaluates all actions via validation functions
-3. Valid actions provided to LLM via actionsProvider
-4. LLM decides which action(s) to execute
-5. Handler generates response with "thought" component
-6. Response processed and sent
-
-### Providers
-
-**Purpose**: Supply dynamic contextual information - agent's "senses"
-
-**Functionality**:
-
-- Inject real-time information into agent context
-- Bridge between agent and external systems
-- Format information for conversation templates
-- Maintain consistent data access
-
-**Examples**:
-
-- News provider: Fetch and format news
-- Terminal provider: Game terminal information
-- Wallet provider: Current asset information
-- Time provider: Current date/time injection
-
-**Execution**: Run during or before action execution
-
-### Evaluators
-
-**Purpose**: Post-interaction cognitive processing
-
-**Capabilities**:
-
-- Knowledge extraction and storage
-- Relationship tracking between entities
-- Conversation quality self-reflection
-- Goal tracking and achievement
-- Tone analysis for future adjustments
-
-**Execution**: Run after response generation with AgentRuntime
-
-### Tasks
-
-**Purpose**: Manage deferred, scheduled, and interactive operations
-
-**Features**:
-
-- Queue work for later execution
-- Repeat actions at defined intervals
-- Await user input
-- Implement multi-interaction workflows
-- Task workers registered by name with runtime
-
-### Plugins
-
+```
+User Message → Platform Client → Agent Runtime
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bio-xyz/BioAgentsEliza](https://github.com/bio-xyz/BioAgentsEliza) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
