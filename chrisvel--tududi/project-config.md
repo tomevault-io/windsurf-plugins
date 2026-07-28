@@ -1,0 +1,159 @@
+---
+trigger: always_on
+description: This documentation is designed for AI assistants and developers working with the tududi codebase. For user-facing documentation, see [README.md](README.md). For contribution guidelines, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+---
+
+# Tududi - Developer Guide
+
+This documentation is designed for AI assistants and developers working with the tududi codebase. For user-facing documentation, see [README.md](README.md). For contribution guidelines, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+
+---
+
+## Quick Start
+
+Tududi is a self-hosted task management system with hierarchical organization (Areas > Goals > Projects > Tasks), smart recurring tasks, and multi-channel integration.
+
+**Tech Stack:** React 18 + TypeScript, Express + Sequelize, SQLite
+
+**Get Started:**
+```bash
+git clone https://github.com/chrisvel/tududi.git
+cd tududi
+npm install
+npm run db:init
+npm start  # Frontend on :8080, Backend on :3002
+```
+
+---
+
+## Documentation Index
+
+### Core Documentation
+
+1. **[Architecture Overview](docs/architecture.md)**
+   - Tech stack details
+   - Request flow diagram
+   - Data model hierarchy
+   - Authentication methods
+
+2. **[Directory Structure](docs/directory-structure.md)**
+   - Complete file tree with absolute paths
+   - Critical paths reference
+   - Backend and frontend organization
+
+3. **[Backend Patterns](docs/backend-patterns.md)**
+   - Module architecture pattern
+   - How to add new modules
+   - Module communication
+   - Repository and service patterns
+
+4. **[Database & Migrations](docs/database.md)**
+   - Key models and relationships
+   - Migration workflow
+   - Migration best practices
+   - Common migration operations
+
+5. **[Backups & Restoration](docs/backups.md)**
+   - Automatic SQLite file backups before migrations
+   - Backup retention policies (4 per day, 1 per day for 7 days)
+   - Restoration procedures for development, Docker, and production
+   - Emergency restore after failed migrations
+   - Best practices for data safety
+
+6. **[Development Workflow](docs/development-workflow.md)**
+   - Initial setup
+   - Daily development (two-server process)
+   - Environment variables
+   - Adding new features (complete walkthrough)
+   - Database management commands
+
+7. **[Code Conventions](docs/code-conventions.md)**
+   - Language usage (TypeScript/JavaScript)
+   - Backend patterns (async/await, repository)
+   - Frontend patterns (components, state)
+   - Naming conventions
+   - API route conventions
+
+8. **[Testing](docs/testing.md)**
+   - Test organization
+   - Running tests
+   - Testing requirements
+   - Test patterns (Arrange-Act-Assert)
+
+9. **[Common Tasks](docs/common-tasks.md)**
+   - Add field to model
+   - Create new backend module
+   - Add React component
+   - Update database schema
+   - Fix a bug (TDD workflow)
+   - Add translations
+
+10. **[Tasks Behavior](docs/00-tasks-behavior.md)**
+    - Task creation and basic fields
+    - Status lifecycle and priority levels
+    - Due dates and Defer Until
+    - Subtasks and hierarchy
+    - File attachments
+    - Project assignment and tags
+    - Task completion and history
+    - Habit mode and tracking
+    - Task deletion and permissions
+
+11. **[Recurring Tasks Behavior](docs/01-recurring-tasks-behavior.md)**
+    - How recurring tasks work (non-technical rules)
+    - Completion behavior and patterns
+    - Virtual instances and display rules
+    - Parent-child relationships
+    - Editing and deletion behavior
+
+12. **[Today Page Sections](docs/02-today-page-sections.md)**
+    - How Overdue, Planned, Suggested, and Completed sections work
+    - Task filtering and display rules
+    - Section priority and deduplication logic
+    - User settings and customization
+    - Defer Until and timezone handling
+
+13. **[Upcoming View](docs/03-upcoming-view.md)**
+    - How the 7-day Upcoming view works
+    - Day-based grouping and organization
+    - Recurring task virtual occurrences
+    - Defer Until and status filtering
+    - Differences from Today view
+
+14. **[Inbox Page](docs/04-inbox-page.md)**
+    - Quick capture system for unorganized thoughts
+    - Smart parsing of hashtags, projects, and URLs
+    - Intelligent suggestions (Task vs Note vs Project)
+    - Converting inbox items to structured content
+    - Telegram integration and auto-refresh
+    - Keyboard shortcuts and workflows
+
+15. **[Notes System](docs/05-notes-system.md)**
+    - Flexible information and reference storage
+    - Markdown support and rich text rendering
+    - Auto-save functionality (1-second debounce)
+    - Project linking and tag-based organization
+    - Focus mode for distraction-free writing
+    - Color customization for visual organization
+    - Integration with inbox and project workflows
+
+16. **[Projects](docs/06-projects.md)**
+    - Project hierarchy and organization (Areas > Projects > Tasks)
+    - Status lifecycle and stalled detection
+    - Completion tracking and progress metrics
+    - Project sharing and collaboration permissions
+    - Due dates, notifications, and priorities
+    - Deletion behavior (orphaning vs cascading)
+    - Filtering, grouping, and sidebar pinning
+
+17. **[Areas](docs/07-areas.md)**
+    - Top-level organizational categories for life domains
+    - Contain Goals and Projects
+    - Area detail page: goals spine, project cards, tasks column
+    - Optional containers (projects can exist without areas)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [chrisvel/tududi](https://github.com/chrisvel/tududi) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
