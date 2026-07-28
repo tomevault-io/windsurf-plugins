@@ -1,24 +1,13 @@
 ---
 trigger: always_on
-description: This is a Meta Quest / Horizon OS sample.
+description: For this repository, prefer Meta Quest Agentic Tools, the Meta Horizon VS Code/Cursor extension, and the `hzdb` MCP server.
 ---
 
-This is a Meta Quest / Horizon OS sample.
 
-Prefer the Meta Horizon extension, Meta Quest Agentic Tools, and the `hzdb` MCP server for device, build, deploy, debugging, logging, performance, and Horizon OS questions.
+For this repository, prefer Meta Quest Agentic Tools, the Meta Horizon VS Code/Cursor extension, and the `hzdb` MCP server.
 
-Read `AGENTS.md` for the canonical agent instructions.
-
-Recommended VS Code extension:
-
-https://marketplace.visualstudio.com/items?itemName=meta.meta-vr-dev
-
-Recommended MCP setup for VS Code:
-
-```sh
-npx -y @meta-quest/hzdb mcp install vscode
-```
+This sample targets Meta Quest / Horizon OS using WebXR — prefer Quest/Horizon OS-specific tooling and terminology over generic WebXR advice.
 
 ---
 > Source: [meta-quest/webxr-first-steps](https://github.com/meta-quest/webxr-first-steps) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
