@@ -7,4 +7,4 @@ description: ﻿Carefully read and internalize `AGENTS.md` from the repository's
 
 ---
 > Source: [viktor-ferenczi/se-performance-improvements](https://github.com/viktor-ferenczi/se-performance-improvements) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
