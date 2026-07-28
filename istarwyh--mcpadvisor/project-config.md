@@ -1,156 +1,119 @@
 ---
 trigger: always_on
-description: MCPAdvisor is a TypeScript-based CLI tool for discovering and recommending MCP (Model Context Protocol) servers. It helps users find the right MCP server for their needs and provides installation guidance.
+description: - **Build**: `pnpm run build` (compiles TypeScript to build/)
 ---
 
-# Claude Instructions for MCPAdvisor
+# AGENT.md - MCP Advisor Development Guide
 
-## Project Overview
-MCPAdvisor is a TypeScript-based CLI tool for discovering and recommending MCP (Model Context Protocol) servers. It helps users find the right MCP server for their needs and provides installation guidance.
+## Build & Test Commands
+- **Build**: `pnpm run build` (compiles TypeScript to build/)
+- **Test**: `pnpm test` (runs vitest), `pnpm run test:watch` (watch mode)
+- **Single test**: `pnpm test -- filename.test.ts` or `pnpm test -- --grep "test name"`
+- **E2E Test**: `pnpm run test:e2e` (Playwright E2E tests)
+- **Meilisearch E2E**: `pnpm test:meilisearch:e2e` (smart automated Meilisearch testing)
+- **Lint**: `pnpm run lint` (ESLint), `pnpm run lint:fix` (auto-fix)
+- **Format**: `pnpm run format` (Prettier), `pnpm run format:check` (check only)
+- **Type check**: `tsc --noEmit` or `pnpm run check` (lint + format check)
+- **All quality checks**: `pnpm run check && pnpm run test && pnpm run test:e2e`
 
-## Development Commands
-
-### Build & Test
-- `pnpm run build` - Compile TypeScript and make executable
-- `pnpm run test` - Run tests with Vitest
-- `pnpm run test:watch` - Run tests in watch mode
-- `pnpm run test:coverage` - Run tests with coverage report
-- `pnpm run test:jest` - Run Jest tests (alternative test runner)
-- `pnpm run test:e2e` - Run end-to-end tests with Playwright
-- `pnpm run test:meilisearch:e2e` - Smart Meilisearch E2E testing (auto-starts services)
-
-### Code Quality
-- `pnpm run lint` - Run ESLint
-- `pnpm run lint:fix` - Run ESLint with auto-fix
-- `pnpm run format` - Format code with Prettier
-- `pnpm run format:check` - Check code formatting
-- `pnpm run check` - Run both lint and format check
-
-### Dependencies
-- `pnpm run deps:update` - Update all dependencies to latest
-- `pnpm run deps:check` - Check for outdated dependencies
-- `pnpm run deps:clean` - Clean and reinstall dependencies
+## Testing Strategy
+- **Unit Tests**: Test individual components with vitest (`src/tests/unit/`)
+- **Integration Tests**: Test provider interactions (`src/tests/integration/`)
+- **E2E Tests**: Test complete workflows with Playwright (`tests/e2e/`)
+- **Smart Automation**: `./scripts/run-meilisearch-e2e.sh` auto-starts all services
+- **Quality Gate**: All tests must pass before merging
+- **Documentation**: See [Quick Start Guide](docs/GETTING_STARTED.md) and [Technical Reference](docs/TECHNICAL_REFERENCE.md) for comprehensive guides
 
 ## Architecture
+- **Main**: ESM TypeScript project with Node.js MCP server
+- **Core**: Search service with multiple providers (Meilisearch, GetMCP, Compass, Nacos, Offline)
+- **Vector Search**: Hybrid search combining text matching + semantic vectors
+- **Transport**: Stdio (CLI), SSE (web), REST API support
+- **Database**: MySQL2, Meilisearch for vector search, Nacos service discovery
+- **Key Directories**: `src/services/` (core logic), `src/types/` (TypeScript types), `src/utils/` (utilities)
 
-### Core Services
-- **Search Service** (`src/services/searchService.ts`) - Main search orchestration
-- **Vector Engines** (`src/services/database/`) - Vector database implementations
-  - Memory-based vector engine
-  - Meilisearch integration
-  - OceanBase integration
-  - Nacos integration
-- **Installation Service** (`src/services/installation/`) - Installation guide generation
-- **Server Service** (`src/services/server/`) - MCP server management
+## Code Style & Conventions
+- **Import style**: Use .js extensions for TypeScript imports, ES modules only
+- **Naming**: camelCase for variables/functions, PascalCase for classes/types
+- **Types**: Use explicit TypeScript types, interfaces over types for objects
+- **Async**: Prefer async/await over Promises, handle errors with try/catch
+- **Testing**: Vitest framework, descriptive test names in Chinese, use vi.mock() for mocking
+- **Formatting**: Prettier (single quotes, 2 spaces, trailing commas, 80 char width)
+- **Logging**: Use winston logger from `utils/logger.js`, structured logging
 
-### Search Providers
-- **Offline Search** - Memory-based search with local data
-- **Meilisearch** - Full-text search with vector capabilities
-- **Nacos** - Service discovery integration
-- **Compass Search** - External search provider
+## Security Best Practices
+- **No hardcoded secrets**: Never commit API keys, passwords, or tokens to code
+- **Environment variables**: Use `.env` files for local development, GitHub Secrets for CI/CD
+- **Default security**: Avoid weak default passwords/keys, force users to set secure values
+- **Error handling**: Scripts must return proper exit codes (0 for success, 1+ for failure)
+- **Secrets management**: Use `process.env.VARIABLE_NAME` with required validation
 
-### Key Directories
-- `src/services/` - Core business logic
-- `src/types/` - TypeScript type definitions
-- `src/utils/` - Utility functions
-- `src/tests/` - Test files (Vitest and Jest)
-- `docs/` - Documentation files
-- `config/` - Configuration files
+## Testing Best Practices  
+- **Environment isolation**: Save/restore environment variables in beforeEach/afterEach
+- **Smart waiting**: Use `page.waitForFunction()` instead of fixed `page.waitForTimeout()`
+- **Content validation**: Verify result content relevance, not just quantity
+- **Cross-platform**: Use relative paths `$(pwd)` instead of hardcoded absolute paths
+- **Timeout configuration**: Set appropriate timeouts (CI: 180s, local: 60s)
+- **Network requests**: Avoid global fetch mocking in test setup - breaks HTTP clients
+- **Integration tests**: Use real network requests, mock only specific external dependencies
+- **Service dependencies**: Check external service health before running integration tests
 
-## Code Style & Best Practices
+## Meilisearch Local Testing
+- **Setup**: Binary installation preferred for dev, Docker for CI
+- **Environment**: Use environment variable fallbacks for API keys
+- **Debug approach**: Systematic API → Client → Test Environment troubleshooting
+- **Test types**: Unit (mocked), Integration (real HTTP), E2E (full stack)
 
-### Naming Conventions
-- **Classes**: PascalCase (e.g., `OfflineDataLoader`)
-- **Functions/Methods**: camelCase (e.g., `loadFallbackData`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `DEFAULT_FALLBACK_DATA_PATH`)
-- **Variables**: camelCase (e.g., `serverResponses`)
-- **Interfaces**: PascalCase with `I` prefix (e.g., `IVectorSearchEngine`)
-- **Files**: kebab-case (e.g., `offline-data-loader.ts`)
+## Commit Message Guidelines
 
-### Code Formatting
-- Use 2 spaces for indentation
-- Keep lines under 80 characters when possible
-- Use template strings `` `${variable}` `` instead of concatenation
-- Use single quotes `'` for strings, double quotes `"` in JSX
-- Always use semicolons
+Follow [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
-### TypeScript Best Practices
-- Always define types for function parameters and return values
-- Avoid `any` type; use `unknown` or specific types
-- Prefer interfaces over type aliases for objects
-- Use union types `string | null` instead of optional `string?`
-- Use enums for finite value sets
-- Use type guards for type narrowing
-- Use named exports instead of default exports
+```
+<type>[optional scope]: <description>
 
-```typescript
-// Good practice
-export interface SearchOptions {
-  minSimilarity?: number;
-  limit: number;
-}
+[optional body]
 
-export function search<T>(query: string, options: SearchOptions): Promise<T[]> {
-  // implementation
-}
+🤖 Generated with [Claude Code](https://claude.ai/code)
 
-// Avoid
-export default function search(query: any, options?: any): any {
-  // implementation
-}
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-### Functional Programming Principles
-- Write pure functions without side effects
-- Avoid mutating parameters; return new objects
-- Use function composition for complex functionality
-- Follow single responsibility principle
-- Use higher-order functions (`map`, `filter`, `reduce`)
-- Avoid deep nesting; use function composition or Promise chains
+### Types
+- `feat`: New feature
+- `fix`: Bug fix  
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `perf`: Performance improvements
+- `test`: Adding or fixing tests
+- `build`: Build system or dependency changes
+- `ci`: CI configuration changes
+- `chore`: Other changes that don't modify src or test files
 
-```typescript
-// Good practice
-function normalizeVector(vector: number[]): number[] {
-  const magnitude = calculateMagnitude(vector);
-  return vector.map(value => value / magnitude);
-}
+### Auto-Commit Template
+When Claude Code makes automatic commits, always include:
+- Clear conventional commit message
+- Optional body explaining the change
+- Standard footer with Claude Code signature
 
-// Avoid
-function processVector(vector: number[]): number[] {
-  // doing multiple things: calculate, normalize, filter, etc.
-}
+Example:
+```
+fix(ci): Add pnpm installation step to GitHub Actions workflow
+
+Fix "pnpm: command not found" error by installing pnpm globally
+before running pnpm install in all workflow jobs.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-### Path Handling
-- Use `pathUtils.ts` for all path-related operations
-- Ensure compatibility across development, test, and production environments
-- Handle `import.meta.url` compatibility properly
-- Avoid hardcoded absolute paths; use relative paths
-- Use `path.join()` and `path.resolve()` for path separators
-- Provide fallback path mechanisms
-
-```typescript
-// Good practice
-import { getMcpServerListPath } from '../utils/pathUtils.js';
-const dataPath = getMcpServerListPath(import.meta.url);
-
-// Avoid
-const dataPath = path.resolve(__dirname, '../../../../data/file.json');
-```
-
-### Error Handling
-- Use specific error types instead of generic `Error`
-- Provide useful error messages with context
-- Properly propagate errors; don't swallow them
-- Use `try/catch` or Promise `.catch()` for async errors
-- Log error details for debugging
-- Provide graceful fallbacks when possible
-- Scripts must return proper exit codes (0 for success, 1+ for failure)
-
-```typescript
+## Common Issues & Solutions
+- **Interface naming**: Use `IClassName` for interfaces to avoid class/interface conflicts
+- **Path portability**: Replace `/Users/username/...` with `$(pwd)/...` in scripts
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [istarwyh/mcpadvisor](https://github.com/istarwyh/mcpadvisor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
