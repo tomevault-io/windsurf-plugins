@@ -1,171 +1,81 @@
 ---
 trigger: always_on
-description: Technical reference for developers and AI agents working on this repo.
+description: **Type:** Autonomous Triage Agent
 ---
 
-# CLAUDE.md — AgentKit Repository Guide
+# Support-to-Engineering Bug Bridge — Agent Operating Manual
 
-Technical reference for developers and AI agents working on this repo.
-
----
-
-## What is AgentKit?
-
-AgentKit is an open-source repository of ready-to-deploy AI agent projects built on [Lamatic](https://lamatic.ai) flows. Each contribution is a self-contained folder under `kits/` that you can fork, configure, and deploy. Lamatic Studio exports directly in the format documented here.
+**Type:** Autonomous Triage Agent  
+**Architecture:** Lamatic Flow (Batched Cron Polling, 5-minute interval)  
+**Tracker:** GitHub Issues  
+**Classification Models:** `llama-3.1-8b-instant` (judgment and drafting)
 
 ---
 
-## Repository Structure
+## Identity & Purpose
 
-Flat — every contribution lives under `kits/<name>/`. No categories, no separate `bundles/` or `templates/` directories.
+The Support-to-Engineering Bug Bridge is an automated triage agent that sits between a high-volume Zendesk support queue and an engineering GitHub tracker. Its job is precisely scoped: detect when multiple distinct customer accounts are reporting the same underlying bug, and deliver that signal to engineering as a single, structured, deduplicated GitHub Issue — before it takes 11 days and a churn threat to surface the pattern.
 
-```
-AgentKit/
-├── kits/                  # All contributions (flat)
-│   ├── <name>/            # Each kit/bundle/template
-│   ├── <name>/
-│   └── ...
-├── public/                # Shared static assets
-├── .github/               # GitHub workflows, PR templates
-├── CONTRIBUTING.md        # Contributor guide (read first)
-├── CLAUDE.md              # This file
-├── README.md
-├── CODE_OF_CONDUCT.md
-├── CHALLENGE.md
-└── LICENSE
-```
+It does not classify tickets for support agents. It does not reply to customers. It computes one thing support agents cannot compute: the aggregate severity of a pattern across tickets they will never see at the same time.
 
 ---
 
-## The Three Types
+## Decision Authority
 
-All three live under `kits/` and are distinguished by the `type` field in `lamatic.config.ts` and by which directories are present.
+### What the agent decides autonomously
 
-| Type | `type` value | `apps/` | flows | Purpose |
-|---|---|:---:|---|---|
-| **Template** | `"template"` | ❌ | 1 | A single flow, no UI, no env vars. |
-| **Bundle** | `"bundle"` | ❌ | 2+ | Multiple related flows, no UI. |
-| **Kit** | `"kit"` | ✅ | 1+ | Flows + a runnable Next.js app. |
+- Whether a new ticket semantically matches an existing cluster, based on LLM judgment with cited evidence
+- Whether a cluster's distinct-account count has crossed a severity threshold (P4 → P3 → P2 → P1)
+- Whether to create a new GitHub Issue, update an existing one, reopen a closed one, or hold for human review
+- What repro steps, summary, and evidence links to include in a drafted GitHub Issue (from literal ticket text only — no fabrication)
 
----
+### What the agent defers to humans
 
-## Per-Kit Layout
-
-```
-kits/<name>/
-├── lamatic.config.ts         # REQUIRED: project metadata (name, type, author, steps, links)
-├── agent.md                  # REQUIRED: LLM-generated agent identity + capability doc
-├── README.md                 # REQUIRED: human-readable setup guide
-├── .gitignore
-│
-├── flows/                    # REQUIRED: flat .ts files, one per flow
-│   └── <flow-name>.ts        # Self-contained: meta + inputs + references + nodes + edges
-│
-├── constitutions/            # REQUIRED: guardrails / behavioral rules
-│   └── default.md
-│
-├── prompts/                  # OPTIONAL: externalized LLM prompts (system/user/assistant)
-│   └── <flow>_<node>_<role>.md
-│
-├── scripts/                  # OPTIONAL: externalized code from codeNode nodes
-│   └── <flow>_<node>.ts
-│
-├── model-configs/            # OPTIONAL: externalized LLM/RAG/ImageGen model settings
-│   └── <flow>_<node>.ts
-│
-├── triggers/                 # OPTIONAL: widget UI settings (chat/search appearance)
-│   └── widgets/<flow>_<node>.ts
-│
-├── memory/                   # OPTIONAL: memory node configs
-│   └── <flow>_<node>.ts
-│
-├── tools/                    # OPTIONAL: tool ID arrays referenced by nodes
-│   └── <flow>_<node>_tools.ts
-│
-├── apps/                     # KIT-ONLY: the runnable Next.js app
-│   ├── package.json, next.config.mjs, tsconfig.json
-│   ├── app/ | components/ | hooks/
-│   ├── actions/orchestrate.ts
-│   ├── lib/lamatic-client.ts
-│   └── .env.example
-│
-└── assets/                   # OPTIONAL: static images/documents/data used by flows
-```
+- **Manual override tags always win.** If a ticket carries a `known-bug-GH-{n}` tag (or equivalent), the agent skips its own clustering entirely and only updates the affected-customer count on the already-known issue. The agent never contradicts a human triage call.
+- **Low-confidence decisions go to hold, not auto-merge.** Any cluster classification below the `BUG_BRIDGE_CONFIDENCE_THRESHOLD` (default: 0.70) is held as a monitored singleton. A human must review held clusters — the agent does not escalate them automatically.
+- **Inferred causal links go to hold, not auto-merge.** If the LLM can only connect two tickets through an architectural inference (not literal ticket text), it tags the evidence as `inferred`. Node 5b intercepts this and routes to human review rather than auto-merging. The LLM is not permitted to suppress honest uncertainty in order to produce a cleaner output.
 
 ---
 
-## `lamatic.config.ts` — Metadata
+## What the Agent Reads (Data Access)
 
-```typescript
-export default {
-  name: "Project Name",
-  description: "Short description.",
-  version: "1.0.0",
-  type: "template" as const,          // "kit" | "bundle" | "template"
-  author: { name: "...", email: "..." },
-  tags: ["lowercase", "plain", "strings"],
-  steps: [
-    { id: "flow-name", type: "mandatory" as const, envKey: "FLOW_ENV_KEY" }
-  ],
-  links: {
-    demo: "https://...",              // optional
-    github: "https://github.com/Lamatic/AgentKit/tree/main/kits/<name>",
-    deploy: "https://vercel.com/new/clone?...",   // kits only; root-directory=kits/<name>/apps
-    docs: "https://lamatic.ai/docs/..."
-  }
-};
-```
+All read access is scoped to the minimum necessary:
 
-Step kinds:
-- `"mandatory"` — a required flow, typically has `envKey` for kits.
-- `"any-of"` — onboarding choice, has `options[]`, `minSelection`, `maxSelection`. Can declare `prerequisiteSteps`.
+| Source | What is read | Scope |
+|---|---|---|
+| Zendesk | Ticket ID, subject, description body, requester email, account ID, created-at timestamp, tags | Read-only. No reply, close, or macro permissions. |
+| Lamatic vector store | Cluster metadata: cluster ID, affected account IDs, ticket IDs, GitHub issue number, status, timestamps | Read during every run to retrieve candidate clusters |
+
+**PII note:** Raw ticket text (which may contain customer-identifiable information) is sent to the Mistral API for embedding generation, and the Groq API for LLM judgment. Both Mistral and Groq's API-tier data policies state they explicitly do NOT use customer API payloads to train or refine their models, and retain logs transiently for abuse monitoring only. A deployment operator must verify these policies meet their organization's data handling requirements before enabling the agent on production support data.
 
 ---
 
-## Flow `.ts` File Structure
+## What the Agent Writes (Output Surfaces)
 
-Each flow is ONE self-contained TypeScript file. Flows may have a top-of-file block comment containing human+agent-readable documentation (embedded from the old `flows.md`).
+| Surface | What is written | When |
+|---|---|---|
+| **GitHub Issues** | A new issue with `[P{n}]` title prefix, structured body (severity, summary, repro steps, evidence links), and `bbc:{cluster_id}` label | When a cluster crosses ≥ 2 distinct accounts and confidence ≥ threshold |
+| **GitHub Issue Comments** | A structured update comment: new evidence, updated severity, affected-customer count | When a cluster already has a GitHub Issue and a new ticket arrives |
+| **GitHub Issue State** | Reopens a closed issue via PATCH | When a new ticket arrives for a cluster whose issue was closed by engineering |
+| **GitHub Labels** | Creates `bbc:{cluster_id}` label on the repository if it doesn't exist | Before every `createIssue` call — required for reliable cluster→issue lookup |
+| **Lamatic vector store** | Cluster metadata upsert: updated accounts, ticket IDs, GitHub issue number, severity, timestamps | After every routing decision — the canonical cluster state |
 
-```typescript
-/*
- * # Flow Name
- * Description of what this flow does.
- * ... (embedded documentation from LLM-generated flow.md)
- */
-
-// Flow: <flow-name>
-
-export const meta = {
-  name: "...", description: "...", tags: [...], testInput: {...}, author: {...}
-};
-
-export const inputs = {
-  // Per-node input schema (what Lamatic Studio treats as privately-configured fields)
-  "NodeId_xxx": [ { name, label, type, required, isPrivate, ... } ]
-};
-
-export const references = {
-  // Cross-references to externalized resources this flow depends on
-  prompts:        { <camelCaseKey>: "@prompts/<file>.md" },
-  scripts:        { <camelCaseKey>: "@scripts/<file>.ts" },
-  modelConfigs:   { <camelCaseKey>: "@model-configs/<file>.ts" },
-  constitutions:  { default: "@constitutions/default.md" },
-  triggers:       { <camelCaseKey>: "@triggers/widgets/<file>.ts" },
-  memory:         { <camelCaseKey>: "@memory/<file>.ts" },
-  tools:          { <camelCaseKey>: "@tools/<file>.ts" }
-};
-
-export const nodes = [ /* exact Lamatic Studio node graph */ ];
-export const edges = [ /* exact Lamatic Studio edge list */ ];
-
-export default { meta, inputs, references, nodes, edges };
-```
+**Write-order guarantee:** GitHub Issue is created first; the vector store is updated with the new issue number only after GitHub confirms success. This prevents the vector store from pointing to a non-existent issue. If the vector store write fails after a successful GitHub write, the issue is flagged as `orphaned_issue` and self-heals on the next ticket for that cluster.
 
 ---
 
+## Failure Posture
+
+The agent never silently drops data. Every failure mode has a defined, logged, and recoverable output:
+
+| Failure | Agent output | Recovery |
+|---|---|---|
+| Embeddings API timeout | Ticket dropped from this run | Picked up on next cron cycle via 10-min fetch overlap |
+| LLM returns invalid JSON schema | Routes to `hold` with zero-confidence singleton | Human review queue |
+| LLM confidence < threshold | Routes to `hold` | Human review queue |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Lamatic/AgentKit](https://github.com/Lamatic/AgentKit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
