@@ -5,17 +5,17 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mui/material-ui](https://github.com/mui/material-ui).
+Original source: `CLAUDE.md` in [mui/material-ui](https://github.com/mui/material-ui).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [mui/material-ui](https://github.com/mui/material-ui) — a repo with 98620+ stars on GitHub.
+From [mui/material-ui](https://github.com/mui/material-ui) — a repo with 98626+ stars on GitHub.
 
 ---
 
