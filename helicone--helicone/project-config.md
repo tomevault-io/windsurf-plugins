@@ -1,191 +1,190 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Helicone Style Guidelines
 ---
 
-# CLAUDE.md
+# Helicone Design System Guidelines
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Core Principles
+1. Use semantic HTML elements
+2. Use Tailwind utility classes for colors
+3. Use typography components for consistent text styling
+4. Use Tailwind's spacing scale
+5. Use lucide-react for icons
 
-## Project Overview
+## Typography System
 
-Helicone is an open-source LLM observability platform that provides monitoring, analytics, and management tools for Large Language Model applications. The project is structured as a monorepo with multiple services.
-
-## Core Architecture
-
-### Services
-
-- **Web (Frontend)**: Next.js dashboard app at `/web`
-- **Jawn (Backend)**: Express.js API server at `/valhalla/jawn`
-- **Worker (Proxy)**: Cloudflare Workers for LLM request interception at `/worker`
-- **AI Gateway**: Rust-based LLM proxy/router at `/aigateway`
-- **Bifrost**: Marketing/landing page at `/bifrost`
-
-### Data Flow
-
-1. Client → Helicone Proxy → LLM Provider
-2. Proxy sends logs to Upstash queue → Jawn processes → Databases
-3. PostgreSQL for app data, ClickHouse for analytics, MinIO for object storage
-
-## Development Commands
-
-### Main Development
-
-```bash
-# Start local development (requires Docker)
-./helicone-compose.sh helicone up
-
-# Web development
-cd web && yarn dev:better-auth          # With better-auth
-cd web && yarn dev:local               # Local development
-
-# Backend development
-cd valhalla/jawn && yarn dev
-
-# AI Gateway (Rust)
-cd aigateway && cargo run
-
-# Worker development (different types)
-cd worker && npx wrangler dev --local --var WORKER_TYPE:OPENAI_PROXY --port 8787
-```
-
-### Build & Test
-
-```bash
-# Web
-cd web && yarn build && yarn test && yarn lint
-
-# Backend
-cd valhalla/jawn && yarn build && yarn test:jawn
-
-# AI Gateway
-cd aigateway && cargo build && cargo test --tests --all-features && cargo clippy
-```
-
-## Code Style Guidelines
-
-### Frontend (Web)
-
-- Use TypeScript with strict typing
-- Follow design system with semantic components from `/web/components/ui/typography`
-- Use Tailwind utility classes for styling with semantic color tokens
-- Icons from `lucide-react` with consistent sizing via `size` prop
-- Layout with flexbox + gap, avoid margins for spacing
-
-### Component Patterns
-
+### Usage Patterns
 ```tsx
-// Typography components
-import { H1, H2, P, Small, Muted } from "@/components/ui/typography"
+// ✅ Do this
+import { H1, P, Small, Muted } from "@/components/ui/typography"
 
-// Colors - use semantic tokens
-className="bg-background text-foreground border-border"
+<H1>Page Title</H1>
+<P>Regular paragraph</P>
+<Small>Helper text</Small>
+<Muted>Secondary text</Muted>
 
-// Layout - use flex + gap
-<div className="flex flex-col gap-4">
-<div className="flex items-center gap-2">
+// ❌ Don't do this
+<h1 className="text-4xl font-bold">Raw Styles</h1>
+<H1 className="text-3xl">Overriding Typography</H1>
+<P className="text-sm">Wrong Size</P>
 ```
 
-### Backend (Jawn)
+### Available Components
+```tsx
+// Headings
+<H1>              // Main page titles
+<H1Large>         // Hero sections
+<H2>              // Section headers
+<H3>              // Subsection headers
+<H4>              // Card titles
 
-- Controllers in `/valhalla/jawn/src/controllers/` use TSOA decorators
-- Managers in `/valhalla/jawn/src/managers/` extend `BaseManager`
-- Use `JawnAuthenticatedRequest` and return `Result<T, string>`
-- Frontend hooks use TanStack Query with `useJawnClient()`
+// Body Text
+<P>               // Regular paragraphs
+<Lead>            // Introduction text
+<Large>           // Emphasized body text
+<Small>           // Helper text
+<Muted>           // Secondary text
 
-### Database
+// Special Elements
+<Blockquote>      // Quotations
+<Code>            // Inline code
+<List>            // Unordered lists
 
-- PostgreSQL with snake_case naming
-- ClickHouse for analytics
-- Proper RLS policies for security
-
-## Tech Stack
-
-### Frontend
-
-- Next.js 14 with React 18.3.1
-- TypeScript, Tailwind CSS, Radix UI
-- Zustand for state management
-- TanStack Query for server state
-
-### Backend
-
-- Express.js with TSOA
-- Supabase (PostgreSQL) + ClickHouse
-- Upstash Redis for queuing
-- Better Auth for authentication
-
-### Infrastructure
-
-- Cloudflare Workers for proxying
-- Docker for local development
-- MinIO for object storage
-
-## Key Directories
-
-```
-/web/                   # Next.js frontend
-/valhalla/jawn/        # Express.js backend
-/worker/               # Cloudflare Workers
-/aigateway/            # Rust LLM proxy
-/bifrost/              # Marketing site
-/packages/             # Shared packages
-  ├── cost/            # Cost calculations
-  ├── llm-mapper/      # Provider mappings
-  └── prompts/         # Prompt management
-/supabase/             # Database migrations
-/clickhouse/           # Analytics DB setup
+// Table Elements
+<TableHead>       // Table headers
+<TableCell>       // Table cells
 ```
 
-## Development Workflow
+### Typography Scale
+| Component | Size | Line Height | Weight | Usage |
+|-----|---|----|---|----|
+| H1 | text-3xl (30px) / lg:text-4xl (36px) | leading-10 (40px) | semibold | Main page titles |
+| H1Large | text-5xl (48px) | leading-10 (40px) | extrabold | Hero sections |
+| H2 | text-3xl (30px) | leading-9 (36px) | semibold | Section headers |
+| H3 | text-2xl (24px) | leading-8 (32px) | semibold | Subsection headers |
+| H4 | text-xl (20px) | leading-7 (28px) | semibold | Card titles |
+| Lead | text-xl (20px) | leading-7 (28px) | normal | Introduction text |
+| P | text-base (16px) | leading-7 (28px) | normal | Body text |
+| Small | text-sm (14px) | leading-4 (16px) | medium | Helper text |
+| Muted | text-sm (14px) | leading-none | normal | Secondary text |
 
-1. Start infrastructure with Docker: `./helicone-compose.sh helicone up`
-2. Start web: `cd web && yarn dev:better-auth`
-3. Start backend: `cd valhalla/jawn && yarn dev`
-4. Access at `http://localhost:3000`
+## Color System
 
-## Testing
+### Usage Patterns
+```tsx
+// 1. Use Tailwind utility classes for colors
+✅ text-foreground
+✅ bg-background
+✅ border-border
 
-- Web: `yarn test` (Jest)
-- Backend: `yarn test:jawn`
-- AI Gateway: `cargo test --tests --all-features`
-- E2E tests available in Python
+// 2. Use foreground variants for text on colored backgrounds
+✅ bg-primary text-primary-foreground
+✅ bg-destructive text-destructive-foreground
 
-## Common Tasks
+// ❌ Don't use CSS variables directly
+❌ text-[hsl(var(--foreground))]
+❌ bg-[hsl(var(--background))]
 
-### Adding New Features
+// ❌ Don't use raw colors
+❌ text-slate-900
+❌ bg-white
+```
 
-1. Design API in Jawn controller with TSOA
-2. Implement manager with database operations
-3. Create frontend hooks with TanStack Query
-4. Follow design system for UI components
+### Color Utility Classes
+```tsx
+/* Text Colors */
+text-foreground              // Primary text
+text-muted-foreground        // Secondary text
+text-accent-foreground       // Accent text
 
-### Database Changes
+/* Background Colors */
+bg-background                // Page background
+bg-card                      // Card background
+bg-muted                     // Muted background
 
-1. Add migrations in `/supabase/migrations/`
-2. Update types and managers accordingly
-3. Test with proper RLS policies
+/* Border Colors */
+border-border                // Default borders
+border-input                 // Form inputs
+ring-ring                    // Focus rings
+```
 
-### Style Changes
+## Color Reference Values
 
-- Use semantic color tokens, never raw colors
-- Follow typography component system
-- Use flexbox + gap for layouts
-- Test in both light and dark modes
-- when making changes to /packages run the tests npx jest **tests**/ in /packages to make sure nothing else is broken
+### Primary Colors
+```tsx
+/* Light Mode */
+bg-primary                   // #0EA5E9 (sky-500)
+text-primary-foreground      // #F0F9FF (sky-50)
 
-### TypeScript Type Changes
+/* Dark Mode */
+bg-primary                   // #0284C7 (sky-600)
+text-primary-foreground      // #083344 (sky-950)
+```
 
-When modifying TypeScript types (interfaces, type aliases, union types):
+### Background Colors
+```tsx
+/* Light Mode */
+bg-background                // #FFFFFF (white)
+text-foreground              // #0F172A (slate-900)
 
-1. **Run type checking before committing**: `npx tsc --noEmit` in the relevant package to catch type errors (Jest tests alone won't catch all type mismatches)
-2. **Search for related types**: When updating union types (e.g., `"low" | "medium" | "high"`), grep for similar patterns to ensure all related types are updated:
-   ```bash
-   grep -r "thinkingLevel" packages/  # Find all usages of similar type
-   ```
+/* Dark Mode */
+bg-background                // #020617 (slate-950)
+text-foreground              // #F8FAFC (slate-50)
+```
+
+### Accent Colors
+```tsx
+/* Light Mode */
+bg-accent                    // #F1F5F9 (slate-100)
+text-accent-foreground       // #0F172A (slate-900)
+
+/* Dark Mode */
+bg-accent                    // #1E293B (slate-800)
+text-accent-foreground       // #F8FAFC (slate-50)
+```
+
+### UI Component Colors
+```tsx
+/* Light Mode */
+bg-card                      // #FFFFFF (white)
+text-card-foreground         // #020617 (slate-950)
+bg-popover                   // #FFFFFF (white)
+text-popover-foreground      // #020617 (slate-950)
+border-border                // #E2E8F0 (slate-200)
+border-input                 // #E2E8F0 (slate-200)
+ring-ring                    // #0F172A (slate-900)
+
+/* Dark Mode */
+bg-card                      // #020617 (slate-950)
+text-card-foreground         // #F8FAFC (slate-50)
+bg-popover                   // #020617 (slate-950)
+text-popover-foreground      // #F8FAFC (slate-50)
+border-border                // #1E293B (slate-800)
+border-input                 // #1E293B (slate-800)
+ring-ring                    // #CBD5E1 (slate-300)
+```
+
+### Semantic Colors
+```tsx
+/* Light Mode */
+bg-muted                     // #F1F5F9 (slate-100)
+text-muted-foreground        // #64748B (slate-500)
+bg-secondary                 // #F1F5F9 (slate-100)
+text-secondary-foreground    // #0F172A (slate-900)
+bg-destructive               // #DC2626 (red-600)
+text-destructive-foreground  // #450A0A (red-950)
+bg-confirmative              // #16A34A (green-600)
+text-confirmative-foreground // #052E16 (green-950)
+
+/* Dark Mode */
+bg-muted                     // #1E293B (slate-800)
+text-muted-foreground        // #94A3B8 (slate-400)
+bg-secondary                 // #1E293B (slate-800)
+text-secondary-foreground    // #F8FAFC (slate-50)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Helicone/helicone](https://github.com/Helicone/helicone) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
