@@ -1,0 +1,136 @@
+---
+trigger: always_on
+description: Ascender is a web-based UI, REST API, and task engine built on top of [Ansible](https://github.com/ansible/ansible). It is a downstream fork of [AWX](https://github.com/ansible/awx), maintained by Ctrl IQ, Inc. It provides job scheduling, inventory management, credential storage, workflow automation, RBAC, and a REST API. ~987 Python source files, ~154 K lines of Python.
+---
+
+# Ascender – Copilot Agent Instructions
+
+## What This Repository Is
+Ascender is a web-based UI, REST API, and task engine built on top of [Ansible](https://github.com/ansible/ansible). It is a downstream fork of [AWX](https://github.com/ansible/awx), maintained by Ctrl IQ, Inc. It provides job scheduling, inventory management, credential storage, workflow automation, RBAC, and a REST API. ~987 Python source files, ~154 K lines of Python.
+
+**Trust these instructions. Search the repo only if the information below is incomplete or incorrect.**
+
+---
+
+## Runtime Environment
+
+All development tooling runs inside the **`tools_awx_1` Docker container**. The repository root is mounted at `/awx_devel` inside the container. The host working directory (`/root/ascender`) does not have the project's Python environment. Always prefix commands with:
+
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && <command>"
+```
+
+Supporting containers also running:
+- `tools_postgres_1` – PostgreSQL database (used by the running app; tests use SQLite)
+- `tools_valkey_1` – Valkey (Redis-compatible) cache
+
+Runtime versions (inside container):
+- **Python** 3.12.12
+- **Django** 5.2.14
+- **psycopg** 3.1.18
+- **black** 26.5.1 | **flake8** 7.3.0 | **yamllint** 1.38.0
+
+---
+
+## Linting
+
+### Black (code formatting)
+Config in `pyproject.toml`: `line-length = 160`, `skip-string-normalization = true`. Always auto-format new Python code before committing:
+
+```bash
+# Check (CI-style):
+docker exec tools_awx_1 bash -c "cd /awx_devel && black --check awx awxkit"
+# Auto-fix:
+docker exec tools_awx_1 bash -c "cd /awx_devel && black awx awxkit"
+```
+
+### Flake8
+Config in `tox.ini` (section `[flake8]`). Checks only: `F401,F402,F821,F823,F841,F811,E265,E266,F541,W605,E722,F822,F523,W291,F405`. Excludes `awx/ui/node_modules`, `env`.
+
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && flake8 awx awxkit"
+```
+
+### Yamllint
+Config in `.yamllint` (root). `line-length` and `truthy` rules are disabled. Ignores `.github`, `.tox`, `tools/docker-compose/_sources`, and a few test data paths.
+
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && yamllint -s ."
+```
+
+---
+
+## Running Tests
+
+Tests use SQLite (not PostgreSQL) and in-memory channel layer — no database setup needed. Settings: `awx.main.tests.settings_for_test` (configured in `pytest.ini`). Default pytest flags: `--reuse-db --nomigrations --tb=native --timeout=300`.
+
+### Unit tests (~15 seconds, run frequently)
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && PYTHONDONTWRITEBYTECODE=1 py.test -p no:cacheprovider -n auto --dist=loadfile awx/main/tests/unit/"
+```
+Result: 1139 passed, 1 skipped.
+
+### Functional tests (~3 minutes)
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && PYTHONDONTWRITEBYTECODE=1 py.test -p no:cacheprovider -n auto --dist=loadfile awx/main/tests/functional/"
+```
+Result: 1987 passed, 5 skipped.
+
+### Full test suite (all dirs, ~4 minutes)
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && PYTHONDONTWRITEBYTECODE=1 py.test -p no:cacheprovider -n auto --dist=loadfile awx/main/tests/unit awx/main/tests/functional awx/conf/tests awx/sso/tests"
+```
+
+### Migration check (always run after model changes)
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && awx-manage check_migrations --dry-run --check -n 'missing_migration_file'"
+```
+Expected output: `No changes detected`
+
+### Target a single test file
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && PYTHONDONTWRITEBYTECODE=1 py.test -p no:cacheprovider awx/main/tests/unit/test_capacity.py"
+```
+
+---
+
+## Model Changes Require Migrations
+
+After changing any Django model, always generate and commit the migration:
+
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && awx-manage makemigrations"
+```
+
+Then verify no missing migration file:
+```bash
+docker exec tools_awx_1 bash -c "cd /awx_devel && awx-manage check_migrations --dry-run --check -n 'missing_migration_file'"
+```
+
+Migration files live in `awx/main/migrations/` (218 existing files).
+
+---
+
+## Project Layout
+
+| Path | Purpose |
+|---|---|
+| `awx/` | Main Django application package |
+| `awx/api/` | DRF REST API – views, serializers, permissions, fields, pagination |
+| `awx/conf/` | DB-backed dynamic settings system + tests |
+| `awx/main/` | Core business logic |
+| `awx/main/models/` | ORM models: jobs, inventory, credentials, workflows, orgs, RBAC, schedules |
+| `awx/main/tasks/` | Background task system (dispatcher-based) |
+| `awx/main/migrations/` | 218 Django migrations |
+| `awx/main/tests/unit/` | Fast isolated unit tests (~1139 tests) |
+| `awx/main/tests/functional/` | Django TestClient-based API tests (~1987 tests) |
+| `awx/main/tests/settings_for_test.py` | Test settings (SQLite, in-memory cache) |
+| `awx/settings/` | Settings modules: `defaults.py`, `development.py`, `production.py` |
+| `awx/sso/` | SSO/LDAP/SAML backends + tests |
+| `awx/ui/` | UI / React frontend (npm) |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ctrliq/ascender](https://github.com/ctrliq/ascender) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
