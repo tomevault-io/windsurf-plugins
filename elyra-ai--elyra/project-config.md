@@ -19,11 +19,123 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Gemini Guidelines
+# Elyra - AI Agent Guidelines
 
-See [AGENT.md](AGENT.md) for project guidelines, repository structure,
-coding conventions, and development setup instructions.
+## Project Overview
+
+Elyra is a set of AI-centric extensions to JupyterLab Notebooks. It provides
+a visual pipeline editor, batch job execution for notebooks/scripts, reusable
+code snippets, AI assistant integration, and hybrid runtime support.
+
+## Repository Structure
+
+```
+elyra/                  # Main Python package
+  airflow/              # Apache Airflow runtime integration
+  api/                  # REST API handlers
+  cli/                  # Command-line interface
+  contents/             # Jupyter contents manager extensions
+  kfp/                  # Kubeflow Pipelines runtime integration
+  metadata/             # Metadata service (schemas, storage, handlers)
+  pipeline/             # Pipeline definition, parsing, and processing
+  templates/            # Jinja2 templates for pipeline generation
+  tests/                # Python unit and integration tests
+  util/                 # Shared utilities
+  elyra_app.py          # Jupyter server extension entry point
+packages/               # TypeScript/JupyterLab frontend extensions
+  code-snippet/         #   Code snippet editor and management
+  metadata/             #   Metadata explorer UI
+  metadata-common/      #   Shared metadata utilities
+  pipeline-editor/      #   Visual pipeline editor
+  python-editor/        #   Python script editor
+  r-editor/             #   R script editor
+  scala-editor/         #   Scala script editor
+  script-debugger/      #   Script debugger integration
+  script-editor/        #   Base script editor (shared by language editors)
+  services/             #   Frontend service clients (API wrappers)
+  theme/                #   Elyra theme extension
+  ui-components/        #   Shared UI components library
+labextensions/          # Pre-built JupyterLab extensions
+cypress/                # End-to-end integration tests (Cypress)
+docs/                   # Sphinx documentation source
+etc/                    # Docker, Kubernetes, and deployment configs
+```
+
+## Tech Stack
+
+- **Backend:** Python 3.10+, Jupyter Server, Tornado
+- **Frontend:** TypeScript, JupyterLab 4.x, React
+- **Build:** Hatchling (Python), Lerna + Yarn (JS), Makefile orchestration
+- **Testing:** pytest (backend), Jest (frontend unit), Cypress (integration)
+- **Linting:** ruff/black (Python), ESLint + Prettier (TypeScript)
+- **Runtimes:** Apache Airflow, Kubeflow Pipelines
+
+## Development Setup
+
+```bash
+# Install all dependencies and build
+make install-all-dev
+
+# Run backend tests
+make test-server
+
+# Run frontend unit tests
+make test-ui-unit
+
+# Run integration tests
+make test-integration
+
+# Lint all code
+make lint
+```
+
+## Coding Conventions
+
+### Python
+
+- Follow PEP 8; use `black` for formatting and `ruff` for linting
+- Type annotations are required for all public functions
+- Use `logging.getLogger(__name__)` instead of `print()`
+- Catch specific exceptions; avoid bare `except:`
+- Use Google-style docstrings for public classes and methods
+- Tests use `pytest` with fixtures; prefer `@pytest.mark.parametrize`
+
+### TypeScript / JupyterLab
+
+- Follow the existing ESLint + Prettier configuration
+- JupyterLab extensions follow the `@elyra/<extension-name>` namespace
+- Frontend packages are managed via Lerna monorepo in `packages/`
+
+### Dependency Constraints
+
+- **`uuid` (in `packages/pipeline-editor`):** Pinned to `^3.4.0`. The
+  pipeline-editor package is CommonJS (no `"type": "module"` in its
+  `package.json`) and the build uses TypeScript `module: Node16` /
+  `moduleResolution: Node16`. uuid v7+ removed the `./v4` subpath
+  export, and uuid v11+ is ESM-only — both shapes conflict with the
+  package's CJS+Node16 setup. **Do not bump `uuid` past `^3.x`** in
+  this package unless the pipeline-editor is first migrated to ESM
+  (`"type": "module"`) or the tsconfig is switched to a bundler-aware
+  module resolution. If Dependabot opens a uuid major bump PR for
+  this package, close it with a reference to this constraint.
+- The same constraint applies to any other dependency in this
+  package that goes ESM-only; verify CJS support before accepting
+  major version bumps.
+
+### General
+
+- Copyright header required on all source files (Apache 2.0)
+- **MANDATORY:** Every commit MUST be signed off with `git commit -s`
+  (or `git commit --signoff`) to comply with the
+  [Developer Certificate of Origin (DCO)](https://developercertificate.org/).
+  Commits without a `Signed-off-by:` trailer will be rejected by the
+  DCO check and cannot be merged. Configure `git config commit.gpgsign`
+  separately if cryptographic signing is also desired; the DCO sign-off
+  is a distinct, always-required text trailer.
+  - **AI agents:** the project's "signing" requirement is the DCO
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [elyra-ai/elyra](https://github.com/elyra-ai/elyra) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
