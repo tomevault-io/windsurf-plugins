@@ -1,0 +1,143 @@
+---
+trigger: always_on
+description: OrcaHello is a real-time AI-assisted killer whale notification system developed by [Orcasound](https://www.orcasound.net/). This system uses deep learning to detect orca whale calls from live hydrophone audio in Puget Sound, helping with the conservation of endangered Southern Resident Killer Whales (SRKW).
+---
+
+# GitHub Copilot Instructions for OrcaHello
+
+## Project Overview
+
+OrcaHello is a real-time AI-assisted killer whale notification system developed by [Orcasound](https://www.orcasound.net/). This system uses deep learning to detect orca whale calls from live hydrophone audio in Puget Sound, helping with the conservation of endangered Southern Resident Killer Whales (SRKW).
+
+## Project Structure
+
+This repository contains multiple interconnected components:
+
+- **ModeratorFrontEnd**: Web applications for moderator portal (both AIForOrcas and OrcaHello implementations)
+- **InferenceSystem**: Real-time AI inference engine for detecting whale calls
+- **ModelTraining**: Machine learning model training and data preparation
+- **ModelEvaluation**: Model benchmarking and evaluation tools
+- **NotificationSystem**: Email notification system for confirmed detections
+
+## Technology Stack
+
+### Primary Technologies
+- **.NET 6+**: Main framework for web applications and APIs
+- **C#**: Primary programming language for backend services
+- **Blazor**: Frontend framework for web UI components
+- **Azure**: Cloud platform (CosmosDB,  Storage, App Services, Kubernetes)
+- **Python**: ML/AI model training and inference
+- **FastAPI/TensorFlow**: AI/ML frameworks
+
+### Architecture Patterns
+- Clean Architecture with separation of concerns
+- Dependency injection and service-oriented design
+- Repository pattern for data access
+- API-first design with Swagger documentation
+
+## Coding Standards
+
+### C# Guidelines
+- Use file-scoped namespaces (NET 6+ feature)
+- Follow established naming conventions (PascalCase for public members, camelCase for private)
+- Include XML documentation comments for public APIs
+- Use `[ExcludeFromCodeCoverage]` attribute for configuration classes
+- Implement proper error handling and logging
+- Use async/await patterns for I/O operations
+
+### Code Organization
+- Organize code into logical layers (Controllers, Services, Brokers, Models)
+- Use configuration classes for dependency injection
+- Separate concerns between API and UI projects
+- Include comprehensive unit tests for business logic
+
+### Example Code Patterns
+
+```csharp
+// Controllers should be minimal and delegate to services
+[ApiController]
+[Route("api/[controller]")]
+public class DetectionsController : ControllerBase
+{
+    private readonly IDetectionService _detectionService;
+    
+    public DetectionsController(IDetectionService detectionService)
+    {
+        _detectionService = detectionService;
+    }
+}
+
+// Use configuration classes for dependency injection
+[ExcludeFromCodeCoverage]
+public static class WebServiceProviders
+{
+    public static void ConfigureServices(this WebApplicationBuilder builder)
+    {
+        // Configuration logic here
+    }
+}
+```
+
+## Domain-Specific Context
+
+### Marine Biology & Acoustics
+- **Hydrophones**: Underwater microphones that capture marine audio
+- **Spectrograms**: Visual representations of audio frequency over time
+- **Bioacoustics**: Scientific study of sound in living organisms
+- **SRKW**: Southern Resident Killer Whales (endangered population)
+- **Detection confidence**: Model probability scores for whale call classification
+
+### Business Logic Context
+- Detections require expert moderation before public notification
+- Model processes 2-second audio segments with overlapping windows
+- Confirmed SRKW detections trigger immediate notifications to subscribers
+- System handles multiple hydrophone locations across Puget Sound
+- Moderators can tag detections with various labels (species, behavior, etc.)
+
+## Contributing Guidelines
+
+### Before Contributing
+1. Read [CONTRIBUTING.md](../CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)
+2. Check existing issues and avoid duplicating work
+3. Follow the established coding patterns and architecture
+4. Include appropriate unit tests for new functionality
+5. Update documentation for user-facing changes
+
+### Pull Request Guidelines
+- Reference GitHub issues in PR descriptions
+- Ensure existing tests continue to pass
+- Include tests for bug fixes and new features
+- Maintain consistent coding style with existing codebase
+- Run code formatting tools (Prettier for frontend, built-in .NET formatting)
+
+### Code Reviews
+- Minimum two reviewers for significant changes
+- Domain experts review ML/AI components
+- Infrastructure team reviews Azure and deployment changes
+- Follow the CODEOWNERS file for appropriate reviewers
+
+## Testing Approach
+
+- Unit tests for business logic and services
+- Integration tests for API endpoints
+- Mock external dependencies (CosmosDB, Azure services)
+- Test data fixtures should use realistic marine biology scenarios
+- Performance testing for real-time inference requirements
+
+## Security Considerations
+
+- Authentication via Azure AD for moderator access
+- Authorization policies for different user roles
+- Secure handling of hydrophone audio data
+- CORS policies configured for specific origins
+- Environment-specific configuration management
+
+## AI/ML Specific Guidelines
+
+### Model Training
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [orcasound/orcahello](https://github.com/orcasound/orcahello) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
