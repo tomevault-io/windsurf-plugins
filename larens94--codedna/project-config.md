@@ -1,27 +1,28 @@
 ---
 trigger: always_on
-description: This codebase uses the CodeDNA communication protocol (v0.9). Apply these rules in every suggestion.
+description: This project uses CodeDNA. Every Python file begins with a module docstring.
 ---
 
-# CodeDNA v0.9 — GitHub Copilot Instructions
+# CodeDNA v0.8 — In-Source Communication Protocol
+# Annotate your project: pip install git+https://github.com/Larens94/codedna.git && codedna init ./
 
-This codebase uses the CodeDNA communication protocol (v0.9). Apply these rules in every suggestion.
+This project uses CodeDNA. Every Python file begins with a module docstring.
 
-> Annotate your project: `pipx install git+https://github.com/Larens94/codedna.git` then `codedna init ./`
+On SESSION START:
+- Read `.codedna` at repo root — project map, last 3-5 agent_sessions entries
+- CodeDNA is additive — it complements Cline's native memory, not replaces it
 
-## Module header (required in every Python file)
+On EDIT:
+- Re-read `rules:` before writing any logic — never violate these constraints
+- Read `Rules:` in function docstrings before writing logic there
+- Check `used_by:` after changes and update callers if needed
+- If you discover a constraint or fix a bug, add it to `rules:` for the next agent
+- Append a new `agent:` line to the module docstring after editing. Keep only the last 5 entries — drop the oldest if adding a 6th. Full history is in git and `.codedna`.
 
-Every file must begin with a module docstring:
-
-```python
-"""filename.py — <what it does, ≤15 words>.
-
-exports: public_function(arg) -> return_type
-used_by: consumer_file.py → consumer_function
-rules:   <hard constraint agents must never violate>
-agent:   <model-id> | <provider> | <YYYY-MM-DD> | <session_id> | <what you did and what you noticed>
-"""
-```
+On CREATE:
+- Write module docstring before any imports (exports/used_by/rules/agent)
+- Every public function **must** have a `Rules:` docstring
+- Use semantic naming: `list_dict_users_from_db = get_users()`
 
 ## Writing good `rules:`
 
@@ -46,10 +47,10 @@ Update rules: every time you discover a constraint, fix a bug, or notice a non-o
 Every public function **must** have a `Rules:` docstring:
 
 ```python
-def critical_function(arg: type) -> return_type:
+def my_function(arg: type) -> return_type:
     """Short description.
 
-    Rules:   What MUST or MUST NOT happen here.
+    Rules:   What the agent MUST or MUST NOT do here.
     message: model-id | YYYY-MM-DD | observation for next agent
     """
 ```
@@ -69,61 +70,29 @@ amount = order.amount * get_exchange_rate(order.currency)
 When to add: business-rule conditionals, loops with filtering, algorithm steps where order matters, edge cases.
 When NOT to add: simple getters, obvious control flow, standard library usage.
 
-## On session start
+`message:` field (v0.8) — use for open observations not yet certain enough to become `rules:`:
+- In module docstring: `message: "<hypothesis or note for the next agent>"`
+- In function docstring: `message: <model-id> | <date> | <open observation>`
+- Lifecycle: promote to `rules:` or dismiss. Always append-only — never delete.
 
-Read `.codedna` at repo root — project structure and last 3 `agent_sessions:` entries.
+On SESSION END:
+- Append to `.codedna` → `agent_sessions:` with agent, provider, date, session_id, task, changed, visited, message
+- Commit with AI git trailers: AI-Agent, AI-Provider, AI-Session, AI-Visited, AI-Message
 
-## On edit: always do these in order
+`exports:` are contracts — never rename without explicit instruction and updating all `used_by:` callers.
 
-1. Check `rules:` in the module docstring — never violate these constraints
-2. Check `used_by:` — these callers will be affected by your changes
-3. Read `Rules:` in any function docstring before writing logic
-4. If you discover a constraint, add it to `rules:` for the next agent
-5. Append a new `agent:` line to the module docstring after editing. Keep only the last 5 entries — drop the oldest if adding a 6th. Full history is in git and `.codedna`.
-
-## On generate: always do these
-
-1. Write module docstring before imports (with `exports:`, `used_by:`, `rules:`, `agent:`)
-2. Every public function **must** have a `Rules:` docstring
-3. Use semantic names: `list_dict_orders_from_db = query(sql)` not `data = query(sql)`
-
-## `message:` — Agent Chat Layer (v0.9)
-
-Use `message:` for observations not yet certain enough to become `rules:`:
-
-```python
-agent:   <model-id> | <provider> | <YYYY-MM-DD> | <session_id> | Implemented X.
-         message: "noticed Y behaviour — not yet sure if this should be a rule"
+Module docstring format:
 ```
+"""filename.py — <purpose ≤15 words>.
 
-```python
-def my_function():
-    """Short description.
-
-    Rules:   hard constraint here
-    message: <model-id> | <date> | open observation for next agent
-    """
+exports: fn(args) -> type
+used_by: consumer.py → fn
+rules:   <hard constraint>
+agent:   <model-id> | <provider> | <YYYY-MM-DD> | <session_id> | <what you did and noticed>
+         message: "<open hypothesis>"
+"""
 ```
-
-**Lifecycle:** promote to `rules:` with `@prev: promoted to rules:` or dismiss with `@prev: verified, not applicable because...`. Always append-only — never delete.
-
-## On session end
-
-Append to `.codedna` → `agent_sessions:` with agent, provider, date, session_id, task, changed, visited, message.
-
-Commit with AI git trailers: `AI-Agent`, `AI-Provider`, `AI-Session`, `AI-Visited`, `AI-Message`.
-
-## CodeDNA + native memory — additive, not replacing
-
-CodeDNA is the **shared** layer — git-tracked, readable by every agent and tool. It does not replace Copilot's native context or any other tool's memory. Use both:
-
-- `.codedna` + file annotations → shared architectural truth, survives `git clone`
-- Copilot native context → session-specific, tool-local context
-
-## Exports are contracts
-
-`exports:` symbols must not be renamed or removed — other files depend on them (check `used_by:`).
 
 ---
 > Source: [Larens94/codedna](https://github.com/Larens94/codedna) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
