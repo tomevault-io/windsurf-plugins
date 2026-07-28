@@ -1,8 +1,6 @@
 # AI instruction files for Meta-Spatial-SDK-Samples
 
-> Sourced from [meta-quest/Meta-Spatial-SDK-Samples](https://github.com/meta-quest/Meta-Spatial-SDK-Samples) and converted for every major platform by [TomeVault](https://tomevault.io)
-
-The Meta Spatial SDK Samples is a collection of code samples and projects that demonstrate the capabilities of the Meta Spatial SDK. Meta Spatial SDK enables mobile developers to build Meta Horizon OS experiences using familiar Android languages, tools, and libraries.
+> Sourced from [meta-quest/Meta-Spatial-SDK-Samples](https://github.com/meta-quest/Meta-Spatial-SDK-Samples), graded against the public Tome Standard and kept consistent across every major platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
