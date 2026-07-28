@@ -1,138 +1,93 @@
 ---
 trigger: always_on
-description: This repo contains an N-API implementation backed by QuickJS. Most of the active
+description: Extends: `undici.Dispatcher`
 ---
 
-# EdgeJS N-API QuickJS Notes
+# Agent
 
-This repo contains an N-API implementation backed by QuickJS. Most of the active
-work has been in the `napi` submodule/worktree, especially:
+Extends: `undici.Dispatcher`
 
-- `napi/quickjs/src/js_native_api_quickjs.cc`
-- `napi/quickjs/src/unofficial_napi.cc`
-- `napi/quickjs/src/internal/`
-- `napi/quickjs/tests/`
-- `napi/tests/js-native-api/`
+Agent allows dispatching requests against multiple different origins.
 
-## QuickJS WASIX Resume Context
+Requests are not guaranteed to be dispatched in order of invocation.
 
-When resuming this work, start with:
+## `new undici.Agent([options])`
 
-```text
-plans/quickjs-wasm/development/README.md
-```
+Arguments:
 
-That file indexes the development phases:
+* **options** `AgentOptions` (optional)
 
-- `001_merge_analysis.md`: comparison with the other QuickJS branch and integration plan.
-- `002_native_bootstrap_contextify.md`: native Edge QuickJS bootstrap and `ContextifyScript` fix.
-- `003_repl_tty_readline.md`: REPL TTY/readline troubleshooting.
-- `004_promise_hooks_microtasks.md`: QuickJS promise hooks and microtask/job draining.
-- `005_wasix_wasmer_http.md`: WASIX/Wasmer bootstrap, Atomics, and HTTP stream listener fix.
-- `006_framework_app_adapters.md`: Astro, Vite, and Next.js app adapter notes.
-- `007_framework_standalone_builds.md`: framework standalone build notes and remaining runtime
-  blockers.
-- `008_runtime_change_containment_rollback.md`: shared runtime rollback containment, native
-  compatibility relocation, and QuickJS WASIX build/linkage notes.
+Returns: `Agent`
 
-Current useful state:
+### Parameter: `AgentOptions`
 
-- Native QuickJS-backed Edge CLI can bootstrap and run the HTTP echo server.
-- REPL input works with persistent history after the promise hook/microtask fix.
-- WASIX Edge QuickJS can run under Wasmer and handle HTTP requests with `--net`.
-- `quickjs-wasm/build.sh` currently builds `build-quickjs-wasix/edge.wasm` and
-  `edgejs.wasm`, and its final no-N-API-imports check passes.
-- The root `wasmer.toml` publishes/uses `sadhbh-c0d3/edgejs-quickjs` at
-  `0.0.1`, module `edge`, source `build-quickjs-wasix/edgejs.wasm`.
-- Framework app notes use anonymized paths: `~/src/astro-app`,
-  `~/src/vite-app`, and `~/src/next-app`.
+Extends: [`PoolOptions`](/docs/docs/api/Pool.md#parameter-pooloptions)
 
-## Plans Documentation Workflow
+* **factory** `(origin: URL, opts: Object) => Dispatcher` - Default: `(origin, opts) => new Pool(origin, opts)`
+* **maxOrigins** `number` (optional) - Default: `Infinity` - Limits the total number of origins that can receive requests at a time, throwing an `MaxOriginsReachedError` error when attempting to dispatch when the max is reached. If `Infinity`, no limit is enforced.
 
-Before starting a new task, always list the plan tree recursively and look for
-existing information:
+## Instance Properties
 
-```sh
-find /Users/sadhbh/src/dev/edgejs/plans -type f -print
-rg -n "<relevant terms>" /Users/sadhbh/src/dev/edgejs/plans
-```
+### `Agent.closed`
 
-Read the relevant existing plan, development note, or troubleshooting note
-before changing code. While working, keep existing information current: if the
-task discovers new facts about an existing topic, update the existing note
-instead of creating a duplicate.
+Implements [Client.closed](/docs/docs/api/Client.md#clientclosed)
 
-If the context window reaches 90% while work is in progress, create a new
-development task note under:
+### `Agent.destroyed`
 
-```text
-plans/quickjs-wasm/development/NNN_<meaningful_name>.md
-```
+Implements [Client.destroyed](/docs/docs/api/Client.md#clientdestroyed)
 
-Include all information needed to continue the current task: user requests,
-review comments being addressed, files changed, verification already run,
-known failures, and the next concrete steps.
+## Instance Methods
 
-### Generate PDF Documentation
+### `Agent.close([callback])`
 
-When asked to "Generate PDF documentation", build a polished white-paper/book
-PDF from `plans/quickjs-wasm` and all of its subdirectories.
+Implements [`Dispatcher.close([callback])`](/docs/docs/api/Dispatcher.md#dispatcherclosecallback-promise).
 
-Use this process:
+### `Agent.destroy([error, callback])`
 
-1. List the plan tree recursively and search the plans for relevant context
-   before generating the document.
-2. Generate temporary Markdown and LaTeX under `/private/tmp`, leaving the
-   source plan notes untouched.
-3. Organize the book by knowledge structure, not raw file order: program
-   definition, chronological development narrative, cleanup/containment
-   subtasks, troubleshooting registry, Astro SSR, Vite app, Next.js, and Wasmer
-   deploy/WASIX packaging.
-4. Preserve all source-note information as chapters or chapter sections, and
-   include source paths for traceability.
-5. Use the title `EdgeJS QuickJS WASIX`, author
-   `Sonia Sadhbh Kolasinska in collaboration with Christoph Herzog, Wasmer`,
-   the current date, and an abstract.
-6. Render through temporary LaTeX with Pandoc and XeLaTeX, rerunning XeLaTeX as
-   needed for the table of contents.
-7. Preserve literal tilde characters in paths and code examples; do not rewrite
-   `~` as math such as `$\sim$`.
-8. Write the final PDF into `plans/quickjs-wasm/`.
+Implements [`Dispatcher.destroy([error, callback])`](/docs/docs/api/Dispatcher.md#dispatcherdestroyerror-callback-promise).
 
-## Experimental Rules
+### `Agent.dispatch(options, handler: AgentDispatchOptions)`
 
-### Experimental 001: Parallel Development Subtasks
+Implements [`Dispatcher.dispatch(options, handler)`](/docs/docs/api/Dispatcher.md#dispatcherdispatchoptions-handler).
 
-For larger development work, split the task into a development task directory:
+#### Parameter: `AgentDispatchOptions`
 
-```text
-plans/quickjs-wasm/development/dev_<number>_<meaningful-name>/<subtask-number>_<meaningful-name>.md
-```
+Extends: [`DispatchOptions`](/docs/docs/api/Dispatcher.md#parameter-dispatchoptions)
 
-Each subtask note should record scope, dependencies, write ownership, status,
-verification expectations, and enough context for an independent worker to
-continue safely. Spawn workers intelligently based on dependency order: only run
-parallel workers for subtasks with disjoint write sets or read-only checks, and
-make each worker aware that others may be active in the same codebase.
+* **origin** `string | URL`
 
-Use this heuristic when deciding where documentation belongs:
+Implements [`Dispatcher.destroy([error, callback])`](/docs/docs/api/Dispatcher.md#dispatcherdestroyerror-callback-promise).
 
-- Development task: broad implementation progress, integration work, runtime
-  design, refactors, or milestone notes. Write or update a numbered development
-  note under:
+### `Agent.connect(options[, callback])`
 
-```text
-plans/quickjs-wasm/development/NNN_<meaningful_name>.md
-```
+See [`Dispatcher.connect(options[, callback])`](/docs/docs/api/Dispatcher.md#dispatcherconnectoptions-callback).
 
-- Troubleshooting issue: an observed failure, crash, regression, compatibility
-  gap, or focused diagnostic trail. Write or update a numbered issue note under
-  the app-specific troubleshooting directory:
+### `Agent.dispatch(options, handler)`
 
-```text
+Implements [`Dispatcher.dispatch(options, handler)`](/docs/docs/api/Dispatcher.md#dispatcherdispatchoptions-handler).
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### `Agent.pipeline(options, handler)`
+
+See [`Dispatcher.pipeline(options, handler)`](/docs/docs/api/Dispatcher.md#dispatcherpipelineoptions-handler).
+
+### `Agent.request(options[, callback])`
+
+See [`Dispatcher.request(options [, callback])`](/docs/docs/api/Dispatcher.md#dispatcherrequestoptions-callback).
+
+### `Agent.stream(options, factory[, callback])`
+
+See [`Dispatcher.stream(options, factory[, callback])`](/docs/docs/api/Dispatcher.md#dispatcherstreamoptions-factory-callback).
+
+### `Agent.upgrade(options[, callback])`
+
+See [`Dispatcher.upgrade(options[, callback])`](/docs/docs/api/Dispatcher.md#dispatcherupgradeoptions-callback).
+
+### `Agent.stats()`
+
+Returns an object of stats by origin in the format of `Record<string, TClientStats | TPoolStats>`
+
+See [`PoolStats`](/docs/docs/api/PoolStats.md) and [`ClientStats`](/docs/docs/api/ClientStats.md).
 
 ---
 > Source: [wasmerio/edgejs](https://github.com/wasmerio/edgejs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
