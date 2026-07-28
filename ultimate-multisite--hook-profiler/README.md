@@ -1,8 +1,6 @@
 # AI instruction files for hook-profiler
 
-> Sourced from [Ultimate-Multisite/hook-profiler](https://github.com/Ultimate-Multisite/hook-profiler) and converted for every major platform by [TomeVault](https://tomevault.io)
-
-A powerful WordPress plugin that profiles every action and filter hook to identify performance bottlenecks and measure execution time by plugin.
+> Sourced from [Ultimate-Multisite/hook-profiler](https://github.com/Ultimate-Multisite/hook-profiler), graded against the public Tome Standard and kept consistent across every major platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
