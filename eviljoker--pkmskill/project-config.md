@@ -1,163 +1,171 @@
 ---
 trigger: always_on
-description: CursorRIPER Framework - START Phase
+description: CursorRIPER Framework - State Management
 ---
 
 <!-- Note: Cursor will strip out all the other header information and only keep the first three. -->
-# CursorRIPER Framework - START Phase
-# Version 1.0.1
+# CursorRIPER Framework - State Management
+# Version 1.0.2
 
 ## AI PROCESSING INSTRUCTIONS
-This file defines the START phase component of the CursorRIPER Framework. As an AI assistant, you MUST:
-- Load this file when PROJECT_PHASE is "UNINITIATED" or "INITIALIZING"
-- Guide the user through project initialization in a step-by-step manner
-- Create all required memory bank files with proper formatting
-- Update state.mdc as each step is completed
-- Archive this component once initialization is complete
+This file defines the current state of the project within the CursorRIPER Framework. As an AI assistant, you MUST:
+- Always load this file after core.mdc but before other components
+- Never modify state values without proper authorization via commands
+- Validate state transitions against allowed paths
+- Update this file when state changes occur
+- Keep all state values consistent with each other
 
-## START PHASE OVERVIEW
+## CURRENT PROJECT STATE
 
-The START phase is a one-time preprocessing phase that runs at the beginning of a new project or major component. It focuses on project initialization, scaffolding, and setting up the Memory Bank with baseline information.
+PROJECT_PHASE: "UNINITIATED"
+# Possible values: "UNINITIATED", "INITIALIZING", "DEVELOPMENT", "MAINTENANCE"
+
+RIPER_CURRENT_MODE: "NONE"
+# Possible values: "NONE", "RESEARCH", "INNOVATE", "PLAN", "EXECUTE", "REVIEW"
+
+START_PHASE_STATUS: "NOT_STARTED"
+# Possible values: "NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ARCHIVED"
+
+START_PHASE_STEP: 0
+# Possible values: 0-6 (0=Not started, 1=Requirements, 2=Technology, 3=Architecture, 4=Scaffolding, 5=Environment, 6=Memory Bank)
+
+LAST_UPDATE: "2025-04-05T00:00:00Z"
+# ISO 8601 formatted timestamp of last state update
+
+INITIALIZATION_DATE: ""
+# When START phase was completed, empty if not completed
+
+FRAMEWORK_VERSION: "1.0.0"
+# Current version of the framework
+
+## STATE TRANSITION RULES
 
 ```mermaid
-flowchart TD
-    Start[BEGIN START PHASE] --> Req[Requirements Gathering]
-    Req --> Tech[Technology Selection]
-    Tech --> Arch[Architecture Definition]
-    Arch --> Scaffold[Project Scaffolding]
-    Scaffold --> Setup[Environment Setup]
-    Setup --> Memory[Memory Bank Initialization]
-    Memory --> End[TRANSITION TO RIPER]
+stateDiagram-v2
+    [*] --> UNINITIATED
+    
+    UNINITIATED --> INITIALIZING: /start
+    INITIALIZING --> DEVELOPMENT: START phase complete
+    DEVELOPMENT --> MAINTENANCE: User request
+    MAINTENANCE --> DEVELOPMENT: User request
+    
+    state INITIALIZING {
+        [*] --> NOT_STARTED
+        NOT_STARTED --> IN_PROGRESS: Begin START
+        IN_PROGRESS --> COMPLETED: All steps finished
+        COMPLETED --> ARCHIVED: Enter DEVELOPMENT
+    }
+    
+    state "DEVELOPMENT/MAINTENANCE" as DM {
+        [*] --> RESEARCH
+        RESEARCH --> INNOVATE: /innovate
+        INNOVATE --> PLAN: /plan
+        PLAN --> EXECUTE: /execute
+        EXECUTE --> REVIEW: /review
+        REVIEW --> RESEARCH: /research
+    }
 ```
 
-## START PHASE PROCESS
+### Phase Transitions
+- UNINITIATED → INITIALIZING
+  - Trigger: "/start" or "BEGIN START PHASE"
+  - Requirements: None
+  
+- INITIALIZING → DEVELOPMENT
+  - Trigger: Automatic upon START phase completion
+  - Requirements: START_PHASE_STATUS = "COMPLETED"
+  
+- DEVELOPMENT → MAINTENANCE
+  - Trigger: Manual transition by user
+  - Requirements: Explicit user request
+  
+- MAINTENANCE → DEVELOPMENT
+  - Trigger: Manual transition by user
+  - Requirements: Explicit user request
 
-[PHASE: START]
-- **Purpose**: Project initialization and scaffolding
-- **Permitted**: Requirements gathering, technology selection, architecture definition, project structure setup
-- **Entry Point**: User command "BEGIN START PHASE" or "/start"
-- **Exit Point**: Automatic transition to RESEARCH mode after setup is complete
+### Mode Transitions
+- Any mode → RESEARCH
+  - Trigger: "/research" or "ENTER RESEARCH MODE"
+  - Requirements: PROJECT_PHASE in ["DEVELOPMENT", "MAINTENANCE"]
+  
+- Any mode → INNOVATE
+  - Trigger: "/innovate" or "ENTER INNOVATE MODE"
+  - Requirements: PROJECT_PHASE in ["DEVELOPMENT", "MAINTENANCE"]
+  
+- Any mode → PLAN
+  - Trigger: "/plan" or "ENTER PLAN MODE"
+  - Requirements: PROJECT_PHASE in ["DEVELOPMENT", "MAINTENANCE"]
+  
+- Any mode → EXECUTE
+  - Trigger: "/execute" or "ENTER EXECUTE MODE"
+  - Requirements: PROJECT_PHASE in ["DEVELOPMENT", "MAINTENANCE"]
+  
+- Any mode → REVIEW
+  - Trigger: "/review" or "ENTER REVIEW MODE"
+  - Requirements: PROJECT_PHASE in ["DEVELOPMENT", "MAINTENANCE"]
 
-## STEP-BY-STEP INITIALIZATION
+### START Phase Status Transitions
+- NOT_STARTED → IN_PROGRESS
+  - Trigger: "/start" or "BEGIN START PHASE"
+  - Requirements: PROJECT_PHASE = "UNINITIATED"
+  
+- IN_PROGRESS → COMPLETED
+  - Trigger: Completion of all START phase steps
+  - Requirements: START_PHASE_STEP = 6
+  
+- COMPLETED → ARCHIVED
+  - Trigger: Automatic after transition to DEVELOPMENT
+  - Requirements: PROJECT_PHASE = "DEVELOPMENT"
 
-### Step 1: Requirements Gathering
-- Collect and document core project requirements
-- Define project scope, goals, and constraints
-- Identify key stakeholders and their needs
-- Document success criteria
-- **Key Questions**:
-  - What problem is this project trying to solve?
-  - Who are the primary users or stakeholders?
-  - What are the must-have features?
-  - What are the nice-to-have features?
-  - What are the technical constraints?
-  - What is the timeline for completion?
-- **Output**: Create projectbrief.md with gathered requirements
+## STATE UPDATE PROCEDURES
 
-### Step 2: Technology Selection
-- Assess technology options based on requirements
-- Evaluate frameworks, libraries, and tools
-- Make recommendations with clear rationales
-- Document technology decisions
-- **Key Questions**:
-  - What programming language(s) best fit this project?
-  - What frameworks or libraries would be most appropriate?
-  - What database technology should be used?
-  - What deployment environment is targeted?
-  - Are there any specific performance requirements?
-  - What testing frameworks should be used?
-- **Output**: Add technology decisions to techContext.md
+### Update Project Phase
+1. Validate transition is allowed
+2. Create backup of current state
+3. Update PROJECT_PHASE value
+4. Update LAST_UPDATE timestamp
+5. Perform any phase-specific initialization
 
-### Step 3: Architecture Definition
-- Define high-level system architecture
-- Identify key components and their relationships
-- Create initial architectural diagrams
-- Document architectural decisions
-- **Key Questions**:
-  - What architectural pattern is most appropriate?
-  - How will the application be structured?
-  - What are the key components and their responsibilities?
-  - How will data flow through the system?
-  - How will the system scale?
-  - What security considerations need to be addressed?
-- **Output**: Create systemPatterns.md with architecture definition
+### Update RIPER Mode
+1. Validate transition is allowed
+2. Update RIPER_CURRENT_MODE value
+3. Update LAST_UPDATE timestamp
+4. Update activeContext.md to reflect mode change
 
-### Step 4: Project Scaffolding
-- Set up initial folder structure
-- Create configuration files
-- Initialize version control
-- Set up package management
-- Create initial README and documentation
-- **Key Actions**:
-  - Create the basic folder structure
-  - Initialize git repository
-  - Set up package manager (npm, pip, etc.)
-  - Create initial configuration files
-  - Set up basic build process
-- **Output**: Create project scaffold according to defined structure
+### Update START Phase Status
+1. Validate transition is allowed
+2. Update START_PHASE_STATUS value
+3. Update LAST_UPDATE timestamp
+4. If transitioning to COMPLETED, set INITIALIZATION_DATE
 
-### Step 5: Environment Setup
-- Configure development environment
-- Set up testing framework
-- Establish CI/CD pipeline configuration
-- Define deployment strategy
-- **Key Actions**:
-  - Set up local development environment
-  - Configure testing framework
-  - Create initial test cases
-  - Define CI/CD pipeline
-  - Document deployment process
-- **Output**: Update techContext.md with environment setup details
+### Update START Phase Step
+1. Validate step increment is logical
+2. Update START_PHASE_STEP value
+3. Update LAST_UPDATE timestamp
+4. If reaching step 6, trigger completion process
 
-### Step 6: Memory Bank Initialization
-- Create and populate all core memory files:
-  - projectbrief.md (if not already created)
-  - systemPatterns.md (if not already created)
-  - techContext.md (if not already created)
-  - activeContext.md
-  - progress.md
-- Establish initial project intelligence files
-- **Key Actions**:
-  - Create memory-bank directory structure
-  - Create and populate all core memory files
-  - Document initial state in activeContext.md
-  - Set up progress.md with initial tasks
-- **Output**: Complete memory bank with all required files
+## AUTOMATIC STATE DETECTION
 
-## MEMORY BANK TEMPLATES
+When determining current project state:
+1. Check for existence of memory bank files
+2. If complete memory bank exists but STATE_PHASE is "UNINITIATED":
+   - Set PROJECT_PHASE to "DEVELOPMENT"
+   - Set START_PHASE_STATUS to "COMPLETED"
+   - Set START_PHASE_STEP to 6
+   - Set INITIALIZATION_DATE based on file timestamps
+3. If partial memory bank exists:
+   - Set PROJECT_PHASE to "INITIALIZING"
+   - Set START_PHASE_STATUS to "IN_PROGRESS"
+   - Determine START_PHASE_STEP based on existing files
 
-### projectbrief.md Template
-```markdown
-# Project Brief: [PROJECT_NAME]
-*Version: 1.0*
-*Created: [CURRENT_DATE]*
-*Last Updated: [CURRENT_DATE]*
+## RE-INITIALIZATION PROTECTION
 
-## Project Overview
-[Brief description of the project, its purpose, and main goals]
-
-## Core Requirements
-- [REQUIREMENT_1]
-- [REQUIREMENT_2]
-- [REQUIREMENT_3]
-
-## Success Criteria
-- [CRITERION_1]
-- [CRITERION_2]
-- [CRITERION_3]
-
-## Scope
-### In Scope
-- [IN_SCOPE_ITEM_1]
-- [IN_SCOPE_ITEM_2]
-
-### Out of Scope
-- [OUT_OF_SCOPE_ITEM_1]
-- [OUT_OF_SCOPE_ITEM_2]
-
-## Timeline
-- [MILESTONE_1]: [DATE]
-- [MILESTONE_2]: [DATE]
+If "/start" or "BEGIN START PHASE" is detected when PROJECT_PHASE is not "UNINITIATED":
+1. Warn user about re-initialization risks
+2. Require explicit confirmation: "CONFIRM RE-INITIALIZATION"
+3. If confirmed:
+   - Create backup of current memory bank
+   - Reset state to PROJECT_PHASE = "INITIALIZING"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
