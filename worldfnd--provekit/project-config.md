@@ -112,5 +112,5 @@ Uses delta-encoded column indices within rows (reduces serialized size ~30-50%).
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [worldfnd/provekit](https://github.com/worldfnd/provekit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+> Source: [worldfnd/ProveKit](https://github.com/worldfnd/ProveKit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
