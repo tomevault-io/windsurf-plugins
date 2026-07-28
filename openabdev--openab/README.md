@@ -5,7 +5,7 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [openabdev/openab](https://github.com/openabdev/openab).
+Original source: `` in [openabdev/openab](https://github.com/openabdev/openab).
 
 ## Also available for
 
@@ -13,6 +13,7 @@ Original source: `GEMINI.md` in [openabdev/openab](https://github.com/openabdev/
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Graded against the Tome Standard, TomeVault's public ruleset for whether AI instructions load, read clearly and stay safe. Source: [github.com/openabdev/openab](https://github.com/openabdev/openab)
