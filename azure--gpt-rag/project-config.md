@@ -1,0 +1,180 @@
+---
+trigger: always_on
+description: This repository follows a structured workflow based on two primary branches:
+---
+
+# Repository Development and Release Instructions
+
+## Overview
+
+This repository follows a structured workflow based on two primary branches:
+
+- `develop` → ongoing development
+- `main` → stable, released versions
+
+All work must follow the branching, versioning, and changelog rules defined below.
+
+---
+
+## Branching Strategy
+
+### Default Behavior
+
+Unless explicitly instructed otherwise:
+
+- All development work MUST start from `develop`
+- All new work MUST be done in a feature branch
+- Feature work MUST target `develop`
+- Release preparation MUST target `main`
+
+---
+
+## Feature Development Workflow
+
+### Branch Creation
+
+- Always create feature branches from `develop`
+- Naming convention:
+  - `feature/<short-description>`
+
+Examples:
+- `feature/conversation-metadata`
+- `feature/improve-chat-history`
+
+---
+
+### Feature Pull Requests
+
+- Source branch: `feature/*`
+- Target branch: `develop`
+- Never target `main` from a feature branch
+
+---
+
+### Expected Flow
+
+1. Start from `develop`
+2. Create `feature/<name>`
+3. Implement changes
+4. Commit changes
+5. Open pull request to `develop`
+
+---
+
+## Release Workflow
+
+### Release Branch Creation
+
+- Release branches MUST be created from `develop`
+- Naming convention:
+  - `release/x.y.z` (no `v` prefix)
+
+Examples:
+- `release/1.2.3`
+- `release/2.4.2`
+
+---
+
+### Release Responsibilities
+
+When preparing a release branch:
+
+- Update version references where applicable
+- Update `CHANGELOG.md`
+- Ensure the repository reflects a releasable state
+- Do NOT introduce new feature work
+- **GitHub Release titles MUST be exactly the tag name** (for example,
+  `v2.8.0`). Never prefix release titles with the product or service name (for
+  example, do not use `GPT-RAG v2.8.0`, `GPT-RAG Orchestrator v2.8.0`, or
+  `gpt-rag-ui v2.8.0`).
+- **MANDATORY for EVERY GPT-RAG umbrella release — no exceptions.** The
+  published GitHub Release notes (the `gh release create` / `gh release edit`
+  body, NOT just the `CHANGELOG.md`) MUST include a `## Component versions`
+  section with a Markdown table listing every validated runtime component
+  from `manifest.json` `components[]` plus `infra / AI Landing Zone` from
+  `manifest.json` `ailz_tag`. This is required even for a patch release where
+  only the landing-zone pin changed and the runtime component versions are
+  unchanged — always restate the full validated combination so operators see
+  the exact set without cross-referencing other releases.
+- Read the versions directly from `manifest.json` at release time (`tag` for
+  each entry in `components[]`, and `ailz_tag` for the landing zone). Do not
+  hand-copy from a previous release.
+- Place the `## Component versions` table immediately after the `## Changed`
+  section and before `## Validation`, matching the existing published
+  releases (e.g. `v2.8.0`, `v2.8.1`).
+- The same table is ALSO added to `CHANGELOG.md` under the release heading
+  (as the `### Validation` component table). The GitHub Release notes and the
+  changelog must agree.
+
+Required GitHub Release notes skeleton:
+
+```md
+## Changed
+- <what changed in this release>
+
+## Component versions
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | vX.Y.Z |
+| gpt-rag-orchestrator | vX.Y.Z |
+| gpt-rag-ingestion | vX.Y.Z |
+| infra / AI Landing Zone | vX.Y.Z |
+
+## Validation
+- <commands / Azure env used to validate>
+```
+
+- **MANDATORY — never leak personal Azure environment or resource group names
+  in published GitHub Release notes.** The `## Validation` section (and any
+  other prose) MUST NOT contain the maintainer's `azd` environment names
+  (`gptrag-MMDDYYHHMM`, e.g. `gptrag-0601261130`) or resource group names
+  (`rg-gptrag-MMDDYYHHMM`). These are private, throwaway validation
+  environments and are noise to operators. Use generic phrasing instead:
+  "a validation environment", "a fresh Basic deployment", or "the validation
+  resource group". Region names (`swedencentral`, `francecentral`) and
+  feature flags (`NETWORK_ISOLATION=false`, `BUILD_MODE=acr-task`) are fine to
+  keep — only the `gptrag-*` / `rg-gptrag-*` tokens must be stripped. Before
+  publishing or editing any release, grep the body for `gptrag-\d{10}` and
+  remove every match.
+
+- **Preserve markdown formatting when editing release notes via the API.**
+  `gh release view <tag> --json body -q .body` returns the body as a
+  PowerShell **array of lines**; passing that array straight into
+  `[regex]::Replace` coerces it to a single string joined with spaces and
+  **flattens the whole release** (headings, bullets, and table rows collapse
+  into one paragraph). Always rejoin the array on newlines first (e.g.
+  `[string]::Join([char]10, $arr)`), edit with `Get-Content -Raw`, write back
+  with `Set-Content -NoNewline`, and republish with `gh release edit <tag> --notes-file <file>`. After editing, re-fetch and
+  confirm the body still has the expected line count and that `## ` headings
+  start at the beginning of a line.
+
+---
+
+### Release Pull Requests
+
+- Source branch: `release/x.y.z`
+- Target branch: `main`
+
+---
+
+### Expected Flow
+
+1. Start from `develop`
+2. Create `release/x.y.z`
+3. Update version and changelog
+4. Open pull request to `main`
+
+---
+
+## Versioning Rules
+
+- Follow semantic versioning: `MAJOR.MINOR.PATCH`
+- Version numbers MUST use the `v` prefix in:
+  - tags
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Azure/GPT-RAG](https://github.com/Azure/GPT-RAG) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
