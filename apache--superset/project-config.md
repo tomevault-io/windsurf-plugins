@@ -1,130 +1,129 @@
 ---
 trigger: always_on
-description: This guide helps LLM agents understand the Superset MCP (Model Context Protocol) service architecture and development conventions.
+description: Apache Superset development standards and guidelines for Cursor IDE
 ---
 
-# MCP Service - LLM Agent Guide
 
-This guide helps LLM agents understand the Superset MCP (Model Context Protocol) service architecture and development conventions.
+# Apache Superset Development Standards for Cursor IDE
 
-## CRITICAL: Apache License Headers
+Apache Superset is a data visualization platform with Flask/Python backend and React/TypeScript frontend.
 
-**EVERY Python file in the MCP service MUST have the Apache Software Foundation license header.**
+## ⚠️ CRITICAL: Ongoing Refactors (What NOT to Do)
 
-This includes:
-- All `.py` files (tool files, schemas, __init__.py files, etc.)
-- **NEVER remove existing license headers during refactoring or edits**
-- **ALWAYS add license headers when creating new files**
-- **ALWAYS verify license headers are present after editing files**
+**These migrations are actively happening - avoid deprecated patterns:**
 
-If you see a file without a license header, ADD IT IMMEDIATELY. If you accidentally remove one during editing, ADD IT BACK.
+### Frontend Modernization
+- **NO `any` types** - Use proper TypeScript types
+- **NO JavaScript files** - Convert to TypeScript (.ts/.tsx)
+- **NO Enzyme** - Use React Testing Library/Jest (Enzyme fully removed)
+- **Use @superset-ui/core** - Don't import Ant Design directly
 
-Use this exact template at the top of EVERY Python file:
+### Testing Strategy Migration
+- **Prefer unit tests** over integration tests
+- **Prefer integration tests** over Cypress end-to-end tests
+- **Cypress is last resort** - Actively moving away from Cypress
+- **Use Jest + React Testing Library** for component testing
 
-```python
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+### Backend Type Safety
+- **Add type hints** - All new Python code needs proper typing
+- **MyPy compliance** - Run `pre-commit run mypy` to validate
+- **SQLAlchemy typing** - Use proper model annotations
+
+## Code Standards
+
+### TypeScript Frontend
+- **NO `any` types** - Use proper TypeScript
+- **Functional components** with hooks
+- **@superset-ui/core** for UI components (not direct antd)
+- **Jest** for testing (NO Enzyme)
+- **Redux** for global state, hooks for local
+
+### Python Backend
+- **Type hints required** for all new code
+- **MyPy compliant** - run `pre-commit run mypy`
+- **SQLAlchemy models** with proper typing
+- **pytest** for testing
+
+### Apache License Headers
+- **New files require ASF license headers** - When creating new code files, include the standard Apache Software Foundation license header
+- **LLM instruction files are excluded** - Files like LLMS.md, CLAUDE.md, etc. are in `.rat-excludes` to avoid header token overhead
+
+## Key Directory Structure
+
+```
+superset/
+├── superset/                    # Python backend (Flask, SQLAlchemy)
+│   ├── views/api/              # REST API endpoints
+│   ├── models/                 # Database models
+│   └── connectors/             # Database connections
+├── superset-frontend/src/       # React TypeScript frontend
+│   ├── components/             # Reusable components
+│   ├── explore/                # Chart builder
+│   ├── dashboard/              # Dashboard interface
+│   └── SqlLab/                 # SQL editor
+├── superset-frontend/packages/
+│   └── superset-ui-core/       # UI component library (USE THIS)
+├── tests/                      # Python/integration tests
+├── docs/                       # Documentation (UPDATE FOR CHANGES)
+└── UPDATING.md                 # Breaking changes log
 ```
 
-**Note**: LLM instruction files like `CLAUDE.md`, `AGENTS.md`, etc. are excluded from this requirement (listed in `.rat-excludes`) to avoid token overhead, but ALL other Python files require it.
+## Architecture Patterns
 
-## Architecture Overview
+### Dataset-Centric Approach
+Charts built from enriched datasets containing:
+- Dimension columns with labels/descriptions
+- Predefined metrics as SQL expressions
+- Self-service analytics within defined contexts
 
-The MCP service provides programmatic access to Superset via the Model Context Protocol, allowing AI assistants to interact with dashboards, charts, datasets, databases, SQL Lab, and instance metadata.
+### Security & Features
+- **RBAC**: Role-based access via Flask-AppBuilder
+- **Feature flags**: Control feature rollouts
+- **Row-level security**: SQL-based data access control
 
-### Key Components
+## Test Utilities
 
-```
-superset/mcp_service/
-├── app.py                      # FastMCP app factory and tool registration
-├── auth.py                     # Authentication, authorization, and RBAC
-├── mcp_config.py              # Default configuration
-├── mcp_core.py                # Reusable core classes for tools
-├── flask_singleton.py         # Flask app singleton for MCP context
-├── middleware.py              # FastMCP middleware (logging, errors, size guards)
-├── server.py                  # Server startup (streamable-http, multi-pod)
-├── jwt_verifier.py            # JWT token validation
-├── chart/                     # Chart tools, schemas, prompts, resources
-│   ├── schemas.py
-│   ├── chart_utils.py
-│   ├── preview_utils.py
-│   ├── validation.py
-│   ├── tool/
-│   ├── prompts/
-│   └── resources/
-├── dashboard/                 # Dashboard tools and schemas
-│   ├── schemas.py
-│   └── tool/
-├── dataset/                   # Dataset tools and schemas
-│   ├── schemas.py
-│   └── tool/
-├── explore/                   # Explore link generation
-│   ├── schemas.py
-│   └── tool/
-├── sql_lab/                   # SQL Lab tools (execute, save, open)
-│   ├── schemas.py
-│   └── tool/
-├── system/                    # System tools (health, instance info, schema)
-│   ├── schemas.py
-│   ├── tool/
-│   ├── prompts/
-│   └── resources/
-├── common/                    # Shared error schemas
-├── commands/                  # MCP-specific command classes
-└── utils/                     # Utilities (URL, schema parsing, error builders)
+### Python Test Helpers
+- **`SupersetTestCase`** - Base class in `tests/integration_tests/base_tests.py`
+- **`@with_config`** - Config mocking decorator
+- **`@with_feature_flags`** - Feature flag testing
+- **`login_as()`, `login_as_admin()`** - Authentication helpers
+- **`create_dashboard()`, `create_slice()`** - Data setup utilities
+
+### TypeScript Test Helpers
+- **`superset-frontend/spec/helpers/testing-library.tsx`** - Custom render() with providers
+- **`createWrapper()`** - Redux/Router/Theme wrapper
+- **`selectOption()`** - Select component helper
+- **React Testing Library** - NO Enzyme (removed)
+
+## Pre-commit Validation
+
+**Use pre-commit hooks for quality validation:**
+
+```bash
+# Install hooks
+pre-commit install
+
+# Quick validation (faster than --all-files)
+pre-commit run                    # Staged files only
+pre-commit run mypy              # Python type checking
+pre-commit run prettier          # Code formatting
+pre-commit run eslint            # Frontend linting
 ```
 
-### Dependency Injection Architecture
+## Development Guidelines
 
-The `@tool` and `@prompt` decorators are defined as stubs in the `superset-core` package (`superset_core.mcp.decorators`). At startup, `app.py` calls `initialize_core_mcp_dependencies()` which replaces these stubs with concrete implementations that register tools/prompts with the FastMCP instance. This avoids circular imports between `superset_core` and `superset`.
+- **Documentation**: Update docs/ for any user-facing changes
+- **Breaking Changes**: Add to UPDATING.md
+- **Docstrings**: Required for new functions/classes
+- **Follow existing patterns**: Mimic code style, use existing libraries and utilities
+- **Type Safety**: This codebase is actively modernizing toward full TypeScript and type safety
+- **Always run `pre-commit run`** to validate changes before committing
 
-**Startup flow**:
-1. `app.py` creates the FastMCP `mcp` instance
-2. `initialize_core_mcp_dependencies()` injects the real decorator implementations
-3. Tool/prompt/resource imports at the bottom of `app.py` trigger registration
-4. `server.py` adds middleware and starts the transport
+---
 
-## Critical Convention: Tool, Prompt, and Resource Registration
-
-**IMPORTANT**: When creating new MCP tools, prompts, or resources, you MUST add their imports to `app.py` for auto-registration. Do NOT add them to `server.py` - that approach doesn't work properly.
-
-### How to Add a New Tool
-
-1. **Create the tool file** in the appropriate directory (e.g., `chart/tool/my_new_tool.py`)
-2. **Decorate with `@tool`** using the decorator from `superset_core.mcp.decorators`
-3. **Export from the module's `__init__.py`** (e.g., `chart/tool/__init__.py`)
-4. **Add import to `app.py`** at the bottom of the file where other tools are imported
-
-**Example (read-only tool)**:
-```python
-# superset/mcp_service/chart/tool/my_new_tool.py
-from fastmcp import Context
-from superset_core.mcp.decorators import tool, ToolAnnotations
-
-from superset.extensions import event_logger
-
-@tool(
-    tags=["core"],
-    class_permission_name="Chart",
-    annotations=ToolAnnotations(
-        title="My new tool",
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Note**: This codebase is actively modernizing toward full TypeScript and type safety. Always run `pre-commit run` to validate changes. Follow the ongoing refactors section to avoid deprecated patterns.
 
 ---
 > Source: [apache/superset](https://github.com/apache/superset) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
