@@ -1,117 +1,110 @@
 ---
 trigger: always_on
-description: Canonical instruction set for any coding agent working in this repo. **Read this
+description: The always-on essentials live in [`AGENTS.md`](../AGENTS.md) ("Code
 ---
 
-# AGENTS.md
+# Code conventions (full)
 
-Canonical instruction set for any coding agent working in this repo. **Read this
-first**, before touching any file.
+The always-on essentials live in [`AGENTS.md`](../AGENTS.md) ("Code
+conventions"). This file holds the depth an agent only needs when actually
+writing code in a given area — kept here, surfaced on demand, so the root
+instruction file stays lean (see
+[ADR 0009](adr/0009-agents-md-lean-budget-and-size-tiers.md)).
 
-- **Claude Code** loads this via the `@AGENTS.md` import in `CLAUDE.md`.
-- **Codex CLI** reads `AGENTS.md` natively (no import needed).
+These conventions apply to code you ship in this repo AND are what the stack
+documents for other repos via
+[`templates/AGENTS.md.example`](../templates/AGENTS.md.example).
 
-Both tools see identical guidance. Tool-specific additions live in `CLAUDE.md`
-(below the `@AGENTS.md` import) — keep them short.
+## Naming
 
-## Mission
+The inline rule is `Name to fit in` (`AGENTS.md` → "Write less, fit in"). The
+discipline behind it, and why it is detect-and-conform rather than a house style,
+is in [ADR 0010](adr/0010-naming-detect-and-conform-over-house-style.md). The
+mechanics:
 
-`claude-leverage` is Filip Podstavec's personal **AI-dev stack for Claude Code
-and Codex**, built to ship **secure and long-term-maintainable software for
-clients** when working primarily through AI agents.
+**Casing / separator — detect, then conform.** There is no stack-wide "correct"
+style; the correct style is whatever the surrounding code already uses. A model's
+language default (Python → `snake_case`, JS → `camelCase`) is a *prior*, not a
+license to impose. Before naming anything new:
 
-The premise: shipping client work with AI agents at velocity is easy; shipping it
-so the *next* agent (human or AI) opening the repo in six months can still safely
-modify it is the hard part. This stack is the guardrails, conventions, and
-on-demand skills that make the second part automatic — continuously as the repo
-grows, not just at session start.
+- **Scan first.** Look at sibling files and nearby identifiers of the *same kind*
+  to read off the convention. `grep` a few existing definitions if unsure.
+- **Match per kind.** Casing legitimately differs by kind even within one repo —
+  `PascalCase` types, `camelCase`/`snake_case` functions and locals,
+  `UPPER_SNAKE` constants, `kebab-case` files/CLI flags. Conform each kind to its
+  own neighbours, not to a single global rule.
+- **Local over global.** In a repo with inconsistent history, match the *local
+  module* you're editing over the repo-wide majority — fitting the immediate
+  context beats a "correct" name that clashes with everything around it.
+- **Idioms only if the repo uses them.** Predicate prefixes (`is_`/`has_`/
+  `should_`), hungarian-ish suffixes, `_async` markers, etc. — adopt them only
+  when the surrounding code already does. Don't import a convention the repo
+  never chose.
 
-Three properties guide every decision here:
+**Granularity / clarity — universal.** Independent of the repo, a name states
+intent at the right altitude:
 
-1. **Security by default** — deterministic shell hooks block secrets, dangerous
-   git operations, and force-push before the model can rationalize past them.
-2. **Self-maintaining as the repo grows** — non-blocking nudges flag missing
-   AIDEV anchors, missing per-dir AGENTS.md, stale anchors, and review-worthy
-   diffs, so maintenance debt surfaces while it's still cheap to fix.
-3. **Cross-tool by design** — the same `AGENTS.md`, `SKILL.md` files, and hook
-   scripts work in both Claude Code and Codex. Author once.
+- **Too vague** (`get()`, `data()`, `handle()`, `process()`, `tmp`) forces the
+  reader to open the body to learn what it does.
+- **Too verbose / leaking** (`getting_data_from_mobile()`,
+  `user_list_array_final2`) bakes implementation detail or history into the name,
+  so it reads as noise and goes stale when the internals change.
+- **Right** names the *what/why* at the call site's level of abstraction:
+  `fetch_mobile_profile()`, `pending_invoices`, `is_expired`. If a good name is
+  hard to find, the unit is often doing too much — that's a design signal, not a
+  naming problem.
 
-The point is **not** to save tokens (that thesis was disproven — see "Honest
-history" below). It's to make the *next* agent's job easier than the previous
-one's, every time.
+## Repo layout
 
-For what ships in the stack and how it installs, see the
-[README](README.md#whats-inside).
+```
+agents/                       Claude Code subagents (Markdown + YAML frontmatter)
+.codex/agents/                Codex subagents (TOML; generated from agents/)
+skills/                       Cross-tool skills (SKILL.md, agentskills.io spec)
+commands/                     Claude Code slash commands
+hooks/hooks.json              Claude Code hook config — paths point at scripts/hooks/
+.codex/hooks.json             Codex hook config (template; install-codex resolves paths)
+.codex/config.toml            Codex sandbox/approval policy
+scripts/hooks/                Hook shell scripts, shared by both tools
+scripts/                      Installers, generators, version checks, smoke-plugin.sh
+statusline/                   Portable statusline script
+assets/                       README banner (banner.svg) + static image assets
+claude-md-snippets/           Opt-in CLAUDE.md / AGENTS.md routing rules (installable via /init-repo)
+templates/                    Per-repo AGENTS.md examples + structured-logging starter kits
+agents-docs/, commands-docs/  Per-dir docs that can't live inside agents/ or
+                              commands/ because Claude Code's plugin loader
+                              registers every *.md as a phantom — see
+                              tests/test_agent_command_frontmatter.py
+docs/adr/                     Architecture Decision Records (numbered, immutable; /adr-new bootstraps)
+docs/sessions/                Distilled session logs (/session-log writes one at end of session)
+docs/specs/                   Design specs (current and historical)
+workflows/                    End-to-end prose guides combining skills/hooks/conventions
+bench/archive-token-savings-thesis/
+                              Frozen evidence of the v0.x token-savings experiment
+                              that motivated the v1.0 pivot. Don't delete.
+```
 
-## Reading order for new agents
+## AIDEV-* anchor deadlines (optional)
 
-Opening this repo for the first time? Read in this order (progressive
-disclosure: minimum context at session start):
+`AIDEV-TODO` and `AIDEV-QUESTION` accept an optional ISO-8601 deadline:
 
-1. **This file** (`AGENTS.md`) — what this repo is and how to work in it.
-2. [`docs/adr/`](docs/adr/) — *why* the architecture looks the way it does. Skim
-   the index; read the ones relevant to your change. Without these you'll propose
-   refactors away from load-bearing constraints.
-3. [`docs/sessions/`](docs/sessions/) — the last 1–3 session logs. Where the
-   previous human + agent left off. Often the highest-leverage orientation per
-   token.
-4. [`docs/conventions.md`](docs/conventions.md) — repo layout + the full code
-   conventions, when you're about to write code.
-5. The code itself — by following imports from the relevant entrypoint.
+```python
+# AIDEV-TODO(by: 2026-08-01): replace the polling loop with webhooks
+# AIDEV-QUESTION(by: 2026-07-15): is the encoding always UTF-8 here?
+```
 
-## Code conventions
+`/stack-check`'s anchor walk parses the date and reports overdue items
+separately from age-based "stale" items, so deadlines have actual teeth.
+Without a deadline, the same anchor falls under the age-based check
+(fresh / aging / stale at 30 / 90 days).
 
-Essentials below. Full depth — repo layout, structured logging spec, per-dir
-AGENTS.md, when to invoke `/adr-new` & `/session-log`, module organization — is
-in [`docs/conventions.md`](docs/conventions.md); read it before writing code in
-an unfamiliar area. These conventions also ship to client repos via
-[`templates/AGENTS.md.example`](templates/AGENTS.md.example).
+## Structured JSON-lines logging
 
-### Write less, fit in
+For application code that emits logs an agent will later need to read:
 
-The north star: the *next* agent should find this code easier to work on than you
-did. More code, comments, or abstraction usually makes that *harder*. Prefer the
-smallest change that works.
-
-- **Match the surrounding code.** Naming, structure, error handling, comment
-  density, and idioms should look like the rest of the module — new code
-  shouldn't be identifiable as "the AI-written part." Where existing code is
-  inconsistent, follow this AGENTS.md and the cleanest nearby example.
-- **Name to fit in.** Detect the repo's casing/separator style (camelCase /
-  snake_case / kebab-case; PascalCase for types) and follow it — don't impose
-  your language default. Pitch granularity at the function's intent — neither
-  `get()` nor `getting_data_from_mobile()`.
-- **Comments explain WHY, not WHAT.** The code already says what it does; a
-  comment restating the line below it is noise that goes stale. Comment the
-  non-obvious — the constraint, the gotcha, the reason for the unusual choice.
-- **No speculative abstraction.** Don't add config, parameters, layers, or
-  "flexible" interfaces for a use case that doesn't exist yet. When a change makes
-  code dead, delete it (git remembers; if the dead code carried an `AIDEV-`
-  anchor, note the removal in the commit message).
-
-### AIDEV-* anchor comments
-
-Three grep-able prefixes for load-bearing facts in code:
-
-- `AIDEV-NOTE:` — why this constraint exists / non-obvious invariant
-- `AIDEV-TODO:` — known follow-up with enough context to resume
-- `AIDEV-QUESTION:` — genuine unknown for the next person (or agent)
-
-Rules: ≤120 chars per line, all-caps prefix. **Before editing a module, run
-`grep -rn 'AIDEV-' <module>` first.** Do not silently remove anchors — removing
-one requires an explicit decision in the commit/PR message. Add them at
-non-obvious decision points (carve-outs, perf workarounds, ordering dependencies,
-idempotency tricks); do NOT decorate every function. The `ai-first-nudge` hook
-nudges when ≥50 net-new LOC ship without any anchor. Anchors accept an optional
-`(by: YYYY-MM-DD)` deadline — see [`docs/conventions.md`](docs/conventions.md).
-
-## Security guardrails
-
-These hooks run on every Bash tool call regardless of which agent invoked them:
-
+```json
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Filip-Podstavec/claude-leverage](https://github.com/Filip-Podstavec/claude-leverage) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
