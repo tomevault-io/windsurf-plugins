@@ -1,9 +1,8 @@
 ---
 trigger: always_on
-description: <!-- OPENSPEC:START -->
+description: Instructions for AI coding assistants using OpenSpec for spec-driven development.
 ---
 
-<!-- OPENSPEC:START -->
 # OpenSpec Instructions
 
 Instructions for AI coding assistants using OpenSpec for spec-driven development.
@@ -142,4 +141,4 @@ openspec/
 
 ---
 > Source: [jim-at-jibba/nvim-redraft](https://github.com/jim-at-jibba/nvim-redraft) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
