@@ -1,0 +1,218 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a Python development environment template using **uv** (fast Python package manager) and **Ruff** (linter/formatter). The repository serves dual purposes:
+1. A template for starting new Python projects
+2. A reusable `tools/` package with production-ready utilities (Logger, Config, Timer)
+
+## Development Commands
+
+### Package Management
+```bash
+# Install dependencies
+uv sync
+
+# Add new dependency
+uv add <package>
+
+# Add dev dependency
+uv add --dev <package>
+
+# Remove dependency
+uv remove <package>
+```
+
+### Testing
+```bash
+# Run all tests with coverage (75% minimum required)
+uv run nox -s test
+
+# Run specific test file
+uv run pytest tests/tools/test__logger.py
+
+# Run with JUnit XML output for CI
+uv run nox -s test -- --cov_report xml --junitxml junit.xml
+
+# Run pytest directly (bypasses nox)
+uv run pytest
+```
+
+### Linting & Formatting
+```bash
+# Format code with Ruff
+uv run nox -s fmt -- --ruff
+
+# Format SQL files with SQLFluff
+uv run nox -s fmt -- --sqlfluff
+
+# Format both Python and SQL
+uv run nox -s fmt -- --ruff --sqlfluff
+
+# Lint with all tools (Ruff, SQLFluff, ty)
+uv run nox -s lint -- --ruff --sqlfluff --ty
+
+# Lint with Ruff only
+uv run nox -s lint -- --ruff
+
+# Lint SQL files only
+uv run nox -s lint -- --sqlfluff
+
+# Lint with ty only
+uv run nox -s lint -- --ty
+
+# Run Ruff directly
+uv run ruff check . --fix
+uv run ruff format .
+
+# Run SQLFluff directly
+uv run sqlfluff lint .
+uv run sqlfluff fix .
+
+# Run ty directly
+uv run ty check
+```
+
+### Pre-commit Hooks
+```bash
+# Install hooks
+uv run pre-commit install
+
+# Run all hooks manually
+uv run pre-commit run --all-files
+
+# Run specific hook
+uv run pre-commit run ruff-format
+```
+
+### Documentation
+```bash
+# Serve docs locally at http://127.0.0.1:8000
+uv run mkdocs serve
+
+# Build documentation
+uv run mkdocs build
+
+# Deploy to GitHub Pages
+uv run mkdocs gh-deploy
+```
+
+## Architecture
+
+### Core Modules
+
+The `tools/` package provides three main utility modules:
+
+#### **tools/logger/** - Dual-Mode Logging System
+- `Logger` class extends `logging.Logger` with environment-aware formatting
+- **LogType.LOCAL**: Colored console output via `LocalFormatter` for development
+- **LogType.GOOGLE_CLOUD**: Structured JSON via `GoogleCloudFormatter` for production
+- Key pattern: Use `Settings.IS_LOCAL` to switch between modes automatically
+
+```python
+from tools.config import Settings
+from tools.logger import Logger, LogType
+
+settings = Settings()
+logger = Logger(
+    __name__,
+    log_type=LogType.LOCAL if settings.IS_LOCAL else LogType.GOOGLE_CLOUD
+)
+```
+
+#### **tools/config/** - Environment-Based Configuration
+- `Settings` class uses Pydantic for type-safe configuration
+- Loads from `.env` (version controlled) and `.env.local` (local overrides, in .gitignore)
+- `FastAPIKwArgs` provides ready-to-use FastAPI initialization parameters
+- Pattern: Extend `Settings` to add project-specific configuration fields
+
+```python
+from tools.config import Settings
+
+settings = Settings()
+api_url = settings.api_prefix_v1  # Loaded from environment
+```
+
+#### **tools/tracer/** - Performance Monitoring
+- `Timer` class works as both decorator and context manager
+- Automatically logs execution time in milliseconds at DEBUG level
+- Uses the `Logger` module for output (inherits logging configuration)
+- Pattern: Nest timers to measure both overall and component performance
+
+```python
+from tools.tracer import Timer
+
+@Timer("full_operation")
+def process():
+    with Timer("step1"):
+        do_step1()
+    with Timer("step2"):
+        do_step2()
+```
+
+### Test Structure
+
+Tests in `tests/tools/` mirror the package structure:
+- **Naming convention**: `test__*.py` (double underscore)
+- **Coverage requirement**: 75% minimum (including branch coverage)
+- **Test files exempt from**: `INP001` (namespace packages), `S101` (assert usage)
+
+### Configuration Philosophy
+
+**Ruff (ruff.toml)**:
+- ALL rules enabled by default with specific exclusions
+- Line length: 88 (Black-compatible)
+- Target Python: 3.14
+- Per-file ignores for test files
+
+**ty (ty.toml)**:
+- Includes `tools/`, `tests/` packages, and `noxfile.py`
+- Excludes cache directories (`__pycache__`, `.pytest_cache`, `.ruff_cache`, `.venv`)
+
+**pytest (pytest.ini)**:
+- Coverage: 75% minimum with branch coverage
+- Reports: HTML + terminal
+- Import mode: importlib
+
+**SQLFluff (.sqlfluff)**:
+- Dialect: BigQuery
+- Max line length: 80
+- Tab space size: 2
+- Custom rules for join qualification and unused joins
+
+### Nox Task Automation
+
+The `noxfile.py` uses a custom `CLIArgs` parser (Pydantic-based):
+- All sessions use `python=False` (rely on `uv run`)
+- Arguments passed via `-- --flag value` syntax
+- Sessions: `fmt`, `lint`, `test`
+
+Example of the argument parsing pattern:
+```python
+# noxfile.py
+@nox.session(python=False)
+def lint(session: nox.Session) -> None:
+    args = CLIArgs.parse(session.posargs)
+    if args.ty:
+        session.run("uv", "run", "ty", "check")
+    if args.ruff:
+        session.run("uv", "run", "ruff", "check", ".", "--fix")
+    if args.sqlfluff:
+        session.run("uv", "run", "sqlfluff", "lint", ".")
+```
+
+## Key Patterns for Development
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [a5chin/python-uv](https://github.com/a5chin/python-uv) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
