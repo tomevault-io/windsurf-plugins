@@ -1,151 +1,171 @@
 ---
 trigger: always_on
-description: This document provides a comprehensive overview of the Contributor Analytics project for AI agents and human contributors.
+description: This document provides a comprehensive guide for an AI agent to effectively write, run, and manage unit and integration tests for a NextJS/TypeScript SDK project using Bun's built-in test runner.
 ---
 
-# Contributor Analytics: Agent & Developer Guide
+# AGENTS.md
 
-This document provides a comprehensive overview of the Contributor Analytics project for AI agents and human contributors.
-
-## 1. Project Overview
-
-A sophisticated analytics platform for GitHub repositories that tracks, analyzes, scores, and summarizes contributor activity.
-
-**Core Features:**
-
-- **Data Ingestion**: Fetches PRs, issues, commits, reviews, comments from GitHub API
-- **Scoring System**: Configurable algorithm scoring contributions by type, complexity, impact
-- **AI Summaries**: Daily, weekly, monthly summaries using LLMs (via OpenRouter)
-- **Data Pipelines**: Modular TypeScript pipeline system
-- **Web Interface**: Next.js static site with leaderboards and contributor profiles
-- **Automation**: GitHub Actions for daily processing and deployment
-
-**Tech Stack:**
-
-- Frontend: Next.js 15, React, TypeScript, Tailwind CSS, shadcn/ui
-- Backend/Pipelines: TypeScript, Bun
-- Database: SQLite with Drizzle ORM
-- CI/CD: GitHub Actions
+This document provides a comprehensive guide for an AI agent to effectively write, run, and manage unit and integration tests for a NextJS/TypeScript SDK project using Bun's built-in test runner.
 
 ---
 
-## 2. System Architecture
+## 🚀 Getting Started
 
-### 2.1. Data Pipeline (`src/lib/pipelines/` & `cli/`)
+Bun comes with a built-in, Jest-compatible test runner that's incredibly fast. To start, you don't need to install any extra packages. The test runner is part of the `bun` CLI.
 
-The TypeScript-based pipeline system handles all data operations:
+### File Discovery
 
-- **Entry Point**: `cli/analyze-pipeline.ts`
-- **Orchestration**: Functional composition (`pipe`, `parallel`, `mapStep`)
-- **Configuration**: `config/pipeline.config.ts` reads from `PIPELINE_CONFIG_FILE`
+Bun's test runner automatically finds and executes tests in files that match the following patterns anywhere in your project:
 
-**Pipeline Stages:**
+- `*.test.{js|jsx|ts|tsx}`
+- `*_test.{js|jsx|ts|tsx}`
+- `*.spec.{js|jsx|ts|tsx}`
+- `*_spec.{js|jsx|ts|tsx}`
 
-1. **Ingest**: Fetch from GitHub API → store in SQLite
-2. **Process**: Calculate scores and expertise tags
-3. **Export**: Generate JSON/MD files for frontend
-4. **Summarize**: AI-generated summaries via OpenRouter
+### Test file locations
 
-### 2.2. Database (`src/lib/data/` & `drizzle/`)
+This codebase colocates test files with the code files, so dont put tests in separate **test** directories.
 
-SQLite database as single source of truth:
+### Running Tests
 
-- **Schema**: `src/lib/data/schema.ts` using Drizzle ORM
-- **Tables**: users, repositories, pullRequests, issues, reviews, comments, scores
-- **Migrations**: `drizzle/` directory, managed by Drizzle Kit
+Execute tests using the `bun test` command.
 
-### 2.3. Frontend (`src/app/` & `src/components/`)
+```shell
+# Run all tests in the project
+bun test
 
-Static Next.js 15 application for GitHub Pages:
+# Run all tests within a specific directory (by path fragment)
+bun test <directory_name>
 
-- **SSG**: Server Components query SQLite at build time
-- **Routing**: App Router with dynamic date-based pages
-- **Styling**: Tailwind CSS + shadcn/ui components
+# Run a specific test file (by path fragment)
+bun test <filename_fragment>
 
-### 2.4. Auth Worker (`auth-worker/`)
-
-Cloudflare Worker for GitHub OAuth:
-
-- Exchanges GitHub code for access token
-- Enables wallet linking feature for contributor profiles
-
----
-
-## 3. Automation (`.github/`)
-
-### Workflows
-
-- **`run-pipelines.yml`**: Daily at 23:00 UTC, runs full pipeline chain
-- **`deploy.yml`**: Builds and deploys to GitHub Pages
-- **`pr-checks.yml`**: Linting, type checking, build verification
-
-### Custom Actions
-
-- **`pipeline-data`**: Manages `_data` branch lifecycle via Git worktrees
-- **`restore-db`**: Serializes/deserializes SQLite for version control
-
-### Data Branch Strategy
-
-- `main`: Application code
-- `_data`: Generated data and SQLite dumps
-
----
-
-## 4. Configuration
-
-Pipeline reads from JSON file specified by `PIPELINE_CONFIG_FILE` env var:
-
-```bash
-# Local development
-export PIPELINE_CONFIG_FILE=config/example.json
-```
-
-**Config options** (`config/example.json`):
-
-- `PIPELINE_REPOS`: Repository list to track
-- `PIPELINE_START_DATE`: Contribution tracking start date
-- `PIPELINE_PROJECT_CONTEXT`: AI summary context
-- `PIPELINE_SCORING`: Scoring rules for PRs, issues, reviews
-- `PIPELINE_TAGS`: Area/role/tech tag definitions
-- `PIPELINE_BOT_USERS`: Bot accounts to exclude
-
----
-
-## 5. Development
-
-### Data Sync Utility
-
-Pull production data for local development:
-
-```bash
-bun run data:sync              # Sync from upstream
-bun run data:sync --help       # See all options
-```
-
-### Schema Changes
-
-1. Modify `src/lib/data/schema.ts`
-2. Run `bun run db:generate`
-3. Run `bun run db:migrate`
-
-### Testing Pipelines
-
-```bash
-bun run pipeline --help        # See all options
-bun run pipeline ingest -d 7   # Small date range
-bun run pipeline process -f    # Force reprocess
+# Run a specific test file by its exact path
+bun test ./tests/specific-file.test.ts
 ```
 
 ---
 
-## 6. TypeScript Guidelines
+## ✍️ Writing Tests
 
-- Prefer type inference over manual signatures
-- Never cast to `any` - fix underlying type issues
-- Search for existing types/schemas before creating new ones
-- Avoid comments on self-explanatory code
-- Use `bun:test` for testing
+Bun's test runner is designed to be a drop-in replacement for Jest. It uses a familiar `describe`, `test`, and `expect` API.
+
+### Basic Test Structure
+
+Tests are defined with the `test()` function (or its alias `it()`) and grouped into suites with `describe()`. Assertions are made using `expect()`.
+
+```typescript
+// Import test utilities from bun:test
+import { test, expect, describe } from "bun:test";
+
+describe("SDK Math Utilities", () => {
+  // A simple synchronous test
+  test("should add two numbers correctly", () => {
+    expect(2 + 2).toBe(4);
+  });
+
+  // An asynchronous test using async/await
+  test("should resolve a promise", async () => {
+    const result = await Promise.resolve("hello");
+    expect(result).toEqual("hello");
+  });
+});
+```
+
+### Assertions with `expect`
+
+Bun implements the full Jest `expect` API. Here are some common matchers:
+
+- `.toBe(value)`: Strict equality (`===`).
+- `.toEqual(value)`: Deep equality for objects and arrays.
+- `.toThrow(error?)`: Checks if a function throws an error.
+- `.toHaveBeenCalled()`: For checking if a mock function was called.
+- `.toHaveBeenCalledWith(...args)`: Checks arguments passed to a mock.
+- `.toMatchSnapshot()`: Performs snapshot testing.
+- `.toMatchInlineSnapshot()`: Performs inline snapshot testing.
+
+You can also verify that a certain number of assertions were called, which is useful in asynchronous code.
+
+```typescript
+test("should run a specific number of assertions", () => {
+  expect.hasAssertions(); // Ensures at least one assertion is called
+  expect.assertions(2); // Ensures exactly two assertions are called
+
+  expect(1).toBe(1);
+  expect(true).not.toBe(false);
+});
+```
+
+### Parametrized Tests with `.each`
+
+Run the same test logic with different data using `test.each` or `describe.each`. This is ideal for data-driven testing.
+
+```typescript
+const additionCases = [
+  [1, 2, 3],
+  [0, 0, 0],
+  [-5, 5, 0],
+];
+
+test.each(additionCases)("add(%i, %i) should equal %i", (a, b, expected) => {
+  expect(a + b).toBe(expected);
+});
+```
+
+---
+
+## 🧪 Test Database & Mock Data
+
+For integration tests that involve database queries, the project provides helper functions to ensure a consistent and isolated testing environment.
+
+### Test Database Setup
+
+Use the `setupTestDb` function from `src/__testing__/helpers/db.ts` to create a fresh, in-memory SQLite database for your test suites. This function handles schema migrations automatically.
+
+**Pattern:** Instantiate the database at the beginning of your `describe` block.
+
+```typescript
+import { describe, test, expect } from "bun:test";
+import { setupTestDb } from "@/src/__testing__/helpers/db";
+
+describe("Database-Related Feature", () => {
+  const db = setupTestDb();
+  // ... tests that use db instance
+});
+```
+
+### Mock Data Generation
+
+Use the mock data generators from `src/__testing__/helpers/mock-data.ts` (e.g., `generateMockUsers`, `generateMockPullRequests`) to populate your test database. These functions use `@faker-js/faker` to produce realistic data and allow you to override any fields for specific test cases.
+
+### Complete Test Example
+
+Follow this pattern for writing tests that interact with the database. This ensures that tests are self-contained, repeatable, and easy to understand.
+
+```typescript
+import { describe, test, expect } from "bun:test";
+import { setupTestDb } from "@/src/__testing__/helpers/db";
+import {
+  generateMockUsers,
+  generateMockPullRequests,
+} from "@/src/__testing__/helpers/mock-data";
+import * as schema from "@/lib/data/schema";
+import { getRepositoryContributors } from "./queries"; // The function being tested
+
+describe("Repository Queries", () => {
+  const db = setupTestDb();
+
+  test("should return unique contributors for a given repository", async () => {
+    // 1. Arrange: Insert mock data
+    const users = generateMockUsers([
+      { username: "user-a" },
+      { username: "user-b" },
+    ]);
+    await db.insert(schema.users).values(users);
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [elizaOS/elizaos.github.io](https://github.com/elizaOS/elizaos.github.io) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-31 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
