@@ -7,13 +7,13 @@ Example Application Experimenting with async / await in Angular
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [mrlonis/example-angular-async](https://github.com/mrlonis/example-angular-async).
+Original source: `copilot-instructions.md` in [mrlonis/example-angular-async](https://github.com/mrlonis/example-angular-async).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
