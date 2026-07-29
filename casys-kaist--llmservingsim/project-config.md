@@ -1,97 +1,147 @@
 ---
 trigger: always_on
-description: generates this automatically based on whether DP groups are present.
+description: A short checklist. Skim before opening a PR. None of these are
 ---
 
-# AGENTS.md
 
-Guidelines for AI coding agents (Claude Code, Cursor, Copilot, etc.) working in this repository.
+# Coding conventions
 
-## Project Context
+A short checklist. Skim before opening a PR. None of these are
+arbitrary; each has bitten the project at least once.
 
-LLMServingSim 2.0 is a cycle-level LLM serving simulator. It combines a Python frontend
-(`serving/`, run as `python -m serving`) with ASTRA-Sim (C++ analytical network simulator)
-as the backend. The profiling pipeline (`profiler/`) generates per-hardware latency data
-that drives the simulation, and the bench module (`bench/`) runs vLLM end-to-end to
-validate the simulator against ground truth.
+## Python style
 
-### Repository structure
+- **4-space indentation, snake_case for functions/variables,
+  PascalCase for classes.** Match surrounding code in the file
+  you're editing.
+- **No enforced formatter.** Don't run black / ruff format on a
+  whole file unless you're rewriting it. Style noise hides real
+  diffs.
+- **Imports**: keep minimal and consistent. `serving/` modules use
+  relative imports (`from .scheduler import …`).
+- **English only** in code, comments, log messages, and docstrings.
+  Korean / other-language identifiers and comments will be flagged
+  in review.
+- **Docstrings**: optional. If you write one, make it a single line
+  that explains *why* the function exists, not *what it does*. The
+  signature already says what.
+- **No top-level prints.** Use `serving/core/logger.py` (already
+  imported as `logger` in most files):
+  ```python
+  logger.info(...)
+  logger.warning(...)
+  logger.success(...)   # Rich-styled green check
+  ```
 
-```
-LLMServingSim/
-├── serving/                    # Simulator (`python -m serving`)
-│   ├── __main__.py             # Simulation entry point + main loop
-│   ├── core/                   # Internals
-│   │   ├── scheduler.py        # vLLM-style continuous batching scheduler
-│   │   ├── trace_generator.py  # Builds execution traces from profiled latencies
-│   │   ├── memory_model.py     # Memory tracking, KV cache, tensor sizes
-│   │   ├── graph_generator.py  # Chakra protobuf graph generation
-│   │   ├── controller.py       # IPC with ASTRA-Sim subprocess
-│   │   ├── router.py           # Request routing across instances
-│   │   ├── gate_function.py    # MoE expert token routing
-│   │   ├── config_builder.py   # Cluster config → ASTRA-Sim input files
-│   │   ├── power_model.py      # Power/energy estimation
-│   │   ├── pim_model.py        # PIM device model
-│   │   ├── request.py          # Request/Batch data classes
-│   │   ├── radix_tree.py       # Prefix cache radix tree (from SGLang)
-│   │   ├── logger.py           # Rich-based logger + stdio capture
-│   │   └── utils.py            # Model config loading, formatting
-│   └── run.sh                  # Example invocations across cluster configs
-├── configs/
-│   ├── cluster/                # Cluster topology configs (hardware, memory, instances)
-│   ├── model/                  # Model architecture configs (subset of HF config.json)
-│   └── pim/                    # PIM device configs (DRAMSim3 INI format)
-├── workloads/                   # Request trace datasets (.jsonl)
-│   └── generators/             # ShareGPT/etc → JSONL workload generators
-├── profiler/                   # vLLM-based layerwise profiler (`python -m profiler`)
-│   ├── __main__.py             # CLI dispatch (profile / slice)
-│   ├── core/                   # internals
-│   │   ├── runner.py           # Orchestration (spin_up → categories → spin_down)
-│   │   ├── config.py           # Architecture / ProfileArgs / engine defaults
-│   │   ├── engine.py           # vLLM lifecycle (tmpdir-based local config load)
-│   │   ├── categories.py       # Dense / PerSequence / Attention / Expert
-│   │   ├── skew.py             # Heterogeneous-decode skew sweep
-│   │   ├── fit_alpha.py        # 5-axis weighted-LS alpha fit
-│   │   ├── writer.py           # CSV + meta.yaml writer, TP-stable replication
-│   │   ├── logger.py           # Rich-based logger + stdio capture
-│   │   └── hooks/              # vLLM-internal-API touchpoints (worker ext, MoE patch, etc.)
-│   ├── models/                 # Architecture yamls, one per HF `model_type`
-│   ├── power/                  # nvidia-smi / IPMI power-logging helpers
-│   ├── perf/                   # Output: perf/<hw>/<model>/<variant>/tp<N>/{dense,per_sequence,attention,moe,skew,skew_fit}.csv
-│   ├── v0/                     # Legacy (pre-rewrite) profiler, kept for reference
-│   ├── profile.sh              # Editable user template (MODEL / HARDWARE / TP_DEGREES / …)
-│   └── profile-all.sh          # Helper: sweeps several MODELs × TP degrees
-├── bench/                      # vLLM end-to-end benchmark + sim validation (`python -m bench`)
-│   ├── __main__.py             # CLI dispatch (run / validate)
-│   ├── core/                   # internals
-│   │   ├── runner.py           # AsyncLLM driver, captures RequestStateStats
-│   │   ├── recorder.py         # writes meta.json / requests.jsonl / timeseries.csv
-│   │   ├── stat_logger.py      # custom vLLM StatLoggerBase that fills timeseries
-│   │   ├── validate.py         # bench-vs-sim comparison entry point
-│   │   ├── plots.py            # throughput / running-waiting / latency-CDF plot helpers
-│   │   └── logger.py           # Rich-based logger + stdio capture
-│   ├── results/                # output: bench/results/<run_id>/
-│   ├── bench.sh                # host-side wrapper for `python -m bench run`
-│   └── validate.sh             # host-side wrapper for `python -m bench validate`
-├── scripts/                    # Shared shell entry points (env / build, not module-specific)
-│   ├── docker-vllm.sh          # vLLM container (profiler + bench)
-│   ├── docker-sim.sh           # simulator container
-│   ├── install-vllm.sh         # bare-metal vLLM install (uv venv)
-│   └── compile.sh              # ASTRA-Sim + Chakra build
-└── astra-sim/                  # ASTRA-Sim C++ backend (submodule)
-    ├── inputs/                 # Generated configs (network, memory, system)
-    └── extern/graph_frontend/chakra/  # Chakra trace converter
-```
+## CLI flag conventions
 
-Per-paper artifact evaluation scripts (the previous `evaluation/`
-directory) live on dedicated branches (`ispass26-artifact`, etc.) and
-are not part of the main branch's tree.
+- **CLI flags use hyphens**: `--cluster-config`, `--max-num-seqs`,
+  `--enable-prefix-caching`.
+- **Internal Python uses underscores**: `cluster_config`,
+  `max_num_seqs`, `enable_prefix_caching`.
+- **Boolean flags use `BooleanOptionalAction`** so both
+  `--enable-X` and `--no-enable-X` work:
+  ```python
+  parser.add_argument('--enable-prefix-caching',
+                      action=argparse.BooleanOptionalAction,
+                      default=True)
+  ```
+- **Match vLLM naming where applicable**
+  (`--max-num-batched-tokens`, `--block-size`, `--kv-cache-dtype`).
+  Users coming from vLLM should not have to relearn.
 
-### Simulation flow
+## File and config naming
+
+- **JSON config filenames**: descriptive snake_case
+  (`single_node_pim_instance.json`, not
+  `singleNodePimInstance.json`).
+- **One config = one scenario.** Don't reuse the same cluster JSON
+  across unrelated examples; copy it.
+- **Don't commit machine-specific paths.** All paths in code and
+  configs must be relative to the repo root.
+
+## Things to never do
+
+These each correspond to a real incident or strong project
+preference:
+
+1. **Don't add `getattr(request, 'attr', default)` fallbacks for
+   `Request` attributes.** Initialize all attributes in
+   `Request.__init__` and access directly. Fallbacks hide initialization
+   bugs.
+
+2. **Don't assume `hidden_size == num_heads * head_dim`.** Some
+   models (Qwen3) violate this. Always:
+   ```python
+   head_dim = config.get('head_dim', n_embd // n_head)
+   q_dim   = n_head * head_dim         # NOT n_embd
+   kv_dim  = kv_head * head_dim        # NOT n_embd // group
+   ```
+
+3. **Don't invent layer names.** Every name the simulator emits
+   must also appear in the architecture YAML's catalog. Canonical
+   set: `qkv_proj`, `o_proj`, `gate_up_proj`, `act_fn`, `down_proj`,
+   `rotary_emb`, `qk_norm`, `attention`, `layernorm`,
+   `final_layernorm`, `embedding`, `lm_head`, `sampler`, `moe`.
+
+4. **Don't edit `astra-sim/`** unless the change targets simulator
+   integration (Chakra converter, `Workload.cc`, input configs).
+   Most contributions never touch this directory.
+
+5. **Don't manually edit `astra-sim/inputs/*.json`.** Those files
+   are regenerated by `config_builder.py` on every run; your edits
+   will be silently overwritten.
+
+6. **Don't commit large generated files.** Trace files,
+   `outputs/*.csv` from your local runs, `.et` protobufs, and
+   profiler bundle CSVs that exceed the gitignore patterns should
+   stay local. The gitignore is set up; just don't `git add -A`.
+
+7. **Don't use `--no-verify` to bypass pre-commit hooks.** If a
+   hook fails, fix the underlying issue.
+
+8. **Don't add error handling for cases that can't happen.** Trust
+   internal invariants; only validate at the boundaries (CLI args,
+   JSON config load, dataset parsing). Defensive programming inside
+   `scheduler.py` makes the file unreadable.
+
+9. **Don't add features beyond the task at hand.** A bug fix
+   doesn't need surrounding cleanup. Three similar lines is better
+   than a premature abstraction.
+
+10. **Don't add comments explaining what the code does.** The
+    identifier names already do that. Comments are reserved for
+    *why* something non-obvious is the way it is (a hidden
+    invariant, a bug workaround, a citation to a paper).
+
+## Layer-name and unit reminders
+
+These two trip up new contributors most often:
+
+- **Profiler CSVs store microseconds (`time_us` column).** The
+  simulator multiplies by 1000 and rounds to nanoseconds at load
+  time. Don't divide twice.
+- **Communication sizes for ASTRA-Sim are *total* (not per-NPU)
+  bytes.** ASTRA-Sim divides by ring size internally. If you pass
+  per-NPU sizes, every collective will be N times too small.
+
+## Trace-format invariants
+
+If you touch `trace_generator.py` or `graph_generator.py`:
+
+- The **first** layer's `input_loc` and the **last** layer's
+  `output_loc` must be `REMOTE:{node_id}`. The Chakra converter
+  emits a `MEM_LOAD` from the first and a `MEM_STORE` from the last;
+  if either is `LOCAL` without local memory configured, ASTRA-Sim
+  crashes.
+- The sampler's `output_loc` is what feeds the `MEM_STORE`. Don't
+  put it on `lm_head`.
+
+## Commit and PR style
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [casys-kaist/LLMServingSim](https://github.com/casys-kaist/LLMServingSim) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
