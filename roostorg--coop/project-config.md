@@ -1,121 +1,56 @@
 ---
 trigger: always_on
-description: Instructions for AI coding agents working on Coop. `README.md` is for humans; this file is for machines. The nearest `AGENTS.md` to the edited file wins; explicit user prompts override everything.
+description: These instructions apply to AI tools when they review pull requests in this repository, and when they answer questions about this codebase. They are guidance, not a checklist. Use judgment, prefer fewer high-signal comments over many low-signal ones, and skip points that don't apply to the diff in front of you. For human contributor guidance see [`README.md`](../README.md); for general agent rules see [`AGENTS.md`](../AGENTS.md).
 ---
 
-# AGENTS.md
+# Code review instructions
 
-Instructions for AI coding agents working on Coop. `README.md` is for humans; this file is for machines. The nearest `AGENTS.md` to the edited file wins; explicit user prompts override everything.
+These instructions apply to AI tools when they review pull requests in this repository, and when they answer questions about this codebase. They are guidance, not a checklist. Use judgment, prefer fewer high-signal comments over many low-signal ones, and skip points that don't apply to the diff in front of you. For human contributor guidance see [`README.md`](../README.md); for general agent rules see [`AGENTS.md`](../AGENTS.md).
 
-This file inherits from the ROOST community policy — read it once:
-- [ROOST community `AGENTS.md`](https://github.com/roostorg/community/blob/main/software-development-practices/agents.md) — pan-org agent rules (dependency approval, CI/CD approval, small diffs, PR standards).
-- [ROOST `CONTRIBUTING.md`](https://github.com/roostorg/.github/blob/main/CONTRIBUTING.md) — contribution standards (explainable, reviewable, digestible).
+## Repository at a glance
 
-## Architecture
+- Node (`.nvmrc`), TypeScript throughout.
+- Independent packages, **not an npm workspace** — each has its own `package.json` and lockfile. Main ones: `/` (root), `/server` (Express + Apollo GraphQL, ESM), `/client` (React + Vite + Apollo Client, Ant Design + Tailwind), `/db` (Postgres/ClickHouse/Scylla migration runner), `/migrator` (CLI).
+- Server uses BottleJS dependency injection wired in `server/iocContainer/`.
+- GraphQL is authored inline in resolvers with `/* GraphQL */` markers and compiled by `npm run generate` into `client/src/graphql/generated.ts` and `server/graphql/generated.ts`. Both `generated.ts` files are codegen output.
 
-Four independent packages, **not an npm workspace** — each has its own `package.json` and lockfile:
+## Scope of review — focus on quality and security
 
-- `/` — root scripts, graphql-codegen, docker compose orchestration
-- `/server` — Express + Apollo GraphQL API (ESM, `"type": "module"`)
-- `/client` — React + Vite + Apollo Client frontend (Ant Design, TailwindCSS)
-- `/db` — migration runner for Postgres, ClickHouse, Scylla
-- `/migrator` — package and CLI tool for database migrations
+Lint and formatting are enforced by ESLint and Prettier in CI (`docker compose run --rm backend npm run lint`, `docker compose run --rm client npm run lint`), so please skip:
 
-Node **24** (`.nvmrc`). Running on Node 20 produces `EBADENGINE` warnings and can fail native builds.
+- formatting, whitespace, indentation, quote style, or import ordering
+- ESLint or Prettier rule violations
+- typos in comments or doc grammar nits
+- missing JSDoc on internal helpers
+- subjective style preferences not codified in a project rule
 
-Reference files: `README.md` (getting started), `server/bin/README.md` (utility scripts), `docs/` (architecture, ADRs).
+If a finding would be caught by `npm run lint` or `npm run prettier` (check) / `npm run prettier:fix` (alias `npm run format`), it's redundant.
 
-## Design
+## Security (cross-cutting)
 
-- **API:** REST + GraphQL (Apollo Server); client uses Apollo Client with InMemoryCache; server resolvers live in `server/graphql/resolvers/`.
-- **GraphQL authoring:** Inline in resolver files with `/* GraphQL */` comment markers — codegen discovers queries this way. Searching for `gql` or `graphql` alone misses most of it.
-- **GraphQL codegen:** `npm run generate` (from root) regenerates `client/src/graphql/generated.ts` and `server/graphql/generated.ts`. **Never hand-edit** either `generated.ts`. **Never hand-merge** either `generated.ts` during a rebase/merge — pick one side with `git checkout --ours|--theirs <file>`, then run `npm run generate`. Hand-merging produces output that parses but drifts from the schema.
-- **Data model:** Use Knex query builder for Postgres; ClickHouse via raw SQL in `server/clickhouse/`; Scylla via Cassandra driver.
-- **Dependency injection:** Server uses BottleJS DI (wired in `server/iocContainer/`). Register services in `iocContainer`, don't export singletons from service files. Consumers receive dependencies via DI rather than importing directly. Bypassing `iocContainer` will work at runtime but breaks test mocking patterns.
+Security findings are the highest-value comments you can leave. When you spot one, name the risk concretely and suggest a fix. Areas to watch across the whole codebase:
 
-## Build and run
+- **Hard-coded secrets.** API keys, tokens, passwords, OAuth secrets, JWT signing keys, DB connection strings, or webhook secrets in source or committed config. Prefer environment variables or a secret manager, fetched close to use.
+- **Injection.** String-built SQL, shell commands, file paths, HTML, or LLM prompts are usually a smell. Look for parameterized queries (Knex bindings, prepared statements), argv arrays for `child_process` (avoid `shell: true`), context-aware HTML encoding, and a clear separation between trusted system prompts and untrusted user content.
+- **Sensitive logging.** Secrets, JWTs, full `Authorization` headers, full request/response bodies, or PII in logs, traces, metrics labels, or error responses are risky. Error responses shouldn't leak stack traces.
+- **Weak crypto.** MD5 or SHA-1 used for security, ECB mode, reused IVs, `Math.random()` for tokens or IDs (prefer `crypto.randomBytes` or `crypto.randomUUID`), or hand-rolled crypto are all worth questioning. JWTs should reject the `none` algorithm, use strong secrets, and have short access-token expirations.
+- **Unsafe deserialization or evaluation.** `eval`, `new Function`, `setTimeout`/`setInterval` with string arguments, and `yaml.load` without a safe schema are risky.
+- **Removing security controls.** If a diff disables CSRF, CORS, rate limits, authentication, or authorization, ask whether it's intentional and justified.
 
-Prerequisites: Node 24 (`.nvmrc`), Docker + Docker Compose v2, 8 GiB RAM recommended (running an instance requires 4 GiB, the rest will be used by development tools).
+Path-specific concerns (resolvers, `server/api.ts`, client, raw SQL in ClickHouse/Scylla, migrations, dependency manifests) are scoped in [`.coderabbit.yaml`](../.coderabbit.yaml) under `reviews.path_instructions`. When reviewing those areas, apply the same general principles — ownership checks on resolver-supplied IDs, parameterized queries, XSS care on the client, license/CVE attention on dependency bumps.
 
-```bash
-# Start backing services (Postgres, ClickHouse, Scylla, Redis)
-npm run up
+## Code quality (cross-cutting)
 
-# Install dependencies in all packages
-npm install
-(cd client && npm install)
-(cd server && npm install)
-(cd db && npm install)
+Use judgment — these patterns tend to cause bugs or maintenance pain regardless of where they appear:
 
-# Populate .env files for /server and /db, then run migrations
-npm run db:update -- --env staging --db api-server-pg
-npm run db:update -- --env staging --db scylla
-npm run db:update -- --env staging --db clickhouse
-
-# Create organization and admin user
-npm run create-org
-
-# Start dev servers (separate terminals recommended)
-npm run client:start        # React dev server
-npm run server:start        # Express + GraphQL API
-npm run generate:watch      # (optional) watch GraphQL changes
-```
-
-Client: http://localhost:3001 · Server: http://localhost:3000
-
-## Testing
-
-Integration tests spin up services via docker compose. Unit tests run in-process.
-
-```bash
-# Run all tests (via docker compose)
-docker compose run --rm test
-
-# Server unit tests (no Docker)
-(cd server && npm test)
-
-# Client unit tests (no Docker)
-(cd client && npm test)
-```
-
-Lint / format / type-check (no Docker needed):
-
-```bash
-npm run lint           # lint all packages
-npm run format         # format all packages
-(cd server && npm run lint)
-(cd client && npm run lint)
-```
-
-If tests fail with database errors, check migration logs via `docker compose logs migrations`.
-
-## CI
-
-CI runs entirely via GitHub Actions (`.github/workflows/apply_pr_checks.yaml`). All PR checks are defined as `docker compose` services so you can reproduce any CI job locally. Run them in your shell (paste-as-is — each command's exit code matches the corresponding CI step's exit code):
-
-```bash
-docker compose run --rm codegen-check
-docker compose run --rm backend npm run lint
-docker compose run --rm backend npm run build
-docker compose run --rm client npm run lint
-docker compose run --rm client npm run build
-docker compose run --rm test
-```
-
-Individual checks:
-
-| CI job | Local command |
-| --- | --- |
-| `check_generated_graphql` | `docker compose run --rm codegen-check` |
-| `check_api_server` (lint) | `docker compose run --rm backend npm run lint` |
-| `check_api_server` (build) | `docker compose run --rm backend npm run build` |
-| `run_frontend_checks_if_changed` (lint) | `docker compose run --rm client npm run lint` |
-| `run_frontend_checks_if_changed` (build) | `docker compose run --rm client npm run build` |
-| `check_api_server` (test) | `docker compose run --rm test` |
-
+- **Generated files.** `generated.ts` (client and server) is produced by `npm run generate`; hand-edits drift from the GraphQL schema.
+- **Error handling.** Silently swallowed errors (`catch {}` with no log or rethrow), unhandled promise rejections, and missing `await` on a promise whose result matters tend to cause production surprises.
+- **Async correctness.** `forEach` with an `async` callback doesn't await; `for...of` with `await` or `Promise.all` is usually what's intended. Worth a look when shared state is involved.
+- **Type safety.** New `any`, `as unknown as`, non-null assertions (`!`) introduced to silence a real type error, or `@ts-ignore` are worth questioning. `@ts-expect-error` with a justifying comment is preferred when an escape hatch is genuinely needed.
+- **Tests.** New behavior generally warrants a test; bug fixes generally warrant a regression test (`AGENTS.md` > "Code review").
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [roostorg/coop](https://github.com/roostorg/coop) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
