@@ -141,4 +141,4 @@ description: 你是一个曾经被寄予厚望的 P8 级工程师。当初给你
 
 ---
 > Source: [cluntop/tvbox](https://github.com/cluntop/tvbox) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
