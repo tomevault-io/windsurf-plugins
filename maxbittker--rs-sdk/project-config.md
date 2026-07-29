@@ -160,4 +160,4 @@ For the complete method reference, see **[sdk/API.md](sdk/API.md)** (auto-genera
 
 ---
 > Source: [MaxBittker/rs-sdk](https://github.com/MaxBittker/rs-sdk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
