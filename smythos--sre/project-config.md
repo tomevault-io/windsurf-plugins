@@ -1,131 +1,151 @@
 ---
 trigger: always_on
-description: SmythOS SRE Monorepo AI Development Guidelines
+description: @Scheduler.service/ implement a SchedulerConnector.ts here
 ---
 
+# Agent Subsystem Documentation
 
-# SmythOS SRE Monorepo - Cursor AI Rules
+## User Prompt
 
-## Project Overview
+@Scheduler.service/ implement a SchedulerConnector.ts here
+it provides the following function
 
-This is the **SmythOS SRE (Smyth Runtime Environment)** monorepo - an advanced agentic AI platform that provides a comprehensive runtime environment for building and managing AI agents. The system includes LLM management, vector databases, storage, security, and agent orchestration capabilities.
+list() //list jobs
+add(jobId, schedule, job) //add or update existing job
+delete(jobId);
 
-## Core Architecture Patterns
+schedule is an instance of an object called Schedule that supports this syntax
 
-### Connector Pattern (Primary Design)
+Schedule.starts(Date).ends(Date).every("10m"); ==> returns a json representation that can be parsed.
 
--   **Base Classes**: `StorageConnector`, `VectorDBConnector`, `CacheConnector`, etc.
--   **Implementations**: Multiple providers per connector type (S3Storage, LocalStorage, RAMVectorDB, PineconeVectorDB, etc.)
--   **Interface**: All connectors expose `.requester(candidate)` for access-controlled operations
--   **Security**: Every operation decorated with `@SecureConnector.AccessControl`
+job is an instance of Job class
+job = new Job(fn(), metadata);
 
-### Access Control System (ACL)
+and also implement a version of this scheduler called LocalScheduler, it uses disk to store jobs data under a .smyth subfolder, and works entierly locally.
+it loads the jobs every start (if any) and triggers them periodically.
 
--   **Universal**: Every resource has ACL metadata with ownership preservation
--   **Roles**: `TAccessRole.User`, `TAccessRole.Agent`, `TAccessRole.Team`
--   **Levels**: `TAccessLevel.Read`, `TAccessLevel.Write`, `TAccessLevel.Owner`
--   **Ownership Rule**: Original creator ALWAYS retains Owner access when ACLs are modified
--   **Pattern**: `ACL.from(acl).addAccess(candidate.role, candidate.id, TAccessLevel.Owner)`
+for references check how @VectorDBConnector.ts and @RAMVecrtorDB.class.ts are implemented
+other examples @StorageConnector.ts and @LocalStorage.class.ts
 
-## Monorepo Structure & Package Manager
+it's important to handle the access rights and isolation properly
 
--   **Package Manager**: PNPM (required) - use `pnpm` commands for all package management
--   **Workspace Structure**:
-    -   `packages/core` - Main runtime library (@smythos/sre)
-    -   `packages/sdk` - Developer SDK (@smythos/sdk)
-    -   `packages/cli` - Command line interface
-    -   `examples/` - Example implementations and demos
+## Important Instructions for LLMs
 
-### Key Subsystems (packages/core/src/subsystems/)
+⚠️ **CRITICAL: Do NOT start implementation immediately**
 
--   **IO**: Storage, VectorDB, NKV, Router, CLI services
--   **Security**: ACL, Vault, Account management
--   **LLMManager**: Model providers, inference, embeddings
--   **AgentManager**: Agent orchestration, components, workflows
--   **MemoryManager**: Cache services
+When receiving a user prompt to create a new connector or service:
 
-## Naming Conventions & Standards
+1. **Assess Information Completeness**
 
-### File Extensions
+    - Review the user's request for completeness
+    - Identify what information is missing or unclear
+    - Determine what patterns and architecture decisions need to be defined
 
--   `.service.ts` - Top-level subsystem services
--   `.class.ts` - Classes and connectors/managers
--   `.utils.ts` - Utility function collections
--   `.helper.ts` - Task-specific helper objects
--   `.handler.ts` - Event handlers
--   `.mw.ts` - Middleware
+2. **DO NOT IMPLEMENT if information is incomplete**
 
-### Testing Patterns
+    - If the prompt lacks critical details (interfaces, methods, config options, persistence strategy, etc.)
+    - If access control requirements are unclear
+    - If the connector pattern to follow is not specified
+    - If testing requirements are not mentioned
 
--   `*/tests/unit/**/*.test.ts` - Unit tests with mocked dependencies (packages/core/tests/unit/)
--   `*/tests/integration/**/*.test.ts` - Integration tests with real connectors (packages/core/tests/integration/)
--   **Mocking Strategy**: Mock external SDKs (AWS, Pinecone, Milvus) but use real SRE connectors
--   **Test Structure**: setupSRE() in beforeAll, deterministic data, ACL ownership validation
+3. **ASK QUESTIONS FIRST**
 
-## Development Guidelines
+    - Request clarification on missing details
+    - Ask about specific methods and their signatures
+    - Inquire about configuration options
+    - Confirm access control and isolation requirements
+    - Verify testing expectations
 
-### When Adding New Connectors
+4. **Establish an Elaborated Plan**
 
-1. Extend appropriate base connector class
-2. Implement all abstract methods with `@SecureConnector.AccessControl`
-3. Ensure ACL ownership preservation in setACL/setMetadata methods
-4. Add to ConnectorService registration
-5. Create both unit tests (mocked) and integration tests (real)
+    - Only after gathering ALL necessary information
+    - Create a detailed specification document (like the one below)
+    - Include complete interfaces, method signatures, and config types
+    - Define file structure and naming conventions
+    - Specify testing requirements
+    - Outline security and ACL patterns
 
-### When Modifying Existing Code
+5. **Get User Approval**
 
-1. **Preserve ACL ownership** - never break the ownership preservation pattern
-2. **Maintain interface compatibility** - existing .requester() patterns must work
-3. **Follow error handling** - undefined for missing resources, exceptions for access denied
-4. **Update tests** - both unit and integration if behavior changes
+    - Present the elaborated plan to the user
+    - Wait for confirmation before proceeding
+    - Make adjustments based on feedback
 
-### When Creating New Connectors Subsystems or Services
+6. **Then Implement**
+    - Only start implementation after the plan is complete and approved
+    - Follow the elaborated specification exactly
+    - Maintain consistency with existing SRE patterns
 
-⚠️ **MANDATORY: Read `packages/core/src/subsystems/Agents.md` FIRST**
+## Processing the user prompt
 
-Before implementing any new connector or service:
+Before processing the user prompt, elaborate it in order to make it more clear and detailed. check below :
 
-1. **Read the Agents.md file** - It contains critical instructions for LLMs on how to approach connector/service creation
-2. **DO NOT implement immediately** - Follow the step-by-step process outlined in Agents.md
-3. **Gather all requirements** - Ask questions if information is incomplete
-4. **Create elaborated plan** - Document complete specifications before coding
-5. **Get user approval** - Wait for confirmation before starting implementation
+## The elaborated prompt
 
-The Agents.md file contains detailed architecture requirements, patterns, and examples that must be followed.
+Implement a **Scheduler service** following the SRE connector pattern. This service will manage scheduled jobs with full ACL-based access control and multi-candidate isolation.
 
-## Running Tests
+### Architecture Requirements
 
-### Test Structure
+#### 1. Service Structure
 
-The monorepo uses **Vitest** with configuration at the root level (`vitest.config.ts`). All test commands must be run from the **monorepo root directory**.
+Create the following structure under `packages/core/src/subsystems/AgentManager/Scheduler.service/`:
 
-⚠️ **Always run tests from monorepo root, not from `packages/*core*`**
-
-```bash
-# From monorepo root (CORRECT)
-pnpm vitest run packages/core/tests/path/to/testfile.unit.test.ts
-
-# Run all unit tests
-pnpm test:unit
-
-# Run all integration tests
-pnpm test:integration
-
-# Watch mode for unit tests
-pnpm test:unit:watch
-
-# Run specific test file pattern
-pnpm vitest run packages/core/tests/unit/**/*scheduler*
+```
+Scheduler.service/
+├── index.ts                          # Service entry point
+├── SchedulerConnector.ts             # Abstract base connector
+├── Schedule.class.ts                 # Schedule builder with fluent API
+├── Job.class.ts                      # Job wrapper class
+└── connectors/
+    └── LocalScheduler.class.ts       # Local disk-based implementation
 ```
 
-## Critical Reminders
+#### 2. SchedulerConnector (Abstract Base Class)
 
-⚠️ **ALWAYS USE PNPM** - This is a pnpm workspace. Never suggest npm or yarn commands.
-⚠️ **MONOREPO STRUCTURE** - Always consider workspace context when suggesting changes or running commands.
-⚠️ **ACL OWNERSHIP** - Creator must ALWAYS retain Owner access. This is non-negotiable.
-⚠️ **CONNECTOR PATTERN** - New functionality should follow the established connector pattern.
-⚠️ **SECURITY FIRST** - All Connectors operations must go through access control decorators.
+**File**: `SchedulerConnector.ts`
+
+**Requirements**:
+
+-   Extend `SecureConnector<ISchedulerRequest>`
+-   Define the `ISchedulerRequest` interface with public-facing methods
+-   Implement `requester(candidate: AccessCandidate): ISchedulerRequest` to expose access-controlled operations
+-   Define abstract protected methods decorated with `@SecureConnector.AccessControl`
+-   Implement `abstract getResourceACL(resourceId: string, candidate: IAccessCandidate): Promise<ACL>`
+
+**Core Methods** (to be exposed via ISchedulerRequest):
+
+```typescript
+interface ISchedulerRequest {
+    list(): Promise<IScheduledJob[]>;
+    add(jobId: string, schedule: Schedule, job: Job): Promise<void>;
+    delete(jobId: string): Promise<void>;
+    get(jobId: string): Promise<IScheduledJob | undefined>;
+    pause(jobId: string): Promise<void>;
+    resume(jobId: string): Promise<void>;
+}
+```
+
+**Protected Abstract Methods** (implementations):
+
+```typescript
+protected abstract list(acRequest: AccessRequest): Promise<IScheduledJob[]>;
+protected abstract add(acRequest: AccessRequest, jobId: string, schedule: Schedule, job: Job): Promise<void>;
+protected abstract delete(acRequest: AccessRequest, jobId: string): Promise<void>;
+protected abstract get(acRequest: AccessRequest, jobId: string): Promise<IScheduledJob | undefined>;
+protected abstract pause(acRequest: AccessRequest, jobId: string): Promise<void>;
+protected abstract resume(acRequest: AccessRequest, jobId: string): Promise<void>;
+```
+
+**Pattern Reference**:
+
+-   See `VectorDBConnector.ts` for how `requester()` wraps protected methods with candidate access requests
+-   See `StorageConnector.ts` for the generic type parameter pattern `extends SecureConnector<IRequest>`
+
+#### 3. Schedule Class (Fluent Builder)
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SmythOS/sre](https://github.com/SmythOS/sre) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
