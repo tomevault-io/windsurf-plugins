@@ -1,162 +1,76 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Guide for using Taskmaster to manage task-driven development workflows
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Taskmaster Development Workflow
 
-## Project Overview
+This guide outlines the standard process for using Taskmaster to manage software development projects. It is written as a set of instructions for you, the AI agent.
 
-SyntaxKit is a Swift package that provides a declarative DSL for generating Swift code using result builders. Built on SwiftSyntax, it allows programmatic creation of Swift code structures (structs, enums, classes, functions) in a type-safe manner.
+- **Your Default Stance**: For most projects, the user can work directly within the `master` task context. Your initial actions should operate on this default context unless a clear pattern for multi-context work emerges.
+- **Your Goal**: Your role is to elevate the user's workflow by intelligently introducing advanced features like **Tagged Task Lists** when you detect the appropriate context. Do not force tags on the user; suggest them as a helpful solution to a specific need.
 
-## Essential Commands
+## The Basic Loop
+The fundamental development cycle you will facilitate is:
+1.  **`list`**: Show the user what needs to be done.
+2.  **`next`**: Help the user decide what to work on.
+3.  **`show <id>`**: Provide details for a specific task.
+4.  **`expand <id>`**: Break down a complex task into smaller, manageable subtasks.
+5.  **Implement**: The user writes the code and tests.
+6.  **`update-subtask`**: Log progress and findings on behalf of the user.
+7.  **`set-status`**: Mark tasks and subtasks as `done` as work is completed.
+8.  **Repeat**.
 
-### Build & Test
-```bash
-# Build the package
-swift build
+All your standard command executions should operate on the user's current task context, which defaults to `master`.
 
-# Run all tests
-swift test
+---
 
-# Run specific test
-swift test --filter TestName
+## Standard Development Workflow Process
 
-# Run tests with coverage
-swift test --enable-code-coverage
-```
+### Simple Workflow (Default Starting Point)
 
-### Code Quality
-```bash
-# Run comprehensive linting (SwiftFormat, SwiftLint, Periphery)
-./Scripts/lint.sh
+For new projects or when users are getting started, operate within the `master` tag context:
 
-# Format code only (skip other checks)
-LINT_MODE=NONE ./Scripts/lint.sh
-```
+-   Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see @`taskmaster.mdc`) to generate initial tasks.json with tagged structure
+-   Configure rule sets during initialization with `--rules` flag (e.g., `task-master init --rules cursor,windsurf`) or manage them later with `task-master rules add/remove` commands  
+-   Begin coding sessions with `get_tasks` / `task-master list` (see @`taskmaster.mdc`) to see current tasks, status, and IDs
+-   Determine the next task to work on using `next_task` / `task-master next` (see @`taskmaster.mdc`)
+-   Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see @`taskmaster.mdc`) before breaking down tasks
+-   Review complexity report using `complexity_report` / `task-master complexity-report` (see @`taskmaster.mdc`)
+-   Select tasks based on dependencies (all marked 'done'), priority level, and ID order
+-   View specific task details using `get_task` / `task-master show <id>` (see @`taskmaster.mdc`) to understand implementation requirements
+-   Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see @`taskmaster.mdc`) with appropriate flags like `--force` (to replace existing subtasks) and `--research`
+-   Implement code following task details, dependencies, and project standards
+-   Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see @`taskmaster.mdc`)
+-   Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see @`taskmaster.mdc`)
 
-### Documentation
-```bash
-# Generate DocC documentation
-swift package generate-documentation
-```
+---
 
-## Architecture
+## Leveling Up: Agent-Led Multi-Context Workflows
 
-### Core Design Patterns
-- **Result Builders**: Declarative DSL using `@resultBuilder` for Swift code generation
-- **Protocol-Oriented**: `CodeBlock` protocol as foundation for all syntax elements
-- **SwiftSyntax Integration**: All components generate native SwiftSyntax AST nodes
+While the basic workflow is powerful, your primary opportunity to add value is by identifying when to introduce **Tagged Task Lists**. These patterns are your tools for creating a more organized and efficient development environment for the user, especially if you detect agentic or parallel development happening across the same session.
 
-### Key Protocols
-- `CodeBlock` - Core protocol for all syntax elements
-- `PatternConvertible` - For pattern matching constructs  
-- `TypeRepresentable` - For type system integration
+**Critical Principle**: Most users should never see a difference in their experience. Only introduce advanced workflows when you detect clear indicators that the project has evolved beyond simple task management.
 
-### Source Organization
-```
-Sources/SyntaxKit/
-├── Core/           # Fundamental protocols and builders
-├── Declarations/   # Type declarations (Class, Struct, Enum, etc.)
-├── Expressions/    # Swift expressions and operators
-├── Functions/      # Function definitions and method calls
-├── Variables/      # Variable and property declarations
-├── ControlFlow/    # Control flow constructs (Switch, If, For)
-├── Collections/    # Array, dictionary helpers
-├── Parameters/     # Function parameter handling
-├── Patterns/       # Pattern matching constructs
-├── Utilities/      # Helper functions and extensions
-└── ErrorHandling/  # Error handling constructs
-```
+### When to Introduce Tags: Your Decision Patterns
 
-## Development Workflow
+Here are the patterns to look for. When you detect one, you should propose the corresponding workflow to the user.
 
-### Adding New Syntax Elements
-1. Create source file in appropriate subdirectory
-2. Implement `CodeBlock` protocol
-3. Add corresponding unit tests in `Tests/SyntaxKitTests/Unit/`
-4. Run `./Scripts/lint.sh` to ensure code quality
-5. Run `swift test` to verify functionality
+#### Pattern 1: Simple Git Feature Branching
+This is the most common and direct use case for tags.
 
-### Package Dependencies
-- **SwiftSyntax** (601.0.1+) - Apple's Swift syntax parser
-- **SwiftOperators** - Operator handling
-- **SwiftParser** - Swift code parsing
-- **SwiftDocC Plugin** (1.4.0+) - Documentation generation
+- **Trigger**: The user creates a new git branch (e.g., `git checkout -b feature/user-auth`).
+- **Your Action**: Propose creating a new tag that mirrors the branch name to isolate the feature's tasks from `master`.
+- **Your Suggested Prompt**: *"I see you've created a new branch named 'feature/user-auth'. To keep all related tasks neatly organized and separate from your main list, I can create a corresponding task tag for you. This helps prevent merge conflicts in your `tasks.json` file later. Shall I create the 'feature-user-auth' tag?"*
+- **Tool to Use**: `task-master add-tag --from-branch`
 
-### Quality Tools
-- **SwiftFormat** (602.0.0) - Code formatting
-- **SwiftLint** (0.63.2) - Static analysis (90+ opt-in rules)
-- **Periphery** (3.7.2) - Unused code detection
-
-## Project Structure
-
-### Products
-1. **SyntaxKit Library** - Main DSL library
-2. **skit Executable** - Command-line tool for parsing Swift code to JSON
-
-### Platform Support
-- Swift 6.0+ required
-- Xcode 16.0+ for development
-
-### Testing
-- Uses modern Swift Testing framework (`@Test` syntax)
-- Tests organized by component in `Tests/SyntaxKitTests/Unit/`
-- Integration tests in `Tests/SyntaxKitTests/Integration/`
-- Comprehensive CI/CD with GitHub Actions
-
-## SwiftSyntax Reference
-
-> **Full Documentation**: [SwiftSyntax 601.0.1 Documentation](https://swiftpackageindex.com/swiftlang/swift-syntax/601.0.1/documentation/swiftsyntax)  
-> **Local Reference**: [docs/SwiftSyntax-LLM.md](Docs/SwiftSyntax-LLM.md) - Complete SwiftSyntax API reference (590KB)
-
-### Core Concepts
-SwiftSyntax is Apple's source-accurate tree representation of Swift source code, enabling parsing, inspection, generation, and transformation of Swift code programmatically.
-
-### Key Types & Protocols
-
-#### Syntax Foundation
-- `Syntax` - Base protocol for all syntax nodes
-- `SyntaxProtocol` - Protocol all syntax nodes conform to
-- `SyntaxCollection` - Collection of syntax nodes
-- `SyntaxChildren` - Collection of child syntax nodes
-
-#### Tokens & Trivia
-- `TokenSyntax` - Single token representation
-- `TokenKind` - Enumerates Swift language token types
-- `Trivia` - Whitespace, comments, and other non-semantic content
-- `TriviaPiece` - Individual trivia element
-- `SourcePresence` - Indicates if node was found in source
-
-#### Major Syntax Categories
-
-**Declarations (`DeclSyntax`)**
-- `ClassDeclSyntax` - Class declarations
-- `StructDeclSyntax` - Struct declarations  
-- `EnumDeclSyntax` - Enum declarations
-- `ProtocolDeclSyntax` - Protocol declarations
-- `FunctionDeclSyntax` - Function declarations
-- `VariableDeclSyntax` - Variable declarations
-- `ImportDeclSyntax` - Import statements
-- `ExtensionDeclSyntax` - Extension declarations
-- `TypeAliasDeclSyntax` - Type alias declarations
-- `AssociatedTypeDeclSyntax` - Associated type declarations
-- `OperatorDeclSyntax` - Operator declarations
-- `PrecedenceGroupDeclSyntax` - Precedence group declarations
-- `MacroDeclSyntax` - Macro declarations
-- `MacroExpansionDeclSyntax` - Macro expansion declarations
-
-**Expressions (`ExprSyntax`)**
-- `FunctionCallExprSyntax` - Function calls
-- `MemberAccessExprSyntax` - Member access (dot notation)
-- `SubscriptCallExprSyntax` - Subscript calls
-- `BinaryOperatorExprSyntax` - Binary operators
-- `PrefixOperatorExprSyntax` - Prefix operators
+#### Pattern 2: Team Collaboration
+- **Trigger**: The user mentions working with teammates (e.g., "My teammate Alice is handling the database schema," or "I need to review Bob's work on the API.").
+- **Your Action**: Suggest creating a separate tag for the user's work to prevent conflicts with shared master context.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [brightdigit/SyntaxKit](https://github.com/brightdigit/SyntaxKit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
