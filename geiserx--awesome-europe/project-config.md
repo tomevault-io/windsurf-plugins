@@ -3,7 +3,7 @@ trigger: always_on
 description: A curated list of open source software that provides **support specifically for Europe** — its institutions, regulations, standards, and cross-border infrastructure. All content in English. The focus is pan-European: software must target a significant portion of European countries, not just one or two.
 ---
 
-# AGENTS.md — awesome-europe
+# CLAUDE.md — awesome-europe
 
 ## Purpose
 
@@ -70,13 +70,8 @@ A curated list of open source software that provides **support specifically for 
 - Projects that started as EU-specific but went global — include if European functionality remains a distinct, prominent feature.
 - Software that covers EU + a few non-EU countries — include if the EU/EEA is the primary target.
 
-## Quality standards
-
-**Same quality bar as [awesome-spain](https://github.com/GeiserX/awesome-spain):**
-
-
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GeiserX/awesome-europe](https://github.com/GeiserX/awesome-europe) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
