@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [replicatedhq/embedded-cluster](https://github.com/replicatedhq/embedded-cluster).
+Original source: `CLAUDE.md` in [replicatedhq/embedded-cluster](https://github.com/replicatedhq/embedded-cluster).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [replicatedhq/embedded-cluster](https://github.com/replicatedhq/embedded-cluster) — a repo with 35+ stars on GitHub.
