@@ -1,91 +1,124 @@
 ---
 trigger: always_on
-description: > This file is the primary entry point for AI coding agents (Copilot, Cursor, etc.).
+description: > Observed conventions from the codebase. Rules marked `[HYPOTHESIS]` are inferred from patterns but not explicitly stated.
 ---
 
-# Agent Notes for Zafiro.Avalonia
+# Zafiro.Avalonia — Coding Conventions
 
-> This file is the primary entry point for AI coding agents (Copilot, Cursor, etc.).
-> Detailed reference docs live in `docs/ai/`. Read them when you need depth; this file gives you the essentials.
+> Observed conventions from the codebase. Rules marked `[HYPOTHESIS]` are inferred from patterns but not explicitly stated.
 
-## Project Identity
+---
 
-Zafiro.Avalonia is a UI component library for **Avalonia 11.3.x** — controls, panels, behaviors, converters, dialogs, wizards, helpers. Targets Desktop, Mobile (Android/iOS), and Browser (WASM). Built on **ReactiveUI**, **CSharpFunctionalExtensions** (`Result<T>`, `Maybe<T>`), and strict **MVVM**.
+## C# Conventions
 
-## Tech Stack (non-negotiable)
+### Naming
 
-| Layer | Technology | Notes |
+| Element | Convention | Example | Evidence |
+|---|---|---|---|
+| Private fields | camelCase, **no** leading underscore | `private readonly CompositeDisposable disposable` | 0 underscore-prefixed fields in samples; only 4 in all of src/ (legacy panel code) |
+| `[Reactive]` backing fields | `private` lowercase | `[Reactive] private string name;` | `Page1ViewModel.cs`, `MasterDetailsSampleViewModel.cs` |
+| Methods returning `Task` | **No** `Async` suffix | `Task OnShowMessage(...)` not `OnShowMessageAsync` | `DialogSampleViewModel.cs`, `WizardViewModel.cs` — sole exception: 1 private `RunAsync` in samples |
+| Interfaces | `IHaveX` / `IX` pattern | `IHaveHeader`, `IHaveTitle`, `IHaveFooter` | `Zafiro.UI.Navigation` namespace |
+| ViewModels | `FooViewModel` | `HomeViewModel`, `Page1ViewModel` | Universal across samples |
+| Views | `FooView` (matching ViewModel) | `HomeView`, `Page1View` | Required by `NamingConventionGeneratedViewLocator` |
+
+### Types and Patterns
+
+| Pattern | Convention | Evidence |
 |---|---|---|
-| MVVM framework | **ReactiveUI** + ReactiveUI.SourceGenerators | `[Reactive]` for properties, `ReactiveCommand` for commands, `WhenAnyValue` for observation. **Never** use CommunityToolkit.Mvvm. |
-| Functional types | **CSharpFunctionalExtensions** | `Result<T>` for fallible ops, `Maybe<T>` for optional values. No exceptions for control flow. |
-| DI | **Microsoft.Extensions.DependencyInjection** | Constructor injection only. No Splat/Locator. |
-| UI framework | **Avalonia 11.3.x** + FluentTheme | `x:DataType` on all views. Code-behind contains only `InitializeComponent()`. |
-| Validation | **ReactiveUI.Validation** | `ReactiveValidationObject`, `this.ValidationRule()`, `this.IsValid()` |
-| Reactive collections | **DynamicData** | `SourceCache<T,K>`, `.Connect().Filter().SortBy().Bind()` |
+| ViewModel base | `ReactiveObject` or `ReactiveValidationObject` | 100% of ViewModels in src/ and samples/ |
+| Records for DTOs | `record` for immutable data | `record SampleCard(string Name, string Description, string Icon, string Category, Type ViewModelType)` |
+| Nullable reference types | Enabled; prefer `Maybe<T>` over null | `string?` is used for nullable; `Maybe<T>` for semantic absence |
+| Command return types | `Result<T>` for fallible; `Unit` for void | `ReactiveCommand<Unit, Result<int>>`, `ReactiveCommand<Unit, Maybe<string>>` |
+| DI registration | Constructor injection only | `NavigationSampleViewModel(INavigator navigator)` — primary constructors used |
+| `IDisposable` ViewModels | `CompositeDisposable` + `DisposeWith` | `WizardViewModel : IDisposable` |
 
-## Critical Rules
+### Code-Behind Rule
 
-1. **No logic in code-behind** — `.axaml.cs` files contain only `InitializeComponent()`. All behavior lives in ViewModels, Behaviors, or Converters.
-2. **No CommunityToolkit.Mvvm** — Use `ReactiveObject`, `[Reactive]`, `ReactiveCommand` exclusively.
-3. **No service locator** — Constructor injection via MS DI. No `Locator.Current`, no `Splat`.
-4. **No exceptions for control flow** — Return `Result<T>` / `Maybe<T>`. Reserve `throw` for truly exceptional cases.
-5. **Idiomatic Result/Maybe** — Use `Map`, `Bind`, `Match`, `Tap`, `Execute`, `GetValueOrDefault`, `Ensure`, etc. **Never** inspect `.IsSuccess`/`.HasValue`/`.Value` imperatively. See anti-pattern #15 below.
-6. **No `Async` suffix** — Methods returning `Task` omit the `Async` suffix.
-7. **No leading underscores** — Private fields use `camelCase`: `private readonly INavigator navigator;`
-8. **Empty Subscribe** — Put logic in the Rx pipeline (`.Where()`, `.Select()`, `.Do()`, `.SelectMany()`), not in `.Subscribe()` callbacks.
-9. **Track subscriptions** — `CompositeDisposable` + `.DisposeWith(disposable)` for any subscription outliving a method.
-10. **`x:DataType` on all Views** — Required for type-safe bindings and source-generated view location.
-11. **Responsive by default** — All layouts MUST use responsive panels (`FlexPanel` for bars, `BootstrapGridPanel` for grids). Never use fixed `Grid`/`StackPanel`/`UniformGrid` for content that should adapt to screen size. See anti-pattern #16.
+View code-behind (`.axaml.cs`) files contain **only**:
 
-## App Bootstrap Pattern
-
-```
-App.axaml                          App.axaml.cs
-─────────                          ────────────
-1. FluentTheme                     1. Register icon providers
-2. StyleInclude (Zafiro)           2. Build ServiceCollection
-3. DataTemplateInclude             3. this.Connect(view, vm, window)
-4. ViewLocator(s)
-```
-
-Minimal startup (39 lines total):
 ```csharp
-// App.axaml.cs
-services.AddZafiroShell(logger: logger);
-services.AddAllSectionsFromAttributes(logger);  // source-generated from [Section]
-this.Connect(() => new ShellView(), _ => shell, () => new Window());
+public partial class HomeView : UserControl
+{
+    public HomeView() => InitializeComponent();
+}
 ```
 
-## Key Abstractions
+No event handlers. No DI. No logic. All behavior lives in the ViewModel or in Behaviors/Converters.
 
-| Abstraction | Purpose |
-|---|---|
-| `[Section]` / `[SectionGroup]` | Auto-register ViewModel as shell section via source generator |
-| `INavigator` | `Go<T>()`, `GoBack()`, `SetInitialPage()` |
-| `IDialog` | `ShowMessage()`, `ShowAndGetResult<T>()` → returns `Maybe<T>` |
-| `IEnhancedCommand<T>` | `ReactiveCommand` + label/icon/IsBusy: `.Enhance("Save")` |
-| `IHaveHeader` / `IHaveFooter` / `IHaveTitle` | `IObservable<object>` reactive content for Frame/wizards |
-| `SlimWizard<T>` | `WizardBuilder.StartWith().Then().Build()` — linear wizard |
-| `GraphWizard<T>` | `GraphWizard.For<T>().Step().Next().Build()` — branching wizard |
-| `BootstrapGridPanel` | 12-col responsive grid: `Col`/`ColSm`/`ColMd`/`ColLg`/`ColXl`/`ColXxl` per child |
-| `FlexPanel` | CSS Flexbox: `Grow`/`Shrink`/`Basis`/`Wrap`/`JustifyContent`/`AlignItems`/`Gap` |
-| `SemanticPanel` | App structure: Primary/Secondary/Sidebar/Actions with 3 responsive size classes |
-| `FlowEditor` | Node-based visual editor: `Nodes`/`Edges`/`NodeTemplate`/`SelectedNodes` with drag support |
-| `PropertyGrid` | Inspector-style property editor: auto-discovers common properties from `SelectedObjects` |
-| `DragDeltaBehavior` | Drag-to-move behavior with configurable threshold, used by `FlowEditor` |
+**Evidence**: Every `.axaml.cs` in `samples/` checked — 100% compliance.
 
-## Canonical Files to Reference
+---
 
-| Concept | File |
-|---|---|
-| Minimal bootstrap | `samples/MinimalShell/App.axaml.cs` |
-| `[Section]` ViewModel | `samples/MinimalShell/Sections/HomeViewModel.cs` |
-| Frame + Navigator | `samples/TestApp/TestApp/Shell/MainView.axaml` |
-| Full DI | `samples/TestApp/TestApp/CompositionRoot.cs` |
-| DynamicData filtering | `samples/TestApp/TestApp/Samples/HomeViewModel.cs` |
+## AXAML Conventions
+
+### Namespace Declarations
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:MyApp.Views"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="MyApp.Views.HomeView"
+             x:DataType="local:HomeViewModel">
+```
+
+- `x:DataType` is declared on the root element for type-safe bindings.
+- `x:CompileBindings` is **not** globally enabled — only used in ~7% of AXAML files, on a per-file opt-in basis.
+
+### Binding Patterns
+
+```xml
+<!-- Standard property binding (most common) -->
+{Binding PropertyName}
+
+<!-- Async observable binding (note the ^) -->
+{Binding Navigator.Content^}
+
+<!-- Parent binding with type cast (for DataTemplate contexts) -->
+{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).NavigateToSample}
+
+<!-- Self binding -->
+{Binding $self.Bounds.Width}
+
+<!-- Two-way binding (explicit) -->
+{Binding Text, Mode=TwoWay}
+```
+
+**Evidence**: `HomeView.axaml`, `MainView.axaml`, `SlimDataGridView.axaml`.
+
+`[HYPOTHESIS]` The `^` operator on `Navigator.Content^` unwraps `IObservable<T>` — this is standard Avalonia reactive binding syntax. The codebase uses it for `INavigator.Content` which is an observable.
+
+### Style Class Usage (observed in samples)
+
+These utility classes appear in `HomeView.axaml` and other sample views:
+
+| Class | Used On | Likely Purpose |
+|---|---|---|
+| `Size-XS`, `Size-S`, `Size-M`, `Size-XL` | `TextBlock` | Font size presets |
+| `Weight-Bold` | `TextBlock` | Font weight |
+| `Text-Muted` | `TextBlock` | Reduced opacity/subdued color |
+| `Ghost` | `Button`, `EnhancedButton` | Transparent/minimal button style |
+| `Card` | `Border`, `OverlayBorder` | Card styling (defined in `Common.axaml`) |
+| `Elevate` | `Border` | Box shadow elevation |
+| `Expand` | `EnhancedButton` | Stretch to fill (defined in `Button.axaml`) |
+| `CenterContent` | `EnhancedButton` | Center-align content |
+| `ShowEmptyContent` | `ListBox`, `CardGrid`, `ItemsControl` | Show empty-state placeholder |
+| `H1`, `H3` | `TextBlock` | Heading sizes |
+
+`[HYPOTHESIS]` `Size-*`, `Weight-*`, `Text-Muted`, `Ghost`, `Elevate`, `H1`, `H3` are likely defined in the consuming app's styles or in FluentAvalonia, not in `Zafiro.Avalonia/Styles/`. The library's `Common.axaml` only defines `Card` on `Border`/`OverlayBorder`. `Expand` is defined in `Button.axaml`. Verify where these classes originate before relying on them.
+
+### EnhancedButton Role Classes (confirmed in library)
+
+Defined in `src/Zafiro.Avalonia/Controls/EnhancedButton.axaml`:
+
+- `Primary` — accent-colored
+- `Secondary` — subdued
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SuperJMN/Zafiro.Avalonia](https://github.com/SuperJMN/Zafiro.Avalonia) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
