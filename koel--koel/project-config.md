@@ -105,4 +105,4 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ---
 > Source: [koel/koel](https://github.com/koel/koel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
