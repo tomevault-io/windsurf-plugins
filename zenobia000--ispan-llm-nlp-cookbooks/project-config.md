@@ -1,133 +1,81 @@
 ---
 trigger: always_on
-description: During you interaction with the user, if you find anything reusable in this project (e.g. version of a library, model name), especially about a fix to a mistake you made or a correction you received, you should take note in the `Lessons` section in the `.cursorrules` file so you will not make the same mistake again.
+description: 統一 Git Commit 格式
 ---
 
-﻿# Instructions
+# Commit Message 規則 
 
-During you interaction with the user, if you find anything reusable in this project (e.g. version of a library, model name), especially about a fix to a mistake you made or a correction you received, you should take note in the `Lessons` section in the `.cursorrules` file so you will not make the same mistake again.
+## **Description**
+本規則用於統一 Git Commit Message 格式，以確保團隊協作時，提交訊息清晰易讀，便於版本控制與變更追蹤。
 
-You should also use the `.cursorrules` file as a scratchpad to organize your thoughts. Especially when you receive a new task, you should first review the content of the scratchpad, clear old different task if necessary, first explain the task, and plan the steps you need to take to complete the task. You can use todo markers to indicate the progress, e.g.
-[X] Task 1
-[ ] Task 2
-
-Also update the progress of the task in the Scratchpad when you finish a subtask.
-Especially when you finished a milestone, it will help to improve your depth of task accomplishment to use the scratchpad to reflect and plan.
-The goal is to help you maintain a big picture as well as the progress of the task. Always refer to the Scratchpad when you plan the next step.
-
-# Tools
-
-Note all the tools are in python. So in the case you need to do batch processing, you can always consult the python files and write your own script.
-
-## Screenshot Verification
-The screenshot verification workflow allows you to capture screenshots of web pages and verify their appearance using LLMs. The following tools are available:
-
-1. Screenshot Capture:
-```bash
-python tools/screenshot_utils.py URL [--output OUTPUT] [--width WIDTH] [--height HEIGHT]
+## **Globs**
+適用於 Git 相關文件與提交規則：
+```plaintext
+/.git/**
 ```
 
-2. LLM Verification with Images:
-```bash
-python tools/llm_api.py --prompt "Your verification question" --provider {openai|anthropic} --image path/to/screenshot.png
+## **Commit Message 格式**
+每次提交時，應遵循以下格式：
+```plaintext
+[類別] 簡短描述 (#IssueNumber)
 ```
 
-Example workflow:
-```python
-from screenshot_utils import take_screenshot_sync
-from llm_api import query_llm
+### **類別分類**
+| 類別 | 說明 |
+|------|------|
+| `feat` | 新功能開發 |
+| `fix` | 修復錯誤 |
+| `docs` | 文檔更新 |
+| `refactor` | 代碼重構（無功能變更）|
+| `test` | 測試代碼新增/修改 |
+| `chore` | 工具設定或非業務邏輯修改 |
+| `ci` | 持續整合相關變更 |
+| `style` | 代碼格式調整（無影響邏輯）|
+| `perf` | 性能優化 |
+| `revert` | 撤銷先前提交 |
 
-# Take a screenshot
-screenshot_path = take_screenshot_sync('https://example.com', 'screenshot.png')
-
-# Verify with LLM
-response = query_llm(
-    "What is the background color and title of this webpage?",
-    provider="openai",  # or "anthropic"
-    image_path=screenshot_path
-)
-print(response)
+## **Commit Message 範例**
+```plaintext
+feat: 新增使用者登入功能 (#123)
+fix: 修正 API 回應格式錯誤 (#456)
+docs: 更新 README，添加安裝步驟
+refactor: 重構資料處理模組，提升效能
 ```
 
-## LLM
+## **額外規則**
+1. **避免冗長的 Commit Message**，描述應清楚扼要（50 字內）。
+2. **Issue 追蹤號**：若提交變更與 Issue 相關，請在 `(#IssueNumber)` 格式中標明。
+3. **禁止提交未測試代碼**：若為 `fix` 或 `feat`，應包含相應測試。
+4. **避免 `WIP`（Work in Progress）提交**，應在本地分支開發完成後再提交。
+5. **如需額外詳細說明**，可於第二行起新增補充內容。
 
-You always have an LLM at your side to help you with the task. For simple tasks, you could invoke the LLM by running the following command:
+## **Revert Commit 規則**
+當需要還原提交時，請使用：
+```plaintext
+revert: 還原 [commit ID] - 原因
 ```
-python ./tools/llm_api.py --prompt "What is the capital of France?" --provider "anthropic"
+範例：
+```plaintext
+revert: 還原 3a5b9c8 - 修正方式有誤，需重新實作 (#789)
 ```
 
-The LLM API supports multiple providers:
-- OpenAI (default, model: gpt-4o)
-- Azure OpenAI (model: configured via AZURE_OPENAI_MODEL_DEPLOYMENT in .env file, defaults to gpt-4o-ms)
-- DeepSeek (model: deepseek-chat)
-- Anthropic (model: claude-3-sonnet-20240229)
-- Gemini (model: gemini-pro)
-- Local LLM (model: Qwen/Qwen2.5-32B-Instruct-AWQ)
-
-But usually it's a better idea to check the content of the file and use the APIs in the `tools/llm_api.py` file to invoke the LLM if needed.
-
-## Web browser
-
-You could use the `tools/web_scraper.py` file to scrape the web.
+## **自動化檢查**
+建議使用 `commitlint` 來強制執行本規則，設定 `.commitlintrc.js`：
+```javascript
+module.exports = {
+  extends: ['@commitlint/config-conventional'],
+  rules: {
+    'type-enum': [
+      2, 'always', [
+        'feat', 'fix', 'docs', 'refactor', 'test', 'chore', 'ci', 'style', 'perf', 'revert'
+      ]
+    ],
+    'subject-case': [2, 'always', 'sentence-case'],
+    'header-max-length': [2, 'always', 50]
+  }
+};
 ```
-python ./tools/web_scraper.py --max-concurrent 3 URL1 URL2 URL3
-```
-This will output the content of the web pages.
-
-## Search engine
-
-You could use the `tools/search_engine.py` file to search the web.
-```
-python ./tools/search_engine.py "your search keywords"
-```
-This will output the search results in the following format:
-```
-URL: https://example.com
-Title: This is the title of the search result
-Snippet: This is a snippet of the search result
-```
-If needed, you can further use the `web_scraper.py` file to scrape the web page content.
-
-# Lessons
-
-## User Specified Lessons
-
-- You have a python venv in ./venv. Use it.
-- Include info useful for debugging in the program output.
-- Read the file before you try to edit it.
-- Due to Cursor's limit, when you use `git` and `gh` and need to submit a multiline commit message, first write the message in a file, and then use `git commit -F <filename>` or similar command to commit. And then remove the file. Include "[Cursor] " in the commit message and PR title.
-
-## Cursor learned
-
-- For search results, ensure proper handling of different character encodings (UTF-8) for international queries
-- Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration
-- When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes
-- Use 'gpt-4o' as the model name for OpenAI's GPT-4 with vision capabilities
-
-
-# Scratchpad
-
-## Task: 建立 LangChain 課程範例程式
-
-### 檔案結構規劃
-Course/
-├── Module1/
-│   ├── 1_1_framework_overview.py      ✓
-│   ├── 1_2_installation_setup.py      ✓
-│   ├── 1_3_llm_integration.py         ✓
-│   └── 1_4_chains_basics.py           ✓
-├── Module2/
-│   ├── 2_1_agent_concepts.py          ✓
-│   ├── 2_2_tools_usage.py             ✓
-│   └── 2_3_agent_automation.py        ✓
-├── Module3/
-│   ├── 3_1_rag_basics.py              ✓
-│   ├── 3_2_vector_retrieval.py        ✓
-│   │   ├── 3_2_1_vectorstores_comparison.py  ✓
-│   │   ├── 3_2_2_embedding_models.py         ✓
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Zenobia000/iSpan_LLM-NLP-cookbooks](https://github.com/Zenobia000/iSpan_LLM-NLP-cookbooks) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
