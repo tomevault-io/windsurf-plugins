@@ -1,29 +1,105 @@
 ---
 trigger: always_on
-description: Provides opinionated best practices and patterns for building production-ready REST APIs using Laravel. Use this skill when designing API endpoints, implementing resource controllers, or structuring JSON responses in a Laravel environment.
+description: This document covers folder structure, naming conventions, and complete worked examples for the API skill.
 ---
 
+# Conventions Reference
 
-# API Skill for Laravel Developers
-
-This skill defines the exact patterns and rules for building scalable, reliable, and modern REST APIs in Laravel. All guidance here is prescriptive. When in doubt, follow the rule.
+This document covers folder structure, naming conventions, and complete worked examples for the API skill.
 
 ---
 
-## 1. Route Organisation
-
-Standalone APIs have **no `api` prefix** on any route. Routes live under `routes/api/` as follows:
+## Folder Structure
 
 ```
+app/
+  Actions/
+    Posts/
+      StorePostAction.php
+      UpdatePostAction.php
+      DestroyPostAction.php
+  Http/
+    Controllers/
+      Auth/
+        V1/
+          LoginController.php
+          LogoutController.php
+          RegisterController.php
+      Posts/
+        V1/
+          IndexController.php
+          ShowController.php
+          StoreController.php
+          UpdateController.php
+          DestroyController.php
+    Middleware/
+      ForceJsonResponse.php
+      Sunset.php
+    Payloads/
+      Posts/
+        StorePayload.php
+        UpdatePayload.php
+      Auth/
+        RegisterUserPayload.php
+    Requests/
+      Auth/
+        V1/
+          LoginRequest.php
+          RegisterRequest.php
+      Posts/
+        V1/
+          StoreRequest.php
+          UpdateRequest.php
+    Resources/
+      PostResource.php
+      UserResource.php
+    Responses/
+      ProblemResponse.php
+  Jobs/
+    Posts/
+      StorePostJob.php
+  Policies/
+    PostPolicy.php
 routes/
   api/
-    routes.php       ← entry point, requires all resource files
+    routes.php
     auth.php
-    posts.php        ← one file per resource
-    users.php
+    posts.php
+tests/
+  Feature/
+    Auth/
+      V1/
+        LoginTest.php
+        RegisterTest.php
+    Posts/
+      V1/
+        IndexTest.php
+        ShowTest.php
+        StoreTest.php
+        UpdateTest.php
+        DestroyTest.php
 ```
 
-`routes/api/routes.php` loads in each resource using a prefix and naming:
+---
+
+## Naming Conventions
+
+| Layer | Convention | Example |
+|---|---|---|
+| Controller | `{Action}Controller` | `StoreController`, `DestroyController` |
+| Action | `{Action}{Resource}Action` | `StorePostAction`, `UpdatePostAction` |
+| Payload (DTO) | `{Action}Payload` | `StorePayload` |
+| Form Request | `{Action}Request` | `StoreRequest` |
+| API Resource | `{Resource}Resource` | `PostResource` |
+| Job | `{Action}{Resource}Job` | `StorePostJob` |
+| Route name | `{resource}:{version}:{action}` | `posts:v1:store` |
+| Test file | `{Action}Test` in the matching path | `StoreTest.php` |
+
+---
+
+## Route Files
+
+### `routes/api/routes.php`
 
 ```php
 <?php
@@ -41,7 +117,27 @@ Route::as('posts:')->group(base_path(
 ));
 ```
 
-Each resource file owns its own version prefix. This keeps versioning explicit and debuggable per resource:
+### `routes/api/auth.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use App\Http\Controllers\Auth;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1/auth')->middleware('throttle:api')->group(function (): void {
+    Route::post('/register', Auth\V1\RegisterController::class)->name('v1:register');
+    Route::post('/login', Auth\V1\LoginController::class)->name('v1:login');
+
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::delete('/logout', Auth\V1\LogoutController::class)->name('v1:logout');
+    });
+});
+```
+
+### `routes/api/posts.php`
 
 ```php
 <?php
@@ -60,69 +156,76 @@ Route::prefix('v1/posts')->middleware(['auth:sanctum', 'throttle:api'])->group(f
 });
 ```
 
-- Always version from day one.
-- Always use named routes, namespaced to their version (e.g. `posts:v1:index` and `posts:v1:store`).
-- The `throttle:api` middleware must always be present.
-
 ---
 
-## 2. Single-Action Invokable Controllers
+## Model — ULID Primary Keys
 
-Every controller is a `final` single-action invokable class. No resourceful controllers. No multiple methods per class. Just an invokable action and a constructor for any dependency injection.
-
-Controllers live under `app/Http/Controllers/{Resource}/{Version}/`:
-
-```
-app/Http/Controllers/Posts/V1/
-  IndexController.php
-  ShowController.php
-  StoreController.php
-  UpdateController.php
-  DestroyController.php
-```
-
-Dependencies are always injected via the constructor. Never use Facades, `app()`, or `resolve()` inside a controller. The `__invoke` method handles the request and returns a response:
+All API-facing models use `HasUlids`. The migration column must be `ulid`:
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Posts\V1;
+namespace App\Models;
 
-use App\Actions\Posts\StorePostAction;
-use App\Http\Requests\Posts\V1\StoreRequest;
-use App\Http\Resources\PostResource;
-use Illuminate\Http\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
 
-final class StoreController
+final class Post extends Model
 {
-    public function __construct(
-        private readonly StorePostAction $action,
-    ) {}
+    use HasUlids;
 
-    public function __invoke(StoreRequest $request): JsonResponse
+    protected function casts(): array
     {
-        $post = $this->action->handle(
-            payload: $request->payload(),
-        );
-
-        return new JsonResponse(
-            data: new PostResource($post),
-            status: Response::HTTP_CREATED,
-        );
+        return [
+            'published_at' => 'datetime',
+        ];
     }
 }
 ```
 
+Migration:
+
+```php
+$table->ulid('id')->primary();
+```
+
+Never use `$table->id()` (auto-increment) on a model that is exposed through an API endpoint.
+
 ---
 
-## 3. Form Requests and Payloads (DTOs)
+## Complete Worked Example — Storing a Post
 
-Every state-mutating endpoint uses a **Form Request**. Form Requests live under `app/Http/Requests/{Resource}/{Version}/`.
+### Payload
 
-The Form Request **must** expose a `payload()` method that returns a typed DTO from `app/Http/Payloads/`. This keeps controllers free of array handling and makes the data contract explicit:
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Payloads\Posts;
+
+final class StorePayload
+{
+    public function __construct(
+        public readonly string $title,
+        public readonly string $content,
+        public readonly string $userId,
+    ) {}
+
+    public function toArray(): array
+    {
+        return [
+            'title'   => $this->title,
+            'content' => $this->content,
+            'user_id' => $this->userId,
+        ];
+    }
+}
+```
+
+### Form Request
 
 ```php
 <?php
@@ -153,54 +256,9 @@ final class StoreRequest extends FormRequest
     {
         return new StorePayload(
             title:   $this->string('title')->toString(),
-            content: $this->string('content')->toString(),
-            userId:  $this->user()->id,
-        );
-    }
-}
-```
-
-**Payloads (DTOs)** are plain PHP objects. They have a typed constructor and a `toArray()` method that returns what Eloquent expects. They live in `app/Http/Payloads/`:
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Http\Payloads\Posts;
-
-final class StorePayload
-{
-    public function __construct(
-        public readonly string $title,
-        public readonly string $content,
-        public readonly string $userId,
-    ) {}
-
-    public function toArray(): array
-    {
-        return [
-            'title'   => $this->title,
-            'content' => $this->content,
-            'user_id' => $this->userId,
-        ];
-    }
-}
-```
-
----
-
-## 4. API Resources
-
-Always use Laravel's Eloquent API Resources to transform model data. Generate them with the `--json-api` CLI flag:
-
-```bash
-php artisan make:resource PostResource --json-api
-```
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [JustSteveKing/api-skill](https://github.com/JustSteveKing/api-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
