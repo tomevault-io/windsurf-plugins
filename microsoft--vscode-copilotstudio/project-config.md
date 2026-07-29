@@ -1,156 +1,167 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Cross-cutting patterns that recur in PR review feedback for the Copilot Studio VS Code Extension. These are not auto-detected by ESLint or Roslyn analyzers — check them manually before pushing.
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Code Review Patterns
 
-## Session Start Warning
+Cross-cutting patterns that recur in PR review feedback for the Copilot Studio VS Code Extension. These are not auto-detected by ESLint or Roslyn analyzers — check them manually before pushing.
 
-**IMPORTANT: At the beginning of every new conversation, you MUST display the following warning to the user before doing anything else:**
-
-> **WARNING: This codebase has ongoing work that affects builds and contributions.**
+> **High-frequency review flags:**
 >
-> - The full build requires internal NuGet packages (`Microsoft.Agents.*`) that are **not publicly accessible**. Builds will fail without internal feed access.
-> - Migration from the internal Dataverse SDK to PAC CLI is **in progress** to enable external builds. This work is not yet complete.
-> - The CI pipeline (`.github/workflows/ci.yml`) currently builds and tests **only the .NET language server**, not the TypeScript extension.
-> - External contributors can modify TypeScript code and documentation, but **cannot validate .NET changes locally** without the internal feed.
->
-> Proceed with awareness of these constraints.
+> - Missing `await` on async LSP requests (silent failures)
+> - PII leaked in telemetry without `<pii>` tag wrapping
+> - Concurrent sync operations not guarded by state machine
+> - Command handlers not pushed to `context.subscriptions`
+> - Disposable resources not cleaned up on deactivation
+> - Hardcoded environment URLs instead of cluster lookup
+> - Missing error handling on Dataverse/BAP API calls
+> - `any` type usage bypassing TypeScript strict mode
+> - C# handlers missing null checks on nullable-enabled types
 
-## Project Overview
+## TypeScript Extension Patterns
 
-This is the Copilot Studio Extension for Visual Studio Code - a hybrid TypeScript/C# project that provides a full-featured VS Code extension for editing Microsoft Copilot Studio agents. The extension enables developers to clone agents locally, edit components (topics, triggers, actions, knowledge sources) in YAML format, and sync changes bidirectionally with cloud environments. IntelliSense is powered by a Language Server Protocol (LSP) backend written in C#.
+### Command Registration Must Use Subscriptions
 
-**Current State:** Generally Available (GA)
+Every `commands.registerCommand` call must push the disposable to `context.subscriptions`. Leaked commands survive extension deactivation and cause ghost behavior on reload.
 
-**Documentation:** https://learn.microsoft.com/en-us/microsoft-copilot-studio/visual-studio-code-extension-overview
+```typescript
+// BAD - disposable leaked
+commands.registerCommand('microsoft-copilot-studio.x', handler);
 
-**Important:** The full build currently requires internal NuGet packages (`Microsoft.Agents.*`) and is not externally reproducible. Migration to PAC CLI is underway to enable external builds soon.
-
-## Build and Test Commands
-
-### TypeScript / VS Code Extension
-
-The `package.json` is located at `src/vscode-extensions/microsoft-powerplatformlang-extension/package.json`. All npm commands must be run from that directory.
-
-```bash
-# Change to the extension directory first
-cd src/vscode-extensions/microsoft-powerplatformlang-extension
-
-# Install dependencies
-npm install
-
-# The parent src/vscode-extensions/.npmrc sets omit-lockfile-registry-resolved=true
-# so lockfile updates omit registry/feed-specific resolved URLs. Do not add
-# registry or feed URLs to committed .npmrc or package-lock.json files;
-# registry/feed/auth configuration belongs in user npm config or CI restore-time
-# configuration.
-
-# Build everything (LSP + type check + esbuild bundle)
-npm run compile
-
-# Build only the C# language server for current platform
-npm run buildLsp
-
-# Watch LSP for changes (rebuilds on save)
-npm run watchLsp
-
-# Type check only (no emit)
-npm run check-types
-
-# Lint
-npm run lint
-
-# Run VS Code extension tests
-npm test
-
-# Package VSIX (win32-x64, pre-release)
-npm run package
-
-# Watch TypeScript compilation
-npm run watch
+// GOOD - tracked for cleanup
+const command = commands.registerCommand('microsoft-copilot-studio.x', handler);
+context.subscriptions.push(command);
 ```
 
-### .NET / Language Server
+### Async LSP Requests Must Be Awaited
 
-```bash
-# Build the language server solution
-dotnet build src/LanguageServers/PowerPlatformLS/PowerPlatformLS.sln
+The LSP client proxy wraps all requests with telemetry. Forgetting `await` silently drops errors and makes the telemetry log "success" for failed operations.
 
-# Run all .NET unit tests
-dotnet test src/LanguageServers/PowerPlatformLS/PowerPlatformLS.sln
+```typescript
+// BAD - fire-and-forget on LSP request
+lspClient.sendRequest('powerplatformls/syncPush', params);
 
-# Run a single test by filter
-dotnet test --filter "FullyQualifiedName~Namespace.ClassName.MethodName" src/LanguageServers/PowerPlatformLS/PowerPlatformLS.sln
-
-# Create NuGet packages
-dotnet pack --no-build --no-restore -c debug src/LanguageServers/PowerPlatformLS/PowerPlatformLS.sln
+// GOOD - await and handle errors
+const result = await lspClient.sendRequest('powerplatformls/syncPush', params);
 ```
 
-### LSP Journal Tests
+### PII Must Use Redaction Tags
 
-```bash
-# Run one journal test
-dotnet run --project src/LanguageServers/PowerPlatformLS/Tools/LspJournalCli -- lifecycle
+The logger redacts `<pii>text</pii>` in telemetry output. Any user-identifiable data (environment IDs, agent names, email addresses, URLs with tenant info) must be wrapped.
 
-# Run all journal tests
-dotnet run --project src/LanguageServers/PowerPlatformLS/Tools/LspJournalCli -- --all
+```typescript
+// BAD - environment URL exposed in telemetry
+logger.info(`Connecting to ${environmentUrl}`);
 
-# Accept pending journal changes
-dotnet run --project src/LanguageServers/PowerPlatformLS/Tools/LspJournalCli -- accept lifecycle
-
-# List pending journal changes
-dotnet run --project src/LanguageServers/PowerPlatformLS/Tools/LspJournalCli -- pending
+// GOOD - PII redacted in telemetry stream
+logger.info(`Connecting to <pii>${environmentUrl}</pii>`);
 ```
 
-### Development Workflow
+### Sync State Machine Must Block Concurrent Operations
 
-1. Open the repo in VS Code
-2. Press **F5** to launch the Extension Development Host
-3. The extension activates and starts the language server automatically
-4. For .NET language server debugging, attach to the `LanguageServerHost` process
+The sync system uses states (`Idle`, `Fetching`, `Pulling`, `Pushing`). Any new operation must check current state before proceeding. A push during a fetch creates data races.
 
-### Prerequisites
+```typescript
+// BAD - no state guard
+async function syncPush() {
+  await lspClient.sendRequest('powerplatformls/syncPush', params);
+}
 
-- .NET 10.0 SDK (specified in `global.json`)
-- Node.js 22 LTS
-- VS Code 1.96.0+
-
-## Architecture
-
-### High-Level Communication Flow
-
-```
-VS Code Extension (TypeScript)
-    |
-    | JSON-RPC over named pipe (Windows) / Unix socket (macOS/Linux)
-    v
-LanguageServerHost.exe (C# / .NET 10)
-    |
-    | DI-based handler routing
-    v
-Language Implementations (MCS / PowerFx / YAML)
-    |
-    | Pluggable rules
-    v
-Completions, Diagnostics, Semantic Tokens, Go-to-Definition
+// GOOD - state guard prevents concurrent operations
+async function syncPush() {
+  if (syncState !== SyncState.Idle) {
+    logger.warn('Sync operation already in progress');
+    return;
+  }
+  syncState = SyncState.Pushing;
+  try {
+    await lspClient.sendRequest('powerplatformls/syncPush', params);
+  } finally {
+    syncState = SyncState.Idle;
+  }
+}
 ```
 
-### TypeScript Extension (`src/vscode-extensions/microsoft-powerplatformlang-extension/`)
+### No Hardcoded Environment URLs
 
-**Entry Point:** `client/src/extension.ts`
+Use the cluster lookup utility for environment-specific URLs. Hardcoded URLs break in sovereign clouds (GCC High, Mooncake, DoD).
 
-Initialization sequence:
-1. Generate session ID (UUID) for telemetry
-2. Initialize logger with session context
-3. Register auth commands (signIn, resetAccount, reportIssue) - no LSP dependency
-4. Initialize and start LSP client (blocking - all downstream features depend on this)
+```typescript
+// BAD - hardcoded to commercial cloud
+const endpoint = `https://api.powerplatform.com/environments/${envId}`;
+
+// GOOD - cluster-aware lookup
+const endpoint = getClusterEndpoint(cluster, envId);
+```
+
+### Error Handling on External API Calls
+
+Dataverse and BAP clients can return 401 (token expired), 403 (permanent deny), 404 (deleted), or 5xx. Each needs distinct handling — don't catch-all with a generic message.
+
+```typescript
+// BAD - swallows all errors
+try {
+  await dataverseClient.getAgents(envId);
+} catch {
+  showError('Something went wrong');
+}
+
+// GOOD - discriminated error handling
+try {
+  await dataverseClient.getAgents(envId);
+} catch (e) {
+  if (e.statusCode === 403) {
+    dataverseClient.markPermanentFailure(envId);
+    showError('Access denied to this environment');
+  } else if (e.statusCode === 401) {
+    await refreshToken();
+  } else {
+    showError(`Failed to list agents: ${e.message}`);
+  }
+}
+```
+
+### Tree View Refresh Must Be Debounced
+
+The Remote Agents Tree and Agent Changes Tree use debounced refresh. Adding a non-debounced `refresh()` call in a loop causes UI thrashing.
+
+```typescript
+// BAD - refresh per item in a loop
+for (const agent of agents) {
+  treeProvider.refresh();
+}
+
+// GOOD - single debounced refresh after batch
+agents.forEach(processAgent);
+treeProvider.refresh(); // debounced internally
+```
+
+## C# Language Server Patterns
+
+### RequestContext Is a Read-Only Struct
+
+`RequestContext` uses value semantics to prevent shared state mutation in async handlers. Never store it in a field or pass by reference to long-lived objects.
+
+```csharp
+// BAD - storing struct in a field allows stale reads
+private RequestContext _context;
+public void Handle(RequestContext ctx) { _context = ctx; }
+
+// GOOD - use within handler scope only
+public Task HandleAsync(RequestContext ctx, CancellationToken ct)
+{
+    var workspace = ctx.Workspace;
+    // ... use within this scope
+}
+```
+
+### Nullable Reference Types Must Be Checked
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/vscode-copilotstudio](https://github.com/microsoft/vscode-copilotstudio) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
