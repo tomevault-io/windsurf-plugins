@@ -1,218 +1,62 @@
 ---
 trigger: always_on
-description: > Obsidian plugin for Eagle asset library integration with cloud upload support.
+description: Obsidian plugin — Eagle 자산 라이브러리를 볼트와 연결. 검색, 임베드, 클라우드 업로드(ImgHippo, R2, S3, WebDAV).
 ---
 
-# AGENTS.md - CMDS Eagle
+# CMDS Eagle
 
-> Obsidian plugin for Eagle asset library integration with cloud upload support.
+Obsidian plugin — Eagle 자산 라이브러리를 볼트와 연결. 검색, 임베드, 클라우드 업로드(ImgHippo, R2, S3, WebDAV).
 
-## Quick Reference
+## Build
 
 ```bash
-# Development (watch mode)
-npm run dev
+npm install
+npm run dev          # watch mode
+npm run build        # tsc + esbuild production
+```
 
-# Production build (type-check + bundle)
-npm run build
-
-# Version bump (updates manifest.json + versions.json)
-npm run version
+빌드 산출물 `main.js`를 볼트에 복사:
+```bash
+cp main.js manifest.json styles.css "/Users/yohankoo/Local Obsidian_MBP/CMDSPACE_Local_MBP/.obsidian/plugins/cmds-eagle/"
 ```
 
 ## Project Structure
 
 ```
 src/
-├── main.ts          # Plugin entry point, commands, event handlers
-├── types.ts         # All interfaces, types, constants
-├── api.ts           # Eagle API service + URL utilities
-├── modals.ts        # UI modals (search, folder select, paste choice)
-├── settings.ts      # Settings tab UI
-└── cloud-providers.ts # Cloud upload providers (R2, S3, WebDAV, ImgHippo)
+├── main.ts             # Plugin entry (CMDSEagle class)
+├── api.ts              # Eagle REST API client
+├── cloud-providers.ts  # ImgHippo, R2, S3, WebDAV upload
+├── modals.ts           # Search/embed modals
+├── settings.ts         # Settings tab
+└── types.ts            # Interfaces, defaults
 ```
 
-## Build System
+## Key Info
 
-- **Bundler**: esbuild (not Webpack/Rollup)
-- **Entry**: `src/main.ts` → `main.js`
-- **Format**: CommonJS (required by Obsidian)
-- **Target**: ES2018
-- **External**: obsidian, electron, @codemirror/*, @lezer/*, node builtins
+- **ID**: `cmds-eagle`
+- **Version**: 1.6.0
+- **Desktop only**: yes (Eagle REST API is local)
+- **GitHub**: `johnfkoo951/cmds-eagle`
+- **Naming rule**: all CMDS plugins use `cmds-` prefix
 
-## TypeScript Configuration
+## Release Workflow
 
-```json
-{
-  "noImplicitAny": true,
-  "strictNullChecks": true,
-  "module": "ESNext",
-  "target": "ES6",
-  "moduleResolution": "node"
-}
-```
+`obsidian-plugin-dev` 스킬 사용 (아무 Claude Code 세션에서 호출 가능).
+1. `npm run build` — 빌드 확인
+2. `manifest.json` + `versions.json` 버전 업데이트
+3. GitHub release 생성 (`main.js`, `manifest.json`, `styles.css` 첨부)
+4. Obsidian Community에서 Review Branch → Check for new release
 
-## Code Style Guidelines
+## CMDS Plugin Family
 
-### Imports
-
-```typescript
-// 1. Obsidian imports (destructured, from 'obsidian')
-import { Plugin, Notice, Editor, TFile } from 'obsidian';
-
-// 2. Node.js imports
-import { promises as fs } from 'fs';
-
-// 3. Local imports (explicit relative paths)
-import { EagleItem, CMDSPACEEagleSettings } from './types';
-import { EagleApiService, parseEagleUrl } from './api';
-```
-
-### Naming Conventions
-
-| Type | Convention | Example |
-|------|------------|---------|
-| Classes | PascalCase | `CMDSPACELinkEagle`, `EagleApiService` |
-| Interfaces | PascalCase | `EagleItem`, `CloudUploadResult` |
-| Methods/Variables | camelCase | `loadSettings`, `thumbnailPath` |
-| Constants | UPPER_SNAKE_CASE | `DEFAULT_SETTINGS`, `SUPPORTED_IMAGE_EXTENSIONS` |
-| CSS Classes | kebab-case with prefix | `cmdspace-eagle-suggestion` |
-| Plugin IDs | kebab-case | `cmds-eagle` |
-
-### Type Definitions
-
-```typescript
-// Interfaces for all data structures
-export interface EagleItem {
-  id: string;
-  name: string;
-  tags: string[];
-  // ...
-}
-
-// Union types for enums (not TypeScript enum)
-export type CloudProviderType = 'r2' | 's3' | 'webdav' | 'imghippo' | 'custom';
-export type ImagePasteBehavior = 'eagle' | 'local' | 'cloud' | 'ask';
-
-// Readonly arrays for constants
-export const SUPPORTED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', ...] as const;
-```
-
-### Error Handling
-
-```typescript
-// Pattern 1: Return null on failure
-async getItemInfo(id: string): Promise<EagleItem | null> {
-  try {
-    const response = await this.get<EagleItem>(`/api/item/info?id=${id}`);
-    return response.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// Pattern 2: Return result object
-async upload(filePath: string): Promise<CloudUploadResult> {
-  try {
-    // ...
-    return { success: true, publicUrl: url };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-}
-
-// Pattern 3: User notification
-try {
-  await this.doSomething();
-} catch (error) {
-  console.error('Failed to do something:', error);
-  new Notice('Failed to do something. Check console for details.');
-}
-```
-
-### Async/Await Patterns
-
-```typescript
-// Always use async/await (not .then())
-async onload(): Promise<void> {
-  await this.loadSettings();
-  this.api = new EagleApiService(this.settings);
-}
-
-// Chain independent operations with await
-const [connected, libraryName] = await Promise.all([
-  this.api.isConnected(),
-  this.api.getLibraryName()
-]);
-```
-
-### Class Structure
-
-```typescript
-export default class CMDSPACELinkEagle extends Plugin {
-  // 1. Properties
-  settings: CMDSPACEEagleSettings;
-  api: EagleApiService;
-
-  // 2. Lifecycle methods
-  async onload(): Promise<void> { }
-  onunload(): void { }
-
-  // 3. Public methods
-  async loadSettings(): Promise<void> { }
-  async saveSettings(): Promise<void> { }
-
-  // 4. Private methods (group by feature)
-  private async insertItemLink(editor: Editor, item: EagleItem): Promise<void> { }
-  private buildMetadataCard(item: EagleItem): string { }
-  
-  // 5. Utility methods at bottom
-  private formatFileSize(bytes: number): string { }
-  private normalizeTag(tag: string): string { }
-}
-```
-
-### Obsidian Plugin Patterns
-
-```typescript
-// Command registration
-this.addCommand({
-  id: 'search-eagle',
-  name: 'Search Eagle library and embed',
-  editorCallback: (editor: Editor, view: MarkdownView) => {
-    new EagleSearchModal(this.app, this.api, this.settings).open();
-  },
-});
-
-// Event registration
-this.registerEvent(
-  this.app.workspace.on('editor-paste', async (evt: ClipboardEvent, editor: Editor) => {
-    await this.handlePaste(evt, editor);
-  })
-);
-
-// Settings persistence
-async loadSettings(): Promise<void> {
-  this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-}
-```
-
-### Modal Patterns
-
-```typescript
-// Extend FuzzySuggestModal for searchable lists
-export class EagleSearchModal extends FuzzySuggestModal<EagleItem> {
-  getItems(): EagleItem[] { return this.allItems; }
-  getItemText(item: EagleItem): string { return item.name; }
-  onChooseItem(item: EagleItem): void { this.insertItemLink(item); }
-}
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| Plugin | DEV 경로 | 설명 |
+|--------|----------|------|
+| **cmds-eagle** | (here) | Eagle 자산 연동 |
+| cmds-share | `/Users/yohankoo/DEV/cmds-share/` | 노트 웹 공유 |
+| cmds-link-bookends | `/Users/yohankoo/DEV/cmds-link-bookends/` | Bookends 참고문헌 연동 |
+| cmds-link-devonthink | `/Users/yohankoo/DEV/cmds-link-devonthink/` | DEVONthink 문서 연동 |
 
 ---
 > Source: [johnfkoo951/cmds-eagle](https://github.com/johnfkoo951/cmds-eagle) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
