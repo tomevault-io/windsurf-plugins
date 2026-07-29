@@ -1,166 +1,82 @@
 ---
 trigger: always_on
-description: Generates AgentCard and manifest JSON. Includes A2A skills, payments metadata, trust registrations.
+description: validates resolved context and wizard values against the schema before it
 ---
 
-# Lucid Agents Monorepo - AI Coding Guide
+# Generated Frontend Guide
 
-This guide helps AI coding agents understand and work with the lucid-agents monorepo effectively.
+The CLI owns one shared React service UI under `adapters/ui`. Next copies the
+contents of `adapters/ui/src` into its project root. TanStack UI copies the
+TanStack headless base first and then overlays `adapters/ui` and its
+framework-specific UI shell.
 
-## Project Overview
+## Boundaries
 
-This is a TypeScript/Bun monorepo for building, monetizing, and verifying AI agents. It provides:
+- Build presentation data with `buildServicePageModel()` from
+  `@lucid-agents/http`.
+- Load the Agent Card and health through public HTTP handler contracts.
+- Do not inspect `runtime.entrypoints`, `runtime.payments`, or
+  `runtime.agent.config` from generated pages.
+- Keep the shared endpoint-table component in `adapters/ui`.
+- Keep only routing, request adaptation, document metadata, and providers in
+  Next or TanStack overlays.
+- TanStack headless remains API-only and must not receive the shared UI layer.
+- `service-ui.config.ts` is the only generated user-editable visual config.
+  Keep preset resolution, token validation, and shared CSS in the browser-safe
+  `@lucid-agents/http/service-ui` subpath.
+- Hono and Express storefronts are static/read-only. Do not add browser scripts,
+  credential fields, or invoke controls to the portable renderer.
+- Every renderer is read-only and consumes the same `ServicePageModel`. Do not
+  add JSON editors, raw Agent Card dumps, wallet controls, or invoke clients to
+  the generated public page.
 
-- **@lucid-agents/core** - Protocol-agnostic agent runtime with extension system
-- **@lucid-agents/http** - HTTP extension for request/response handling
-- **@lucid-agents/identity** - ERC-8004 identity and trust layer
-- **@lucid-agents/payments** - x402 payment utilities
-- **@lucid-agents/wallet** - Wallet SDK for agent and developer wallets
-- **@lucid-agents/a2a** - A2A Protocol client for agent-to-agent communication
-- **@lucid-agents/ap2** - AP2 (Agent Payments Protocol) extension
-- **@lucid-agents/hono** - Hono HTTP server adapter
-- **@lucid-agents/express** - Express HTTP server adapter
-- **@lucid-agents/tanstack** - TanStack Start adapter
-- **@lucid-agents/cli** - CLI for scaffolding new agent projects
+## Testing
 
-**Tech Stack:**
+When changing generated UI:
 
-- Runtime: Bun (Node.js 20+ compatible)
-- Language: TypeScript (ESM, strict mode)
-- Build: tsup
-- Package Manager: Bun workspaces
-- Versioning: Changesets
-
-## Architecture Overview
-
-### Package Dependencies
-
-```
-cli (scaffolding tool)
-    ↓ scaffolds projects using
-hono OR express OR tanstack (adapters)
-    ↓ both use
-core (protocol-agnostic runtime)
-    ↓ uses extensions
-http, identity, payments, wallet, a2a, ap2 (extensions)
+```bash
+bun test packages/cli/tests/cli.test.ts
+bun run scripts/test-generated-project.ts next all
+bun run scripts/test-generated-project.ts tanstack-ui console
 ```
 
-### Extension System
+The generated-project script packs current workspace packages before install.
+Do not replace this with a test that resolves `latest` from npm.
 
-The framework uses an extension-based architecture where features are added via composable extensions:
+Avoid tests tied to component internals. Assert the generated public contract,
+user-visible states, accessible markup, and real generated application builds.
 
-- **http** (`@lucid-agents/http`) - HTTP request/response handling, streaming, SSE
-- **wallets** (`@lucid-agents/wallet`) - Wallet management for agents
-- **payments** (`@lucid-agents/payments`) - x402 payment verification and pricing
-- **identity** (`@lucid-agents/identity`) - ERC-8004 on-chain identity and trust
-- **a2a** (`@lucid-agents/a2a`) - Agent-to-agent communication protocol
-- **ap2** (`@lucid-agents/ap2`) - Agent Payments Protocol extension
+## Deployment overlays
 
-### Adapter System
+Deployment assets are adapter/template overlays, not runtime-adapter behavior.
+The first overlay applies only to `blank` + `hono` unless `--no-deploy` is
+passed. It contributes `src/worker.ts`, `wrangler.jsonc`,
+`lucid.deploy.json`, package scripts/dependencies, and an appended README
+section while leaving `src/index.ts` unchanged.
 
-The framework supports multiple runtime adapters:
+Keep provider execution, environment allowlisting, redaction, confirmation,
+and public-origin verification in `@lucid-agents/deploy`. Generated adapters
+must continue delegating requests to the canonical HTTP runtime and must not
+grow provider-specific paywalls or route registries.
 
-- **Hono** (`@lucid-agents/hono`) - Traditional HTTP server
-- **Express** (`@lucid-agents/express`) - Node.js/Express server with x402 middleware
-- **TanStack Start** (`@lucid-agents/tanstack`) - Full-stack React with dashboard (UI) or API-only (headless)
+## Scaffold safety
 
-Templates are adapter-agnostic and work with any compatible adapter.
-
-### Data Flow
-
-```
-HTTP Request
-    ↓
-Adapter Router (Hono, Express, or TanStack)
-    ↓
-x402 Paywall Middleware (if configured)
-    ↓
-Runtime Handler (core)
-    ↓
-Entrypoint Handler
-    ↓
-Response (JSON or SSE stream)
-```
-
-### Key Architectural Decisions
-
-1. **Multi-adapter support** - Same agent logic works with different frameworks
-2. **Template-based scaffolding** - Templates use `.template` extensions for clean code generation
-3. **Zod for validation** - Schema-first approach for input/output
-4. **Server-Sent Events for streaming** - Standard SSE for real-time responses
-5. **ERC-8004 for identity** - On-chain agent identity and reputation
-6. **x402 for payments** - HTTP-native payment protocol supporting both EVM and Solana networks
-
-### Supported Payment Networks
-
-The framework supports payment receiving on multiple blockchain networks:
-
-**EVM Networks:**
-
-- `base` - Base mainnet (L2, low cost)
-- `base-sepolia` - Base Sepolia testnet
-- `ethereum` - Ethereum mainnet
-- `sepolia` - Ethereum Sepolia testnet
-
-**Solana Networks:**
-
-- `solana` - Solana mainnet (high throughput, low fees)
-- `solana-devnet` - Solana devnet
-
-**Key Differences:**
-
-- **EVM**: EIP-712 signatures, ERC-20 tokens (USDC), 0x-prefixed addresses
-- **Solana**: Ed25519 signatures, SPL tokens (USDC), Base58 addresses
-- **Transaction finality**: Solana (~400ms) vs EVM (12s-12min)
-- **Gas costs**: Solana (~$0.0001) vs EVM ($0.01-$10)
-
-**Identity vs Payments:**
-
-- Identity registration (ERC-8004): EVM-only (smart contract on Ethereum chains)
-- Payment receiving: Any supported network (EVM or Solana)
-- These are independent: register identity on Base, receive payments on Solana
-
-## Code Structure Principles
-
-These principles guide how we organize and structure code across the monorepo. Follow them when writing new code or refactoring existing code.
-
-### 1. Single Source of Truth
-
-**One type definition per concept.** Avoid duplicate types like `PaymentsRuntimeInternal` vs `PaymentsRuntime`. If you need variations, use type composition or generics, not separate type definitions.
-
-**Bad:**
-
-```typescript
-// Internal type
-type PaymentsRuntimeInternal = { config: PaymentsConfig | undefined; activate: ... };
-// Public type
-type PaymentsRuntime = { config: PaymentsConfig; requirements: ... };
-```
-
-**Good:**
-
-```typescript
-// One type definition
-type PaymentsRuntime = {
-  config: PaymentsConfig;
-  isActive: boolean;
-  requirements: ...;
-  activate: ...;
-};
-```
-
-### 2. Encapsulation at the Right Level
-
-**Domain complexity belongs in the owning package.** The payments package should handle all payments-related complexity. The core runtime should use it directly without transformation layers.
-
-**Bad:**
-
-```typescript
-// In core runtime - wrapping payments runtime
-const paymentsRuntime = payments.config ? {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Mark secret wizard inputs with `sensitive: true`; the interactive prompt
+  suppresses terminal echo and does not render secret defaults.
+- Keep generated `.env` files in the shared ignore policy for every adapter.
+- Keep `template.json` prompts and `template.schema.json` aligned. The CLI
+  validates resolved context and wizard values against the schema before it
+  creates a staging directory.
+- Preserve owner-only `0600` permissions on generated `.env` files.
+- Build and optionally install in the staging directory. Do not write directly
+  into the final target before validation succeeds.
+- Reject `.` and other paths that resolve to the current working directory;
+  atomic handoff requires a distinct target directory.
+- Treat installation failure as scaffold failure. Do not report a partially
+  installed project as successfully created.
+- Test failures through `runCli()` and the generated filesystem rather than
+  private copy or prompt helpers.
 
 ---
 > Source: [daydreamsai/lucid-agents](https://github.com/daydreamsai/lucid-agents) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
