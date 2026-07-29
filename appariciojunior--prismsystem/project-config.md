@@ -1,67 +1,146 @@
 ---
 trigger: always_on
-description: Design System token agent rules
+description: This file is intentionally concise for prompt efficiency.
 ---
 
+# Design System - AI Agent Instructions
 
-# Design System — Token Agent Rules
+This file is intentionally concise for prompt efficiency.
 
-## Architecture
+Canonical deep references (read when needed):
 
-3-layer token system: Foundation → Palette → Semantic.
-Semantic tokens MUST reference Palette, never Foundation directly.
+- `packages/tokens/.agents/skills/README.md`
+- `packages/tokens/.agents/skills/governance/constraint-reference.md`
+- `packages/tokens/DESIGN_SYSTEM_CONTEXT.md`
+- `packages/tokens/styleguide.md`
 
-## Source of Truth
+## First Prompt Bootstrap (Once Per Day)
 
-- Token definitions: `packages/tokens/src/tokens.json`
-- Skills library: `.cursor/skills/` (symlinked from `packages/tokens/.agents/skills/`)
-- Agent briefs: `packages/tokens/.agents/briefs/`
+Before any substantial work on first prompt of the day, run:
 
-## Critical Rules
+```bash
+# 1) Sync repo
+git fetch origin main && git pull origin main --rebase 2>/dev/null || echo "Offline mode"
 
-1. **Dark mode neutral ramps are REVERSED**: `neutral.50` = black, `neutral.1000` = white
-2. **Never touch foundation layer** without explicit human approval
-3. **Never modify `$themes` or `$figma*` metadata** in tokens.json
-4. **Semantic → Palette references only** (e.g., `{brand.core.ramp.neutral.150}`)
-5. **Font weights must be strings** (`"Bold"`, not `700`)
-6. **Don't edit tokens.json for output issues** — fix build scripts instead
-
-## Skills (`.cursor/skills/`)
-
-Use these skills for structured decision-making:
-
-- `reasoning/react-loop.md` — ReAct: Thought → Action → Observation loop
-- `governance/foundation-gate.md` — Foundation layer protection gate
-- `governance/constraint-reference.md` — All 8 constraint violations
-- `color-ramps/dark-mode-mapping.md` — Light↔dark step mapping (CRITICAL)
-- `editing/safe-token-edit.md` — Safe edit with validation gates
-- `validation/build-verify.md` — npm build + test verification
-- `discovery/token-lookup.md` — Find tokens by path/pattern/value
-
-## Agent Roles
-
-| Role | Brief | Use When |
-|---|---|---|
-| Architect | `packages/tokens/.agents/briefs/architect.md` | Planning, blueprints |
-| Code | `packages/tokens/.agents/briefs/code.md` | Implementation, commits |
-| Testing | `packages/tokens/.agents/briefs/testing.md` | Validation, QA |
-
-## Workflow: Token Edit
-
-```
-1. Check governance gates (foundation-gate, palette-gate)
-2. Locate token (token-lookup)
-3. Make edit (safe-token-edit)
-4. Validate JSON: python3 -m json.tool packages/tokens/src/tokens.json > /dev/null
-5. Run tests: npm run test:output
-6. Build: npm run build:output
-7. Commit: git commit -m "feat(tokens): description"
+# 2) Quick status
+echo "=== DAILY BOOTSTRAP ===" && \
+git log --oneline -3 && \
+echo "=== TODO STATE ===" && \
+head -30 packages/tokens/.agents/TODO_STATE.md
 ```
 
-## Reference
+Then read: `packages/tokens/.agents/TODO_STATE.md` and `packages/tokens/.agents/skills/governance/constraint-reference.md`.
 
-- Ramp colors: `packages/tokens/data/ramp-colors-reference.csv`
-- Token state: `packages/tokens/.agents/TODO_STATE.md`
+Skip bootstrap only if user says `skip bootstrap` or `continue from last session`.
+
+## Architecture Invariants
+
+- Token architecture is 3-layer: Foundation -> Palette -> Semantic.
+- Semantic tokens must reference Palette, never Foundation.
+- `packages/tokens/src/tokens.json` is the Token Studio source of truth.
+- Never modify `$themes` or any `$figma*` metadata unless explicitly human-approved.
+- Do not edit `tokens.json` to fix output/render issues; investigate build scripts in `packages/output/src/scripts/` first.
+
+## Dark Mode Critical Rule
+
+Neutral ramps are reversed in dark mode:
+
+- Light mode: `neutral.50` is white, `neutral.1000` is black.
+- Dark mode: `neutral.50` is black, `neutral.1000` is white.
+
+Always verify actual hex in `packages/tokens/data/ramp-colors-reference.csv` before deciding dark mappings.
+
+## Governance Gates
+
+- Foundation edits require explicit human approval and `foundation-change` governance path.
+- Palette edits require explicit approval (`palette/approval`) and design owner sign-off.
+- For semantic-only scope, do not change foundation or palette layers.
+- If scope is ambiguous, stop and ask one concise clarifying question.
+
+## tokens.json Edit Rules
+
+When explicitly asked to edit `packages/tokens/src/tokens.json`:
+
+- Change only intended token `value`/`description` fields.
+- Keep font weights as strings (for Figma export), not numeric values.
+- Validate JSON immediately:
+
+```bash
+python3 -m json.tool packages/tokens/src/tokens.json > /dev/null
+```
+
+## Verification Commands
+
+Use these after token-affecting changes:
+
+```bash
+npm run build:output
+npm run test:output
+```
+
+If the workflow requires it, also run:
+
+```bash
+python3 packages/tokens/scripts/verify_tag_updates.py
+```
+
+## Documentation Boundary
+
+Keep token documentation under `packages/tokens/`. Do not create token docs elsewhere.
+
+## Agent Brief Size Limit
+
+All files in `packages/tokens/.agents/briefs/` must stay at or below 150 lines. Keep briefs concise and push deep workflow detail into skills under `packages/tokens/.agents/skills/`.
+
+## Skills Path
+
+Canonical skills live in `packages/tokens/.agents/skills/` and are synced to:
+
+- `.github/skills/tokens`
+- `.cursor/skills`
+- `.claude/skills`
+- `.codex/skills`
+
+Avoid duplicating long instruction blocks across tool-specific files.
+
+## Token MCP Fast Path
+
+- Prefer `ds-tokens-mcp` for token discovery before broad file scans.
+- Use `search_tokens` for intent-first lookup, then `token_lookup` for exact path/value confirmation.
+- Use `audit_design_system` when evaluating quality/risk across token groups.
+- `packages/tokens/src/tokens.json` remains the source of truth.
+
+## Token Reference Query Contract (MCP-Only, Deterministic)
+
+For requests that are explicitly reference-only (for example "suggest tokens", "which token should I use", "token reference", "no implementation"), use this strict output contract:
+
+1. Retrieval path must be MCP-only fast path.
+2. If the intent is about a component or interaction pattern (for example modal, drawer, onboarding flow, paywall), query Mobbin MCP first to ground the response in real shipped patterns.
+3. Do not use non-MCP validation fallback for these requests.
+4. Output must be table-only and grouped by application area in this exact order:
+   - Fill
+   - Border
+   - Icon
+   - Text
+   - Other
+5. Table columns must be exactly:
+   - Semantic Token
+   - Description
+6. Rows must be deterministically sorted alphabetically by semantic token path within each group.
+7. If MCP results are partial or noisy, retry MCP with a narrower intent once and a scoped token-type filter once.
+8. If still partial, return best available grouped tables and add a single line:
+   - `Data Quality: MCP partial match. Tokens listed are highest-confidence semantic references for this intent.`
+
+This contract is mandatory for all agents responding to token reference queries.
+
+## Component Docs Fast Path
+
+Component docs are indexed in Docmancer and readable via explicit file pointers. Use both layers:
+
+- **Discovery (unknown component):** `docmancer query "<intent>"` — finds the right component doc without knowing the file path. 238 sections indexed across 12 components.
+- **Direct read (known component):** `read_file packages/tokens/docs/components/<name>/<Name>.md` — load the full spec immediately. See `packages/tokens/docs/components/README.md` for the canonical read-order list.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [appariciojunior/PrismSystem](https://github.com/appariciojunior/PrismSystem) — distributed by [TomeVault](https://tomevault.io).
