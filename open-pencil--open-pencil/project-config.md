@@ -1,98 +1,47 @@
 ---
 trigger: always_on
-description: Vue 3 + CanvasKit (Skia WASM) + Yoga WASM design editor. Tauri v2 desktop, also runs in browser.
+description: OpenPencil is a Bun workspace for a Vue 3 + CanvasKit design editor with Tauri desktop support.
 ---
 
-# OpenPencil
+# OpenPencil Copilot instructions
 
-Vue 3 + CanvasKit (Skia WASM) + Yoga WASM design editor. Tauri v2 desktop, also runs in browser.
+OpenPencil is a Bun workspace for a Vue 3 + CanvasKit design editor with Tauri desktop support.
 
-**Roadmap:** `plan.md` — phases, tech stack, CLI architecture, test strategy, keyboard shortcuts.
+## Pull request requirements
 
-## Monorepo
+- Write PR titles and bodies in English.
+- Follow `.github/PULL_REQUEST_TEMPLATE.md` exactly.
+- Remove template comments and placeholders before opening a PR.
+- Never leave dangling text like `Fixes #`, `TODO`, `TBD`, or unfinished checklist explanations.
+- Summarize what changed, why it changed, and how it was validated.
+- If a user-facing change is made, update `CHANGELOG.md`.
+- Follow `CONTRIBUTING.md` and `AGENTS.md` for repository conventions.
 
-Bun workspace with three packages:
+## Validation
 
-- `packages/core` — `@open-pencil/core`: scene graph, renderer, layout, codec, kiwi, clipboard, vector, snap, undo. Zero DOM deps, runs headless in Bun.
-- `packages/cli` — `@open-pencil/cli`: headless CLI for .fig inspection, export, linting. Uses `citty` + `agentfmt`.
-- `packages/docs` — `@open-pencil/docs`: VitePress documentation site. Run with `cd packages/docs && bun run dev`.
-- `packages/mcp` — `@open-pencil/mcp`: MCP server for AI coding tools. Stdio + HTTP (Hono). Reuses `createServer()` factory with all core tools.
+Use Bun, not npm or Node scripts unless the package explicitly requires Node.
 
-- `packages/vue` — `@open-pencil/vue`: headless Vue 3 SDK (Reka UI-style) for building custom OpenPencil-powered editor shells and embedded editing surfaces. Renderless components and composables. The app is one consumer of the SDK.
+Before proposing changes, run targeted checks when possible and document them in the PR body. For broad changes, run:
 
-The root app (`src/`) is the Tauri/Vite desktop editor. Its `src/engine/` files are thin re-export shims from `@open-pencil/core`. `src/composables/use-canvas.ts` re-exports from `@open-pencil/vue`.
+```sh
+bun run check
+```
 
-### Core subpath exports
+Package publishing changes should also run:
 
-`@open-pencil/core` exposes domain-specific subpath exports for targeted imports. The main `"."` entry re-exports everything for backward compatibility.
+```sh
+bun run test:packages
+```
 
-| Subpath | What | Heavy dep isolated |
-|---|---|---|
-| `@open-pencil/core` | everything (barrel) | all |
-| `@open-pencil/core/scene-graph` | SceneGraph, node types, hit-test, copy, snap, undo | — |
-| `@open-pencil/core/color` | parseColor, colorToHex, color management, OkHCL | culori |
-| `@open-pencil/core/text` | fonts, text editor, style runs, direction | — |
-| `@open-pencil/core/vector` | vector network encode/decode, bezier math | — |
-| `@open-pencil/core/figma-api` | FigmaAPI, FigmaNodeProxy | — |
-| `@open-pencil/core/icons` | Iconify API client, icon rendering | @iconify/utils |
-| `@open-pencil/core/canvas` | SkiaRenderer (Skia/CanvasKit painting engine) | — |
-| `@open-pencil/core/design-jsx` | JSX-to-design renderer | sucrase |
-| `@open-pencil/core/editor` | createEditor, Editor, EditorState | — |
-| `@open-pencil/core/tools` | ToolDef, ALL_TOOLS, AI adapter | diff |
-| `@open-pencil/core/kiwi` | .fig parse/serialize, codec, protocol | fflate, fzstd |
-| `@open-pencil/core/rpc` | RPC commands for CLI | — |
-| `@open-pencil/core/lint` | design linter rules and presets | — |
-| `@open-pencil/core/profiler` | render profiling | — |
-| `@open-pencil/core/canvaskit` | getCanvasKit loader | canvaskit-wasm |
-| `@open-pencil/core/layout` | computeLayout | yoga-layout |
+## Code conventions
 
-Runtime `canvaskit-wasm` import exists only in `canvaskit.ts` — all other files use `import type`. CanvasKit instance is passed as a parameter everywhere.
-
-### Editor architecture
-
-`packages/core/src/editor/` is the framework-agnostic editor core — 13 modules sharing an `EditorContext` interface:
-
-| Module | What |
-|---|---|
-| `types.ts` | EditorState, EditorOptions, Tool, EditorToolDef, EditorContext |
-| `create.ts` | `createEditor()` assembler — wires context + all modules |
-| `viewport.ts` | screenToCanvas, applyZoom, pan, zoomToFit/100/Selection |
-| `selection.ts` | select, clearSelection, marquee, snap, hover, entered container |
-| `pages.ts` | switchPage, addPage, deletePage, renamePage |
-| `shapes.ts` | createShape, pen tool, adoptNodesIntoSection |
-| `structure.ts` | group, ungroup, wrapInAutoLayout, reorder, reparent, z-order |
-| `components.ts` | component/instance/detach/componentSet |
-| `clipboard.ts` | duplicate, copy, paste, delete, storeImage |
-| `undo.ts` | commitMove/Resize/Rotation, snapshot/restore |
-| `text.ts` | startTextEditing, commitTextEdit |
-| `nodes.ts` | updateNode, updateNodeWithUndo, setLayoutMode |
-
-Each module exports a factory: `createXxxActions(ctx: EditorContext) => { ... }`.
-`create.ts` assembles context + all modules, spreads into a flat return object.
-`Editor` type = `ReturnType<typeof createEditor>`.
-
-The app store (`src/stores/editor.ts`) is a thin Vue wrapper: creates `shallowReactive` state, calls `createEditor()`, adds Vue-specific concerns (computed refs, file I/O, autosave, export, image placement, mobile clipboard).
-
-## Commands
-
-- `bun run check` — type-aware lint + typecheck via oxlint + tsgo (run before committing)
-- `bun run check:vue` — vue-tsc type-check for .vue files (has pre-existing errors, fix progressively)
-- `bun run test:dupes` — jscpd copy-paste detection across all TS sources
-- `bun run format` — oxfmt with import sorting
-- `bun test ./tests/engine` — unit tests
-- `bun run test` — Playwright visual regression
-- `bun run tauri dev` — desktop app with hot reload
-- `bun open-pencil info <file>` — document stats
-- `bun open-pencil tree <file>` — node tree
-- `bun open-pencil find <file>` — search nodes
-- `bun open-pencil node <file> --id <id>` — detailed node properties
-- `bun open-pencil pages <file>` — list pages
-- `bun open-pencil variables <file>` — list design variables
-- `bun open-pencil export <file>` — headless render to PNG/JPG/WEBP
-- `bun open-pencil analyze colors <file>` — color palette usage
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- No `any` unless there is a clear typed alternative problem and a justification.
+- No non-null assertions; use guards.
+- Use `crypto.getRandomValues()`, never `Math.random()`.
+- Keep Vue components free of `<style>` blocks.
+- Use existing dependencies and Reka UI components before hand-rolling UI.
+- Preserve architecture boundaries from `AGENTS.md`.
 
 ---
 > Source: [open-pencil/open-pencil](https://github.com/open-pencil/open-pencil) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
