@@ -122,5 +122,5 @@ The worker includes a scheduled event handler that runs every 5 minutes (configu
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [xixu-me/deeplx](https://github.com/xixu-me/deeplx) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+> Source: [xixu-me/DeepLX](https://github.com/xixu-me/DeepLX) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
