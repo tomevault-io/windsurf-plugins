@@ -1,191 +1,137 @@
 ---
 trigger: always_on
-description: This guide defines the writing standards for all Igniter.js content: documentation, blog posts, templates, and updates.
+description: This guide ensures consistent, high-quality documentation across all Igniter.js content types (blog, docs, templates, updates). It's designed for both human authors and AI agents to produce excellent developer experiences.
 ---
 
-## ✍️ Unified Documentation Style Guide (for LLMs & Authors)
+# Writing Guidelines for Humans and LLMs
 
-This guide defines the writing standards for all Igniter.js content: documentation, blog posts, templates, and updates.
+This guide ensures consistent, high-quality documentation across all Igniter.js content types (blog, docs, templates, updates). It's designed for both human authors and AI agents to produce excellent developer experiences.
 
-### 🎯 Core Style Principles (Applies to All Documentation)
+## Core Style Principles
 
-1. **Clarity Over Cleverness**  
-   Use simple, direct language. Favor short words and short sentences. Avoid jargon unless it's essential—and if it is, define it once.
-
-2. **Speak Developer**  
-   Write the way you'd speak to a smart, curious engineer sitting next to you. Friendly, confident, and precise.
-
-3. **Show, Don't Just Tell**  
-   Use examples liberally. Explain ideas with real code, not abstract theory. Every key concept should be backed by a working snippet.
-
-4. **Write in Active Voice**  
-   ✅ "Click the button to save your changes."  
-   ❌ "The button should be clicked in order for changes to be saved."
-
-5. **Present First, Explain Later**  
-   Get the reader to success as quickly as possible. After they've seen something work, then explain how/why it works.
-
-6. **Be Honest and Human**  
-   If something is tricky, say so. If you're recommending a workaround, explain why. Transparency builds trust.
-
-7. **Use consistent terminology**  
-   Always refer to concepts, components, and APIs by the same name. Don't mix "endpoint" and "route" if they mean the same thing.
-
-8. **Verify Before Documenting**  
-   **NEVER assume API behavior.** Always check the actual implementation in `packages/` before writing code examples or documentation. Read source code, interfaces, and type definitions to ensure accuracy.
+| Principle | Definition | Example: Good | Example: Bad |
+|-----------|------------|--------------|-------------|
+| Clear Language | Use simple, direct language with short words and sentences. Avoid unnecessary jargon. | "Click save to store your changes." | "Initiate the persistence process by activating the storage mechanism." |
+| Developer-Focused | Write in a professional but approachable tone that addresses the reader directly. | "You can configure this option in the settings panel." | "Users might want to adjust configuration parameters." |
+| Example-Driven | Include practical code examples for all key concepts. | "Use the `useState` hook: `const [count, setCount] useState(0)`" | "State management is an important React concept." |
+| Active Voice | Make the subject perform the action rather than receive it. | "React renders the component." | "The component is rendered by React." |
+| Success-First | Show working examples before explaining theory. | "First, create a component: `function Button() {...}`. Now let's understand how it works..." | "The component lifecycle has several phases which you must understand before implementation..." |
+| Transparent | Be honest about limitations and challenges. | "This approach works well for small datasets but may cause performance issues with larger ones." | "This is the optimal solution for data management." |
+| Consistent Terms | Use the same terminology throughout to refer to the same concepts. | "Route" consistently or "endpoint" consistently, not both interchangeably. | Mixing "callback function" and "handler" for the same concept. |
 
 ---
 
-### 📘 Documentation (Docs): Writing Style
+## Fumadocs-Specific Guidelines
 
-**Tone:** Clear, technical, and helpful  
-**Voice:** An expert engineer sharing knowledge directly
+Igniter.js documentation uses **Fumadocs**, a modern documentation framework with MDX support and powerful components.
 
-#### ✅ Style Rules:
-- **Verify Implementation**: Always check `packages/` source code before documenting APIs
-- Use **second person** ("you") to address developers directly
-- Keep explanations **focused and concise**
-- Start with **working examples**, then explain concepts
-- Use **`<Callout>`** for important notes and warnings
-- Include **complete, runnable code examples** that match actual APIs
-- Structure with **`<Steps>`** for sequential instructions
-- Use **`<Tabs>`** for package manager commands (with `groupId="package-manager"`)
-- Add **`<TypeTable>`** for API reference documentation
-- Show **file structures** with `<Files>`, `<Folder>`, `<File>` components
-- **Never assume**: If unsure about an API, search and read the implementation
+### Available MDX Components
 
-#### 📝 Example Structure:
+Always use these components from `mdx-components.tsx` when appropriate:
+
+#### Content Organization
+- **`<Callout />`** - Highlight important information (types: `info`, `warn`, `error`, `success`)
+- **`<Accordions />` + `<Accordion />`** - Collapsible content sections
+- **`<Tabs />` + `<Tab />`** - Tabbed content (supports persistence with `groupId`)
+- **`<Steps />` + `<Step />`** - Step-by-step instructions
+
+#### Code & Files
+- **`<CodeBlock />`** - Enhanced code blocks with syntax highlighting
+- **`<Files />`, `<Folder />`, `<File />`** - File structure visualization
+- **`<TypeTable />`** - API/type documentation tables
+
+#### Other Components
+- **`<Banner />`** - Page-level announcements
+- **`<Card />`, `<Cards />`** - Content cards for links/features
+
+### Component Usage Examples
+
 ```mdx
----
-title: "Feature Name"
-description: "Brief description of what this feature does"
----
-
-## Introduction
-
-What problem does this solve? One paragraph maximum.
-
-<Callout type="info">
-  Important context or prerequisite.
+<!-- Callout for warnings -->
+<Callout type="warn" title="Important">
+  Make sure to configure your environment variables before deployment.
 </Callout>
 
-## Installation
-
-<Tabs items={['npm', 'pnpm', 'yarn', 'bun']} groupId="package-manager">
-  <Tab value="npm">
-    ```bash
-    npm install @igniter-js/package
-    ```
-  </Tab>
-  <!-- Other package managers -->
-</Tabs>
-
-## Quick Start
-
+<!-- Steps for tutorials -->
 <Steps>
   <Step>
-    ### Install and Configure
-    Complete code example that works.
+    ### Install Dependencies
+    Run `npm install @igniter-js/core`
   </Step>
   
   <Step>
-    ### Use the Feature
-    Another working example.
+    ### Configure
+    Create a `igniter.config.ts` file
   </Step>
 </Steps>
 
-## API Reference
+<!-- Tabs for multiple options -->
+<Tabs items={['npm', 'pnpm', 'yarn', 'bun']} groupId="package-manager">
+  <Tab value="npm">
+    ```bash
+    npm install @igniter-js/core
+    ```
+  </Tab>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add @igniter-js/core
+    ```
+  </Tab>
+</Tabs>
 
-<TypeTable type={{
-  propertyName: {
-    type: 'string',
-    description: 'What this does',
-    required: true
-  }
-}} />
+<!-- File structure -->
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="features">
+      <File name="users.controller.ts" />
+    </Folder>
+    <File name="igniter.ts" />
+  </Folder>
+</Files>
 ```
 
 ---
 
-### 📗 Blog Posts: Writing Style
+## For LLM Content Generation
 
-**Tone:** Engaging, conversational, and inspiring  
-**Voice:** A developer sharing insights and experiences
+### Formatting Instructions
 
-#### ✅ Style Rules:
-- Use **first person** ("I", "we") or **second person** ("you")
-- Tell a **story** - what's the journey or insight?
-- Include **real-world examples** and use cases
-- Use **visual elements** (images, diagrams, demos)
-- Add **`<Callout>`** for key takeaways
-- Include **working code examples** with context
-- End with **clear next steps** or call-to-action
-- Use **tags** to categorize content
+When generating content with an LLM, ensure the following:
 
-#### 📝 Example Structure:
-```mdx
----
-title: "Introducing Real-Time Features in Igniter.js"
-description: "How we built SSE-based real-time updates that just work"
-tags: ["announcement", "feature", "real-time"]
-cover: "https://example.com/cover.jpg"
----
+1. **Structured Data**: Present information in well-defined structures like tables, numbered lists, and hierarchical headings
+2. **Explicit Examples**: Always include contrastive examples (good vs. bad)
+3. **Clear Boundaries**: Use explicit section markers and consistent formatting patterns
+4. **Context-Awareness**: Begin with the most critical information for the document type
+5. **Pattern Consistency**: Maintain consistent patterns throughout similar sections
+6. **Component Usage**: Use Fumadocs components appropriately for the content type
 
-## The Challenge
+### LLM Content Templates
 
-Developers told us real-time features were too complex...
+For each document type, LLMs should structure content as follows:
 
-## Our Solution
-
-We built SSE-based real-time updates that work out of the box:
-
-```typescript
-// One line of code for real-time
-export const posts = igniter.query({
-  stream: true, // That's it!
-  handler: async () => { /* ... */ }
-});
+```yaml
+DocumentType: [Tutorial|HowTo|Reference|Explanation|BlogPost|Update]
+Audience: [Beginner|Intermediate|Advanced]
+PrimaryGoal: "Single sentence describing document purpose"
+Sections:
+  - Name: "Introduction"
+    Content: "Clear goal statement with outcomes"
+  - Name: "Prerequisites"
+    Content: "Bulleted list of requirements"
+  - Name: "MainContent"
+    Content: "Follows appropriate structure for document type"
+  - Name: "Conclusion"
+    Content: "Summary and next steps"
 ```
 
-<Callout type="success" title="Key Benefit">
-  Real-time updates with zero configuration.
-</Callout>
 
-## How It Works
+## Document Types and Their Styles
 
-Deep dive into the implementation...
+### Documentation (Docs)
 
-## Getting Started
-
-<Steps>
-  <Step>
-    ### Install the Package
-    Installation code
-  </Step>
-</Steps>
-
-## What's Next
-
-We're working on WebSocket support, GraphQL subscriptions...
-```
-
----
-
-### 📙 Templates: Writing Style
-
-**Tone:** Practical, clear, and motivating  
-**Voice:** A guide showing what's possible
-
-#### ✅ Style Rules:
-- Focus on **what's included** out-of-the-box
-- Use **`<Files>`** to visualize project structure
-- Add **`<Steps>`** for quick start instructions
-- Show **key features** with code examples
-- Include **deployment instructions**
-- Use **`<Callout>`** for important setup notes
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [felipebarcelospro/igniter-js](https://github.com/felipebarcelospro/igniter-js) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
