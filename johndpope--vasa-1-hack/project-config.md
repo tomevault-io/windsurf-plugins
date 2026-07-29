@@ -1,162 +1,76 @@
 ---
 trigger: always_on
-description: **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+description: Guide for using Taskmaster to manage task-driven development workflows
 ---
 
-# Claude Code Instructions
 
-## Task Master AI Instructions
-**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
-@./.taskmaster/CLAUDE.md
+# Taskmaster Development Workflow
 
-## Documentation
+This guide outlines the standard process for using Taskmaster to manage software development projects. It is written as a set of instructions for you, the AI agent.
 
-All project documentation is stored in the `/docs` folder. Key documents include:
-- `docs/AUDIT_TOOL_README.md` - Expression audit tool documentation
-- `docs/LOSS_AUDIT.md` - Loss function audit and configuration
-- `docs/LOSS_CLEANUP_SUMMARY.md` - Loss cleanup history
-- `docs/vasa_model_documentation.md` - VASA model architecture docs
-- `docs/vasa-prd.md` - Product requirements document
+- **Your Default Stance**: For most projects, the user can work directly within the `master` task context. Your initial actions should operate on this default context unless a clear pattern for multi-context work emerges.
+- **Your Goal**: Your role is to elevate the user's workflow by intelligently introducing advanced features like **Tagged Task Lists** when you detect the appropriate context. Do not force tags on the user; suggest them as a helpful solution to a specific need.
 
-When creating new documentation, place `.md` files in `/docs` folder (except README.md and CLAUDE.md which stay in root).
+## The Basic Loop
+The fundamental development cycle you will facilitate is:
+1.  **`list`**: Show the user what needs to be done.
+2.  **`next`**: Help the user decide what to work on.
+3.  **`show <id>`**: Provide details for a specific task.
+4.  **`expand <id>`**: Break down a complex task into smaller, manageable subtasks.
+5.  **Implement**: The user writes the code and tests.
+6.  **`update-subtask`**: Log progress and findings on behalf of the user.
+7.  **`set-status`**: Mark tasks and subtasks as `done` as work is completed.
+8.  **Repeat**.
 
-## VASA-1 Project Status and Findings
+All your standard command executions should operate on the user's current task context, which defaults to `master`.
 
-### Current Training Status
-- **Overfitting Training**: Successfully running with wandb logging
-  - Loss decreased from 40+ to ~1.2-1.3 showing good convergence
-  - Using WindowSequenceSampler for temporal context preservation
-  - Caching optimization working (source embeddings computed once per batch)
-  - Wandb project: https://wandb.ai/snoozie/vasa-overfitting
+---
 
-### Key Fixes Applied
+## Standard Development Workflow Process
 
-#### 1. DataLoader Issues (FIXED)
-- **Problem**: VASAIntegratedDataset.__len__() returned video count (6) instead of window count (316)
-- **Solution**: Fixed to return len(self.windows) and implemented WindowSequenceSampler
-- **Files**: vasa_dataset.py, vasa_sampler.py, train_overfit.py, vasa_trainer.py
+### Simple Workflow (Default Starting Point)
 
-#### 2. Temporal Context Handling (FIXED)
-- **Problem**: Breaking prev_context mechanism when changing __getitem__
-- **Solution**: Custom WindowSequenceSampler maintains sequences of 4 consecutive windows
-- **Implementation**: create_window_sequence_collate_fn adds prev_context to batches
+For new projects or when users are getting started, operate within the `master` tag context:
 
-#### 3. CUDA Multiprocessing (FIXED)
-- **Problem**: "Cannot re-initialize CUDA in forked subprocess"
-- **Solution**: Set num_workers=0 in DataLoader
+-   Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see @`taskmaster.mdc`) to generate initial tasks.json with tagged structure
+-   Configure rule sets during initialization with `--rules` flag (e.g., `task-master init --rules cursor,windsurf`) or manage them later with `task-master rules add/remove` commands  
+-   Begin coding sessions with `get_tasks` / `task-master list` (see @`taskmaster.mdc`) to see current tasks, status, and IDs
+-   Determine the next task to work on using `next_task` / `task-master next` (see @`taskmaster.mdc`)
+-   Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see @`taskmaster.mdc`) before breaking down tasks
+-   Review complexity report using `complexity_report` / `task-master complexity-report` (see @`taskmaster.mdc`)
+-   Select tasks based on dependencies (all marked 'done'), priority level, and ID order
+-   View specific task details using `get_task` / `task-master show <id>` (see @`taskmaster.mdc`) to understand implementation requirements
+-   Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see @`taskmaster.mdc`) with appropriate flags like `--force` (to replace existing subtasks) and `--research`
+-   Implement code following task details, dependencies, and project standards
+-   Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see @`taskmaster.mdc`)
+-   Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see @`taskmaster.mdc`)
 
-#### 4. Redundant Computations (FIXED)
-- **Problem**: Source embeddings computed repeatedly for same identity image
-- **Solution**: Improved caching with stable tensor-based keys instead of id()
+---
 
-### Audio Context Implementation
+## Leveling Up: Agent-Led Multi-Context Workflows
 
-#### JoyVASA Approach (from paper):
-- Uses frozen wav2vec2 encoder for audio features
-- Includes both past audio features A_{-w_prev, w_prev} and current motion
-- Concatenates past speech with current noisy motion in diffusion
+While the basic workflow is powerful, your primary opportunity to add value is by identifying when to introduce **Tagged Task Lists**. These patterns are your tools for creating a more organized and efficient development environment for the user, especially if you detect agentic or parallel development happening across the same session.
 
-#### Our Implementation:
-- ✅ Using wav2vec2 for audio features (768 dimensions)
-- ✅ Including prev_context with previous motion parameters
-- ✅ Including previous audio features in context
-- ⚠️ May need to adjust concatenation strategy to match JoyVASA
+**Critical Principle**: Most users should never see a difference in their experience. Only introduce advanced workflows when you detect clear indicators that the project has evolved beyond simple task management.
 
-### Expression Audit Tool
+### When to Introduce Tags: Your Decision Patterns
 
-#### Purpose
-Diagnose training issues by comparing ground truth expressions vs model predictions frame-by-frame.
+Here are the patterns to look for. When you detect one, you should propose the corresponding workflow to the user.
 
-#### Quick Start
-```bash
-./audit.sh  # Interactive menu
-```
+#### Pattern 1: Simple Git Feature Branching
+This is the most common and direct use case for tags.
 
-Or direct:
-```bash
-python audit_expressions.py \
-    --video junk/videovideoeI2V8Bd5X9s-scene6_scene1.mp4 \
-    --identity ./data/IMG_1.png \
-    --config overfit_config.yaml \
-    --checkpoint checkpoints_overfit/best_checkpoint.pt \
-    --output-dir expression_audit
-```
+- **Trigger**: The user creates a new git branch (e.g., `git checkout -b feature/user-auth`).
+- **Your Action**: Propose creating a new tag that mirrors the branch name to isolate the feature's tasks from `master`.
+- **Your Suggested Prompt**: *"I see you've created a new branch named 'feature/user-auth'. To keep all related tasks neatly organized and separate from your main list, I can create a corresponding task tag for you. This helps prevent merge conflicts in your `tasks.json` file later. Shall I create the 'feature-user-auth' tag?"*
+- **Tool to Use**: `task-master add-tag --from-branch`
 
-#### What It Analyzes
-1. **Expression L2 Distance** - Per-frame difference in expression embeddings
-   - Target: < 1.0 for good overfitting
-   - Current: ~5.5 (model NOT overfitting yet)
-
-2. **Theta L2 Distance** - Per-frame head pose difference
-   - Target: < 0.3 for good overfitting
-   - Current: ~1.5 (poor pose matching)
-
-3. **Audio Alignment** - Verifies identical audio features used
-   - Should be: 0.000000 ✅
-   - Confirms audio preprocessing is correct
-
-#### Current Findings (Epoch 226)
-- ❌ **Model is NOT overfitting** despite 226 epochs
-- ❌ Expression L2: 5.54 (should be < 1.0)
-- ❌ Theta L2: 1.50 (should be < 0.3)
-- ✅ Audio features identical (preprocessing correct)
-
-**Root causes**:
-1. Model capacity too small (12.5M vs 29M target)
-2. Loss weights may need tuning
-3. Learning rate may be too high
-4. Need more training epochs
-
-#### Output Files
-- `expression_comparison.png` - Visualization with 3 subplots showing L2 distances over time
-- `expression_metrics.csv` - Per-frame metrics for detailed analysis
-
-See `docs/AUDIT_TOOL_README.md` for full documentation.
-
-### Known Issues
-
-#### 1. Wandb Visualization
-- `disentangle/frame_j` visualization broken due to shape mismatches
-- Occurs when generated_frames has different shape than expected
-- Non-critical - doesn't affect training
-
-#### 2. Batch Size Optimization
-- Currently using 4 windows per batch (7GB/32GB VRAM)
-- Could increase to 16 windows but shape mismatch in collate function needs debugging
-
-### Training Scripts
-
-#### For Overfitting Test:
-```bash
-./train.sh  # Select option 1 for overfitting
-# OR directly:
-python train_overfit.py
-```
-
-#### For Full Training:
-```bash
-./train.sh  # Select option 2 for full training
-# OR directly:
-python vasa_trainer.py --config vasa_config.yaml
-```
-
-### Important Configuration
-
-#### overfit_config.yaml:
-- learning_rate: 5e-3
-- gradient_accumulation_steps: 2
-- num_epochs: 1000
-- resume_from: "checkpoints_overfit/best_checkpoint.pt"
-
-#### vasa_config.yaml:
-- resume_from: "" (set to checkpoint path to resume)
-- Similar settings but for full dataset
-
-### JoyVASA Reference
-- Location: /media/12TB/JoyVASA
+#### Pattern 2: Team Collaboration
+- **Trigger**: The user mentions working with teammates (e.g., "My teammate Alice is handling the database schema," or "I need to review Bob's work on the API.").
+- **Your Action**: Suggest creating a separate tag for the user's work to prevent conflicts with shared master context.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [johndpope/VASA-1-hack](https://github.com/johndpope/VASA-1-hack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
