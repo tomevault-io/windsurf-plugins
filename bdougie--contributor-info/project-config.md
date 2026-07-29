@@ -1,9 +1,11 @@
 ---
 trigger: always_on
-description: When making changes to the codebase, please run the following commands to ensure code quality:
+description: This document contains the same instructions as CLAUDE.md and .github/copilot-instructions.md, maintained for compatibility with various AI assistants and tools.
 ---
 
-# GitHub Copilot Instructions for contributor.info
+# AI Agent Instructions
+
+This document contains the same instructions as CLAUDE.md and .github/copilot-instructions.md, maintained for compatibility with various AI assistants and tools.
 
 ## Build Commands
 
@@ -134,16 +136,9 @@ npx supabase status
 
 **Root Cause**: Netlify Functions compile to CommonJS while Vite expects ESM. The `import.meta.env` pattern works at runtime but TypeScript struggles with mixed module contexts.
 
-**Solution**: Use the fallback pattern `import.meta.env?.VAR || process.env.VAR` in environment variable files:
-
-```typescript
-// ✅ Correct pattern - works in both ESM and CommonJS
-const VITE_GITHUB_TOKEN = import.meta.env?.VITE_GITHUB_TOKEN || process.env.VITE_GITHUB_TOKEN;
-```
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bdougie/contributor.info](https://github.com/bdougie/contributor.info) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
