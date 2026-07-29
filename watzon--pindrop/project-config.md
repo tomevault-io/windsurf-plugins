@@ -1,108 +1,100 @@
 ---
 trigger: always_on
-description: Last updated: 2026-03-24
+description: 9 service modules handling all non-UI logic. All @MainActor except HotkeyManager.
 ---
 
-# Repository Guidelines
+# SERVICES LAYER
 
-Last updated: 2026-03-24
+9 service modules handling all non-UI logic. All @MainActor except HotkeyManager.
 
-## Project Snapshot
+## OVERVIEW
 
-- App: `Pindrop` (menu bar macOS app, `LSUIElement` behavior)
-- Stack: Swift 5.9+, SwiftUI, SwiftData, Swift Testing, XCTest UI tests
-- Platform target: macOS 14+
-- Main dependency path: `Pindrop.xcodeproj` + SwiftPM
-- Entry points: `Pindrop/PindropApp.swift`, `Pindrop/AppCoordinator.swift`
-
-## Source Layout
-
-- App code: `Pindrop/`
-- Services: `Pindrop/Services/`
-- UI: `Pindrop/UI/`
-- Persistence models: `Pindrop/Models/`
-- Utilities/logging: `Pindrop/Utils/`
-- Tests: `PindropTests/`
-- Test doubles: `PindropTests/TestHelpers/`
-- Build automation: `justfile`, `scripts/`, `.github/workflows/`
-
-## Required Local Tooling
-
-- Xcode with command-line tools (`xcodebuild`)
-- `just` for all routine workflows: `brew install just`
-- Optional: `swiftlint`, `swiftformat`, `create-dmg`
-- Apple Developer signing configured in Xcode for signed local/release builds; CI recipes use explicit unsigned overrides
-
-## Build and Run Commands
-
-Prefer `just` recipes over ad-hoc shell commands.
-
-```bash
-just build                 # Debug build (ALWAYS use this when testing builds)
-just build-release         # Release build
-just export-app            # Developer ID export for distribution
-just dmg                   # Signed DMG for distribution
-just test                  # Unit test plan
-just test-integration      # Integration test plan (opt-in)
-just test-ui               # UI test plan
-just test-all              # Unit + integration + UI
-just test-coverage         # Unit tests with coverage
-just dev                   # clean + build + test
-just ci                    # clean + unsigned build + unsigned test + unsigned release build
-just run                   # open Xcode project
-just xcode                 # open Xcode project
+```
+Services/
+├── AudioRecorder.swift        # AVAudioEngine, 16kHz mono PCM
+├── TranscriptionService.swift # WhisperKit integration
+├── ModelManager.swift         # Model download/storage
+├── HotkeyManager.swift        # Carbon Events (NOT @MainActor)
+├── OutputManager.swift        # Clipboard + Accessibility
+├── HistoryStore.swift         # SwiftData persistence
+├── SettingsStore.swift        # @AppStorage + Keychain
+├── PermissionManager.swift    # Mic + Accessibility permissions
+└── AIEnhancementService.swift # OpenAI-compatible API
 ```
 
-Direct focused test commands:
+## WHERE TO LOOK
 
-```bash
-xcodebuild test -project Pindrop.xcodeproj -scheme Pindrop -testPlan Unit -destination 'platform=macOS'
-xcodebuild test -project Pindrop.xcodeproj -scheme Pindrop -testPlan UI -destination 'platform=macOS'
-xcodebuild test -project Pindrop.xcodeproj -scheme Pindrop -destination 'platform=macOS' -only-testing:PindropTests/AudioRecorderTests
-xcodebuild test -project Pindrop.xcodeproj -scheme Pindrop -destination 'platform=macOS' -only-testing:PindropTests/AudioRecorderTests/testStartRecordingRequestsPermission
-```
+| Task                   | Service              | Key Methods                                   |
+| ---------------------- | -------------------- | --------------------------------------------- |
+| Start/stop recording   | AudioRecorder        | `startRecording()`, `stopRecording() -> Data` |
+| Transcribe audio       | TranscriptionService | `loadModel()`, `transcribe(audioData:)`       |
+| Download Whisper model | ModelManager         | `downloadModel()`, `listAvailableModels()`    |
+| Register global hotkey | HotkeyManager        | `registerHotkey()`, `unregisterAll()`         |
+| Output text            | OutputManager        | `output(_:)`, `setOutputMode()`               |
+| Save transcription     | HistoryStore         | `save()`, `search()`, `export()`              |
+| Read/write settings    | SettingsStore        | `@AppStorage`, `saveAPIKey()`                 |
+| Check permissions      | PermissionManager    | `requestPermission()`, `checkAccessibility()` |
+| Enhance text via AI    | AIEnhancementService | `enhance(text:apiEndpoint:apiKey:)`           |
 
-## Coding Conventions
+## SERVICE DETAILS
 
-- Follow existing file header style (`Created on YYYY-MM-DD`)
-- Use `final class` for services and most concrete implementations
-- Actor isolation pattern: services are usually `@MainActor`
-- Known exception: hotkey internals with Carbon/event constraints
-- Use `@Observable` for reactive services where compatible
-- `SettingsStore` intentionally uses `ObservableObject` + `@AppStorage`
-- Keep import groups consistent with existing files
+### AudioRecorder
 
-## Service Patterns
+- **Input**: 16kHz mono PCM (WhisperKit requirement)
+- **Engine**: AVAudioEngine with converter tap
+- **Output**: `Data` (Float32 samples)
+- **Error**: `AudioRecorderError`
 
-- Dependency injection via initializer arguments (avoid hidden globals)
-- Protocol abstractions for hardware/system boundaries
-- Example protocol seam: `AudioCaptureBackend` in `Pindrop/Services/AudioRecorder.swift`
-- Keep async boundaries explicit (`async` / `async throws`)
-- Avoid fire-and-forget tasks unless they are UI/lifecycle orchestration
+### TranscriptionService (@Observable)
 
-## Error Handling
+- **States**: `.unloaded` → `.loading` → `.ready` ⇄ `.transcribing`
+- **Model loading**: `WhisperKitConfig` with prewarm
+- **Concurrency**: Rejects concurrent transcriptions
+- **Error**: `TranscriptionError`
 
-- Define domain errors as `enum ...: Error, LocalizedError`
-- Keep user-facing messaging in `errorDescription`
-- Catch at boundaries, log with context, then rethrow typed errors when possible
-- Do not swallow errors with empty catch blocks
+### HotkeyManager (NOT @MainActor)
 
-## Localization
+- **API**: Carbon Events (RegisterEventHotKey)
+- **Modes**: `.toggle` (single press) or `.pushToTalk` (hold)
+- **Callbacks**: `onKeyDown`, `onKeyUp` via DispatchQueue.main
 
-- **String Catalogs**: `Pindrop/Localization/Localizable.xcstrings` (in-app copy) and `Pindrop/Localization/InfoPlist.xcstrings` (privacy strings, bundle display name). Both are in the app target’s **Copy Bundle Resources**. The top-level `Localization/` tree is the source of truth for the YAML-first pipeline.
-- **Runtime API**: `localized("English key", locale: locale)` in `Pindrop/AppLocalization.swift` now resolves through generated stable-key metadata before falling back to `Bundle`; `SettingsStore.selectedAppLocale` drives UI locale and `SettingsStore.selectedAppLanguage` drives dictation/transcription language.
-- **New user-facing strings**: Add an entry to the YAML source tree under `Localization/`, then run `just l10n-sync` so the catalogs and generated Swift stay in sync.
-- **New language (locale)**: Add the locale with `just l10n-add-locale <locale>` (or edit `Localization/locales.yml`), then populate the relevant `Localization/app/*.yml` and `Localization/infoplist/*.yml` files before syncing.
-- **Interface vs dictation language**: The General settings UI now separates interface language from dictation language. Keep `AppLocale`-driven UI locale changes away from `AppLanguage`/transcription behavior.
-- **AI enhancement prompts**: `AIEnhancementSettingsView` localizes default prompts for display; if the user saves without editing, the **localized** prompt text can be persisted and sent to the API—expect models to follow non-English system prompts, or keep defaults in English if you change that flow.
-- **Localization tooling**: Use `just l10n-import-current`, `just l10n-sync`, and `just l10n-lint`. The old `scripts/translate_xcstrings.py` helper is obsolete.
+### OutputManager
 
-## Logging
+- **Modes**: `.clipboard` (always works) or `.directInsert` (requires Accessibility)
+- **Fallback**: Always copies to clipboard even in directInsert mode
+- **Text insertion**: CGEvent key simulation
 
-- Use `Log` categories from `Pindrop/Utils/Logger.swift`
+### HistoryStore (SwiftData)
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Model**: `TranscriptionRecord`
+- **Search**: Case-insensitive text search
+- **Export**: JSON, CSV, plain text
+- **Read-only**: No edit/delete in UI
+
+### SettingsStore
+
+- **@AppStorage**: selectedModel, hotkeys, outputMode, toggles
+- **Keychain**: API endpoint, API key
+- **Never**: Store secrets in UserDefaults
+
+## CONVENTIONS
+
+- **Error enums**: Each service has nested error type
+- **Logging**: Use `Log.{category}` matching service domain
+- **Async init**: Services init sync, heavy work in async methods
+- **State**: Use @Observable for reactive state (TranscriptionService)
+
+## ANTI-PATTERNS
+
+| DO NOT                         | WHERE                | WHY                            |
+| ------------------------------ | -------------------- | ------------------------------ |
+| Save audio to disk             | AudioRecorder        | Privacy, no persistence needed |
+| Bundle models in app           | ModelManager         | Size (75MB-3GB per model)      |
+| Store API keys in UserDefaults | SettingsStore        | Security                       |
+| Use private APIs               | HotkeyManager        | App Store rejection            |
+| Require Accessibility          | OutputManager        | Clipboard fallback required    |
+| Implement streaming            | TranscriptionService | Out of scope v1                |
 
 ---
 > Source: [watzon/pindrop](https://github.com/watzon/pindrop) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
