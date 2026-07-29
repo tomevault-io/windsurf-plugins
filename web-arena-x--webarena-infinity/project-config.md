@@ -1,138 +1,73 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: We utilize the [`DeclarativePolicy` framework for authorization in GitLab](../policies.md), making it straightforward to add new permissions. Until 2024, there was no clear guidance on when to introduce new permissions and how to name them. This lack of direction is a significant reason why the number of permissions has become unmanageable.
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Historical Context
 
-## What This Project Is
+We utilize the [`DeclarativePolicy` framework for authorization in GitLab](../policies.md), making it straightforward to add new permissions. Until 2024, there was no clear guidance on when to introduce new permissions and how to name them. This lack of direction is a significant reason why the number of permissions has become unmanageable.
 
-WebArena-Infinity is a scalable pipeline for auto-generating web-app testing environments and evaluating AI browser agents (Gemini, GPT, Claude) against them. The pipeline: generates HTML/CSS/JS apps from documentation using Claude Code → runs browser agents on task suites → audits results and iterates.
+The purpose of this document is to provide guidance on:
 
-## Commands
+- When to introduce a new permission and when to reuse an existing one
+- How to name new permissions
+- What should be included in the `Policy` classes and what should not
 
-### Local Evaluation
+### Introducing New Permissions
 
-```bash
-# Single task (starts server automatically, results go to apps/<app>/results/)
-python evaluation/run_eval_parallel.py --model gemini-pro --task-id task_e1 --workers 1 --web-app apps/linear-account-settings
+Introduce a new permission only when absolutely necessary. Always try to use an existing one first. For example, there's no need for a `read_issue_description` permission when we already have `read_issue`, and both require the same level of access. As a general guideline, a permission can be reused when the subject and action are the same. In the previous example the subject would be an `issue` and the action would be `read`. There is no need to create a new permission for each attribute of an issue a user may be able to read.
 
-# Filter by difficulty
-python evaluation/run_eval_parallel.py --model gpt --difficulty easy --workers 4 --web-app apps/linear-account-settings
+An example for when you should introduce a permission is when the permission is very broad, such as `admin_project`. In this case the permission is vague and is granted to project maintainers.
+In theory, this permission can be used to control access to manage CI/CD variables in a project since that capability is granted to maintainers. Unfortunately, it is not clear by looking at the permission check what we are authorizing when a broad permission is used.
+Additionally using permissions such as `admin_cicd_variable` or `manage_cicd_variable` should be avoided because they imply different actions that are being authorized. Instead, the action should be specific such as `create_cicd_variable` or `read_cicd_variable`.
+Implementing granular permissions allows us to adhere to the principle of least privilege for custom roles and provides much more fine grained options for standard roles.
 
-# Parallel evaluation against remote pre-running servers
-python evaluation/run_eval_parallel.py --model gemini-pro --workers 8 \
-    --env-host ec2-host --base-port 8001 --web-app apps/linear-account-settings
+### Permission Definition File
+
+Each permission should have a corresponding definition file. These files are used to build documentation and enable a permissions-first architecture around authorization logic.
+
+To generate a new definition file, run the following command.
+
+```shell
+bundle exec rails generate authz:permission <permission_name>
 ```
 
-### Running an App Server Directly
+Optionally, if you need to override the default action or resource you can use the `--action` and/or `--resource` options. This is helpful if the action is more than one word. For example, consider the permission `force_delete_ai_catalog_item`. By default the generator will assume that the permission action is `force` and the resource is `delete_ai_catalog_item` which would result in a definition file being written to `config/authz/permissions/delete_ai_catalog_item/force.yml`, which is incorrect.
 
-Servers use `SimpleHTTPRequestHandler` and serve files relative to CWD, so you must `cd` into the app directory first:
+The following command can be used to generate a definition file with the correct action and resource which will result in the definition file being written to `config/authz/permissions/ai_catalog_item/force_delete.yml`.
 
-```bash
-cd apps/gmail && python3 server.py --port 8000
+```shell
+bundle exec rails generate authz:permission force_delete_ai_catalog_item --action force_delete
 ```
 
-### AWS Pipeline
+### Naming Permissions
 
-Each environment runs as a self-contained pipeline on one EC2 instance (no SQS, no cross-machine coordination).
+Our goal is for all permissions to follow a consistent pattern: `action_resource(_subresource)`. The resource and subresource should always be in the singular and match the object being acted upon. For example, if an action is being evaluated against a `Project` the permission name should be in the format `action_project`. Additionally, we aim to limit the actions used to ensure clarity. The preferred actions are:
 
-```bash
-# Launch one EC2 instance per environment in manifest
-bash infra/setup/launch.sh --manifest infra/env_manifest.jsonl --model gemini-pro
+- `create` - for creating an object. For example, `create_issue`.
+- `read` - for reading an object. For example, `read_issue`.
+- `update` - for updating an object. For example, `update_issue`.
+- `delete` - for deleting an object. For example, `delete_issue`.
+- `push` and `download` - these are specific actions for file-related permissions. Other industry terms can be permitted after a justification.
 
-# SSH into each instance, then:
-#   claude login
-#   claude plugins install frontend-design
-#   nohup python infra/pipeline.py --app-name <env_id> --docs-path <docs> \
-#     --model gemini-pro --workers 8 > /tmp/mirror-mirror-logs/pipeline.log 2>&1 &
+We recognize that this set of actions is limited and not applicable to every feature. If you're unsure about a new permission name, consult a member of the [Authorization team](https://handbook.gitlab.com/handbook/engineering/development/sec/software-supply-chain-security/authorization/#group-members) for advice or approval for exceptions.
 
-# Monitor progress
-bash infra/setup/monitor.sh
+#### Preferred Actions
 
-# Collect results from all branches
-python infra/collect_results.py
+- `create` is preferred over `build` or `import`
+- `read` is preferred over `access`
+- `push` is preferred over `upload`
+- `delete` is preferred over `destroy`
 
-# Tear down
-bash infra/setup/teardown.sh --release-eips
-```
+#### Avoiding Resource Boundaries in Permission Names
 
-### Package Management
+Permissions **should NOT encode the resource boundary** (such as `project`, `group`, or `user`) directly into the permission name.
 
-Uses `uv` (not pip). Python >=3.12 required. The single dependency is `browser-use>=0.11.9`. Shared venv lives at `~/mirror-mirror/.venv`. Run `bash setup.sh` from the repo root to install everything (Python deps, Playwright Chromium, and OS-level browser dependencies).
-
-## Architecture
-
-### Pipeline Data Flow
-
-Each environment runs independently on one EC2 instance via `infra/pipeline.py`:
-
-```
-pipeline.py (one instance per environment)
-├─ Phase 1: Generate App (Claude CLI)
-│   └─ Writes app code + APP_DESCRIPTION.md
-├─ Phase 2: Function Tasks
-│   ├─ 2a: Generate function tasks (Claude CLI, once)
-│   │   └─ Sanity check (fix if needed) → commit
-│   └─ 2b: Eval-Audit loop (up to max_iterations)
-│       └─ eval → audit failures (Claude) → sanity check → commit
-├─ Phase 3: Real Tasks
-│   ├─ 3a: Generate real tasks (Claude CLI, once)
-│   │   └─ Sanity check (fix if needed) → commit
-│   └─ 3b: Eval-Audit loop (up to max_iterations)
-│       └─ eval → audit failures (Claude) → sanity check → commit
-├─ Phase 4: Task Hardening (N rounds, --hardening-rounds)
-│   └─ Per round:
-│       ├─ 4a: Analyze agent behavior + generate harder tasks (Claude)
-│       │   └─ Reads history.json from results/, appends to real-tasks.json
-│       │   └─ Sanity check (fix if needed, revert if irrecoverable) → commit
-│       └─ 4b: Eval-Audit loop (new tasks only, via --task-id filter)
-│           └─ eval → audit failures (Claude) → sanity check → commit
-└─ Phase 5: Final Regression Eval
-    └─ Full-suite eval on function tasks + real tasks (no audit)
-```
-
-### Environment Protocol (every app must follow)
-
-Each app exposes a standard HTTP API consumed by the evaluation harness:
-
-- `GET /api/state` — returns current app state JSON (read by verifiers)
-- `PUT /api/state` — browser pushes state on every mutation
-- `POST /api/reset` — restores seed state, sends SSE reset event
-- `GET /api/events` — SSE stream for reset notifications
-- `GET /*` — static file serving
-
-**State sync contract:** Browser PUTs full state on first load → server captures as immutable `_seed_state` → browser PUTs on every mutation → verifiers read via GET → reset restores seed state and sends SSE event to browser.
-
-### App Structure (each app under `apps/`)
-
-```
-{app-name}/
-├── server.py          # HTTP server implementing the protocol above
-├── index.html         # Entry point
-├── js/                # app.js, state.js, views.js, components.js, data.js
-├── css/styles.css
-├── real-tasks.json    # 24 tasks: 8 easy, 8 medium, 8 hard
-├── real-tasks/        # Verifier scripts (task_e1.py .. task_h8.py)
-├── sanity_check.py    # Automated verifier validation
-├── Dockerfile
-└── results/           # Evaluation output per model run
-```
-
-### Verifier Pattern
-
-Each `real-tasks/task_*.py` exports `verify(server_url: str) -> tuple[bool, str]`. Verifiers read `/api/state` and check conditions — they never interact with the UI.
-
-### Key Design Constraints for Apps
-
-- No native OS UI elements (`<select>`, `alert()`, `confirm()`, file pickers) — use custom JS-rendered equivalents
-- Rich realistic seed data (10+ items per dropdown, varied formats)
-- Form validation with required fields and conditional requirements
+For example, avoid introducing separate permissions like `read_project_insights_dashboard` and `read_group_insights_dashboard`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [web-arena-x/webarena-infinity](https://github.com/web-arena-x/webarena-infinity) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
