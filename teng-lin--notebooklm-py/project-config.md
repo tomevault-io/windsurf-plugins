@@ -1,102 +1,132 @@
 ---
 trigger: always_on
-description: Complete API for Google NotebookLM - full programmatic access including features not in the web UI. Create notebooks, add sources, generate all artifact types, download in multiple formats. Activates on explicit /notebooklm or intent like "create a podcast about X
+description: **Last Updated:** 2026-05-21
 ---
 
+# Naming Conventions
 
-# NotebookLM Automation
+**Status:** Active
+**Last Updated:** 2026-05-21
 
-Complete programmatic access to Google NotebookLM—including capabilities not exposed in the web UI. Create notebooks, add sources (URLs, YouTube, PDFs, audio, video, images), chat with content, generate all artifact types, and download results in multiple formats.
+This document is the canonical reference for naming patterns that recur across
+the `notebooklm-py` codebase. It catalogues three families that an internal
+architecture audit (findings CC2 / CC3 / CC5) called out as inconsistent enough
+to need a written tiebreaker:
 
-## Installation
+1. [Waiting / polling verbs](#1-waiting--polling-verbs-cc2) — `poll_X` vs
+   `wait_for_X` vs `wait_until_X` vs `await_X` vs `_wait_for_X`.
+2. [RPC-callable Protocol names](#2-rpc-callable-protocol-names-cc3) —
+   `NextCall` / `RpcCallback` / `RpcCaller`.
+3. [Metrics method verbs](#3-metrics-method-verbs-cc5) — `record_X` vs `emit_X`.
 
-**From PyPI (Recommended for AI agents — Python-version-aware):**
-```bash
-pip install "notebooklm-py[browser]"   # mandatory; errors must propagate
+Examples below cite **symbol names only** (no file:line refs). Use
+`rg '<symbol>' src/notebooklm/` to locate the current home — line numbers drift
+faster than this file can keep up with.
 
-# [cookies] (rookiepy) is optional and known to FAIL TO BUILD on Python 3.13+.
-# Skip it deliberately on 3.13+ rather than swallowing the error — that lets
-# *real* install failures (typos, network, PyPI outages) surface for the agent.
-if python -c "import sys; sys.exit(0 if sys.version_info < (3, 13) else 1)"; then
-    pip install "notebooklm-py[cookies]"   # errors propagate
-else
-    echo "Skipping [cookies] on Python 3.13+ (rookiepy unavailable). Use 'notebooklm login' interactively."
-fi
-```
+---
 
-> Full install matrix (extras, headless servers, contributor flow): [Installation guide on GitHub](https://github.com/teng-lin/notebooklm-py/blob/main/docs/installation.md).
+## 1. Waiting / polling verbs (CC2)
 
-**From GitHub (use latest release tag, NOT main branch):**
-```bash
-# Get the latest release tag (requires curl + jq)
-if ! command -v jq >/dev/null; then
-    echo "jq is required to read the latest release tag" >&2
-    exit 1
-fi
-LATEST_TAG=$(
-    curl -fsSL https://api.github.com/repos/teng-lin/notebooklm-py/releases/latest |
-    jq -r '.tag_name'
-)
-# Includes [browser] so the interactive `notebooklm login` flow works.
-pip install "notebooklm-py[browser] @ git+https://github.com/teng-lin/notebooklm-py@${LATEST_TAG}"
-```
+Five distinct verbs are intentional. They are not interchangeable. Pick the
+shape that matches what the function actually does and the loop will document
+itself.
 
-⚠️ **DO NOT install from main branch** (`pip install git+https://github.com/teng-lin/notebooklm-py`). The main branch may contain unreleased/unstable changes. Always use PyPI or a specific release tag, unless you are testing unreleased features.
+### `poll_X` — one-shot status read, no loop, no sleep
 
-**Skill install methods:**
+A `poll_X` function performs **a single** status / readiness check and returns
+immediately. It never sleeps and never iterates. Use this when the *loop* lives
+in the caller (or in a `wait_*` wrapper) and the function is just the
+per-iteration probe.
 
-- `notebooklm skill install` installs this skill into the supported local agent directories managed by the CLI.
-- `npx skills add teng-lin/notebooklm-py` installs this skill from the GitHub repository into compatible agent skill directories.
-- If you are already reading this file inside an agent skill directory, the skill is already installed. You only need the Python package and authentication below.
+Examples:
 
-**CLI-managed install:**
-```bash
-notebooklm skill install
-```
+- `ArtifactPollingService.poll_status` — single RPC list + scan for one task ID.
+- `ArtifactsAPI.poll_status` — public single-shot facade over the service.
+- `ResearchAPI.poll` — single status read for a research plan.
+- `artifact_poll` (CLI command) — one shot, then exit. Use the separate
+  `artifact wait` command for the blocking / looping variant; `artifact poll`
+  itself has no `--wait` flag.
 
-## Prerequisites
+> **Test name:** "if I call this twice in a row without a sleep, does that make
+> sense?" If yes → it's a `poll_X`.
 
-**IMPORTANT:** Before using any command, you MUST authenticate:
+### `wait_for_X` — bounded loop with a **timeout**
 
-```bash
-notebooklm login          # Opens browser for Google OAuth
-notebooklm list           # Verify authentication works
-```
+A `wait_for_X` function loops until either the awaited condition holds **or** a
+deadline expires. Timeouts are required (default or explicit); the function
+raises a typed `*TimeoutError` on expiry rather than returning a sentinel.
 
-If commands fail with authentication errors, re-run `notebooklm login`.
+Examples:
 
-### CI/CD, Multiple Accounts, and Parallel Agents
+- `ArtifactPollingService.wait_for_completion` — loops `poll_status` until the
+  artifact is terminal or `timeout` elapses.
+- `ArtifactsAPI.wait_for_completion` — public facade over the service loop.
+- `ResearchAPI.wait_for_completion` — loops `poll` until research is terminal,
+  pinning a discovered `task_id` between iterations.
+- `SourcePoller.wait_for_sources` (and `SourcesAPI.wait_for_sources`) — batch
+  wait across N source IDs with a shared deadline.
+- `RetryMiddleware._wait_for_rate_limit` / `_wait_for_server_error` — private
+  variant; see the underscore-prefix subsection below.
 
-For automated environments, multiple accounts, or parallel agent workflows:
+### `wait_until_X` — loop on a **predicate** (also bounded)
 
-| Variable | Purpose |
-|----------|---------|
-| `NOTEBOOKLM_HOME` | Custom config directory (default: `~/.notebooklm`) |
-| `NOTEBOOKLM_PROFILE` | Active profile name (default: `default`) |
-| `NOTEBOOKLM_AUTH_JSON` | Inline auth JSON - no file writes needed |
+`wait_until_X` reads like English: "wait until `X` is true". Same loop+timeout
+contract as `wait_for_X`, but the verb signals that the awaited condition is a
+**state predicate** on a specific resource, not the *arrival* of a value.
 
-**CI/CD setup:** Set `NOTEBOOKLM_AUTH_JSON` from a secret containing your `storage_state.json` contents.
+Examples:
 
-**Multiple accounts:** Use named profiles (`notebooklm profile create work`, then `notebooklm -p work login`). Alternatively, use different `NOTEBOOKLM_HOME` directories per account.
+- `SourcePoller.wait_until_ready` / `SourcesAPI.wait_until_ready` — block until
+  `source.is_ready`.
+- `SourcePoller.wait_until_registered` / `SourcesAPI.wait_until_registered` —
+  block until a freshly-added source appears in the notebook listing.
 
-**Parallel agents:** The CLI stores notebook context per profile (`~/.notebooklm/profiles/<profile>/context.json`, with a legacy fallback to `~/.notebooklm/context.json` for the implicit default profile). Multiple concurrent agents that share a profile and use `notebooklm use` can overwrite each other's context — use one of the isolation strategies below.
+> **`wait_for_X` vs `wait_until_X`:** both loop with a timeout. The difference
+> is naming ergonomics. Prefer `wait_until_X` when the awaited condition is a
+> boolean property of an existing resource (`is_ready`, `is_registered`).
+> Prefer `wait_for_X` when you're waiting on an external arrival or a *set* of
+> items (`wait_for_sources`, `wait_for_completion`). Neither form is "more
+> correct"; pick the one that reads naturally at the call site.
 
-**Solutions for parallel workflows:**
-1. **Always use explicit notebook ID** (recommended): Pass `-n <notebook_id>` / `--notebook <notebook_id>` on notebook-scoped commands instead of relying on `use`
-2. **Per-agent isolation via profiles:** `export NOTEBOOKLM_PROFILE=agent-$ID` (each profile gets its own context file)
-3. **Per-agent isolation via home:** Set unique `NOTEBOOKLM_HOME` per agent: `export NOTEBOOKLM_HOME=/tmp/agent-$ID`
-4. **Use full UUIDs:** Avoid partial IDs in automation (they can become ambiguous)
+### `await_X` — coalesced single-flight join
 
-## Agent Setup Verification
+`await_X` is reserved for **single-flight coalescing** primitives: many
+concurrent callers join one shared in-flight operation. The function name
+matches the user-facing verb ("await the refresh"), and the implementation
+guarantees deduplication (typically via `asyncio.shield` + a stored task).
 
-Before starting workflows, verify auth is in place. **Use `--test --json` (not bare `--json`)** — bare `--json` only proves the cookie file parses; `--test` makes a network call and proves the cookies still authenticate against Google.
+Examples:
 
-1. `notebooklm auth check --test --json` → require BOTH `"status": "ok"` AND `"checks.token_fetch": true`. Bare `"status": "ok"` (without `--test`) is a false-positive trap — a stale cookie file passes the parse check.
-2. `notebooklm list --json` → expect valid JSON (may be empty for new accounts).
-3. **If auth fails or is missing → run `notebooklm login` first.** This is the primary auth path: opens a browser, the user signs in to Google once, and the resulting `storage_state.json` is reused on every subsequent run. Works on any environment with a display.
+- `AuthRefreshCoordinator.await_refresh` — thundering-herd-safe token refresh;
+  all 401-bouncing callers join one refresh task.
+
+Do **not** use `await_X` for ordinary `async def` functions just because they
+get `await`-ed. The verb signals coalescing semantics, not async-ness.
+
+### `_wait_for_X` — module-private backoff helper
+
+The leading underscore + `wait_for_` shape is used inside middlewares to
+indicate **"this is the bounded backoff helper I extracted from one specific
+retry leg"**. It is not a public coordination primitive; it is a private
+implementation detail of a larger retry loop.
+
+Examples:
+
+- `RetryMiddleware._wait_for_rate_limit` — honors `Retry-After`, falls back to
+  exponential backoff. Called from inside the rate-limit branch of the retry
+  loop; never called externally.
+- `RetryMiddleware._wait_for_server_error` — same shape for the 5xx branch.
+
+If you extract a backoff helper from a middleware, follow this pattern. If you
+extract a *public* waiting primitive, drop the underscore and use one of the
+four verbs above.
+
+### Summary table
+
+| Verb | Loop? | Timeout? | Predicate or arrival? | Shared single-flight? | Public? |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [teng-lin/notebooklm-py](https://github.com/teng-lin/notebooklm-py) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
