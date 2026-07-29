@@ -1,121 +1,81 @@
 ---
 trigger: always_on
-description: Instructions for AI agents working on Obsidian vaults powered by the Bedrock plugin.
+description: <!-- vibeflow:auto:start -->
 ---
 
-# Bedrock — CLAUDE.md
+# Coding Conventions
 
-Instructions for AI agents working on Obsidian vaults powered by the Bedrock plugin.
+<!-- vibeflow:auto:start -->
+## File Organization
+- All skills: `skills/<name>/SKILL.md` — one file per skill
+- All entity definitions: `entities/<type>.md` — one file per entity type
+- All templates: `templates/<type>/_template.md` — one file per entity type
+- Plugin manifest: `.claude-plugin/plugin.json`
+- Project instructions: `CLAUDE.md` at root
 
----
+## Naming Conventions
+- **Filenames:** kebab-case, no accents, lowercase (e.g., `knowledge-node.md`, `sources-field.md`)
+- **Skill names:** single lowercase word matching directory name (e.g., `query`, `teach`, `preserve`)
+- **Entity types:** singular lowercase (e.g., `actor`, `person`, `team`)
+- **Frontmatter keys:** always English (e.g., `type`, `name`, `status`, `updated_at`)
+- **Frontmatter values:** vault language (configurable, default pt-BR)
+- **Tags:** hierarchical with `/` separator (e.g., `type/actor`, `status/active`, `domain/payments`)
+- **Wikilinks:** bare kebab-case names (e.g., `[[billing-api]]`, never `[[actors/billing-api]]` or `[[BillingAPI]]`)
 
-## What is Bedrock?
+## Skill Structure Convention (via CLAUDE.md)
+Every skill MUST include in this order:
+1. YAML frontmatter with `name`, `description`, `user_invocable`, `allowed-tools`
+2. `# /bedrock:<name>` heading
+3. `## Plugin Paths` section (mandatory boilerplate for path resolution)
+4. `## Overview` section with agent type declaration
+5. Numbered phases (`## Fase N — <Title>` or `## Phase N — <Title>`)
+6. `## Critical Rules` table at the end
 
-**Bedrock** is a Claude Code plugin that turns any Obsidian vault into a structured Second Brain. It provides entity management, ingestion, compression, and sync automation — all via Claude Code skills.
+## Entity Definition Convention (via CLAUDE.md)
+Every entity definition MUST include:
+1. `# Entity: <Name>` heading
+2. `> Source of truth` reference to template
+3. Sections: What it is, When to create, When NOT to create, How to distinguish, Required fields, Zettelkasten Role, Examples
 
-This is **not a codebase**. The target vault is markdown-only — no build system, no tests, no deployable artifacts. The primary consumers are humans reading in Obsidian and AI agents writing via skills.
+## Template Convention (via CLAUDE.md)
+Every template MUST include:
+1. YAML frontmatter with all required fields and inline comments for valid values
+2. `<!-- Zettelkasten role: ... -->` comment
+3. `<!-- Links in the body... -->` linking instruction comment
+4. `## Expected Bidirectional Links` reference table (marked as removable)
 
----
+## Writing Rules (via CLAUDE.md)
+- Aliases: minimum 1 per entity, must not duplicate filename
+- `updated_at` and `updated_by`: mandatory on every entity, updated on every write
+- Sources field: append-only, dedup by URL, most recent first
+- Wikilinks: add new, NEVER remove existing
+- Body update rules: actors can be modified; people/teams/topics are append-only
+- Callouts: `[!warning] Deprecated` and `[!danger] PCI Scope` are mandatory when applicable
 
-## Entity Types
+## Git Convention (via CLAUDE.md)
+- Trunk-based: push directly to `main`
+- Pull before write: `git pull --rebase origin main`
+- Commit message: `vault(<type>): <verb> <name> [fonte: <source>]`
+- Types: `pessoa`, `time`, `ator`, `assunto`, `discussao`, `projeto`, `nota`
+- Verbs: `cria`, `atualiza`, `vincula`, `comprime`
+- Sources: `memoria`, `github`, `jira`, `confluence`, `gdoc`, `sheets`, `manual`, `compress`
+- Multi-entity: `vault: preserves N entities [fonte: <sources>]`
+- Max 2 push attempts with rebase retry
 
-The vault organizes knowledge into 8 entity types, each in its own directory:
-
-| Entity | Directory | Filename pattern | Example |
-|---|---|---|---|
-| Actors | `actors/` | `repo-name.md` | `billing-api.md` |
-| People | `people/` | `first-last.md` | `alice-smith.md` |
-| Teams | `teams/` | `squad-name.md` | `squad-payments.md` |
-| Concepts | `concepts/` | `slug.md` | `event-sourcing.md` |
-| Topics | `topics/` | `YYYY-MM-category-slug.md` | `2026-04-feature-new-checkout.md` |
-| Discussions | `discussions/` | `YYYY-MM-DD-slug.md` | `2026-04-02-daily-payments.md` |
-| Projects | `projects/` | `slug.md` | `processing-3-0.md` |
-| Fleeting | `fleeting/` | `YYYY-MM-DD-slug.md` | `2026-04-09-new-tokenization-service.md` |
-
-Each entity type has a `_template.md` defining the required frontmatter and structure. **Always follow the template when creating new entities.**
-
-Entity semantic definitions live in the plugin's `entities/` directory — used by `/bedrock:teach` and `/bedrock:preserve` to classify content.
-
----
-
-## Writing Rules
-
-### Language
-- **English (en-US)** for all content by default (configurable via `/bedrock:setup`)
-- Technical terms in English are accepted (PCI, API, Kafka, etc.)
-
-### Frontmatter
-- YAML between `---` delimiters
-- **Keys always in English** (`type`, `name`, `status`, `updated_at`, `updated_by`)
-- **Values in the vault's configured language** (`description: "Billing and invoicing API"`)
-- Array references use wikilink syntax: `["[[name1]]", "[[name2]]"]`
-- Every entity must have `updated_at` (YYYY-MM-DD) and `updated_by` (person or `name@agent`)
-
-### Wikilinks
-- Bare names only: `[[notification-service]]`, never `[[actors/notification-service]]`
-- Bidirectional links expected (see template for link table per entity type)
-- Add new links, **never remove** existing ones
-- Links to non-existent files are fine — Obsidian shows them as creation invitations
-
-### Tags (hierarchical)
-Tags use `/` separator for multi-dimensional filtering in Obsidian graph view:
-
-| Dimension | Prefix | Values |
-|---|---|---|
-| Type | `type/` | `actor`, `person`, `team`, `concept`, `topic`, `discussion`, `project`, `fleeting` |
-| Status | `status/` | `active`, `deprecated`, `planning`, `blocked`, `done`, `in-progress`, `open`, `completed`, `cancelled`, `raw`, `reviewing`, `promoted`, `archived` |
-| Domain | `domain/` | `payments`, `finance`, `notifications`, `checkout`, `orders`, `integrations`, `compliance`, `core`, `data`, `infra`, `marketplace`, `internal-tools`, `platform`, `security` |
-| Scope | `scope/` | `pci`, `sox`, `lgpd` (fintech), `hipaa` (health), `gdpr` (Europe), `soc2` (SaaS) |
-| Category | `category/` | `deprecation`, `bugfix`, `troubleshooting`, `rfc`, `incident`, `feature`, `compliance` |
-
-These are examples — both domains and scopes are extensible. Add new values as your organization grows (e.g. new teams, new compliance requirements).
-
-Rules:
-- `type/*` mandatory on all entities
-- `status/*` mandatory on actors and topics
-- `domain/*` mandatory on actors and teams
-- `scope/*` and `category/*` only when applicable
-
-### Aliases
-- Minimum 1 alias per entity (Obsidian `aliases` field)
-- Must not duplicate the filename
-- Format: `aliases: ["Readable Name", "Acronym"]`
-
-### Callouts
-| Callout | When | Mandatory? |
-|---|---|---|
-| `> [!warning] Deprecated` | Actor/topic with status deprecated | Yes |
-| `> [!danger] PCI Scope` | Actor with `pci: true` | Yes |
-| `> [!danger] SOX Scope` | Actor with SOX scope | Yes |
-| `> [!info]`, `> [!todo]`, `> [!bug]` | Contextual highlights | No — use sparingly |
-
-### Filenames
-- Kebab-case, no accents, lowercase
-- Actor filenames = GitHub repository name (canonical identifier)
-
----
-
-## Update Rules
-
-| Entity | Body | Frontmatter |
-|---|---|---|
-| **Actors** | May modify and merge — new data replaces stale content | Merge new data, never delete fields |
-| **People, Teams, Concepts, Topics** | Append-only — never delete content from another agent/human | Merge new data, never delete fields |
-| **All** | Never remove existing wikilinks | Always update `updated_at` and `updated_by` |
-
----
-
-## Skills
-
-These are the Claude Code skills provided by the Bedrock plugin:
-
-| Skill | Purpose |
-|---|---|
-| `/bedrock:ask` | Orchestrated vault reader — decomposes questions, searches graph and vault, cross-references entities |
-| `/bedrock:teach` | Ingest external sources (Confluence, Google Docs, GitHub repositories, remote URLs, and any file format supported by docling — DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and more) — extracts entities — delegates to `/bedrock:preserve` |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Don'ts
+- Do NOT use flat tags (`[actor]`) — always hierarchical (`[type/actor]`)
+- Do NOT use path-qualified wikilinks (`[[dir/name]]`) — always bare (`[[name]]`)
+- Do NOT use display names in wikilinks (`[[NotificationService]]`) — always kebab-case (`[[notification-service]]`)
+- Do NOT delete content in people/teams/topics written by another agent/human
+- Do NOT delete existing wikilinks or frontmatter fields
+- Do NOT commit credentials, tokens, PANs, CVVs, or any sensitive data
+- Do NOT write entities directly from detection skills (teach, sync) — always delegate to preserve
+- Do NOT block workflows for failed external sources — always best-effort
+- Do NOT skip user confirmation before write operations
+- Do NOT use subagents for MCP calls — permissions are not inherited
+- Do NOT translate templates during setup — copy verbatim
+<!-- vibeflow:auto:end -->
 
 ---
 > Source: [iurykrieger/claude-bedrock](https://github.com/iurykrieger/claude-bedrock) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
