@@ -1,68 +1,129 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: **Analysis Date:** 2026-02-03
 ---
 
-# CLAUDE.md
+# Coding Conventions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Analysis Date:** 2026-02-03
 
-## Build Commands
+## Naming Patterns
 
-```bash
-cargo build                       # Debug build
-cargo build --release             # Optimized release build
-cargo test                        # Run fast tests only
-cargo test -- --include-ignored   # Run all tests including slow ones
-cargo test -- --ignored           # Run only slow/integration tests
-cargo clippy                      # Lint checks
-cargo fmt                         # Format code
-cargo fmt -- --check              # Check formatting
-cargo run -- test.log             # Run with a log file
-```
+**Files:**
+- Lowercase with underscores: `main.rs`, `filter_engine.rs`, `string_filter.rs`
+- Module directories mirror file structure: `src/filter/mod.rs` exports submodules
+- Trait implementations in separate files: `src/filter/string_filter.rs`, `src/filter/regex_filter.rs`
 
-Tests marked with `#[ignore]` are slow integration tests involving file system operations.
+**Functions:**
+- Snake_case for all functions: `run_app()`, `collect_file_events()`, `resolve_with_options()`
+- Helper functions prefixed with verb: `handle_`, `process_`, `trigger_`, `collect_`
+- Private helper functions explicitly documented with triple-slash comments
+- Accessor methods use get_ prefix: `get_line()`, `get_screen_offset()`, `get_input()`
+- Boolean checks use is_ or has_ prefix: `is_match()`, `is_loading()`, `is_case_sensitive()`
 
-## Architecture
+**Variables:**
+- Snake_case for all variables: `active_tab`, `line_indices`, `scroll_position`, `filter_mode`
+- Mutable collections suffix with _mut: Not observed; uses `mut` keyword instead
+- Configuration constants in UPPER_SNAKE_CASE at module top: `const MAX_HISTORY_ENTRIES: usize = 50;`, `const DEFAULT_EDGE_PADDING: usize = 3;`
+- Field names descriptive but concise: `anchor_line`, `scroll_position`, `edge_padding`, `input_buffer`
 
-LazyTail is a terminal-based log viewer written in Rust using ratatui for the TUI.
+**Types:**
+- PascalCase for all structs: `App`, `TabState`, `FileWatcher`, `StringFilter`, `RegexFilter`
+- PascalCase for enums: `FilterMode`, `InputMode`, `ViewMode`, `FileEvent`, `AppEvent`
+- Enum variants PascalCase: `FilterMode::Plain`, `InputMode::EnteringFilter`, `FileEvent::Modified`
+- Type aliases match struct style: Not extensively used
 
-### Event-Driven Core Loop (main.rs)
+## Code Style
 
-The application follows a render-collect-process cycle:
-1. Render current state with ratatui
-2. Check pending debounced filters, refresh source status, check directory watcher
-3. Collect events from: file watcher, filter threads, user input
-4. Process events via `App::apply_event()` to update state (all side-effects handled there)
-5. Repeat until quit
+**Formatting:**
+- Standard Rust style via `cargo fmt`
+- 4-space indentation (enforced by rustfmt)
+- Maximum line length not explicitly enforced but generally ~80-100 chars
+- Blank lines separate logical sections within functions
+- Comments on own line for clarity
 
-`main.rs` (~1200 lines) handles terminal setup, event collection, and delegates all state changes to `App::apply_event()`. The `process_event()` function is a single-line passthrough.
+**Linting:**
+- `cargo clippy` for lint checking
+- Dead code marked with `#[allow(dead_code)]` with explanatory comment:
+  ```rust
+  #[allow(dead_code)] // Public API for external use and tests
+  pub fn plain() -> Self {
+  ```
+- Unused imports removed, but `use` statements organized in groups
+- Compiler warnings treated seriously (few in codebase)
 
-### State Structure
+## Import Organization
 
-- **App** (app/mod.rs): Top-level state decomposed into sub-controllers: `TabManager` (tabs/combined views), `InputController` (mode/buffer/cursor), `FilterController` (validation/debouncing/history), `SourcePanelController` (source tree), plus preset registry and theme
-- **TabState** (app/tab.rs): Per-tab state including source, watcher, viewport, expansion
-- **LogSource** (log_source.rs): Domain state for a log source — reader, index, filter config, line indices, rate tracker, aggregation result, renderer names, view modes (raw/wrap/timestamps). Shared across TUI/Web/MCP adapters.
-- **Viewport** (app/viewport.rs): Vim-style scrolling with selection anchor and scrolloff padding
+**Order:**
+1. Standard library imports: `use std::path::PathBuf;`
+2. External crate imports: `use ratatui::{...}; use regex::Regex;`
+3. Internal crate imports: `use crate::filter::{...}; use crate::app::App;`
+4. Conditional imports: `#[cfg(test)] use std::path::PathBuf;`
 
-### Key Modules
+**Path Aliases:**
+- Not heavily used; explicit full paths preferred
+- Some convenience re-exports in mod.rs: `pub use self::engine::FilterEngine;`
+- Glob imports avoided except in tests: `use super::*;`
 
-- **app/**: Sub-modules: `event.rs` (AppEvent enum), `filter_controller.rs` (FilterController — debounce, validation, history), `input_controller.rs` (InputController, InputMode), `source_panel.rs` (SourcePanelController — tree navigation), `tab_manager.rs` (TabManager — tab collection, combined views, active tab)
-- **reader/**: `LogReader` trait (4 methods: `total_lines`, `get_line`, `reload`, `as_any`) with `FileReader` (lazy O(1) line access via sparse index, lossy UTF-8 for binary tolerance), `StreamReader` (stdin buffering), and `CombinedReader` (multi-source chronological merging via index timestamps). `StreamableReader` trait extends `LogReader` with stream-specific methods (`append_lines`, `mark_complete`, `is_loading`) — only `StreamReader` implements it. This follows ISP: `FileReader` only implements `LogReader`.
-- **filter/**: `Filter` trait with `StringFilter` and `RegexFilter`. `FilterEngine` runs filtering in background thread, sends progress via channel. `streaming_filter` provides mmap-based grep-like performance. `query/` directory implements field-based filtering (JSON/logfmt with text parser for `json | level == "error"` syntax) — `ast.rs` (FilterQuery AST), `parser.rs` (text parser), `filter.rs` (QueryFilter), `time.rs` (@ts time-based filtering). `search_engine` provides `SearchEngine` — stateless unified search dispatch (picks fastest execution path based on filter type, index, and range). `aggregation` provides grouped query results (`count by (field)` with `top N`).
-- **filter_orchestrator.rs**: `FilterOrchestrator` — the unified entry point for all filter trigger paths (top-level module, not inside `filter/`)
-- **handlers/**: Input, filter progress, and file event handlers
-- **tui/**: ratatui rendering — `log_view.rs` (main log content), `side_panel.rs` (source tree), `status_bar.rs`, `help.rs` (keyboard shortcut overlay), `aggregation_view.rs` (grouped query results)
-- **watcher/**: File watching (`file.rs` via notify/inotify) and directory watching (`dir.rs` for dynamic source discovery)
-- **source.rs**: Source discovery, marker files (PID-based active/ended tracking), stale marker cleanup
-- **log_source.rs**: `LogSource` struct (domain state shared across TUI/Web/MCP), `FilterConfig`, `LineRateTracker` (sliding-window ingestion rate)
-- **capture.rs**: Capture mode (`-n` flag) — tee-like stdin-to-file with signal handling and incremental indexing
-- **config/**: Config system — `discovery.rs` (lazytail.yaml walk parent dirs), `loader.rs` (YAML loading), `types.rs` (config structs), `error.rs`. Project-scoped vs global
-- **cli/**: CLI subcommand definitions — `init.rs`, `config.rs`, `bench.rs` (filter performance benchmarking), `theme.rs` (theme import/list), `update.rs` (feature-gated: self-update)
-- **renderer/**: Rendering preset system for structured log lines — `preset.rs` (compiled presets), `detect.rs` (auto-detection), `field.rs` (field extraction), `format.rs` (segment formatting), `segment.rs` (styled segments), `builtin.rs` (built-in presets)
+## Error Handling
+
+**Patterns:**
+- Uniform error type: `anyhow::Result<T>` throughout codebase
+- Error context added at call site: `.context("Failed to reload file")?`
+- Internal errors propagated via `?` operator rather than `.unwrap()`
+- Critical invariants use `assert!()` macro: `assert!(!tabs.is_empty(), "App must be created with at least one tab")`
+- Graceful degradation: Invalid filters logged but don't crash, reader lock poisoning handled with explicit error message:
+  ```rust
+  reader_guard.reload()
+      .expect("Reader lock poisoned - filter thread panicked")
+  ```
+- File operation errors include path in message for debugging
+- Match on `Ok(x)` for expected success paths, ignore errors with `let _ = tx.send()`
+
+**Error Recovery:**
+- Errors in filter threads result in `FilterError` events, not panics
+- File watcher errors logged to stderr but app continues: `FileEvent::Error(String)`
+- Stream read errors marked as complete rather than crashing: `tab.mark_stream_complete()`
+
+## Logging
+
+**Framework:** Standard `println!()` and `eprintln!()` macros
+
+**Patterns:**
+- Debug info typically sent to stdout during normal operation
+- Errors sent to stderr: `eprintln!("Failed to reload file for tab {}: {}", tab_idx, e);`
+- Non-critical failures logged with context: `eprintln!("Warning: Failed to parse filter history: {}", e);`
+- File modification tracking uses comments rather than logs: important state changes documented in code
+- Tab index included in multi-tab operations for debugging:
+  ```rust
+  eprintln!("Filter error for tab {}: {}", tab_idx, err);
+  ```
+
+## Comments
+
+**When to Comment:**
+- Algorithm rationale: "During filtering, we used to force view to end. But this causes jumping when user navigates..."
+- Non-obvious logic: Explain why something is done, not what it does
+- SAFETY blocks for unsafe code: Required for all unsafe { } blocks
+- Public APIs documented with `///` comments
+- Complex state transitions explained: "First pass: reload files and handle inactive tabs"
+- Configuration constants documented: "Debounce delay for live filter preview (milliseconds)"
+
+**JSDoc/TSDoc:**
+- Uses `///` doc comments for public items:
+  ```rust
+  /// Create a new viewport anchored to the given line
+  pub fn new(initial_line: usize) -> Self {
+  ```
+- Parameter documentation: `/// The file line number that is selected (stable across filter changes)`
+- Module-level documentation with `//!`: See `viewport.rs` and `source.rs`
+- Examples in doc comments: Not extensively used
+- Private function documentation sparse but present for complex logic
+
+**Special Comments:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [raaymax/lazytail](https://github.com/raaymax/lazytail) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
