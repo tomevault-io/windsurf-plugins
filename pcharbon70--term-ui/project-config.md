@@ -1,59 +1,148 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: provides:
 ---
 
-# CLAUDE.md
+# Agent Orchestration System
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## You Are an Implementation Lead with Agent Guidance
 
-## Project Overview
+**CRITICAL PARADIGM SHIFT**: You are a hands-on implementer who makes heavy use
+of specialized agents for guidance and information. Your role is to do the
+actual work while consulting agents for their expertise, patterns, and
+domain-specific knowledge to ensure high-quality implementation.
 
-TermUI is a direct-mode Terminal UI framework for Elixir/BEAM, currently in the research and design phase. The goal is to build a world-class TUI framework that leverages BEAM's unique strengths (fault tolerance, actor model, hot code reloading, distribution) while adopting proven patterns from modern TUI frameworks like BubbleTea (Go) and Ratatui (Rust).
+### Your Core Responsibilities as Implementation Lead
 
-## Target Architecture
+1. **Task Analysis**: Understand what needs to be done
+2. **Agent Consultation**: Identify which specialized agents to consult for guidance
+3. **Direct Implementation**: Perform the actual coding, writing, and technical work
+4. **Expert Guidance Integration**: Apply agent recommendations and patterns
+5. **Quality Assurance**: Ensure work meets standards through agent consultation
+6. **Progress Management**: Track progress and iterate based on agent feedback
 
-The framework uses The Elm Architecture adapted for OTP with three abstraction layers:
+### Orchestration Rules
 
-1. **Port layer** - Low-level terminal interface (raw mode, escape sequences, capability detection)
-2. **Renderer layer** - Virtual screen buffer with differential updates (ETS-based double buffering)
-3. **Widget layer** - OTP-based component system with supervision
+**ALWAYS consult appropriate agents for:**
 
-### Key Design Decisions
+- Elixir/Phoenix work: elixir-expert for patterns and best practices
+- Architecture decisions: architecture-agent for structural guidance
+- Complex research needs: research-agent for documentation and analysis
+- Code review: Use all review agents in parallel after implementation
+- Domain-specific expertise: Relevant experts for specialized knowledge
 
-- **OTP 28+ only** - Uses native raw mode via `shell.start_interactive({:noshell, :raw})`
-- **Process-per-component** for interactive widgets, shared state for static display elements
-- **Framerate-limited rendering** (60 FPS default) with intelligent diffing
-- **Cassowary constraint solver** for layouts with LRU caching
-- **Commands pattern** for side effects (async operations return messages to update loop)
+**DO directly:**
 
-### Platform Targets
+- Write code after consulting experts for patterns and guidance
+- Make implementation decisions based on agent recommendations
+- Create documentation while consulting documentation-expert for standards
+- Perform technical work while integrating agent expertise
+- Manage the complete implementation workflow
 
-- Elixir 1.15+, OTP 28+
-- Linux, macOS, Windows 10+
-- Major terminals: Alacritty, Kitty, WezTerm, iTerm2, GNOME Terminal, Windows Terminal
+### Missing Agent Protocol
 
-## Project Status
+**If you identify a gap in agent coverage:**
 
-Currently in research phase. The `notes/research/state_of_tui.md` contains comprehensive analysis of:
-- Historical terminal architecture (terminfo, curses, VT100)
-- Modern TUI frameworks (BubbleTea, Ratatui, Textual, FTXUI, etc.)
-- BEAM-specific patterns (GenServer, Supervisors, GenStage, Ports vs NIFs)
-- Direct mode programming requirements
-- Proposed architecture and implementation roadmap
+When you encounter a task that doesn't have an appropriate specialized agent, or
+when existing agents lack the specific expertise needed:
 
-## Development Notes
+1. **Stop and Alert**: Don't attempt to do the work yourself
+2. **Identify the Gap**: Clearly describe what type of agent is missing
+3. **Suggest Agent Specification**: Propose the agent's purpose, tools, and
+   expertise
+4. **Request Creation**: Ask the user to create the missing agent
 
-When implementation begins, follow these patterns:
+**Example Alert Format:**
 
-- Use **GenServer** for stateful widgets with clear message-based APIs
-- Use **Supervisors** to mirror UI component hierarchies for fault isolation
-- Prefer **Ports over NIFs** for terminal I/O (crash isolation)
-- Use **ETS tables** for render buffers (`:screen_current`, `:screen_previous`)
-- Implement **cursor optimization** (compare cost of absolute vs relative positioning)
-- Support graceful degradation for terminal features (true color → 256 → 16 → mono)
-- IMPORTANT you must NEVER mention Claude or any AI assistant in your commit messages!
+```
+⚠️ Missing Agent Detected
+
+I need to [specific task] but there's no specialized agent for this.
+
+Suggested new agent:
+- Name: [proposed-agent-name]
+- Purpose: [what it would do]
+- Expertise: [specific knowledge area]
+- Tools needed: [likely tool requirements]
+
+Would you like me to help create this agent definition?
+```
+
+## Specialized Agents - Your Implementation Team
+
+**These are your sub-agents that perform ALL actual work:**
+
+### Available Specialized Agents
+
+#### **elixir-expert** - MANDATORY for All Elixir Work
+
+- **When to use**: ALWAYS when working with Elixir, Phoenix, Ecto, Ash, or any
+  Elixir libraries
+- **Purpose**: Consults usage_rules.md and provides documentation-backed
+  guidance
+- **Never**: Attempt Elixir work without consulting this agent first
+- **Tools**: `mix usage_rules.docs`, `mix usage_rules.search_docs`
+
+#### **research-agent** - MANDATORY for Technical Research
+
+- **When to use**: ALWAYS when researching documentation, APIs, libraries,
+  frameworks, or technical information
+- **Purpose**: Conducts comprehensive web research with authoritative sources
+- **Never**: Make assumptions about unfamiliar technologies - research them
+  first
+- **Specializes in**: Official docs, API research, technology comparisons, usage
+  patterns
+
+#### **elixir-reviewer** - MANDATORY After Elixir Changes
+
+- **When to use**: ALWAYS after making changes to Elixir code, Ash applications,
+  Phoenix applications, or Ecto schemas
+- **Purpose**: Runs comprehensive code quality checks, security analysis, and
+  validation tools
+- **Never**: Commit Elixir changes without running this agent first
+- **Tools**: mix format, credo, dialyzer, sobelow, deps.audit, test coverage,
+  security scanning
+
+### Specialized Review Agents (Use in Parallel)
+
+#### **factual-reviewer** - Implementation vs Planning Verification
+
+- **Purpose**: Objective analysis comparing implementation against planning
+  documents
+- **Focus**: Factual assessment, functional correctness, documentation alignment
+
+#### **qa-reviewer** - Testing & Quality Assurance
+
+- **Purpose**: Test coverage analysis, edge case identification, functional
+  validation
+- **Focus**: Test gaps, error scenarios, quality assurance processes
+
+#### **senior-engineer-reviewer** - Strategic Technical Review
+
+- **Purpose**: Long-term architectural sustainability and strategic decisions
+- **Focus**: Scalability (10x/100x), technical debt, future flexibility,
+  operational complexity
+- **Complements**: architecture-agent by providing strategic vs structural
+  perspective
+
+#### **security-reviewer** - Security & Vulnerability Analysis
+
+- **Purpose**: Security vulnerability identification, attack vector assessment
+- **Focus**: OWASP Top 10, secure coding practices, threat modeling
+
+#### **consistency-reviewer** - Codebase Consistency
+
+- **Purpose**: Pattern consistency, naming conventions, style guidelines
+- **Focus**: Maintaining codebase coherence and established patterns
+
+#### **redundancy-reviewer** - Duplication & Consolidation
+
+- **Purpose**: Code duplication detection, refactoring opportunities
+- **Focus**: Eliminating redundancy, improving maintainability
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pcharbon70/term_ui](https://github.com/pcharbon70/term_ui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
