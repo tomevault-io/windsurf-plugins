@@ -1,98 +1,105 @@
 ---
 trigger: always_on
-description: Systems-design principles for dimos-ar bridge code — ownership, single source of truth, naming, explicit failures
+description: Persistent agent rules live in `.cursor/rules/` (version-controlled). This file
 ---
 
+# Cursor rules — spectacles-dimensional-os (monorepo)
 
-# dimos-ar bridge — systems design
+Persistent agent rules live in `.cursor/rules/` (version-controlled). This file
+is a project overview; prefer those rules for non-negotiable constraints.
 
-When changing `dimos-ar/`, keep these principles. They apply to new code and refactors
-touching bridge collaborators, registration, world frame, network protocol, or robot profile.
+This repository combines the DimOS AR bridge (`dimos-ar/`) and the Spectacles
+Lens client (`lens-studio/`). It is **not a fork of DimOS** — a separate package
+that depends on DimOS and composes into blueprints via `autoconnect`.
 
-## One owner per concern
+## Layout
 
-Each runtime concern has exactly one owning module/class. Other code reads or delegates;
-it does not duplicate lifecycle or mutation logic.
+```text
+spectacles-dimensional-os/
+├── README.md                    # whole-project overview, setup, doc map
+├── assets/                      # README gifs, demo media (NOT Lens Studio Assets/)
+├── dimos-ar/                    # Python DimOS extension (platform-agnostic core)
+│   ├── dimos/ar/                # ARBridge module, robot_profile, protocol, transforms, filters
+│   ├── assets/                  # Generated apriltag_robot_* PNG/PDF for robot-mounted tags
+│   ├── dimos/ar/blueprints.py   # monorepo entrypoint used by launcher/scripts/start.sh
+│   ├── scripts/                 # generate_marker.py
+│   ├── PROTOCOL.md              # JSON WebSocket contract (cross-repo)
+│   └── tests colocated under dimos/ar/
+├── launcher/                    # CLI scripts + web UI for setup/start
+│   ├── Start Launcher.command   # Finder double-click entry (http://127.0.0.1:8790)
+│   ├── scripts/                 # setup.sh, start.sh, start-launcher.sh, run-ci.sh, …
+│   └── app/                     # FastAPI bridge launcher
+└── lens-studio/                 # Spectacles Lens Studio project
+    ├── spectacles-dimensional-os.esproj   # open THIS file (never from repo root)
+    ├── Assets/Scripts/          # Lens TypeScript (ARBridgeServices, ARBridgeCoordinator, …)
+```
 
-| Concern | Owner |
-|---------|-------|
-| Composition + DimOS stream wiring | `bridge/module.py` (`ARBridge`) |
-| Outbound WebSocket send scheduling | `BridgeSender` → `ARWebSocketServer` |
-| Inbound text dispatch lanes | `InboundDispatcher` |
-| Stream freshness + `bridge_status` broadcast | `StatusService` |
-| Robot connection flags (`robot_connected`, …) | `BridgeStatusTracker` (updated only via `StatusService.refresh`) |
-| Odom ring buffer + speed | `OdomBuffer` |
-| Committed world←odom transform | `WorldFrameState` |
-| Commit / clear world frame + static TF + refiner baseline | `WorldRegistry` |
-| Post-commit tag refinement | `WorldFrameRefiner` |
-| Registration setup wizard | `RegistrationSession` |
-| Nav goal lifecycle + `nav_status` | `navigation/navigate.py` `NavigateGoalHandler` |
-| Profile motion RPC serialization | `MotionRouter` (`bridge/motion_router.py`) |
-| Estop / client-disconnect policy | `BridgeSafetyCoordinator` |
-| LiDAR/pose AR payloads | `TelemetryPublisher` |
-| Pure payload encoding (no state) | `network/data_plane.py`, `network/protocol.py` |
+| Component | Location | Notes |
+|-----------|----------|-------|
+| `ARBridge`, robot profile, protocol, transforms | `dimos-ar/dimos/ar/` | Platform-agnostic — no Spectacles logic |
+| Blueprint entry | `dimos-ar/dimos/ar/blueprints.py` | Run on Mac with DimOS via `./launcher/scripts/start.sh` |
+| Robot-mounted AprilTag PDF | `dimos-ar/assets/apriltag_robot_{a4,letter}.pdf` | Print at 100% scale (70 mm); `python scripts/generate_marker.py` |
+| Spectacles Lens | `lens-studio/` | All Lens Studio code; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for scene wiring |
+| Cross-platform contract | `dimos-ar/PROTOCOL.md` | JSON WebSocket API |
 
-`ARBridge` stays a thin composition root: construct collaborators in `build()`, fan out
-`handle_ar_*` streams, route a few WS callbacks. Do not add business logic there.
+## Where to read first
 
-## One source of truth
+| Area | Read |
+|------|------|
+| Whole project | `README.md` |
+| WebSocket message schema | `dimos-ar/PROTOCOL.md` |
+| Spectacles / Lens Studio | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| Contributing | `CONTRIBUTING.md` |
 
-Avoid mirroring the same fact in two mutable places. Prefer read-through, merge-at-encode,
-or a single writer with observers.
+## Planning
 
-Established patterns:
+When fixing a bug, investigate and identify the root cause before writing a
+plan. Plans must state the found issue and proposed solution up front, then list
+implementation steps only. Do not create "investigation plans."
 
-- **`WorldFrameState`** is the live authority for `T_world_odom`, `is_committed`,
-  `method`, and `approximate`. Read it; do not cache those fields elsewhere.
-- **`bridge_status` world-frame fields** are merged at encode time from `WorldFrameState`
-  (see `StatusService.status_payload` / `merged_bridge_snapshot`). Do not store them on
-  `BridgeStatusTracker`.
-- **`WorldFrameRefiner._refinement_baseline`** is a refinement *reference baseline* (initial
-  commit snapshot for delta gating), not a second live transform. When updating the live
-  transform, update `_state` and keep `_refinement_baseline` in sync in the same code path
-  (`WorldRegistry.commit` / `clear`, `_commit_runtime_correction`).
-- **Nav phase on the wire** is derived from `NavigateGoalHandler` internal flags
-  via `nav_phase_payload`; `_dimos_nav_state == "recovery"` is the single
-  recovering indicator (no separate boolean).
-- **Protocol schema** lives in `PROTOCOL.md` + `network/protocol.py` (+ Lens
-  `Protocol.ts`). Wire field names are defined once per language, not re-invented in
-  collaborators.
+Plans are standalone documents: write only the final design and actionable
+steps. Do not include Q&A history, rejected alternatives, migration tables from
+earlier drafts, or "we decided against X" notes from prior plan iterations.
 
-When adding state, ask: *who writes this, who reads it, and can readers go to the
-owner instead?*
+## dimos-ar bridge — systems design
 
-## Consistent, descriptive naming
+When working in `dimos-ar/`, follow `.cursor/rules/dimos-ar-bridge-design.mdc`:
 
-Names should read clearly in logs and stack traces. Prefer slightly verbose over cryptic.
-**One concept → one name** across Python, tests, protocol docs, and Lens.
+1. **One owner per concern** — each runtime concern has a single owning class; other
+   code delegates rather than duplicating lifecycle or mutation logic.
+2. **One source of truth** — do not mirror mutable state in two places; merge at encode
+   time or read through the owner (e.g. `WorldFrameState` for committed transforms).
+3. **Consistent, descriptive naming** — one concept, one name (`is_committed` /
+   `world_frame_committed`, not `registered` / `calibration`); prefer clarity over brevity.
+4. **Explicit failures over silent fallbacks** — when a required value, configuration,
+   or input is missing or invalid, raise or throw; do not substitute a hardcoded default
+   that masks the problem. Use a fallback only when there is a deliberate, documented
+   reason (e.g. backward-compatible wire defaults).
 
-Canonical vocabulary:
+## State & lifecycle authoring
 
-| Concept | Use | Avoid |
-|---------|-----|-------|
-| World frame committed | `is_committed`, wire: `world_frame_committed` | `registered`, `calibrated` |
-| Alignment method | `world_frame_method`, `WorldFrameMethod` | `registration_method` (legacy wire) |
-| Live world←odom transform | `WorldFrameState`, `T_world_odom` | `calibration` (parameter name) |
-| Refinement reference transform | `WorldFrameRefiner._refinement_baseline`, `set_refinement_baseline` | overloading “committed” without context |
-| Setup / wizard flow | `registration_*`, `RegistrationPhase`, `RegistrationSession` | mixing with committed world-frame fields |
-| DimOS nav stack string | `nav_state`, `ar_navigation_state` | conflating with wire `NavPhase` |
-| Client nav lifecycle phase | `NavPhase`, `nav_status`, `nav_phase_payload` | `navigation_state` on the wire |
+When adding lifecycle, wire handlers, coordinators, or presentation logic, follow
+`.cursor/rules/state-lifecycle-authoring.mdc`:
 
-`RegistrationMode` and `WorldFrameMethod` share wire values (`april_tag`,
-`manual_pose`). At commit time, use the candidate’s mode; do not introduce a third name.
+- **One concept, one name** — canonical type once; no parallel enums for the same flow.
+- **Session + inputs + derive** — store event-sourced facts; rebuild inputs each read; never store derived UX state.
+- **Derive; do not mirror** — one derivation function; wire owns execution truth.
+- **Wire effects only** — reducer emits sends; controller owns presentation/teardown.
+- **Presentation from state** — coupled UI from derived flags, not policy structs or duplicate bools.
 
-New public APIs, protocol fields, and log keys should follow the canonical table. When
-touching legacy names (`registered`, `calibration`, `registration_method`), migrate toward
-the canonical form in the same change when practical.
+## Non-negotiable facts
 
-## Explicit failures over silent fallbacks
+- **Never edit DimOS source.** Import from the installed `dimos` package.
+- `dimos-ar/dimos/ar/` stays platform-agnostic. Spectacles-specific code lives
+  only under `lens-studio/`.
+- **Open Lens Studio from `lens-studio/spectacles-dimensional-os.esproj`**, not the repo
+  root — opening at root creates stray `Cache/`, `Packages/`, etc.
+- The cross-repo contract is `dimos-ar/PROTOCOL.md`. When the protocol
+  changes, update the Python protocol and the Lens protocol modules in the same change:
+  - `dimos-ar/dimos/ar/network/protocol.py`
+  - `dimos-ar/PROTOCOL.md`
 
-When a required value, configuration, or input is missing or invalid, raise or throw.
-Do not substitute a hardcoded default that masks misconfiguration or incomplete setup.
-
-Reserve fallbacks for cases with a deliberate, documented justification — for example,
-backward-compatible defaults on the wire where older clients omit an optional field.
-If you add a fallback, state why silence is acceptable there.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [V4C38/spectacles-dimensional-os](https://github.com/V4C38/spectacles-dimensional-os) — distributed by [TomeVault](https://tomevault.io).
