@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [yelog/vim-flash](https://github.com/yelog/vim-flash).
+Original source: `CLAUDE.md` in [yelog/vim-flash](https://github.com/yelog/vim-flash).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [yelog/vim-flash](https://github.com/yelog/vim-flash) — a repo with 73+ stars on GitHub.
