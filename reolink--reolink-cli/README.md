@@ -7,14 +7,14 @@ The CLI for devices manufactured by Reolink
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [reolink/reolink-cli](https://github.com/reolink/reolink-cli).
+Original source: `copilot-instructions.md` in [reolink/reolink-cli](https://github.com/reolink/reolink-cli).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [reolink/reolink-cli](https://github.com/reolink/reolink-cli) — a repo with 15+ stars on GitHub.
