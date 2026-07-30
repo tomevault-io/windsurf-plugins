@@ -1,125 +1,111 @@
 ---
 trigger: always_on
-description: MFE boundary review: URL routing ownership — shell vs micro-frontend. Load when this topic is in scope; part of mfe-skills.
+description: MFE boundary review: MFE boundary rules. Load when this topic is in scope; part of mfe-skills.
 ---
 
 
-# URL routing ownership — shell vs micro-frontend
+# MFE boundary rules
 
-**Version**: 1.1 | **Skill**: reviewing-mfe-boundaries | **Source**: *Building Micro-Frontends* (O'Reilly)
+**Version**: 1.3 | **Skill**: reviewing-mfe-boundaries | **Source**: *Building Micro-Frontends* (O'Reilly). Canvas facilitation: separate micro-frontend-canvas skill.
 
-## Principle
+Principle-level definitions, violation signals, and canonical code patterns for all eight boundary rules. Tool-agnostic — applies regardless of composition mechanism, framework, or toolchain.
 
-Split routing responsibility by **URL depth**, not by who implements the router API:
+For framework-specific code patterns (Module Federation v2, Angular/Native Federation, Single SPA): load `references/rules-toolchain.md`.
 
-| URL depth | Owner | Example |
-|-----------|--------|---------|
-| **First segment** (top-level path) | **Shell** | `/`, `/catalog`, `/checkout` |
-| **Second segment onward** | **Micro-frontend** | `/catalog/product/sku-123`, `/checkout/shipping` |
-
-The shell answers only: *which MFE loads for this top-level area?*  
-The MFE answers: *what happens inside that area?*
-
-**Navigation style is flexible.** Use `<a href>`, React Router `<Link>`, `navigate()`, Angular `Router`, or full page loads — as long as changing the **first segment** loads the correct remote and deeper segments stay inside the owning MFE.
+Each rule entry contains: the canonical definition, violation signals, and code-checkable patterns.
 
 ---
 
-## Shell: dynamic first-level routes (main goal)
+## Rule 1 — Represents a business subdomain, not a component
 
-The shell should load **only** first-level URLs from a **runtime manifest** (`routes.json` or equivalent) plus remote URLs (`remotes.json`). That way:
+A micro-frontend is the technical representation of a business subdomain. It is not a reusable UI component.
 
-- **Adding or removing an MFE** updates configuration — not shell application code
-- **No shell redeploy** is required when an existing MFE adds internal pages (`/catalog/product/:id`, `/catalog/sale`) — those routes are owned and deployed by the MFE team
+**The distinction**: a component addresses a technical challenge through abstraction and reusability, and its API is frequently coupled with its container. A micro-frontend completely owns a business domain; it is context-aware, not designed for reuse across domains.
 
-```json
-[
-  { "path": "/", "scope": "home_mfe", "module": "./HomeApp", "navLabel": "Home" },
-  { "path": "/catalog/*", "scope": "catalog_mfe", "module": "./CatalogApp", "navLabel": "Catalog" }
-]
+**How to identify a domain**: base boundaries on user journey steps (checkout, search, profile, authentication) or clear business capabilities — not on technical frameworks, component types, or UI layout regions.
+
+**The rule of thumb**: if you can reuse it everywhere, it is probably a component. If it represents a domain and can live on its own, it is a micro-frontend.
+
+**Violation signals**:
+- A micro-frontend named after a UI element (header, sidebar, card) rather than a business capability
+- A micro-frontend that is reused across multiple unrelated domains
+- Boundaries drawn along technical layers (data layer, presentation layer) rather than domain lines
+
+**Code-checkable patterns**:
+```jsx
+// ✗ Named after a UI element — not a domain
+<HeaderMicrofrontend />
+<SidebarMicrofrontend />
+<CardMicrofrontend />
+
+// ✓ Named after a business capability
+<CheckoutMicrofrontend />
+<CatalogMicrofrontend />
+<AuthenticationMicrofrontend />
 ```
 
-The shell maps each entry to one remote mount (wildcard `/*` hands all deeper paths to that MFE). Nav labels can also come from the manifest.
-
-**Do not** in the shell:
-
-- Register domain sub-routes (`/catalog/product/:id`, `/checkout/shipping`)
-- Hard-code per-MFE routes in `App.tsx` when a manifest could list them instead
+If a micro-frontend is imported and used in many unrelated domains, it is likely a component that should move to a shared design system package — not a runtime-integrated micro-frontend.
 
 ---
 
-## Micro-frontend: hardcoded internal routes (expected)
 
-Inside an MFE, routes are usually **hardcoded in code** — that is normal and preferred. The catalog team ships new pages without touching the shell because the shell only mounts `/catalog/*`.
+---
 
-```tsx
-// Catalog MFE — routes defined in code; shell never sees these paths
-<BrowserRouter basename="/catalog">
-  <Routes>
-    <Route path="/" element={<ProductList />} />
-    <Route path="/product/:productId" element={<ProductDetail />} />
-  </Routes>
-</BrowserRouter>
+## Rule 2 — Exposes a minimal API surface to its container
+
+Streamline the API surface to the essential minimum required for the micro-frontend to understand the user's context. Typically this means little more than a session token and a context identifier such as a product ID.
+
+**The Canvas threshold**: fewer than 5 props exposed to the container.
+
+**Why this matters**: when you expose too many properties, the container starts owning the context instead of the micro-frontend. The micro-frontend becomes a dumb rendering layer, and the container accumulates domain knowledge it should not have. This produces accidental complexity and forces constant coordination across teams.
+
+**Violation signals**:
+- More than 5 props passed from container to micro-frontend
+- Props that represent entire domain objects (a full User, a full Order, a full Cart)
+- The container fetching data on behalf of the micro-frontend and passing it in
+- Teams coordinating constantly because a prop change in one triggers changes in the other
+
+**Code-checkable patterns**:
+```jsx
+// ✓ Minimal context — identifier + session access
+<CheckoutMicrofrontend userId={userId} cartId={cartId} />
+
+// ✗ Container owns context — too many props, domain objects passed
+<CheckoutMicrofrontend
+  user={user}                    // full domain object
+  cart={cart}                    // full domain object
+  shippingOptions={shippingOptions}
+  paymentMethods={paymentMethods}
+  discountCodes={discountCodes}
+  onComplete={handleComplete}
+  onError={handleError}
+  theme={theme}
+/>
 ```
 
-Use `basename`, `activeWhen` prefix, or Angular child routes so internal paths align with the shell's first segment.
+**Secondary signal**: if the container is making API calls to fetch data before passing it to the micro-frontend, the micro-frontend is not fetching its own data — the container owns context it should not.
+
 
 ---
 
-## Shell platform events vs domain events
+## Rule 3 — Hides implementation details behind an API contract
 
-The shell **may** expose an event bus (or similar) for **platform / chrome** concerns shared across MFEs:
+Define the API contract upfront between producer and consumer teams. Internal implementation details — frameworks, data fetching strategies, database schemas, code structure — stay hidden behind it.
 
-| Allowed in shell (platform) | Not allowed in shell (domain) |
-|-----------------------------|-------------------------------|
-| `shell:alert`, `shell:toast` | `catalog:productSelected` |
-| `shell:modal:open`, `shell:modal:close` | `checkout:paymentFailed` |
-| `shell:loading`, `shell:analytics` (if generic) | `cart:itemAdded` |
-| Focus trap, global error banner, consent banner | Any handler that applies business rules |
+**The API-first principle**: the contract is the binding agreement. Both teams can work in parallel, focused on their side of the contract. Either team can change their internals freely without affecting the other, as long as the contract is respected.
 
-MFEs emit platform events when they need shell-owned UI. The shell subscribes only to **platform-scoped** event names (e.g. `shell:*` or `ui:*`).
+**Strong encapsulation is required** to avoid domain leaks into other parts of the application. When a micro-frontend exposes its internals — through direct imports, shared modules, or coupled data structures — changes inside cascade outside and independent deployment breaks down.
 
+**Violation signals**:
+- Direct imports from one micro-frontend's source into another
+- Shared internal modules or utilities across micro-frontend boundaries
+- Contract changes that require simultaneous updates across multiple teams
+- A micro-frontend exposing more than what consumers strictly need
+
+**Code-checkable patterns**:
 ```javascript
-// ✓ Catalog MFE — ask shell to show chrome
-platformBus.emit('shell:alert', { message: 'Item saved', variant: 'success' })
-platformBus.emit('shell:modal:open', { id: 'confirm-delete', title: 'Remove item?' })
-
-// ✗ Shell — domain listener
-platformBus.on('catalog:productSelected', (payload) => { ... })
-
-// ✗ Shell — domain logic triggered from MFE event
-platformBus.on('checkout:completed', ({ orderId }) => redirectToThankYou(orderId))
-```
-
-**Cross-MFE navigation** between top-level areas: prefer **URL** (change first segment). Do not require a dedicated `navigation:go` platform event unless the product already standardises on it — URL depth ownership is the rule that matters.
-
-**Horizontal split (same page):** MFEs may use an event bus for **peer** domain coordination; the shell still must not grow domain handlers. Prefer platform events to shell and domain events MFE-to-MFE only.
-
----
-
-## Vertical vs horizontal split
-
-| Split | Routing | Events |
-|-------|---------|--------|
-| **Vertical** | Shell first segment; MFE sub-routes | URL + storage for cross-area; platform events to shell |
-| **Horizontal** | Shell may own page URL; siblings don't own each other's sub-routes | Platform events to shell; domain events between peers, not shell |
-
----
-
-## Violation signals
-
-- Shell route table or `App.tsx` includes paths below the first segment
-- Shell subscribes to `catalog:*`, `checkout:*`, `order:*`, or other business namespaces
-- New MFE requires shell code changes instead of manifest + `remotes.json` only
-- MFE adds `/catalog/new-page` but team believes shell must redeploy (misunderstanding — only manifest matters at shell level)
-- Shell passes route-derived domain state as props (`productId`, `cart`) instead of MFE reading its own URL
-
----
-
-## Adding or removing a micro-frontend
-
-1. Deploy (or undeploy) the remote; update `remotes.json`
-2. Add or remove one **first-level** entry in `routes.json`
-3. Optionally add nav metadata in the same manifest
+// ✗ CRITICAL — cross-boundary import, bypasses the API contract
+import { UserStore } from '@org/auth-mfe/store'
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
