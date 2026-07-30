@@ -1,100 +1,140 @@
 ---
 trigger: always_on
-description: This file provides a comprehensive overview of the Opentu project, its structure, and development conventions to serve as a guide for AI-assisted development.
+description: Instructions for AI coding assistants using OpenSpec for spec-driven development.
 ---
 
-# GEMINI.md
+# OpenSpec Instructions
 
-This file provides a comprehensive overview of the Opentu project, its structure, and development conventions to serve as a guide for AI-assisted development.
+Instructions for AI coding assistants using OpenSpec for spec-driven development.
 
-## Project Overview
+## TL;DR Quick Checklist
 
-Opentu (开图) is a feature-rich, open-source whiteboard application that combines traditional diagramming tools with powerful AI-powered image and video generation. It is built as a modern web application using a monorepo architecture managed by Nx.
+- Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
+- Decide scope: new capability vs modify existing capability
+- Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
+- Scaffold: `proposal.md`, `tasks.md`, `design.md` (only if needed), and delta specs per affected capability
+- Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
+- Validate: `openspec validate [change-id] --strict` and fix issues
+- Request approval: Do not start implementation until proposal is approved
 
-### Key Features:
+## Three-Stage Workflow
 
-*   **AI Creation**: Integrates with models like Gemini and Sora for image and video generation.
-*   **Whiteboard**: Infinite canvas supporting mind maps, flowcharts, freehand drawing, and image insertion.
-*   **Task Management**: An asynchronous task queue handles AI generation tasks in the background.
-*   **Data Portability**: Supports importing from Markdown/Mermaid and exporting to PNG/JSON.
+### Stage 1: Creating Changes
+Create proposal when you need to:
+- Add features or functionality
+- Make breaking changes (API, schema)
+- Change architecture or patterns  
+- Optimize performance (changes behavior)
+- Update security patterns
 
-### Architecture:
+Triggers (examples):
+- "Help me create a change proposal"
+- "Help me plan a change"
+- "Help me create a proposal"
+- "I want to create a spec proposal"
+- "I want to create a spec"
 
-*   **Monorepo**: The project uses **Nx** to manage a monorepo containing the main web application and several shared libraries.
-*   **Frontend**: The application is built with **React 18** and **TypeScript**.
-*   **UI**: The UI is constructed using the **TDesign React** component library.
-*   **Drawing Engine**: The core whiteboard functionality is powered by the **Plait Framework**.
-*   **Text Editing**: Rich text editing is handled by **Slate.js**.
-*   **Build Tool**: **Vite** is used for fast development and optimized builds.
+Loose matching guidance:
+- Contains one of: `proposal`, `change`, `spec`
+- With one of: `create`, `plan`, `make`, `start`, `help`
 
-### Project Structure:
+Skip proposal for:
+- Bug fixes (restore intended behavior)
+- Typos, formatting, comments
+- Dependency updates (non-breaking)
+- Configuration changes
+- Tests for existing behavior
 
-The monorepo is organized into `apps` and `packages`:
+**Workflow**
+1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
+2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
+3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
+4. Run `openspec validate <id> --strict` and resolve any issues before sharing the proposal.
 
-```
-aitu/
-├── apps/
-│   └── web/            # The main web application
-├── packages/
-│   ├── drawnix/        # The core whiteboard library containing most of the business logic, components, and plugins
-│   ├── react-board/    # An adapter layer for the Plait Framework
-│   └── react-text/     # A component for text rendering
-├── docs/               # Project documentation
-├── scripts/            # Helper scripts for versioning and publishing
-└── specs/              # Project specifications
-```
+### Stage 2: Implementing Changes
+Track these steps as TODOs and complete them one by one.
+1. **Read proposal.md** - Understand what's being built
+2. **Read design.md** (if exists) - Review technical decisions
+3. **Read tasks.md** - Get implementation checklist
+4. **Implement tasks sequentially** - Complete in order
+5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
+6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
+7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
 
-## Building and Running
+### Stage 3: Archiving Changes
+After deployment, create separate PR to:
+- Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
+- Update `specs/` if capabilities changed
+- Use `openspec archive <change-id> --skip-specs --yes` for tooling-only changes (always pass the change ID explicitly)
+- Run `openspec validate --strict` to confirm the archived change passes checks
 
-### Prerequisites:
+## Before Any Task
 
-*   Node.js >= 16.0.0
-*   npm >= 8.0.0
+**Context Checklist:**
+- [ ] Read relevant specs in `specs/[capability]/spec.md`
+- [ ] Check pending changes in `changes/` for conflicts
+- [ ] Read `openspec/project.md` for conventions
+- [ ] Run `openspec list` to see active changes
+- [ ] Run `openspec list --specs` to see existing capabilities
 
-### Installation:
+**Before Creating Specs:**
+- Always check if capability already exists
+- Prefer modifying existing specs over creating duplicates
+- Use `openspec show [spec]` to review current state
+- If request is ambiguous, ask 1–2 clarifying questions before scaffolding
+
+### Search Guidance
+- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
+- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
+- Show details:
+  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
+  - Change: `openspec show <change-id> --json --deltas-only`
+- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+
+## Quick Start
+
+### CLI Commands
 
 ```bash
-npm install
+# Essential commands
+openspec list                  # List active changes
+openspec list --specs          # List specifications
+openspec show [item]           # Display change or spec
+openspec validate [item]       # Validate changes or specs
+openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
+
+# Project management
+openspec init [path]           # Initialize OpenSpec
+openspec update [path]         # Update instruction files
+
+# Interactive mode
+openspec show                  # Prompts for selection
+openspec validate              # Bulk validation mode
+
+# Debugging
+openspec show [change] --json --deltas-only
+openspec validate [change] --strict
 ```
 
-### Key Commands:
+### Command Flags
 
-All commands should be run from the root of the project.
+- `--json` - Machine-readable output
+- `--type change|spec` - Disambiguate items
+- `--strict` - Comprehensive validation
+- `--no-interactive` - Disable prompts
+- `--skip-specs` - Archive without spec updates
+- `--yes`/`-y` - Skip confirmation prompts (non-interactive archive)
 
-*   **Start Development Server:**
-    ```bash
-    # Serves the web app on http://localhost:7200
-    npm start
-    ```
+## Directory Structure
 
-*   **Build Project:**
-    ```bash
-    # Builds all applications and libraries for production
-    npm run build
-    ```
+```
+openspec/
+├── project.md              # Project conventions
+├── specs/                  # Current truth - what IS built
+│   └── [capability]/       # Single focused capability
 
-*   **Run Tests:**
-    ```bash
-    # Executes unit tests for all packages
-    npm test
-
-    # Run tests for a specific project (e.g., drawnix)
-    nx test drawnix
-    ```
-
-*   **Linting:**
-    ```bash
-    # Lints a specific project
-    nx lint drawnix
-    ```
-
-## Development Conventions
-
-*   **Code Style**: The project uses **ESLint** and **Prettier** to enforce a consistent code style. Configuration can be found in `.eslintrc.json` and `.prettierrc`.
-*   **Commit Messages**: Commits should follow the [Conventional Commits](https://conventionalcommits.org/) specification. This is used to automate changelog generation.
-*   **Branching**: Feature development should happen on branches named `feature/your-feature-name`. Bug fixes should be on `fix/issue-description`.
-*   **Contribution**: Detailed contribution guidelines are available in `CONTRIBUTING.md`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ljquan/opentu](https://github.com/ljquan/opentu) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
