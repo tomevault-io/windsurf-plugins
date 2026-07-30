@@ -1,92 +1,124 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: **Analysis Date:** 2026-02-05
 ---
 
-# CLAUDE.md
+# Coding Conventions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Analysis Date:** 2026-02-05
 
-## Project Overview
+## Naming Patterns
 
-This is `sebuf`, a specialized Go protobuf toolkit for building HTTP APIs. It consists of five complementary protoc plugins that together enable modern, type-safe API development:
+**Files:**
+- Go implementation files: `lowercase_snake_case.go` (e.g., `generator.go`, `annotations.go`, `error_handler.go`)
+- Test files: `*_test.go` suffix with same base name (e.g., `generator_test.go`, `validation_test.go`)
+- Golden file tests: `*_golden_test.go` for regression testing (e.g., `golden_test.go` in httpgen, tsclientgen, openapiv3)
+- Generated output files: `*_http.pb.go`, `*_http_binding.pb.go`, `*_http_config.pb.go`, `*_client.ts`
 
-- **`protoc-gen-go-http`**: Generates HTTP handlers, routing, request/response binding, and automatic validation
-- **`protoc-gen-go-client`**: Generates type-safe Go HTTP clients with functional options pattern
-- **`protoc-gen-ts-client`**: Generates TypeScript HTTP clients with full type safety, header helpers, and error handling
-- **`protoc-gen-ts-server`**: Generates TypeScript HTTP server handlers using the Web Fetch API (Request/Response), framework-agnostic
-- **`protoc-gen-openapiv3`**: Creates comprehensive OpenAPI v3.1 specifications
+**Functions:**
+- Package-scoped helper functions: `camelCase` with lowercase first letter (e.g., `lowerFirst()`, `camelToSnake()`, `extractPathParams()`)
+- Exported functions: `PascalCase` (e.g., `New()`, `Generate()`, `ProcessService()`)
+- Methods: `PascalCase` (e.g., `GenerateFile()`, `generateHTTPFile()`)
+- Constructor functions: `New` or `NewWithOptions()` pattern in `internal/*gen/generator.go`
 
-The toolkit enables developers to build HTTP APIs directly from protobuf definitions without gRPC dependencies, targeting web and mobile API development with built-in request validation.
+**Variables:**
+- Local variables: `camelCase` (e.g., `pathParams`, `httpConfig`, `baseDir`)
+- Constants: `camelCase` for unexported package constants (e.g., `httpMethodGET`, `tsString`)
+- Struct fields: `PascalCase` (e.g., `Path`, `Method`, `FieldName`)
+- Regular expression patterns: `pathParamRegex`, `lowerCaseRegex` - lowercase_snake_case with Regex suffix
 
-## Architecture
+**Types:**
+- Struct types: `PascalCase` (e.g., `HTTPConfig`, `QueryParam`, `ValidationError`, `Generator`)
+- Interface types: `PascalCase` (e.g., `Printer`)
+- Constants for enum-like strings: `camelCase` with Type prefix (e.g., `httpMethodGET`, `httpMethodPOST`)
 
-The project follows a clean Go protoc plugin architecture with separated concerns across two main components:
+## Code Style
 
-### Plugin Structure
-- **cmd/protoc-gen-go-http/**: HTTP handler generator entry point
-- **cmd/protoc-gen-go-client/**: Go HTTP client generator entry point
-- **cmd/protoc-gen-ts-client/**: TypeScript HTTP client generator entry point
-- **cmd/protoc-gen-ts-server/**: TypeScript HTTP server generator entry point
-- **cmd/protoc-gen-openapiv3/**: OpenAPI specification generator entry point
-- **internal/httpgen/**: HTTP handler generation logic, annotations, and header validation middleware
-- **internal/clientgen/**: Go HTTP client generation logic and annotations
-- **internal/tscommon/**: Shared TypeScript type mapping and generation (used by ts-client and ts-server)
-- **internal/tsclientgen/**: TypeScript HTTP client generation logic
-- **internal/tsservergen/**: TypeScript HTTP server generation logic, header validation, route creation
-- **internal/openapiv3/**: OpenAPI generation logic, type mapping, and header parameter generation
-- **proto/sebuf/http/**: HTTP annotation definitions including headers.proto for header validation
-- **scripts/**: Test automation and build scripts
+**Formatting:**
+- Go formatter: `go fmt` (standard Go formatting with tabs, 4-space indent)
+- Enforced via EditorConfig at `/.editorconfig`:
+  - Go files: tab indent, 4 spaces per tab
+  - Proto files: space indent, 2 spaces
+  - YAML/JSON: space indent, 2 spaces
+  - Makefiles: tab indent (required by make syntax)
 
-### Core Components
+**Linting:**
+- Tool: `golangci-lint` (if installed)
+- Run with: `make lint` or `make lint-fix` (auto-fix mode)
+- Not yet configured with .golangci.yml, uses defaults
+- Check available at `/.editorconfig` for code style expectations
 
-1. **HTTP Handler Generator** (`internal/httpgen/generator.go:22`): Generates HTTP handlers, request binding, routing configuration, automatic body validation, and header validation middleware
-2. **Go HTTP Client Generator** (`internal/clientgen/generator.go:13`): Generates type-safe Go HTTP clients with functional options pattern, automatic request/response marshaling, and error handling
-3. **TypeScript HTTP Client Generator** (`internal/tsclientgen/generator.go`): Generates TypeScript HTTP clients with typed interfaces, service/method header helpers, query parameter encoding, path parameter substitution, and structured error handling (ValidationError/ApiError)
-4. **TypeScript HTTP Server Generator** (`internal/tsservergen/generator.go`): Generates framework-agnostic TypeScript HTTP server handlers using the Web Fetch API (`Request` → `Promise<Response>`), with route descriptors, header validation, query/body parsing, and error handling
-5. **OpenAPI Generator** (`internal/openapiv3/generator.go:53`): Creates comprehensive OpenAPI v3.1 specifications from protobuf definitions with full header parameter support, generating one file per service for better organization
-6. **Shared TypeScript Types** (`internal/tscommon/`): Shared TypeScript type mapping, interface generation, error types, and proto-defined error message collection (messages ending with "Error") used by both ts-client and ts-server generators
-7. **HTTP Annotations** (`proto/sebuf/http/annotations.proto`): Custom protobuf extensions for HTTP configuration
-5. **Header Validation** (`proto/sebuf/http/headers.proto`): Protobuf definitions for service and method-level header validation
-6. **Validation System**: Automatic request body validation via buf.validate/protovalidate and header validation middleware
+**Line Length:**
+- No explicit enforced limit observed
+- Typical patterns suggest preference for readability over strict column limits
 
-### Generated Output Examples
+## Import Organization
 
-**HTTP Handlers** - Complete HTTP server infrastructure:
-```go
-// UserServiceServer is the server API for UserService
-type UserServiceServer interface {
-    CreateUser(context.Context, *CreateUserRequest) (*User, error)
-}
+**Order:**
+1. Standard library imports (e.g., `fmt`, `strings`, `bytes`, `os`)
+2. External third-party imports (e.g., `google.golang.org/protobuf`, `github.com/pb33f/libopenapi`)
+3. Local package imports (e.g., `github.com/SebastienMelki/sebuf/internal/...`)
 
-// RegisterUserServiceServer registers HTTP handlers for UserService
-func RegisterUserServiceServer(server UserServiceServer, opts ...ServerOption) error
-```
+**Path Aliases:**
+- Used for clarity in imports: `v3 "github.com/pb33f/libopenapi/datamodel/high/v3"`
+- Used for standard rewrites: `yaml "go.yaml.in/yaml/v4"`, `k8syaml "sigs.k8s.io/yaml"`
+- Module imports: `"github.com/SebastienMelki/sebuf/http"` for custom annotations
 
-**HTTP Clients** - Type-safe HTTP client with functional options:
-```go
-// UserServiceClient is the client API for UserService
-type UserServiceClient interface {
-    CreateUser(ctx context.Context, req *CreateUserRequest, opts ...UserServiceCallOption) (*User, error)
-}
+**Bare Imports:**
+- Avoid bare imports; all imports have explicit references in code
 
-// Create a client with options
-client := NewUserServiceClient(
-    "http://localhost:8080",
-    WithUserServiceHTTPClient(&http.Client{Timeout: 30 * time.Second}),
-    WithUserServiceAPIKey("your-api-key"),  // From service_headers annotation
-)
+## Error Handling
 
-// Make requests with per-call options
-user, err := client.CreateUser(ctx, req,
-    WithUserServiceHeader("X-Request-ID", "req-123"),
-    WithUserServiceCallContentType(ContentTypeProto),
-)
-```
+**Patterns:**
+- Early return on error: `if err != nil { return err }` for error propagation up the stack
+- Error wrapping with context: `fmt.Errorf("validation error: %w", err)` to add context while preserving underlying error
+- Test error patterns: `if err := cmd.Run(); err != nil { t.Fatalf("Failed to build plugin: %v", err) }`
+- Custom validation errors: `ValidationError` struct with `Service`, `Method`, and `Message` fields
+- Helper functions in tests: `t.Helper()` to mark test helper functions
+- Assertions for nil checks: Tests check explicit nil comparisons for nil values
+
+**Error Messages:**
+- Descriptive messages: "Failed to get working directory: %v"
+- Context-specific: Include what operation failed and the underlying error
+- No automatic error wrapping unless adding value with context
+
+## Logging
+
+**Framework:** `testing.T` (t.Log, t.Logf, t.Error, t.Errorf, t.Fatal, t.Fatalf)
+
+**Patterns:**
+- Test logging: `t.Logf("Updated golden file: %s", goldenFile)`
+- Test errors: `t.Errorf("Expected format %v, got %v", expected, actual)`
+- Fatal errors: `t.Fatalf("Failed to read file: %v", err)` for test setup errors
+- Helper functions: `t.Helper()` at start of test helper functions to report errors at caller location
+- No printf-style formatting for simple messages: use `t.Log()` without format args
+
+**Console Output in Scripts:**
+- Scripts use colored output: `${RED}`, `${GREEN}`, `${YELLOW}`, `${BLUE}`, `${NC}` (no color)
+- Status indicators: ✅ (success), ❌ (failure), ⚠️ (warning), 📊 (metrics), 💡 (info)
+
+## Comments
+
+**When to Comment:**
+- Function-level documentation: Every exported function starts with `// FunctionName <description>` comment
+- Complex logic: Explain WHY, not WHAT (code shows WHAT)
+- Examples in comments: `// Example: "/users/{user_id}/posts/{post_id}" -> ["user_id", "post_id"]`
+- Backward compatibility notes: `// HTTP_METHOD_UNSPECIFIED defaults to POST for backward compatibility`
+- Important behavior: Comments explain enum handling, default values, and special cases
+
+**JSDoc/TSDoc:**
+- TypeScript generated code includes JSDoc-style comments for exported functions
+- Not consistently used in Go code but present for critical helpers
+
+**Test Comments:**
+- Test helper comments explain: `// Test [what] tests [goal]`
+- Golden file test comments explain update mechanism: `// UPDATE_GOLDEN=1 go test -run TestHTTPGenGoldenFiles`
+
+## Function Design
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SebastienMelki/sebuf](https://github.com/SebastienMelki/sebuf) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
