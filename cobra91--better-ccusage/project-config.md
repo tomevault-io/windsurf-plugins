@@ -1,107 +1,133 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This is the main better-ccusage CLI package that provides usage analysis for Claude Code.
 ---
 
-# CLAUDE.md
+# CLAUDE.md - better-ccusage Package
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This is the main better-ccusage CLI package that provides usage analysis for Claude Code.
 
-## Monorepo Structure
+## Package Overview
 
-This is a monorepo containing multiple packages. For package-specific guidance, refer to the individual CLAUDE.md files:
+**Name**: `better-ccusage`
+**Description**: Usage analysis tool for Claude Code with automatic multi-provider model detection
+**Type**: CLI tool and library with TypeScript exports
 
-- **Main CLI Package**: @apps/better-ccusage/CLAUDE.md - Core better-ccusage CLI tool and library
-- **MCP Server Package**: @apps/mcp/CLAUDE.md - MCP server implementation for better-ccusage data
-- **Documentation**: @docs/CLAUDE.md - VitePress-based documentation website
+**Key Features**:
 
-## About better-ccusage
+- Auto-detects models from any provider (Anthropic, Moonshot, MiniMax, Zai, GLM, kat-coder, etc.)
+- Intelligent model name resolution with exact/suffix/fuzzy matching
+- Zero configuration for new AI providers - just works out of the box
+- Eliminates `$0.00` cost issues from unfound models
 
-better-ccusage is a fork of the original ccusage project that addresses a critical limitation: while ccusage focuses exclusively on Claude Code usage with Anthropic models, better-ccusage extends support to external providers that use Claude Code with different providers like Anthropic, Zai, Dashscope, and many models like GLM-xx, kat-coder.
+## Development Commands
 
-### Why the Fork?
+**Testing and Quality:**
 
-The original ccusage project is designed specifically for Anthropic's Claude Code and doesn't account for:
+- `pnpm run test` - Run all tests (using vitest via pnpm, watch mode disabled)
+- `pnpm run lint` - Lint code using ESLint
+- `pnpm run format` - Format and auto-fix code with ESLint
+- `pnpm typecheck` - Type check with TypeScript
 
-- **Zai** providers that use Claude Code infrastructure with their own models
-- **GLM-xx, kat-coder, kimi and Minimax** models from other AI providers
-- Multi-provider environments where organizations use different AI services through Claude Code
+**Build and Release:**
 
-better-ccusage maintains full compatibility with ccusage while adding comprehensive support for these additional providers and models.
+- `pnpm run build` - Build distribution files with tsdown (includes schema generation)
+- `pnpm run generate:schema` - Generate JSON schema for configuration
+- `pnpm run prerelease` - Full release workflow (lint + typecheck + build)
 
-### Key Differences
+**Development Usage:**
 
-| Feature                      | Original ccusage | better-ccusage |
-| ---------------------------- | ---------------- | -------------- |
-| Anthropic Models             | ✅               | ✅             |
-| Zai Provider                 | ❌               | ✅             |
-| GLM\* Models                 | ❌               | ✅             |
-| kat-coder                    | ❌               | ✅             |
-| kimi\* Models                | ❌               | ✅             |
-| MiniMax Models               | ❌               | ✅             |
-| Multi-Provider Support       | ❌               | ✅             |
-| Automatic Provider Detection | ❌               | ✅             |
-| Cost Calculation by Provider | ❌               | ✅             |
-| Original ccusage Features    | ✅               | ✅             |
+- `pnpm run start daily` - Show daily usage report
+- `pnpm run start monthly` - Show monthly usage report
+- `pnpm run start session` - Show session-based usage report
+- `pnpm run start blocks` - Show 5-hour billing blocks usage report
+- `pnpm run start statusline` - Show compact status line (Beta)
+- Add `--json` flag for JSON output format
+- Add `--mode <mode>` for cost calculation control (auto/calculate/display)
+- Add `--active` flag for blocks to show only active block with projections
+- Add `--recent` flag for blocks to show last 3 days including active
 
-### Automatic Model Detection
+**CLI Testing:**
 
-**No Manual Provider Prefix Management Required**
+- `pnpm run test:statusline` - Test statusline with default test data
+- `pnpm run test:statusline:all` - Test statusline with all model variants
+- `pnpm run test:statusline:sonnet4` - Test with Sonnet 4 data
+- `pnpm run test:statusline:opus4` - Test with Opus 4 data
+- `pnpm run test:statusline:sonnet41` - Test with Sonnet 4.1 data
 
-better-ccusage automatically detects and supports new AI providers without code changes. The pricing system uses intelligent fallback matching:
+## Architecture
 
-1. **Exact Match**: Direct lookup for model name (e.g., `"kimi-for-coding"`)
-2. **Provider Prefix Match**: Suffix matching for qualified names (e.g., `"moonshot/kimi-for-coding"`)
-3. **Fuzzy Match**: Scored partial matching for variations
+This package contains the core better-ccusage functionality:
 
-This eliminates the need to maintain provider prefix whitelists and ensures automatic support for:
+**Key Modules:**
 
-- Moonshot AI (`kimi-*` models)
-- MiniMax (`MiniMax-M2`)
-- Any future provider without code modifications
+- `src/index.ts` - CLI entry point with Gunshi-based command routing
+- `src/data-loader.ts` - Parses JSONL files from Claude data directories
+- `src/calculate-cost.ts` - Token aggregation and cost calculation utilities
+- `src/_pricing-fetcher.ts` - Extended PricingFetcher with automatic model detection
+- `src/commands/` - CLI subcommands (daily, monthly, session, blocks, statusline)
+- `src/logger.ts` - Logging utilities (use instead of console.log)
 
-Each package has its own development commands, dependencies, and specific guidelines. Always check the relevant package's CLAUDE.md when working within that package directory.
+**Data Flow:**
 
-### Apps Are Bundled
+1. Loads JSONL files from `~/.claude/projects/` and `~/.config/claude/projects/`
+2. Aggregates usage data by time periods or sessions
+3. **Resolves model names** using `CcusagePricingFetcher` with automatic detection
+4. **Calculates costs** using local pricing database with tiered pricing support
+5. Outputs formatted tables or JSON
 
-All projects under `apps/` ship as bundled CLIs/binaries. Treat their runtime dependencies as bundled assets: list everything in each app's `devDependencies` (never `dependencies`) so the bundler owns the runtime payload.
+**Automatic Model Detection:**
 
-## Guide for lsmcp mcp
+The `CcusagePricingFetcher` extends the base `PricingFetcher` with automatic model name resolution:
 
-You are a professional coding agent concerned with one particular codebase. You have
-access to semantic coding tools on which you rely heavily for all your work, as well as collection of memory
-files containing general information about the codebase. You operate in a frugal and intelligent manner, always
-keeping in mind to not read or generate content that is not needed for the task at hand.
+- **Direct Match**: Looks up model name exactly as it appears in usage logs (e.g., `"kimi-for-coding"`)
+- **Provider Prefix Match**: Automatically finds models with provider prefixes (e.g., `"moonshot/kimi-for-coding"`)
+- **Fallback Matching**: Uses fuzzy scoring for partial matches when exact matches fail
 
-When reading code in order to answer a user question or task, you should try reading only the necessary code.
-Some tasks may require you to understand the architecture of large parts of the codebase, while for others,
-it may be enough to read a small set of symbols or a single file.
-Generally, you should avoid reading entire files unless it is absolutely necessary, instead relying on
-intelligent step-by-step acquisition of information. Use the symbol indexing tools to efficiently navigate the codebase.
+This eliminates the need for manual provider prefix configuration and ensures new AI providers work automatically without code changes.
 
-IMPORTANT: Always use the symbol indexing tools to minimize code reading:
+## Testing Guidelines
 
-- Use `search_symbol_from_index` to find specific symbols quickly (after indexing)
-- Use `get_document_symbols` to understand file structure
-- Use `find_references` to trace symbol usage
-- Only read full files when absolutely necessary
+- **In-Source Testing**: Tests are written in the same files using `if (import.meta.vitest != null)` blocks
+- **Vitest Globals Enabled**: Use `describe`, `it`, `expect` directly without imports
+- **Model Testing**: Use current Claude 4 models (sonnet-4-5, sonnet-4 and opus-4) in tests
+- **Mock Data**: Uses `fs-fixture` with `createFixture()` for Claude data simulation
+- **CRITICAL**: NEVER use `await import()` dynamic imports anywhere, especially in test blocks
 
-You can achieve intelligent code reading by:
+## Code Style
 
-1. Using `index_files` to build symbol index for fast searching
-2. Using `search_symbol_from_index` with filters (name, kind, file, container) to find symbols
-3. Using `get_document_symbols` to understand file structure
-4. Using `get_definitions`, `find_references` to trace relationships
-5. Using standard file operations when needed
+- **Error Handling**: Prefer `@praha/byethrow Result` type over try-catch for functional error handling
+- **Imports**: Use `.ts` extensions for local imports (e.g., `import { foo } from './utils.ts'`)
+- **Exports**: Only export what's actually used by other modules
+- **Dependencies**: Add as `devDependencies` unless explicitly requested otherwise
+- **No console.log**: Use `logger.ts` instead
 
-## Working with Symbols
+**Post-Change Workflow:**
+Always run these commands in parallel after code changes:
 
-Symbols are identified by their name, kind, file location, and container. Use these tools:
+- `pnpm run format` - Auto-fix and format
+- `pnpm typecheck` - Type checking
+- `pnpm run test` - Run tests
 
-- `index_files` - Build symbol index for files matching pattern (e.g., '\*_/_.ts')
+## Environment Variables
+
+- `LOG_LEVEL` - Control logging verbosity (0=silent, 1=warn, 2=log, 3=info, 4=debug, 5=trace)
+- `CLAUDE_CONFIG_DIR` - Custom Claude data directory paths (supports multiple comma-separated paths)
+
+## Dependencies
+
+Because `better-ccusage` is distributed as a bundled CLI, keep all runtime libraries in `devDependencies` so the bundler captures them.
+
+**Key Runtime Dependencies:**
+
+- `gunshi` - CLI framework
+- `cli-table3` - Table formatting
+- `valibot` - Schema validation
+- `@praha/byethrow` - Functional error handling
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cobra91/better-ccusage](https://github.com/cobra91/better-ccusage) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
