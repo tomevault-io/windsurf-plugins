@@ -1,127 +1,73 @@
 ---
 trigger: always_on
-description: Instructions for AI coding assistants and developers working on the hermes-agent codebase.
+description: > **Hermes Agent — Implementation Notes**
 ---
 
-# Hermes Agent - Development Guide
+# Design System: Claude (Anthropic)
 
-Instructions for AI coding assistants and developers working on the hermes-agent codebase.
 
-## Development Environment
+> **Hermes Agent — Implementation Notes**
+>
+> The original site uses proprietary fonts. For self-contained HTML output, use these CDN substitutes:
+> - **Primary:** `Inter` | **Mono:** `JetBrains Mono`
+> - **Font stack (CSS):** `font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;`
+> - **Mono stack (CSS):** `font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;`
+> ```html
+> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+> ```
+> Use `write_file` to create HTML, serve via `generative-widgets` skill (cloudflared tunnel).
+> Verify visual accuracy with `browser_vision` after generating.
 
-```bash
-source venv/bin/activate  # ALWAYS activate before running Python
-```
+## 1. Visual Theme & Atmosphere
 
-## Project Structure
+Claude's interface is a literary salon reimagined as a product page — warm, unhurried, and quietly intellectual. The entire experience is built on a parchment-toned canvas (`#f5f4ed`) that deliberately evokes the feeling of high-quality paper rather than a digital surface. Where most AI product pages lean into cold, futuristic aesthetics, Claude's design radiates human warmth, as if the AI itself has good taste in interior design.
 
-```
-hermes-agent/
-├── run_agent.py          # AIAgent class — core conversation loop
-├── model_tools.py        # Tool orchestration, _discover_tools(), handle_function_call()
-├── toolsets.py           # Toolset definitions, _HERMES_CORE_TOOLS list
-├── cli.py                # HermesCLI class — interactive CLI orchestrator
-├── hermes_state.py       # SessionDB — SQLite session store (FTS5 search)
-├── agent/                # Agent internals
-│   ├── prompt_builder.py     # System prompt assembly
-│   ├── context_compressor.py # Auto context compression
-│   ├── prompt_caching.py     # Anthropic prompt caching
-│   ├── auxiliary_client.py   # Auxiliary LLM client (vision, summarization)
-│   ├── model_metadata.py     # Model context lengths, token estimation
-│   ├── models_dev.py         # models.dev registry integration (provider-aware context)
-│   ├── display.py            # KawaiiSpinner, tool preview formatting
-│   ├── skill_commands.py     # Skill slash commands (shared CLI/gateway)
-│   └── trajectory.py         # Trajectory saving helpers
-├── hermes_cli/           # CLI subcommands and setup
-│   ├── main.py           # Entry point — all `hermes` subcommands
-│   ├── config.py         # DEFAULT_CONFIG, OPTIONAL_ENV_VARS, migration
-│   ├── commands.py       # Slash command definitions + SlashCommandCompleter
-│   ├── callbacks.py      # Terminal callbacks (clarify, sudo, approval)
-│   ├── setup.py          # Interactive setup wizard
-│   ├── skin_engine.py    # Skin/theme engine — CLI visual customization
-│   ├── skills_config.py  # `hermes skills` — enable/disable skills per platform
-│   ├── tools_config.py   # `hermes tools` — enable/disable tools per platform
-│   ├── skills_hub.py     # `/skills` slash command (search, browse, install)
-│   ├── models.py         # Model catalog, provider model lists
-│   ├── model_switch.py   # Shared /model switch pipeline (CLI + gateway)
-│   └── auth.py           # Provider credential resolution
-├── tools/                # Tool implementations (one file per tool)
-│   ├── registry.py       # Central tool registry (schemas, handlers, dispatch)
-│   ├── approval.py       # Dangerous command detection
-│   ├── terminal_tool.py  # Terminal orchestration
-│   ├── process_registry.py # Background process management
-│   ├── file_tools.py     # File read/write/search/patch
-│   ├── web_tools.py      # Web search/extract (Parallel + Firecrawl)
-│   ├── browser_tool.py   # Browserbase browser automation
-│   ├── code_execution_tool.py # execute_code sandbox
-│   ├── delegate_tool.py  # Subagent delegation
-│   ├── mcp_tool.py       # MCP client (~1050 lines)
-│   └── environments/     # Terminal backends (local, docker, ssh, modal, daytona, singularity)
-├── gateway/              # Messaging platform gateway
-│   ├── run.py            # Main loop, slash commands, message dispatch
-│   ├── session.py        # SessionStore — conversation persistence
-│   └── platforms/        # Adapters: telegram, discord, slack, whatsapp, homeassistant, signal
-├── acp_adapter/          # ACP server (VS Code / Zed / JetBrains integration)
-├── cron/                 # Scheduler (jobs.py, scheduler.py)
-├── environments/         # RL training environments (Atropos)
-├── tests/                # Pytest suite (~3000 tests)
-└── batch_runner.py       # Parallel batch processing
-```
+The signature move is the custom Anthropic Serif typeface — a medium-weight serif with generous proportions that gives every headline the gravitas of a book title. Combined with organic, hand-drawn-feeling illustrations in terracotta (`#c96442`), black, and muted green, the visual language says "thoughtful companion" rather than "powerful tool." The serif headlines breathe at tight-but-comfortable line-heights (1.10–1.30), creating a cadence that feels more like reading an essay than scanning a product page.
 
-**User config:** `~/.hermes/config.yaml` (settings), `~/.hermes/.env` (API keys)
+What makes Claude's design truly distinctive is its warm neutral palette. Every gray has a yellow-brown undertone (`#5e5d59`, `#87867f`, `#4d4c48`) — there are no cool blue-grays anywhere. Borders are cream-tinted (`#f0eee6`, `#e8e6dc`), shadows use warm transparent blacks, and even the darkest surfaces (`#141413`, `#30302e`) carry a barely perceptible olive warmth. This chromatic consistency creates a space that feels lived-in and trustworthy.
 
-## File Dependency Chain
+**Key Characteristics:**
+- Warm parchment canvas (`#f5f4ed`) evoking premium paper, not screens
+- Custom Anthropic type family: Serif for headlines, Sans for UI, Mono for code
+- Terracotta brand accent (`#c96442`) — warm, earthy, deliberately un-tech
+- Exclusively warm-toned neutrals — every gray has a yellow-brown undertone
+- Organic, editorial illustrations replacing typical tech iconography
+- Ring-based shadow system (`0px 0px 0px 1px`) creating border-like depth without visible borders
+- Magazine-like pacing with generous section spacing and serif-driven hierarchy
 
-```
-tools/registry.py  (no deps — imported by all tool files)
-       ↑
-tools/*.py  (each calls registry.register() at import time)
-       ↑
-model_tools.py  (imports tools/registry + triggers tool discovery)
-       ↑
-run_agent.py, cli.py, batch_runner.py, environments/
-```
+## 2. Color Palette & Roles
 
----
+### Primary
+- **Anthropic Near Black** (`#141413`): The primary text color and dark-theme surface — not pure black but a warm, almost olive-tinted dark that's gentler on the eyes. The warmest "black" in any major tech brand.
+- **Terracotta Brand** (`#c96442`): The core brand color — a burnt orange-brown used for primary CTA buttons, brand moments, and the signature accent. Deliberately earthy and un-tech.
+- **Coral Accent** (`#d97757`): A lighter, warmer variant of the brand color used for text accents, links on dark surfaces, and secondary emphasis.
 
-## AIAgent Class (run_agent.py)
+### Secondary & Accent
+- **Error Crimson** (`#b53333`): A deep, warm red for error states — serious without being alarming.
+- **Focus Blue** (`#3898ec`): Standard blue for input focus rings — the only cool color in the entire system, used purely for accessibility.
 
-```python
-class AIAgent:
-    def __init__(self,
-        model: str = "anthropic/claude-opus-4.6",
-        max_iterations: int = 90,
-        enabled_toolsets: list = None,
-        disabled_toolsets: list = None,
-        quiet_mode: bool = False,
-        save_trajectories: bool = False,
-        platform: str = None,           # "cli", "telegram", etc.
-        session_id: str = None,
-        skip_context_files: bool = False,
-        skip_memory: bool = False,
-        # ... plus provider, api_mode, callbacks, routing params
-    ): ...
+### Surface & Background
+- **Parchment** (`#f5f4ed`): The primary page background — a warm cream with a yellow-green tint that feels like aged paper. The emotional foundation of the entire design.
+- **Ivory** (`#faf9f5`): The lightest surface — used for cards and elevated containers on the Parchment background. Barely distinguishable but creates subtle layering.
+- **Pure White** (`#ffffff`): Reserved for specific button surfaces and maximum-contrast elements.
+- **Warm Sand** (`#e8e6dc`): Button backgrounds and prominent interactive surfaces — a noticeably warm light gray.
+- **Dark Surface** (`#30302e`): Dark-theme containers, nav borders, and elevated dark elements — warm charcoal.
+- **Deep Dark** (`#141413`): Dark-theme page background and primary dark surface.
 
-    def chat(self, message: str) -> str:
-        """Simple interface — returns final response string."""
+### Neutrals & Text
+- **Charcoal Warm** (`#4d4c48`): Button text on light warm surfaces — the go-to dark-on-light text.
+- **Olive Gray** (`#5e5d59`): Secondary body text — a distinctly warm medium-dark gray.
+- **Stone Gray** (`#87867f`): Tertiary text, footnotes, and de-emphasized metadata.
+- **Dark Warm** (`#3d3d3a`): Dark text links and emphasized secondary text.
+- **Warm Silver** (`#b0aea5`): Text on dark surfaces — a warm, parchment-tinted light gray.
 
-    def run_conversation(self, user_message: str, system_message: str = None,
-                         conversation_history: list = None, task_id: str = None) -> dict:
-        """Full interface — returns dict with final_response + messages."""
-```
-
-### Agent Loop
-
-The core loop is inside `run_conversation()` — entirely synchronous:
-
-```python
-while api_call_count < self.max_iterations and self.iteration_budget.remaining > 0:
-    response = client.chat.completions.create(model=model, messages=messages, tools=tool_schemas)
-    if response.tool_calls:
-        for tool_call in response.tool_calls:
+### Semantic & Accent
+- **Border Cream** (`#f0eee6`): Standard light-theme border — barely visible warm cream, creating the gentlest possible containment.
+- **Border Warm** (`#e8e6dc`): Prominent borders, section dividers, and emphasized containment on light surfaces.
+- **Border Dark** (`#30302e`): Standard border on dark surfaces — maintains the warm tone.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pengchengxia75-arch/hermes-agent-windows](https://github.com/pengchengxia75-arch/hermes-agent-windows) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
