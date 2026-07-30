@@ -1,17 +1,24 @@
 ---
 trigger: always_on
-description: Spec-first rules for new data products and major changes
+description: Select the right platform preset before implementation
 ---
 
 
-# Spec First
+# Platform Preset Selector
 
-For new pipelines, schema changes, major modeling work, or operationally significant changes:
+Before implementation, select the matching preset from `presets/`.
 
-- use `skills/data-specification/SKILL.md`
-- use `skills/pipeline-planning-and-task-breakdown/SKILL.md`
-- use templates from `templates/`
-- avoid coding until success criteria and open questions are explicit
+Examples:
+
+- `aws-data-engineering`
+- `gcp-data-engineering`
+- `databricks-lakehouse-engineering`
+- `apache-spark-engineering`
+- `apache-airflow-orchestration`
+- `apache-kafka-streaming`
+- `apache-iceberg-lakehouse`
+
+Do not mix platform assumptions silently.
 
 ---
 > Source: [vaquarkhan/data-engineering-agent-skills](https://github.com/vaquarkhan/data-engineering-agent-skills) — distributed by [TomeVault](https://tomevault.io).
