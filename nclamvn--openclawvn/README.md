@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [nclamvn/openclawvn](https://github.com/nclamvn/openclawvn).
+Original source: `AGENTS.md` in [nclamvn/openclawvn](https://github.com/nclamvn/openclawvn).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
