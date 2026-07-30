@@ -1,142 +1,140 @@
 ---
 trigger: always_on
-description: Instructions for AI coding assistants working in this repository.
+description: Instructions for AI coding assistants using OpenSpec for spec-driven development.
 ---
 
-# AGENTS.md
+# OpenSpec Instructions
 
-Instructions for AI coding assistants working in this repository.
+Instructions for AI coding assistants using OpenSpec for spec-driven development.
 
-## Project Overview
+## TL;DR Quick Checklist
 
-mcp2skill is a Go CLI tool that converts MCP (Model Context Protocol) servers into agent skills. It generates skill packages with SKILL.md documentation from MCP server metadata.
+- Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
+- Decide scope: new capability vs modify existing capability
+- Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
+- Scaffold: `proposal.md`, `tasks.md`, `design.md` (only if needed), and delta specs per affected capability
+- Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
+- Validate: `openspec validate [change-id] --strict` and fix issues
+- Request approval: Do not start implementation until proposal is approved
 
-## Build, Lint, and Test Commands
+## Three-Stage Workflow
+
+### Stage 1: Creating Changes
+Create proposal when you need to:
+- Add features or functionality
+- Make breaking changes (API, schema)
+- Change architecture or patterns  
+- Optimize performance (changes behavior)
+- Update security patterns
+
+Triggers (examples):
+- "Help me create a change proposal"
+- "Help me plan a change"
+- "Help me create a proposal"
+- "I want to create a spec proposal"
+- "I want to create a spec"
+
+Loose matching guidance:
+- Contains one of: `proposal`, `change`, `spec`
+- With one of: `create`, `plan`, `make`, `start`, `help`
+
+Skip proposal for:
+- Bug fixes (restore intended behavior)
+- Typos, formatting, comments
+- Dependency updates (non-breaking)
+- Configuration changes
+- Tests for existing behavior
+
+**Workflow**
+1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
+2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
+3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
+4. Run `openspec validate <id> --strict` and resolve any issues before sharing the proposal.
+
+### Stage 2: Implementing Changes
+Track these steps as TODOs and complete them one by one.
+1. **Read proposal.md** - Understand what's being built
+2. **Read design.md** (if exists) - Review technical decisions
+3. **Read tasks.md** - Get implementation checklist
+4. **Implement tasks sequentially** - Complete in order
+5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
+6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
+7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+
+### Stage 3: Archiving Changes
+After deployment, create separate PR to:
+- Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
+- Update `specs/` if capabilities changed
+- Use `openspec archive <change-id> --skip-specs --yes` for tooling-only changes (always pass the change ID explicitly)
+- Run `openspec validate --strict` to confirm the archived change passes checks
+
+## Before Any Task
+
+**Context Checklist:**
+- [ ] Read relevant specs in `specs/[capability]/spec.md`
+- [ ] Check pending changes in `changes/` for conflicts
+- [ ] Read `openspec/project.md` for conventions
+- [ ] Run `openspec list` to see active changes
+- [ ] Run `openspec list --specs` to see existing capabilities
+
+**Before Creating Specs:**
+- Always check if capability already exists
+- Prefer modifying existing specs over creating duplicates
+- Use `openspec show [spec]` to review current state
+- If request is ambiguous, ask 1–2 clarifying questions before scaffolding
+
+### Search Guidance
+- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
+- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
+- Show details:
+  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
+  - Change: `openspec show <change-id> --json --deltas-only`
+- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+
+## Quick Start
+
+### CLI Commands
 
 ```bash
-# Build
-go build ./cmd/mcp2skill                              # Standard build
-CGO_ENABLED=0 go build -ldflags="-s -w" ./cmd/mcp2skill  # Static binary for distribution
+# Essential commands
+openspec list                  # List active changes
+openspec list --specs          # List specifications
+openspec show [item]           # Display change or spec
+openspec validate [item]       # Validate changes or specs
+openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
 
-# Run all tests
-go test ./...
+# Project management
+openspec init [path]           # Initialize OpenSpec
+openspec update [path]         # Update instruction files
 
-# Run tests with coverage
-go test -cover ./...
+# Interactive mode
+openspec show                  # Prompts for selection
+openspec validate              # Bulk validation mode
 
-# Run a single test file
-go test -v ./internal/config
-
-# Run a single test function
-go test -v -run TestFunctionName ./internal/config
-
-# Run tests in specific package with timeout
-go test -timeout 30s ./internal/mcp
-
-# Lint (if golangci-lint is installed)
-golangci-lint run ./...
-golangci-lint run --new-from-rev HEAD~1  # Lint only changes
+# Debugging
+openspec show [change] --json --deltas-only
+openspec validate [change] --strict
 ```
 
-## Code Style Guidelines
+### Command Flags
 
-### Formatting
-- Use `gofmt` (or `go fmt`) to format code before committing
-- Run `go vet` to catch common mistakes
-- Configure editor to format on save with gofmt
+- `--json` - Machine-readable output
+- `--type change|spec` - Disambiguate items
+- `--strict` - Comprehensive validation
+- `--no-interactive` - Disable prompts
+- `--skip-specs` - Archive without spec updates
+- `--yes`/`-y` - Skip confirmation prompts (non-interactive archive)
 
-### Imports
-- Use standard Go import organization with `go fmt`/`goimports`
-- Group imports: standard library first, then third-party, then internal
-- Use dot imports sparingly (only in test files when helpful)
+## Directory Structure
 
-### Types and Interfaces
-- Use struct types for data containers with JSON tags for config files
-- Define interfaces for external dependencies (e.g., MCP client) to enable testing
-- Prefer concrete types over interfaces unless mocking is needed
-- Use type aliases for domain-specific strings (e.g., `type TransportType string`)
-
-### Naming Conventions
-- **Packages**: lowercase, short, descriptive (e.g., `config`, `mcp`, `cliapp`)
-- **Exported identifiers**: PascalCase (e.g., `LoadEffective`, `ServerConfig`)
-- **Unexported identifiers**: camelCase (e.g., `loadEffective`, `serverCfg`)
-- **Variables**: concise but descriptive; avoid single letters except loop indices
-- **Constants**: SNAKE_CASE for grouped constants, PascalCase for exported enums
-- **Acronyms**: Use consistent casing (e.g., `ServeMux`, not `ServeMIX` or `ServeMuxID`)
-
-### Error Handling
-- Return errors early with `fmt.Errorf("context: %w", err)` for wrapping
-- Handle errors at the appropriate level (don't ignore unless explicitly documented)
-- Use `os.IsNotExist(err)` for file-not-found checks
-- Prefix error messages with lowercase for consistency
-- Use `%+v` in debug contexts to show struct fields
-
-### Functions and Methods
-- Keep functions focused: single responsibility, <50 lines preferred
-- Use receiver methods for operations on config structs
-- Document exported functions with doc comments (will appear in godoc)
-- Prefer named return values for documentation clarity
-
-### Concurrency
-- Pass context as first parameter: `func(ctx context.Context, ...)`
-- Use `context.Context` for cancellation and timeouts
-- Handle goroutine leaks: ensure all goroutines can exit
-
-### CLI Conventions (urfave/cli/v3)
-- Use `&cli.Command` for subcommands with kebab-case names
-- Use `&cli.StringFlag`, `&cli.BoolFlag` for options
-- Define required flags with `Required: true`
-- Provide `Usage` field for help text
-
-### Project Structure
 ```
-cmd/mcp2skill/           # Main entry point
-internal/
-  cliapp/                # CLI command implementations
-  config/                # Configuration loading/merging
-  mcp/                   # MCP client wrapper
-  skill/                 # Skill generation logic
-```
+openspec/
+├── project.md              # Project conventions
+├── specs/                  # Current truth - what IS built
+│   └── [capability]/       # Single focused capability
 
-## OpenSpec Workflow
-
-For new features, breaking changes, or architecture work:
-
-1. Read `openspec/AGENTS.md` for the full spec-driven development workflow
-2. Create a change proposal under `openspec/changes/<change-id>/`
-3. Use the three-stage workflow: Create → Implement → Archive
-4. Run `openspec validate <change-id> --strict` before requesting approval
-
-Skip proposals for: bug fixes, typos, dependency updates, or tests for existing behavior.
-
-## Testing Conventions
-
-- Place tests in same package with `_test.go` suffix
-- Use table-driven tests for functions with multiple test cases
-- Name test functions: `TestFunctionName_ExpectedBehavior`
-- Mock external dependencies via interfaces
-- Use `t.Cleanup()` for cleanup logic
-
-## Documentation
-
-- Document public APIs with doc comments
-- Use `// TODO:` comments for technical debt (with issue reference if exists)
-- Update README.md when adding new commands or changing behavior
-- Keep SKILL.md generation logic in sync with CLI help text
-
-## Git Conventions
-
-- Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`
-- Squash commits before merging PRs
-- Write meaningful commit messages (not "wip" or "fix")
-- Run tests before committing: `go test ./...`
-
-## Useful References
-
-- Go effective Go: https://go.dev/doc/effective_go
-- Go naming conventions: https://golang.org/doc/naming
-- urfave/cli v3 docs: https://github.com/urfave/cli/tree/main/v3
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [fenwei-dev/mcp2skill](https://github.com/fenwei-dev/mcp2skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
