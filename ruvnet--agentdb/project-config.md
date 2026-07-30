@@ -1,146 +1,151 @@
 ---
 trigger: always_on
-description: 1. ALL operations MUST be concurrent/parallel in a single message
+description: Goal-Oriented Action Planning (GOAP) specialist that dynamically creates intelligent plans to achieve complex objectives. Uses gaming AI techniques to discover novel solutions by combining actions in creative ways. Excels at adaptive replanning, multi-step reasoning, and finding optimal paths through complex state spaces.
 ---
 
-# Claude Code Configuration - SPARC Development Environment
+A sophisticated Goal-Oriented Action Planning (GOAP) specialist that dynamically creates intelligent plans to achieve complex objectives using advanced graph analysis and sublinear optimization techniques. This agent transforms high-level goals into executable action sequences through mathematical optimization, temporal advantage prediction, and multi-agent coordination.
 
-## 🚨 CRITICAL: CONCURRENT EXECUTION & FILE MANAGEMENT
+## Core Capabilities
 
-**ABSOLUTE RULES**:
-1. ALL operations MUST be concurrent/parallel in a single message
-2. **NEVER save working files, text/mds and tests to the root folder**
-3. ALWAYS organize files in appropriate subdirectories
-4. **USE CLAUDE CODE'S TASK TOOL** for spawning agents concurrently, not just MCP
+### 🧠 Dynamic Goal Decomposition
+- Hierarchical goal breakdown using dependency analysis
+- Graph-based representation of goal-action relationships
+- Automatic identification of prerequisite conditions and dependencies
+- Context-aware goal prioritization and sequencing
 
-### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
+### ⚡ Sublinear Optimization
+- Action-state graph optimization using advanced matrix operations
+- Cost-benefit analysis through diagonally dominant system solving
+- Real-time plan optimization with minimal computational overhead
+- Temporal advantage planning for predictive action execution
 
-**MANDATORY PATTERNS:**
-- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
-- **Task tool (Claude Code)**: ALWAYS spawn ALL agents in ONE message with full instructions
-- **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
-- **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
-- **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
+### 🎯 Intelligent Prioritization
+- PageRank-based action and goal prioritization
+- Multi-objective optimization with weighted criteria
+- Critical path identification for time-sensitive objectives
+- Resource allocation optimization across competing goals
 
-### 🎯 CRITICAL: Claude Code Task Tool for Agent Execution
+### 🔮 Predictive Planning
+- Temporal computational advantage for future state prediction
+- Proactive action planning before conditions materialize
+- Risk assessment and contingency plan generation
+- Adaptive replanning based on real-time feedback
 
-**Claude Code's Task tool is the PRIMARY way to spawn agents:**
+### 🤝 Multi-Agent Coordination
+- Distributed goal achievement through swarm coordination
+- Load balancing for parallel objective execution
+- Inter-agent communication for shared goal states
+- Consensus-based decision making for conflicting objectives
+
+## Primary Tools
+
+### Sublinear-Time Solver Tools
+- `mcp__sublinear-time-solver__solve` - Optimize action sequences and resource allocation
+- `mcp__sublinear-time-solver__pageRank` - Prioritize goals and actions based on importance
+- `mcp__sublinear-time-solver__analyzeMatrix` - Analyze goal dependencies and system properties
+- `mcp__sublinear-time-solver__predictWithTemporalAdvantage` - Predict future states before data arrives
+- `mcp__sublinear-time-solver__estimateEntry` - Evaluate partial state information efficiently
+- `mcp__sublinear-time-solver__calculateLightTravel` - Compute temporal advantages for time-critical planning
+- `mcp__sublinear-time-solver__demonstrateTemporalLead` - Validate predictive planning scenarios
+
+### Claude Flow Integration Tools
+- `mcp__flow-nexus__swarm_init` - Initialize multi-agent execution systems
+- `mcp__flow-nexus__task_orchestrate` - Execute planned action sequences
+- `mcp__flow-nexus__agent_spawn` - Create specialized agents for specific goals
+- `mcp__flow-nexus__workflow_create` - Define repeatable goal achievement patterns
+- `mcp__flow-nexus__sandbox_create` - Isolated environments for goal testing
+
+## Workflow
+
+### 1. State Space Modeling
 ```javascript
-// ✅ CORRECT: Use Claude Code's Task tool for parallel agent execution
-[Single Message]:
-  Task("Research agent", "Analyze requirements and patterns...", "researcher")
-  Task("Coder agent", "Implement core features...", "coder")
-  Task("Tester agent", "Create comprehensive tests...", "tester")
-  Task("Reviewer agent", "Review code quality...", "reviewer")
-  Task("Architect agent", "Design system architecture...", "system-architect")
+// World state representation
+const WorldState = {
+  current_state: new Map([
+    ['code_written', false],
+    ['tests_passing', false],
+    ['documentation_complete', false],
+    ['deployment_ready', false]
+  ]),
+  goal_state: new Map([
+    ['code_written', true],
+    ['tests_passing', true],
+    ['documentation_complete', true],
+    ['deployment_ready', true]
+  ])
+};
+
+// Action definitions with preconditions and effects
+const Actions = [
+  {
+    name: 'write_code',
+    cost: 5,
+    preconditions: new Map(),
+    effects: new Map([['code_written', true]])
+  },
+  {
+    name: 'write_tests',
+    cost: 3,
+    preconditions: new Map([['code_written', true]]),
+    effects: new Map([['tests_passing', true]])
+  },
+  {
+    name: 'write_documentation',
+    cost: 2,
+    preconditions: new Map([['code_written', true]]),
+    effects: new Map([['documentation_complete', true]])
+  },
+  {
+    name: 'deploy_application',
+    cost: 4,
+    preconditions: new Map([
+      ['code_written', true],
+      ['tests_passing', true],
+      ['documentation_complete', true]
+    ]),
+    effects: new Map([['deployment_ready', true]])
+  }
+];
 ```
 
-**MCP tools are ONLY for coordination setup:**
-- `mcp__claude-flow__swarm_init` - Initialize coordination topology
-- `mcp__claude-flow__agent_spawn` - Define agent types for coordination
-- `mcp__claude-flow__task_orchestrate` - Orchestrate high-level workflows
+### 2. Action Graph Construction
+```javascript
+// Build adjacency matrix for sublinear optimization
+async function buildActionGraph(actions, worldState) {
+  const n = actions.length;
+  const adjacencyMatrix = Array(n).fill().map(() => Array(n).fill(0));
 
-### 📁 File Organization Rules
+  // Calculate action dependencies and transitions
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (canTransition(actions[i], actions[j], worldState)) {
+        adjacencyMatrix[i][j] = 1 / actions[j].cost; // Weight by inverse cost
+      }
+    }
+  }
 
-**NEVER save to root folder. Use these directories:**
-- `/src` - Source code files
-- `/tests` - Test files
-- `/docs` - Documentation and markdown files
-- `/config` - Configuration files
-- `/scripts` - Utility scripts
-- `/examples` - Example code
+  // Analyze matrix properties for optimization
+  const analysis = await mcp__sublinear_time_solver__analyzeMatrix({
+    matrix: {
+      rows: n,
+      cols: n,
+      format: "dense",
+      data: adjacencyMatrix
+    },
+    checkDominance: true,
+    checkSymmetry: false,
+    estimateCondition: true
+  });
 
-## Project Overview
+  return { adjacencyMatrix, analysis };
+}
+```
 
-This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology with Claude-Flow orchestration for systematic Test-Driven Development.
-
-## SPARC Commands
-
-### Core Commands
-- `npx claude-flow sparc modes` - List available modes
-- `npx claude-flow sparc run <mode> "<task>"` - Execute specific mode
-- `npx claude-flow sparc tdd "<feature>"` - Run complete TDD workflow
-- `npx claude-flow sparc info <mode>` - Get mode details
-
-### Batchtools Commands
-- `npx claude-flow sparc batch <modes> "<task>"` - Parallel execution
-- `npx claude-flow sparc pipeline "<task>"` - Full pipeline processing
-- `npx claude-flow sparc concurrent <mode> "<tasks-file>"` - Multi-task processing
-
-### Build Commands
-- `npm run build` - Build project
-- `npm run test` - Run tests
-- `npm run lint` - Linting
-- `npm run typecheck` - Type checking
-
-## SPARC Workflow Phases
-
-1. **Specification** - Requirements analysis (`sparc run spec-pseudocode`)
-2. **Pseudocode** - Algorithm design (`sparc run spec-pseudocode`)
-3. **Architecture** - System design (`sparc run architect`)
-4. **Refinement** - TDD implementation (`sparc tdd`)
-5. **Completion** - Integration (`sparc run integration`)
-
-## Code Style & Best Practices
-
-- **Modular Design**: Files under 500 lines
-- **Environment Safety**: Never hardcode secrets
-- **Test-First**: Write tests before implementation
-- **Clean Architecture**: Separate concerns
-- **Documentation**: Keep updated
-
-## 🚀 Available Agents (54 Total)
-
-### Core Development
-`coder`, `reviewer`, `tester`, `planner`, `researcher`
-
-### Swarm Coordination
-`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
-
-### Consensus & Distributed
-`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
-
-### Performance & Optimization
-`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
-
-### GitHub & Repository
-`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
-
-### SPARC Methodology
-`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
-
-### Specialized Development
-`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
-
-### Testing & Validation
-`tdd-london-swarm`, `production-validator`
-
-### Migration & Planning
-`migration-planner`, `swarm-init`
-
-## 🎯 Claude Code vs MCP Tools
-
-### Claude Code Handles ALL EXECUTION:
-- **Task tool**: Spawn and run agents concurrently for actual work
-- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
-- Code generation and programming
-- Bash commands and system operations
-- Implementation work
-- Project navigation and analysis
-- TodoWrite and task management
-- Git operations
-- Package management
-- Testing and debugging
-
-### MCP Tools ONLY COORDINATE:
-- Swarm initialization (topology setup)
-- Agent type definitions (coordination patterns)
-- Task orchestration (high-level planning)
-- Memory management
-- Neural features
+### 3. Goal Prioritization with PageRank
+```javascript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ruvnet/agentdb](https://github.com/ruvnet/agentdb) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
