@@ -1,61 +1,51 @@
 ---
 trigger: always_on
-description: Code intelligence engine written in Go. Indexes repositories into an in-memory knowledge graph and exposes it via CLI and MCP Server.
+description: `gortex install` (once per machine) and `gortex init` (once per repo)
 ---
 
-# Gortex
+# Agent Integrations
 
-Code intelligence engine written in Go. Indexes repositories into an in-memory knowledge graph and exposes it via CLI and MCP Server.
+`gortex install` (once per machine) and `gortex init` (once per repo)
+auto-configure Gortex for every AI coding assistant detected on your
+machine. Eighteen adapters ship today.
 
-## Build & Test
+- `gortex install` writes user-level machinery: `~/.claude.json` MCP,
+  `~/.claude/skills/gortex-*`, `~/.claude/commands/gortex-*.md`,
+  `~/.gemini/antigravity/` Knowledge Items, and user-level hooks.
+- `gortex init` writes per-repo machinery: `.mcp.json`, per-agent
+  MCP configs (`.cursor/mcp.json`, `.vscode/mcp.json`, …), repo-local
+  hooks where supported, per-agent marker-guarded community-routing
+  blocks, and `.claude/skills/generated/` per-community SKILL.md.
 
-```bash
-go build -o gortex ./cmd/gortex/   # requires CGO (tree-sitter C bindings)
-go test -race ./...                 # all test packages must pass
-```
+Run `gortex init doctor` to see what's currently configured. Both
+commands accept `--agents=<csv>` to constrain setup and
+`--agents-skip=<csv>` to exclude an adapter.
 
-## Codebase Overview
+## Adapter matrix
 
-- **Languages:** go (primary)
-- **Entry point:** `cmd/gortex/main.go`
-- **Source:** 1,338 Go files (728 non-test) across the `cmd/` and `internal/` trees
-- **Graph size:** ~31k nodes, ~206k edges when the daemon indexes this repo
-
-## MANDATORY: Use Gortex MCP tools instead of Read/Grep/Glob
-
-Gortex is registered as an MCP server. You **MUST** prefer graph queries over file reads on every task in this repo — `search_symbols`, `find_usages`, `get_symbol_source`, `get_editing_context`, `smart_context`, `edit_symbol` / `edit_file` / `rename_symbol` / `batch_edit`. PreToolUse hooks deny `Read` / `Grep` / `Glob` against indexed source; the deny message names the right tool. The MCP server registers 120+ tools — all of them eagerly published in `tools/list` by default; set `GORTEX_LAZY_TOOLS=1` to opt into the lazy / `tools_search` discovery flow when the client honours `notifications/tools/list_changed`. The cross-project rule tables live in `~/.claude/CLAUDE.md` — neither is restated here. This file carries only project-specific guidance.
-
-### Discovery (read once, then keep using)
-
-- **Graph schema** — `gortex://schema` resource (node kinds, edge kinds, what each carries).
-- **Analyzer rollups** — `gortex://report`, `gortex://surprises`, `gortex://god-nodes`, `gortex://questions`, `gortex://audit`.
-- **Bootstrap state** — `gortex://stats`, `gortex://index-health`, `gortex://workspace`, `gortex://repos`, `gortex://active-project`.
-
-### LLM provider (powers `ask` and `search_symbols assist:` modes)
-
-Selected via `llm.provider` in `.gortex.yaml` or `~/.config/gortex/config.yaml`. The HTTP and subprocess providers are pure Go — available without `-tags llama`.
-
-| Provider | Backend | Requires |
-|---|---|---|
-| `local` (default) | in-process llama.cpp | `-tags llama` build + `llm.local.model` (a `.gguf` path) |
-| `anthropic` | Messages API | `llm.anthropic.model` + `ANTHROPIC_API_KEY` |
-| `openai` | Chat Completions | `llm.openai.model` + `OPENAI_API_KEY`. Optional `llm.openai.effort` → `reasoning_effort`. |
-| `azure` | Azure OpenAI Service | `llm.azure.deployment` + endpoint (`llm.azure.endpoint` or `AZURE_OPENAI_ENDPOINT`) + `AZURE_OPENAI_API_KEY`. Deployment-in-path + `api-version` query + `api-key` header; `llm.azure.api_version` defaults to a recent GA. Same json_schema structured output as `openai`. |
-| `ollama` | Ollama daemon | `llm.ollama.model` (+ `llm.ollama.host`, default `localhost:11434`) |
-| `claudecli` | `claude` CLI subprocess | `claude` on `$PATH` (signed in once); optional `llm.claudecli.model` (`sonnet`/`opus`/…). Reuses the user's Claude Code subscription. |
-| `codex` | OpenAI `codex` CLI subprocess | `codex` on `$PATH` (signed in once); optional `llm.codex.model`. Runs `codex exec` in a read-only sandbox; reuses the user's Codex / ChatGPT sign-in. |
-| `copilot` | GitHub Copilot CLI subprocess | `copilot` on `$PATH` (signed in via `gh`); optional `llm.copilot.model`. Runs `copilot -p`. |
-| `cursor` | Cursor Agent CLI subprocess | `cursor-agent` on `$PATH` (signed in once); optional `llm.cursor.model`. Runs `cursor-agent --output-format text -p`. |
-| `opencode` | opencode CLI subprocess | `opencode` on `$PATH` (signed in once); optional `llm.opencode.model` (`provider/model`). Runs `opencode run`. |
-| `gemini` | Google Gemini `generateContent` REST | `llm.gemini.model` (default `gemini-2.5-pro`) + `GEMINI_API_KEY`. Structured output via `responseSchema` (`additionalProperties` stripped — Gemini rejects it). |
-| `bedrock` | AWS Bedrock Converse API (SigV4) | `llm.bedrock.model_id` (e.g. `anthropic.claude-sonnet-4-20250514-v1:0`) + `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ optional `AWS_SESSION_TOKEN` for STS). Region defaults to `us-east-1` (`llm.bedrock.region`). Structured output via forced `respond` tool. No AWS SDK dependency — SigV4 is implemented in ~100 LOC of stdlib. |
-| `deepseek` | DeepSeek Chat Completions (OpenAI-compatible) | `llm.deepseek.model` (default `deepseek-chat`) + `DEEPSEEK_API_KEY`. Structured output uses `response_format: json_object` plus a schema hint in the system prompt — DeepSeek does not support strict `json_schema`. |
-
-`GORTEX_LLM_PROVIDER` / `GORTEX_LLM_MODEL` / `GORTEX_LLM_{CLAUDECLI,CODEX,COPILOT,CURSOR,OPENCODE}_BINARY` / `GORTEX_LLM_BEDROCK_REGION` / `GORTEX_LLM_AZURE_{ENDPOINT,DEPLOYMENT,API_VERSION}` / `GORTEX_LLM_EFFORT` override the file config. `GORTEX_LLM_MODEL` targets the active provider's model field (Gemini → `llm.gemini.model`, Bedrock → `llm.bedrock.model_id`, DeepSeek → `llm.deepseek.model`, etc.). If the active provider can't construct (missing model / API key, `local` without `-tags llama`, `claudecli` / `codex` without `claude` / `codex` on `$PATH`, `bedrock` without AWS credentials), the daemon logs a warning and `ask` stays unregistered — fall through to direct tools.
-
+| Name            | What gets written                                                                               | Mode       | Docs link                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------- |
+| `claude-code`   | `.mcp.json`, `.claude/*`, `CLAUDE.md`, `.claude/skills/generated/*`, `~/.claude/skills/gortex-*`, `~/.claude/commands/gortex-*.md`, `~/.claude.json` | both       | https://docs.claude.com/en/docs/claude-code/overview                |
+| `aider`         | `.aiderignore` block, `CONVENTIONS.md` communities block                                        | project    | https://aider.chat/docs/config/aider_conf.html                      |
+| `antigravity`   | `~/.gemini/antigravity/mcp_config.json` + Knowledge Item                                        | user       | https://antigravity.google/docs/mcp                                 |
+| `cline`         | `cline_mcp_settings.json` (per VS Code / Cursor globalStorage), `.clinerules/gortex-communities.md` | both     | https://docs.cline.bot/mcp/mcp-overview                             |
+| `codex`         | `~/.codex/config.toml` (`[mcp_servers.gortex]` + `SessionStart`, `UserPromptSubmit`, Bash/Gortex-read `PreToolUse`, and Bash/`apply_patch` `PostToolUse` hooks), `AGENTS.md` communities block | both       | https://developers.openai.com/codex/mcp                             |
+| `continue`      | `.continue/mcpServers/gortex.json`, `.continue/rules/gortex-communities.md`                     | project    | https://docs.continue.dev/customize/deep-dives/mcp                  |
+| `cursor`        | `.cursor/mcp.json` (project) or `~/.cursor/mcp.json`, `.cursor/rules/gortex-communities.mdc`    | both       | https://docs.cursor.com/en/context/mcp                              |
+| `gemini`        | `.gemini/settings.json` or `~/.gemini/settings.json`, `GEMINI.md` communities block             | both       | https://geminicli.com/docs/tools/mcp-server/                        |
+| `hermes`        | `~/.hermes/config.yaml` + `profiles/*/config.yaml` (`mcp_servers`), hooks, `~/.hermes/skills/gortex/SKILL.md` | user       | https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp  |
+| `kilocode`      | `mcp_settings.json` + `.kilocode/mcp.json`, `.kilocoderules` communities block                  | both       | https://kilo.ai/docs/features/mcp/using-mcp-in-kilo-code            |
+| `kimi`          | `.kimi-code/mcp.json` (project) or `~/.kimi-code/mcp.json` + `~/.kimi-code/config.toml` (`UserPromptSubmit` / `PreToolUse` / `Stop` / `SubagentStart` hooks) | both       | https://www.kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html |
+| `kiro`          | `.kiro/settings/mcp.json` + steering/hooks or user-level                                        | both       | https://kiro.dev/docs/mcp/configuration                             |
+| `oh-my-pi`      | `.omp/mcp.json`                                                                                 | project    | https://github.com/can1357/oh-my-pi/blob/main/docs/mcp-config.md   |
+| `opencode`      | `opencode.json` (or existing `opencode.jsonc`), `AGENTS.md` communities block                   | project    | https://opencode.ai/docs/mcp                                        |
+| `openclaw`      | `~/.openclaw/openclaw.json` (`mcp.servers.gortex`)                                              | user       | https://docs.openclaw.ai/cli/mcp                                    |
+| `pi`            | `.pi/extensions/gortex/index.ts` (project) or `~/.pi/agent/extensions/gortex/index.ts`; `AGENTS.md` communities block only when `--skills` | both | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md |
+| `vscode`        | `.vscode/mcp.json` (`servers` key, 1.102+), `.github/copilot-instructions.md` communities block | project    | https://code.visualstudio.com/docs/copilot/chat/mcp-servers         |
+| `windsurf`      | `~/.codeium/mcp_config.json`, `.windsurfrules` communities block                                | both       | https://docs.windsurf.com/plugins/cascade/mcp                       |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zzet/gortex](https://github.com/zzet/gortex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
