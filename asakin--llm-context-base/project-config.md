@@ -1,9 +1,9 @@
 ---
 trigger: always_on
-description: <!-- Real instructions live in _config/config.md and _meta/instructions/general.md. This file only bootstraps Cursor into those. -->
+description: <!-- Real instructions live in _config/config.md and _meta/instructions/general.md. This file only bootstraps Windsurf into those. -->
 ---
 
-<!-- Real instructions live in _config/config.md and _meta/instructions/general.md. This file only bootstraps Cursor into those. -->
+<!-- Real instructions live in _config/config.md and _meta/instructions/general.md. This file only bootstraps Windsurf into those. -->
 
 ## STEP 0: Framework mode check (run this first)
 
@@ -35,8 +35,8 @@ Allow me to get ready first!
 
 Follow the Session Start Protocol defined in `_config/config.md`, then `_meta/instructions/general.md`. All instructions are there.
 
-This file exists only to bootstrap Cursor into the system. The real instructions are LLM-agnostic and live in the files above.
+This file exists only to bootstrap Windsurf into the system. The real instructions are LLM-agnostic and live in the files above.
 
 ---
 > Source: [asakin/llm-context-base](https://github.com/asakin/llm-context-base) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
