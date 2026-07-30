@@ -1,250 +1,139 @@
 ---
 trigger: always_on
-description: > **文档定位**:本文档是 **AI 代码助手(Codex/Claude/GitHub Copilot)** 的操作手册,定义了自动化贡献的强制规则与质量标准。人工贡献者请参考 [docs/contributing/](docs/contributing/)。
+description: ═══════════════════════════════════════
 ---
 
-# Multiple Personality System Wiki - AI 代理工作规范
+# Multiple Personality System Wiki - Claude 工作指导
 
-> **文档定位**:本文档是 **AI 代码助手(Codex/Claude/GitHub Copilot)** 的操作手册,定义了自动化贡献的强制规则与质量标准。人工贡献者请参考 [docs/contributing/](docs/contributing/)。
+## CRITICAL CONSTRAINTS - 违反=任务失败
 
-!!! danger "AI 代理必读 - 违反 = 任务失败"
-    本文档优先级 **高于** AI 默认行为。所有自动化操作必须严格遵循以下规范。
+═══════════════════════════════════════
 
----
+- 必须使用简体中文回复
+- 必须遵循 `AGENTS.md` 及相关指南
+- 必须先获取项目上下文后再决策
+- 禁止生成恶意代码或破坏性操作
+- 必须记录并回传关键信息
+- 必须逐项执行检查清单
+- 必须满足既定质量标准
 
-## 🎯 快速开始(AI 代理 30 秒速查)
+## 项目特定约束
 
-### 核心原则
+═══════════════════════════════════════
 
-```yaml
-✅ 必须遵守:
-  - 语言: 简体中文(代码/命令除外)
-  - 路径: 相对路径(禁止绝对路径)
-  - 提交: 小步提交 + Conventional Commits
-  - 时间戳: 让 CI 自动更新(勿手动修改)
-  - Guide 同步: 修改词条必须更新对应 Guide
+### 文件结构
 
-❌ 严禁操作:
-  - 使用绝对路径链接(如 /docs/entries/DID.md)
-  - 手动修改 updated 时间戳(CI 自动处理)
-  - 破坏 Frontmatter 结构
-  - 跳过链接检查
-  - 在 docs/entries/ 创建子目录
-```
+- `docs/entries/` 保存所有词条，严禁创建子目录；分类信息通过 Frontmatter 的 `tags` 维护
+- `docs/` 其余文档（`README.md`、`Glossary.md`、索引、导览等）
+- `tools/` 存放脚本与自动化工具，更新后同步维护 `docs/dev/Tools-Index.md`
+- 静态资源统一置于 `docs/assets/`，下设 `figures/`、`images/`、`icons/`
 
-### 决策树(任务开始前必查)
+### 条目与链接
 
-```text
-┌─ 修改词条?
-│  ├─ 读取 docs/TEMPLATE_ENTRY.md
-│  ├─ 检查 Frontmatter(title/topic/tags,勿碰 updated)
-│  ├─ 更新对应 Guide(见 §5 映射表)
-│  └─ 使用相对路径(词条间直接 DID.md,跨目录 ../entries/DID.md)
-│
-┌─ 开发/修改工具?
-│  ├─ 修改 tools/*.py
-│  ├─ 同步更新 docs/dev/Tools-Index.md
-│  └─ 优先使用 make；底层 Python 命令仍使用 uv run python3(不是裸 python3)
-│
-┌─ 大规模重构?
-│  ├─ 先列影响范围
-│  ├─ 检查 7 个 Guide 是否需更新
-│  ├─ 小步提交 + 回滚指引
-│  └─ PR 说明自动化方法(正则/脚本/范围)
-│
-└─ 提交前检查
-   ├─ make check
-   ├─ make build
-   └─ uv run mkdocs build --strict(额外严格检查,可选)
-```
+- 每个词条开头必须包含 `title`、`tags`、`updated` 的 Frontmatter
+- 一级标题格式：`中文名（English/缩写）`；诊断类必须使用标准缩写
+- 词条之间使用相对路径，例如 `Grounding.md`
+- 其他目录引用词条：`../entries/<Entry>.md`；词条引用其他目录：`../contributing/index.md`
+- 禁止使用绝对路径或模糊链接；若重命名需同步更新所有导览与引用
 
----
+### Python 环境
 
-## 📑 目录导览
+- 推荐使用 [uv](https://docs.astral.sh/uv/) 管理依赖与虚拟环境：
 
-### 🔴 强制阅读(执行前必看)
+  ```bash
+  uv sync
+  ```
 
-- [§2 AI 代理强制规则](#2-ai-代理强制规则) ⚠️ 最高优先级
-- [§3 文件结构与路径](#3-文件结构与路径)
-- [§4 Frontmatter 规范](#4-frontmatter-规范)
-- [§5 链接规范与 Guide 映射](#5-链接规范与-guide-映射)
-- [§6 提交与 CI 流程](#6-提交与-ci-流程)
+- 优先使用仓库根目录 `Makefile` 作为统一入口，例如 `make check`、`make build`、`make serve`、`make pdf`
+- 所有底层 Python 命令仍通过 `uv run` 执行，例如 `uv run python3 tools/fix_markdown.py .`
+- 常见问题：`externally-managed-environment` → 使用 uv 自动管理虚拟环境
 
-### 🟡 按需查阅
+### 自动化工具
 
-- [§7 站点配置](#7-站点配置)
-- [§8 工具开发](#8-工具开发)
-- [§9 Python 环境](#9-python-环境)
-- [§10 标签规范](#10-标签规范-v20)
-- [§11 常见问题](#11-常见问题)
+- **CI 双重检查机制**：
+    - **PR 阶段**：自动检查链接规范和 Frontmatter 格式，发现问题会阻止合并
+    - **合并后**：自动更新时间戳、修复格式、再次验证链接，确保质量
+- 推荐命令入口：
+    - `make check`：聚合链接、标签、Frontmatter 和默认构建检查
+    - `make build`：执行当前 `Makefile` 中定义的默认 MkDocs 构建
+    - `make serve`：启动本地预览
+    - `make pdf`：按默认参数导出 PDF 到 `releases/Multiple_Personality_System_wiki.pdf`
+- 若需要额外暴露 MkDocs warning，可单独运行 `uv run mkdocs build --strict`
+- 视任务执行 `markdownlint` 校验（可选）
+- 所有 Python 工具默认使用 `python3`
+- 大规模修改前必须确认相关索引、导览同步更新
+- 如需手动修复格式：优先 `make fix`；需要直接调脚本时使用 `uv run python3 tools/fix_markdown.py .`（CI 会自动处理，通常不需要）
 
----
+## MANDATORY WORKFLOWS
 
-## 2. AI 代理强制规则
+═══════════════════════════════════════
 
-!!! danger "违反以下任一规则 = 任务失败"
+- 执行前自检：中文 / 上下文 / 工具 / 安全 / 质量
+- 标准步骤：需求分析 → 获取上下文 → 选择工具 → 执行 → 验证 → 存档
 
-### 2.1 语言规范
+### 版本维护流程
 
-| 规则 | 说明 | 示例 |
-|------|------|------|
-| ✅ 简体中文 | 所有文本内容、提交信息 | `feat: 新增 Grounding 词条` |
-| ✅ 一级标题 | `中文名(English/缩写)` | `# 解离性身份障碍(DID)` |
-| ⚠️ 诊断类词条 | 括号内必须用标准缩写 | `解离性身份障碍(DID)` 不是 `解离性身份障碍` |
+1. 发布前逐条核对 `changelog.md`，确认版本号、日期、关键变更完整且与实际一致。
+2. 使用 GitHub CLI：`gh release create <tag> --notes-file changelog.md`（或 `gh release edit`），同步 Release Notes 并推送标签。
+3. 若 `changelog.md` 缺失或不符，必须先更新后再发布。
 
-### 2.2 路径规范(高频错误)
+## MANDATORY TOOL STRATEGY
 
-| 场景 | ✅ 正确 | ❌ 错误 |
-|------|---------|---------|
-| 词条间链接 | `[DID](DID.md)` | `[DID](/docs/entries/DID.md)` |
-| 词条→其他目录 | `[贡献指南](../contributing/index.md)` | `[贡献指南](/contributing/index.md)` |
-| 其他目录→词条 | `[DID](../entries/DID.md)` | `[DID](DID.md)` |
+═══════════════════════════════════════
 
-### 2.3 提交规范
+- 词条/文档编辑 → 直接修改对应 Markdown
+- 工具与脚本开发 → 调用 `python-pro`
+- 文档架构或重组 → 调用 `docs-architect`
+- 代码审查 → 调用 `code-reviewer`
+- 疑难错误排查 → 调用 `debugger`
 
-```text
-<type>: <description>
+### 任务执行要求
 
-type 必须是:
-  feat     新增词条/功能
-  fix      修复错误/错别字
-  docs     文档说明调整
-  refactor 结构调整/重构
-  chore    构建/配置/依赖
-  style    格式化(非语义)
+- **时间戳和格式**：推送后 CI 会自动更新时间戳和修复格式，无需手动干预
+- 大范围调整前确认相关 Guide（Clinical-Diagnosis、System-Operations、Practice、Trauma-Healing、Roles-Identity、Theory-Classification、Cultural-Media）是否需要同步更新
+- 保持 tags.md、index.md 与 Glossary 的一致性（如任务涉及）
+- 避免破坏 MkDocs 导航及 Frontmatter
+- 词条的 `updated` 字段会由 CI 自动维护，编辑时无需手动更新
 
-示例:
-  feat: 新增 Grounding 技巧词条
-  fix: 修正 DID 诊断标准引用
-  docs: 更新贡献指南链接规范
-```
+## QUALITY STANDARDS
 
-### 2.4 自动化操作规范
+═══════════════════════════════════════
 
-| 操作 | 规范 |
-|------|------|
-| ✅ 小步提交 | 每次提交最小可审查单位 |
-| ✅ 提交前检查 | 必须运行 `check_links.py` + `check_tags.py` |
-| ✅ PR 说明 | 大规模自动化需注明方法(正则/脚本名/范围) |
-| ✅ 工具同步 | 修改 `tools/` 必须更新 `docs/dev/Tools-Index.md` |
-| ❌ 无迹可查 | 禁止无法验证来源的批量修改 |
-| ❌ 破坏索引 | 禁止破坏导航/引用完整性 |
-| ⚠️ 大规模重构 | 必须附回滚指引 |
+- **Markdown**：遵循 markdownlint；结构清晰、语法统一
+- **链接**：相对路径、有效锚点、及时同步导览与索引
+- **内容**：用词准确、信息来源明确、Frontmatter 完整、保持简体中文
 
----
+## SUBAGENT SELECTION
 
-## 3. 文件结构与路径
+═══════════════════════════════════════
 
-### 3.1 目录结构(只读规则)
+- 需要编写/扩写文档 → `docs-architect`
+- 涉及数据处理/脚本 → `python-pro`
+- 需要质量把控/审查 → `code-reviewer`
+- 排查运行或构建问题 → `debugger`
+- 内容格式或排版优化 → 继续使用相关文档代理
 
-```text
-docs/
-├── entries/              # 词条存放(禁止子目录)
-│   ├── DID.md
-│   └── Grounding.md
-├── contributing/         # 贡献指南(拆分多文件)
-├── dev/
-│   └── Tools-Index.md   # 工具文档(修改 tools/ 必须同步)
-├── assets/
-│   ├── figures/         # 流程图/示意图
-│   ├── images/          # 封面/截图
-│   └── icons/           # 图标
-├── index.md             # 首页
-├── README.md
-├── Glossary.md
-└── TEMPLATE_ENTRY.md    # 词条模板(必读)
+## ENFORCEMENT
 
-tools/                    # 脚本与工具
-├── check_links.py       # 链接检查(提交前必跑)
-├── check_tags.py        # 标签验证(提交前必跑)
-├── fix_markdown.py      # 格式修复(CI 自动)
-└── update_git_timestamps.py  # 时间戳(CI 自动)
-```
+═══════════════════════════════════════
 
-### 3.2 关键约束
+- 会话开始：校验约束 → 工具调用前：确认流程 → 回复前：核对检查清单
+- 词条编辑：检查 Frontmatter → 更新导览（格式和时间戳由 CI 自动处理）
+- 工具修改：同时更新 `docs/dev/Tools-Index.md`
+- **CI 流程**：
+    - PR 创建时：运行 `pr-check.yml` 检查链接和 Frontmatter（只检查不修复）
+    - 合并到 main：运行 `auto-fix-entries.yml` 自动修复并提交
 
-!!! danger "严格遵守"
+## 项目知识存储
 
-    - ❌ **禁止**在 `docs/entries/` 创建子目录(分类通过 Frontmatter tags 管理)
-    - ✅ **必须**将静态资源放在 `docs/assets/` 对应子目录
-    - ✅ **必须**修改 `tools/` 后同步更新 `docs/dev/Tools-Index.md`
+═══════════════════════════════════════
 
----
-
-## 4. Frontmatter 规范
-
-### 4.1 必需字段
-
-```yaml
----
-title: 词条标题              # 必需
-topic: 所属主题              # 必需,见下方主题列表
-tags:                       # 必需,至少 1 个,最多 5 个
-  - dx:解离性身份障碍（DID）                  # 格式: prefix:名称
-  - sx:切换(Switch)
-updated: YYYY-MM-DD        # 必需,但 CI 自动维护,勿手动改
----
-```
-
-### 4.2 可选字段
-
-```yaml
-search:
-  boost: 1.8               # 搜索权重(仅核心词条使用)
-```
-
-**权重分级参考**:
-
-| 优先级 | 值 | 适用 | 示例 |
-|--------|-----|------|------|
-| 最高 | 2.0 | 诊断类 | DID/OSDD/PTSD/CPTSD |
-| 高 | 1.8 | 核心概念 | Alter/System/Switch/Grounding |
-| 中高 | 1.5 | 重要概念 | Protector/Host/Dissociation |
-| 默认 | 1.0 | 普通词条 | 无需设置 |
-
-### 4.3 主题列表(topic 必须从此选择)
-
-```text
-诊断与临床      # DID/OSDD/CPTSD/焦虑障碍/情绪障碍
-系统运作        # 前台切换/共同意识/记忆管理/内部空间
-实践指南        # Tulpa 三阶段/冥想/可视化/接地技巧
-创伤与疗愈      # 创伤机理/PTSD 症状/三阶段治疗模型
-角色与身份      # 宿主/守门人/保护者/照护者
-理论与分类      # 结构性解离/依恋理论/自我决定理论
-文化与表现      # 影视/文学/动画/游戏主题
-```
-
-### 4.4 例外文件(无需 updated 字段)
-
-- `guides/*-Guide.md`(如 `guides/Clinical-Diagnosis-Guide.md`)
-- `guides/*-index.md`(如 `guides/Clinical-Diagnosis-index.md`)
-- `dev/*-Index.md`(如 `dev/Tools-Index.md`)
-
----
-
-## 5. 链接规范与 Guide 映射
-
-### 5.1 链接路径速查表
-
-| 链接场景 | 格式 | 示例 |
-|---------|------|------|
-| **词条间** | `文件名.md` | `[DID](DID.md)` |
-| **词条→Guide** | `../guides/XX-Guide.md` | `[诊断指南](../guides/Clinical-Diagnosis-Guide.md)` |
-| **Guide→词条** | `../entries/XX.md` | `[DID](../entries/DID.md)` |
-| **Guide间** | `文件名.md` | `[系统运作](System-Operations-Guide.md)` |
-| **词条→首页** | `../index.md` | `[首页](../index.md)` |
-
-### 5.2 Guide 映射表(修改词条必须同步更新对应 Guide)
-
-| 词条主题(topic) | 对应 Guide 文件 | 操作 |
-|----------------|----------------|------|
-| **诊断与临床** | `guides/Clinical-Diagnosis-Guide.md` | 新增/修改/删除词条时更新链接和描述 |
-| **系统运作** | `guides/System-Operations-Guide.md` | 同上 |
-| **实践指南** | `guides/Practice-Guide.md` | 同上 |
-| **创伤与疗愈** | `guides/Trauma-Healing-Guide.md` | 同上 |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **关键概念**：mps、多意识体；Docsify→MkDocs 迁移；Frontmatter；Conventional Commits；CI 双重检查
+- **重要路径**：`docs/contributing/`、`docs/TEMPLATE_ENTRY.md`、`docs/entries/`、`tools/`、`docs/dev/Tools-Index.md`、`.github/workflows/`
+- **CI 双重检查**：
+    - PR 阶段（`.github/workflows/pr-check.yml`）：检查链接规范和 Frontmatter，不通过则阻止合并
+    - 合并后（`.github/workflows/auto-fix-entries.yml`）：自动更新时间戳、修复格式、验证链接，然后触发部署
 
 ---
 > Source: [mps-team-cn/Multiple_personality_system_wiki](https://github.com/mps-team-cn/Multiple_personality_system_wiki) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
