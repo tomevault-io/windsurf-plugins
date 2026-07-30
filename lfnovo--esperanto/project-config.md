@@ -1,140 +1,145 @@
 ---
 trigger: always_on
-description: Unified interface library for working with multiple AI models (LLM, embedding, reranking, speech-to-text, text-to-speech) from different providers.
+description: Embedding provider implementations for text-to-vector conversion.
 ---
 
-# Esperanto
+# Embedding Model Providers
 
-Unified interface library for working with multiple AI models (LLM, embedding, reranking, speech-to-text, text-to-speech) from different providers.
+Embedding provider implementations for text-to-vector conversion.
 
-## Core Value Proposition
+## Files
 
-Esperanto provides a **consistent, provider-agnostic interface** for AI models. Users can switch providers by changing one parameter, with identical code otherwise.
+- **`base.py`**: Abstract base class `EmbeddingModel` defining the interface
+- **`openai.py`**: OpenAI embedding models (text-embedding-3-small/large, etc.)
+- **`google.py`**: Google embedding models (text-embedding-004, etc.)
+- **`azure.py`**: Azure OpenAI embedding models
+- **`ollama.py`**: Local Ollama embedding models
+- **`mistral.py`**: Mistral embedding models
+- **`jina.py`**: Jina AI embedding models
+- **`voyage.py`**: Voyage AI embedding models
+- **`cohere.py`**: Cohere embedding models (native v2 API, input_type-aware, 96-text auto-batching)
+- **`openrouter.py`**: OpenRouter embedding API
+- **`vertex.py`**: Google Vertex AI embeddings
+- **`transformers.py`**: Local HuggingFace transformers models (BERT, sentence-transformers, etc.)
+- **`openai_compatible.py`**: Generic OpenAI-compatible embedding API
 
-**Key principle**: Consistency across providers is the main value proposition. When adding features, maintain interface uniformity.
+## Patterns
 
-## Project Structure
+### Base Class Contract
 
+All providers inherit from `EmbeddingModel` (base.py:16) and must:
+
+1. **Implement abstract methods**:
+   - `embed()`: Synchronous embedding generation
+   - `aembed()`: Async embedding generation
+   - `_get_models()`: Return list of available models
+   - `_get_default_model()`: Return default model name
+   - `provider` property: Return provider name string
+
+2. **Override `__post_init__()`**:
+   - Call `super().__post_init__()` first (extracts task-aware settings)
+   - Set `api_key` from parameter or environment variable
+   - Set `base_url` (use default if not provided)
+   - Call `self._create_http_clients()` last (for API-based providers)
+
+3. **Handle Advanced Features**:
+   - Task-aware embeddings via `self.task_type` (EmbeddingTaskType enum)
+   - Late chunking via `self.late_chunking` boolean
+   - Output dimensions via `self.output_dimensions`
+   - Truncation control via `self.truncate_at_max_length`
+
+### Task-Aware Embeddings
+
+Providers handle `task_type` differently:
+
+- **Native support** (Jina, Voyage, Google): Pass task directly to API
+- **Prefix-based** (others): Use `_apply_task_optimization()` to add prefixes like "query: " or "passage: "
+- **No support**: Override `_apply_task_optimization()` to return texts unchanged
+
+Set `SUPPORTED_FEATURES` class attribute to list which features are supported:
+
+```python
+class JinaEmbeddingModel(EmbeddingModel):
+    SUPPORTED_FEATURES = ["task_type", "late_chunking"]
 ```
-esperanto/
-├── src/esperanto/
-│   ├── __init__.py                 # Public API exports
-│   ├── factory.py                  # AIFactory for creating provider instances
-│   ├── model_discovery.py          # Static model discovery system
-│   ├── providers/                  # Provider implementations
-│   │   ├── llm/                    # Language model providers
-│   │   ├── embedding/              # Embedding providers
-│   │   ├── reranker/               # Reranker providers
-│   │   ├── stt/                    # Speech-to-text providers
-│   │   └── tts/                    # Text-to-speech providers
-│   ├── common_types/               # Shared type definitions
-│   └── utils/                      # Cross-cutting utilities
-└── tests/                          # Test suite
 
-See detailed documentation in subdirectory CLAUDE.md files.
-```
+### Task Type Conversion
 
-## Module Documentation
+Google uses different task names. Implement `_map_task_to_google_task()` or similar:
 
-- **[src/esperanto/providers/](src/esperanto/providers/CLAUDE.md)**: All provider implementations
-  - **[llm/](src/esperanto/providers/llm/CLAUDE.md)**: Language models (OpenAI, Anthropic, Google, etc.)
-  - **[embedding/](src/esperanto/providers/embedding/CLAUDE.md)**: Embedding models (OpenAI, Jina, Voyage, etc.)
-  - **[reranker/](src/esperanto/providers/reranker/CLAUDE.md)**: Reranking models (Jina, Voyage, Transformers)
-  - **[stt/](src/esperanto/providers/stt/CLAUDE.md)**: Speech-to-text (OpenAI, Groq, Google, Azure)
-  - **[tts/](src/esperanto/providers/tts/CLAUDE.md)**: Text-to-speech (OpenAI, ElevenLabs, Google, Azure)
-- **[src/esperanto/common_types/](src/esperanto/common_types/CLAUDE.md)**: Response types and models
-- **[src/esperanto/utils/](src/esperanto/utils/CLAUDE.md)**: Timeout, SSL, caching utilities
+- Esperanto `RETRIEVAL_QUERY` → Google `RETRIEVAL_QUERY`
+- Esperanto `RETRIEVAL_DOCUMENT` → Google `RETRIEVAL_DOCUMENT`
+- Esperanto `SIMILARITY` → Google `SEMANTIC_SIMILARITY`
 
-## Key Files
+### Text Preprocessing
 
-### factory.py
+Base class provides:
 
-Central factory for creating provider instances:
+- `_clean_text()`: Normalize spacing, remove extra punctuation (base.py:101)
+- `_apply_task_optimization()`: Add task-specific prefixes (base.py:128)
+- `_apply_late_chunking()`: Simple sentence-based chunking (base.py:161)
 
-- `AIFactory.create_language()`: Create LLM provider
-- `AIFactory.create_embedding()`: Create embedding provider
-- `AIFactory.create_reranker()`: Create reranker provider
-- `AIFactory.create_speech_to_text()`: Create STT provider
-- `AIFactory.create_text_to_speech()`: Create TTS provider
-- `AIFactory.get_provider_models()`: Static model discovery (no instance needed)
+Providers with native support should override to skip preprocessing.
 
-**Registration**: All providers registered in `_provider_modules` dict by type and name.
+### Configuration Serialization
 
-### model_discovery.py
+When passing config to APIs:
 
-Static model discovery system:
+- Use `_serialize_config_for_api()` to convert enums to strings (base.py:218)
+- Use `_filter_unsupported_params()` to remove features the provider doesn't support (base.py:238)
+- Use `_get_api_kwargs()` for clean kwargs dict (base.py:263)
 
-- `PROVIDER_MODELS_REGISTRY`: Maps provider names to discovery functions
-- Discovery functions return `List[Model]` without creating provider instances
-- Results cached with `ModelCache` (1 hour TTL)
+### HTTP Client Pattern
 
-### __init__.py
-
-Public API surface:
-
-- Exports `AIFactory` (primary interface)
-- Exports base classes (`LanguageModel`, `EmbeddingModel`, etc.)
-- Conditionally imports provider classes (handles missing dependencies)
-
-## Architecture Patterns
-
-### Provider Pattern
-
-All providers follow consistent architecture:
-
-1. **Base class** defines interface (abstract methods)
-2. **Provider implementations** inherit and implement interface
-3. **Factory registration** makes provider discoverable
-4. **Common response types** ensure consistency
-
-### Configuration Priority
-
-Three-tier configuration system (highest to lowest):
-
-1. **Config dict**: `config={"timeout": 120}`
-2. **Environment variables**: `ESPERANTO_LLM_TIMEOUT=90`
-3. **Defaults**: Provider type defaults
-
-### Mixin Composition
-
-Providers inherit functionality via mixins:
-
-- `TimeoutMixin`: Configurable HTTP timeouts
-- `SSLMixin`: Configurable SSL verification
-- Base class (e.g., `LanguageModel`): Provider-specific interface
-- Provider implementation: Actual API integration
-
-## Adding a New Provider
-
-When building a provider:
-
-1. **Research existing implementations**: Check base class and 2-3 sibling providers for patterns
-2. **Follow the interface exactly**: Consistency is critical for user experience
-3. **Implement all abstract methods**: Don't skip required methods
-4. **Register in factory**: Add to `factory._provider_modules["{type}"]`
-5. **Add optional import**: In `src/esperanto/__init__.py` with try/except
-6. **Write tests**: Use `uv run pytest -v` to verify
-
-**Critical pattern** - `__post_init__()`:
+Same as LLM providers:
 
 ```python
 def __post_init__(self):
-    super().__post_init__()  # ALWAYS call first
+    super().__post_init__()  # Extracts task_type, late_chunking, etc.
     self.api_key = self.api_key or os.getenv("PROVIDER_API_KEY")
     self.base_url = self.base_url or "https://api.provider.com/v1"
-    self._create_http_clients()  # ALWAYS call last
+    self._create_http_clients()
 ```
 
-### Steps for New Provider
+### Local vs API Providers
 
-1. Identify provider type (language, embedding, reranker, stt, tts)
-2. Create `{provider_name}.py` in appropriate `src/esperanto/providers/{type}/` directory
-3. Import base class from `.base`
-4. Implement all abstract methods
-5. Follow `__post_init__()` pattern above
+- **API providers** (OpenAI, Jina, Voyage): Use httpx clients, make HTTP requests
+- **Local providers** (Transformers, Ollama local): May use local libraries instead
+  - Transformers: Uses HuggingFace `sentence-transformers` library
+  - Ollama: Can use HTTP (if remote) or local client
+
+### Batch Processing (standardized)
+
+Embedding APIs cap how many texts one request may contain, so the base class
+auto-batches. **Do not hand-roll a batch loop** — use the shared helper:
+
+1. Declare the provider's ceiling as a class attribute:
+   ```python
+   class MyEmbeddingModel(EmbeddingModel):
+       MAX_BATCH_SIZE: ClassVar[int] = 2048  # 0 = no cap (send whole list)
+   ```
+2. Wrap the existing single-request body in `self._iter_embed_batches(texts)`:
+   ```python
+   def embed(self, texts: List[str], **kwargs) -> List[List[float]]:
+       texts = [self._clean_text(t) for t in texts]
+       results: List[List[float]] = []
+       for batch in self._iter_embed_batches(texts):
+           # build payload for `batch`, POST, parse
+           results.extend(...)
+       return results
+   ```
+
+The base class owns the policy:
+
+- `_get_embed_batch_size()` resolves the effective size — `MAX_BATCH_SIZE` by
+  default, overridable via `config={"embed_batch_size": N}` (clamped to
+  `MAX_BATCH_SIZE` with a `logging.debug`; `N <= 0` raises `ValueError`).
+- `_iter_embed_batches(texts)` yields ordered slices; **empty input yields
+  nothing** (zero API calls), so `embed([])` returns `[]`.
+- `embed_batch_size` is stripped in `_get_api_kwargs()` — it is a client-side
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/lfnovo) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [lfnovo/esperanto](https://github.com/lfnovo/esperanto) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
