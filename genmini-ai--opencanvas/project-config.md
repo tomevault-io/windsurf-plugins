@@ -1,105 +1,213 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The OpenCanvas API is a RESTful service for AI-powered presentation generation. It supports both topic-based and PDF-based generation with advanced features like image extraction and web research.
 ---
 
-# CLAUDE.md
+# OpenCanvas Generation API
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Overview
 
-## CRITICAL GLOBAL RULES
+The OpenCanvas API is a RESTful service for AI-powered presentation generation. It supports both topic-based and PDF-based generation with advanced features like image extraction and web research.
 
-### NEVER Create Synthetic/Fallback Data
-- **NEVER** create synthetic gaps, scores, or results as fallbacks
-- **NEVER** use fake data to mask real issues or keep systems running
-- If evaluation fails → Stop evolution, don't analyze error data
-- If no gaps found → This is SUCCESS (system optimized), not failure
-- Real failures should propagate and be fixed, not hidden with synthetic data
-- This applies to ALL components: evaluation, reflection, improvement, implementation
+## Key Features
 
-## Development Commands
+🎨 **Dual Input Support**: Generate from text topics or PDF documents  
+📸 **Image Extraction**: Extract and include images from PDF sources  
+🔍 **Smart Research**: Automatic web research for insufficient knowledge  
+🎯 **Multiple Themes**: Professional themes for different contexts  
+📁 **Organized Output**: Structured file organization with timestamps  
 
-```bash
-# Install dependencies
-pip install -e .                    # Recommended: CLI + core functionality
-pip install -r requirements-all.txt # Complete installation (CLI + API)
-pip install -r requirements.txt     # Core functionality only
-pip install -r requirements-api.txt # API dependencies only
+## Architecture
 
-# Install browser drivers for PDF conversion
-playwright install chromium
-
-# Setup environment variables
-cp .env.example .env
-# Edit .env with your API keys
-
-# CLI Usage
-opencanvas generate "AI in healthcare" --purpose "academic presentation" --theme "clean minimalist"
-opencanvas convert output/slides.html --output presentation.pdf --zoom 1.5
-opencanvas evaluate evaluation_folder/
-opencanvas pipeline "quantum computing" --purpose "conference talk" --evaluate
-
-# Start API server
-opencanvas api --host 0.0.0.0 --port 8000 --reload
-
-# Run tests
-python run_tests.py                 # Full E2E test suite
-python run_tests.py light           # Light mode (faster)
-python run_tests.py topic           # Topic tests only
-python run_tests.py pdf             # PDF tests only
-python run_tests.py force           # Force regenerate all files
-
-# Adversarial evaluation testing
-python run_adversarial_eval_test.py
-python run_adversarial_eval_test.py --regenerate
-
-# Topic Evolution System - Autonomous presentation improvement
-python topic_evolution.py --run  # Run complete autonomous evolution system (default: 2 iterations)
-python topic_evolution.py --run --max-iterations 1  # Single iteration test to verify tool/prompt changes
-python topic_evolution.py --run --max-iterations 1 --topic "AI in healthcare"  # Custom topic single iteration
-python topic_evolution.py --run --diagnostic  # Run with diagnostic output for debugging
-python topic_evolution.py --run --prompt-only  # Focus only on prompt optimization, skip tool creation
-python topic_evolution.py --run --initial-prompt evolution_runs/evolved_prompts/generation_prompt_v3.txt  # Start with custom prompt
-python topic_evolution.py --run --resume evolution_runs/tracked_evolution_20250815_162354  # Resume from existing experiment
-
-# PDF Evolution System - PDF-based presentation evolution
-python pdf_evolution.py --max-iterations 2 --prompt-only --test-pdfs https://arxiv.org/pdf/2505.20286
-python pdf_evolution.py --max-iterations 4 --prompt-only --test-pdfs URL1 URL2 URL3 --memory
-
-# Validate configuration
-python -c "from opencanvas.config import Config; Config.validate(); print('✅ Configuration valid')"
+```
+src/api/
+├── app.py           # FastAPI application setup
+├── routes.py        # API endpoint definitions
+├── services.py      # Business logic layer
+├── models.py        # Pydantic request/response models
+└── run_api.py       # Standalone server runner
 ```
 
-## Project Architecture
+**Dependencies**: The API imports core functionality from the `opencanvas` package:
+- `opencanvas.generators.router` - Generation routing
+- `opencanvas.config` - Configuration management
 
-This is a Python-based presentation generation and evaluation system with both CLI and REST API interfaces:
+## Setup & Installation
 
-**Core Components:**
-- **CLI Interface** (`src/opencanvas/main.py`): Primary command-line interface with `generate`, `convert`, `evaluate`, `pipeline`, and `api` commands
-- **Generation Router** (`src/opencanvas/generators/router.py`): Routes between topic-based and PDF-based generation
-- **Topic Generator** (`src/opencanvas/generators/topic_generator.py`): Creates presentations from text topics with optional web research
-- **PDF Generator** (`src/opencanvas/generators/pdf_generator.py`): Extracts and converts PDF content to presentations
-- **HTML-to-PDF Converter** (`src/opencanvas/conversion/html_to_pdf.py`): Converts generated HTML slides to PDF using Selenium/Playwright
-- **AI Evaluator** (`src/opencanvas/evaluation/evaluator.py`): Evaluates presentation quality using Claude, GPT, or Gemini models
+### 1. Install Dependencies
+```bash
+# Core dependencies
+pip install -r requirements.txt
 
-**Evolution System** (Autonomous Improvement):
-- **Evolution System** (`src/opencanvas/evolution/core/evolution.py`): Main orchestrator for autonomous presentation quality improvement
-- **Multi-Agent System** (`src/opencanvas/evolution/core/agents.py`): Reflection, improvement, and implementation agents
-- **Auto Tool Implementation** (`src/opencanvas/evolution/core/tool_implementation.py`): Fully autonomous tool creation and deployment system
-- **Evolved Router** (`src/opencanvas/evolution/core/evolved_router.py`): Enhanced generation router with evolved prompts and auto-generated tools
-- **Prompt Evolution** (`src/opencanvas/evolution/core/prompts.py`): Dynamic prompt improvement based on evaluation results
-- **Tools Manager** (`src/opencanvas/evolution/core/tools.py`): Tool discovery, specification, and lifecycle management
+# API-specific dependencies
+pip install fastapi uvicorn
 
-**API Layer:**
-- **FastAPI Application** (`src/api/app.py`): REST API with auto-generated documentation
-- **API Routes** (`src/api/routes.py`): Endpoints for generation, conversion, evaluation, and pipeline operations
-- **Pydantic Models** (`src/api/models.py`): Request/response schemas
+# Image extraction dependencies (recommended)
+pip install docling docling-core pdfplumber
 
-### Key Features
+# Browser automation for PDF conversion
+playwright install chromium
+```
+
+### 2. Configure Environment
+```bash
+# Copy and edit environment file
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+Required API keys:
+- `ANTHROPIC_API_KEY` - For generation (required)
+- `BRAVE_API_KEY` - For web research (optional)
+
+## Running the API
+
+### Method 1: Standalone Runner (Recommended)
+```bash
+cd src
+python api/run_api.py
+```
+
+### Method 2: Direct uvicorn
+```bash
+cd src
+python -m uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Method 3: OpenCanvas CLI (if available)
+```bash
+opencanvas api --host 0.0.0.0 --port 8000 --reload
+```
+
+### API Access
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/api/v1/health
+- **Features**: http://localhost:8000/api/v1/features
+
+## API Endpoints
+
+### Generation Endpoint
+
+#### `POST /api/v1/generate`
+Generate presentation from topic or PDF source.
+
+**Request Parameters:**
+- `input_source`: Text topic or PDF URL/path
+- `purpose`: Presentation purpose (academic, conference, corporate, etc.)
+- `theme`: Visual theme (professional blue, clean minimalist, etc.)
+- `extract_images`: Boolean - extract images from PDFs
+- `output_dir`: Output directory (optional)
+
+**Topic Generation Example:**
+```json
+{
+  "input_source": "quantum computing basics",
+  "purpose": "academic presentation",
+  "theme": "professional blue"
+}
+```
+
+**PDF Generation Example:**
+```json
+{
+  "input_source": "https://arxiv.org/pdf/2301.08727.pdf",
+  "purpose": "conference presentation",
+  "theme": "clean minimalist",
+  "extract_images": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "html_file": "output/quantum_computing_20250831_181245/slides/presentation.html",
+  "research_performed": true,
+  "organized_files": {
+    "html": "output/quantum_computing_20250831_181245/slides/presentation.html",
+    "sources": "output/quantum_computing_20250831_181245/sources/",
+    "images": "output/quantum_computing_20250831_181245/images/"
+  },
+  "extracted_images_count": 3,
+  "image_validation_report": {
+    "total_images_checked": 5,
+    "successful_replacements": 2
+  },
+  "message": "Presentation generated successfully"
+}
+```
+
+### Configuration Endpoints
+
+#### `GET /api/v1/themes`
+Get available presentation themes.
+
+#### `GET /api/v1/purposes`
+Get available presentation purposes.
+
+#### `GET /api/v1/features`
+Check available features and dependencies.
+
+**Response:**
+```json
+{
+  "image_extraction": {
+    "docling": true,
+    "pdfplumber": true,
+    "description": "Advanced image extraction from PDFs"
+  },
+  "supported": {
+    "pdf_generation": true,
+    "topic_generation": true,
+    "html_to_pdf": true,
+    "evaluation": true
+  }
+}
+```
+
+## Testing
+
+### Basic Health Check
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+### Topic Generation Test
+```bash
+curl -X POST "http://localhost:8000/api/v1/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_source": "artificial intelligence ethics",
+    "purpose": "academic presentation",
+    "theme": "professional blue"
+  }'
+```
+
+### PDF Generation with Image Extraction
+```bash
+curl -X POST "http://localhost:8000/api/v1/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_source": "https://arxiv.org/pdf/2301.08727.pdf",
+    "purpose": "conference presentation", 
+    "theme": "clean minimalist",
+    "extract_images": true
+  }'
+```
+
+### Concurrent Generation Testing
+Test multiple generation requests simultaneously:
+```bash
+# Run in background
+curl -X POST "http://localhost:8000/api/v1/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"input_source": "quantum computing", "purpose": "academic presentation", "theme": "clean minimalist"}' \
+  -o response1.json &
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [genmini-ai/OpenCanvas](https://github.com/genmini-ai/OpenCanvas) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
