@@ -1,117 +1,198 @@
 ---
 trigger: always_on
-description: Guidelines for AI coding assistants working with this repository.
+description: Plugin development guidance for AI coding assistants.
 ---
 
-# AGENTS.md
+# plugins/AGENTS.md
 
-Guidelines for AI coding assistants working with this repository.
+Plugin development guidance for AI coding assistants.
 
-For domain-specific guidance, see subdirectory AGENTS.md files:
-- `tests/AGENTS.md` - Testing conventions and workflows
-- `plugins/AGENTS.md` - Plugin framework and development
-- `charts/AGENTS.md` - Helm chart operations
-- `docs/AGENTS.md` - Documentation authoring
-- `mcp-servers/AGENTS.md` - MCP server implementation
-- `crates/mcp_runtime/DEVELOPING.md` - Rust MCP runtime development workflows, command matrix, and validation
-
-**Note:** The `llms/` directory contains guidance for LLMs *using* ContextForge solution (end-user runtime guidance), not for code agents working on this codebase.
-
-## Project Overview
-
-ContextForge is an open source registry and proxy that federates MCP, A2A, and REST/gRPC APIs with centralized governance, discovery, and observability. It federates tools, agents, and APIs, optimizes agent and tool calling, and supports plugins, auth/RBAC, rate-limiting, virtual servers, multi-transport protocols, and an optional Admin UI.
-
-## Project Structure
+## Directory Structure
 
 ```
-mcpgateway/                 # Core FastAPI application
-├── main.py                 # Application entry point
-├── config.py               # Environment configuration
-├── db.py                   # SQLAlchemy ORM models and session management
-├── schemas.py              # Pydantic validation schemas
-├── services/               # Business logic layer (50+ services)
-├── routers/                # HTTP endpoint definitions (19 routers)
-├── middleware/             # Cross-cutting concerns (16 middleware)
-├── transports/             # Protocol implementations (SSE, WebSocket, stdio, streamable HTTP)
-├── plugins/                # Plugin framework infrastructure
-└── alembic/                # Database migrations
-
-tests/                      # Test suite (see tests/AGENTS.md)
-plugins/                    # Plugin implementations (see plugins/AGENTS.md)
-plugin_templates/           # Starter templates for building new plugins
-charts/                     # Helm charts (see charts/AGENTS.md)
-docs/                       # Architecture and usage documentation (see docs/AGENTS.md)
-a2a-agents/                 # A2A agent implementations (used for testing/examples)
-mcp-servers/                # MCP server templates (see mcp-servers/AGENTS.md)
-crates/                     # Direct Rust crate folders (runtime and wrapper)
-llms/                       # End-user LLM guidance (not for code agents)
+plugins/
+├── config.yaml              # Central plugin configuration (Jinja-enabled)
+├── README.md                # Plugin documentation
+├── install.yaml             # Installation manifest
+├── pii_filter/              # Built-in: PII detection and masking
+├── deny_filter/             # Built-in: Denylist blocking
+├── regex_filter/            # Built-in: Search/replace
+├── resource_filter/         # Built-in: Resource validation
+├── argument_normalizer/     # Built-in: Input normalization
+└── [many more plugins...]   # 42 plugin directories total
 ```
 
-## Essential Commands
+## Plugin Framework
 
-### Setup
+The plugin framework is provided by the [`cpex`](https://github.com/contextforge-org/contextforge-plugins-framework) package (ContextForge Plugin Extensions).
+
+### Core Interfaces
+
+```python
+from cpex.framework import Plugin, PluginConfig, PluginContext
+from cpex.framework import (
+    PromptPrehookPayload, PromptPrehookResult,
+    ToolPreInvokePayload, ToolPreInvokeResult,
+    ResourcePreFetchPayload, ResourcePreFetchResult,
+    PluginViolation,
+)
+```
+
+### Hook Lifecycle
+
+Six production hooks:
+- `prompt_pre_fetch` / `prompt_post_fetch` - Before/after prompt rendering
+- `tool_pre_invoke` / `tool_post_invoke` - Before/after tool execution
+- `resource_pre_fetch` / `resource_post_fetch` - Before/after resource fetch
+
+Plugins execute in priority order (ascending). Lower priority runs first.
+
+### Plugin Modes
+
+- `sequential` - Block on violation (use `on_error: ignore` to block violations but allow errors to pass)
+- `transform` - Log violations, continue processing
+- `disabled` - Loaded but not executed
+
+## Creating a Plugin
+
+### 1. Bootstrap from Template
+
 ```bash
-cp .env.example .env && make install-dev check-env    # Complete setup
-make venv                          # Create virtual environment with uv
-make install-dev                   # Install with dev dependencies (includes build-ui)
-make check-env                     # Verify .env against .env.example
-make build-ui                      # Rebuild Admin UI JS bundle (requires npm)
+mcpplugins bootstrap --destination plugins/my_plugin --type native
 ```
 
-### Development
+### 2. Implement the Plugin Class
+
+```python
+# plugins/my_plugin/my_plugin.py
+from cpex.framework import Plugin, PluginConfig, PluginContext
+from cpex.framework import PromptPrehookPayload, PromptPrehookResult, PluginViolation
+
+class MyPlugin(Plugin):
+    async def prompt_pre_fetch(self, payload: PromptPrehookPayload, context: PluginContext) -> PromptPrehookResult:
+        # Check for forbidden content
+        if payload.args and any("forbidden" in str(v) for v in payload.args.values()):
+            return PromptPrehookResult(
+                continue_processing=False,
+                violation=PluginViolation(
+                    reason="Forbidden content",
+                    description="Blocked by MyPlugin",
+                    code="FORBIDDEN",
+                    details={"matched": True},
+                ),
+            )
+        # Allow with optional modification
+        return PromptPrehookResult(modified_payload=payload)
+```
+
+### 3. Register in config.yaml
+
+```yaml
+plugins:
+  - name: "MyPlugin"
+    kind: "plugins.my_plugin.my_plugin.MyPlugin"
+    hooks: ["prompt_pre_fetch"]
+    mode: "sequential"
+    priority: 100
+    config:
+      # Plugin-specific configuration
+      custom_setting: "value"
+```
+
+### 4. Enable in .env
+
 ```bash
-make dev                          # Dev server on :8000 with autoreload
-make serve                        # Production gunicorn on :4444
-make serve-ssl                    # HTTPS on :4444 (creates certs if needed)
+PLUGINS_ENABLED=true
+PLUGINS_CONFIG_FILE=plugins/config.yaml
 ```
 
-### Code Quality
+## Configuration Schema
+
+`plugins/config.yaml` structure:
+
+```yaml
+plugins: []           # List of plugin configurations
+plugin_dirs: []       # Additional plugin directories
+plugin_settings:
+  plugin_timeout: 30            # Per-call timeout (seconds)
+  fail_on_plugin_error: false   # Strict error handling
+  enable_plugin_api: true       # Enable plugin management API
+```
+
+Plugin entry fields:
+- `name` - Unique identifier
+- `kind` - Fully-qualified class path (native) or `external` (MCP)
+- `hooks` - List of hooks to implement
+- `mode` - Execution mode
+- `priority` - Execution order (lower = earlier)
+- `conditions` - Selective execution filters
+- `config` - Plugin-specific settings
+
+## External Plugins (MCP)
+
+External plugins run as separate MCP servers.
+
+```yaml
+plugins:
+  - name: "ExternalFilter"
+    kind: "external"
+    priority: 10
+    mcp:
+      proto: STREAMABLEHTTP    # or STDIO
+      url: http://localhost:8000/mcp
+      # tls:
+      #   ca_bundle: /path/to/ca.crt
+```
+
+Required tools on external server:
+- `get_plugin_config`
+- `prompt_pre_fetch`, `prompt_post_fetch`
+- `tool_pre_invoke`, `tool_post_invoke`
+- `resource_pre_fetch`, `resource_post_fetch`
+
+## Testing Plugins
+
+### Unit Test
+
+```python
+import pytest
+from cpex.framework import (
+    HookType, PluginConfig, PluginContext, GlobalContext,
+    PromptPrehookPayload,
+)
+from plugins.my_plugin.my_plugin import MyPlugin
+
+@pytest.mark.asyncio
+async def test_my_plugin_blocks_forbidden():
+    cfg = PluginConfig(
+        name="test",
+        kind="plugins.my_plugin.my_plugin.MyPlugin",
+        hooks=[HookType.PROMPT_PRE_FETCH],
+        priority=100,
+    )
+    plugin = MyPlugin(cfg)
+    payload = PromptPrehookPayload(name="test", args={"text": "forbidden content"})
+    ctx = PluginContext(global_context=GlobalContext(request_id="t-1"))
+
+    result = await plugin.prompt_pre_fetch(payload, ctx)
+    assert result.continue_processing is False
+    assert result.violation is not None
+```
+
+### Run Tests
+
 ```bash
-# After writing code
-make autoflake isort black pre-commit
-
-# Before committing, use ty, mypy and pyrefly to check just the new files, then run:
-make ruff bandit interrogate pylint verify
-
-# Before committing Rust changes (tools_rust/):
-# Run fmt-check, clippy -D warnings, and cargo test for Rust crates
-cd tools_rust/mcp_runtime && cargo fmt --check && cargo clippy -- -D warnings && cargo test
+pytest tests/unit/mcpgateway/plugins/
+make doctest test
 ```
 
-## Authentication & RBAC Overview
+## Built-in Plugin Examples
 
-ContextForge implements a **two-layer security model**:
-
-1. **Token Scoping (Layer 1)**: Controls what resources a user CAN SEE (data filtering)
-2. **RBAC (Layer 2)**: Controls what actions a user CAN DO (permission checks)
-
-### Token Scoping Quick Reference
-
-**API / legacy tokens** — JWT `teams` claim is the sole authority (`normalize_token_teams()`):
-
-| JWT `teams` State | `is_admin: true` | `is_admin: false` |
-|-------------------|------------------|-------------------|
-| Key MISSING | PUBLIC-ONLY `[]` | PUBLIC-ONLY `[]` |
-| `teams: null` | ADMIN BYPASS | PUBLIC-ONLY `[]` |
-| `teams: []` | PUBLIC-ONLY `[]` | PUBLIC-ONLY `[]` |
-| `teams: ["t1"]` | Team + Public | Team + Public |
-
-**Session tokens** (`token_use: "session"`) — DB is the authority; JWT `teams` only narrows (`resolve_session_teams()`):
-
-| JWT `teams` State | DB admin? | Result | Access Level |
-|-------------------|-----------|--------|--------------|
-| any | yes | `None` | ADMIN BYPASS (DB authority) |
-| Missing/null/`[]` | no | DB teams | Full DB membership |
-| `["t1"]` | no | intersection | Narrowed to overlap |
-| `["revoked"]` | no | `[]` | Public-only (fail-closed) |
-
-**Key behaviors:**
-
-- **API/legacy tokens**: Missing `teams` key = public-only access (secure default). Admin bypass requires BOTH `teams: null` AND `is_admin: true`. `normalize_token_teams()` in `mcpgateway/auth.py` is the single source of truth.
-- **Session tokens**: Admin bypass is determined by the DB `is_admin` flag, not the JWT `teams` claim. Non-admin sessions can be narrowed via JWT `teams`. `resolve_session_teams()` in `mcpgateway/auth.py` is the single policy point.
+| Plugin | Hooks | Purpose |
+|--------|-------|---------|
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [IBM/mcp-context-forge](https://github.com/IBM/mcp-context-forge) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
