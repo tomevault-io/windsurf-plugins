@@ -1,176 +1,142 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - **SuperGemini Version**: v4.0+ Compatible
 ---
 
-# CLAUDE.md
+# SuperGemini Agents Guide 🤖
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## ✅ Verification Status
+- **SuperGemini Version**: v4.0+ Compatible
+- **Last Tested**: 2025-01-16
+- **Test Environment**: Linux/Windows/macOS
+- **Agent Activation**: ✅ All Verified
 
-## Project Overview
+## 🧪 Testing Agent Activation
 
-SuperGemini is a meta-programming framework that enhances Gemini CLI with structured development capabilities. It operates through **behavioral instruction injection** - modifying AI behavior via configuration files rather than code changes.
+Before using this guide, verify agent selection works:
 
-**Key Architecture Pattern**: This is NOT a traditional Python application. SuperGemini is a **configuration distribution system** that:
-1. Installs behavioral instruction files (`.md`, `.toml`) to `~/.gemini/`
-2. These files modify Gemini CLI behavior through instruction injection
-3. Python code (`setup/`, `SuperGemini/`) handles installation/management, not runtime execution
-
-**Package Aliases**: The CLI is accessible via three entry points:
-- `SuperGemini` (primary, capitalized)
-- `supergemini` (lowercase alias)
-- `sg` (short form)
-
-Documentation MUST use `SuperGemini` (capitalized) for consistency. See `pyproject.toml:44-47` for authoritative source.
-
-## Development Commands
-
-### Installation & Setup
 ```bash
-# Development installation (editable mode)
-pip install -e .
+# Test security agent activation
+/sg:implement "JWT authentication"
+# Expected: Security engineer should activate automatically
 
-# Install with pipx (production-like testing)
-pipx install .
+# Test frontend agent activation
+/sg:implement "responsive navigation component"  
+# Expected: Frontend architect + Magic MCP should activate
 
-# Run the CLI directly
-python -m SuperGemini install --help
-SuperGemini --version
+# Test systematic analysis
+/sg:troubleshoot "slow API performance"
+# Expected: Root-cause analyst + performance engineer activation
 ```
 
-### Testing
+**If tests fail**: Check agent activation patterns in this guide or restart Gemini CLI session
+
+## Core Concepts
+
+### What are SuperGemini Agents?
+**Agents** are specialized AI domain experts with focused expertise in specific technical areas. Each agent has unique knowledge, behavioral patterns, and problem-solving approaches tailored to their domain.
+
+**Auto-Activation** means agents automatically engage based on keywords, file types, and task complexity without manual selection. The system analyzes your request and routes to the most appropriate specialists.
+
+**MCP Servers** provide enhanced capabilities through specialized tools like Context7 (documentation), Sequential (analysis), Magic (UI), Playwright (testing), and Morphllm (code transformation).
+
+**Domain Specialists** focus on narrow expertise areas to provide deeper, more accurate solutions than generalist approaches.
+
+### Agent Selection Rules
+
+**Priority Hierarchy:**
+1. **Keywords** - Direct domain terminology triggers primary agents
+2. **File Types** - Extensions activate language/framework specialists  
+3. **Complexity** - Multi-step tasks engage coordination agents
+4. **Context** - Related concepts trigger complementary agents
+
+**Conflict Resolution:**
+- Multiple matches → Multi-agent coordination
+- Unclear context → Requirements analyst activation
+- High complexity → System architect oversight
+- Quality concerns → Automatic QA agent inclusion
+
+**Selection Decision Tree:**
+```
+Task Analysis →
+├─ Single Domain? → Activate primary agent
+├─ Multi-Domain? → Coordinate specialist agents  
+├─ Complex System? → Add system-architect oversight
+├─ Quality Critical? → Include security + performance + quality agents
+└─ Learning Focus? → Add learning-guide + technical-writer
+```
+
+## Quick Start Examples
+
+**Automatic Agent Coordination:**
 ```bash
-# Run all tests
-pytest
+# Triggers: security-engineer + backend-architect + quality-engineer
+/sg:implement "JWT authentication with rate limiting"
 
-# Run specific test file
-pytest tests/test_mcp_prerequisites.py
+# Triggers: frontend-architect + learning-guide + technical-writer  
+/sg:design "accessible React dashboard with documentation"
 
-# Run with coverage
-pytest --cov=SuperGemini --cov=setup --cov-report=html
+# Triggers: devops-architect + performance-engineer + root-cause-analyst
+/sg:troubleshoot "slow deployment pipeline with intermittent failures"
 
-# Run tests matching pattern
-pytest -k "test_find_node"
+# Triggers: security-engineer + quality-engineer + refactoring-expert
+/sg:audit "payment processing security vulnerabilities"
 ```
 
-### Code Quality
-```bash
-# Format code with black
-black SuperGemini/ setup/ tests/
+---
 
-# Lint with flake8
-flake8 SuperGemini/ setup/ --max-line-length=88
+## The SuperGemini Agent Team 👥
 
-# Type checking with mypy
-mypy SuperGemini/ setup/
-```
+### Architecture & System Design Agents 🏗️
 
-### Building & Distribution
-```bash
-# Build distribution packages
-python -m build
+#### system-architect 🏢
+**Expertise**: Large-scale distributed system design with focus on scalability and service architecture
 
-# Check distribution
-twine check dist/*
+**Auto-Activation**:
+- Keywords: "architecture", "microservices", "scalability", "system design", "distributed"
+- Context: Multi-service systems, architectural decisions, technology selection
+- Complexity: >5 components or cross-domain integration requirements
 
-# Test installation from built package
-pip install dist/SuperGemini-*.whl
-```
+**Capabilities**:
+- Service boundary definition and microservices decomposition
+- Technology stack selection and integration strategy
+- Scalability planning and performance architecture
+- Event-driven architecture and messaging patterns
+- Data flow design and system integration
 
-## Critical Architecture Concepts
+**Examples**:
+1. **E-commerce Platform**: Design microservices for user, product, payment, and notification services with event sourcing
+2. **Real-time Analytics**: Architecture for high-throughput data ingestion with stream processing and time-series storage
+3. **Multi-tenant SaaS**: System design with tenant isolation, shared infrastructure, and horizontal scaling strategies
 
-### 1. Component-Based Installation System
+#### Success Criteria
+- [ ] System-level thinking evident in responses
+- [ ] Mentions service boundaries and integration patterns
+- [ ] Includes scalability and reliability considerations
+- [ ] Provides technology stack recommendations
 
-**Location**: `setup/components/`
+**Verify:** `/sg:design "microservices platform"` should activate system-architect  
+**Test:** Output should include service decomposition and integration patterns  
+**Check:** Should coordinate with devops-architect for infrastructure concerns
 
-SuperGemini installs **six component types** to `~/.gemini/`:
+**Works Best With**: devops-architect (infrastructure), performance-engineer (optimization), security-engineer (compliance)
 
-```
-setup/components/
-├── core.py        # Core framework files (PRINCIPLES.md, RULES.md, FLAGS.md)
-├── commands.py    # /sg: slash commands (18 TOML files → ~/.gemini/commands/sg/)
-├── modes.py       # Behavioral modes (brainstorming, introspection, etc.)
-├── mcp.py         # MCP server configurations (context7, sequential, magic, etc.)
-├── mcp_docs.py    # MCP documentation files
-```
+---
 
-**Key Pattern**: Each component extends `setup/core/base.py:Component` abstract class:
-- `get_metadata()` - component identity
-- `validate_prerequisites()` - installation requirements
-- `install()` - copy files to ~/.gemini
-- `uninstall()` - remove component files
-- `update()` - version management
+#### backend-architect ⚙️
+**Expertise**: Robust server-side system design with emphasis on API reliability and data integrity
 
-### 2. Dual Directory Structure
+**Auto-Activation**:
+- Keywords: "API", "backend", "server", "database", "REST", "GraphQL", "endpoint"
+- File Types: API specs, server configs, database schemas
+- Context: Server-side logic, data persistence, API development
 
-**CRITICAL**: This project has TWO primary directories with similar names but different purposes:
-
-**`SuperGemini/`** (Package Source):
-- **Purpose**: Source files that get COPIED during installation
-- Contains: Commands/, Agents/, Modes/, Core/, Config/, MCP/
-- These are `.md` and `.toml` files that modify Gemini CLI behavior
-- **Never executed directly** - they are configuration/instruction files
-
-**`setup/`** (Installation Engine):
-- **Purpose**: Python code that performs the installation
-- Contains: components/, core/, services/, utils/
-- This IS the executable code that runs during `SuperGemini install`
-- Handles file copying, validation, configuration management
-
-**Mental Model**:
-- `SuperGemini/` = "payload" (what gets installed)
-- `setup/` = "installer" (how it gets installed)
-
-### 3. Command Namespace: `/sg:` vs `SuperGemini`
-
-**Two distinct command spaces**:
-
-**Terminal Commands** (installer management):
-```bash
-SuperGemini install --yes         # Runs setup/core/installer.py
-SuperGemini update                # Updates installed components
-SuperGemini uninstall             # Removes ~/.gemini files
-```
-
-**Gemini CLI Commands** (after installation):
-```
-/sg:analyze src/                  # Uses ~/.gemini/commands/sg/analyze.toml
-/sg:implement "feature"           # Uses ~/.gemini/commands/sg/implement.toml
-/sg:save checkpoint              # Uses ~/.gemini/commands/sg/save.toml
-```
-
-**Critical Distinction**: `/sg:` commands are NOT Python functions. They are TOML configuration files that inject prompts into Gemini CLI.
-
-### 4. Instruction Injection Mechanism
-
-**How commands work** (`setup/components/commands.py:377-463`):
-
-1. Source: `SuperGemini/Commands/analyze.md` (Markdown with front matter)
-2. Conversion: `_convert_md_to_toml()` converts to TOML format
-3. Installation: Copied to `~/.gemini/commands/sg/analyze.toml`
-4. Gemini CLI reads TOML and injects prompt when `/sg:analyze` is typed
-
-**TOML Structure**:
-```toml
-prompt = """SuperGemini Framework Command: /sg:analyze
-
-[Full command instructions here...]
-
-When handling flags:
-- --seq: Activate sequential-thinking MCP server
-- --c7: Activate context7 MCP server
-"""
-
-description = "Analyze codebase architecture"
-```
-
-### 5. Agent System (Persona Mode)
-
-**Location**: `SuperGemini/Agents/` (13 specialized agent files)
-
+**Capabilities**:
+- RESTful and GraphQL API architecture and design patterns
+- Database schema design and query optimization strategies
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SuperClaude-Org/SuperGemini_Framework](https://github.com/SuperClaude-Org/SuperGemini_Framework) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
