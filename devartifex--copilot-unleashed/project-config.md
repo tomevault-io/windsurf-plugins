@@ -1,98 +1,72 @@
 ---
 trigger: always_on
-description: Self-hosted multi-model AI chat platform powered by the official `@github/copilot-sdk`. A modern alternative to ChatGPT, Claude, and Gemini — with access to all Copilot models (GPT-4.1, o-series, Claude, Gemini) through a single interface. Users authenticate with GitHub Device Flow, pick a model, and chat over WebSocket with real-time token streaming.
+description: The most comprehensive, practical, and engineer-authored performance optimization instructions for all languages, frameworks, and stacks. Covers frontend, backend, and database best practices with actionable guidance, scenario-based checklists, troubleshooting, and pro tips.
 ---
 
-# Copilot Unleashed — Project Instructions
 
-## Project Overview
+# Performance Optimization Best Practices
 
-Self-hosted multi-model AI chat platform powered by the official `@github/copilot-sdk`. A modern alternative to ChatGPT, Claude, and Gemini — with access to all Copilot models (GPT-4.1, o-series, Claude, Gemini) through a single interface. Users authenticate with GitHub Device Flow, pick a model, and chat over WebSocket with real-time token streaming.
+## Introduction
 
-> See [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for full architecture details, data flow diagrams, and component inventory.
+Performance isn't just a buzzword—it's the difference between a product people love and one they abandon. I've seen firsthand how a slow app can frustrate users, rack up cloud bills, and even lose customers. This guide is a living collection of the most effective, real-world performance practices I've used and reviewed, covering frontend, backend, and database layers, as well as advanced topics. Use it as a reference, a checklist, and a source of inspiration for building fast, efficient, and scalable software.
 
-## Architecture
+---
 
-- **Full-stack**: SvelteKit 5 with `adapter-node` (replaces Express + vanilla JS)
-- **Frontend**: 20 Svelte 5 components with 4 rune-based stores — dark theme, mobile-first
-- **Real-time**: WebSocket via custom `server.js` entry, per-user `CopilotClient` lifecycle
-- **Auth**: GitHub Device Flow only (no client secret, no redirect URI)
-- **Session**: Express sessions bridged to SvelteKit via `x-session-id` header in `hooks.server.ts`
-- **Skills**: `.github/skills/` directory with `SKILL.md` definitions, discovered server-side and passed to the SDK via `skillDirectories`
-- **Settings**: Persisted server-side via `/api/settings` and mirrored in `localStorage`
-- **Deployment**: Docker container → Azure Container Apps via `azd up`
+## General Principles
 
-### Deployment
-- **Azure**: Key Vault (RBAC-only) for secrets, Basic ACR, EmptyDir volume; `COPILOT_CONFIG_DIR=/data/copilot-home`
-- **Local Docker**: Bind mount `~/.copilot` preserved for CLI sync; `COPILOT_CONFIG_DIR` stays at `/home/node/.copilot`
+- **Measure First, Optimize Second:** Always profile and measure before optimizing. Use benchmarks, profilers, and monitoring tools to identify real bottlenecks. Guessing is the enemy of performance.
+  - *Pro Tip:* Use tools like Chrome DevTools, Lighthouse, New Relic, Datadog, Py-Spy, or your language's built-in profilers.
+- **Optimize for the Common Case:** Focus on optimizing code paths that are most frequently executed. Don't waste time on rare edge cases unless they're critical.
+- **Avoid Premature Optimization:** Write clear, maintainable code first; optimize only when necessary. Premature optimization can make code harder to read and maintain.
+- **Minimize Resource Usage:** Use memory, CPU, network, and disk resources efficiently. Always ask: "Can this be done with less?"
+- **Prefer Simplicity:** Simple algorithms and data structures are often faster and easier to optimize. Don't over-engineer.
+- **Document Performance Assumptions:** Clearly comment on any code that is performance-critical or has non-obvious optimizations. Future maintainers (including you) will thank you.
+- **Understand the Platform:** Know the performance characteristics of your language, framework, and runtime. What's fast in Python may be slow in JavaScript, and vice versa.
+- **Automate Performance Testing:** Integrate performance tests and benchmarks into your CI/CD pipeline. Catch regressions early.
+- **Set Performance Budgets:** Define acceptable limits for load time, memory usage, API latency, etc. Enforce them with automated checks.
 
-## Tech Stack
+---
 
-| Layer | Technology |
-|-------|-----------|
-| Runtime | Node.js 24 (node:24-slim in Docker) |
-| Language | TypeScript 5.7 (strict mode, ES2022) |
-| Framework | SvelteKit 5 with `adapter-node` |
-| Reactivity | Svelte 5 runes ($state, $derived, $effect, $props) |
-| AI Engine | `@github/copilot-sdk` ^0.1.32 |
-| WebSocket | `ws` ^8.18 via custom server.js |
-| Markdown | `marked` + `dompurify` + `highlight.js` (npm, bundled by Vite) |
-| Security | Custom CSP/HSTS in hooks.server.ts, rate limiting, DOMPurify |
-| Sessions | express-session bridged to SvelteKit locals |
-| Build | `npm run build` (`tsc -p tsconfig.node.json` + `vite build`) → `build/` via adapter-node |
-| Testing | Vitest (colocated `*.test.ts`) + Playwright (Desktop Chrome, Pixel 7, iPhone 14) |
-| Container | Multi-stage Dockerfile (builder + runtime) |
-| IaC | Bicep (Azure Container Apps) |
+## Frontend Performance
 
-## Project Structure
+### Rendering and DOM
+- **Minimize DOM Manipulations:** Batch updates where possible. Frequent DOM changes are expensive.
+  - *Anti-pattern:* Updating the DOM in a loop. Instead, build a document fragment and append it once.
+- **Virtual DOM Frameworks:** Use React, Vue, or similar efficiently—avoid unnecessary re-renders.
+  - *React Example:* Use `React.memo`, `useMemo`, and `useCallback` to prevent unnecessary renders.
+- **Keys in Lists:** Always use stable keys in lists to help virtual DOM diffing. Avoid using array indices as keys unless the list is static.
+- **Avoid Inline Styles:** Inline styles can trigger layout thrashing. Prefer CSS classes.
+- **CSS Animations:** Use CSS transitions/animations over JavaScript for smoother, GPU-accelerated effects.
+- **Defer Non-Critical Rendering:** Use `requestIdleCallback` or similar to defer work until the browser is idle.
 
-```
-server.js                       # Custom entry: HTTP + express-session + WebSocket + SvelteKit handler
-.github/skills/                 # SDK skill definitions (currently 1 skill)
-└── git-commit/SKILL.md         # Built-in git commit workflow skill
-tests/                          # Playwright E2E suites and helpers
-svelte.config.js                # SvelteKit config (adapter-node)
-vite.config.ts                  # Vite config
-vitest.config.ts                # Vitest config for colocated unit tests
+### Asset Optimization
+- **Image Compression:** Use tools like ImageOptim, Squoosh, or TinyPNG. Prefer modern formats (WebP, AVIF) for web delivery.
+- **SVGs for Icons:** SVGs scale well and are often smaller than PNGs for simple graphics.
+- **Minification and Bundling:** Use Webpack, Rollup, or esbuild to bundle and minify JS/CSS. Enable tree-shaking to remove dead code.
+- **Cache Headers:** Set long-lived cache headers for static assets. Use cache busting for updates.
+- **Lazy Loading:** Use `loading="lazy"` for images, and dynamic imports for JS modules/components.
+- **Font Optimization:** Use only the character sets you need. Subset fonts and use `font-display: swap`.
 
-scripts/
-└── generate-vapid-keys.mjs     # VAPID key generation utility for push notifications
-static/
-├── manifest.json               # PWA manifest (name, icons, start_url, display: standalone)
-└── sw.js                       # Service worker: precaching, push handler, notification click
-infra/
-├── modules/
-│   ├── container-apps.bicep    # Container Apps Environment + App (Consumption, scale-to-zero)
-│   ├── container-registry.bicep # Azure Container Registry (Basic SKU)
-│   ├── key-vault.bicep         # Azure Key Vault (RBAC-only, secrets management)
-│   ├── managed-identity.bicep  # User-assigned MI (AcrPull + Key Vault Secrets User)
-│   └── monitoring.bicep        # Log Analytics workspace
+### Network Optimization
+- **Reduce HTTP Requests:** Combine files, use image sprites, and inline critical CSS.
+- **HTTP/2 and HTTP/3:** Enable these protocols for multiplexing and lower latency.
+- **Client-Side Caching:** Use Service Workers, IndexedDB, and localStorage for offline and repeat visits.
+- **CDNs:** Serve static assets from a CDN close to your users. Use multiple CDNs for redundancy.
+- **Defer/Async Scripts:** Use `defer` or `async` for non-critical JS to avoid blocking rendering.
+- **Preload and Prefetch:** Use `<link rel="preload">` and `<link rel="prefetch">` for critical resources.
 
-src/
-├── app.html                    # SvelteKit shell (viewport, theme-color, PWA meta)
-├── app.css                     # Global reset, design tokens, highlight.js theme
-├── hooks.server.ts             # Session bridge, CSP headers, rate limiting, CSRF, token revalidation
-├── hooks.server.test.ts        # Example colocated unit test pattern
-│
-├── lib/
-│   ├── components/             # 20 Svelte 5 components (see ARCHITECTURE.md)
-│   ├── stores/                 # 4 rune stores: auth, chat, settings, ws
-│   ├── server/                 # Server-only code
-│   │   ├── auth/
-│   │   │   ├── github.ts              # Device Flow OAuth (fetch-based)
-│   │   │   └── guard.ts               # Auth middleware + 30-min token revalidation
-│   │   ├── copilot/
-│   │   │   ├── client.ts              # CopilotClient factory
-│   │   │   └── session.ts             # Session config (model, reasoning, tools, hooks)
-│   │   ├── ws/
-│   │   │   ├── handler.ts             # WebSocket handler: 22+ message types, SDK events
-│   │   │   └── session-pool.ts        # Per-user session pool with TTL + buffer
-│   │   ├── push/
-│   │   │   ├── subscription-store.ts  # Push subscription CRUD per user (10 sub cap)
-│   │   │   └── sender.ts             # web-push wrapper with 60-min TTL, auto-cleanup
+### JavaScript Performance
+- **Avoid Blocking the Main Thread:** Offload heavy computation to Web Workers.
+- **Debounce/Throttle Events:** For scroll, resize, and input events, use debounce/throttle to limit handler frequency.
+- **Memory Leaks:** Clean up event listeners, intervals, and DOM references. Use browser dev tools to check for detached nodes.
+- **Efficient Data Structures:** Use Maps/Sets for lookups, TypedArrays for numeric data.
+- **Avoid Global Variables:** Globals can cause memory leaks and unpredictable performance.
+- **Avoid Deep Object Cloning:** Use shallow copies or libraries like lodash's `cloneDeep` only when necessary.
+
+### Accessibility and Performance
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [devartifex/copilot-unleashed](https://github.com/devartifex/copilot-unleashed) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
