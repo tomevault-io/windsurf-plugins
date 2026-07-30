@@ -1,69 +1,81 @@
 ---
 trigger: always_on
-description: - **Python version**: Use Python 3.13+.
+description: **Analysis Date:** 2026-03-27
 ---
 
-# Meraki Magic MCP - Agent Guide
+# Coding Conventions
 
-## Dev environment tips
+**Analysis Date:** 2026-03-27
 
-- **Python version**: Use Python 3.13+.
-- **Virtual env (recommended)**:
-  ```bash
-  python3 -m venv .venv
-  source .venv/bin/activate
-  python -m pip install -U pip
-  pip install -r requirements.txt
-  ```
+## Naming Patterns
 
-- **Environment setup**:
-  ```bash
-  cp .env-example .env
-  # Edit .env with your MERAKI_API_KEY and MERAKI_ORG_ID
-  ```
+**Files:**
+- Executable server entrypoints use hyphenated script names in the repository root: `meraki-mcp.py`, `meraki-mcp-dynamic.py`.
+- Helper scripts use snake_case with `.py` suffix: `inspect_tools.py`.
+- Documentation files use uppercase or uppercase-hyphen Markdown names: `README.md`, `README-DYNAMIC.md`, `INSTALL.md`, `OPTIMIZATIONS.md`.
 
-### Quick run examples
+**Functions:**
+- Manual MCP tool wrappers in `meraki-mcp.py` use snake_case names such as `get_networks`, `update_wireless_ssid`, and `create_action_batch`.
+- Dynamic MCP convenience tools in `meraki-mcp-dynamic.py` mirror Meraki SDK method names in camelCase, such as `getOrganizations`, `getNetworkClients`, and `updateDeviceSwitchPort`.
+- Internal helpers are prefixed with `_` when not exposed as tools, such as `_build_kwargs` in `meraki-mcp.py` and `_call_meraki_method_internal` in `meraki-mcp-dynamic.py`.
 
-```bash
-# Run the dynamic MCP server (recommended, ~804 endpoints)
-python meraki-mcp-dynamic.py
+**Variables:**
+- Module-level configuration constants are uppercase and loaded from the environment in `meraki-mcp.py`, `meraki-mcp-dynamic.py`, and `inspect_tools.py`: `MERAKI_API_KEY`, `MERAKI_ORG_ID`, `MCP_TRANSPORT`, `CACHE_TTL_SECONDS`.
+- Local Python variables use snake_case, even when they are later translated to Meraki SDK camelCase parameters, for example `org_id`, `network_id`, `device_policy`, and `global_bandwidth_limits` in `meraki-mcp.py`.
+- Temporary request dictionaries are commonly named `params`, `kwargs`, `update_dict`, `rules_dict`, or `response_data` in `meraki-mcp.py` and `meraki-mcp-dynamic.py`.
 
-# Run the manual MCP server (40 curated endpoints)
-python meraki-mcp.py
+**Types:**
+- Pydantic models in `meraki-mcp.py` use PascalCase and `Schema` suffixes where the model represents request payloads: `SsidUpdateSchema`, `DeviceUpdateSchema`, `ActionBatchSchema`.
+- Support models also use PascalCase: `Dot11wSettings`, `FirewallRule`, `SimpleCache`.
+- Type hints rely on built-in generics and `typing` names in both servers, for example `list[str]`, `Dict[str, Any]`, and `Optional[bool]`.
 
-# Run over HTTP transport
-MCP_TRANSPORT=http python meraki-mcp-dynamic.py
+## Code Style
 
-# Run with Docker
-docker compose up -d
-```
+**Formatting:**
+- No formatter configuration is present. `pyproject.toml` only defines project metadata and runtime dependencies; there is no Ruff, Black, isort, or autopep8 config.
+- Code follows 4-space indentation and keeps one top-level declaration per block in `meraki-mcp.py`, `meraki-mcp-dynamic.py`, and `inspect_tools.py`.
+- Tool responses are consistently serialized with `json.dumps(..., indent=2)` in `meraki-mcp.py` and `meraki-mcp-dynamic.py`.
+- Section banners made of `###################` are used to break up large single-file modules in `meraki-mcp.py` and `meraki-mcp-dynamic.py`.
 
-## Testing instructions
+**Linting:**
+- No lint configuration is detected in the repository root. Files such as `.ruff.toml`, `ruff.toml`, `.flake8`, `setup.cfg`, and `tox.ini` are not present.
+- Style consistency is maintained manually. When editing `meraki-mcp.py` or `meraki-mcp-dynamic.py`, match existing spacing, banner comments, and `json.dumps(..., indent=2)` output style.
 
-- **MCP server links**
+## Import Organization
 
-  This project is an MCP server built with [FastMCP](https://github.com/jlowin/fastmcp) and the [Meraki Python SDK](https://github.com/meraki/dashboard-api-python).
+**Order:**
+1. Standard library imports appear first in `meraki-mcp.py`, `meraki-mcp-dynamic.py`, and `inspect_tools.py`, including `os`, `sys`, `json`, `asyncio`, `functools`, `inspect`, `hashlib`, and `threading`.
+2. Third-party imports follow, including `meraki`, `pydantic`, `mcp.server.fastmcp.FastMCP`, and `dotenv.load_dotenv`.
+3. There are no local package imports because the repository is a flat script layout without a `src/` package.
 
-- **Test the code with the Cisco DevNet sandbox**
+**Path Aliases:**
+- Not used. All imports are direct module imports from installed dependencies or Python standard library modules.
 
-  Visit https://devnetsandbox.cisco.com/DevNet to book a Meraki sandbox.
+## Error Handling
 
-- **Latest Cisco Meraki API documentation**:
+**Patterns:**
+- Configuration failures are treated as fatal at import time. Both `meraki-mcp.py` and `meraki-mcp-dynamic.py` check `MERAKI_API_KEY`, print a message to `stderr`, and call `sys.exit(1)` if it is missing.
+- The dynamic server centralizes runtime error handling in `_call_meraki_method_internal` inside `meraki-mcp-dynamic.py`. It catches `meraki.exceptions.APIError`, `TypeError`, and generic `Exception`, then returns a JSON string with `error`, `message`, and related metadata instead of raising.
+- The manual server in `meraki-mcp.py` usually lets SDK exceptions bubble out. Most tool functions are thin wrappers with no `try/except`, so failures depend on FastMCP and the Meraki SDK to surface errors.
+- Invalid or unsafe file-cache access is normalized to JSON error payloads in `get_cached_response` and `list_cached_responses` in `meraki-mcp-dynamic.py`.
 
-  https://developer.cisco.com/meraki/api-v1/
+## Logging
 
-- **Meraki OpenAPI spec**:
+**Framework:** `print` to `stderr`
 
-  https://github.com/meraki/openapi
+**Patterns:**
+- Meraki SDK logging is intentionally suppressed with `suppress_logging=True` in `meraki-mcp.py`, `meraki-mcp-dynamic.py`, and `inspect_tools.py`.
+- Startup and configuration messages are emitted with `print(..., file=sys.stderr)` in `meraki-mcp.py`, `meraki-mcp-dynamic.py`, and `entrypoint.sh`.
+- The Python `logging` module is not used anywhere in the repository.
 
-## PR instructions
+## Comments
 
-- **Security**: Do not commit real credentials or tokens. Use placeholders and document required env vars or files. The `.env` file is used for secrets and must never be committed.
+**When to Comment:**
+- Use short banner comments to separate major domains or systems, following the existing style in `meraki-mcp.py` and `meraki-mcp-dynamic.py`.
+- Add brief inline comments only when they explain operational intent, such as cache invalidation, read-only behavior, or transport selection.
 
-## Contribution conventions
-
-- **Backward compatibility**: Do not change existing sample behavior unless clearly improving or fixing a bug; document changes.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [CiscoDevNet/meraki-magic-mcp-community](https://github.com/CiscoDevNet/meraki-magic-mcp-community) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
