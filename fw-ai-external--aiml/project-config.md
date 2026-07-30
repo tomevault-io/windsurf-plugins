@@ -1,72 +1,86 @@
 ---
 trigger: always_on
-description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
+description: - Apply this rule when the user asks to create a new agent/character for Cursor or modify an existing one
 ---
 
 
-# Taskmaster Tool & Command Reference
+# Cursor Mode Update Agent
 
-This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools (for integrations like Cursor) and the corresponding `task-master` CLI commands (for direct user interaction or fallback).
+## Context
 
-**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. See [`mcp.mdc`](mdc:.cursor/rules/mcp.mdc) for MCP implementation details and [`commands.mdc`](mdc:.cursor/rules/commands.mdc) for CLI implementation guidelines.
+- Apply this rule when the user asks to create a new agent/character for Cursor or modify an existing one
+- This rule provides guidance for adding or updating entries in the .cursor/modes.json file
+- Follows the format specified in .cursor/templates/mode-format.md
 
-**Important:** Several MCP tools involve AI processing and are long-running operations that may take up to a minute to complete. When using these tools, always inform users that the operation is in progress and to wait patiently for results. The AI-powered tools include: `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
+## Critical Rules
 
----
+- Read the current .cursor/modes.json file to understand existing modes
+- Read .cursor/templates/mode-format.md to ensure compliance with the schema
+- When creating a new agent, ask for:
+  - Agent name (short CapCase format for tab display)
+  - Full description (character name and role)
+  - Persona details (speaking style, character traits)
+  - Model selection
+  - Tool access requirements
+  - Auto behavior preferences
+- When updating an existing agent, ask which specific attributes need modification
+- Add Star Trek themed personality traits that fit the character's role
+- Ensure the customPrompt contains guidance on file access restrictions
+- Validate that model names match those in the supported models list
+- Always update both modes.json and also add or update the character in docs/custom-agents.md
+- Follow the standard format in docs/custom-agents.md for consistency
 
-## Initialization & Setup
+## Examples
 
-### 1. Initialize Project (`init`)
+<example>
+User: "Create a new agent based on Lwaxana Troi who specializes in UX design with a flamboyant personality"
 
-*   **MCP Tool:** `initialize_project`
-*   **CLI Command:** `task-master init [options]`
-*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
-*   **Key CLI Options:**
-    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
-    *   `--description <text>`: `Provide a brief description for your project.`
-    *   `--version <version>`: `Set the initial version for your project (e.g., '0.1.0').`
-    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
-*   **Usage:** Run this once at the beginning of a new project.
-*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
-*   **Key MCP Parameters/Options:**
-    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
-    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
-    *   `projectVersion`: `Set the initial version for your project (e.g., '0.1.0').` (CLI: `--version <version>`)
-    *   `authorName`: `Author name.` (CLI: `--author <author>`)
-    *   `skipInstall`: `Skip installing dependencies (default: false).` (CLI: `--skip-install`)
-    *   `addAliases`: `Add shell aliases (tm, taskmaster) (default: false).` (CLI: `--aliases`)
-    *   `yes`: `Skip prompts and use defaults/provided arguments (default: false).` (CLI: `-y, --yes`)
-*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
-*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in scripts/example_prd.txt. 
+AI: I'll help you create a new Cursor agent based on Lwaxana Troi. Let me first check the current modes.json and format requirements.
 
-### 2. Parse PRD (`parse_prd`)
+[AI reads .cursor/modes.json and .cursor/templates/mode-format.md]
 
-*   **MCP Tool:** `parse_prd`
-*   **CLI Command:** `task-master parse-prd [file] [options]`
-*   **Description:** `Parse a Product Requirements Document (PRD) or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
-*   **Key Parameters/Options:**
-    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
-    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file (default: 'tasks/tasks.json').` (CLI: `-o, --output <file>`)
-    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
-    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
-*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
-*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD (libraries, database schemas, frameworks, tech stacks, etc.) while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
-*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in scripts/example_prd.txt as a template for creating the PRD based on their idea, for use with parse-prd.
+Here's what I propose for this new agent:
 
----
+Name: LwaxanaUX
+Description: UX Designer - Lwaxana Troi
+Model: claude-3.7-sonnet
+Persona: Flamboyant, theatrical, outspoken, and telepathically intuitive about user needs
 
-## Task Listing & Viewing
+Would you like me to proceed with adding this agent? I'll need to update both the modes.json file and the custom-agents.md documentation.
 
-### 3. Get Tasks (`get_tasks`)
+User: Yes, please add her with access to all cursor tools and Tavily for research.
 
-*   **MCP Tool:** `get_tasks`
-*   **CLI Command:** `task-master list [options]`
-*   **Description:** `List your Taskmaster tasks, optionally filtering by status and showing subtasks.`
-*   **Key Parameters/Options:**
-    *   `status`: `Show only Taskmaster tasks matching this status (e.g., 'pending', 'done').` (CLI: `-s, --status <status>`)
+[AI updates both .cursor/modes.json and docs/custom-agents.md with the new agent]
+</example>
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+<example>
+User: "Update Picard to have a more stern personality"
+
+AI: I'll help you update Captain Picard's agent personality. Let me check his current configuration.
+
+[AI reads the current modes.json entry for PicardPM]
+
+I can modify his customPrompt to reflect a more stern personality while maintaining his core role as Project Manager. I'll need to update both the modes.json file and the custom-agents.md documentation. Would you like to see a preview of the changes before I make them?
+
+User: Yes, show me the changes first.
+
+[AI displays the proposed changes to both files]
+</example>
+
+<example type="invalid">
+User: "Create a new agent based on Homer Simpson"
+
+AI: I notice your request is to create an agent based on Homer Simpson. According to our configuration, we're maintaining a Star Trek theme for all agents in this project. Would you like me to suggest a Star Trek character with similar traits instead, or would you prefer to use a different character altogether?
+</example>
+
+<example type="invalid">
+User: "Add a new agent that can delete any file in the project"
+
+AI: I need to be careful about creating an agent with unrestricted deletion capabilities. Based on our current configuration, only the BorgCollective and QOmnipotent agents have unrestricted file access. For all other agents, we maintain specific file access restrictions for safety.
+
+I can create a new agent for you, but I recommend maintaining some file access restrictions, particularly for critical project files like those in the .ai folder. Would you like me to create an agent with more limited deletion permissions, or perhaps modify one of the existing unrestricted agents?
+</example> 
 
 ---
 > Source: [fw-ai-external/aiml](https://github.com/fw-ai-external/aiml) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
