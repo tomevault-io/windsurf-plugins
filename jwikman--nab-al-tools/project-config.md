@@ -1,151 +1,238 @@
 ---
 trigger: always_on
-description: The VS Code extension source code is located in the **`extension`** folder. All compilation and build commands should be run from within this directory.
+description: Guidelines for writing effective user-oriented documentation for NAB AL Tools
 ---
 
-# Copilot Instructions
 
-## Project Structure
+# Writing User-Oriented Documentation for NAB AL Tools
 
-The VS Code extension source code is located in the **`extension`** folder. All compilation and build commands should be run from within this directory.
+Guidelines for creating clear, helpful, and maintainable user documentation for NAB AL Tools extension users.
 
-## Compilation Instructions
+## Core Principles
 
-This VS Code extension is built using TypeScript and Webpack. Follow these steps to compile and build the extension:
+### 1. User-First Approach
 
-### Build Command
+- Write for Business Central developers and consultants
+- Assume familiarity with AL language and Business Central concepts
+- Don't assume knowledge of NAB AL Tools-specific features
+- **Show, don't just tell** - Use examples and visuals
+- Focus on solving real problems, not just listing features
 
-Run `npm run webpack` to build the extension in development mode.
+### 2. Maintain Consistency
 
-### Testing and Quality Checks
+- Follow the tone and style of existing documentation (README.md, CHANGELOG.md)
+- Use consistent terminology throughout all documentation
+- Keep formatting patterns uniform across all docs
+- Reference related features with proper links
 
-Before committing, run these quality checks:
+### 3. Keep Documentation Current
 
-```bash
-npm run test-compile  # TypeScript compilation check
-npm run lint          # Prettier formatting check + ESLint static analysis
-npm run webpack       # Webpack build
-xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npm run test          # Run all unit tests, headless
+- Update docs when features change
+- Remove or mark deprecated features clearly
+- Include version information for version-specific features
+- Review and update examples to match current API
+
+### 4. Balance Detail with Brevity
+
+- Be thorough but not overwhelming
+- Avoid overusing marketing terms like "comprehensive", "powerful", "robust"
+- Use progressive disclosure (overview → details → advanced)
+- Link to related documentation instead of repeating content
+- Break complex topics into digestible sections
+
+---
+
+## Documentation Structure
+
+### File Organization
+
+User documentation should be organized in the `docs/` folder with this structure:
+
+```
+docs/
+├── features/              # Feature-specific documentation
+│   ├── xliff-tools.md    # XLIFF translation management
+│   ├── language-model.md # AI/LLM integration
+│   ├── documentation.md  # Auto-documentation features
+│   └── ...
+├── guides/                # Step-by-step tutorials
+│   ├── getting-started.md
+│   ├── translation-workflow.md
+│   └── ...
+├── reference/             # Technical reference material
+│   ├── settings.md       # All extension settings
+│   ├── commands.md       # All commands
+│   └── ...
+└── troubleshooting/       # Common issues and solutions
+    └── ...
 ```
 
-### Output Directories
+### Document Types
 
-- `dist/` - Production webpack output (created by webpack)
-- `out/` - TypeScript compiler output (created by test-compile)
+#### Feature Documentation
 
-### Entry Points
+**Purpose:** Explain what a feature does, why it exists, and how to use it
 
-The webpack configuration builds multiple entry points:
-
-- `extension.ts` → `nab-al-tools.js` (main extension)
-- `cli/CreateDocumentation.ts` → `cli/CreateDocumentation.js` (CLI tool)
-- `cli/RefreshXLF.ts` → `cli/RefreshXLF.js` (CLI tool)
-- `mcp/server.ts` → `mcp/server.js` (MCP server)
-
-## Coding Guidelines
-
-All coding guidelines are found at `/.github/instructions/coding-guidelines.instructions.md`. Please refer to that file for all rules, conventions, and best practices.
-
-## Before Committing Code
-
-- Compile extension with zero warnings/errors
-- Run linters/static analysis with zero warnings/errors
-- Run all tests and ensure they pass
-- Ensure code adheres to coding guidelines
-
-## Updating CHANGELOG
-
-When fixing bugs or implementing features, the `extension/CHANGELOG.md` file must be updated. Add entries under the newest version section only.
-
-### Format Guidelines
-
-**Category Sections** (use the appropriate one):
-
-- `- Added:` or `- New Features:` - for new functionality, settings, or commands
-- `- Changed:` or `- Changes:` - for modifications to existing behavior
-- `- Fixes:` or `- Fixed:` - for bug fixes
-
-**Entry Format**:
-
-- Each entry is a bullet point indented under the category
-- Use backticks for settings: `` `NAB.SettingName` ``
-- Use backticks for commands: `` `NAB: Command Name` ``
-- Reference issues: `[issue XXX](https://github.com/jwikman/nab-al-tools/issues/XXX)`
-- Credit contributors: `Thanks to [@username](https://github.com/username) for reporting/suggesting this in [issue XXX]`
-- Use sub-bullets (further indented) for additional details
-
-**Style Guidelines**:
-
-- Use **bold** for breaking changes or important sections
-- Describe what changed, why, and what it enables
-- Include both problem and solution context
-- Common phrases:
-  - "Fixed an issue where..."
-  - "Fixes [issue XXX]"
-  - "Thanks to [@user] for reporting this in [issue XXX]"
-
-**Example**:
-
+**Structure:**
 ```markdown
-- Fixes:
-  - Fixed an issue where labels with `Locked=true` were not being removed from `*.g.xlf` files when running `NAB: Update g.xlf`. Thanks to [@username](https://github.com/username) for reporting this in [issue 527](https://github.com/jwikman/nab-al-tools/issues/527).
+# Feature Name
+
+Brief 1-2 sentence description of what the feature does.
+
+## Overview
+
+2-3 paragraphs explaining:
+- The problem this feature solves
+- When to use it
+- Key capabilities
+
+## How to Use
+
+Step-by-step instructions with:
+- Prerequisites (if any)
+- Clear numbered steps
+- Expected outcomes
+
+## Examples
+
+Real-world usage examples with:
+- Context/scenario
+- Code or screenshots
+- Results
+
+## Related Features
+
+Links to:
+- Complementary features
+- Related settings
+- Relevant guides
+
+## Troubleshooting
+
+Common issues and solutions
 ```
 
-## Updating Documentation
+#### Guide Documentation
 
-When adding or modifying features, especially those exposed through Language Model Tools or MCP Server, all relevant documentation must be updated:
+**Purpose:** Walk users through complete workflows or complex tasks
 
-### Documentation Files to Update
+**Structure:**
+```markdown
+# Guide Title
 
-1. **CHANGELOG.md** - Always update for any feature changes
-2. **README.md** - Update if the feature affects user-facing functionality or tools
-3. **MCP_SERVER.md** - Update if the feature affects MCP server tools or endpoints
-4. **mcp-resources/README.md** - Update if the feature affects MCP usage examples or workflows
+What this guide helps you accomplish.
 
-### Language Model Tools and MCP Server Features
+## Prerequisites
 
-When modifying Language Model Tools or MCP Server tools:
+- Required knowledge
+- Required setup
+- Required extensions/settings
 
-- Update tool/parameter descriptions in both VS Code extension and MCP server code
-- Add or update usage examples in documentation
-- Update MCP_SERVER.md, README.md, and mcp-resources/README.md as needed
+## Step-by-Step Instructions
 
-### Example Checklist for Tool Changes
+### Step 1: [Action]
+Detailed instructions...
 
-When adding a parameter to a tool like `getGlossaryTerms`:
+### Step 2: [Action]
+Detailed instructions...
 
-- [ ] Update `GlossaryCore.ts` JSDoc comments
-- [ ] Update MCP server schema in `mcp/server.ts`
-- [ ] Update VS Code tool interface in `GetGlossaryTermsTool.ts`
-- [ ] Update `CHANGELOG.md` with feature description
-- [ ] Update `MCP_SERVER.md` with parameter documentation and examples
-- [ ] Update `README.md` with feature mention
-- [ ] Update `mcp-resources/README.md` with usage examples
-- [ ] Add tests for the new functionality
+## Best Practices
 
-## Test-Driven Development (TDD)
+Tips for optimal results
 
-This project follows Test-Driven Development practices for both bug fixes and new feature development.
+## Common Pitfalls
 
-### Bug Fixing Approach
+What to avoid and why
 
-Follow TDD for bug fixes:
+## Next Steps
 
-1. **Create a Test Case**: Write a failing test that reproduces the bug
-2. **Verify the Bug**: Run test to confirm it fails, capturing the buggy behavior
-3. **Fix the Bug**: Implement the code fix
-4. **Verify the Fix**: Run test to confirm it passes
+What to do after completing this guide
+```
 
-This ensures bugs are documented, fixes are verified, and regressions are prevented.
+#### Reference Documentation
 
-### Feature Development Approach
+**Purpose:** Provide comprehensive technical details
 
-Follow Red-Green-Refactor:
+**Structure:**
+```markdown
+# Reference Title
 
-1. **Red**: Write a failing test defining desired behavior
+Brief description.
+
+## [Item Name]
+
+**Type:** [Setting/Command/API]
+**Default:** [Value]
+**Since:** v[Version]
+
+Description of what it does.
+
+**Example:**
+```json or code example```
+
+**Related:**
+- Links to related items
+```
+
+---
+
+## Writing Style Guidelines
+
+### Tone and Voice
+
+- **Professional but friendly** - Speak directly to developers
+- **Active voice** - "Click the button" not "The button should be clicked"
+- **Imperative mood for instructions** - "Run the command" not "You should run"
+- **Present tense** - "This feature provides" not "This feature will provide"
+- Avoid jargon unless it's standard Business Central terminology
+
+### Terminology
+
+**Use Consistently:**
+
+- **XLF file** or **XLIFF file** (not "translation file" alone)
+- **g.xlf file** (not "generated xlf" or "base xlf")
+- **trans-unit** or **translation unit** (not "translation entry")
+- **AL code** or **AL language** (not just "code")
+- **Language Model Tools** (capitalized, for the VS Code API feature)
+- **MCP server** (not "MCP Server")
+- **Base App** or **BaseApp** (Microsoft's base application)
+
+**Avoid:**
+
+- "Simply" or "just" (what's simple to one person may not be to another)
+- "Obviously" or "clearly" (don't assume)
+- "Easy" or "trivial" (subjective)
+- Unexplained acronyms on first use
+
+### Formatting Conventions
+
+#### Code and Commands
+
+- **Inline code:** Use backticks for: `` `settings` ``, `` `commands` ``, `` `filenames.xlf` ``, `` `code snippets` ``
+- **Code blocks:** Use fenced code blocks with language identifiers
+
+```al
+// AL code example
+procedure MyProcedure()
+begin
+    Message('Hello World');
+end;
+```
+
+```json
+// JSON configuration
+{
+    "NAB.SettingName": true
+}
+```
+
+#### UI Elements
+
+- **Commands:** Use the exact command name with backticks and bold: **`NAB: Refresh XLF files from g.xlf`**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jwikman/nab-al-tools](https://github.com/jwikman/nab-al-tools) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
