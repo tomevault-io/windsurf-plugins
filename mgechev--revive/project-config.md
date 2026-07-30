@@ -1,113 +1,140 @@
 ---
 trigger: always_on
-description: Guidance for AI coding agents (Claude Code, Copilot, Cursor, Codex, etc.) working in this repository.
+description: Instructions for writing Go code following idiomatic Go practices and community standards
 ---
 
-# AGENTS.md
 
-Guidance for AI coding agents (Claude Code, Copilot, Cursor, Codex, etc.) working in this repository.
+# Go Development Instructions
 
-Human contributors: see [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPING.md](DEVELOPING.md) first — this file is a complement, not a replacement.
+Follow idiomatic Go practices and community standards when writing Go code.
+These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
+[Go Code Review Comments](https://go.dev/wiki/CodeReviewComments),
+[Go Test Code Comments](https://go.dev/wiki/TestComments),
+and [Google's Go Style Guide](https://google.github.io/styleguide/go/).
 
-## 1. What this project is
+## Go Version Awareness
 
-`revive` is a fast, configurable, extensible Go linter.
-It parses Go source via `go/ast` (+ `go/types` for typed rules), runs a configurable set of rules, and emits findings through pluggable formatters.
+- Always determine the project's Go version from the `go` directive in `go.mod` before suggesting changes.
+- Do **not** propose rewrites that replace modern standard-library features (Go 1.21+) with hand-rolled equivalents.
+- Do **not** flag, downgrade, or "polyfill" the following modern features when the `go.mod` permits them:
+  - Go 1.20: `errors.Join`.
+  - Go 1.21: built-ins `min`, `max`, `clear`; stdlib packages `slices`, `maps`, `cmp`; structured logging `log/slog`.
+  - Go 1.22: range-over-integer (`for i := range n`); per-iteration loop variable scoping; `math/rand/v2`; enhanced `http.ServeMux` patterns; `cmp.Or`.
+  - Go 1.23: range-over-function iterators (`iter.Seq`, `iter.Seq2`); `unique` package; `slices.Sorted`, `slices.Collect`, etc.
+  - Go 1.24: generic type aliases; `omitzero` JSON tag; `weak` package; `testing.B.Loop`; `os.Root`.
+  - Go 1.25: `testing/synctest`; `runtime.AddCleanup`; container-aware `GOMAXPROCS`; `encoding/json/v2` (experimental).
+- When proposing code that requires a feature newer than `go.mod` allows, call this out explicitly rather than silently using it.
+- Prefer the newest idiomatic form available for the project's Go version; only suggest the older pattern when the feature is genuinely unavailable.
 
-Top-level packages:
+## General Instructions
 
-- `cli/` — command-line entry point (`main.go` defers to `cli.RunRevive`).
-- `lint/` — core linter engine, rule interfaces (`Rule`, `ConfigurableRule`), `File`, `Failure`, `Severity`, and the in-memory `Config` types.
-- `rule/` — one file per rule (100+ rules). Untyped rules also listed in `untyped.toml`.
-- `formatter/` — output formatters (default, json, sarif, stylish, friendly, …).
-- `config/` — config file loading (TOML), defaults, and the registries of available rules and formatters.
-- `revivelib/` — programmatic API for embedding revive.
-- `test/` — rule tests, one `_test.go` per rule.
-- `testdata/` — Go source fixtures consumed by rule tests.
-- `internal/` — helpers not part of the public API.
+- Write simple, clear, and idiomatic Go code
+- Favor clarity and simplicity over cleverness
+- Follow the principle of least surprise
+- Keep the happy path left-aligned (minimize indentation)
+- Return early to reduce nesting
+- Make the zero value useful
+- Document exported types, functions, methods, and packages
+- Use Go modules for dependency management
 
-## 2. Coding standards — read these first
+## Naming Conventions
 
-Before writing Go, read [`.github/instructions/go.instructions.md`](.github/instructions/go.instructions.md).
-It is the single source of truth for naming, error handling, concurrency, testing style, and modern Go (1.21+) idioms that this project expects.
-**Do not duplicate or contradict it here.**
+### Packages
 
-In addition to that file:
+- Use lowercase, single-word package names
+- Avoid underscores, hyphens, or mixedCaps
+- Choose names that describe what the package provides, not what it contains
+- Avoid generic names like `util`, `common`, or `base`
+- Package names should be singular, not plural
 
-- The project targets the Go version in [`go.mod`](go.mod) (currently `go 1.25.0`).
-  Use stdlib features available at that version (`min`/`max`, `slices`, `maps`, `cmp.Or`, `errors.Join`, range-over-int, `slog`, etc.)
-  instead of hand-rolled equivalents.
-- `revive` lints itself. Code must pass `revive --config revive.toml ./...` **and** `golangci-lint run`.
-  See [`.golangci.yml`](.golangci.yml) for the strict config.
+### Variables and Functions
 
-## 3. Build, test, lint
+- Use mixedCaps or MixedCaps (camelCase) rather than underscores
+- Keep names short but descriptive
+- Use single-letter variables only for very short scopes (like loop indices)
+- Exported names start with a capital letter
+- Unexported names start with a lowercase letter
+- Avoid stuttering (e.g., avoid `http.HTTPServer`, prefer `http.Server`)
 
-All workflows go through the [`Makefile`](Makefile):
+### Interfaces
 
-```sh
-make build # builds ./revive with version ldflags
-make test  # go test -v -race ./...
-make lint  # revive + golangci-lint
-make fmt   # golangci-lint fmt
-make tidy  # go mod tidy -diff (fails on drift)
-make all   # test + lint + build
-```
+- Name interfaces with -er suffix when possible (e.g., `Reader`, `Writer`, `Formatter`)
+- Single-method interfaces should be named after the method (e.g., `Read` → `Reader`)
+- Keep interfaces small and focused
 
-Run a single rule's tests:
+### Constants
 
-```sh
-go test -run TestUnusedParam ./test/...
-```
+- Use MixedCaps for exported constants
+- Use mixedCaps for unexported constants
+- Group related constants using `const` blocks
+- Consider using typed constants for better type safety
 
-Logging during local runs: set `REVIVE_LOG_LEVEL` (`debug|info|warn|error`) — logs go to stderr. See [DEVELOPING.md](DEVELOPING.md#logging).
+## Code Style and Formatting
 
-## 4. Adding or modifying a rule
+### Formatting
 
-The canonical example is [`rule/argument_limit.go`](rule/argument_limit.go). For each new rule:
+- Always use `gofmt` to format code
+- Use `goimports` to manage imports automatically
+- Keep line length reasonable (no hard limit, but consider readability)
+- Add blank lines to separate logical groups of code
 
-1. **Implementation** — `rule/<rule_name>.go`. Implement `lint.Rule`:
+### Comments
 
-    ```golang
-    Name() string
-    Apply(*lint.File, lint.Arguments) []lint.Failure
-    ```
+- Write comments in complete sentences
+- Start sentences with the name of the thing being described
+- Package comments should start with "Package [name]"
+- Use line comments (`//`) for most comments
+- Use block comments (`/* */`) only for files in `testdata`
+- Document why, not what, unless the what is complex
 
-    If the rule takes arguments, also implement `lint.ConfigurableRule.Configure(lint.Arguments) error`.
-    Validate arguments there and return errors rather than panicking.
-2. **Naming** — `Name()` returns `kebab-case` (e.g. `argument-limit`).
-   The Go type is `ArgumentsLimitRule`. Source file is `argument_limit.go`. Keep these three in lockstep.
-3. **Concurrency** — `Apply` may be called concurrently for different files.
-   Do not mutate rule state from `Apply`. Mutate only in `Configure`, which is called once.
-4. **Typed vs untyped** — if the rule uses `file.Pkg.TypeCheck()` (or anything from `go/types`), it is typed.
-   Otherwise it is untyped and **must** be added to [`untyped.toml`](untyped.toml). Keep that file sorted and in sync.
-5. **Tests** — add `test/<rule_name>_test.go` and a fixture under `testdata/<rule_name>.go` (and `_test.go`, `.gold`, or sub-dirs as needed).
-   Use the existing test harness; do not introduce assertion libraries.
-6. **Documentation** — add a `## <rule-name>` section to [`RULES_DESCRIPTIONS.md`](RULES_DESCRIPTIONS.md), in alphabetical order.
-   Include configuration shape, an `### Examples` block, and a one-line entry in the rules table in [`README.md`](README.md).
-   The TOC in both files is generated by `markdown-toc` (see DEVELOPING.md §Lint Markdown files) — regenerate it; don't hand-edit.
-7. **Defaults** — hard-code defaults as constants in the rule file and apply them in `Configure` when arguments are missing
-   (see `defaultArgumentsLimit` in `rule/argument_limit.go`). Bundle-level defaults live in `defaults.toml` / `revive.toml`.
-8. **Register** — append the rule to `allRules` in [`config/config.go`](config/config.go) so the CLI can discover it.
+### Error Handling
 
-## 5. Adding a formatter
+- Check errors immediately after the function call
+- Don't ignore errors using `_` unless you have a good reason (document why)
+- Wrap errors with context using `fmt.Errorf` with `%w` verb
+- Create custom error types when you need to check for specific errors
+- Place error returns as the last return value
+- Name error variables `err`
+- Keep error messages lowercase and don't end with punctuation
 
-Implement `lint.Formatter`:
+## Architecture and Project Structure
 
-```golang
-Format(<-chan lint.Failure, lint.Config) (string, error)
-Name() string
-```
+### Package Organization
 
-Place the implementation in `formatter/<name>.go`, append it to `allFormatters` in [`config/config.go`](config/config.go)
-(so `config.GetFormatter` can find it), and add a row to the formatters table in [`README.md`](README.md).
+- Follow standard Go project layout conventions
+- Use `internal/` for packages that shouldn't be imported by external projects
+- Group related functionality into packages
+- Avoid circular dependencies
 
-## 6. Markdown changes
+### Dependency Management
 
-[`README.md`](README.md) and [`RULES_DESCRIPTIONS.md`](RULES_DESCRIPTIONS.md) are linted by `markdownlint-cli2`,
-have generated tables of contents (`markdown-toc`), and have code snippets formatted by `mdsf`.
+- Use Go modules (`go.mod` and `go.sum`)
+- Keep dependencies minimal
+- Regularly update dependencies for security patches
+- Use `go mod tidy` to clean up unused dependencies
+
+## Type Safety and Language Features
+
+### Type Definitions
+
+- Define types to add meaning and type safety
+- Use struct tags for JSON, XML, database mappings
+- Prefer explicit type conversions
+- Use type assertions carefully and check the second return value
+
+### Pointers vs Values
+
+- Use pointers for large structs or when you need to modify the receiver
+- Use values for small structs and when immutability is desired
+- Be consistent within a type's method set
+- Consider the zero value when choosing pointer vs value receivers
+
+### Interfaces and Composition
+
+- Accept interfaces, return concrete types
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mgechev/revive](https://github.com/mgechev/revive) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
