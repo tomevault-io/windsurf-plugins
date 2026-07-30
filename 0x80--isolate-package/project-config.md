@@ -1,170 +1,118 @@
 ---
 trigger: always_on
-description: `isolate-package` is a tool for isolating monorepo workspace packages into
+description: This file provides guidance to Claude Code (claude.ai/code) when working with
 ---
 
-# Isolate Package - Development Rules
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
 
 ## Project Overview
 
-`isolate-package` is a tool for isolating monorepo workspace packages into
-self-contained directories with their internal dependencies and adapted
-lockfiles. It's particularly useful for deploying to platforms like Firebase
-from a monorepo without complex scripting.
+`isolate-package` is a CLI tool that isolates a monorepo workspace package into
+a self-contained directory with all internal dependencies and an adapted
+lockfile. It's primarily used for deploying monorepo packages (especially
+Firebase functions) without bundling the entire monorepo.
 
-## Core Concepts
+## Commands
 
-- **Package Isolation**: Extracts a package from a monorepo with all its
-  internal dependencies
-- **Lockfile Adaptation**: Generates or adapts lockfiles for the isolated
-  package structure
-- **Multi-Package Manager Support**: Works with NPM, PNPM, Yarn, and partially
-  with Bun
-- **Firebase Integration**: Special support for Firebase deployments
-
-## Code Style and Conventions
-
-### TypeScript
-
-- Use TypeScript for all source files
-- Target ES modules (ESM) - the project uses `"type": "module"`
-- Use path aliases: `~` maps to `src/` directory
-- Prefer `node:` prefix for Node.js built-in modules (e.g., `node:path`,
-  `node:assert`)
-- Use `satisfies` operator for type-safe object literals where appropriate
-
-### Functional Programming
-
-- Prefer functional approaches over class-based ones (as seen in the recent
-  Config refactor)
-- Use pure functions where possible
-- Avoid unnecessary state management
-- Use `remeda` for functional utilities (not lodash)
-
-### Error Handling
-
-- Use `assert` from `node:assert` for critical validations
-- Use the `getErrorMessage` utility for consistent error message extraction
-- Provide clear, actionable error messages
-
-### Logging
-
-- Use the centralized logger from `lib/logger`
-- Follow the log level hierarchy: debug < info < warn < error
-- Use `debug` for detailed implementation info
-- Use `info` for important user-facing information
-- Include context in log messages (file paths, package names, etc.)
-
-### File Organization
-
-```
-src/
-├── lib/
-│   ├── config.ts          # Configuration management
-│   ├── logger.ts          # Logging utilities
-│   ├── types.ts           # Shared type definitions
-│   ├── lockfile/          # Lockfile processing logic
-│   ├── manifest/          # Package.json manipulation
-│   ├── output/            # Output generation
-│   ├── package-manager/   # Package manager detection/handling
-│   ├── registry/          # Package registry management
-│   └── utils/             # General utilities
-├── isolate.ts             # Main isolation logic
-├── isolate-bin.ts         # CLI entry point
-└── index.ts               # Library export
+```bash
+pnpm install          # Install dependencies
+pnpm build            # Build with tsup-node
+pnpm dev              # Development mode with watch
+pnpm test             # Run all tests with Vitest
+pnpm test <pattern>   # Run specific test file
+pnpm lint             # Lint with ESLint
+pnpm check-types      # TypeScript type checking
+pnpm check-format     # Check code formatting
+pnpm format           # Format with Prettier
 ```
 
-### Testing
+## Architecture
 
-- Use Vitest for testing
-- Place test files next to the source files with `.test.ts` suffix
-- Write focused unit tests for utility functions
-- Use descriptive test names with `describe` and `it`
+### Entry Points
 
-### Dependencies
+- `src/isolate-bin.ts` - CLI binary entry (`npx isolate`)
+- `src/index.ts` - Library API entry
+  (`import { isolate } from "isolate-package"`)
+- `src/isolate.ts` - Main orchestration logic
 
-- Use `fs-extra` instead of native `fs` for enhanced file operations
-- Use `consola` for logging (via the centralized logger in `lib/logger`)
-- Use `yaml` package for YAML parsing/writing
-- Use `glob` for file pattern matching
+### Core Modules (`src/lib/`)
 
-## Key Implementation Patterns
+**config.ts** - Configuration loading and validation. Reads
+`isolate.config.json` and merges with defaults.
 
-### Package Manager Detection
+**registry/** - Builds a `PackagesRegistry` (Record<name, WorkspacePackageInfo>)
+by scanning workspace package directories. Used to resolve internal dependencies
+by name.
 
-```typescript
-// Always use the centralized detection
-const packageManager = detectPackageManager(workspaceRootDir);
-// or for singleton usage within a module
-const packageManager = usePackageManager();
-```
+**package-manager/** - Detects the workspace's package manager
+(npm/pnpm/yarn/bun) from lockfiles and manifests.
 
-### Path Handling
+**manifest/** - Handles package.json operations:
 
-- Always use `path.join()` for cross-platform compatibility
-- Never use string concatenation for paths
-- Use utility functions for consistent path formatting:
-  - `getRootRelativeLogPath()` for logging paths relative to root
-  - `getIsolateRelativeLogPath()` for paths relative to isolate dir
+- Validates required fields (version, files)
+- Adapts internal dependency versions to use `file:` protocol
+- Handles pnpm-specific fields
 
-### Manifest Manipulation
+**lockfile/** - Generates isolated lockfiles for each package manager:
 
-- Read manifests with `readTypedJson<PackageManifest>()`
-- Write manifests with `writeManifest()`
-- Always preserve unknown fields when modifying manifests
-- Strip `devDependencies` and `scripts` from internal package manifests
+- PNPM: Prunes and adapts lockfile using `@pnpm/lockfile-file` and
+  `@pnpm/prune-lockfile` (supports v8 and v9)
+- NPM: Uses `@npmcli/arborist`'s `loadVirtual` + `workspaceDependencySet`
+  to compute the target's transitive closure, then copies matching entries
+  verbatim from the root `package-lock.json` (preserves original resolved
+  versions and integrity). Falls back to Arborist's `buildIdealTree` when
+  no root `package-lock.json` exists (e.g. `forceNpm` from pnpm/bun/yarn).
+- Yarn: Copies the root `yarn.lock` and runs `yarn install` locally to
+  prune it (Yarn v1 only; v2+ falls through to the NPM generator)
+- Bun: Walks and prunes the root `bun.lock` manually
 
-### Async Operations
+**output/** - Handles file operations:
 
-- Use async/await consistently
-- Parallelize operations where possible with `Promise.all()`
-- Handle file system operations carefully with proper error handling
+- `pack-dependencies.ts` - Packs internal dependencies using npm/pnpm pack
+- `unpack-dependencies.ts` - Extracts packed tarballs to isolate directory
+- `process-build-output-files.ts` - Copies target package build output
 
-## Configuration Philosophy
+**patches/** - Handles PNPM patched dependencies:
 
-- Zero-config by default - most users shouldn't need configuration
-- Configuration file: `isolate.config.json`
-- Environment variables for debugging: `DEBUG_ISOLATE_CONFIG=true`
-- Validate configuration keys and warn about unknown options
+- `copy-patches.ts` - Copies relevant patch files from workspace root to isolate
+  directory, filtering based on target package dependencies
 
-## Package Manager Specific Handling
+### Key Types (`src/lib/types.ts`)
 
-### PNPM
+- `PackageManifest` - Extended pnpm package manifest type
+- `PackagesRegistry` - Maps package names to their paths and manifests
+- `WorkspacePackageInfo` - Package metadata (absoluteDir, rootRelativeDir,
+  manifest)
+- `PatchFile` - Represents a patch file entry with path and hash
 
-- Preserve `workspace:*` specifiers in isolated output
-- Copy or generate `pnpm-workspace.yaml`
-- Handle Rush workspaces specially (generate workspace config)
-- Prune lockfiles before writing
+### Process Flow
 
-### NPM
+1. Resolve configuration (defaults + isolate.config.json + API args)
+2. Detect package manager and locate workspace root
+3. Build packages registry from workspace definitions
+4. Recursively find all internal dependencies
+5. Pack and unpack internal dependencies to isolate directory
+6. Adapt manifests to use `file:` references
+7. Copy PNPM patched dependencies (if any exist)
+8. Generate pruned lockfile for the isolated package
+9. Copy workspace config files (.npmrc, pnpm-workspace.yaml)
 
-- Replace workspace specifiers with `file:` paths
-- Preserve original resolved versions and integrity by reading the root
-  `package-lock.json` via Arborist `loadVirtual` and copying matching
-  entries into the isolated lockfile
-- Fall back to Arborist's `buildIdealTree` (generating from node_modules)
-  when no root `package-lock.json` exists (`forceNpm` from non-npm
-  monorepos, or modern Yarn v2+)
+## Path Alias
 
-### Yarn
+The codebase uses `~/` as path alias for `src/` (configured in tsconfig.json).
 
-- Replace workspace specifiers with file paths
-- Yarn v1: copy `yarn.lock` and run a local `yarn install` to prune
-- Yarn v2+: fall through to the NPM generator
+## Testing
 
-## Pull Request Guidelines
+Tests use Vitest and are co-located with source files (`*.test.ts`).
 
-- Keep changes focused and atomic
-- Update tests for any logic changes
-- Update README.md for user-facing changes
-- Include clear commit messages
-- Consider backward compatibility
+## Code Style
 
-### PR Summary Documentation
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Use JSDoc style comments (`/** ... */`) for all comments, including
+  single-line comments
 
 ---
 > Source: [0x80/isolate-package](https://github.com/0x80/isolate-package) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
