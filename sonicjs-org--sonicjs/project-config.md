@@ -1,84 +1,66 @@
 ---
 trigger: always_on
-description: Use when scope is bounded AND output would bloat main context:
+description: Cloudflare-native headless CMS built with **Hono.js** + TypeScript on **Cloudflare Workers** / **D1**.
 ---
 
-# SonicJS Agent Guidelines
+# SonicJS AI Development Guidelines
 
-These instructions mirror the workflow Claude Code already follows in Conductor so every coding agent behaves consistently.
+Cloudflare-native headless CMS built with **Hono.js** + TypeScript on **Cloudflare Workers** / **D1**.
 
-## Token-Efficient Tooling (use FIRST, before grep/Read sprees)
+## Core Technology Stack
+- **Framework**: Hono.js
+- **Runtime**: Cloudflare Workers
+- **Database**: Cloudflare D1 (SQLite) with Drizzle ORM (legacy only — document layer is raw SQL)
+- **Validation**: Zod
+- **Testing**: Vitest (unit + real-SQLite) + Playwright (E2E)
+- **Frontend**: HTMX + HTML tagged templates (admin UI)
+- **Auth**: Better Auth (session + RBAC) — `c.get('user') === { userId, email, role }`
+- **Deployment**: Wrangler
 
-This repo is indexed by **codegraph** (684 files, 5693 nodes). Use it as the default code-lookup tool. Hook also rewrites shell commands via **rtk** for 60-90% bash savings. Default response mode is **caveman** for terse output.
+## Workspace boundary (Conductor)
 
-### Decision tree — code exploration
+- Work in `.conductor/hong-kong-v3/`. **Never read or write** `/Users/lane/Dev/refs/sonicjs/` (sibling main checkout).
+- Target branch: `origin/v3`. PRs: `gh pr create --base v3`. Diff: `git diff origin/v3...`.
 
-| Intent | Tool | Why |
-|--------|------|-----|
-| "How does X work / where does X live / trace flow X→Y" | `mcp__codegraph__codegraph_explore` | ONE call returns verbatim source grouped by file. Replaces many Read/Grep. |
-| "Just the location of symbol named X" | `mcp__codegraph__codegraph_search` | Cheapest — name + path only. |
-| "What calls this / what does this call / blast radius" | `codegraph_callers` / `codegraph_callees` / `codegraph_impact` | Edges already indexed; grep can't follow dynamic dispatch. |
-| Pinpoint known file edit | `Read` + `Edit` | Codegraph not needed for known path. |
-| Truly open-ended cross-cutting search | `Agent` w/ `Explore` or `cavecrew-investigator` | Compressed output, protects main context. |
+## Architecture direction: Document Model (authoritative)
 
-**Rule:** Before any 3+ Grep/Read combo for "where is X", call `codegraph_explore` first. Treat codegraph as a pre-built index — don't re-run searches it already answers.
+The project is migrating from per-feature tables (`content`, `media`, `testimonials`, `email_log`, …) to a unified **document repository**. **All new features build on the document model. Do not add new feature tables.**
 
-### rtk (Rust Token Killer)
+Full design + remediation runbook: `docs/ai/plans/document-model-poc-plan.md` (Appendix A = original design; §1–§7 = current implementation status, defect IDs `D1`–`D48`).
 
-- Bash commands auto-rewritten by hook — transparent, 0 overhead. No action needed.
-- `rtk gain` to audit savings; `rtk discover` to find missed opportunities.
-- Don't bypass rtk with raw shell unless debugging.
+### The 5 document tables (migration `0002_documents.sql`)
+1. **`document_types`** — registered schemas (code/plugin-owned).
+2. **`documents`** — every content/media/plugin record + every historical version. Queryable scalar fields are exposed as **indexed JSON `VIRTUAL` generated columns** (`q_*`) on this table — `json_extract(data, '$.path')`.
+3. **`document_references`** — typed strong/weak edges (FK to `documents`); powers "where used" and reference-aware delete.
+4. **`document_facets`** — indexed rows for multi-valued scalar fields (e.g. `tags`) — the one case generated columns can't cover.
+5. **`document_permissions`** — per-document ACL overrides on top of type-level base grants.
 
-### caveman mode
+### Implementation rules (non-negotiable — each line is a bug already shipped)
 
-- Active by default (full). Drops articles/filler. Code blocks, commits, security warnings stay normal.
-- Toggle: `/caveman lite|full|ultra`, off via "stop caveman".
+| # | Rule |
+|---|------|
+| **R1** | All document writes use raw `env.DB.prepare(sql).bind(...)` inside `env.DB.batch([...])`. **Never** put Drizzle query-builder objects (`db.update()`, `db.insert()`) into a `batch`. |
+| **R2** | `VIRTUAL` generated columns and partial / expression UNIQUE indexes live **only** in raw migrations (`0002`, `0003`, and future ALTERs via `MigrationService.ensureDocumentGeneratedColumns`). Never declare them in `db/schema.ts` (Drizzle can't express them). |
+| **R3** | Every document read/write is tenant-scoped. Go through `DocumentRepository` (injects `this.tenantId`) or include `AND tenant_id = ?`. POC tenant = literal `'default'`. |
+| **R4** | Document route handlers must not build raw document SQL. Use `DocumentRepository.list()` / `DocumentsService`. (Legacy `content`/`media` routes are the exception — and are being decommissioned.) |
+| **R5** | Count placeholders/columns/binds by hand before committing any `INSERT`. Mock tests can't catch arithmetic bugs (R10). |
+| **R6** | `version_number` is derived in SQL: `(SELECT COALESCE(MAX(version_number),0)+1 FROM documents WHERE root_id = ?)`. Never compute in JS — the partial unique index `idx_documents_unique_version` will reject concurrent collisions. |
+| **R7** | Derived rows (`document_facets`, `document_references`) exist **only** for the current-draft and published rows of a root. Delete explicitly on supersede/unpublish — never rely on `ON DELETE CASCADE` (D1 FK enforcement is not guaranteed). |
+| **R8** | Escape every user-controlled value rendered into HTML with `escapeHtml` from `utils/sanitize`. |
+| **R9** | After editing any `packages/core/migrations/*.sql`: run `cd packages/core && npm run generate:migrations`, re-sync the `my-sonicjs-app/migrations/` copies (byte-identical), commit the regenerated `src/db/migrations-bundle.ts`. |
+| **R10** | Unit tests on the pure-mock DB cannot verify SQL, constraints, batch atomicity, generated columns, or bind counts. Real coverage requires the `better-sqlite3` harness — `documents.sqlite.test.ts` + the `*.integration.test.ts` route harness. |
+| **R11** | New E2E specs are numbered **68+** (highest existing is 67). |
+| **R12** | POC runs **alongside** legacy paths. Do not drop legacy plugin tables in the POC — decommission only after read-flip + backfill + grep-gate (see plan §"Decommissioning"). |
 
-### Delegation — cavecrew subagents
+### Key behaviors to preserve
 
-Use when scope is bounded AND output would bloat main context:
-- `cavecrew-investigator` — read-only locator ("where is X / what calls Y / map this dir"). ~60% smaller tool result vs vanilla Explore.
-- `cavecrew-builder` — surgical 1-2 file edit (typo, single-fn rewrite, mechanical rename). Refuses 3+ files.
-- `cavecrew-reviewer` — diff/PR review, one line per finding.
-
-Skip cavecrew for: known-path edits, multi-file features, anything codegraph answers in one call.
-
-### Anti-patterns (token waste)
-
-- ❌ Running `grep -r` across the repo when `codegraph_search` would answer.
-- ❌ Reading 5+ files to understand a flow — `codegraph_explore` returns the relevant slice.
-- ❌ Spawning a subagent just to read one known file.
-- ❌ Verbose narration. Caveman mode handles that — keep updates to one sentence.
-
-## Project Structure & Stack
-- Monorepo managed with npm workspaces. Core Hono + Workers code, routes, middleware, templates, plugins, utils, and DB lives in `packages/core/src`.
-- Shared templates/components: `packages/templates/`. CLI scaffolder: `packages/create-app/`. Helper scripts: `packages/scripts/`.
-- Marketing/docs site is `www/` (Next.js + MDX). Long-form docs, AI plans, and architecture notes live in `docs/`.
-- E2E specs use Playwright in `tests/e2e/` (configs in `tests/playwright*.config.ts`). Postman and smoke docs sit under `tests/`.
-- `my-sonicjs-app/` is the sand-boxed sample install; recreate freely and use it to exercise migrations (`npm run setup:db` produces a fresh branch-specific D1 DB).
-
-## Preferred Workflow (Claude Code parity)
-1. **Understand & Plan** – Read the issue and affected modules, skim relevant docs, and outline a plan/todo list before heavy editing. Keep changes minimal and targeted.
-2. **Prep Environment** – From `my-sonicjs-app/`, run `npm run setup:db` for a clean Cloudflare D1 database tied to the worktree. Run `npm install` at repo root if dependencies changed.
-3. **Implement** – Match existing TypeScript/Hono patterns (server templates, plugins, Drizzle schema, HTMX UI). Keep types explicit and favor async/await.
-4. **Add Tests** – Unit tests go beside the feature in `packages/core/src/__tests__`. Every change also needs an accompanying Playwright spec under `tests/e2e/##-description.spec.ts`.
-5. **Verify** – Run `npm run type-check`, `npm test`, and `npm run e2e` locally. Use `npm run e2e:smoke` or `npm run e2e:ui` only for debugging, but ensure the full suite passes before sign-off.
-6. **Document** – Update README/docs or AI plans when APIs, migrations, or workflows change. Mention any fixtures or DB prep needed in the PR/test plan.
-
-## Build & Test Commands
-- Install deps: `npm install`
-- Build core only: `npm run build:core`; full build + sample app: `npm run build`
-- Dev servers: `npm run dev` (proxies to `my-sonicjs-app`), `npm run dev:www` (marketing)
-- Type safety: `npm run type-check`
-- Unit tests: `npm test` or `npm run test:watch`
-- Playwright E2E: `npm run e2e`, smoke subset via `npm run e2e:smoke`, headed/UI via `npm run e2e:ui`
-- Sample-app DB reset: `npm run db:reset` (or `npm run setup:db` inside `my-sonicjs-app`)
-
-### Local secrets (`my-sonicjs-app/.dev.vars`)
-- `wrangler dev` reads `my-sonicjs-app/.dev.vars` for local secrets. Auth refuses to initialize without `BETTER_AUTH_SECRET` (>=16 chars); requests to `/auth/*` then return 500 with "BETTER_AUTH_SECRET is missing or too short".
+- **Two axes**: `is_current_draft` and `is_published` are **separate** — a published doc stays live while an editor saves new drafts. `status` (`draft`/`published`/`archived`) is a derived UI label only.
+- **Timestamps**: `documents.created_at`/`updated_at` are stored in **seconds** (legacy `content` used ms). Use `documentSecondsToMs()` from `services/documents.ts` at every response/render boundary that expects ms.
+- **Pagination**: keyset on `(updated_at, id)` for all JSON APIs. `OFFSET` only allowed in admin HTML page-number tables, and only with an explicit comment.
+- **ACL**: `isAllowed` precedence = **deny wins → explicit allow → base grants**. Authed callers' `principalSet` must include `{ type: 'role', id: <role> }` (base grants only match `public` + `role`).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SonicJs-Org/sonicjs](https://github.com/SonicJs-Org/sonicjs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
