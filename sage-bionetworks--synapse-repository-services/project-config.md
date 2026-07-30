@@ -1,133 +1,85 @@
 ---
 trigger: always_on
-description: Business logic layer — Manager interfaces and implementations that sit between controllers and DAOs. This module enforces authorization, validation, and transaction boundaries.
+description: Multi-agent architecture where specialist agents handle context-heavy operations with focused tool sets. Each specialist is conversational (multi-turn), uses Haiku for cost efficiency, and writes results to the shared code interpreter session.
 ---
 
-# services/repository-managers
+# Specialist Sub-Agents
 
-Business logic layer — Manager interfaces and implementations that sit between controllers and DAOs. This module enforces authorization, validation, and transaction boundaries.
+Multi-agent architecture where specialist agents handle context-heavy operations with focused tool sets. Each specialist is conversational (multi-turn), uses Haiku for cost efficiency, and writes results to the shared code interpreter session.
 
-## Package Structure
+## Tool Conventions
 
-```
-org.sagebionetworks.repo.manager
-├── (root)           # Core managers: EntityManager, UserManager, NodeManager, etc.
-├── asynch/          # Async job framework (AsynchJobStatusManager, AsyncJobRunner)
-├── entity/          # Entity authorization
-├── file/            # File handle operations
-├── table/           # Table/view managers
-├── schema/          # JSON Schema managers
-├── grid/            # Grid/Curator managers
-├── agent/           # AI agent managers
-├── config/          # Spring @Configuration classes
-└── ...              # Many more domain sub-packages
-```
+### `@ToolParam` for all parameters
 
-## Manager Pattern
-
-### Interface + Impl
+Every tool method parameter (except `ToolContext`) must use `@ToolParam` with both `description` and `required`:
 
 ```java
-// Interface — defines the contract
-public interface EntityManager {
-    Entity getEntity(UserInfo userInfo, String entityId) throws NotFoundException, UnauthorizedException;
-}
+@Tool(description = "...", resultConverter = JSONEntityResultConverter.class)
+public QueryResultBundle queryTable(
+        @ToolParam(description = "A complete Synapse SQL query", required = true) String sql,
+        @ToolParam(description = "Max rows to return (capped at 100)", required = false) Long limit,
+        ToolContext toolContext) {
+```
 
-// Implementation — @Service, constructor injection, transaction annotations
-@Service
-public class EntityManagerImpl implements EntityManager {
-    private final NodeManager nodeManager;
-    private final EntityAuthorizationManager entityAuthorizationManager;
-    // ... more dependencies
+### `JSONEntityResultConverter` for rich return types
 
-    // Constructor injection (preferred over @Autowired fields)
-    public EntityManagerImpl(NodeManager nodeManager, EntityAuthorizationManager authManager, ...) {
-        this.nodeManager = nodeManager;
-        this.entityAuthorizationManager = authManager;
+Tools that return Synapse domain objects (POJOs implementing `JSONEntity`) use the `JSONEntityResultConverter`:
+
+```java
+@Tool(description = "...", resultConverter = JSONEntityResultConverter.class)
+public QueryResultBundle queryTable(...) { ... }
+```
+
+This serializes the return value via `JDOSecondaryPropertyUtils.createJSONFromObject()` — the canonical Synapse JSON serialization path. The LLM receives the full JSON structure and can reason over counts, facets, column metadata, etc.
+
+For simple string responses (error messages, confirmations), tools can still return `String` with the default converter.
+
+### `ToolContext` pattern
+
+All tools receive `ToolContext` as their last parameter (not annotated with `@ToolParam`). Extract user and session:
+
+```java
+UserInfo userInfo = (UserInfo) toolContext.getContext().get("userInfo");
+String sessionId = (String) toolContext.getContext().get("sessionId");
+```
+
+### `ToolResponse<T>` for structured results with error handling
+
+Tools that return rich domain objects should wrap them in `ToolResponse<T extends JSONEntity>`. This provides a uniform JSON envelope that the LLM can parse:
+
+```java
+@Tool(description = "...", resultConverter = JSONEntityResultConverter.class)
+public ToolResponse<QueryResultBundle> queryTable(...) {
+    try {
+        QueryResultBundle result = ...;
+        return new ToolResponse<>(result);       // {"responseBody": {...}}
+    } catch (Exception e) {
+        return new ToolResponse<>(e.getMessage()); // {"errorMessage": "..."}
     }
 }
 ```
+
+`ToolResponse` itself implements `JSONEntity` and serializes as either `{"responseBody": <T as JSON>}` on success or `{"errorMessage": "..."}` on failure. This allows tools to return meaningful error messages without throwing exceptions that disrupt the agent loop.
 
 ### Authorization
 
-Check access before performing operations:
+All tool methods must verify the user has access before returning data. Internal utilities like `TableManagerSupport.getTableSchema()` do NOT check authorization — they are designed for system-internal use. Agent tools must call an authorization-checked method (e.g., `EntityManager.getEntity(userInfo, id)`) before returning any entity metadata. An agent must never leak information the user cannot access directly via the REST API.
+
+## Factory Pattern
+
+Specialists are created via a `@Service` factory. The specialist instance itself is NOT a Spring bean — it holds per-conversation state (ChatMemory):
 
 ```java
-entityAuthorizationManager.hasAccess(userInfo, entityId, ACCESS_TYPE.READ)
-    .checkAuthorizationOrElseThrow();
-```
-
-- Returns `AuthorizationStatus` with `.checkAuthorizationOrElseThrow()`
-- Throws `UnauthorizedException` on failure
-- Every public method that accepts `UserInfo` should check authorization
-
-### Input Validation
-
-```java
-ValidateArgument.required(userInfo, "userInfo");
-ValidateArgument.required(entityId, "entityId");
-ValidateArgument.requiredNotBlank(name, "name");
-ValidateArgument.requiredNotEmpty(list, "list");
-```
-
-## Transaction Annotations
-
-Defined in `org.sagebionetworks.repo.transactions`. Applied on **implementation methods**, not interfaces.
-
-| Annotation | Behavior |
-|-----------|----------|
-| `@WriteTransaction` | Joins existing transaction or creates a new one. Standard for most write operations. |
-| `@MandatoryWriteTransaction` | **Requires** an existing transaction — throws if none exists. Used for methods that must be called within an outer transaction. |
-| `@NewWriteTransaction` | Always creates a **new, independent** transaction (suspends any existing one). Used for operations that must commit independently (e.g., updating job progress). |
-
-Read-only operations have no transaction annotation (default Spring behavior).
-
-## Async Job Framework
-
-For long-running operations exposed as async REST endpoints:
-
-1. **Define request/response schemas** in `lib-auto-generated` (extend `AsynchronousRequestBody` / `AsynchronousResponseBody`)
-2. **Implement `AsyncJobRunner<Req, Resp>`** in the manager layer:
-   ```java
-   @Service
-   public class MyAsyncWorker implements AsyncJobRunner<MyRequest, MyResponse> {
-       public MyResponse run(Long jobId, UserInfo user, MyRequest request, JobCancelCallback cancelCallback) {
-           // Do work, return response
-       }
-   }
-   ```
-3. **Wire in worker config** — add a `@Bean` method in `AsyncJobWorkersConfig` that wraps the runner with `AsyncJobRunnerAdapter` and a `WorkerTriggerBuilder`
-4. **Controller** calls `asynchJobStatusManager.startJob(userInfo, request)` to enqueue, client polls `getJobStatus()`
-
-## Spring Configuration
-
-- Managers use `@Service` annotation — discovered via component scan
-- Constructor injection preferred (fields are `private final`)
-- **Preferred**: Add new bean definitions to `ManagerConfiguration` (`org.sagebionetworks.repo.manager.config.ManagerConfiguration`)
-- **Legacy**: Spring XML configs (`*-spb.xml` in `src/main/resources/`) still used for some beans and `MigrationTypeListener` registration (`managers-spb.xml`). Do not add new XML configs.
-- Controllers access managers through `ServiceProvider` (not direct injection)
-
-## Common Patterns
-
-### ID Parsing
-`NumberFormatException` extends `IllegalArgumentException`, which already maps to HTTP 400. Wrapping `Long.parseLong()` in a try-catch is **optional** — it's acceptable to let the `NumberFormatException` propagate directly. If you want a more descriptive error message, extract to a shared utility method rather than duplicating try-catch blocks:
-```java
-// Option 1: Let NumberFormatException propagate (acceptable — results in 400)
-Long id = Long.parseLong(request.getId());
-
-// Option 2: Wrap for better message (optional, extract to util if reused)
-private Long parseId(String value, String fieldName) {
-    try {
-        return Long.parseLong(value);
-    } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'", e);
-    }
+@Service
+public class TableQuerySpecialistFactory {
+    public TableQuerySpecialist create() { ... }
 }
 ```
 
+## System Prompts
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Stored as Velocity templates (`.vtp`) in `src/main/resources/prompts/`. The factory renders them at creation time, merging in dynamic content (e.g., SQL reference examples from classpath CSVs).
 
 ---
 > Source: [Sage-Bionetworks/Synapse-Repository-Services](https://github.com/Sage-Bionetworks/Synapse-Repository-Services) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
