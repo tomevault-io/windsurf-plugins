@@ -1,115 +1,128 @@
 ---
 trigger: always_on
-description: 한국어 텍스트를 한국 점자로 변환하는 라이브러리.
+description: Korean + Math Braille encoding engine implementing 2024 Korean Braille Standard.
 ---
 
-# Braillify
+# CORE LIBRARY (libs/braillify)
 
-한국어 텍스트를 한국 점자로 변환하는 라이브러리.
+Korean + Math Braille encoding engine implementing 2024 Korean Braille Standard.
 
-## 프로젝트 구조
+## STRUCTURE
 
-- `libs/braillify/` — Rust 핵심 변환 엔진
-- `packages/node/` — Node.js WASM 바인딩
-- `packages/python/` — Python 바인딩 (maturin)
-- `apps/landing/` — Next.js 랜딩 페이지
-- `test_cases/` — 점자 변환 테스트 케이스 (JSON)
-- `docs/` — 2024 개정 한국 점자 규정 PDF
-- `braillove-case-collector/` — 점자 내부표기 → 숫자/유니코드 변환기
-
-## 빌드 & 테스트
-
-```bash
-bun install
-cargo build --release -p braillify
-bun test                    # 전체 테스트 (Rust + Bun + Python)
-bun test test_cases/         # 테스트케이스 무결성 검증만
+```
+src/
+├── lib.rs              # Main encode() entry + encode_to_unicode() / encode_to_braille_font()
+├── cli.rs              # CLI: REPL + one-shot mode (feature-gated)
+├── main.rs             # Binary entry point
+├── encoder.rs          # DocumentIR construction, token + char engine orchestration
+├── char_struct.rs      # CharType enum (Korean/English/Number/Symbol/MathSymbol/Fraction)
+├── korean_char.rs      # Full Korean syllable encoding
+├── korean_part.rs      # Standalone jamo (consonant/vowel) encoding
+├── jauem/              # Consonant handling
+│   ├── choseong.rs     # Initial consonants
+│   └── jongseong.rs    # Final consonants
+├── moeum/              # Vowel handling
+│   └── jungsong.rs     # Medial vowels
+├── english.rs          # English letter encoding
+├── english_logic.rs    # English context detection
+├── number.rs           # Number encoding
+├── fraction.rs         # Fraction handling (Unicode + LaTeX)
+├── math_symbol_shortcut.rs  # PHF math symbol lookup table
+├── symbol_shortcut.rs       # PHF general symbol lookup table
+├── word_shortcut.rs         # PHF word abbreviation lookup table
+├── unicode.rs          # Internal braille code ↔ Unicode Braille conversion
+├── split.rs            # Korean jamo decomposition
+├── utils.rs            # Helper functions
+└── rules/              # Rule engine (see below)
 ```
 
-## 테스트 케이스 규칙
+## ENCODING PIPELINE
 
-### 파일 구조
+```
+Input text
+  ↓ DocumentIR::parse()         (tokenize into Word/Space/Mode tokens)
+  ↓ TokenRuleEngine::apply_all() (token-level rules by phase)
+  │   ├── LatexMergeRule         (merge $...$ across spaces)
+  │   ├── LatexFractionRule      (detect $\frac{}{})$)
+  │   ├── LatexMathRule          (strip LaTeX → math notation)
+  │   ├── InlineFractionRule     (detect N/N inline fractions)
+  │   ├── MathExpressionTokenRule (detect & encode math expressions)
+  │   └── ...other token rules
+  ↓ emit()                      (character-level encoding)
+      ├── Token::Word → RuleEngine (BrailleRule trait, char-by-char)
+      ├── Token::Space → braille space byte
+      ├── Token::Fraction → fraction encoding
+      └── Token::PreEncoded → pass-through (from math encoder)
+```
 
-- `test_cases/korean/rule_{N}.json` — 한글 점자 제N항
-- `test_cases/korean/rule_{N}_b1.json` — 제N항 붙임 1
-- `test_cases/math/math_{N}.json` — 수학 점자 제N항
-- 근거: `docs/2024 개정 한국 점자 규정.pdf`
+## RULE ARCHITECTURE
 
-### 엔트리 형식
+### Two parallel rule systems
 
-```json
-{
-  "input": "입력 텍스트 (묵자 또는 LaTeX)",
-  "note": "설명 (선택, 동일 input이 여럿이거나 맥락 필요 시에만)",
-  "internal": "점자 내부표기",
-  "expected": "브라유셀 인덱스 연결 문자열",
-  "unicode": "점자 유니코드 문자열"
+| System | Trait | Engine | Operates On | Used By |
+|--------|-------|--------|-------------|---------|
+| Korean (char-level) | `BrailleRule` | `RuleEngine` | Individual characters (`CharType`) | Korean text encoding |
+| Math (token-level) | `MathTokenRule` | `MathTokenEngine` | Token sequences (`MathToken`) | Math expression encoding |
+
+### BrailleRule (Korean, character-level)
+
+```rust
+trait BrailleRule: Send + Sync {
+    fn meta(&self) -> &'static RuleMeta;
+    fn phase(&self) -> Phase;           // Preprocessing → CoreEncoding → InterCharacter
+    fn matches(&self, ctx: &RuleContext) -> bool;
+    fn apply(&self, ctx: &mut RuleContext) -> Result<RuleResult, String>;
 }
 ```
 
-### internal → expected/unicode 변환
+Registered in `encoder.rs` → processes one character at a time via `RuleContext`.
 
-`braillove-case-collector/converter.py`의 패턴을 따른다:
+### MathTokenRule (Math, token-level)
 
-```
-pattern: " a1b'k2l@cif/msp"e3h9o6r^djg>ntq,*5<-u8v.%[$+x!&;:4\0z7(_?w]#y)="
-braille: ⠀⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿
-```
-
-특수 매핑: `` ` ``→0, `{`→42, `}`→59, `~`→24, `|`→51
-
-`expected`는 각 문자의 인덱스를 문자열로 이어붙인 것, `unicode`는 대응하는 점자 유니코드 문자를 이어붙인 것이다.
-
-### 무결성 검증
-
-`test_cases/testcase-integrity.test.ts`가 모든 엔트리의 internal → expected/unicode 일치를 검증한다. 대문자(수학 변수 A, B 등)를 포함한 internal은 기본 패턴 외이므로 skip된다.
-
-### 테스트 케이스 작성 원칙
-
-1. **PDF가 유일한 근거** — `docs/2024 개정 한국 점자 규정.pdf`에 없는 예제를 만들지 않는다.
-2. **PDF 순서 준수** — 기호 정의 → 해당 예제 순서로, PDF에 나온 순서 그대로 배치한다.
-3. **기호 단독 엔트리 필수** — 각 기호는 단독 엔트리로 먼저 등록하고, 그 뒤에 해당 기호를 사용하는 예제가 온다.
-4. **note는 필요할 때만** — 동일 input이 다른 의미로 쓰일 때, 또는 맥락이 필요할 때만 추가한다. input을 반복하는 note는 쓰지 않는다.
-5. **소속 정확히** — 각 엔트리는 해당 항 파일에만 존재한다. 다른 항의 예제를 섞지 않는다.
-
-### LaTeX 입력
-
-수학 수식은 LaTeX 형식의 input도 테스트한다. 기존 엔트리의 LaTeX 버전을 추가하는 방식이다:
-
-- 형식: `$<LaTeX 수식>$` (앞에 `$`, 뒤에 `$`)
-- 동일한 `internal`/`expected`/`unicode`를 공유
-- `"note": "LaTeX"` 표기
-- **기존 예제의 변환만** — 새로운 수식을 만들지 않는다
-
-```json
-{
-  "input": "$\\frac{3}{4}$",
-  "note": "LaTeX",
-  "internal": "#d/#c",
-  "expected": "6025129",
-  "unicode": "⠼⠙⠌⠉"
+```rust
+trait MathTokenRule: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn priority(&self) -> u16;          // Lower = runs first (10=lookahead, 50=core, 100=symbol)
+    fn matches(&self, tokens: &[MathToken], index: usize, state: &MathEncodeState) -> bool;
+    fn apply(&self, tokens: &[MathToken], index: usize, result: &mut Vec<u8>,
+             state: &mut MathEncodeState, engine: &MathTokenEngine) -> Result<MathTokenResult, String>;
 }
 ```
 
-주요 LaTeX 변환:
+Registered in `encoder.rs::build_math_engine()` → processes parsed MathToken sequences with lookahead.
 
-| 수식 | LaTeX |
-|------|-------|
-| 분수 | `$\frac{분자}{분모}$` |
-| 근호 | `$\sqrt{x}$`, `$\sqrt[n]{x}$` |
-| 위첨자 | `$x^{2}$` |
-| 아래첨자 | `$x_{n}$` |
-| 부등호 | `$\neq$`, `$\geq$`, `$\leq$` |
-| 절댓값 | `$\|x\|$` |
-| 무한대 | `$\infty$` |
-| 적분 | `$\int f(x)dx$` |
-| 집합 | `$\cup$`, `$\cap$`, `$\subset$`, `$\emptyset$` |
-| 논리 | `$\land$`, `$\lor$`, `$\forall$`, `$\exists$` |
+### Math rule structs (in respective rule files)
 
-### 대문자 수학 변수
+| Priority | Struct | File | Handles |
+|----------|--------|------|---------|
+| 10 | `FractionReversalRule` | rule_7.rs | Denominator-first simple fractions |
+| 10 | `ConditionalProbFractionRule` | rule_7.rs | =a/b with \| pattern |
+| 10 | `CombinatoricsRule` | rule_12.rs | nPr, nCr |
+| 50 | `NumberRule` | rule_1.rs | Number tokens |
+| 50 | `VariableRule` | rule_12.rs | Lowercase variables |
+| 50 | `UpperVariableRule` | rule_12.rs | Uppercase variables |
+| 50 | `OperatorRule` | rule_2.rs | Arithmetic operators |
+| 50 | `FunctionNameRule` | rule_47.rs | log, lim, sin, cos... |
+| 50 | `BracketRule` | rule_6.rs | Open/close parentheses |
+| 50 | `SuperscriptRule` | rule_18.rs | Superscript content |
+| 50 | `SubscriptRule` | rule_19.rs | Subscript content |
+| 50 | `DecimalPointRule` | rule_8.rs | Decimal points |
+| 50 | `PrimeRule` | rule_53.rs | Prime marks |
+| 100 | `MathSymbolRule` | encoder.rs | All math symbols (30+ dispatch chain) |
 
-수학 점자에서 대문자 변수(A, B, N 등)를 사용하는 internal은 기본 64셀 패턴에 포함되지 않는다. 이런 엔트리는 `expected`/`unicode`가 빈 문자열이며, 무결성 테스트에서 자동으로 skip된다.
+## KEY TYPES
+
+| Type | Location | Purpose |
+|------|----------|---------|
+| `CharType` | `char_struct.rs` | Input character classification |
+| `BrailleRule` | `rules/traits.rs` | Korean char-level rule trait |
+| `MathTokenRule` | `rules/math/math_token_rule.rs` | Math token-level rule trait |
+| `MathTokenEngine` | `rules/math/math_token_rule.rs` | Math rule dispatch engine |
+| `MathToken` | `rules/math/parser.rs` | Parsed math expression token |
+| `MathEncodeState` | `rules/math/math_token_rule.rs` | Shared math encoding state |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dev-five-git/braillify](https://github.com/dev-five-git/braillify) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
