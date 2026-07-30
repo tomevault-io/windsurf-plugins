@@ -1,124 +1,106 @@
 ---
 trigger: always_on
-description: > `AGENTS.md` and `GEMINI.md` are symlinks to this file for Codex CLI and Gemini CLI compatibility.
+description: Guidance for Claude Code and other AI tools. Structured around [Andrej Karpathy's observations on LLM coding pitfalls](https://x.com/karpathy/status/2015883857489522876): surface assumptions, don't overcomplicate, make surgical changes, verify before moving on.
 ---
 
-# claude-settings
+# Claude Code Settings
 
-> `AGENTS.md` and `GEMINI.md` are symlinks to this file for Codex CLI and Gemini CLI compatibility.
+Guidance for Claude Code and other AI tools. Structured around [Andrej Karpathy's observations on LLM coding pitfalls](https://x.com/karpathy/status/2015883857489522876): surface assumptions, don't overcomplicate, make surgical changes, verify before moving on.
 
-Multi-tool plugin marketplace. Each plugin under `plugins/` is independently installable on Claude Code, Codex CLI, Gemini CLI, and Cursor.
+## Core Principles
 
-## Repo Structure
+**Do what was asked. Nothing more, nothing less.** This year is 2026.
 
-```
-claude-settings/
-  CLAUDE.md                              # this file (repo dev guide)
-  AGENTS.md -> CLAUDE.md                 # Codex CLI reads this
-  GEMINI.md -> CLAUDE.md                 # Gemini CLI reads this
-  .claude/CLAUDE.md                      # user-facing global config (synced to ~/.claude/CLAUDE.md)
-  .claude/settings.json                  # Claude Code settings
-  .claude-plugin/marketplace.json        # Claude Code marketplace
-  .agents/plugins/marketplace.json       # Codex CLI marketplace
-  .cursor-plugin/marketplace.json        # Cursor marketplace
-  .codex/config.toml                     # Codex CLI config
-  .github/scripts/                       # repo maintenance scripts
-    _helpers.sh                          # shared sync/zip functions
-    sync-<vendor>-skills.sh              # per-vendor skill sync
-    sync-versions.sh                     # version alignment
-    release.sh                           # GitHub release creation
-    validate_plugins.py                  # CI plugin validation
-  plugins/
-    <name>/
-      .claude-plugin/plugin.json         # Claude Code manifest
-      .codex-plugin/plugin.json          # Codex CLI manifest
-      .cursor-plugin/plugin.json         # Cursor manifest
-      gemini-extension.json              # Gemini CLI manifest
-      skills/<skill>/SKILL.md            # universal across all tools
-      agents/<agent>.md                  # Claude Code + Gemini + Cursor
-      hooks/hooks.json + scripts/        # Claude Code + Gemini only
-      commands/<cmd>.md                  # Claude Code only
-```
+**Delete > Replace > Add.** Before any change, answer in order: what can I delete, what can I replace, and only then, what must I add?
 
-## Cross-Tool Plugin Format Reference
+- **Guard nothing, relocate the trigger.** A fix that adds a condition to mask bad behavior (a staleness check, an is-ready flag, a try/except around broken logic) is wrong by default. Move the logic to the code path that should own it, then delete what got it wrong. No defensive programming unless you state the motivation and the user approves.
+- **Bugfixes are net-negative by default.** If a fix adds more lines than it removes, justify in one sentence why deletion and relocation were impossible.
+- **Search before creating.** The helper probably exists, so grep the project first. Fold duplicates into one shared utility. Three similar lines beat a helper nobody else calls.
+- **Deletion beats caution.** Broken or duplicated code kept "to be safe" is the regression. Understand what you remove, then remove it.
+- **This guidance is code: additions require deletions.** To add a rule, remove or merge one.
 
-### Plugin Manifests
+Ask yourself: "What can I delete instead of add, and does this trace to what was asked?"
 
-Each plugin has 4 manifest files. Claude Code manifest is the source of truth; others are copies or subsets.
+## Working Rules
 
-| Tool        | Path                                     | Format                                                                  |
-| ----------- | ---------------------------------------- | ----------------------------------------------------------------------- |
-| Claude Code | `.claude-plugin/plugin.json`             | JSON: name, version, description, author, homepage, repository, license |
-| Codex CLI   | `.codex-plugin/plugin.json`              | JSON: same fields as Claude Code                                        |
-| Cursor      | `.cursor-plugin/plugin.json`             | JSON: same fields as Claude Code                                        |
-| Gemini CLI  | `gemini-extension.json` (at plugin root) | JSON: name, version, description only                                   |
+- Reflect on tool results before acting, then plan and take the best next action.
+- Run independent operations in parallel.
+- Verify your solution before finishing.
+- Never create files unless necessary. Prefer editing. Never create docs (*.md, README) unless asked.
+- Prefer `rg` over `grep`.
+- When updating code, check related code in the same and other files for consistency.
+- Never use `consolidate`, `modernize`, `streamline`, `flexible`, `delve`, `establish`, `enhanced`, `comprehensive`, `optimize`, or em-dashes in docstrings, commit messages, or comments.
 
-Docs:
+## MCP Tools
 
-- Claude Code: https://code.claude.com/docs/en/plugins-reference
-- Codex CLI: https://developers.openai.com/codex/plugins/build/
-- Cursor: https://cursor.com/docs/reference/plugins
-- Gemini CLI: https://geminicli.com/docs/extensions/reference/
-- AGENTS.md spec: https://agents.md/
-- Agent Skills spec: https://agentskills.io/specification
+### Tavily (Web Search)
 
-### Root Marketplace Files
+- Use `mcp__tavily__tavily_search` for discovery/broad queries
+- Use `mcp__tavily__tavily_extract` for specific URL content
+- Search first to find URLs, then extract for detailed analysis
 
-| Tool        | Path                               | Notes                                                                           |
-| ----------- | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Claude Code | `.claude-plugin/marketplace.json`  | local sources only (use sync scripts for external repos)                        |
-| Codex CLI   | `.agents/plugins/marketplace.json` | local sources only; use `./`-prefixed `source.path` plus plugin `policy` fields |
-| Cursor      | `.cursor-plugin/marketplace.json`  | local sources, needs `source` + `description`                                   |
-| Gemini CLI  | none                               | per-plugin install: `gemini extensions install --path ./plugins/<name>`         |
+### MongoDB
 
-#### Claude Code marketplace entry
+- MongoDB MCP is READ-ONLY (no write/update/delete operations)
 
-```json
-{
-  "name": "<plugin-name>",
-  "source": "./plugins/<plugin-name>",
-  "description": "...",
-  "version": "1.0.0",
-  "keywords": ["keyword1", "keyword2"],
-  "category": "<category>",
-  "tags": ["tag1", "tag2"]
-}
-```
+### GitHub CLI
 
-#### Codex CLI marketplace entry
+Use `gh` CLI for all GitHub interactions. Never clone repositories to read code.
 
-```json
-{
-  "name": "<plugin-name>",
-  "source": { "source": "local", "path": "./plugins/<plugin-name>" },
-  "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
-  "category": "<category>"
-}
-```
+- **Read file from repo**: `gh api repos/{owner}/{repo}/contents/{path} -q .content | base64 -d`
+- **Search code**: `gh search code "query" --repo {owner}/{repo}` or `gh search code "query" --language python`
+- **Search repos**: `gh search repos "query" --language python --sort stars`
+- **Compare commits**: `gh api repos/{owner}/{repo}/compare/{base}...{head}`
+- **View PR**: `gh pr view {number} --repo {owner}/{repo}`
+- **View PR diff**: `gh pr diff {number} --repo {owner}/{repo}`
+- **View PR comments**: `gh api repos/{owner}/{repo}/pulls/{number}/comments`
+- **List commits**: `gh api repos/{owner}/{repo}/commits --jq '.[].sha'`
+- **View issue**: `gh issue view {number} --repo {owner}/{repo}`
 
-`source.path` must point to a local folder with a `./`-prefixed path relative to the marketplace root.
+## Python Coding
 
-`policy.installation` values: `AVAILABLE`, `INSTALLED_BY_DEFAULT`, `NOT_AVAILABLE`.
+For full Python guidelines, install and enable the `python-skills` plugin (`python-guidelines` skill). Key rules always in effect:
 
-`policy.authentication` controls whether auth happens on install or first use.
+- **Package manager**: uv (NOT pip). **Paths**: pathlib, not os.path.
+- **Verify before planning**: Run `python -c "..."` to test hypotheses. Never assume.
+- **Virtual env**: `source .venv/bin/activate` or `uv run python -c "..."`
+- Integrate into existing code, don't append. Match existing patterns.
 
-#### Codex CLI personal marketplace example
+## Git and Pull Request Workflows
 
-Use this only for generic Codex marketplace docs and maintainer examples. User-facing installation docs should stay specific to this repo's bundled marketplace.
+### Commit Messages
 
-```json
-{
-  "name": "personal-plugins",
-  "interface": {
-    "displayName": "Personal Plugins"
-  },
-  "plugins": [
-    {
-      "name": "my-plugin",
-      "source": { "source": "local", "path": "./.codex/plugins/my-plugin" },
+- Run the `/simplify` skill on the staged diff before committing, then apply its findings. Docs-only diffs are a no-op
+- Format: `{type}: brief description` (max 50 chars first line)
+- Optional second line: 1 sentence with findings/motivation
+- Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `build`
+- Simple terms, no jargon
+- ONLY analyze staged files (`git diff --cached`), ignore unstaged
+- NO test plans in commit messages
+
+### Pull Requests
+
+- PR titles: NO type prefix (unlike commits) - start with capital letter + verb
+- Analyze ALL commits with `git diff <base-branch>...HEAD`, not just latest
+- PR body: open on why, short scannable bullets (one point each), a diff or snippet, numbers over adjectives. Single section, no headers
+- No test plans, no changed files list, no line-number links in PR body
+- Self-assign with `-a @me`
+- Find reviewers: `gh pr list --repo <owner>/<repo> --author @me --limit 5`
+
+### PR Comments and Reviews
+
+- Create pending reviews only, never auto-submit
+- Comment style: start lowercase, no em-dashes, simple terms, no end punctuation, max 1 sentence
+- Bot comment responses: few words is enough
+- Real person responses: polite, concise
+
+### Commands
+
+- `/github-dev:commit-staged` - commit staged changes
+- `/github-dev:create-pr` - create pull request
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [fcakyon/claude-codex-settings](https://github.com/fcakyon/claude-codex-settings) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
