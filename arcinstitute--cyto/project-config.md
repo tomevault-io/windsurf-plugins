@@ -1,158 +1,29 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Core mapping engine. Maps paired-end sequencing reads to features (genes, CRISPR guides) using sequence hashing. Handles barcode correction, UMI extraction, and optional probe demultiplexing. When probes are present, writes per-probe IBU output files; otherwise writes a single IBU. Supports both BINSEQ and FASTX inputs via parallel processing.
 ---
 
-# CLAUDE.md
+# cyto-map
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Purpose
 
-## Project Overview
+Core mapping engine. Maps paired-end sequencing reads to features (genes, CRISPR guides) using sequence hashing. Handles barcode correction, UMI extraction, and optional probe demultiplexing. When probes are present, writes per-probe IBU output files; otherwise writes a single IBU. Supports both BINSEQ and FASTX inputs via parallel processing.
 
-Cyto is a rust-based bioinformatics tool for processing 10x Genomics Flex single-cell RNA sequencing data. It handles gene expression profiling, multiplexed experiments (16-plex Flex-V1, 384-plex Flex-V2), and CRISPR perturbation screens (Perturb-seq). Supports both FASTQ and BINSEQ input formats.
+## Key Source Files
 
-BINSEQ is a binary format that is a modern replacement for FASTQ.
-It is natively parallel, more compressed, and has both paired-end and single-end support in a single file.
-The main extension used by cyto is `.cbq`.
-Interaction with these files is handled via the CLI `bqtools`.
+- `src/detect.rs` — Geometry detection module. Samples N reads **per input file** independently, scans all positions for known reference sequences using `query_sliding_iter`, infers optimal geometry from position consensus. When multiple files are provided, validates that all files produce the same geometry string and takes the maximum remap window. Types: `DetectionConfig` (`num_reads`, `min_proportion`, `remap_min_proportion`, `num_threads`), `ComponentEvidence` (carries single-position `match_count`/`match_proportion` plus windowed counterparts `windowed_match_count`/`windowed_match_proportion` summed over `[pos ± remap_window]` on the same mate -- approximates what `cyto map --remap-window N` would score), `PerFileResult` (per-file detection summary), `DetectionResult` (includes `per_file_results: Vec<PerFileResult>`). Public API: `detect_gex_geometry()`, `detect_crispr_geometry()` (both consume unpositioned mappers, sample all input files, validate consistency), `log_detection_result()` (logs aggregated result with per-file counts to stderr via `info!`; emits a clearly labeled `Recommended --remap-window: N` line on its own so users can copy it into `cyto map --remap-window N`; the per-component stderr line includes `windowed_count=` and `windowed_proportion=` tokens inline after the existing `count=`/`proportion=` tokens; the bare geometry string itself is printed to stdout by `run_detect_*` in `run.rs`, not by this module). Internal: `PositionAccumulator` (has `windowed_count()` helper that sums hits over `[best_pos.saturating_sub(window), best_pos + window]` inclusive on a given `(component, mate)`), `GexDetectionProcessor`/`CrisprDetectionProcessor` (implement both `binseq::ParallelProcessor` and `paraseq::PairedParallelProcessor`), `infer_geometry()`, `estimate_remap_window()` (proportion-based threshold, contiguous-range walk, includes `[probe]` -- only `[barcode]` is excluded), `resolve_overlaps()`, `validate_and_aggregate()` (takes `Vec<(String, PositionAccumulator, DetectionResult)>`, validates geometry consistency across files, aggregates evidence counts, and re-walks the merged accumulator at `max_remap_window` to populate aggregated windowed counts), `log_per_file_result()`, `log_top_alternatives()`.
+- `src/geometry.rs` — Geometry DSL parser and resolver. Parses bracket notation (e.g. `[barcode][umi:12][:10][probe] | [gex]`) into `Geometry` → resolves to `ResolvedGeometry` with concrete byte offsets and read mates. `has_component()` checks whether a geometry includes a given component (used for probe validation). Extensive unit tests (~300 lines).
+- `src/mapper/mod.rs` — `Mapper` trait (`query(&self, seq) -> Option<usize>`, `mate() -> ReadMate`), `Library` trait (statistics), typestate markers (`Unpositioned`, `Ready`)
+- `src/mapper/gex.rs` — `GexMapper<S>`: maps GEX probes via `SplitSeqHash`. Two-half matching with configurable hamming distance (`GEX_MAX_HDIST=3`). Implements `FeatureWriter`.
+- `src/mapper/crispr.rs` — `CrisprMapper<S>`: two-stage matching — `MultiLenSeqHash` for variable-length anchors, then `SeqHash` for fixed-length protospacers. Protospacer offset computed dynamically from anchor match.
+- `src/mapper/whitelist.rs` — `WhitelistMapper<S>`: cell barcode correction via `SeqHash`. Returns 2-bit encoded barcodes. Supports parallelized hash build.
+- `src/mapper/probe.rs` — `ProbeMapper<S>`: demultiplexing probe mapper with optional regex filtering on aliases. Creates `Bijection` for unique probe-to-index mapping.
+- `src/mapper/umi.rs` — `UmiMapper`: extracts UMI from reads, validates quality scores against threshold (`UMI_MIN_QUALITY=10`), provides 2-bit encoding.
+- `src/mapper/biject.rs` — `Bijection<T>`: bidirectional map (element <-> index) used for deduplicating probe aliases.
+- `src/processor.rs` — `MapProcessor<M>`: parallelized read processing. Handles both probed (multi-output with `Option<ProbeMapper>` and `Option<Bijection>`) and unprobed (single-output) modes in a unified struct. Two constructors: `probed()` and `unprobed()`. Implements both `binseq::ParallelProcessor` and `paraseq::PairedParallelProcessor`. Thread-local buffers flushed on batch complete. Progress bar on thread 0.
 
-IBU (Indexed-Barcode-UMI) is a binary format that is similar to a BUS file or a very minimal BAM.
-When probe demultiplexing is enabled, cyto writes one IBU file per probe; without probes, a single IBU file is written.
-This is a deterministically sized format with a HEADER, and then many 24-byte records, each containing a BARCODE and UMI (2-bit encoded as u64 values) and a u64 representing the library element mapped by the record.
-
-## Build Commands
-
-```bash
-# Install with SIMD optimization (recommended for performance)
-export RUSTFLAGS="-C target-cpu=native"; cargo install --path crates/cyto
-
-# Or use justfile
-just install
-```
-
-### Dependencies
-
-Not strictly necessary but recommended: `bqtools`
-
-- If not installed, run `cargo install bqtools`
-
-## Testing
-
-```bash
-# Run all tests
-cargo test --verbose
-
-# Run tests for specific crate
-cargo test -p cyto-map
-
-# Run specific test by name
-cargo test test_name
-
-# Run a map test (uses data/ directory)
-just run-gex-binseq    # Gene expression workflow
-just run-crispr-binseq # CRISPR workflow
-
-# Run workflow integration tests (uses data/ directory)
-just run-wf-gex      # Gene expression workflow
-just run-wf-crispr   # CRISPR workflow
-just run-all         # All test workflows
-```
-
-### Test Data
-
-The repository contains relevant test data in the `data/` directory.
-
-Example data in `data/` directory:
-
-- `data/sequencing/` - CRISPR and GEX BINSEQ/FASTQ files
-  - Expected format: [.bq/.vbq/.cbq or \*\_R[12].fastq.gz]
-  - Minimal test files for CI
-- `data/libraries/` - CRISPR guides and GEX probes
-  - Format: [TSV]
-- `data/metadata/` - Probe barcodes and cell barcode whitelist
-  - Whitelist format (one sequence per line): [.txt.gz]
-  - Probe format: [3-col TSV]
-
-## Linting and Formatting
-
-```bash
-cargo clippy
-cargo fmt
-```
-
-Workspace uses pedantic clippy lints with specific exceptions defined in root Cargo.toml.
-
-## Architecture
-
-### Crate Organization (11 crates in `crates/`)
-
-**Entry Points:**
-
-- `cyto` - Main binary, module selection, logger init
-- `cyto-cli` - CLI definitions using Clap
-
-**Processing Pipeline:**
-
-- `cyto-map` - Maps reads to features (barcode correction, optional probe demux, geometry handling)
-- `cyto-workflow` - Orchestrates multi-step pipelines (gex, crispr workflows)
-- `cyto-io` - File I/O utilities
-
-**IBU (Index-Barcode-UMI) Format Processing:**
-
-- `cyto-ibu-count` - Counting and deduplication
-- `cyto-ibu-sort` - In-memory and external sorting
-- `cyto-ibu-umi-correct` - UMI error correction
-- `cyto-ibu-cat` - Concatenate IBU files
-- `cyto-ibu-view` - View IBU contents as text
-- `cyto-ibu-reads` - Read/UMI statistics
-
-### Command Hierarchy
-
-```
-cyto
-├── workflow
-│   ├── gex        # map → sort → umi-correct → count → filter
-│   └── crispr     # map → sort → umi-correct → count → assign
-├── map
-│   ├── gex        # Map to gene expression library
-│   └── crispr     # Map to CRISPR guides
-├── detect
-│   ├── gex        # Auto-detect GEX read geometry
-│   └── crispr     # Auto-detect CRISPR read geometry
-└── ibu
-    ├── view, sort, count, cat, umi, reads
-```
-
-### Geometry DSL
-
-Read geometry is specified via a domain-specific language:
-
-- Presets: `gex-v1`, `gex-v2`, `crispr-v1`, `crispr-v2`
-- Components: `[barcode]`, `[umi:N]`, `[probe]`, `[gex]`, `[anchor]`, `[protospacer]`
-- Skip regions: `[:N]` for anonymous spacers
-- Custom via `--geometry` flag
-
-### Key Source Files
-
-- `crates/cyto/src/main.rs` - Entry point, command routing
-- `crates/cyto-workflow/src/lib.rs` - Workflow orchestration (gex.rs, crispr.rs)
-- `crates/cyto-map/src/mapper/mod.rs` - Mapper implementations (GexMapper, CrisprMapper, WhitelistMapper)
-- `crates/cyto-map/src/geometry.rs` - Geometry DSL parsing
-
-## Maintaining CLAUDE.md Files
-
-Each crate in `crates/` has its own `CLAUDE.md` describing that module's purpose, key types, source files, and design patterns. These files must stay accurate as the code evolves.
-
-When making changes to a crate, check whether the diff affects anything described in that crate's `CLAUDE.md`:
-
-- Renamed or removed functions, types, or traits that are listed as key types or referenced in source file descriptions
-- New source files added or existing ones restructured
-- Changed design patterns (e.g., new parallelism strategy, different error handling approach)
-- Added or removed dependencies on other workspace crates
-- New or removed tests
-
-If the diff touches any of these, update the relevant `CLAUDE.md` as part of the same change. Keep descriptions concise and factual — these files are reference material, not prose documentation.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ArcInstitute/cyto](https://github.com/ArcInstitute/cyto) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
