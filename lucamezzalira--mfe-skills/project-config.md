@@ -1,87 +1,125 @@
 ---
 trigger: always_on
-description: Reviews and generates micro-frontend code against eight boundary rules from Building Micro-Frontends (O'Reilly), plus governance extensions for feature-flag scope, edge strategy, SSR ownership, and boundary fitness functions. Use when a user says "review my shell code", "is this a boundary violation?", "generate a Module Federation shell", "how do I mount this MFE?", "review my micro-frontend architecture", "set up event communication between MFEs", "create a new micro-frontend", "how should we 
+description: MFE boundary review: URL routing ownership — shell vs micro-frontend. Load when this topic is in scope; part of mfe-skills.
 ---
 
 
-# MFE boundary health
+# URL routing ownership — shell vs micro-frontend
 
-Reviews and generates micro-frontend code against the eight boundary rules from *Building Micro-Frontends* (O'Reilly). All rules are tool-agnostic. Full rule definitions, violation signals, and code-checkable patterns are in `references/rules.md` — load it when you need the detail for a specific rule.
+**Version**: 1.1 | **Skill**: reviewing-mfe-boundaries | **Source**: *Building Micro-Frontends* (O'Reilly)
 
-**On every activation, apply this summary table directly — no file load needed:**
+## Principle
 
-| Rule | What to check in code | Severity |
-|---|---|---|
-| 1 — Business subdomain | Name reflects a business capability, not a UI element | High |
-| 2 — Minimal API surface | Fewer than 5 props; no full domain objects passed | Critical |
-| 3 — Hide implementation details | No direct imports from another MFE's internals | Critical |
-| 4 — Events not shared state | No shared store; shell handles `shell:*` only; domain events peer-to-peer or URL | Critical |
-| 5 — Independent deployment | No versioned URLs in shell config; no build-time MFE imports; no CI pipeline coupling | High |
-| 6 — Isolate failure | Every remote mount has a fallback in the shell | High |
-| 7 — Coarse-grained | Nesting depth > 1 (MFE inside MFE); more than 3 MFEs per view | High |
-| 8 — Single-team ownership | One team in CODEOWNERS; no cross-team sign-off on internals | High |
+Split routing responsibility by **URL depth**, not by who implements the router API:
 
-For full rule definitions and violation signals: load `references/rules-core.md`.
-For framework-specific patterns (MF v2, Angular/Native Federation, Single SPA): load `references/rules-toolchain.md`.
-For URL routing ownership (shell first segment, MFE deeper paths): load `references/routing-ownership.md`.
-For fix patterns and step-by-step remediation: load `references/remediation.md` when the user asks how to fix a violation or requests a migration plan.
+| URL depth | Owner | Example |
+|-----------|--------|---------|
+| **First segment** (top-level path) | **Shell** | `/`, `/catalog`, `/checkout` |
+| **Second segment onward** | **Micro-frontend** | `/catalog/product/sku-123`, `/checkout/shipping` |
+
+The shell answers only: *which MFE loads for this top-level area?*  
+The MFE answers: *what happens inside that area?*
+
+**Navigation style is flexible.** Use `<a href>`, React Router `<Link>`, `navigate()`, Angular `Router`, or full page loads — as long as changing the **first segment** loads the correct remote and deeper segments stay inside the owning MFE.
 
 ---
 
-## Cold start: new project
+## Shell: dynamic first-level routes (main goal)
 
-If no boundaries exist yet, ask about the highest-priority unknown first — one question per turn. Do not generate implementation code until each check is resolved.
+The shell should load **only** first-level URLs from a **runtime manifest** (`routes.json` or equivalent) plus remote URLs (`remotes.json`). That way:
 
-**Check 1 — Team ownership**
-Ask: "Which team will own this micro-frontend end-to-end — design, development, deployment, and operations?"
-**If unresolved:** do not generate implementation code. Ask the user to install the **micro-frontend-canvas** skill and complete a canvas iteration (see https://github.com/lucamezzalira/mfe-canvas).
+- **Adding or removing an MFE** updates configuration — not shell application code
+- **No shell redeploy** is required when an existing MFE adds internal pages (`/catalog/product/:id`, `/catalog/sale`) — those routes are owned and deployed by the MFE team
 
-**Check 2 — Domain identification**
-Ask: "What business capability does this represent? What user journey step does it enable?"
-**If unclear:** recommend the **micro-frontend-canvas** skill before implementation. Do not generate a full Canvas worksheet from this skill. A boundary without a named domain is not ready for code.
+```json
+[
+  { "path": "/", "scope": "home_mfe", "module": "./HomeApp", "navLabel": "Home" },
+  { "path": "/catalog/*", "scope": "catalog_mfe", "module": "./CatalogApp", "navLabel": "Catalog" }
+]
+```
 
-**Check 3 — Decisions framework**
-Ask: "Is this a vertical or horizontal split, and how will it be composed — client-side or server-side?"
-**If unresolved:** generate a skeleton with a placeholder composition comment and note which decision is still needed.
+The shell maps each entry to one remote mount (wildcard `/*` hands all deeper paths to that MFE). Nav labels can also come from the manifest.
 
-Once all three are confirmed, apply the rules as design constraints from the first line of code — retrofitting is significantly more expensive than designing correctly upfront.
+**Do not** in the shell:
+
+- Register domain sub-routes (`/catalog/product/:id`, `/checkout/shipping`)
+- Hard-code per-MFE routes in `App.tsx` when a manifest could list them instead
 
 ---
 
-## Code generation defaults
+## Micro-frontend: hardcoded internal routes (expected)
 
-When generating any MFE code, apply these defaults without being asked. Examples are shown per toolchain — apply the pattern that matches the user's stack.
-
-**URL routing — shell first segment only; MFE owns depth below (Rule 7):**
-
-- **Shell**: load **only** first-level paths from a runtime manifest (`routes.json` + `remotes.json`) so adding/removing an MFE does not require shell code changes or redeploy for MFE-internal pages
-- **MFE**: hardcoded internal routes are expected (`/product/:id` under `/catalog`); new sub-pages are MFE-only deploys
-- **Navigation implementation**: flexible (`<a>`, `<Link>`, `navigate()`, etc.) — enforce URL depth ownership, not a specific router API
-- **Cross-area navigation**: change the first URL segment; deeper segments stay inside the owning MFE
+Inside an MFE, routes are usually **hardcoded in code** — that is normal and preferred. The catalog team ships new pages without touching the shell because the shell only mounts `/catalog/*`.
 
 ```tsx
-// ✓ Shell — manifest-driven first segment (wildcard → remote)
-// routes.json: { "path": "/catalog/*", "scope": "catalog_mfe", "module": "./CatalogApp" }
-routes.map((r) => <Route key={r.scope} path={r.path} element={<RemoteMount ... />} />)
-
-// ✓ Catalog MFE — hardcoded routes under basename (no shell change when adding pages)
+// Catalog MFE — routes defined in code; shell never sees these paths
 <BrowserRouter basename="/catalog">
   <Routes>
+    <Route path="/" element={<ProductList />} />
     <Route path="/product/:productId" element={<ProductDetail />} />
   </Routes>
 </BrowserRouter>
-
-// ✗ Shell — domain sub-route
-<Route path="/catalog/product/:productId" element={...} />
 ```
 
-**Shell platform events — allowed; domain events in shell — not (Rules 4, 7):**
+Use `basename`, `activeWhen` prefix, or Angular child routes so internal paths align with the shell's first segment.
 
-- Shell **may** handle platform/chrome events: alerts, toasts, modals, global loading chrome
-- Shell **must not** subscribe to domain namespaces (`catalog:*`, `checkout:*`, `cart:*`)
-- MFEs emit `shell:alert`, `shell:modal:open`, etc.; horizontal peers may use domain events MFE-to-MFE, not via shell handlers
+---
+
+## Shell platform events vs domain events
+
+The shell **may** expose an event bus (or similar) for **platform / chrome** concerns shared across MFEs:
+
+| Allowed in shell (platform) | Not allowed in shell (domain) |
+|-----------------------------|-------------------------------|
+| `shell:alert`, `shell:toast` | `catalog:productSelected` |
+| `shell:modal:open`, `shell:modal:close` | `checkout:paymentFailed` |
+| `shell:loading`, `shell:analytics` (if generic) | `cart:itemAdded` |
+| Focus trap, global error banner, consent banner | Any handler that applies business rules |
+
+MFEs emit platform events when they need shell-owned UI. The shell subscribes only to **platform-scoped** event names (e.g. `shell:*` or `ui:*`).
 
 ```javascript
+// ✓ Catalog MFE — ask shell to show chrome
+platformBus.emit('shell:alert', { message: 'Item saved', variant: 'success' })
+platformBus.emit('shell:modal:open', { id: 'confirm-delete', title: 'Remove item?' })
+
+// ✗ Shell — domain listener
+platformBus.on('catalog:productSelected', (payload) => { ... })
+
+// ✗ Shell — domain logic triggered from MFE event
+platformBus.on('checkout:completed', ({ orderId }) => redirectToThankYou(orderId))
+```
+
+**Cross-MFE navigation** between top-level areas: prefer **URL** (change first segment). Do not require a dedicated `navigation:go` platform event unless the product already standardises on it — URL depth ownership is the rule that matters.
+
+**Horizontal split (same page):** MFEs may use an event bus for **peer** domain coordination; the shell still must not grow domain handlers. Prefer platform events to shell and domain events MFE-to-MFE only.
+
+---
+
+## Vertical vs horizontal split
+
+| Split | Routing | Events |
+|-------|---------|--------|
+| **Vertical** | Shell first segment; MFE sub-routes | URL + storage for cross-area; platform events to shell |
+| **Horizontal** | Shell may own page URL; siblings don't own each other's sub-routes | Platform events to shell; domain events between peers, not shell |
+
+---
+
+## Violation signals
+
+- Shell route table or `App.tsx` includes paths below the first segment
+- Shell subscribes to `catalog:*`, `checkout:*`, `order:*`, or other business namespaces
+- New MFE requires shell code changes instead of manifest + `remotes.json` only
+- MFE adds `/catalog/new-page` but team believes shell must redeploy (misunderstanding — only manifest matters at shell level)
+- Shell passes route-derived domain state as props (`productId`, `cart`) instead of MFE reading its own URL
+
+---
+
+## Adding or removing a micro-frontend
+
+1. Deploy (or undeploy) the remote; update `remotes.json`
+2. Add or remove one **first-level** entry in `routes.json`
+3. Optionally add nav metadata in the same manifest
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
