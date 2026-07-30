@@ -1,97 +1,94 @@
 ---
 trigger: always_on
-description: RIPDPI is an Android VPN/proxy application for DPI (Deep Packet Inspection) bypass. It runs a local SOCKS5 proxy and VPN tunnel through in-repository Rust native modules.
+description: <!-- BEGIN:nextjs-agent-rules -->
 ---
 
-# AGENTS.md -- RIPDPI
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
 
-## Project
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
 
-RIPDPI is an Android VPN/proxy application for DPI (Deep Packet Inspection) bypass. It runs a local SOCKS5 proxy and VPN tunnel through in-repository Rust native modules.
+## Purpose
 
-## Setup
+Renders Google Play Store marketing assets for the RIPDPI Android app: six 1080x1920 phone screenshots plus a 1024x500 feature graphic. The full design and constraints reference lives in `.claude/skills/play-store-screenshots/SKILL.md`; this file is the entry-point cheat sheet.
 
-1. Requirements: JDK 17, Android SDK, Android NDK 29.0.14206865, stable Rust toolchain with Android targets, Android CLI (`android`) from `d.android.com/tools/agents` (agents and CI depend on it; `android docs` must be available)
-2. Native build properties are defined in `gradle.properties` -- do not hardcode NDK version, ABI filters, or SDK levels elsewhere
-3. The Android build invokes the `ripdpi.android.rust-native` convention plugin from `:core:engine`, which builds the native workspace under `native/rust/`
-4. Agent runtime permissions for `android` CLI calls:
-   - **Claude Code**: `.claude/settings.local.json` allowlists `Bash(android:*)` -- committed, no per-developer action needed
-   - **Codex**: approve the project once via `trust_level = "trusted"` in `~/.codex/config.toml` (Codex prompts on first run). Codex has no per-command allowlist; project trust covers all shell invocations including `android docs` / `android sdk` / `android emulator`.
+## Brand
 
-## Build & Test
+- **Current logo (2026-05):** brutalist black silhouette ("bag-in-arch" motif) on white. `app/src/main/ic_launcher-playstore.png` is canonical; copy it to `public/app-icon.png` after any change.
+- **Previous logo:** dove rising from barbed wire on navy — no longer in use.
+- **DESIGN.md** is monochrome-first **light** (`#FAFAFA` bg, `#1A1A1A` fg). Marketing slides honor DESIGN.md: light, monochrome-first, restrained status color, no decorative gradients. `page.tsx` keeps both `BRAND` (dark) and `BRAND_LIGHT` token sets; `BRAND_LIGHT` is the canonical default, and `BRAND` is reserved for at most 1-2 rhythm-break slides as a strict inversion of the same role mapping (not a separate visual identity).
+- **7 launcher variants** ship in-app via the icon picker: `clean` (default), `cracked`, `disintegrate`, `glitch`, `rubble`, `stitch`, plus monochrome. Variants live as XML adaptive icons in `app/src/main/res/drawable/ic_launcher_foreground_ripdpi_*.xml`; there are no rasterized PNG copies in the repo. Showcasing the picker in a slide requires capturing each variant from a device home screen.
 
-```bash
-./gradlew assembleDebug              # Debug build (includes native compilation)
-./gradlew assembleRelease             # Release build (requires signing env vars)
-./gradlew testDebugUnitTest           # Run all unit tests
-./gradlew :core:data:testDebugUnitTest  # Run tests for a single module
-./gradlew staticAnalysis              # Run detekt + ktlint + Android lint
-```
+## File Layout
 
-## Project Rules
+| Path | Role |
+|------|------|
+| `src/app/page.tsx` (~1,180 lines) | Single-file generator: 6 phone slides + 1 feature graphic + `SLIDES` registry |
+| `src/app/layout.tsx` | Geist Sans + Geist Mono font setup |
+| `src/app/globals.css` | Minimal global styles |
+| `capture.mjs` | Puppeteer headless batch driver |
+| `public/screenshots/` | RAW 1080x2400 app captures (INPUT, manually produced — see Stage 1) |
+| `public/app-icon.png` | Copied from `app/src/main/ic_launcher-playstore.png` (brutalist black silhouette; refresh with `cp` after any brand change) |
+| `../docs/screenshots/` | Puppeteer OUTPUT, checked into git, referenced by READMEs |
+| `package.json` | Next.js 16.2.6, React 19.2.4, Puppeteer 24, Tailwind 4 |
 
-- **Never extend baselines** (detekt, LoC, lint). Fix the underlying violation -- baselines exist only for legacy debt; do not work around CI or hook enforcement.
-- **Non-rooted Android baseline** -- the app must fully function on non-rooted devices. Root-only features (`ripdpi-root-helper`, `FakeRst`, `MultiDisorder`, `IpFrag2`) are opt-in behind the `root_mode_enabled` setting and must degrade gracefully when root is unavailable.
-- **No backend server** -- all features work offline and locally. Do not design features that require an API endpoint or remote service. External data uses static files on GitHub or bundled assets; user data never leaves the device unless the user explicitly exports it.
-- **Goal-driven execution** -- before implementing, convert each task into verifiable success criteria (test name, metric delta, UI render) and verify each before reporting completion. Ask for clarification when criteria are ambiguous rather than guessing.
-- **Surface ambiguity early** -- an undocumented JNI contract, a missing schema migration, an unclear protobuf field number, a `DesyncMode` without documented activation: name it, do not guess.
-- **Reproduce before fixing** -- a packet-smoke scenario, a `cargo nextest` test, or a Roborazzi baseline is the artifact you change; the source edit follows.
-- Removing custom detekt rules, lint baselines, or other quality gates is out of scope unless explicitly requested.
+## Two-Stage Pipeline
 
-## Task Board
+### Stage 1 — Capture raw app UI into `public/screenshots/`
 
-This repository uses Obsidian Tasks-compatible Markdown task lines as the canonical task system.
-Use the `repo-task-board` skill for all task-related operations.
+These 1080x2400 PNGs are the visual content embedded into the marketing slides. They are NOT generated by this Next.js project; they are captured manually from the running RIPDPI Android app on a real device or 1080x2400 emulator (Pixel 6 emulator works).
 
-Canonical files:
+Expected files in `public/screenshots/`:
 
-- `docs/tasks/issues/<slug>.md` — **source of truth** — one note per task/epic (YAML frontmatter + canonical `- [ ]` line + spec)
-- `docs/tasks/active.md` — Obsidian Tasks query view (`#status/doing`, `#status/review`)
-- `docs/tasks/backlog.md` — Obsidian Tasks query view (`#status/backlog`)
-- `docs/tasks/blocked.md` — Obsidian Tasks query view (`#status/blocked`)
-- `docs/tasks/epics.md` — Obsidian Tasks query view (`#area/epic`)
-- `docs/tasks/dashboard.md` — Obsidian Tasks query hub + Bases view links
-- `docs/tasks/board.md` — Kanban board (visual layer; source of truth is `issues/`)
+| File | Source screen |
+|------|---------------|
+| `home-light.png` | Home, system light theme |
+| `home-dark.png` | Home, system dark theme |
+| `settings.png` | Settings root, light |
+| `settings-dark.png` | Settings root, dark |
+| `diagnostics.png` | Diagnostics landing |
+| `diagnostics-scan.png` | Diagnostics during scan |
+| `dns-settings.png` | DNS settings detail |
+| `config.png` | Config screen |
+| `history.png` | Connection history |
+| `relay.png` | Mode editor — outbound relay protocol picker |
 
-Canonical task syntax (lives inside `docs/tasks/issues/<slug>.md`):
+> Slides currently embed `home-light.png` (Slide 1), `relay.png` (Slide 3), and `diagnostics.png` (Slide 5). The other files are kept as Stage-1 inputs for future slides.
 
-```md
-- [ ] #task <imperative title> #repo/RIPDPI #area/<area> #status/<status> <priority>
-```
+Regenerate: install the debug build on a 1080x2400 device, navigate to each screen, capture with `adb shell screencap -p`, copy out with `adb pull`. Light/dark variants come from the system theme toggle.
 
-Per-task note YAML frontmatter:
+### Stage 2 — Render marketing slides via Next.js + Puppeteer
 
-```yaml
----
-title: Imperative task title
-type: task            # task | epic
-status: doing         # backlog | todo | doing | review | blocked | done | dropped
-area: diagnostics     # engine | rust-native | diagnostics | transport | outbound | dns |
-                      # routing | vpn | proxy | relay | android | ui | data | service |
-                      # testing | ci | epic
-priority: high        # critical | high | medium | low
-owner: Role name
-parent: epic-slug     # slug of parent epic, or null
-blocks: []
-blocked_by: []
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
----
-```
+`bun run dev` for interactive iteration; `capture.mjs` for the batch export that writes into `../docs/screenshots/`.
 
-Lifecycle: create via Templater template → transitions update `status:` + `#status/*` tag → delete file on close (git history is the audit trail). Do NOT add task lines to `active.md`, `backlog.md`, `blocked.md`, or `epics.md` — those are query-only views.
+## Slide Registry
 
-Invoke the `repo-task-board` skill when the user mentions: roadmap, TODO, backlog, Kanban, task board, sprint, blocked work, or agent-ready work.
+Defined in `page.tsx:855–862` (`SLIDES` array). The feature graphic is a separate component (`FeatureGraphicSlide`) addressed by `?slide=fg`.
 
-## Architecture
+| Idx | `id` | Label | Headline |
+|-----|------|-------|----------|
+| 1 | `hero` | Hero | Browse without borders |
+| 2 | `no-root` | No Root | One tap. No root. |
+| 3 | `relays` | Relays | Local bypass or your relay |
+| 4 | `controls` | Controls | Fine-tune every packet |
+| 5 | `diagnostics` | Diagnostics | See what's really happening |
+| 6 | `more` | More Features | And so much more. |
+| fg | — | Feature Graphic | Browse without borders |
 
-```
-:app (UI/Compose) --> :core:service (VPN/proxy services)
-                          |
-                     :core:engine (Rust native + JNI)
+Puppeteer file names are pinned in `capture.mjs:4-12` (`01-hero`, `02-no-root`, …, `feature-graphic`).
+
+## Common Workflows
+
+| Goal | Command |
+|------|---------|
+| Iterate locally, click cards to export individually | `bun install && bun run dev` then open `localhost:3000` |
+| Render one slide at full resolution for debugging | `localhost:3000/?slide=N` where N is `1..6` or `fg` |
+| Batch capture for release (one-shot) | `bun run capture:prod` -- builds, boots the prod server on :3099, runs `capture.mjs`, and tears the server down on success or failure |
+| Batch capture for release (manual) | `bun run build && bun run start -- -p 3099 &` then `node capture.mjs` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [po4yka/RIPDPI](https://github.com/po4yka/RIPDPI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
