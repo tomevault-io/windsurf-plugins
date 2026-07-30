@@ -1,104 +1,158 @@
 ---
 trigger: always_on
-description: > **Comprehensive docs:** See [`AGENTS.md`](../AGENTS.md) at the repository root for full AI agent documentation.
+description: **Applies to:** `configuration.yaml` files
 ---
 
-# GitHub Copilot Instructions
 
-> **Comprehensive docs:** See [`AGENTS.md`](../AGENTS.md) at the repository root for full AI agent documentation.
->
-> **Why two files?** This file is loaded automatically by GitHub Copilot. `AGENTS.md` serves non-Copilot agents (Claude Code, Cursor, etc.) who don't read this file. Some overlap is intentional. Path-specific `*.instructions.md` files provide detailed patterns per file type — avoid duplicating their content here.
+# Home Assistant Configuration Instructions
 
-## Project Identity
+**Applies to:** `configuration.yaml` files
 
-- **Domain:** `philips_airpurifier_coap` (use this in all user-facing text)
-- **Title:** Philips Air Purifier Integration
-- **Class prefix:** `PhilipsAirPurifier`
-- **Main code:** `custom_components/philips_airpurifier/`
-- **Validate:** `script/check` (type-check + lint-check + spell-check)
-- **Start HA:** `./script/develop` (kills existing, starts on port 8123)
-- **Force restart:** `pkill -f "hass --config" || true && pkill -f "debugpy.*5678" || true && ./script/develop`
+## Schema
 
-Use these exact identifiers throughout the codebase. Never hardcode different values.
+**Schema:** `/schemas/yaml/configuration_schema.yaml`
 
-## Code Quality Baseline
+Consult this schema for available configuration options and structure.
 
-- **Python:** 4 spaces, 120 char lines, double quotes, full type hints, async for all I/O
-- **YAML:** 2 spaces, modern Home Assistant syntax (no legacy `platform:` style)
-- **JSON:** 2 spaces, no trailing commas, no comments
+## Minimal Structure
 
-Before considering any coding task complete, the following **must** pass:
+For development and testing, keep configuration minimal:
 
-```bash
-script/check      # Runs type-check + lint-check + spell-check
+```yaml
+# Load default configuration
+default_config:
+
+# Enable your integration
+ha_integration_domain:
+
+# Logging for development
+logger:
+  default: info
+  logs:
+    custom_components.ha_integration_domain: debug
 ```
 
-Generate code that passes these checks on first run. As an AI agent, you should produce higher quality code than manual development. Aim for zero validation errors.
+## Modern Syntax Only
 
-## Architecture (Quick Reference)
+**Always use modern automation/script syntax:**
 
-**Data Flow:** Entities → Coordinator → API Client (never skip layers)
+```yaml
+# ✅ Correct (modern)
+automation:
+  - alias: "Motion detected"
+    trigger:
+      - trigger: state
+        entity_id: binary_sensor.motion
+        to: "on"
+    action:
+      - action: light.turn_on
+        target:
+          entity_id: light.hallway
+```
 
-**Package Structure (DO NOT create other packages):**
+**Never use legacy platform-based syntax:**
 
-- `coordinator/` — DataUpdateCoordinator (base + data_processing + error_handling + listeners)
-- `api/` — External API client (async aiohttp)
-- `entity/` — Base entity class (`IntegrationBlueprintEntity`)
-- `entity_utils/` — Entity-specific helpers (device_info, state formatting)
-- `config_flow_handler/` — Config flow with `schemas/` and `validators/` subdirs
-- `[platform]/` — One directory per platform (sensor, switch, etc.), one class per file
-- `service_actions/` — Service action implementations
-- `utils/` — Integration-wide utilities
+```yaml
+# ❌ Wrong (legacy)
+automation:
+  - alias: "Motion detected"
+    trigger:
+      platform: state # Don't use this!
+      entity_id: binary_sensor.motion
+      to: "on"
+```
 
-**Forbidden packages:** `helpers/`, `ha_helpers/`, `common/`, `shared/`, `lib/` — use `utils/` or `entity_utils/` instead. Do NOT create new top-level packages without explicit approval.
+## Service Calls
 
-**Key patterns** (details in path-specific `*.instructions.md`):
+**Use `action:` key (not deprecated `service:`):**
 
-- Entity MRO: `(PlatformEntity, IntegrationBlueprintEntity)` — order matters
-- Unique ID: `{entry_id}_{description.key}` (set in base entity)
-- Services: register in `async_setup()`, NOT `async_setup_entry()` (Quality Scale requirement)
-- Config entry data: `entry.runtime_data.client` / `entry.runtime_data.coordinator`
+```yaml
+action:
+  - action: light.turn_on # Modern syntax
+    target:
+      entity_id: light.living_room
+    data:
+      brightness: 255
+```
 
-## Workflow Rules
+## Logger Configuration
 
-1. **Small, focused changes** — avoid large refactorings unless explicitly requested
-2. **Implement features completely** — even if spanning 5-8 files
-   - Example: New sensor needs entity class + platform init + descriptions → implement all together
-   - Example: Bug fix touching coordinator + entity + error handling → do all at once
-3. **Multiple independent features:** implement one at a time, suggest commit between each
-4. **Large refactoring (>10 files or architectural changes):** propose plan first, get explicit confirmation
-5. **Validation:** run `script/check` before considering task complete
-6. **File size:** keep files at ~200-400 lines. Split large modules into smaller ones when needed.
+**Adjust log levels for debugging:**
 
-**Important: Do NOT write tests unless explicitly requested.** Focus on implementing functionality. The developer decides when and if tests are needed.
+```yaml
+logger:
+  default: warning
+  logs:
+    # Your integration - verbose
+    custom_components.ha_integration_domain: debug
 
-**Translation strategy:**
+    # Reduce noise from other components
+    homeassistant.components.http: warning
+    homeassistant.components.websocket_api: error
 
-- Business logic first, translations later
-- Update `en.json` only when asked or at major feature completion
-- NEVER update other language files automatically — extremely time-consuming
-- Ask before updating multiple translation files
-- Use placeholders in code (e.g., `"config.step.user.title"`) — functionality works without translations
+    # Keep important helpers visible
+    homeassistant.helpers.entity_registry: info
+    homeassistant.helpers.device_registry: info
+    homeassistant.config_entries: info
+```
 
-## Research First
+## Common Patterns
 
-**Don't guess — look it up:**
+**Conditions:**
 
-1. Search [Home Assistant Developer Docs](https://developers.home-assistant.io/) for current patterns
-2. Check the [developer blog](https://developers.home-assistant.io/blog/) for recent changes
-3. Look at existing patterns in similar files in the integration (e.g., existing sensor implementations)
-4. Search: `site:developers.home-assistant.io [your question]` for official guidance
-5. Run `script/check` early and often — catch issues before they compound
-6. Consult [Ruff rules](https://docs.astral.sh/ruff/rules/) or [Pyright docs](https://microsoft.github.io/pyright/) when validation fails
-7. Ask for clarification rather than implementing based on assumptions
+```yaml
+condition:
+  - condition: state
+    entity_id: input_boolean.enable_automation
+    state: "on"
+  - condition: time
+    after: "07:00:00"
+    before: "23:00:00"
+```
 
-**Home Assistant evolves rapidly** — verify current best practices rather than relying on outdated knowledge.
+**Templates:**
 
-## Local Development
+```yaml
+action:
+  - action: notify.notify
+    data:
+      message: >
+        Temperature is {{ states('sensor.temperature') }}°C
+```
 
+**Delays:**
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```yaml
+action:
+  - action: light.turn_on
+    target:
+      entity_id: light.hallway
+  - delay:
+      seconds: 30
+  - action: light.turn_off
+    target:
+      entity_id: light.hallway
+```
+
+## Validation
+
+Configuration is validated on Home Assistant startup:
+
+```bash
+script/develop  # Start HA and check logs for validation errors
+```
+
+Check terminal output and `config/home-assistant.log` for schema errors.
+
+## Staying Current
+
+**Home Assistant configuration syntax evolves:**
+
+- Check [automation documentation](https://www.home-assistant.io/docs/automation/)
+- Review [condition documentation](https://www.home-assistant.io/docs/scripts/conditions/)
+- Search for examples: `site:www.home-assistant.io automation [trigger type]`
+- Don't use deprecated syntax even if it still works
 
 ---
 > Source: [ruaan-deysel/ha-philips-airpurifier](https://github.com/ruaan-deysel/ha-philips-airpurifier) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
