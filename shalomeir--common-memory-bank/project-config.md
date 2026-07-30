@@ -1,118 +1,175 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - Follow the user's requirements carefully & to the letter.
 ---
 
-# CLAUDE.md
+## 1. Coding styles
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### 1.1 General rules
+- Follow the user's requirements carefully & to the letter.
+- Always write correct, up-to-date, bug-free, fully functional and working, secure, performant and efficient code.
+- Focus on readability over being performant.
+- Fully implement all requested functionality.
+- Leave NO todo's, placeholders or missing pieces in the code.
+- Be sure to reference file names.
+- Be concise. Minimize any other prose.
+- If you think there might not be a correct answer, you say so. If you do not know the answer, say so instead of guessing.    
+- Don't forget to update codebase documentation with changes.
+- Always add a blank line at the end of the file
+- Use UTF-8 encoding
 
-## Project Overview
+### 1.2 Naming Conventions
+- Variable name: camelCase
+- Class name: PascalCase
+- Constant: UPPER_SNAKE_CASE
+- File name: kebab-case
+- Function name: camelCase
 
-Common Memory Bank is a collection of integrated memory bank rules for AI development tools. It provides memory bank rule files that can be used across various AI development tools such as Cursor, Windsurf, Cline, RooCode, etc. It's specifically designed to work with TaskMaster AI for maintaining context across sessions.
+### 1.3 Commenting conventions
+- Write comments that explain the "why" of the code
+- Write documentation comments for all public APIs
 
-## Memory Bank Architecture
+## 2. Documentation
 
-The Memory Bank follows a structured hierarchy with these core files:
+### 2.1 README Essentials
+- Project overview
+- How to install
+- How to run
+- Environment Setup
+- License Information
 
+### 2.2 API Documentation
+- Use the OpenAPI/Swagger format
+- All endpoints should include example requests/responses
+- Clearly document error responses
+
+## 3. Project Structure
+
+### 3.1 Basic directory structure
 ```
-memory-bank/
-├── projectbrief.md       # Foundation document with core requirements and goals
-├── productContext.md     # Product purpose, problems solved, user experience
-├── systemPatterns.md     # System architecture, design patterns, technical decisions
-├── techContext.md        # Technologies, development setup, technical constraints
-└── activeContext.md      # Current focus, recent changes, next steps
-```
-
-When working with this project, always check the memory bank files first to understand the current state and context of the project.
-
-## TaskMaster Integration
-
-This project is designed to work with TaskMaster AI. When using TaskMaster:
-
-1. Always synchronize memory bank files with task status changes
-2. Update `activeContext.md` whenever a task status changes
-3. Check consistency between TaskMaster state and memory bank contents
-
-### Task Status Change Process
-
-When changing a task status:
-1. Change the task status with TaskMaster command (e.g., `set_task_status`)
-2. Update `activeContext.md` to reflect the current task focus change
-3. Update the next steps and considerations
-
-## Common Commands
-
-### TaskMaster Commands
-
-```bash
-# Initialize TaskMaster
-task-master init
-
-# Parse PRD to generate tasks
-task-master parse-prd scripts/prd.txt
-
-# Generate individual task files
-task-master generate
-
-# Show all tasks
-task-master list
-
-# Get next task
-task-master next
-
-# Set task status
-task-master set-task-status <id> <status>
-
-# Add a subtask
-task-master add-subtask <id>
-
-# Expand a task into subtasks
-task-master expand-task <id>
+project/
+├── src/ # source code
+├── tests/ # test code
+├── docs/ # Documentation
+├── utils/ # utility scripts
+└── config/ # Configuration files
 ```
 
-## Project Workflow
+### 3.2 Setting up the environment
+- Provide an .env.example file
+- Configuration is managed by environment variables
+- Never include sensitive information in the repository
 
-### Setup Workflow
+## 4. Versioning
 
-1. Install TaskMaster AI globally: `npm install -g task-master-ai`
-2. Initialize TaskMaster: `task-master init`
-3. Set up LLM API keys in `.env` for TaskMaster
-4. Initialize memory bank based on project requirements
-5. Create `scripts/prd.txt` if it doesn't exist
-6. Parse PRD to generate tasks: `task-master parse-prd scripts/prd.txt`
-7. Generate task files: `task-master generate`
+### 4.1 Commit Message Conventions
+```
+<type>(<scope>): <subject>
 
-### Development Workflow
+<body>.
 
-1. Check current task status: `task-master list`
-2. Get next task: `task-master next`
-3. Work on task and update status when complete
-4. Update `activeContext.md` with changes
-5. Create/update subrules for specific folders when needed
+<footer>
+```
 
-## Additional Features
+- type: feat, fix, docs, style, refactor, test, chore
+- scope: Changed components/modules
+- subject: Summary of changes (50 characters or less)
+- body: Detailed description (optional)
+- footer: Breaking changes, issue reference (optional)
 
-### Subfolder Rules
+### 4.2 Branching strategy
+- main: Production code
+- develop: Development branch
+- feature/*: Feature development
+- bugfix/*: Bug fixes
+- release/*: Release preparation
 
-The project supports a Folder Path-Based Sub Rule Management System:
-- Rules are stored in `.cursor/rules/subrules/` directory
-- Rule paths are recorded in `.cursor/rules/subrules/rule_list.txt`
-- Create subrules for folders that need special architectural patterns or context
 
-### PRD and Task Chain Review
+## 5. Security
 
-When core memory bank files are modified:
-1. Review consistency with PRD (`scripts/prd.txt`)
-2. If PRD is modified, analyze impact on tasks and propose updates
+### 5.1 Basic rules
+- Never put security token or security key values in your code.
+- Never expose security token and security key values to clients.
+- Update all dependencies regularly
+- Run security vulnerability scans regularly
+- Use validated libraries for authentication/authorization
+- Use HTTPS by default
 
-## Consistency Checks
+### 5.2 Data Security
+- Store personal information encrypted
+- Do not include sensitive information in logs
+- Perform thorough input validation
 
-Regularly perform these consistency checks:
-- Verify TaskMaster state matches memory bank content
-- Ensure `activeContext.md` reflects current task focus
-- Check that dependencies between tasks are reflected in documentation
+### 5.3 Environment Variables
+- .env and .env.local is not accessible to LLM due to .gitignore, .aiexclude, etc. but if there is .env.example, it is likely to be set up normally.
+- Assume that .env and .env.local already exists. For template see .env.example. This is an LLM AI inaccessible file, but since it's in env, it can be converted to a variable at runtime
+
+
+## 6. Test
+
+### 6.1 Testing Requirements
+- Unit test coverage of at least 80%.
+- Integration tests cover key functional flows
+- E2E tests cover key user scenarios
+
+### 6.2 Test Writing Rules
+- Be sure to typecheck when you’re done making a series of code changes
+- Prefer running single tests, and not the whole test suite, for performance
+- Tests must be independent
+- Test data is generated within the test code
+- All tests should be automated
+
+### 6.3 Applying Tests
+- When developing a web app or React Native app, we start with a test-driven development approach using Jest + React or React Native Testing Library as a minimum
+- If you're using python, we default to a test-driven approach with pytest
+- If you are specifically instructed to do so, you should always start with test-driven development
+- When you start test-driven development, you write tests by default for functions with pure logic, such as utility functions and hook functions, for functions with complex logic, and for edge cases.
+- As your project grows in size and complexity, you write tests for classes or components that are already developed but need to be modified frequently.
+
+### 6.4 Local Test Server
+- Once you run a local server for testing, it usually stays up. Don't start local server automatically unless I tell it to (ex: npm run dev, python manage.py runserver)
+- If the environment supports HMR (Hot Module Replacement) and Hot Reloading, any file modifications will already be reflected on the screen, so test with this in mind
+
+## 7. Performance
+
+### 7.1 Optimization Criteria
+- Page load time within 3 seconds
+- API response time within 300ms
+- Bundle size optimization
+
+### 7.2 Monitoring
+- Implement error logging
+- Collect performance metrics
+- Analyze user behavior
+
+### 8. Accessibility
+
+### 8.1 Basic Requirements
+- Conform to WCAG 2.1 Level AA
+- Ensure screen reader compatibility
+
+### 9. Deployment
+
+### 9.1 Deployment Process
+- Configure your CI/CD pipeline
+- Run automated tests
+- Staged deployment (staging -> production)
+- Create a rollback plan
+
+### 9.2 Monitoring
+- Log centralization
+- Setting up alerts
+- Performance monitoring
+- Error tracking
+
+## 10. Maintenance
+
+### 10.1 Code Quality
+- Regular code reviews
+- Managing technical debt
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shalomeir/common-memory-bank](https://github.com/shalomeir/common-memory-bank) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
