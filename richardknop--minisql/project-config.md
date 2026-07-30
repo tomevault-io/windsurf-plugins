@@ -1,77 +1,38 @@
 ---
 trigger: always_on
-description: MiniSQL is an embedded, single-file SQL database written in Go, inspired by SQLite. It implements a hand-written recursive-descent + state-machine SQL parser, a B+ tree storage engine with 4 KB pages, an LRU page cache, a Write-Ahead Log (WAL) for crash recovery, single-writer enforcement (via an atomic counter) for write transactions, and in-memory MVCC snapshot isolation for read-only transactions. It registers itself as a `database/sql` driver.
+description: This directory contains the database engine: storage, transactions, query planning/execution, row encoding, indexes, JSON/full-text/HNSW, constraints, and integrity checks. Correctness matters more than performance wins.
 ---
 
-# AGENTS.md — MiniSQL Codebase Guide for AI Coding Agents
+# AGENTS.md — `internal/minisql`
 
-## Project Overview
+## Scope
 
-MiniSQL is an embedded, single-file SQL database written in Go, inspired by SQLite. It implements a hand-written recursive-descent + state-machine SQL parser, a B+ tree storage engine with 4 KB pages, an LRU page cache, a Write-Ahead Log (WAL) for crash recovery, single-writer enforcement (via an atomic counter) for write transactions, and in-memory MVCC snapshot isolation for read-only transactions. It registers itself as a `database/sql` driver.
+This directory contains the database engine: storage, transactions, query planning/execution, row encoding, indexes, JSON/full-text/HNSW, constraints, and integrity checks. Correctness matters more than performance wins.
 
-**Module:** `github.com/RichardKnop/minisql`
-**Go version:** 1.26
-**Not production-ready.** Treat it as a research/learning project.
+## High-Risk Areas
 
-**Feature summary:** INSERT/SELECT/UPDATE/DELETE, ON CONFLICT DO NOTHING/DO UPDATE, UNION/UNION ALL, DISTINCT, GROUP BY/HAVING, ORDER BY (multi-column), LIMIT/OFFSET, INNER/LEFT/RIGHT JOIN (arbitrary chain topology), CASE WHEN, CAST, INTERVAL, arithmetic, scalar functions, subqueries (non-correlated scalar + IN/NOT IN in WHERE, derived tables in FROM, CTEs, correlated UPDATE FROM), CHECK/FOREIGN KEY/NOT NULL/UNIQUE constraints, RETURNING, EXPLAIN/EXPLAIN ANALYZE, VACUUM, ANALYZE, PRAGMA, prepared statements (`?` placeholders), data types BOOLEAN/INT4/INT8/REAL/DOUBLE/TEXT/VARCHAR/TIMESTAMP/JSON/UUID, B-tree indexes (primary, unique, secondary, composite, covering, partial, expression), full-text inverted index, JSON inverted index, parallel full table scans, slow query logging.
+- WAL, checkpointing, rollback, page cache invalidation, and MVCC snapshot isolation are correctness-critical. Preserve transaction boundaries and rollback behaviour.
+- `TransactionalPager.ModifyPage` has in-place and clone paths. In-place writes are valid only when no snapshot reader can observe the old version.
+- B+ tree page layout, row/cell encoding, `RowView`, overflow pages, and free-page handling are on-disk format concerns. Update storage standards when the format changes.
+- Index DML hooks must stay consistent across INSERT, UPDATE, DELETE, constraint handling, rollback, and persistence after reopen.
+- Full-text, JSON inverted, and HNSW indexes have dedicated storage/update paths; test build, insert, update, delete, search, and drop/recreate when touching them.
 
----
+## Local Standards
 
-## Repository Layout
+- Read the relevant files in `agent-os/standards/storage-engine/`, `agent-os/standards/query-execution/`, or `agent-os/standards/testing/` before changing those subsystems.
+- Prefer `RowView`/lazy decoding on read paths unless materialisation is required for sorting, deduplication, mutation, or API return values.
+- Keep context as the first argument and pass transaction-bearing contexts through the stack.
+- Preserve sentinel errors and `%w` wrapping so callers can use `errors.Is` and `errors.As`.
+- Do not hand-edit `mocks_test.go`; update interfaces in `ports.go`, then regenerate mocks.
 
-```
-/
-├── minisql.go              # Driver, Conn, Stmt — database/sql/driver registration
-├── tx.go                   # Tx — database/sql/driver.Tx
-├── rows.go                 # Rows, Result — database/sql/driver.Rows / .Result
-├── connection_string.go    # Connection string parameter parsing
-├── go.mod / go.sum
-│
-├── internal/
-│   ├── minisql/            # Core database engine (~140 .go files, listed selectively below)
-│   │   │
-│   │   │  ── Statement & Planning ──
-│   │   ├── stmt.go               # Statement struct, all statement kinds, Clone(), Validate(), Prepare()
-│   │   ├── stmt_join.go          # JoinClause, join statement helpers
-│   │   ├── stmt_result.go        # StatementResult + lazy Iterator pattern
-│   │   ├── condition.go          # WHERE condition evaluation (checkCondition, likeMatch, etc.)
-│   │   ├── condition_node.go     # ConditionNode tree + ToDNF()
-│   │   ├── expr.go               # Expr struct + Eval: arithmetic, CASE WHEN, functions
-│   │   ├── compare.go            # compareValues helper used by sort and condition evaluation
-│   │   ├── composite_key.go      # CompositeKey for multi-column indexes
-│   │   │
-│   │   │  ── Query Execution ──
-│   │   ├── database.go           # Top-level Database: parse → validate → execute dispatch
-│   │   ├── database_schema.go    # Schema introspection helpers (createTableDDL, createIndexDDL)
-│   │   ├── database_options.go   # DatabaseOption functional options
-│   │   ├── table.go              # Table struct: columns, indexes, query plan entry-point
-│   │   ├── table_options.go      # TableOption functional options
-│   │   ├── table_pager.go        # Table-level pager wiring
-│   │   ├── table_primary_key.go  # Primary key B-tree operations
-│   │   ├── table_secondary_index.go  # Secondary/unique index DML helpers
-│   │   ├── table_unique_index.go # Unique index enforcement
-│   │   ├── insert.go             # INSERT execution (incl. ON CONFLICT)
-│   │   ├── select.go             # SELECT execution: selectStreaming + selectWithSort paths
-│   │   ├── update.go             # UPDATE execution
-│   │   ├── update_from.go        # UPDATE FROM (correlated subquery via context injection)
-│   │   ├── delete.go             # DELETE execution
-│   │   ├── returning.go          # RETURNING clause projection for INSERT/UPDATE/DELETE
-│   │   ├── subquery.go           # Non-correlated subquery pre-evaluation (resolveSubqueries)
-│   │   ├── correlated_subquery.go # Correlated subquery execution for UPDATE FROM
-│   │   ├── derived_table.go      # FROM subquery: materialises into VirtualTable
-│   │   ├── cte.go                # WITH clauses: CTE registry via context, VirtualTable injection
-│   │   ├── check.go              # CHECK constraint evaluation
-│   │   ├── foreign_key.go        # FOREIGN KEY enforcement, FK callbacks, CASCADE/SET NULL
-│   │   ├── explain.go            # EXPLAIN / EXPLAIN ANALYZE output
-│   │   ├── query_plan.go         # Query planner: scan-type selection, index optimisation
-│   │   ├── query_plan_order.go   # ORDER BY planning (index skip-sort, heap, full sort)
-│   │   ├── query_plan_join.go    # JOIN planning: flattenJoinTree, hash join selection
-│   │   ├── query_plan_stats.go   # ANALYZE statistics: equi-depth histograms, selectivity
-│   │   ├── hash_join.go          # Hash join build/probe executor
-│   │   ├── parallel_scan.go      # Parallel full table scan (PRAGMA parallel_scan)
+## Validation
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Targeted engine tests: `LOG_LEVEL=warn go test ./internal/minisql/... -run '<TestName>' -count=1`
+- Broader engine pass: `LOG_LEVEL=warn go test ./internal/minisql/... -count=1`
+- Relevant e2e suite for user-visible SQL behaviour: `LOG_LEVEL=warn go test ./e2e_tests/... -run 'TestTestSuite/Test<Name>' -count=1 -v`
+- Storage/WAL/transaction changes should include relevant `tx`, `wal`, `concurrency`, `vacuum`, and integrity-check tests.
+- Always run `make lint` before committing.
 
 ---
 > Source: [RichardKnop/minisql](https://github.com/RichardKnop/minisql) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
