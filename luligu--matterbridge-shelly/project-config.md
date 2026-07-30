@@ -1,43 +1,151 @@
 ---
 trigger: always_on
-description: - Follow [STYLEGUIDE.md](../STYLEGUIDE.md) for code style, naming, JSDoc, validation, logging, and formatting expectations.
+description: How to create MatterbridgeEndpoint instances, register them in Matterbridge plugins, and use the single-class devices exported by the package.
 ---
 
-# Matterbridge Workspace Instructions (v.1.0.2)
 
-## Style And Formatting
+# Matterbridge Endpoint Guide
 
-- Follow [STYLEGUIDE.md](../STYLEGUIDE.md) for code style, naming, JSDoc, validation, logging, and formatting expectations.
-- JSDoc requirements are enforced by the configured linter. Treat missing or incomplete JSDoc on required APIs as a real lint issue, not optional documentation.
-- Import and export ordering are enforced by the formatter. Preserve the existing grouped and sorted order unless a change requires updating it.
-- Formatting is enforced by oxfmt. Follow the existing formatting and do not fight the formatter.
+Use this guide when writing Matterbridge code in this repository or when authoring a plugin that consumes Matterbridge.
 
-## Scope And Safety
+## Public imports
 
-- Keep changes minimal and scoped to the request. Avoid unrelated refactors or broad cleanup.
-- Do not modify production code only to make a test pass. If a failing test points to a likely source issue, explain the issue and change behavior only when required by the task.
-- Preserve cross-platform behavior. Changes must work on Windows, macOS, and Linux, especially for paths, shell commands, environment variables, and networking behavior.
-- Maintain compatibility with the supported Node.js versions in this repository: 20.19, 22.13, 24, and 26.
+- Import core classes, endpoint helpers, and device type definitions from `matterbridge`.
+- Import single-class devices from `matterbridge/devices`.
 
-## Project Architecture
+```ts
+import {
+  MatterbridgeAccessoryPlatform,
+  MatterbridgeDynamicPlatform,
+  MatterbridgeEndpoint,
+  addFixedLabel,
+  addUserLabel,
+  contactSensor,
+  getAttribute,
+  onOffLight,
+  powerSource,
+  setAttribute,
+  subscribeAttribute,
+  updateAttribute,
+} from 'matterbridge';
 
-- This repository uses TypeScript and ESM. Follow existing project patterns for imports, exports, build configuration, and test setup.
+import { LaundryWasher, RoboticVacuumCleaner } from 'matterbridge/devices';
+```
 
-## Testing And Validation
+## Create a MatterbridgeEndpoint
 
-- Prefer the existing npm scripts in [package.json](../package.json) and the VS Code tasks in [tasks.json](../.vscode/tasks.json) for building, linting, and testing.
-- Keep tests deterministic and simple. Prefer small data sets and straightforward setup.
-- Some tests are intentionally multi-step flows. State may persist across successive steps within a single test flow, but each test unit must remain isolated from other tests.
-- For validation, run the relevant full test file or the matching suite/task for the touched area rather than assuming arbitrary isolated single-test execution is reliable.
+`MatterbridgeEndpoint` is the low-level building block for custom Matterbridge devices.
 
-## Documentation
+Constructor:
 
-- When behavior changes, update the relevant tests and documentation.
+```ts
+new MatterbridgeEndpoint(
+  definition: DeviceTypeDefinition | AtLeastOne<DeviceTypeDefinition>,
+  options: MatterbridgeEndpointOptions = {},
+  debug = false,
+)
+```
 
-## Additional Agent Guidance
+Recommended pattern:
 
-- Use dedicated instruction files under [.github/instructions](instructions/) when a rule applies only to specific file types or workflows.
+```ts
+const device = new MatterbridgeEndpoint([contactSensor, powerSource], { id: 'EntryDoor' })
+  .createDefaultIdentifyClusterServer()
+  .createDefaultBridgedDeviceBasicInformationClusterServer('Entry Door', 'ENTRY-DOOR-001', 0xfff1, 'Matterbridge', 'Entry Door Sensor')
+  .createDefaultBooleanStateClusterServer(false)
+  .createDefaultPowerSourceReplaceableBatteryClusterServer(75)
+  .addRequiredClusters();
+```
+
+Rules that matter:
+
+- `definition` can be a single device type or an array of device types.
+- Use multiple device types when the endpoint needs more than one role, for example `[contactSensor, powerSource]`.
+- Call one of the Basic Information helpers before `registerDevice()`. Without `deviceName`, `serialNumber`, and `uniqueId`, registration fails.
+- Call `addRequiredClusters()` at the end of the chain so any required clusters (server or client) that you did not explicitly create are added automatically.
+- Use `addOptionalClusterServers()` only when you really want the optional clusters defined by the selected device type(s).
+
+## MatterbridgeEndpointOptions
+
+`MatterbridgeEndpointOptions` supports:
+
+- `id`: stable storage key for the endpoint.
+- `number`: explicit endpoint number when you need one.
+- `tagList`: semantic tags used for disambiguation, especially for composed devices or `mode: 'matter'` endpoints.
+- `mode`: `undefined`, `'server'`, or `'matter'`.
+
+Mode selection:
+
+- `undefined`: normal bridged endpoint. This is the default for most DynamicPlatform devices.
+- `'server'`: create an independent Matter device with its own server node.
+- `'matter'`: add the endpoint directly to the Matterbridge server node alongside the aggregator.
+
+Practical guidance:
+
+- Use `mode: undefined` for normal bridged devices shown as children of the bridge.
+- Use `mode: 'server'` when the device must be paired independently.
+- Use `mode: 'matter'` when the device should be a native Matter endpoint on the server node.
+- When using `mode: 'matter'`, respect Matter disambiguation rules and supply a `tagList` when sibling endpoints could be ambiguous.
+
+Implementation details worth remembering:
+
+- Spaces and `.` are removed from the internal endpoint id. The original value is retained as `originalId`.
+- Non-Latin ids are normalized to a generated unique id.
+- `id` should remain stable across restarts.
+
+## Choose the right Basic Information helper
+
+Use the helper that matches how the endpoint is exposed:
+
+- `createDefaultBasicInformationClusterServer(...)`
+  Use for `mode: 'server'`, `mode: 'matter'`, and AccessoryPlatform devices.
+- `createDefaultBridgedDeviceBasicInformationClusterServer(...)`
+  Use for bridged DynamicPlatform endpoints.
+
+Important behavior:
+
+- `createDefaultBasicInformationClusterServer(...)` sets the metadata on the endpoint.
+- For bridged endpoints, `registerDevice()` can add the `BridgedDeviceBasicInformation` cluster automatically when the device is running as a bridged endpoint in bridge mode, or in childbridge mode on a `DynamicPlatform`.
+- Explicitly calling `createDefaultBridgedDeviceBasicInformationClusterServer(...)` is clearer for bridged devices and matches the repo examples.
+
+## Register the endpoint from a plugin
+
+In plugin code, call `this.registerDevice(device)`.
+
+DynamicPlatform bridged device:
+
+```ts
+import { MatterbridgeDynamicPlatform, MatterbridgeEndpoint, onOffLight } from 'matterbridge';
+
+export default function initializePlugin(matterbridge, log, config) {
+  return new ExamplePlatform(matterbridge, log, config);
+}
+
+class ExamplePlatform extends MatterbridgeDynamicPlatform {
+  async onStart(reason) {
+    await this.ready;
+
+    const device = new MatterbridgeEndpoint(onOffLight, { id: 'OnOffLightPlugin' })
+      .createDefaultBridgedDeviceBasicInformationClusterServer('Kitchen Light', 'LIGHT-001', 0xfff1, 'Matterbridge', 'Matterbridge OnOffLight')
+      .addRequiredClusters();
+
+    await this.registerDevice(device);
+  }
+}
+```
+
+AccessoryPlatform device:
+
+```ts
+import { MatterbridgeAccessoryPlatform, MatterbridgeEndpoint, temperatureSensor } from 'matterbridge';
+
+export default function initializePlugin(matterbridge, log, config) {
+  return new ExamplePlatform(matterbridge, log, config);
+}
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Luligu/matterbridge-shelly](https://github.com/Luligu/matterbridge-shelly) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
