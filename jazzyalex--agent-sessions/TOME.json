@@ -2,9 +2,9 @@
   "name": "agent-sessions",
   "owner": "jazzyalex",
   "repo": "agent-sessions",
-  "description": "Session browser + Agent Cockpit +  Analytics + Limits tracker for Codex CLI,  Claude Code, OpenCode, Gemini CLI, Factory Droid , GitHub Copilot CLI & OpenClaw. Search/filter ALL past sessions,  archive sessions, resume instantly, see rate limits in real-time. Native macOS app.",
+  "description": "",
   "type": "tome",
-  "source_format": "GEMINI.md",
+  "source_format": "AGENTS.md",
   "formats": [
     {
       "format": "claude_md",
@@ -95,5 +95,5 @@
   ],
   "source_url": "https://github.com/jazzyalex/agent-sessions",
   "distributed_by": "TomeVault",
-  "distributed_at": "2026-07-30T21:50:50Z"
+  "distributed_at": "2026-07-30T21:51:26Z"
 }
