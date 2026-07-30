@@ -1,267 +1,80 @@
 ---
 trigger: always_on
-description: Service layer patterns for business logic and data access
+description: Core architecture and patterns for the TypeScript backend toolkit
 ---
 
 
-# Service Layer Patterns
+# Architecture Overview
 
-## Core Principle
+This is a TypeScript Express.js backend toolkit with a modular, type-safe architecture.
 
-Services contain business logic, database operations, external API calls, and complex computations. They should be framework-agnostic (no Express req/res).
+## Core Patterns
 
-## Service Template
+### MagicRouter System
 
-```typescript
-import { Model } from './module.model';
-import { logger } from '@/plugins/logger';
-import type { CreateInput, UpdateInput } from './module.dto';
+- All routes MUST use MagicRouter from [router.ts](mdc:src/plugins/magic/router.ts)
+- MagicRouter automatically generates OpenAPI/Swagger documentation from Zod schemas
+- Never use plain Express `app.get()` or `router.get()` - always use MagicRouter
 
-/**
- * Find item by ID
- */
-export const findById = async (id: string) => {
-  const item = await Model.findById(id);
-  return item;
-};
+### Module Structure
 
-/**
- * Find all items with pagination
- */
-export const findAll = async (options: {
-  page: number;
-  limit: number;
-  search?: string;
-}) => {
-  const { page, limit, search } = options;
-  const skip = (page - 1) * limit;
+Modules live in [src/modules/](mdc:src/modules/) and follow this structure:
 
-  const query = search ? { name: { $regex: search, $options: 'i' } } : {};
-
-  const [items, total] = await Promise.all([
-    Model.find(query).skip(skip).limit(limit).lean(),
-    Model.countDocuments(query),
-  ]);
-
-  return {
-    data: items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
-};
-
-/**
- * Create new item
- */
-export const create = async (data: CreateInput) => {
-  const item = await Model.create(data);
-
-  logger.info('Item created', { itemId: item._id });
-
-  return item.toObject();
-};
-
-/**
- * Update item
- */
-export const update = async (
-  id: string,
-  data: UpdateInput,
-  userId?: string,
-) => {
-  const item = await Model.findById(id);
-
-  if (!item) {
-    return null;
-  }
-
-  // Business logic: Check permissions
-  if (item.createdBy?.toString() !== userId) {
-    const error = new Error('Forbidden') as any;
-    error.statusCode = 403;
-    throw error;
-  }
-
-  Object.assign(item, data);
-  await item.save();
-
-  logger.info('Item updated', { itemId: id, userId });
-
-  return item.toObject();
-};
-
-/**
- * Delete item
- */
-export const remove = async (id: string, userId?: string) => {
-  const item = await Model.findById(id);
-
-  if (!item) {
-    return false;
-  }
-
-  // Business logic: Check permissions
-  if (item.createdBy?.toString() !== userId) {
-    const error = new Error('Forbidden') as any;
-    error.statusCode = 403;
-    throw error;
-  }
-
-  await item.deleteOne();
-
-  logger.info('Item deleted', { itemId: id, userId });
-
-  return true;
-};
-
-/**
- * Complex business logic example
- */
-export const performComplexOperation = async (input: {
-  userId: string;
-  data: any;
-}) => {
-  // 1. Validate business rules
-  const user = await UserModel.findById(input.userId);
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  // 2. Perform operations
-  const result = await Model.create({
-    ...input.data,
-    userId: input.userId,
-  });
-
-  // 3. Trigger background jobs if needed
-  await triggerEmailJob(user.email, result);
-
-  // 4. Return result
-  return result;
-};
-
-/**
- * Trigger background job
- */
-const triggerEmailJob = async (email: string, data: any) => {
-  const { emailQueue } = await import('@/queues/email.queue');
-  await emailQueue.add('sendNotification', { email, data });
-};
+```
+module-name/
+  ├── module.controller.ts    # Business logic handlers
+  ├── module.router.ts        # MagicRouter route definitions
+  ├── module.service.ts       # Database and external service interactions
+  ├── module.schema.ts        # Zod schemas for validation
+  ├── module.model.ts         # Mongoose models
+  └── module.dto.ts           # TypeScript types/interfaces
 ```
 
-## Key Patterns
+### Validation & Type Safety
 
-### Database Operations
+- ALWAYS use Zod schemas for request/response validation
+- Runtime validation via [validate-zod-schema.ts](mdc:src/middlewares/validate-zod-schema.ts)
+- Extend Zod with OpenAPI metadata using `.openapi()` method from [zod-extend.ts](mdc:src/plugins/magic/zod-extend.ts)
+- Use TypeScript strict mode - no `any` types
 
-Use Mongoose models from `module.model.ts`:
+### Configuration
 
-```typescript
-// Find
-const item = await Model.findById(id);
-const items = await Model.find({ status: 'active' });
+- All config in [env.ts](mdc:src/config/env.ts)
+- Environment variables validated with Zod
+- Time values are in milliseconds (converted from strings like "1d" or "7d")
 
-// Create
-const item = await Model.create({ name: 'Test' });
+### Database
 
-// Update
-const item = await Model.findByIdAndUpdate(id, { name: 'New' }, { new: true });
+- MongoDB with Mongoose ODM
+- Connection managed in [database.ts](mdc:src/lib/database.ts)
+- Models defined per module (e.g., [user.model.ts](mdc:src/modules/user/user.model.ts))
 
-// Delete
-await Model.findByIdAndDelete(id);
+### Background Jobs & Queues
 
-// Count
-const count = await Model.countDocuments({ status: 'active' });
+- BullMQ with Redis for all background jobs
+- Email queue in [email.queue.ts](mdc:src/queues/email.queue.ts)
+- Admin dashboard at `/queues`
 
-// Use .lean() for better performance (returns plain objects)
-const items = await Model.find().lean();
-```
+### Error Handling
 
-### Pagination Helper
+- Global error handler in [error-handler.ts](mdc:src/middlewares/error-handler.ts)
+- Throw errors with proper HTTP status codes
+- Errors are automatically caught and formatted
 
-Use pagination utility from [pagination.utils.ts](mdc:src/utils/pagination.utils.ts):
+## Technology Stack
 
-```typescript
-import { getPaginator } from '@/utils/pagination.utils';
-
-const paginatorInfo = getPaginator(limit, page, totalRecords);
-const items = await Model.find()
-  .skip(paginatorInfo.skip)
-  .limit(paginatorInfo.limit);
-```
-
-Or implement manually:
-
-```typescript
-const skip = (page - 1) * limit;
-const items = await Model.find().skip(skip).limit(limit);
-const total = await Model.countDocuments();
-```
-
-### Background Jobs
-
-Queue background tasks using BullMQ:
-
-```typescript
-import { emailQueue } from '@/queues/email.queue';
-
-await emailQueue.add(
-  'jobName',
-  { data },
-  {
-    delay: 5000, // Optional: delay in ms
-    attempts: 3, // Optional: retry attempts
-  },
-);
-```
-
-### Email Sending
-
-Send emails through queue system:
-
-```typescript
-import { sendEmail } from '@/email/email.service';
-
-await sendEmail({
-  to: user.email,
-  subject: 'Welcome',
-  template: 'Welcome',
-  data: { name: user.name },
-});
-```
-
-### File Storage (S3)
-
-Use storage service from [storage.ts](mdc:src/lib/storage.ts):
-
-```typescript
-import { uploadFile, deleteFile, getFileUrl } from '@/lib/storage';
-
-// Upload file (usually in controller, after file is uploaded)
-const { url, key } = await uploadFile({
-  file: uploadedFile,
-  key: `uploads/${userId}/${filename}`,
-});
-
-// Delete file
-await deleteFile(fileKey);
-
-// Get file URL
-const url = getFileUrl(fileKey);
-```
-
-### Authentication & Tokens
-
-Use auth utilities from the src/utils folder:
-
-```typescript
-import { signToken, verifyToken } from '@/utils/jwt.utils';
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Runtime**: Node.js with TypeScript
+- **Framework**: Express.js
+- **Validation**: Zod
+- **Database**: MongoDB + Mongoose
+- **Cache/Queue**: Redis + BullMQ
+- **Auth**: JWT (with optional OTP)
+- **Storage**: AWS S3 (or R2 or Local)
+- **Email**: React Email + Mailgun / Resend / Nodemailer
+- **Real-time**: Socket.io
+- **API Docs**: Swagger/OpenAPI (auto-generated)
+- **Logger**: Pino
 
 ---
 > Source: [muneebhashone/typescript-backend-toolkit](https://github.com/muneebhashone/typescript-backend-toolkit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
