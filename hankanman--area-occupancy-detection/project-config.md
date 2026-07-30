@@ -1,157 +1,138 @@
 ---
 trigger: always_on
-description: All tests are written using pytest.
+description: The prior probabilities for each input entity are calculated in [custom_components/area_occupancy/calculate_prior.py](mdc:custom_components/area_occupancy/calculate_prior.py) using historical data:
 ---
 
+# Bayesian Probability Calculations
 
-All tests are written using pytest.
+## Prior Probability Calculation
 
-All tests are written in the `tests` directory.
+The prior probabilities for each input entity are calculated in [custom_components/area_occupancy/calculate_prior.py](mdc:custom_components/area_occupancy/calculate_prior.py) using historical data:
 
-The `conftest.py` file is used to configure the tests and contains the fixtures for the tests.
+1. For each input entity:
+   - Query historical states using recorder component
+   - Compare with motion sensor states (used as ground truth for occupancy)
+   - Calculate:
+     - prob_given_true: P(Entity State | Area Occupied)
+     - prob_given_false: P(Entity State | Area Not Occupied)
+     - prior_probability: P(Entity State)
 
-All fixtures should be defined in the conftest.py file.
+2. For environmental sensors:
+   - Analyze historical correlations with occupancy patterns
+   - Calculate baseline values and occupancy-induced changes
+   - Determine sensor-specific thresholds and response patterns
+   - Generate prior probabilities for environmental conditions
 
-Each module has its own test file. e.g. `tests/test_coordinator.py`.
+3. If insufficient history:
+   - Fall back to defaults in [custom_components/area_occupancy/probabilities.py](mdc:custom_components/area_occupancy/probabilities.py)
 
-Testing is done by running the command `pytest --cov=custom_components/area_occupancy --cov-report=xml --cov-report=term-missing`.
+## Composite Bayesian Calculation
 
-Test coverage is expected to be over 85%.
+The real-time occupancy probability is calculated in [custom_components/area_occupancy/calculate_prob.py](mdc:custom_components/area_occupancy/calculate_prob.py):
 
-# Testing Guide for Area Occupancy Detection
+1. For each input entity:
+   - Get current state
+   - Use corresponding priors (calculated or default)
+   - Apply Bayes' theorem:
+     P(Occupied | Evidence) = P(Evidence | Occupied) * P(Occupied) / P(Evidence)
 
-This guide explains how to write and maintain tests for the Area Occupancy Detection component, with a focus on the multi-area architecture.
+2. For environmental sensors:
+   - Process environmental data through [environmental_analysis.py](mdc:custom_components/area_occupancy/environmental_analysis.py)
+   - Generate environmental occupancy probability using ML or deterministic methods
+   - Weight environmental probability by confidence score
+   - Integrate with traditional sensor probabilities
 
-## Table of Contents
+3. Combine probabilities using:
+   - For independent evidence: P = P1 * P2 * ... * Pn
+   - For dependent evidence: Use appropriate weighting/correlation factors
+   - For environmental evidence: Apply confidence weighting and temporal factors
 
-- [Architecture Overview](#architecture-overview)
-- [Using pytest-homeassistant-custom-component](#using-pytest-homeassistant-custom-component)
-- [Choosing the Right Fixtures](#choosing-the-right-fixtures)
-- [Common Patterns](#common-patterns)
-- [Area-Based Access](#area-based-access)
-- [Database Connection Management](#database-connection-management)
-- [Migration Guide](#migration-guide)
-- [Examples](#examples)
+4. Normalize final probability to 0-100% range
 
-## Architecture Overview
+## Implementation Guidelines
 
-The component uses a **multi-area architecture** where:
+### Prior Calculation
+- Use significant state changes from recorder
+- Consider time windows for correlation
+- Handle missing or invalid data
+- Cache results to avoid recalculation
+- Update periodically (configurable interval)
 
-- `AreaOccupancyCoordinator` manages multiple `Area` objects
-- Each `Area` has its own `config`, `entities`, `prior`, and `purpose`
-- Properties like `probability()`, `threshold()`, `device_info()` now take `area_name` parameter
-- Access patterns: `coordinator.get_area_or_default(area_name).entities` instead of `coordinator.entities`
+### Real-time Calculation
+- Update on any input entity state change
+- Handle unavailable entities gracefully
+- Apply confidence weighting
+- Consider temporal factors
+- Optimize for performance
 
-## Using pytest-homeassistant-custom-component
+### Data Flow
+1. [coordinator.py](mdc:custom_components/area_occupancy/coordinator.py) triggers updates
+2. [calculate_prior.py](mdc:custom_components/area_occupancy/calculate_prior.py) computes priors
+3. [calculate_prob.py](mdc:custom_components/area_occupancy/calculate_prob.py) computes final probability
+4. [decay_handler.py](mdc:custom_components/area_occupancy/decay_handler.py) applies probability decay
+5. [storage.py](mdc:custom_components/area_occupancy/storage.py) persists state data
+6. Results update sensors in [sensor.py](mdc:custom_components/area_occupancy/sensor.py) and [binary_sensor.py](mdc:custom_components/area_occupancy/binary_sensor.py)
 
-This project uses the [`pytest-homeassistant-custom-component`](https://pypi.org/project/pytest-homeassistant-custom-component/) package to provide proper Home Assistant test infrastructure. This package automatically provides fixtures for testing custom components.
+## Probability Decay
 
-### Key Fixtures from the Package
+The probability decay functionality is implemented in [custom_components/area_occupancy/decay_handler.py](mdc:custom_components/area_occupancy/decay_handler.py):
 
-**`hass`** - Real Home Assistant instance for testing:
+1. **Decay Triggers**:
+   - Starts when occupancy probability drops below threshold
+   - Continues until probability reaches minimum or area becomes occupied again
 
-```python
-def test_with_hass(hass: HomeAssistant):
-    """Test using real Home Assistant instance."""
-    # hass is a real HomeAssistant instance, not a mock
-    assert hass is not None
-    assert hass.states is not None
-    assert hass.config_entries is not None
-```
+2. **Decay Algorithm**:
+   - Exponential decay based on configurable decay rate
+   - Time-based decay using configured intervals
+   - Smooth transitions to avoid sudden probability jumps
 
-**`device_registry`** - Device registry fixture:
+3. **Configuration**:
+   - Decay rate configurable via number entity
+   - Decay start threshold configurable
+   - Minimum decay probability configurable
 
-```python
-async def test_device_registry(hass: HomeAssistant, device_registry):
-    """Test using device registry."""
-    # Create a device in the registry
-    device_entry = device_registry.async_get_or_create(
-        config_entry_id="test_entry_id",
-        identifiers={("domain", "identifier")},
-        name="Test Device",
-    )
-    assert device_entry is not None
-```
+## Data Persistence
 
-**`entity_registry`** - Entity registry fixture:
+State persistence is handled by [custom_components/area_occupancy/storage.py](mdc:custom_components/area_occupancy/storage.py):
 
-```python
-async def test_entity_registry(hass: HomeAssistant, entity_registry):
-    """Test using entity registry."""
-    # Access entity registry
-    entities = entity_registry.entities
-    assert entities is not None
-```
+1. **Stored Data**:
+   - Current probability state
+   - Prior calculation results
+   - Decay state and parameters
+   - Historical calculation metadata
 
-**`enable_custom_integrations`** - Automatically enables custom integrations (autouse fixture):
+2. **Storage Format**:
+   - JSON serialization using type-safe conversion
+   - Backward compatibility with version migrations
+   - Error recovery for corrupted data
 
-This fixture is automatically applied to all tests, so you don't need to explicitly request it. It ensures that custom components can be loaded during tests.
+3. **Performance**:
+   - Async write operations
+   - Batched updates to minimize I/O
+   - Lazy loading of stored data
 
-### Import Requirements
+## Virtual Sensors
 
-When using the `hass` fixture, import `HomeAssistant` from `homeassistant.core`:
+Virtual sensor implementations in [custom_components/area_occupancy/virtual_sensor/](mdc:custom_components/area_occupancy/virtual_sensor/):
 
-```python
-from homeassistant.core import HomeAssistant
+1. **Wasp in Box Algorithm**:
+   - Implements probabilistic occupancy detection
+   - Uses motion patterns and timing analysis
+   - Provides confidence scoring for occupancy states
 
-def test_something(hass: HomeAssistant):
-    """Test using hass fixture."""
-    # Use hass here
-```
+2. **Integration**:
+   - Treated as standard input entities
+   - Participate in Bayesian calculations
+   - Configurable weighting and sensitivity
 
-### Benefits of Using the Package
-
-1. **Real Home Assistant Infrastructure** - Tests run against real Home Assistant components, not mocks
-2. **Automatic Setup** - The package handles all the complex setup required for testing custom components
-3. **Standard Fixtures** - Uses the same fixtures that Home Assistant core uses for testing
-4. **Better Integration Testing** - Tests catch real-world issues that mocks might miss
-5. **Device and Entity Registry Support** - Provides real registry fixtures for testing device/entity interactions
-
-### Migration from Custom mock_hass
-
-**We no longer use a custom `mock_hass` fixture.** All tests should use the `hass` fixture from `pytest-homeassistant-custom-component`:
-
-```python
-# OLD - Don't use this anymore
-def test_something(mock_hass: Mock):
-    mock_hass.states = Mock()
-    # ...
-
-# NEW - Use this instead
-def test_something(hass: HomeAssistant):
-    # hass already has states, config_entries, etc.
-    # No need to mock them
-```
-
-## Choosing the Right Fixtures
-
-### Real Coordinators vs Mock Coordinators
-
-**We now prefer using real coordinators and databases in tests.** This provides better integration testing and catches real-world issues.
-
-**Use `coordinator` when:**
-
-- Integration-style tests that need real coordinator behavior
-- Testing area loading and initialization
-- You need areas to be automatically loaded from config
-- Testing coordinator methods that interact with areas
-- **This is the recommended default for most tests**
-
-**Use `test_db` when:**
-
-- Testing database operations directly
-- Testing data persistence and loading
-- Testing migration logic
-- Testing database schema and models
-- **This is the recommended primary fixture for database testing**
-
-**Use `coordinator_with_db` when:**
-
-- Testing database operations that need coordinator access
-- Testing integration between coordinator and database
+### Error Handling
+- Validate probability ranges (0-1)
+- Handle division by zero
+- Log calculation steps at debug level
+- Provide fallback values
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Hankanman/Area-Occupancy-Detection](https://github.com/Hankanman/Area-Occupancy-Detection) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
