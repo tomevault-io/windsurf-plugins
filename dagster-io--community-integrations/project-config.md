@@ -7,118 +7,134 @@ description: This file provides guidance to Claude Code (claude.ai/code) when wo
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository Overview
+## Overview
 
-This is the Dagster Community Integrations repository - a collection of community-built and maintained integrations for the Dagster data orchestration platform. The repository provides a centralized place for custom integrations without requiring individual maintainers to manage their own build and release processes.
-
-## Repository Structure
-
-- `libraries/` - Contains all integration packages (e.g., dagster-anthropic, dagster-polars, etc.)
-- `libraries/_template/` - Template for creating new integrations
-- `pipes/implementations/` - Dagster Pipes implementations for Java, Rust, and TypeScript
+dagster-evidence is a Dagster integration for [Evidence.dev](https://evidence.dev/), enabling orchestration of Evidence dashboard projects as Dagster assets. It automatically discovers sources from Evidence projects, generates corresponding Dagster assets, and handles build/deployment pipelines.
 
 ## Development Commands
 
-All integrations use standardized Makefiles with these commands:
-
 ```bash
-# Install dependencies
-make install  # or: uv sync
+make install   # Install dependencies (uv sync)
+make build     # Build package (uv build)
+make test      # Run all tests (uv run pytest)
+make ruff      # Format and lint (ruff check --fix && ruff format)
+make check     # Type checking (uv run ty check)
+make quality   # Run all checks (ruff, format, ty, pytest)
 
-# Build package
-make build    # or: uv build
-
-# Run tests
-make test     # or: uv run pytest
-
-# Format and lint code
-make ruff     # Runs: uv run ruff check --fix && uv run ruff format
-
-# Type checking
-make check    # Runs: uv run ty check
+# Run specific tests
+uv run pytest dagster_evidence_tests/test_component.py
+uv run pytest dagster_evidence_tests/test_translator.py::test_custom_translator
 ```
 
-### Running Individual Tests
+**IMPORTANT**: Always run `make quality` after making changes to ensure all checks pass before committing.
 
-```bash
-# Run a specific test file
-uv run pytest dagster_<package>_tests/test_specific.py
+## Architecture
 
-# Run a specific test function
-uv run pytest dagster_<package>_tests/test_specific.py::test_function_name
+### Core Component Flow
 
-# Run tests with verbose output
-uv run pytest -v
+```
+EvidenceProjectComponentV2 (StateBackedComponent)
+    │
+    ├── BaseEvidenceProject (LocalEvidenceProject | EvidenceStudioProject)
+    │       │
+    │       ├── parse_evidence_project() → EvidenceProjectData
+    │       │       └── Reads sources/ folder, parses connection.yaml + SQL files
+    │       │
+    │       └── load_evidence_project_assets() → (AssetsDefinition[], SensorDefinition[])
+    │               └── Uses DagsterEvidenceTranslator to convert sources to assets
+    │
+    └── DagsterEvidenceTranslator
+            │
+            ├── SOURCE_TYPE_REGISTRY: maps source types to source classes
+            │       duckdb → DuckdbEvidenceProjectSource
+            │       motherduck → MotherDuckEvidenceProjectSource
+            │       bigquery → BigQueryEvidenceProjectSource
+            │       gsheets → GSheetsEvidenceProjectSource
+            │
+            └── get_asset_spec(data) → AssetSpec | AssetsDefinition
+                    └── Delegates to source class for source assets
 ```
 
-## Creating New Integrations
+### Key Classes
 
-1. Navigate to `libraries/` directory
-2. Copy the template: `cp -r _template dagster-<my-package>`
-3. Replace all instances of `example-integration` with your package name
-4. Update version in `dagster_<package>/__init__.py`
-5. Create GitHub Actions workflows from templates in `.github/workflows/template-*`
+| Class | Location | Purpose |
+|-------|----------|---------|
+| `EvidenceProjectComponentV2` | `components/evidence_project_v2.py` | Main Dagster component, state-backed |
+| `DagsterEvidenceTranslator` | `components/translator.py` | Converts Evidence objects to Dagster assets |
+| `BaseEvidenceProjectSource` | `components/sources.py` | Abstract base for data source types |
+| `LocalEvidenceProject` | `components/projects.py` | Handles local file-based Evidence projects |
+| `BaseEvidenceProjectDeployment` | `components/deployments.py` | Abstract base for deployment targets |
 
-## Code Quality Standards
+### Source Asset Generation
 
-- **Python Version**: Default to Python 3.10
-- **Package Management**: Use `uv` exclusively (never pip, poetry, or conda)
-- **Formatting**: Enforced with Ruff (`ruff format`)
-- **Linting**: Enforced with Ruff (`ruff check --fix`)
-- **Type Checking**: Required with ty (`ty check`)
-- **Testing**: Required with pytest
+Each source type (DuckDB, BigQuery, etc.) implements:
+1. `extract_data_from_source()` - Parses SQL to extract table dependencies using `sqlglot`
+2. `get_source_asset()` - Creates `AssetsDefinition` with automation conditions
+3. `get_source_sensor()` - Optional sensor for detecting upstream data changes
 
-## Release Process
+### Translator Data Types
 
-```bash
-# Create a release tag
-./release.sh dagster-<package> X.X.X
+- `EvidenceSourceTranslatorData` - Passed to translator for source query assets (contains `source_content`, `source_group`, `query`, `extracted_data`)
+- `EvidenceProjectTranslatorData` - Passed to translator for project build asset (contains `project_name`, `sources_by_id`, `source_deps`)
 
-# Tags follow pattern: <integration-name>-X.X.X
+### Deployment Types
+
+- `GithubPagesEvidenceProjectDeployment` - Pushes to GitHub Pages branch using GitPython
+- `CustomEvidenceProjectDeployment` - Runs arbitrary shell command
+- `EvidenceProjectNetlifyDeployment` - Planned (not yet implemented)
+
+## Extension Points
+
+### Custom Translator
+Subclass `DagsterEvidenceTranslator` to customize asset generation:
+```python
+class MyTranslator(DagsterEvidenceTranslator):
+    SOURCE_TYPE_REGISTRY = {
+        **DagsterEvidenceTranslator.SOURCE_TYPE_REGISTRY,
+        "postgres": PostgresEvidenceProjectSource,
+    }
+
+    def get_asset_spec(self, data):
+        spec = super().get_asset_spec(data)
+        # customize...
+        return spec
 ```
 
-## Integration Architecture
+### Adding a New Source Type
 
-Each integration follows this structure:
-```
-dagster-<package>/
-├── Makefile              # Standard development commands
-├── README.md             # Documentation with usage examples
-├── pyproject.toml        # Package configuration and dependencies
-├── uv.lock               # Locked dependencies
-├── dagster_<package>/    # Main package code
-│   ├── __init__.py       # Contains __version__
-│   └── ...               # Integration modules
-└── dagster_<package>_tests/
-    └── test_*.py         # Test files
-```
+To add a new source type (e.g., Postgres, MySQL, Snowflake):
 
-### Key Architectural Patterns
+1. **Add the source class** in `components/sources.py`:
+   ```python
+   @beta
+   @public
+   class PostgresEvidenceProjectSource(BaseEvidenceProjectSource):
+       @staticmethod
+       def get_source_type() -> str:
+           return "postgres"  # Must match 'type' in connection.yaml
 
-1. **Dagster Resources**: Integrations typically implement Dagster resources for external services
-2. **IO Managers**: For data storage integrations, implement custom IO managers
-3. **Ops and Assets**: Provide pre-built ops and assets for common operations
-4. **Type Annotations**: Use type hints throughout the codebase
-5. **Error Handling**: Wrap external API calls with appropriate error handling
+       @classmethod
+       def get_hide_source_asset_default(cls) -> bool:
+           return True  # Set to True if source assets should be hidden by default
 
-## Testing Local Changes
+       @classmethod
+       def get_source_sensor_enabled_default(cls) -> bool:
+           return True  # Set to True to enable change detection sensors
 
-```bash
-# Run GitHub Actions locally with act
-act -W .github/workflows/quality-check-dagster-<package>.yml
+       @classmethod
+       def extract_data_from_source(cls, data: "EvidenceSourceTranslatorData") -> dict[str, Any]:
+           from dagster_evidence.utils import extract_table_references
+           options = data.source_content.connection.extra.get("options", {})
+           table_refs = extract_table_references(
+               data.query.content,
+               default_database=options.get("database"),
+               default_schema=options.get("schema", "public"),
+           )
+           return {"table_deps": table_refs}
 
-# For testcontainers support
-act --env TESTCONTAINERS_HOST_OVERRIDE=`ipconfig getifaddr en0` -W .github/workflows/quality-check-dagster-<package>.yml
-```
 
-## Important Notes
-
-- All tests, formatting, and type checking must pass before merging
-- Follow existing patterns in similar integrations
-- Include comprehensive documentation with usage examples
-- Version is managed in `__init__.py` as `__version__ = "X.X.X"`
-- Dependencies are specified in `pyproject.toml` and locked with `uv.lock`
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dagster-io/community-integrations](https://github.com/dagster-io/community-integrations) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
