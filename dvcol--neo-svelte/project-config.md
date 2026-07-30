@@ -1,277 +1,122 @@
 ---
 trigger: always_on
-description: I'm using svelte 5 instead of svelte 4 here is an overview of the changes.
+description: import { NeoDroppableZone, NeoSortableItem, NeoSortableProvider, NoDraggable } from '@dvcol/neo-svelte/sortable';
 ---
 
-I'm using svelte 5 instead of svelte 4 here is an overview of the changes.
+# `@dvcol/neo-svelte/sortable`
 
-#### Overview
-
-Svelte 5 introduces runes, a set of advanced primitives for controlling reactivity. The runes replace certain non-runes features and provide more explicit control over state and effects.
-
-#### $state
-
-- **Purpose:** Declare reactive state.
-- **Usage:**
-
-```javascript
-<script>let count = $state(0);</script>
+```ts
+import { NeoDroppableZone, NeoSortableItem, NeoSortableProvider, NoDraggable } from '@dvcol/neo-svelte/sortable';
 ```
 
-- **Replaces:** Top-level `let` declarations in non-runes mode.
-- **Class Fields:**
+## Components
 
-```javascript
-class Todo {
-	done = $state(false);
-	text = $state();
-	constructor(text) {
-		this.text = text;
-	}
-}
-```
+- `NeoSortableProvider` — context root. Creates a `NeoSortableContext`, wires up `@dnd-kit`'s `DragDropProvider`, and passes the context to a `children` snippet. Accepts both a **single-list** (`NeoSortableItem<Data>[]`) and a **multi-list** (`Record<UniqueIdentifier, NeoSortableItem<Data>[]>`) `items` shape. Must wrap all sortable items and droppable zones.
+- `NeoSortableItem` — a single sortable entry. Must be a descendant of `NeoSortableProvider`. Registers itself in the context on mount and deregisters on destroy. Passes an `instance` (the `createSortable` return value) to the `children` snippet; apply `{@attach instance.attach}` to the host DOM element.
+- `NeoDroppableZone` — a standalone droppable area with no sort logic. Use as a fallback drop target for empty containers in a multi-list layout. Passes the droppable `instance` to `children`.
+- `NoDraggable` — a standalone, **non-sortable** draggable source (for dragging an item into a `NeoDroppableZone`, not for reordering within a list). Passes the draggable `instance` to `children`.
 
-- **Deep Reactivity:** Only plain objects and arrays become deeply reactive.
+## Concepts
 
-#### $state.raw
+### `items` shape
 
-- **Purpose:** Declare state that cannot be mutated, only reassigned.
-- **Usage:**
+`NeoSortableProvider` accepts two shapes for `items`:
 
-```javascript
-<script>let numbers = $state.raw([1, 2, 3]);</script>
-```
+- **Array** (`NeoSortableItem<Data>[]`) — single-list drag-to-reorder.
+- **Record** (`Record<UniqueIdentifier, NeoSortableItem<Data>[]>`) — multi-list drag between containers. Each key is a container id; `@dnd-kit/helpers`'s `move` handles cross-list item transfer automatically.
 
-- **Performance:** Improves with large arrays and objects.
+`items` is `$bindable`; always write `bind:items` so the parent array/record stays in sync after every drag.
 
-#### $state.snapshot
+### Attach directive
 
-- **Purpose:** Take a static snapshot of $state.
-- **Usage:**
+After `createSortable` / `createDraggable` / `createDroppable` returns an instance, wire it to the DOM element via `{@attach instance.attach}`. Without the attach the element has no registered position with `@dnd-kit` and dragging silently fails.
 
-```javascript
-<script>
-	let counter = $state({ count: 0 });
+For drag-handle sub-elements (restrict drag activation to a child handle), use `{@attach instance.attachHandle}` on that child and `{@attach instance.attach}` on the outer item element. `NeoHandle` (from `@dvcol/neo-svelte/floating`) exposes both via `{@attach instance.attachHandle}`.
 
-	function onClick() {
-		console.log($state.snapshot(counter));
-	}
-</script>
-```
+### `axis` restriction
 
-#### $derived
+`axis="x"` / `axis="y"` applies the corresponding `@dnd-kit` modifier. Defaults to unrestricted (any direction). Useful for purely horizontal or purely vertical lists.
 
-- **Purpose:** Declare derived state.
-- **Usage:**
+### `container` prop
 
-```javascript
-<script>let count = $state(0); let doubled = $derived(count * 2);</script>
-```
+The optional `container` prop (`HTMLElement`) restricts drag movement to that element's bounds via `RestrictToElement`. Defaults to `document.body`. Typical pattern: declare a template variable, bind it with `bind:this`, and pass it as the container:
 
-- **Replaces:** Reactive variables computed using `$:` in non-runes mode.
-
-#### $derived.by
-
-- **Purpose:** Create complex derivations with a function.
-- **Usage:**
-
-```javascript
-<script>
-	let numbers = $state([1, 2, 3]); let total = $derived.by(() => numbers.reduce((a, b) => a + b,
-	0));
-</script>
-```
-
-#### $effect
-
-- **Purpose:** Run side-effects when values change.
-- **Usage:**
-
-```javascript
-<script>
-	let size = $state(50);
-	let color = $state('#ff3e00');
-
-	$effect(() => {
-		const context = canvas.getContext('2d');
-		context.clearRect(0, 0, canvas.width, canvas.height);
-		context.fillStyle = color;
-		context.fillRect(0, 0, size, size);
-	});
-</script>
-```
-
-- **Replacements:** $effect replaces a substantial part of `$: {}` blocks triggering side-effects.
-
-#### $effect.pre
-
-- **Purpose:** Run code before the DOM updates.
-- **Usage:**
-
-```javascript
-<script>
-	$effect.pre(() =>{' '}
-	{
-		// logic here
-	}
-	);
-</script>
-```
-
-- **Replaces:** beforeUpdate.
-
-#### $effect.tracking
-
-- **Purpose:** Check if code is running inside a tracking context.
-- **Usage:**
-
-```javascript
-<script>console.log('tracking:', $effect.tracking());</script>
-```
-
-#### $props
-
-- **Purpose:** Declare component props.
-- **Usage:**
-
-```javascript
-<script>let {(prop1, prop2)} = $props();</script>
-```
-
-- **Replaces:** export let syntax for declaring props.
-
-#### $bindable
-
-- **Purpose:** Declare bindable props.
-- **Usage:**
-
-```javascript
-<script>let {(bindableProp = $bindable('fallback'))} = $props();</script>
-```
-
-#### $inspect
-
-- **Purpose:** Equivalent to `console.log` but re-runs when its argument changes.
-- **Usage:**
-
-```javascript
-<script>let count = $state(0); $inspect(count);</script>
-```
-
-#### $host
-
-- **Purpose:** Retrieve the this reference of the custom element.
-- **Usage:**
-
-```javascript
-<script>
-	function greet(greeting) {
-		$host().dispatchEvent(new CustomEvent('greeting', { detail: greeting }));
-	}
-</script>
-```
-
-- **Note:** Only available inside custom element components on the client-side.
-
-#### Overview of snippets in svelte 5
-
-Snippets, along with render tags, help create reusable chunks of markup inside your components, reducing duplication and enhancing maintainability.
-
-#### Snippets Usage
-
-- **Definition:** Use the `#snippet` syntax to define reusable markup sections.
-- **Basic Example:**
-
-```javascript
-{#snippet figure(image)}
-	<figure>
-		<img src={image.src} alt={image.caption} width={image.width} height={image.height} />
-		<figcaption>{image.caption}</figcaption>
-	</figure>
-{/snippet}
-```
-
-- **Invocation:** Render predefined snippets with `@render`:
-
-```javascript
-{@render figure(image)}
-```
-
-- **Destructuring Parameters:** Parameters can be destructured for concise usage:
-
-```javascript
-{#snippet figure({ src, caption, width, height })}
-	<figure>
-		<img alt={caption} {src} {width} {height} />
-		<figcaption>{caption}</figcaption>
-	</figure>
-{/snippet}
-```
-
-#### Snippet Scope
-
-- **Scope Rules:** Snippets have lexical scoping rules; they are visible to everything in the same lexical scope:
-
-```javascript
-<div>
-	{#snippet x()}
-		{#snippet y()}...{/snippet}
-
-		<!-- valid usage -->
-		{@render y()}
-	{/snippet}
-
-	<!-- invalid usage -->
-	{@render y()}
-</div>
-
-<!-- invalid usage -->
-{@render x()}
-```
-
-- **Recursive References:** Snippets can self-reference or reference other snippets:
-
-```javascript
-{#snippet blastoff()}
-	<span>🚀</span>
-{/snippet}
-
-{#snippet countdown(n)}
-	{#if n > 0}
-		<span>{n}...</span>
-		{@render countdown(n - 1)}
-	{:else}
-		{@render blastoff()}
-	{/if}
-{/snippet}
-
-{@render countdown(10)}
-```
-
-#### Passing Snippets to Components
-
-- **Direct Passing as Props:**
-
-```javascript
-<script>
-	import Table from './Table.svelte';
-	const fruits = [{ name: 'apples', qty: 5, price: 2 }, ...];
+```svelte
+<script lang="ts">
+  let listEl = $state<HTMLElement>();
 </script>
 
-{#snippet header()}
-	<th>fruit</th>
-	<th>qty</th>
-	<th>price</th>
-	<th>total</th>
-{/snippet}
+<NeoSortableProvider {container} bind:items>
+  {#snippet children(ctx)}
+    <ol bind:this={listEl} data-size={ctx.items.length} ...>...</ol>
+  {/snippet}
+</NeoSortableProvider>
+```
 
-{#snippet row(fruit)}
-	<td>{fruit.name}</td>
-	<td>{fruit.qty}</td>
-	<td>{fruit.price}</td>
+### Drag overlay
+
+Pass an `overlay` snippet to `NeoSortableProvider` to activate a `DragOverlay` — a portal-rendered clone that follows the cursor during drag. Without it the item itself translates. When the overlay is active, hide the in-place item while it is being dragged:
+
+```svelte
+<li data-grabbed={instance.isDragging} style:opacity={instance.isDragging ? 0 : 1}>
+  ...
+</li>
+```
+
+### Cancel / snapshot
+
+`NeoSortableContext` snapshots `items` on `dragStart`. If the drag is cancelled (Escape key or externally via `event.canceled`), `dragEnd` receives `{ canceled: true }` and the context **automatically restores the snapshot** — no consumer code needed.
+
+### `NeoSortableContext` API
+
+The context object passed to the `children` snippet exposes:
+
+- `ctx.items` — `NeoSortableContextItems<Data>` — current items (reactive through the bound prop).
+- `ctx.ids` — derived id list (array or record mirroring the `items` shape).
+- `ctx.isDragging` — `boolean` — `true` while a drag is in flight.
+- `ctx.get(id)` — `Sortable | undefined` — look up a registered sortable instance by id.
+- `ctx.has(id)` — `boolean` — check whether an id is registered.
+- `ctx.move(event)` — delegates to `@dnd-kit/helpers` `move`.
+- `ctx.swap(event)` — delegates to `@dnd-kit/helpers` `swap`.
+
+## Common pattern
+
+### Single list
+
+```svelte
+<script lang="ts">
+  import type { NeoSortableContextItems } from '@dvcol/neo-svelte/sortable';
+
+  import { NeoSortableItem, NeoSortableProvider } from '@dvcol/neo-svelte/sortable';
+
+  let items = $state<NeoSortableContextItems<{ label: string }>>([
+    { id: '1', data: { label: 'Alpha' } },
+    { id: '2', data: { label: 'Beta' } },
+    { id: '3', data: { label: 'Gamma' } },
+  ]);
+</script>
+
+<NeoSortableProvider bind:items axis="y">
+  {#snippet children(ctx)}
+    <ul>
+      {#each ctx.items as item, index (item.id)}
+        <NeoSortableItem {...item} {index}>
+          {#snippet children({ instance, data })}
+            <!-- apply {@attach instance.attach} to register the element with @dnd-kit -->
+            <li {@attach instance.attach}>
+              {data.label}
+            </li>
+          {/snippet}
+        </NeoSortableItem>
+      {/each}
+    </ul>
+  {/snippet}
+</NeoSortableProvider>
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dvcol/neo-svelte](https://github.com/dvcol/neo-svelte) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
