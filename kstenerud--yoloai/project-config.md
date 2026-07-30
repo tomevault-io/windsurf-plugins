@@ -1,99 +1,122 @@
 ---
 trigger: always_on
-description: This section documents the headless/Docker characteristics of major AI coding CLI agents. Claude Code and Codex are supported in v1; additional agents are researched for future versions.
+description: Patterns Cobra command handlers in this package follow. These are written
 ---
 
-# AI Coding Agents
+# `internal/cli/` conventions
 
-## AI Coding CLI Agents: Multi-Agent Support Research
+Patterns Cobra command handlers in this package follow. These are written
+after each pattern earned its place — read this before writing a new
+command, but don't apply patterns where they don't fit.
 
-This section documents the headless/Docker characteristics of major AI coding CLI agents. Claude Code and Codex are supported in v1; additional agents are researched for future versions.
+## Construction: `withClient`, `systemClient`, and `newRuntime`
 
-**Resolved research gaps (v1):**
-- **Codex proxy support:** Not supported. The static Rust binary does not honor `HTTP_PROXY`/`HTTPS_PROXY`. Open upstream issues: github.com/openai/codex#4242, github.com/openai/codex#6060.
-- **Codex required network domains:** Confirmed `api.openai.com` only. Telemetry uses user-configured OTLP endpoints, not hardcoded domains.
-- **Codex TUI behavior in tmux:** Confirmed working. Interactive mode runs correctly in tmux.
+Two helpers in `helpers.go` give a command handler an orchestration
+entry point. Pick the one that matches the command's scope.
 
-### Viable Agents
+- **`withClient(cmd, backend, fn)`** — opens a `yoloai.Client` for one
+  backend, defers close. The canonical path for sandbox-scoped command
+  handlers: `Run`, `Stop`, `Destroy`, `List`, `Inspect`, `Diff`, `Apply`,
+  `Exec`, `Attach`, plus the MCP server's tool handlers. Use this for
+  every new command that operates on a single sandbox / single backend.
+- **`systemClient()`** — returns a `*yoloai.SystemClient` (no runtime
+  yet, no close needed). The canonical path for `yoloai system …`
+  handlers that aren't tied to a specific backend: `DiskUsage`, `Prune`,
+  `Build`, `Check`, `Setup`. SystemClient spins up runtimes per backend
+  internally for cross-backend operations.
 
-#### Claude Code
+`withRuntime` and `withManager` have been removed (W-L10) — every
+command goes through `yoloai.Client` / `yoloai.SystemClient`. The
+underlying `newRuntime(ctx, backend)` factory still exists for the
+handful of commands that walk every registered backend for
+enumeration (`yoloai ls`, `yoloai sandbox <name> allow`,
+`yoloai system doctor`, `yoloai system info`) and for the
+backend-scoped `system tart` subtree. Don't add new direct calls —
+prefer Client/SystemClient for any new orchestration.
 
-- **Install:** `npm i -g @anthropic-ai/claude-code`
-- **Headless command:** `claude --dangerously-skip-permissions -p "task"`
-- **API key env vars:** `ANTHROPIC_API_KEY`
-- **State dir:** `~/.claude/`
-- **Model selection:** `--model <model>`
-- **Sandbox bypass:** `--dangerously-skip-permissions`
-- **Runtime:** Node.js
-- **Root restriction:** Refuses to run as root
-- **Docker quirks:** Requires tmux with double-Enter workaround to submit prompts; needs non-root user
+### Interactive wizards: prompts live in the CLI
 
-##### Claude Code Streaming Protocol (stream-json mode)
+Q-F (W-L8b) — library Client/SystemClient methods never do interactive
+IO. `yoloai system setup` follows the established pattern:
 
-Claude Code supports a machine-readable streaming mode that enables programmatic integration without a TTY or tmux. This is separate from yoloai's current interactive mode but relevant to future headless/programmatic scenarios.
+1. Call `SystemClient.SetupStatus(ctx)` to inspect the host (classify
+   `~/.tmux.conf`, enumerate available backends/agents).
+2. Render prompts and read user input in the CLI (`system_setup.go`'s
+   `wizardTmuxConf` / `wizardChoice`).
+3. Pass the resulting `SetupOptions` to `SystemClient.Setup(ctx, opts)`
+   for a pure config write.
 
-**Invocation:**
-```
-claude --output-format stream-json --input-format stream-json --verbose --model <model> [--session-id <id>] --dangerously-skip-permissions
-```
+If a new command needs interactive prompts, follow the same shape:
+library provides "what to ask" (status + available options) and "how
+to apply" (a non-interactive setter); CLI owns the conversation.
 
-**Communication:** Newline-delimited JSON on stdin/stdout. The process stays alive across multiple turns — subsequent user messages are written to the same stdin. A new process spawn is only needed when the session is explicitly ended or the process exits.
+### Attach: `Client.Attach` is now the canonical path
 
-**Input format** (written to stdin per turn):
-```json
-{"type":"user","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
-```
+W-L8d added `yoloai.Client.Attach(ctx, name, IOStreams) error` and moved
+the readiness polling (`waitForTmux`) into `sandbox.WaitForAttachReady`.
+Every attach flow should ultimately go through `c.Attach`:
 
-**Output message types:**
-| Type | Meaning |
-|------|---------|
-| `system` / `init` | Process startup; carries initial `session_id` |
-| `content_block_start` | Start of text/thinking/tool_use block (keyed by `index`) |
-| `content_block_delta` | Streaming delta: `text_delta`, `thinking_delta`, `input_json_delta` |
-| `content_block_stop` | Block finished |
-| `assistant` | Complete non-streaming assistant message |
-| `user` | Tool results fed back from Claude Code |
-| `result` | **End of turn** (see below) |
+- The standalone `yoloai attach` command uses `withClient + c.Attach`
+  directly (see `attach.go`).
+- Lifecycle commands with an `--attach` branch (`clone` today;
+  `restart`/`reset`/`start`/`new` to be migrated) call the shared
+  `attachToSandboxByName(cmd, name)` helper in `helpers.go`, which
+  itself opens a Client and calls `c.Attach`.
+- The terminal-title machinery (`setTerminalTitle`) stays in the CLI —
+  it's UI, not orchestration. `Client.Attach` is library code and
+  doesn't touch the terminal beyond the PTY.
 
-**The `result` message is the authoritative idle/done signal:**
-```json
-{
-  "type": "result",
-  "session_id": "abc123",
-  "is_error": false,
-  "total_cost_usd": 0.012,
-  "duration_ms": 4200,
-  "duration_api_ms": 3100,
-  "num_turns": 3,
-  "usage": {"input_tokens": 1234, "output_tokens": 567}
-}
-```
-`is_error: true` indicates the turn failed. This is cleaner than timeout or output-stability heuristics for detecting completion.
+`IOStreams.In/Out/Err` are wired all the way through the runtime
+interface as of `runtime/iostreams.go`. Non-CLI embedders (HTTP, MCP,
+test harnesses) can pass their own streams to `Client.Attach` and
+have them reach the backend faithfully. For TTY=true the streams
+must be terminals (e.g. `*os.File` with a PTY fd); for TTY=false
+plain pipes work and stderr stays separate.
 
-**Session resumption via `--session-id`:** The `session_id` from the `result` or `system/init` message can be saved and passed back as `--session-id` on the next invocation. This allows Claude Code to resume its conversation context after a process restart or container recreation — the session history is stored in Claude Code's own state (`~/.claude/`), so as long as `agent-state/` is preserved, the session can be resumed.
+### Legacy raw-runtime attach — RETIRED
 
-**Environment requirement:** `TERM=xterm-256color` must be set in the subprocess environment; omitting it causes Claude CLI to misbehave.
+`new.go`, `start.go`, `restart.go`, `reset.go` previously held their own
+`attachAfter<Verb>` helpers; all have been migrated to `c.Attach`. The
+`attachToSandbox` and `waitForTmux` CLI shims in `attach.go` are gone.
+The library `sandbox.WaitForAttachReady` is the single readiness
+implementation; `Client.Attach` is the single attach entry point. Do
+NOT add a `Client.Runtime()` escape hatch; it would defeat the
+layering.
 
-**MCP tools in stream-json mode:** MCP server tools appear in the output stream with name format `mcp__<server>__<tool>`. Claude Code runs its configured MCP servers internally (from `~/.claude/settings.json`); they are transparent to the caller.
+Still on raw runtime: `exec.go` (interactive non-attach exec — needs
+PTY-aware Exec on the runtime interface).
 
-**Source:** Analysis of [opencode-claude-code-plugin](https://github.com/unixfox/opencode-claude-code-plugin) (2026-03), which implements the Vercel AI SDK `LanguageModelV2` interface on top of `claude` subprocess stdio.
+`list.go` does NOT need migration — it calls the library helper
+`sandbox.ListSandboxesMultiBackend` directly, which is the correct
+layered shape for multi-backend ops (single-backend Client by design;
+multi-backend dispatch is the embedder's concern).
 
-#### OpenAI Codex
+`apply.go` does NOT need migration — operates entirely on disk, no
+runtime in the picture.
 
-- **Install:** Static binary download or `npm i -g @openai/codex`
-- **Headless command:** `codex exec --yolo "task"`
-- **API key env vars:** `CODEX_API_KEY` (preferred), `OPENAI_API_KEY` (fallback)
-- **State dir:** `~/.codex/`
-- **Model selection:** `--model <model>` or `-m <model>` (e.g., `gpt-5.3-codex`, `gpt-5.3-codex-spark`, `codex-mini-latest`)
-- **Model aliases:** `default` → `gpt-5.3-codex`, `spark` → `gpt-5.3-codex-spark`, `mini` → `codex-mini-latest`
-- **Sandbox bypass:** `--yolo` (alias `--dangerously-bypass-approvals-and-sandbox`)
-- **Runtime:** Rust (statically-linked musl binary, zero runtime deps)
-- **Proxy support:** Not supported — does not honor `HTTP_PROXY`/`HTTPS_PROXY` (upstream issues github.com/openai/codex#4242, #6060)
-- **Root restriction:** None found, but convention is non-root
-- **Docker quirks:** `codex exec` avoids TUI entirely — no tmux needed; `--skip-git-repo-check` useful outside repos; Landlock sandbox may fail in containers (use `--yolo`); TUI works correctly in tmux
+## Path resolution: `cliLayout()`
+
+Every path under `~/.yoloai/` comes from `cliLayout()` (defined in
+`layout_bridge.go`) — that is the ONE place in the CLI that reads `$HOME`.
+A handler that constructs a `sandbox.NewEngine` directly must pass
+`sandbox.WithLayout(cliLayout())`; otherwise the Engine panics at
+construction. `withClient` handles this automatically.
+
+Never call `config.YoloaiDir()`, `config.SandboxesDir()`, etc. — those
+helpers were deleted in Q-W.6. Use the Layout methods instead
+(`cliLayout().SandboxesDir()`, `cliLayout().ProfileDir(name)`).
+
+## Backend selection
+
+Resolution priority for the `--backend` flag, in order:
+
+1. `--backend` flag (if set; not present on all commands).
+2. For lifecycle commands operating on a named sandbox
+   (`stop`/`start`/`destroy`/etc.): `resolveBackendForSandbox(name)`
+   reads the backend from the sandbox's `meta.json`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kstenerud/yoloai](https://github.com/kstenerud/yoloai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
