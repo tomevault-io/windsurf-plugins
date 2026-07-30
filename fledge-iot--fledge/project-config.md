@@ -1,147 +1,153 @@
 ---
 trigger: always_on
-description: description: "Cursor AI rules for Fledge documentation - covers reStructuredText, Sphinx, file naming, and content guidelines"
+description: Python unit testing rules for Fledge - test organization, framework, execution, and coverage
 ---
 
 
----
-description: "Cursor AI rules for Fledge documentation - covers reStructuredText, Sphinx, file naming, and content guidelines"
-globs: 
-  - "docs/**/*"
-  - "*.rst"
-alwaysApply: false
-author: "Ashish Jabble"
----
+# Python Unit Testing Guidelines
 
-# Documentation Directory Cursor Rules
-
-## Overview
-This file contains specific rules for working with documentation in the `/docs` directory of the Fledge project. These rules supplement the main project cursor rules and focus on documentation-specific patterns and conventions.
-
-## Documentation Framework
-- **Format**: reStructuredText (.rst) format exclusively
-- **Build System**: Sphinx documentation generator
-- **Theme**: sphinx_rtd_theme (Read the Docs theme)
-- **Configuration**: All settings in `docs/conf.py`
-
-## 🚫 "Fledge" Branding Guidelines - MINIMIZE USAGE
-
-**CRITICAL RULE: Avoid "Fledge" in naming wherever possible**
-
-### What to Avoid:
-- ❌ Image files: `fledge_architecture.png`
-- ❌ Directory names: `fledge_authentication/`
-- ❌ File names: `fledge_configuration.rst`
-- ❌ Headings: "Fledge Authentication Setup"
-- ❌ Repetitive content: "Fledge does this... Fledge provides that..."
-
-### What to Use Instead:
-- ✅ Image files: `architecture_overview.png`, `auth_flow.png`
-- ✅ Directory names: `authentication/`, `configuration/`, `monitoring/`
-- ✅ File names: `authentication.rst`, `configuration.rst`
-- ✅ Headings: "Authentication Setup", "Configuration Guide"
-- ✅ Content alternatives: "the platform", "the system", "this feature"
-
-### When "Fledge" IS Appropriate:
-- Main title pages and introductory content
-- External references and comparisons
-- Installation package names
-- API endpoint references where it's part of the actual name
-
-## File Organization
+## Test Organization & Structure
 
 ### Directory Structure
-- `/docs/` - Main documentation root
-- `/docs/_static/` - Static assets (CSS, images that aren't content)
-- `/docs/_templates/` - Custom Sphinx templates
-- `/docs/images/` - Documentation images and screenshots
-- `/docs/quick_start/` - Getting started guides
-- `/docs/plugin_developers_guide/` - Plugin development documentation
-- `/docs/rest_api_guide/` - REST API documentation
-- `/docs/building_fledge/` - Build and installation guides
-- `/docs/monitoring/` - System monitoring documentation
-- `/docs/fledge-rule-DataAvailability/` - Built-in Data Availability rule plugin docs
-- `/docs/fledge-rule-Threshold/` - Built-in Threshold rule plugin docs
-- `/docs/fledge-north-OMF.rst` - Built-in OMF north plugin documentation
-- `/docs/keywords/` - Plugin categorization keywords and mappings
-- `/docs/fledge_plugins.rst` - Master plugin list with conditional hyperlinks
+- **Unit Tests**: Located in [tests/unit/python/](mdc:tests/unit/python/) 
+- **Test Instructions**: Follow detailed guidelines in [tests/README.rst](mdc:tests/README.rst)
+- **File Structure**: Tests should mirror the component structure under `tests/unit/python/fledge/<component>`
+- **Template**: Use [tests/unit/python/__template__.py](mdc:tests/unit/python/__template__.py) as starting point
 
-**DIRECTORY NAMING GUIDELINES:**
-- **AVOID "fledge" in new directory names** - use functional descriptions
-- Use topic-based naming: `authentication/` instead of `fledge_authentication/`
-- Keep directory names lowercase with underscores
-- Focus on the purpose/feature rather than product branding
+### Test File Conventions
+- **Naming**: Test files must begin with `test_` for pytest auto-discovery
+- **Pattern**: `test_<module_name>.py`
+- **Location**: Place tests in correct directory matching component structure
+- **Imports**: Follow Fledge import patterns and avoid circular dependencies
+- **Docstrings**: Include Pydoc-compatible docstrings for test classes and methods
 
-### File Naming Conventions
-- Use lowercase with underscores: `file_name.rst`
-- Index files: `index.rst` for each directory
-- Numbered files for version/download info: `91_version_history.rst`, `92_downloads.rst`
-- Descriptive names reflecting content: `securing.rst`, `troubleshooting_pi_server_integration.rst`
-- **AVOID "fledge" in filenames** - use functional descriptions: `authentication.rst` instead of `fledge_authentication.rst`
-- Focus on the topic/feature being documented
+### Test Class & Method Organization
+- Group related tests in classes using `TestClassName` pattern
+- Use descriptive test method names: `test_should_return_success_when_valid_input`
+- Organize tests logically: happy path, edge cases, error conditions
+- Use pytest fixtures for common setup and teardown
+- Keep tests focused and atomic - one assertion per test when possible
 
-## reStructuredText Style Guidelines
+## Testing Framework & Dependencies
 
-### Heading Hierarchy
-Follow this exact hierarchy for consistency:
-```rst
-***************
-Document Title (Level 1)
-***************
+### Primary Framework
+- **Framework**: pytest (version specified in [python/requirements-test.txt](mdc:python/requirements-test.txt))
+- **Dependencies**: All testing dependencies are managed in requirements-test.txt
+- **Dependency Management**: Reference requirements-test.txt for current versions - do not hardcode versions in documentation
 
-===============
-Major Section (Level 2)
-===============
+### Core Testing Dependencies
+Key testing packages (see [python/requirements-test.txt](mdc:python/requirements-test.txt) for current versions):
+- `pytest` - Main testing framework
+- `pytest-asyncio` - For async testing support
+- `pytest-mock` - Mocking framework integration
+- `pytest-cov` - Code coverage reporting
+- `pytest-aiohttp` - aiohttp testing utilities
+- `pylint` - Code quality and linting
 
-Minor Section (Level 3)
------------------------
+### Additional Testing Dependencies
+- `requests` - For HTTP client testing
+- `pyserial` - For RTU serial testing
+- `pytz` - Timezone handling in tests
+- `aiohttp` and `yarl` - Keep versions synchronized with main requirements
 
-Subsection (Level 4)
-^^^^^^^^^^^^^^^^^^^^
+## Test Configuration
 
-Sub-subsection (Level 5)
-"""""""""""""""""""""""""
+### pytest Configuration
+- **Configuration File**: [tests/unit/python/.pytest.ini](mdc:tests/unit/python/.pytest.ini)
+- **Minimum Version**: Check requirements-test.txt for current pytest version
+- **Excluded Directories**: Plugin directories excluded from test recursion
+- **Test Discovery**: Automatic discovery of test_*.py files
+
+### Coverage Configuration
+- **Configuration File**: [tests/unit/python/.coveragerc](mdc:tests/unit/python/.coveragerc)
+- **Omitted Files**: 
+  - `__init__.py` and `__template__.py` files
+  - Setup files and plugin directories
+  - Test directories themselves
+- **Coverage Scope**: Focus on core Fledge components, exclude plugin frameworks
+
+## Test Execution
+
+### Basic pytest Commands
+Refer to [tests/README.rst](mdc:tests/README.rst) for complete instructions:
+
+```bash
+# Execute all tests in specific file
+pytest test_filename.py
+
+# Execute specific test class
+pytest test_filename.py::TestClass
+
+# Execute specific test method
+pytest test_filename.py::TestClass::test_case
+
+# Verbose output with detailed information
+pytest -s -vv
+
+# Run tests with coverage
+pytest --cov=. --cov-report=html
 ```
 
-**IMPORTANT NAMING CONVENTIONS:**
-- **AVOID "Fledge" in headings** unless absolutely necessary for context
-- Use descriptive, functional titles: "Authentication Configuration" instead of "Fledge Authentication Configuration"
-- Focus on the feature/functionality rather than the product name
-- Keep headings concise and user-focused
+### Advanced Test Execution
+```bash
+# Run tests with full coverage report
+pytest -s -vv tests/unit/python/fledge/ --cov=. --cov-report=html --cov-config tests/unit/python/.coveragerc
 
-### Document Structure
-1. **Title**: Use level 1 heading with asterisks above and below
-2. **Introduction**: Brief overview of the document's purpose
-3. **Table of Contents**: Use `.. toctree::` for sections with multiple pages
-4. **Main Content**: Organized with appropriate heading levels
-5. **Cross-references**: Link to related documentation
+# Run tests with XML coverage for CI/CD
+pytest --cov=. --cov-report html:coverage_html --cov-report xml:coverage.xml
 
-### Code Blocks
-```rst
-.. code-block:: language
-   :linenos:
-   :emphasize-lines: 2,3
+# Run specific test patterns
+pytest -k "test_pattern_name"
 
-   code here
 ```
 
-### Common Directives
-- `.. note::` - Important information
-- `.. warning::` - Critical warnings
-- `.. code-block::` - Code examples
-- `.. image::` - Images with proper alt text
-- `.. toctree::` - Table of contents trees
+## Code Coverage
 
-### Images and Media
-- Store images in `/docs/images/` directory
-- Use descriptive filenames: `architecture_overview.png` (avoid "fledge_" prefix)
-- **AVOID "Fledge" in image filenames** - use descriptive terms like `architecture_overview.png` instead of `fledge_architecture_overview.png`
-- Always include alt text: `.. image:: images/filename.png :alt: Description`
-- Optimize images for web (reasonable file sizes)
-- Use subdirectories in images/ for organization by topic
+### Coverage Configuration
+- **Tool**: pytest-cov framework integration
+- **Config File**: [tests/unit/python/.coveragerc](mdc:tests/unit/python/.coveragerc)
+- **Output Formats**: HTML, XML, and terminal reports
+- **Exclusions**: Configured to omit template files, plugins, and test directories
+
+### Coverage Commands
+
+#### Basic Coverage Reports
+```bash
+# Terminal coverage report (default)
+pytest --cov=. --cov-report=term
+
+# Terminal with missing lines shown
+pytest --cov=. --cov-report=term-missing
+
+# HTML coverage report (recommended for development)
+pytest --cov=. --cov-report=html
+
+# JSON coverage report for tools integration
+pytest --cov=. --cov-report=json
+
+# XML coverage report for CI/CD systems
+pytest --cov=. --cov-report=xml
+```
+
+#### Comprehensive Coverage Commands
+```bash
+# Full coverage with HTML and XML (for CI/CD)
+pytest --cov=. --cov-report=html:coverage_html --cov-report=xml:coverage.xml --cov-config=tests/unit/python/.coveragerc
+
+# Coverage with specific source directory and custom config
+pytest tests/unit/python/fledge/ --cov=fledge --cov-report=html --cov-config=tests/unit/python/.coveragerc
+
+# Coverage with minimum percentage threshold (fail if below)
+pytest --cov=. --cov-report=term --cov-fail-under=80
+
+# Coverage with detailed terminal output and HTML
+pytest --cov=. --cov-report=term-missing --cov-report=html:htmlcov
+
+# Coverage for specific modules only
+pytest --cov=fledge.services.core --cov=fledge.common --cov-report=html
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/fledge-iot) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [fledge-iot/fledge](https://github.com/fledge-iot/fledge) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
