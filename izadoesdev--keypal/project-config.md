@@ -1,109 +1,112 @@
 ---
 trigger: always_on
-description: Ultracite Rules - AI-Ready Formatter and Linter
+description: Avoid `accessKey` attr and distracting els
 ---
 
-
-# Project Context
-Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
-
-## Key Principles
-- Zero configuration required
-- Subsecond performance
-- Maximum type safety
-- AI-friendly code generation
-
-## Before Writing Code
-1. Analyze existing patterns in the codebase
-2. Consider edge cases and error scenarios
-3. Follow the rules below strictly
-4. Validate accessibility requirements
-
-## Rules
-
-### Accessibility (a11y)
-- Don't use `accessKey` attribute on any HTML element.
-- Don't set `aria-hidden="true"` on focusable elements.
-- Don't add ARIA roles, states, and properties to elements that don't support them.
-- Don't use distracting elements like `<marquee>` or `<blink>`.
-- Only use the `scope` prop on `<th>` elements.
-- Don't assign non-interactive ARIA roles to interactive HTML elements.
-- Make sure label elements have text content and are associated with an input.
-- Don't assign interactive ARIA roles to non-interactive HTML elements.
-- Don't assign `tabIndex` to non-interactive HTML elements.
-- Don't use positive integers for `tabIndex` property.
-- Don't include "image", "picture", or "photo" in img alt prop.
-- Don't use explicit role property that's the same as the implicit/default role.
-- Make static elements with click handlers use a valid role attribute.
-- Always include a `title` element for SVG elements.
-- Give all elements requiring alt text meaningful information for screen readers.
-- Make sure anchors have content that's accessible to screen readers.
-- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
-- Include all required ARIA attributes for elements with ARIA roles.
-- Make sure ARIA properties are valid for the element's supported roles.
-- Always include a `type` attribute for button elements.
-- Make elements with interactive roles and handlers focusable.
-- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
-- Always include a `lang` attribute on the html element.
-- Always include a `title` attribute for iframe elements.
-- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
-- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
-- Include caption tracks for audio and video elements.
-- Use semantic elements instead of role attributes in JSX.
-- Make sure all anchors are valid and navigable.
-- Ensure all ARIA properties (`aria-*`) are valid.
-- Use valid, non-abstract ARIA roles for elements with ARIA roles.
-- Use valid ARIA state and property values.
-- Use valid values for the `autocomplete` attribute on input elements.
-- Use correct ISO language/country codes for the `lang` attribute.
-
-### Code Complexity and Quality
-- Don't use consecutive spaces in regular expression literals.
-- Don't use the `arguments` object.
-- Don't use primitive type aliases or misleading types.
-- Don't use the comma operator.
-- Don't use empty type parameters in type aliases and interfaces.
-- Don't write functions that exceed a given Cognitive Complexity score.
-- Don't nest describe() blocks too deeply in test files.
-- Don't use unnecessary boolean casts.
-- Don't use unnecessary callbacks with flatMap.
-- Use for...of statements instead of Array.forEach.
-- Don't create classes that only have static members (like a static namespace).
-- Don't use this and super in static contexts.
-- Don't use unnecessary catch clauses.
-- Don't use unnecessary constructors.
-- Don't use unnecessary continue statements.
-- Don't export empty modules that don't change anything.
-- Don't use unnecessary escape sequences in regular expression literals.
-- Don't use unnecessary fragments.
-- Don't use unnecessary labels.
-- Don't use unnecessary nested block statements.
-- Don't rename imports, exports, and destructured assignments to the same name.
-- Don't use unnecessary string or template literal concatenation.
-- Don't use String.raw in template literals when there are no escape sequences.
-- Don't use useless case statements in switch statements.
-- Don't use ternary operators when simpler alternatives exist.
-- Don't use useless `this` aliasing.
-- Don't use any or unknown as type constraints.
-- Don't initialize variables to undefined.
-- Don't use the void operators (they're not familiar).
-- Use arrow functions instead of function expressions.
-- Use Date.now() to get milliseconds since the Unix Epoch.
-- Use .flatMap() instead of map().flat() when possible.
-- Use literal property access instead of computed property access.
-- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
-- Use concise optional chaining instead of chained logical expressions.
-- Use regular expression literals instead of the RegExp constructor when possible.
-- Don't use number literal object member names that aren't base 10 or use underscore separators.
-- Remove redundant terms from logical expressions.
-- Use while loops instead of for loops when you don't need initializer and update expressions.
-- Don't pass children as props.
-- Don't reassign const variables.
-- Don't use constant expressions in conditions.
-- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
+Avoid `accessKey` attr and distracting els
+No `aria-hidden="true"` on focusable els
+No ARIA roles, states, props on unsupported els
+Use `scope` prop only on `<th>` els
+No non-interactive ARIA roles on interactive els
+Label els need text and associated input
+No event handlers on non-interactive els
+No interactive ARIA roles on non-interactive els
+No `tabIndex` on non-interactive els
+No positive integers on `tabIndex` prop
+No `image`, `picture`, or `photo` in img alt props
+No explicit role matching implicit role
+Valid role attrs on static, visible els w/ click handlers
+Use `title` el for `svg` els
+Provide meaningful alt text for all els requiring it
+Anchors need accessible content
+Assign `tabIndex` to non-interactive els w/ `aria-activedescendant`
+Include all required ARIA attrs for els w/ ARIA roles
+Use valid ARIA props for the el's role
+Use `type` attr on `button` els
+Make els w/ interactive roles and handlers focusable
+Heading els need accessible content
+Add `lang` attr to `html` el
+Use `title` attr on `iframe` els
+Pair `onClick` w/ `onKeyUp`, `onKeyDown`, or `onKeyPress`
+Pair `onMouseOver`/`onMouseOut` w/ `onFocus`/`onBlur`
+Add caption tracks to audio and video els
+Use semantic els vs role attrs
+All anchors must be valid and navigable
+Use valid, non-abstract ARIA props, roles, states, and values
+Use valid values for `autocomplete` attr
+Use correct ISO language codes in `lang` attr
+Include generic font family in font families
+No consecutive spaces in regex literals
+Avoid `arguments`, comma op, and primitive type aliases
+No empty type params in type aliases and interfaces
+Keep fns under Cognitive Complexity limit
+Limit nesting depth of `describe()` in tests
+No unnecessary boolean casts or callbacks on `flatMap`
+Use `for...of` vs `Array.forEach`
+No classes w/ only static members
+No `this` and `super` in static contexts
+No unnecessary catch clauses, ctors, `continue`, escape sequences in regex literals, fragments, labels, or nested blocks
+No empty exports
+No renaming imports, exports, or destructured assignments to same name
+No unnecessary string/template literal concatenation or useless cases in switch stmts, `this` aliasing, or `String.raw` without escape sequences
+Use simpler alternatives to ternary ops if possible
+No `any` or `unknown` as type constraints or initializing vars to `undefined`
+Avoid `void` op
+Use arrow fns vs function exprs
+Use `Date.now()` for milliseconds since Unix Epoch
+Use `.flatMap()` vs `map().flat()`
+Use `indexOf`/`lastIndexOf` vs `findIndex`/`findLastIndex` for simple lookups
+Use literal property access vs computed property access
+Use binary, octal, or hex literals vs `parseInt()`
+Use concise optional chains vs chained logical exprs
+Use regex literals vs `RegExp` ctor
+Use base 10 or underscore separators for number literal object member names
+Remove redundant terms from logical exprs
+Use `while` loops vs `for` loops if initializer and update aren't needed
+No reassigning `const` vars or constant exprs in conditions
+No `Math.min`/`Math.max` to clamp values where result is constant
+No return values from ctors or setters
+No empty character classes in regex literals or destructuring patterns
+No `__dirname` and `__filename` in global scope
+No calling global object props as fns or declaring fns and `var` accessible outside their block
+Instantiate builtins correctly
+Use `super()` correctly in classes
+Use standard direction values for linear gradient fns
+Use valid named grid areas in CSS Grid Layouts
+Use `@import` at-rules in valid positions
+No vars and params before their decl
+Include `var` fn for CSS vars
+No `\8` and `\9` escape sequences in strings
+No literal numbers that lose precision, configured els, or assigning where both sides are same
+Compare string case modifications w/ compliant values
+No lexical decls in switch clauses or undeclared vars
+No unknown CSS value fns, media feature names, props, pseudo-class/pseudo-element selectors, type selectors, or units
+No unmatchable An+B selectors or unreachable code
+Call `super()` exactly once before accessing `this` in ctors
+No control flow stmts in `finally` blocks
+No optional chaining where `undefined` is not allowed
+No unused fn params, imports, labels, private class members, or vars
+No return values from fns w/ return type `void`
+Specify all dependencies correctly in React hooks and names for GraphQL operations
+Call React hooks from top level of component fns
+Use `isNaN()` when checking for NaN
+Use `{ type: "json" }` for JSON module imports
+Use radix arg w/ `parseInt()`
+Start JSDoc comment lines w/ single asterisk
+Move `for` loop counters in right direction
+Compare `typeof` exprs to valid values
+Include `yield` in generator fns
+No importing deprecated exports, duplicate dependencies, or Promises where they're likely a mistake
+No non-null assertions after optional chaining or shadowing vars from outer scope
+No expr stmts that aren't fn calls or assignments or useless `undefined`
+Add `href` attr to `<a>` els and `width`/`height` attrs to `<img>` els
+Use consistent arrow fn bodies and either `interface` or `type` consistently
+Specify deletion date w/ `@deprecated` directive
+Make switch-case stmts exhaustive and limit number of fn params
+Sort CSS utility classes
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [izadoesdev/keypal](https://github.com/izadoesdev/keypal) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
