@@ -5,17 +5,17 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [MannLabs/alphadia](https://github.com/MannLabs/alphadia).
+Original source: `CLAUDE.md` in [MannLabs/alphadia](https://github.com/MannLabs/alphadia).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [MannLabs/alphadia](https://github.com/MannLabs/alphadia) — a repo with 110+ stars on GitHub.
+From [MannLabs/alphadia](https://github.com/MannLabs/alphadia) — a repo with 111+ stars on GitHub.
 
 ---
 
