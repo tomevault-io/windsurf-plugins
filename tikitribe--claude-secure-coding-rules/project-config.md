@@ -1,100 +1,162 @@
 ---
 trigger: always_on
-description: This repository provides comprehensive security rules for Claude Code, covering web applications, AI/ML systems, and agentic AI.
+description: Security patterns for the Unstructured library used in RAG document ingestion pipelines.
 ---
 
-# CLAUDE.md - Secure Coding Rules for Claude Code
+# Unstructured Document Processing Security Rules
 
-This repository provides comprehensive security rules for Claude Code, covering web applications, AI/ML systems, and agentic AI.
+Security patterns for the Unstructured library used in RAG document ingestion pipelines.
 
-## Project Overview
+---
 
-**Purpose**: Open-source security rules that guide Claude Code to generate secure code by default
+## Quick Reference
 
-**Coverage**:
-- OWASP Top 10 2025 (web application security)
-- OWASP MCP Top 10 2025 (Model Context Protocol security)
-- AI/ML security (NIST AI RMF, MITRE ATLAS, Google SAIF)
-- Agentic AI security (tool use, autonomy, sandboxing)
-- Language-specific rules (Python, JavaScript, TypeScript, Go, Rust, Java, C#, Ruby, R, C++, Julia, SQL)
-- Backend frameworks (FastAPI, Express, Django, Flask, NestJS)
-- AI/ML frameworks (LangChain, CrewAI, AutoGen, Transformers, vLLM, Triton, TorchServe, Ray Serve, BentoML, MLflow, Modal)
-- Frontend frameworks (React, Next.js, Vue, Angular, Svelte)
+| Rule | Level | Risk | Primary Defense |
+|------|-------|------|-----------------|
+| Partition Function Security | `strict` | Resource exhaustion, DoS | Strategy limits, resource controls |
+| PDF Processing Security | `strict` | Memory exhaustion, OCR abuse | Mode selection, OCR controls |
+| Table Extraction Security | `warning` | Memory exhaustion, malformed data | Size limits, structure validation |
+| HTML Processing Security | `strict` | XSS, script injection | Script removal, sanitization |
+| Image Extraction Security | `warning` | Metadata leakage, decompression bombs | EXIF stripping, dimension limits |
+| Element Metadata Security | `warning` | PII exposure, data leakage | PII filtering, field validation |
+| Chunking Strategy Security | `warning` | Context manipulation, resource abuse | Size limits, overlap control |
+| API Service Security | `strict` | Credential exposure, rate limit abuse | Authentication, rate limiting |
+| Output Validation | `warning` | Injection payloads, data overflow | Element limits, content filtering |
 
-## Repository Structure
+---
 
+## Rule: Partition Function Security
+
+**Level**: `strict`
+
+**When**: Using `partition()`, `partition_pdf()`, `partition_html()`, or other partition functions
+
+**Do**:
+```python
+from unstructured.partition.auto import partition
+from unstructured.partition.pdf import partition_pdf
+import os
+import resource
+from typing import List, Optional
+from dataclasses import dataclass
+
+@dataclass
+class PartitionSecurityConfig:
+    """Security configuration for partition operations."""
+    max_file_size_mb: int = 100
+    max_pages: int = 500
+    max_elements: int = 10000
+    timeout_seconds: int = 300
+    max_memory_mb: int = 2048
+    allowed_strategies: tuple = ("fast", "hi_res", "ocr_only")
+    default_strategy: str = "fast"
+
+class SecurePartitioner:
+    """Secure wrapper for Unstructured partition functions."""
+
+    def __init__(self, config: Optional[PartitionSecurityConfig] = None):
+        self.config = config or PartitionSecurityConfig()
+
+    def partition_document(
+        self,
+        filename: str,
+        strategy: Optional[str] = None,
+        **kwargs
+    ) -> List:
+        """Partition document with security controls."""
+
+        # Validate file size
+        file_size_mb = os.path.getsize(filename) / (1024 * 1024)
+        if file_size_mb > self.config.max_file_size_mb:
+            raise ValueError(
+                f"File size {file_size_mb:.1f}MB exceeds limit of "
+                f"{self.config.max_file_size_mb}MB"
+            )
+
+        # Validate strategy
+        if strategy is None:
+            strategy = self.config.default_strategy
+
+        if strategy not in self.config.allowed_strategies:
+            raise ValueError(
+                f"Strategy '{strategy}' not allowed. "
+                f"Allowed: {self.config.allowed_strategies}"
+            )
+
+        # Set resource limits
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        resource.setrlimit(
+            resource.RLIMIT_AS,
+            (self.config.max_memory_mb * 1024 * 1024, hard)
+        )
+
+        try:
+            # Partition with controlled parameters
+            elements = partition(
+                filename=filename,
+                strategy=strategy,
+                max_partition_length=50000,  # Limit element size
+                include_page_breaks=True,
+                **kwargs
+            )
+
+            # Validate output
+            if len(elements) > self.config.max_elements:
+                raise ValueError(
+                    f"Document produced {len(elements)} elements, "
+                    f"exceeds limit of {self.config.max_elements}"
+                )
+
+            return list(elements)
+
+        finally:
+            # Restore resource limits
+            resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+
+    def partition_with_timeout(
+        self,
+        filename: str,
+        **kwargs
+    ) -> List:
+        """Partition with timeout protection."""
+        import signal
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError(
+                f"Partition exceeded {self.config.timeout_seconds}s timeout"
+            )
+
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(self.config.timeout_seconds)
+
+        try:
+            return self.partition_document(filename, **kwargs)
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
 ```
-claude-secure-coding-rules/
-├── rules/
-│   ├── _core/                      # Foundation rules (apply to all projects)
-│   │   ├── owasp-2025.md          # OWASP Top 10 2025 security rules
-│   │   ├── mcp-security.md        # Model Context Protocol (MCP) security rules
-│   │   ├── ai-security.md         # AI/ML system security rules
-│   │   └── agent-security.md      # Agentic AI security rules
-│   │
-│   ├── languages/                  # Language-specific security rules
-│   │   ├── python/CLAUDE.md       # Deserialization, subprocess, path traversal, crypto, SQL
-│   │   ├── javascript/CLAUDE.md   # eval, prototype pollution, DOM security, Node.js
-│   │   ├── typescript/CLAUDE.md   # Type safety, validation, any types
-│   │   ├── go/CLAUDE.md           # Concurrency, context, templates, error handling
-│   │   ├── rust/CLAUDE.md         # unsafe blocks, FFI, memory safety, crypto
-│   │   ├── java/CLAUDE.md         # Serialization, JNDI, reflection, streams
-│   │   ├── csharp/CLAUDE.md       # .NET patterns, LINQ injection, assemblies
-│   │   ├── ruby/CLAUDE.md         # Metaprogramming, ERB, mass assignment
-│   │   ├── r/CLAUDE.md            # Shiny apps, data security, package verification
-│   │   ├── cpp/CLAUDE.md          # Memory safety, buffer overflows, smart pointers
-│   │   ├── julia/CLAUDE.md        # Metaprogramming, type safety, serialization
-│   │   └── sql/CLAUDE.md          # Injection, permissions, stored procedures
-│   │
-│   ├── backend/                    # Backend framework rules
-│   │   ├── fastapi/CLAUDE.md      # Pydantic validation, JWT, authorization, CORS, AI APIs
-│   │   ├── express/CLAUDE.md      # Helmet, sessions, rate limiting, file uploads
-│   │   ├── django/CLAUDE.md       # ORM, CSRF, templates, settings
-│   │   ├── flask/CLAUDE.md        # Werkzeug, sessions, blueprints, extensions
-│   │   ├── nestjs/CLAUDE.md       # Decorators, guards, pipes, interceptors
-│   │   ├── langchain/CLAUDE.md    # Prompt injection, tool security, chains, RAG
-│   │   ├── crewai/CLAUDE.md       # Multi-agent trust, delegation, memory isolation
-│   │   ├── autogen/CLAUDE.md      # Code execution, human-in-loop, sandboxing
-│   │   ├── transformers/CLAUDE.md # Model loading, tokenizers, fine-tuning
-│   │   ├── vllm/CLAUDE.md         # KV cache, PagedAttention, batching security
-│   │   ├── triton/CLAUDE.md       # GPU isolation, ensemble security, gRPC
-│   │   ├── torchserve/CLAUDE.md   # MAR files, custom handlers, management API
-│   │   ├── ray-serve/CLAUDE.md    # Deployment, autoscaling, serialization
-│   │   ├── bentoml/CLAUDE.md      # Bento packaging, runners, API security
-│   │   ├── mlflow/CLAUDE.md       # Model registry, experiment tracking, artifacts
-│   │   └── modal/CLAUDE.md        # Serverless functions, secrets, containers
-│   │
-│   └── frontend/                   # Frontend framework rules
-│       ├── react/CLAUDE.md        # XSS prevention, state management, CSRF, forms
-│       ├── nextjs/CLAUDE.md       # Server Components, Server Actions, middleware, env vars
-│       ├── vue/CLAUDE.md          # v-html, computed properties, Vuex, router guards
-│       ├── angular/CLAUDE.md      # DomSanitizer, template injection, HTTP client
-│       └── svelte/CLAUDE.md       # {@html}, stores, SSR, form actions
-│
-├── templates/                      # Templates for adding new rules
-│   ├── rule-template.md           # Template for individual rules
-│   └── framework-template.md      # Template for framework rule sets
-│
-├── docs/                           # Documentation and guides
-│   └── CONTRIBUTING.md            # Contribution guidelines with quality standards
-│
-├── compliance/                     # Compliance mapping (future)
-│
-├── CLAUDE.md                       # This file - project instructions
-├── README.md                       # User documentation and implementation guide
-└── LICENSE                         # MIT License
+
+**Don't**:
+```python
+# VULNERABLE: No resource controls
+from unstructured.partition.auto import partition
+
+def process_document(filename):
+    # No file size check - can process 10GB files
+    # No strategy validation - hi_res on all docs (expensive)
+    # No element limit - can return millions of elements
+    # No timeout - can run forever
+
+    elements = partition(filename)  # Uncontrolled execution
+    return elements
+
+# VULNERABLE: Using hi_res for all documents
+elements = partition(filename, strategy="hi_res")  # Resource intensive
 ```
 
-## Rule Counts
-
-| Category | Count | Description |
-|----------|-------|-------------|
-| Core Rules | 4 | OWASP 2025, MCP Security, AI Security, Agent Security |
-| Languages | 12 | Python, JavaScript, TypeScript, Go, Rust, Java, C#, Ruby, R, C++, Julia, SQL |
-| Backend Frameworks | 5 | FastAPI, Express, Django, Flask, NestJS |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TikiTribe/claude-secure-coding-rules](https://github.com/TikiTribe/claude-secure-coding-rules) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
