@@ -1,109 +1,78 @@
 ---
 trigger: always_on
-description: Contributor and AI-agent guide for **pfSense-pkg-RESTAPI** (https://pfrest.org).
+description: Dispatchers run work in the background so HTTP requests stay responsive. Use a Dispatcher for any operation that can take more than ~1 second: filter reloads, service restarts, certificate issuance, HA sync, etc.
 ---
 
-# AGENTS.md
 
-Contributor and AI-agent guide for **pfSense-pkg-RESTAPI** (https://pfrest.org).
+# Dispatchers — `RESTAPI\Dispatchers\*`
 
-This file is the **single source of truth** for how code in this repository is structured and how new contributions must be authored. It is intentionally opinionated. Read it end-to-end before proposing changes.
+Dispatchers run work in the background so HTTP requests stay responsive. Use a Dispatcher for any operation that can take more than ~1 second: filter reloads, service restarts, certificate issuance, HA sync, etc.
 
-For deeper, file-scoped guidance see:
+For full guidance and worked examples see:
 
-- `.github/skills/` — task-oriented playbooks (endpoints/models/fields, validators/commands/dispatchers, writing tests, full feature walkthroughs).
-- `.github/instructions/` — GitHub Copilot path-scoped instructions that auto-apply when you edit specific directories (Models, Endpoints, Validators, Dispatchers, Tests).
-- `docs/CONTRIBUTING.md` — human-facing contribution and build guide.
-- `docs/BUILDING_CUSTOM_*` — long-form references for each subsystem.
-- `https://pfrest.org/php-docs/` — generated PHPDoc for every class.
+- `.github/skills/validation-command-dispatcher.md`
+- `docs/BUILDING_CUSTOM_DISPATCHER_CLASSES.md`
 
----
+## Required shape
 
-## 1. What this project is
+```php
+<?php
 
-`pfSense-pkg-RESTAPI` adds a fully featured REST and GraphQL API to **pfSense CE**. It is implemented as a FreeBSD package that installs PHP code under `/usr/local/pkg/RESTAPI` on a pfSense host.
+namespace RESTAPI\Dispatchers;
 
-The framework is **declarative and metadata-driven**: Endpoints, Models, Fields, Validators, Dispatchers, Auth, ContentHandlers, and Responses describe the system, and the runtime generates:
+use RESTAPI\Core\Dispatcher;
 
-- HTTP endpoint PHP files in the pfSense webroot
-- pfSense privileges (ACL entries) per endpoint and method
-- OpenAPI 3 / Swagger documentation
-- A GraphQL schema
-- Background dispatcher cron jobs
-- Optional webConfigurator forms
+/**
+ * Defines a Dispatcher that <does the long-running thing>.
+ */
+class <Area>ApplyDispatcher extends Dispatcher {
+    public int $timeout = 300;          # optional override
+    public int $max_queue = 10;         # optional override
+    public string $schedule = '';       # 5-field cron string; set to register a CronJob
+    protected array $required_packages = [];
+    protected array $package_includes = [];
 
-If you bypass the framework's metadata (e.g. by hand-writing handlers or hard-coding shapes), you silently break documentation, schema generation, privileges, HA sync, and tests. **Don't.**
-
----
-
-## 2. Repository layout (only the parts you'll touch)
-
-```
-pfSense-pkg-RESTAPI/files/usr/local/pkg/RESTAPI/
-├── Auth/              # Auth methods (BasicAuth, JWTAuth, KeyAuth)
-├── Caches/            # Scheduled JSON dataset producers
-├── ContentHandlers/   # Request/response Content-Type and Accept handlers
-├── Core/              # Framework base classes (do not modify without maintainer approval)
-│   ├── Auth.inc  Cache.inc  Command.inc  ContentHandler.inc
-│   ├── Dispatcher.inc  Endpoint.inc  Field.inc  Form.inc
-│   ├── Model.inc  ModelSet.inc  QueryFilter.inc
-│   ├── Response.inc  Schema.inc  TestCase.inc  Tools.inc  Validator.inc
-├── Dispatchers/       # Long-running / background workers
-├── Endpoints/         # URL → Model adapters (thin)
-├── Fields/            # Field types (StringField, IntegerField, ForeignModelField, ...)
-├── Forms/             # webConfigurator form pages
-├── Models/            # Feature logic (config schema + apply behavior)
-├── ModelTraits/       # Cross-Model mixins (e.g. log file traits)
-├── QueryFilters/      # Query operators (e.g. exact, regex, gt, lt)
-├── Responses/         # Throwable HTTP responses (Success, ValidationError, ...)
-├── Schemas/           # Schema generators (OpenAPISchema, GraphQLSchema, NativeSchema)
-├── Tests/             # Custom *TestCase.inc files (see §10)
-├── Validators/        # Reusable Field-level validation classes
-├── autoloader.inc
-└── .resources/
-    ├── cache/         # Cache file output
-    ├── schemas/       # Generated schema artifacts
-    └── scripts/       # dispatch.sh, manage.php (build/runtime CLI)
+    protected function _process(mixed ...$arguments): void {
+        # Do the actual work here. This runs in a forked PHP process.
+    }
+}
 ```
 
-Other top-level items:
+## Conventions
 
-- `tools/make_package.py` — builds the FreeBSD package.
-- `vagrant-build.sh` + `Vagrantfile` — builds via a FreeBSD VM on your local machine.
-- `docs/` — MkDocs source for https://pfrest.org.
-- `composer.json` / `package.json` — runtime PHP deps and dev tooling (Prettier + plugin-php, Spectral).
-- `.github/workflows/` — CI: Prettier, Black, phplint, phpdoc, package build, OpenAPI lint, runtests on real pfSense VMs.
+- Class name ends in `Dispatcher` (e.g. `FirewallApplyDispatcher`, `DNSResolverApplyDispatcher`, `RESTAPISettingsSyncDispatcher`).
+- Implement `_process(mixed ...$arguments): void`. Never expose work via a public method other than the inherited `process()`/`spawn_process()`.
+- Honor `$this->async` when the underlying pfSense function offers both sync and async forms (e.g. `filter_configure()` vs `filter_configure_sync()`).
+- For Dispatchers that depend on a pfSense package, list it in `$required_packages` (full `pfSense-pkg-...` name) and any required PHP includes in `$package_includes`. Missing dependencies throw `FailedDependencyError`.
+- Use `$this->schedule = '*/5 * * * *';` to register a `CronJob` automatically (handled by `manage.php` at install time).
 
----
+## Triggering from a Model
 
-## 3. Mental model: how a request flows
-
-```
-HTTP → generated PHP file in webroot
-     → Endpoint (Auth → ACL → method dispatch → ContentHandler)
-        → Model (validate Fields → run validators → validate_FIELD_NAME / validate_extra
-                 → write to pfSense config (or call internal_callable) → apply())
-           → apply() may spawn a Dispatcher process (filter reload, service restart, ...)
-        ← Model returns representation
-     ← Endpoint serializes via ContentHandler → Response
+```php
+public function apply(): void {
+    (new <Area>ApplyDispatcher(async: $this->async))->spawn_process();
+}
 ```
 
-Two implications:
+`spawn_process()` returns a PID, writes a PID file under `/tmp/`, and respects `$max_queue` (overflow throws `ServiceUnavailableError` with `DISPATCHER_TOO_MANY_QUEUED_PROCESSES`).
 
-1. The Endpoint layer is essentially a router/adapter. Everything that _does_ something belongs in the Model (or in a Dispatcher invoked from the Model).
-2. Field metadata is the schema. OpenAPI types, GraphQL types, validation, defaults, choices, sensitivity, pagination, and HATEOAS links all derive from Field/Model/Endpoint properties.
+## Hard rules
 
----
+- **Never** call `filter_configure*()`, `services_*_configure()`, or other long-running pfSense functions directly from a Model — always wrap them in a Dispatcher.
+- **Never** use bare `exec()` / `shell_exec()` / `passthru()`. Use `RESTAPI\Core\Command`.
+- **Never** rely on `_process()` running synchronously in tests unless you instantiate with `async: false`.
+- The PID file lifecycle is owned by `Core/Dispatcher.inc`. Do not write your own locking.
 
-## 4. Non-negotiable rules
+## Manual invocation (debugging)
 
-These are enforced by maintainers in code review.
+On the pfSense host:
 
-1. **Model-first.** Every Endpoint sets `model_name` and exposes a Model. Endpoints **must not** override `get()`, `post()`, `patch()`, `put()`, `delete()` unless a maintainer has explicitly approved an exception.
-2. **Field-driven schema.** Object shape, types, defaults, choices, constraints, sensitivity, conditional visibility, and help text live on `Field` objects in the Model constructor. Do not hand-write OpenAPI/GraphQL.
+```bash
+pfsense-restapi notifydispatcher <DispatcherClassShortName>
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+This runs the dispatcher synchronously, queues behind any existing instance, and writes `/tmp/<DispatcherName>.lock` while running.
 
 ---
 > Source: [pfrest/pfSense-pkg-RESTAPI](https://github.com/pfrest/pfSense-pkg-RESTAPI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
