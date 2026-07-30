@@ -1,141 +1,222 @@
 ---
 trigger: always_on
-description: > **🎯 Optimized for AI Coding Agents** - Modular, path-specific instructions
+description: > **Instructions for developing the ExcelMcp VS Code Extension**
 ---
 
-# GitHub Copilot Instructions - ExcelMcp
 
-> **🎯 Optimized for AI Coding Agents** - Modular, path-specific instructions
+# VS Code Extension Development Instructions
 
-## 📋 Critical Files (Read These First)
+> **Instructions for developing the ExcelMcp VS Code Extension**
 
-**ALWAYS read when working on code:**
-- [CRITICAL-RULES.md](instructions/critical-rules.instructions.md) - 27 mandatory rules (Success flag, COM cleanup, tests, etc.)
-- [Architecture Patterns](instructions/architecture-patterns.instructions.md) - Batch API, command pattern, resource management
+## Extension Overview
 
-**Read based on task type:**
-- Adding/fixing commands → [Excel COM Interop](instructions/excel-com-interop.instructions.md)
-- Writing tests → [Testing Strategy](instructions/testing-strategy.instructions.md)
-- MCP Server work → [MCP Server Guide](instructions/mcp-server-guide.instructions.md)
-- Creating PR → [Development Workflow](instructions/development-workflow.instructions.md)
-- Fixing bugs → [Bug Fixing Checklist](instructions/bug-fixing-checklist.instructions.md)
+The ExcelMcp VS Code Extension provides one-click installation of the ExcelMcp MCP server for Visual Studio Code, enabling AI assistants like GitHub Copilot to automate Microsoft Excel.
 
-**Less frequently needed:**
-- [Excel Connection Types](instructions/excel-connection-types-guide.instructions.md) - Only for connection-specific work
-- [README Management](instructions/readme-management.instructions.md) - Only when updating READMEs
-- [Documentation Structure](instructions/documentation-structure.instructions.md) - Only when creating docs
+**Key Files:**
+- `package.json` - Extension manifest (metadata, dependencies, version)
+- `src/extension.ts` - Extension entry point (activation, MCP registration)
+- `README.md` - Marketplace description page
+- `CHANGELOG.md` - Version history (marketplace changelog tab)
+- `DEVELOPMENT.md` - Developer guide
+- `icon.png` - Extension icon (128x128px, displayed in marketplace)
 
 ---
 
-## What is ExcelMcp?
+## CHANGELOG.md Maintenance (CRITICAL)
 
-**ExcelMcp** is a Windows-only toolset for programmatic Excel automation via COM interop, designed for coding agents and automation scripts.
+### How to Maintain CHANGELOG.md
 
-> **⚠️ CRITICAL: ExcelMcp has TWO equal entry points — MCP Server AND CLI.**
-> Both are first-class citizens. Every feature, action, and parameter must work identically through both.
-> When adding/changing features, ALWAYS verify BOTH MCP Server tools AND CLI commands are updated.
-> See Rule 24 (Post-Change Sync) for the full checklist.
+**Rule:** The root CHANGELOG.md should always have a **top entry ready for the next release**. The release workflow will automatically update the version number and date.
 
-**Core Layers:**
-1. **ComInterop** (`src/ExcelMcp.ComInterop`) - Reusable COM automation patterns (STA threading, session management, batch operations, OLE message filter)
-2. **Core** (`src/ExcelMcp.Core`) - Excel-specific business logic (Power Query, VBA, worksheets, parameters)
-3. **Service** (`src/ExcelMcp.Service`) - Excel session management and command routing (in-process for MCP Server, named pipe for CLI daemon)
-4. **CLI** (`src/ExcelMcp.CLI`) - Command-line interface for scripting (EQUAL entry point)
-5. **MCP Server** (`src/ExcelMcp.McpServer`) - Model Context Protocol for AI assistants (EQUAL entry point)
+### Workflow Process
 
-**Source Generators** (`src/ExcelMcp.Generators*`) - Generate CLI commands and MCP tools from Core interfaces
+1. **You maintain**: Keep root CHANGELOG.md updated with changes as you make them
+2. **Version number must match tag**: Use the version you'll tag (e.g., `1.5.7`)
+3. **Workflow extracts automatically**: When you push tag `v1.5.7`, the unified workflow:
+   - Extracts the section for that version from CHANGELOG.md for release notes
+   - Updates package.json version to `1.5.7`
+   - Builds and releases ALL components (MCP Server, CLI, VS Code Extension, MCPB)
+
+### Example Workflow
+
+**During Development** (root CHANGELOG.md):
+```markdown
+# Changelog
+
+## [Unreleased]
+
+## [1.5.7] - 2025-01-21
+
+### Added
+- New feature A
+- New feature B
+
+### Fixed
+- Bug fix C
+
+## [1.5.6] - 2025-01-20
+
+### Added
+- Initial slicer support
+```
+
+**After Pushing Tag** `v1.5.7`:
+- Workflow extracts the `[1.5.7]` section for GitHub Release notes
+- All 4 components are built and released with version 1.5.7
+```
+
+### Best Practice
+
+**After each release, add a new top section**:
+```markdown
+# Change Log
+
+## [1.0.0] - 2025-10-29
+
+### Added
+- Preparing for next release
+- Add changes here as you develop
+
+## [1.1.0] - 2025-10-30
+
+### Added
+- Previous release
+```
+
+This ensures CHANGELOG is always ready for the next release.
+
+### Format Guidelines
+
+Follow [Keep a Changelog](https://keepachangelog.com/) format:
+
+- **Added**: New features
+- **Changed**: Changes in existing functionality
+- **Deprecated**: Soon-to-be removed features
+- **Removed**: Removed features
+- **Fixed**: Bug fixes
+- **Security**: Security fixes
 
 ---
 
-## 🎯 Quick Reference
+## Version Management
 
-### Test Commands
+### Automatic Version Management (Unified Release Workflow)
+
+**DO NOT manually edit package.json version** - The unified release workflow handles this:
+
 ```powershell
-# ⚠️ CRITICAL: Integration tests take 45+ MINUTES for full suite
-# ALWAYS use surgical testing - test only what you changed!
-# ALWAYS run tests with an explicit timeout in the terminal/tooling layer.
-# Never leave test runs open-ended; fail fast if Excel or COM automation stalls.
-
-# Fast feedback (excludes VBA) - Still takes 10-15 minutes
-dotnet test --filter "Category=Integration&RunType!=OnDemand&Feature!=VBA&Feature!=VBATrust"
-
-# Surgical testing - Feature-specific (2-5 minutes per feature)
-dotnet test --filter "Feature=PowerQuery&RunType!=OnDemand"
-dotnet test --filter "Feature=Ranges&RunType!=OnDemand"
-dotnet test --filter "Feature=PivotTables&RunType!=OnDemand"
-
-# Session/batch changes (MANDATORY)
-dotnet test --filter "RunType=OnDemand"
+# Create and push tag - workflow releases ALL components with same version
+git tag v1.5.7
+git push origin v1.5.7
 ```
 
-### Code Patterns
-```csharp
-// Core: NEVER wrap batch.Execute() in try-catch that returns error result
-// Let exceptions propagate naturally - batch.Execute() handles them via TaskCompletionSource
-public DataType Method(IExcelBatch batch, string arg1)
-{
-    return batch.Execute((ctx, ct) => {
-        dynamic? item = null;
-        try {
-            // Operation code here
-            item = ctx.Book.SomeObject;
-            // For CRUD: return void (throws on error)
-            // For queries: return actual data
-            return someData;
-        }
-        finally {
-            // ✅ ONLY finally blocks for COM cleanup
-            ComUtilities.Release(ref item!);
-        }
-        // ❌ NO catch blocks that return error results
-    });
-}
+Unified workflow automatically:
+1. Extracts version from tag (`v1.5.7` → `1.5.7`)
+2. Updates `package.json` version using `npm version`
+3. Extracts changelog section for release notes
+4. Builds and packages VS Code extension
+5. Builds all other components (MCP Server, CLI, MCPB)
+6. Publishes to VS Code Marketplace and NuGet
+7. Creates unified GitHub release with all artifacts
 
+### Local Testing (Manual Version Bump)
 
-// CLI: Wrap Core calls
-public int Method(string[] args)
-{
-    try {
-        using var batch = ExcelSession.BeginBatch(filePath);
-        _coreCommands.Method(batch, arg1);
-        return 0;
-    } catch (Exception ex) {
-        AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message.EscapeMarkup()}");
-        return 1;
-    }
-}
+For local testing only, use npm version commands:
 
-// Tests: Use batch API
-[Fact]
-public void TestMethod()
-{
-    using var batch = ExcelSession.BeginBatch(_testFile);
-    var result = _commands.Method(batch, args);
-    Assert.NotNull(result); // Or other appropriate assertion
-}
+```powershell
+npm version patch   # 1.0.0 → 1.0.1
+npm version minor   # 1.0.0 → 1.1.0
+npm version major   # 1.0.0 → 2.0.0
 ```
 
-### Tool Selection
-- Code changes → `replace_string_in_file` (3-5 lines context)
-- Find code → `grep_search` or `semantic_search`
-- Check errors → `get_errors`
-- Build/test/git → `run_in_terminal`
+**Important:** Don't commit manual version changes - they're for testing only.
 
 ---
 
-## 🔄 Key Lessons (Update After Major Work)
+## Marketplace Information
 
-**Success Flag:** NEVER `Success = true` with `ErrorMessage`. Set Success in try block, always false in catch.
+### What Users See
 
-**Batch API:** Create NEW simple tests. CLI needs try-catch wrapping.
+**VS Code Marketplace displays:**
 
-**Excel Quirks:** Type 3/4 both handle TEXT. `RefreshAll()` unreliable. Use `queryTable.Refresh(false)`.
+1. **package.json metadata**:
+   - `displayName` - Title shown in marketplace
+   - `description` - Subtitle/summary
+   - `icon` - Extension icon (128x128px minimum)
+   - `categories` - Marketplace categories
+   - `keywords` - Search terms
+   - `publisher` - Publisher ID
 
-**MCP Design:** Prompts are shortcuts, not tutorials. LLMs know Excel/programming.
+2. **README.md** - Main description page (features, installation, docs)
+3. **CHANGELOG.md** - Changelog tab in marketplace
+4. **LICENSE** - License information
+
+### Critical Files for Marketplace
+
+- ✅ **README.md** - Keep up-to-date with accurate commands and features
+- ✅ **CHANGELOG.md** - Maintain version history
+- ✅ **package.json** - Ensure metadata is accurate
+- ✅ **icon.png** - High-quality 128x128px PNG
+
+---
+
+## Extension Commands
+
+### Correct Command Syntax
+
+**The extension uses**: `dotnet tool run mcp-excel`
+
+**NOT**: `dnx Sbroenne.ExcelMcp.McpServer --yes` (this is incorrect)
+
+### Where Commands Are Referenced
+
+Check these files when updating command syntax:
+
+1. **src/extension.ts** - Actual command executed
+2. **README.md** - Documentation shown in marketplace
+3. **DEVELOPMENT.md** - Developer notes
+4. **INSTALL.md** - Installation guide (if applicable)
+
+### Verification
+
+Before committing, search for outdated command references:
+
+```powershell
+# Search for incorrect dnx references
+grep -r "dnx" vscode-extension/
+
+# Should only find references in documentation explaining the NuGet approach
+# Actual command should be: dotnet tool run mcp-excel
+```
+
+---
+
+## Development Workflow
+
+### Building and Testing
+
+```powershell
+# Install dependencies
+npm install
+
+# Compile TypeScript
+npm run compile
+
+# Watch mode (auto-recompile)
+npm run watch
+
+# Lint code
+npm run lint
+
+# Package for testing
+npm run package
+```
+
+### Testing Locally
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sbroenne/mcp-server-excel](https://github.com/sbroenne/mcp-server-excel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
