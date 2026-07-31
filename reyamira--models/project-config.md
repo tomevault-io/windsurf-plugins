@@ -1,81 +1,34 @@
 ---
 trigger: always_on
-description: A Rust CLI/TUI for browsing AI models, benchmarks, and coding agents. Built with ratatui, crossterm, and tokio.
+description: Registry-driven multi-source tab: a data-source switcher over 4 sources (AA,
 ---
 
-# Models — Claude Code Instructions
+# Benchmarks Tab
 
-## Project Overview
-A Rust CLI/TUI for browsing AI models, benchmarks, and coding agents. Built with ratatui, crossterm, and tokio.
+Registry-driven multi-source tab: a data-source switcher over 4 sources (AA,
+Epoch, Arena, LLM Stats), with every view (Detail, H2H, Scatter, Radar, sort,
+sidebar) rendered from per-source `MetricDef`s rather than hardcoded field names.
 
-## Build & Test
-```bash
-mise run fmt        # Format code (required before commit)
-mise run clippy     # Lint with -D warnings
-mise run test       # Run tests
-mise run build      # Build debug
-mise run run        # Run the TUI
-```
+## Files
+- `app.rs` — `BenchmarksApp` state, `BenchmarkFocus` (Creators/List/Details/Compare), `BottomView` (H2H/Scatter/Radar), `CreatorGrouping`, `ComparatorMode`, sort/filter types. Key fields: `active_source: usize`, `sort_key: SortKey`, `sort_descending`, `bottom_view`, `comparator: ComparatorMode`, `scatter_x`/`scatter_y`, `radar_group`, `show_sort_picker`/`sort_picker_selected`, `show_glossary`/`glossary_scroll: ScrollOffset`, `detail_scroll: ScrollOffset`. `MultiStore` itself lives on the top-level `App` (`app.multi_store`), not on `BenchmarksApp` — sub-app methods take `&SourceFile` as a parameter.
+- `render.rs` — `draw_benchmarks_main()`, `draw_source_bar()`, `build_benchmark_detail_lines()`, `build_glossary_lines()`, `draw_glossary()`, `draw_sort_picker()`, `compare_colors()` (8-color palette)
+- `compare.rs` — `draw_h2h_table_generic()`, `draw_scatter()`
+- `radar.rs` — `draw_radar()`, `axes_for_group()`, spoke/polygon math (`MAX_AXES = 6`)
 
-Always run the full check sequence before committing:
-```bash
-mise run fmt && mise run clippy && mise run test
-```
+## Source switcher
+- 1-line source bar above the existing content (`draw_source_bar`): bracketed label per `SOURCES` entry — active = Cyan+BOLD, loaded-inactive = DarkGray, loading = label + `◐` Yellow, failed = label + `✗` Red, then a DarkGray `{ } switch source` hint (mirrors the header's `[/] switch tabs`). Right-aligned for the active source: `updated {relative}` (DarkGray, the data's build-time last-change timestamp from `SourceMeta.fetched_at` — **not** the client fetch time; the app fetches fresh every launch) + ` self-reported` (Yellow) when `verified == false`. Source identity lives here only — no detail-panel attribution line, no status-bar flash on switch.
+- `{` / `}` cycle data source prev/next (tab-local; `[` / `]` stay global PrevTab/NextTab). Switching is **state-preserving** (`switch_source` → `reset_for_source`): it keeps `search_query`, the open-weights `source_filter`, `creator_grouping`, and the `reasoning_filter` (reset to `All` only when the target source carries no reasoning metadata, so a stuck invisible filter can't silently empty the list), and keeps a `ReleaseDate`/`Name` sort with its direction (a `Metric(i)` sort is source-specific → falls back to the new source's `default_sort`). Per-source view state still resets: selection/creator indices, all scrolls, `scatter_x`/`scatter_y`, `radar_group`, `bottom_view`, and all popups. Compare selections (`App.selections`) carry over by **exact `ModelRow.id` match, then `benchmarks::normalize_id` match** (the four sources spell the same model differently — `grok-4-3` vs `grok-4.3`, `DeepSeek-V3-1`, `zai-org/GLM-4-7`, dated Arena ids — so exact-only looked randomly flaky), order-preserving (compare-color stability) and deduped (normalization folds e.g. `-thinking` variants onto their base); ids with no counterpart drop, then `update_bottom_view` runs so a compare→browse demotion fires when <2 ids survive.
+- `r` — **refresh the active source** (`Message::RefreshBenchmarkSource`). Stale-while-revalidate: the current data keeps rendering while a fresh `fetch_source` runs on tokio, delivered as `Message::DataSourceRefreshed(idx, Option<SourceFile>)`. `Some(file)` → `set_loaded` + the same `finalize_loaded_source` enrichment + a **state-preserving rebuild** (`rebuild_preserving`: keeps sort/search/filters/grouping, remaps `selections` + the focused row by id, falls back a stale `Metric(i)` when the refreshed metric list shrank); status `Refreshed {name}`. `None` (fetch failed) → keep the existing loaded file untouched (never `set_failed`s good data); status `Failed to refresh {name} — keeping current data`. A `Loading`/`Failed` source stays recoverable via `r`.
+- Sources load progressively; selecting a still-loading/failed source shows the standard loading/error state.
 
-## Architecture
+## Column picker (`C`, browse mode)
+- `visible_columns: Vec<usize>` (metric indices, file order, default empty; **persisted** — picker save mirrors the selection into `config.benchmarks.columns` as per-source metric ids and writes config.toml; switch/first-load/refresh re-resolve saved ids via `App::restore_saved_columns`/`apply_saved_columns`, dropping stale ids) + picker state (`show_column_picker`/`column_picker_selected`/`column_picker_pending` — Enter applies the pending set, Esc discards). `C` guarded to browse mode in event.rs; `handle_column_picker_keys` intercepts all keys (incl. `q`) while open.
+- `effective_columns()` = visible columns plus the active sort `Metric(i)` appended when absent; ReleaseDate sort keeps the Released column; Name sort adds nothing. Metric columns are 11 wide, headers via `multi::short_label` (curated `short_label` else truncated label), sorted column's header Cyan+BOLD. Width cap keeps the name column ≥ 10 chars and drops excess visible columns from the right — the sort column always survives (resolved from `sort_key`, not by position).
 
-### Tabs
-- **Models Tab** (`src/tui/models/`) — browse models from models.dev API with 3-column layout (20% providers | 45% model list | 35% detail panel), RTFO capability indicators, adaptive provider panel
-- **Benchmarks Tab** (`src/tui/benchmarks/`) — compare model benchmarks from Artificial Analysis with browse/compare modes, H2H table, scatter plot, radar chart views
-- **Agents Tab** (`src/tui/agents/`) — track AI coding assistants with GitHub integration
-- **Status Tab** (`src/tui/status/`) — live provider health monitoring with detail view for incidents, components, and scheduled maintenance
-
-### Data Flow
-- Model data: fetched from models.dev API at startup (`src/api.rs`)
-- Benchmark data: fetched fresh from jsDelivr CDN on every launch (`src/benchmarks/fetch.rs`)
-- Agent/GitHub data: disk-cached with ETag conditional fetching (`src/agents/cache.rs`, `src/agents/github.rs`)
-- CLI agents: uses `fetch_releases_only` (1 API call, no repo metadata) — TUI uses full `fetch_conditional` (2 calls, includes stars/issues/license)
-- Status data: fetched from each provider's official status page (Statuspage, BetterStack, Instatus, etc.) with apistatuscheck.com as fallback (`src/status/fetch.rs`), provider registry and strategy mapping in `src/status/registry.rs`
-- Status source contract and normalization rules are documented in code comments within `src/status/` adapters
-
-### Async Pattern
-Background fetches use tokio::spawn + mpsc channels. Results arrive as `Message` variants processed in the main loop (`src/tui/mod.rs`). The app never blocks on network calls.
-
-### Agents & CLI
-See `src/agents/CLAUDE.md` and `src/cli/CLAUDE.md` for detailed module docs.
-- Binary aliases: `models agents <cmd>` or `agents <cmd>` via argv[0] symlink detection. Alias names configurable via `[aliases]` in config.toml (defaults: `agents`, `benchmarks`, `mstatus`)
-- Commands: `list`, `search`, `show`, `benchmarks`, `completions <shell>`, `link`, full agents suite (`status`, `latest`, `list-sources`, `<tool>`), full status suite (`list`, `show`, `status`, `sources`)
-- CLI pickers use shared `PickerTerminal` infrastructure in `src/cli/picker.rs`
-
-### Key Files
-
-Each module has its own `CLAUDE.md` with detailed documentation. Top-level highlights:
-
-- `src/formatting.rs` — shared utilities: `truncate`, `parse_date`, `format_tokens`, `format_stars`, `EM_DASH`, `cmp_opt_f64`
-- `src/data.rs` — Provider/Model data structures from models.dev API
-- `src/config.rs` — user config file (agents, cache, display, aliases settings). `AliasesConfig` struct + `AliasKind` enum for symlink routing
-- `src/provider_category.rs` — provider categorization logic
-- `src/benchmarks/` — `store.rs` (BenchmarkStore/Entry), `fetch.rs` (CDN fetcher), `traits.rs` (AA↔models.dev matching)
-- `src/status/` — `types.rs`, `registry.rs`, `assessment.rs`, `fetch.rs`, `adapters/` (per-source-family parsers)
-- `src/tui/` — `app.rs` (App state, Message enum), `event.rs` (NavAction dedup), `ui.rs` (shared helpers), `markdown.rs`, `widgets/` (ScrollablePanel, SoftCard, ScrollOffset, ComparisonLegend), per-tab subdirs: `models/`, `agents/`, `benchmarks/` (includes `radar.rs`), `status/` — each with `app.rs` (sub-app state) + `render.rs` (tab rendering)
-- `src/agents/health.rs` — agent-to-status-provider mapping for service health display in the Agents tab
-- `src/cli/` — `picker.rs` (shared PickerTerminal, nav helpers, style constants), `models.rs`/`benchmarks.rs`/`agents_ui.rs`/`status.rs` (inline pickers), `styles.rs`
-
-### GitHub Actions
-- `ci.yml` — runs on PR/push: fmt check, clippy, test
-- `release.yml` — triggered by `v*` tags: builds 5 targets in parallel with Rust caching, packages .deb/.rpm via cargo-binstall (pinned versions), generates SHA256SUMS, publishes to crates.io, and updates AUR package. Homebrew Core updates are handled in `Homebrew/homebrew-core` by Homebrew automation/maintainers, not from this repo. Pre-release tags (containing `-`) skip publish/AUR and mark the GitHub release as prerelease. Scoop Extras handles Windows updates via its own autoupdate mechanism.
-- `update-benchmarks.yml` — runs every 30 minutes: fetches AA API, commits if data changed
-
-## Conventions
-- Use `mise run <task>` for all CLI operations — never run bare commands
-- Keep clippy clean with `-D warnings`
-- Enum-based message passing (no callbacks)
-- No disk cache — benchmark data fetched fresh from CDN on every launch, empty store until CDN responds
-- `BenchmarkEntry` must derive both `Serialize` and `Deserialize`
-- New `BenchmarkEntry` fields require `#[serde(default)]`
+## Glossary popup (`i`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [reyamira/models](https://github.com/reyamira/models) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
