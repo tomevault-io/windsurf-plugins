@@ -1,120 +1,125 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - @~/.claudebox/tooling.md
 ---
 
-# CLAUDE.md
+## Current Environment Tooling
+- @~/.claudebox/tooling.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Default Coding Behavior
 
-You are a Senior Bash/Docker Engineer with deep expertise in shell scripting and containerization. You're working on ClaudeBox, a Docker-based development environment for Claude CLI that you co-created with the user. This tool has 1000+ users and enables multiple Claude instances to communicate via tmux, provides dynamic containerization, and includes various development profiles.
+**CRITICAL: Always consider TDD discipline before starting any coding task**
 
-## Critical Requirements
+1. **Before any implementation work** - Ask: "Should I use /tdd mode for this coding task?"
+2. **Default to TDD discipline** unless explicitly told otherwise or for trivial changes
+3. **TDD applies to most coding scenarios**:
+   - Adding new functions or features
+   - Implementing validation logic
+   - Building utilities or libraries
+   - Refactoring with behavioral changes
+   - Any multi-step implementation work
+4. **Skip TDD only for**:
+   - Simple documentation updates
+   - Obvious typo fixes
+   - Configuration file changes
+   - Single-line code adjustments
+5. **TDD workflow activation**:
+   - Use `/tdd [task description]` command to activate strict discipline
+   - Follow red-green-refactor cycle rigorously
+   - Never write multiple test cases without implementing each one first
+   - Commit test + implementation + docs together for each test case
 
-- **Bash 3.2 compatibility ONLY** - this ensures it works on both macOS and Linux
-- **Preserve ALL existing functionality** - breaking changes have caused days of lost work
-- **Read and understand code thoroughly** before suggesting any modifications
+**Key behavioral change**: Make TDD consideration automatic, not optional.
 
-## CRITICAL DESIGN DECISIONS - DO NOT CHANGE
+## Automatic Commit Workflow
 
-### Container Management
-- **Named containers WITH --rm flag** - This is intentional and works perfectly
-- **Containers are ephemeral** - They are created, run, and auto-delete on exit
-- **Slot system tracks availability** - Each slot gets a unique container name
-- **DO NOT remove --rm flag** - Containers must clean themselves up
-- **DO NOT try to delete containers on start** - They don't exist (--rm removed them)
-- **DO NOT prevent named containers from using --rm** - This combination is valid and required
+### Pre-commit Checks (in order)
 
-### Docker Images
-- **Images are shared across all slots** - Named after parent (slot 0)
-- **Layer caching is critical** - DO NOT force --no-cache unless explicitly requested
-- **DO NOT delete images during rebuild** - Docker handles layer updates automatically
-- **Rebuild should be FAST** - Only changed layers rebuild
+**CRITICAL: Always run these checks before any commit:**
 
-### Slot System
-- **Slots start at 1, not 0** - Slot 0 conceptually represents the parent
-- **Counter value 0 means no slots exist**
-- **First container uses slot 1** - This ensures different hash from parent
-- **Lock files are NOT used** - Container names provide the locking mechanism
-- **Check `docker ps` for running containers** - This is the source of truth
+1. **Formatting** - Run code formatters first (prettier, black, rustfmt, etc.)
+2. **Linting** - Run linters after formatting
+3. **Type checking** - Run type checkers
+4. **Tests** - Run relevant tests last
+5. **Test coverage verification** - Confirm all expected test files are running
+6. **All tests must pass** - **CRITICAL**: Fix any failing tests immediately, do not commit/push with failing tests
+7. **Final review** - Check `git diff --staged` to review what will be committed
+8. **Security check** - Verify no sensitive information (keys, tokens, passwords) is included
 
-### Common Mistakes to Avoid
-1. **DO NOT assume named containers can't use --rm** - They can and they must
-2. **DO NOT delete non-existent containers** - They're already gone from --rm
-3. **DO NOT force --no-cache on rebuilds** - Layer caching is intentional
-4. **DO NOT change the slot numbering system** - It's designed this way for hash uniqueness
-5. **DO NOT add lock files** - Docker container names are the locks
-6. **DO NOT redirect stderr to /dev/null** - Errors are needed for troubleshooting
-   - Only redirect stdout for noisy commands: `command >/dev/null` not `2>&1`
-   - Use --verbose flag and [[ "$VERBOSE" == "true" ]] for debug messages
-7. **DO NOT assume typical Docker patterns** - This system has specific requirements
-8. **NEVER USE `git restore HEAD`** - This is FORBIDDEN unless explicitly instructed by the user
-   - If user requests restore, ALWAYS `git stash` first to preserve current work
-   - Never discard changes without stashing them
+### Test Requirements
 
-## CRITICAL: Error Handling with set -e
+**All tests must pass before any commit or push:**
 
-**THIS SCRIPT USES `set -euo pipefail` EXTENSIVELY** - This means ANY command that returns non-zero will cause the entire script to exit immediately.
+1. **Fix failing tests immediately** - Never leave failing tests for "future PRs" or "follow-up work"
+2. **CI requirement** - Most CI/CD systems require all tests to pass before merge
+3. **Quality gate** - Failing tests indicate broken functionality that must be addressed
+4. **No exceptions** - Even if failure seems minor or unrelated, investigate and fix
 
-### DO NOT use these patterns:
-```bash
-# WRONG - This exits the script when VERBOSE != "true"
-[[ "$VERBOSE" == "true" ]] && echo "Debug message"
+**When tests fail:**
+- **Investigate the root cause** - Don't just change the test, understand why it's failing
+- **Fix the implementation or test** - Address the actual issue, whether in code or test logic
+- **Verify the fix** - Run the full test suite to ensure no regressions
+- **Document complex fixes** - If the fix was non-obvious, add comments explaining the solution
 
-# WRONG - This exits the script when the grep doesn't find anything
-grep "pattern" file && echo "Found it"
+### When Pre-commit Checks Fail
 
-# WRONG - This exits when the first condition is false
-[[ -f "$file" ]] && [[ -r "$file" ]] && process_file
-```
+- **Formatting failures**: Auto-fix and stage the formatted changes, then retry commit
+- **Linting failures**: Fix the issues, stage the fixes, then retry commit
+- **Type checking failures**: Fix type errors, stage the fixes, then retry commit
+- **Test failures**: Fix failing tests, stage the fixes, then retry commit
+- If any check fails twice, report the issue and ask for guidance
+- Always include auto-fixes in the same commit when possible
 
-### ALWAYS use proper if statements:
-```bash
-# CORRECT - Won't exit regardless of VERBOSE value
-if [[ "$VERBOSE" == "true" ]]; then
-    echo "Debug message"
-fi
+## Git Workflow
 
-# CORRECT - Handle the failure case explicitly
-if grep "pattern" file; then
-    echo "Found it"
-fi
+### Commit Strategy
 
-# CORRECT - Clear control flow
-if [[ -f "$file" ]] && [[ -r "$file" ]]; then
-    process_file
-fi
-```
+- Create logical, atomic commits that can be reviewed independently
+- Each commit should represent a single conceptual change
+- Commit related changes together (e.g., function + tests + documentation)
+- Separate refactoring commits from feature commits
+- Use descriptive commit messages that explain the "why" not just the "what"
 
-### Key Rules:
-- **NEVER use `&&` for conditional execution** - Use `if` statements instead
-- **NEVER use `||` as a fallback** - Handle errors explicitly
-- **ALWAYS use if/then/fi** for any conditional logic
-- **NO SHORTCUTS** - Write clear, explicit code that won't accidentally exit
-- If you must use `&&` or `||`, ensure the line always exits with 0: `command || true`
+### Development Commit Frequency
 
-This is not about style preference - shortcuts with `set -e` WILL break the script in subtle, hard-to-debug ways.
+- **Commit early and often** during feature development
+- Make a commit after completing each logical unit of work:
+  - Adding a single function with its test
+  - Implementing one specific feature or validation
+  - Adding documentation for a single component
+  - Fixing one specific issue or bug
+- **Never bundle unrelated changes** in a single commit
+- **One behavior per commit** - each commit should implement exactly one piece of functionality
+- **Separate commits even for the same file type** - configuration changes, documentation updates, and code changes should be separate commits even if they modify similar file types
+- Prefer 10-20 micro-commits over 3-5 larger commits for a feature
+- Each commit should leave the codebase in a working state
 
-## Common Development Commands
+### Documentation Updates
 
-When working on ClaudeBox, ensure Bash 3.2 compatibility by running the test scripts in the tests directory and checking for common incompatibilities.
+Include necessary documentation updates in the same commit as the code change:
 
-## High-Level Architecture
+- **Update code comments** when changing function behavior or adding parameters
+- **Update README.md** if adding new setup steps, dependencies, or usage instructions
+- **Update existing examples** that would be invalidated by the change
+- **Skip excessive documentation** that would quickly become outdated
+- **Focus on user-facing changes** that affect how people use the code
 
-ClaudeBox is a modular Bash application that creates isolated Docker environments for Claude CLI:
+Examples:
+- ✅ Adding a new CLI flag? Update README.md usage examples in the same commit
+- ✅ Changing function parameters? Update the function's comment block
+- ✅ Adding a new dependency? Update installation instructions
+- ❌ Don't document internal implementation details that change frequently
+- ❌ Don't add verbose explanations for self-documenting code
 
-1. **Entry Point**: `claudebox.sh` - Main script handling command parsing and orchestration
-2. **Library Modules** (in `lib/`):
-   - `common.sh` - Shared utilities, logging, and error handling
-   - `docker.sh` - Docker operations, image building, container management
-   - `config.sh` - Configuration loading/saving, ~/.claudebox structure
-   - `project.sh` - Per-project isolation, environment switching
-   - `profile.sh` - Development profile system (20+ language stacks)
-   - `firewall.sh` - Network isolation and allowlist management
+### TDD Commit Strategy
 
+For detailed TDD workflow enforcement, use the `/tdd` command.
+
+Key principles when following Test-Driven Development:
+- One test case at a time with minimal implementation
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [RchGrav/claudebox](https://github.com/RchGrav/claudebox) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
