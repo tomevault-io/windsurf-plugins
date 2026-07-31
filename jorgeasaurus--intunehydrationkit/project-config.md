@@ -1,92 +1,147 @@
 ---
 trigger: always_on
-description: Intune Hydration Kit is a PowerShell 7 module that bootstraps Microsoft Intune tenants with best-practice baseline configurations. It uses `Invoke-MgGraphRequest` (only `Microsoft.Graph.Authentication` required) to import policies, groups, compliance baselines, enrollment profiles, conditional access, mobile apps, and device filters. If required Graph scopes are missing, instruct the user to grant the missing permissions and stop the operation.
+description: PowerShell Pester testing best practices based on Pester v5 conventions
 ---
 
-# IntuneHydrationKit - Copilot Instructions
 
-## Project Overview
+# PowerShell Pester v5 Testing Guidelines
 
-Intune Hydration Kit is a PowerShell 7 module that bootstraps Microsoft Intune tenants with best-practice baseline configurations. It uses `Invoke-MgGraphRequest` (only `Microsoft.Graph.Authentication` required) to import policies, groups, compliance baselines, enrollment profiles, conditional access, mobile apps, and device filters. If required Graph scopes are missing, instruct the user to grant the missing permissions and stop the operation.
+This guide provides PowerShell-specific instructions for creating automated tests using PowerShell Pester v5 module. Follow PowerShell cmdlet development guidelines in [powershell.instructions.md](./powershell.instructions.md) for general PowerShell scripting best practices.
 
-## Build, Test, and Lint
+## File Naming and Structure
 
-Use the InvokeBuild-based bootstrap script (installs dependencies automatically):
+- **File Convention:** Use `*.Tests.ps1` naming pattern
+- **Placement:** Place test files next to tested code or in dedicated test directories
+- **Import Pattern:** Use `BeforeAll { . $PSScriptRoot/FunctionName.ps1 }` to import tested functions
+- **No Direct Code:** Put ALL code inside Pester blocks (`BeforeAll`, `Describe`, `Context`, `It`, etc.)
+
+## Test Structure Hierarchy
 
 ```powershell
-# Full CI pipeline: Analyze + Test + Build
-./build.ps1 -Task CI
-
-# Run specific tasks
-./build.ps1 -Task Analyze          # PSScriptAnalyzer only
-./build.ps1 -Task Test             # Pester tests only
-./build.ps1 -Task Build            # Build module to build/IntuneHydrationKit/
-./build.ps1 -Task Clean            # Remove build artifacts
-
-# Direct commands (module must be imported first for tests)
-Import-Module ./IntuneHydrationKit.psd1 -Force
-Invoke-Pester -Path ./Tests/Private/Invoke-GraphBatchOperation.Tests.ps1 -Output Detailed
-Invoke-ScriptAnalyzer -Path ./Public/Orchestration/Invoke-IntuneHydration.ps1
+BeforeAll { # Import tested functions }
+Describe 'FunctionName' {
+    Context 'When condition' {
+        BeforeAll { # Setup for context }
+        It 'Should behavior' { # Individual test }
+        AfterAll { # Cleanup for context }
+    }
+}
 ```
 
-PSScriptAnalyzer excludes `PSUseShouldProcessForStateChangingFunctions` and `PSAvoidUsingConvertToSecureStringWithPlainText` (handled manually).
+## Core Keywords
 
-## High-Level Architecture
+- **`Describe`**: Top-level grouping, typically named after function being tested
+- **`Context`**: Sub-grouping within Describe for specific scenarios
+- **`It`**: Individual test cases, use descriptive names
+- **`Should`**: Assertion keyword for test validation
+- **`BeforeAll/AfterAll`**: Setup/teardown once per block
+- **`BeforeEach/AfterEach`**: Setup/teardown before/after each test
 
-### Module Structure
-- `IntuneHydrationKit.psm1` - Root module. Defines `$script:` state variables and dot-sources `Public/**/*.ps1` and `Private/**/*.ps1`.
-- `Public/` - 19 exported functions (one file per function). Main entry point: `Invoke-IntuneHydration`.
-- `Private/` - Internal helpers (batch operations, pagination, template loading, result formatting, auth).
-- `Templates/` - JSON templates organized by resource type (OpenIntuneBaseline, Compliance, Enrollment, DynamicGroups, StaticGroups, Filters, ConditionalAccess, AppProtection, MobileApps, Notifications).
+## Setup and Teardown
 
-### Execution Flow (`Invoke-IntuneHydration`)
-High-level flow: authenticate and validate prerequisites, process template-driven imports/deletes by resource type, then generate reports.
-Runs 12 sequential steps:
-1. Authenticate via `Connect-MgGraph`
-2. Pre-flight checks (`Test-IntunePrerequisites`) - Intune license, MDM authority
-3. Create/delete dynamic groups (`Invoke-GroupBatchImport`)
-3b. Create/delete static groups
-4. Import/delete device filters
-5. Import/delete OpenIntuneBaseline policies (routed by `@odata.type` or folder name)
-6. Import/delete compliance templates
-7. Import/delete notification templates
-8. Import/delete app protection policies (MAM)
-9. Import/delete enrollment profiles (Autopilot, ESP, DEP, Device Prep)
-10. Import/delete conditional access policies (always disabled on import)
-11. Import/delete mobile apps
-12. Generate summary report (`Reports/Hydration-Summary.md` + `.json`)
+- **`BeforeAll`**: Runs once at start of containing block, use for expensive operations
+- **`BeforeEach`**: Runs before every `It` in block, use for test-specific setup
+- **`AfterEach`**: Runs after every `It`, guaranteed even if test fails
+- **`AfterAll`**: Runs once at end of block, use for cleanup
+- **Variable Scoping**: `BeforeAll` variables available to child blocks (read-only), `BeforeEach/It/AfterEach` share same scope
 
-### State & Configuration
-- `$script:HydrationState` - connection status, tenant ID, results (Groups, Policies, Baselines, Profiles, ConditionalAccess, Errors, Warnings)
-- `$script:ImportPrefix = '[IHD] '` - prepended to most resource display names; mobile apps and WinGet apps append ` - [IHD]`
-- `$script:HydrationMarker` / `$script:HydrationMarkerAlt` - description marker for safe deletion
-- Settings file: `settings.json` (validated against `settings.schema.json`)
+## Assertions (Should)
 
-## Key Conventions
+- **Basic Comparisons**: `-Be`, `-BeExactly`, `-Not -Be`
+- **Collections**: `-Contain`, `-BeIn`, `-HaveCount`
+- **Numeric**: `-BeGreaterThan`, `-BeLessThan`, `-BeGreaterOrEqual`
+- **Strings**: `-Match`, `-Like`, `-BeNullOrEmpty`
+- **Types**: `-BeOfType`, `-BeTrue`, `-BeFalse`
+- **Files**: `-Exist`, `-FileContentMatch`
+- **Exceptions**: `-Throw`, `-Not -Throw`
 
-### One File Per Function
-Every function lives in its own `.ps1` file named exactly after the function. Public functions are exported in both the `.psd1` manifest and the `.psm1` `$publicFunctions` array. Keep them in sync.
+## Mocking
 
-### Graph API Batch Pattern
-All imports/deletions that touch Graph use `Invoke-GraphBatchOperation`:
-- Batches up to `$script:MaxBatchSize` (default 10) items per request
-- Retry with exponential backoff for 429 (throttle), 500+, 503
-- POST bodies are sent as raw JSON strings (not hashtables) to avoid PowerShell serialization issues
-- DELETE items need `Id`; POST items need `BodyJson`
-- Batch responses use string IDs (1-indexed) - always parse with `[int]::TryParse()`
+- **`Mock CommandName { ScriptBlock }`**: Replace command behavior
+- **`-ParameterFilter`**: Mock only when parameters match condition
+- **`-Verifiable`**: Mark mock as requiring verification
+- **`Should -Invoke`**: Verify mock was called specific number of times
+- **`Should -InvokeVerifiable`**: Verify all verifiable mocks were called
+- **Scope**: Mocks default to containing block scope
 
-### Idempotency & Dual-Lookup
-Importers check for both prefixed (`[IHD] Name`) and legacy unprefixed (`Name`) display names before creating, to prevent duplicates across runs.
+```powershell
+Mock Get-Service { @{ Status = 'Running' } } -ParameterFilter { $Name -eq 'TestService' }
+Should -Invoke Get-Service -Exactly 1 -ParameterFilter { $Name -eq 'TestService' }
+```
 
-### Template-Scoped Deletion
-Delete operations only remove objects that have BOTH the hydration marker in their description AND a matching template name. If only one condition is met, the object is not deleted. This prevents accidental deletion of manually created resources.
+## Test Cases (Data-Driven Tests)
 
-### Baseline Import Routing (`Import-IntuneBaseline`)
-Uses two routing strategies:
-- **IntuneManagement path** (`$intuneManagementFolders`): Routes by `@odata.type` via `$odataTypeToEndpoint` map. Used for `IntuneManagement/` and `AppProtection/` subfolders.
+Use `-TestCases` or `-ForEach` for parameterized tests:
+
+```powershell
+It 'Should return <Expected> for <Input>' -TestCases @(
+    @{ Input = 'value1'; Expected = 'result1' }
+    @{ Input = 'value2'; Expected = 'result2' }
+) {
+    Get-Function $Input | Should -Be $Expected
+}
+```
+
+## Data-Driven Tests
+
+- **`-ForEach`**: Available on `Describe`, `Context`, and `It` for generating multiple tests from data
+- **`-TestCases`**: Alias for `-ForEach` on `It` blocks (backwards compatibility)
+- **Hashtable Data**: Each item defines variables available in test (e.g., `@{ Name = 'value'; Expected = 'result' }`)
+- **Array Data**: Uses `$_` variable for current item
+- **Templates**: Use `<variablename>` in test names for dynamic expansion
+
+```powershell
+# Hashtable approach
+It 'Returns <Expected> for <Name>' -ForEach @(
+    @{ Name = 'test1'; Expected = 'result1' }
+    @{ Name = 'test2'; Expected = 'result2' }
+) { Get-Function $Name | Should -Be $Expected }
+
+# Array approach
+It 'Contains <_>' -ForEach 'item1', 'item2' { Get-Collection | Should -Contain $_ }
+```
+
+## Tags
+
+- **Available on**: `Describe`, `Context`, and `It` blocks
+- **Filtering**: Use `-TagFilter` and `-ExcludeTagFilter` with `Invoke-Pester`
+- **Wildcards**: Tags support `-like` wildcards for flexible filtering
+
+```powershell
+Describe 'Function' -Tag 'Unit' {
+    It 'Should work' -Tag 'Fast', 'Stable' { }
+    It 'Should be slow' -Tag 'Slow', 'Integration' { }
+}
+
+# Run only fast unit tests
+Invoke-Pester -TagFilter 'Unit' -ExcludeTagFilter 'Slow'
+```
+
+## Skip
+
+- **`-Skip`**: Available on `Describe`, `Context`, and `It` to skip tests
+- **Conditional**: Use `-Skip:$condition` for dynamic skipping
+- **Runtime Skip**: Use `Set-ItResult -Skipped` during test execution (setup/teardown still run)
+
+```powershell
+It 'Should work on Windows' -Skip:(-not $IsWindows) { }
+Context 'Integration tests' -Skip { }
+```
+
+## Error Handling
+
+- **Continue on Failure**: Use `Should.ErrorAction = 'Continue'` to collect multiple failures
+- **Stop on Critical**: Use `-ErrorAction Stop` for pre-conditions
+- **Test Exceptions**: Use `{ Code } | Should -Throw` for exception testing
+
+## Best Practices
+
+- **Descriptive Names**: Use clear test descriptions that explain behavior
+- **AAA Pattern**: Arrange (setup), Act (execute), Assert (verify)
+- **Isolated Tests**: Each test should be independent
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jorgeasaurus/IntuneHydrationKit](https://github.com/jorgeasaurus/IntuneHydrationKit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
