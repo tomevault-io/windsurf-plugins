@@ -1,33 +1,31 @@
 ---
 trigger: always_on
-description: See `~/AGENTS.md` for the global Codex environment, wiki protocol, hard rules,
+description: When to run tests — full suite only before PR submission, targeted tests during development
 ---
 
-# Codex Configuration - osaurus-staging
 
-See `~/AGENTS.md` for the global Codex environment, wiki protocol, hard rules,
-machine context, and useful commands.
+# Testing Workflow
 
-## Build & Test
+The full unit suite (`make test`, ~5000 tests) takes about 30 minutes. Do NOT
+run it during normal development iterations.
 
-Running tests and builds is encouraged — they're how we keep quality high. The
-canonical lanes live in `Makefile`:
+## During development
 
-- `make test` — `swift test --package-path Packages/OsaurusCore` (fast unit
-  loop).
-- `make ci-test` — mirrors the CI `test-core` xcodebuild job (`xcbeautify`
-  output, xcresult bundle at `build/Tests.xcresult`).
-- `make cli` / `make app` — build the CLI and the embedded app via
-  `xcodebuild` against `osaurus.xcworkspace`.
-- `make evals` / `make evals-all` — run OsaurusEvals suites under
-  `Packages/OsaurusEvals/Suites/*`.
-- Live-app smoke: `scripts/live-proof/launch-keychain-free-osaurus.sh`.
+- Run only targeted tests scoped to what you changed, using `--filter`:
 
-### Keychain tip (optional)
+```bash
+OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 \
+OSAURUS_TEST_ROOT=/tmp/osaurus-test \
+OSU_MODELS_DIR=/tmp/osaurus-test-models \
+swift test --package-path Packages/OsaurusCore --filter "SuiteOrTestName"
+```
 
-Some tests touch Osaurus Keychain wrappers. If a test doesn't need real
-Keychain access, prefer running it in keychain-disabled mode to avoid
-unrelated "wants to use your confidential information" prompts:
+- A plain `swift build --package-path Packages/OsaurusCore` is enough to
+  verify compilation after edits.
+
+## Before submitting a PR
+
+- Run the full suite exactly once, right before the PR is created:
 
 ```bash
 OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 \
@@ -36,73 +34,10 @@ OSU_MODELS_DIR=/tmp/osaurus-test-models \
 make test
 ```
 
-In that mode, Keychain wrappers should return nil / no-op on reads, writes,
-and deletes rather than calling `SecItemCopyMatching` / `SecItemAdd` /
-`SecItemUpdate` / `SecItemDelete` against the login Keychain.
-
-`OSU_MODELS_DIR` (pointed at an empty dir) matters on machines with real
-models in `~/MLXModels`: dispatch-style tests start real `ChatSession.send`
-turns, and without the override they resolve the user's installed models and
-try to load them inside the SwiftPM harness — which has no Metal kernels and
-dies with `MLX/MLXArray.swift precondition failed`. With the override those
-sends fail fast with `modelUnavailable`, matching CI behavior. Keychain-gated
-suites (e.g. `PluginAgentScopingTests`) still fail by design under
-`OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`; run those without the flag when you
-need real Keychain proof.
-
-## Model Runtime Non-Negotiables
-
-- Never add forced thinking tags, parser repair, hidden sampler defaults,
-  repetition-penalty rescues, close-token bias, or prompt/template coercion to
-  make a model appear coherent.
-- Never add fake guards, placeholder gates, hardcoded model allowlists,
-  synthetic output filters, or "same behavior" enforcement to make a runtime
-  row look safe. If JANG, JANGTQ, MXFP, VL/audio/video, hybrid cache, SWA,
-  speed, coherency, leaking tool parser output, reasoning boundaries, or RAM
-  policy is wrong, trace the root cause and fix the real function/path. If the
-  root cause is not fixed yet, document the row as `PARTIAL` or `BLOCKED` with
-  exact evidence instead of forcing behavior in prompts, parsers, samplers, or
-  UI state.
-- Chat/API defaults must come from the active model bundle's
-  `generation_config.json` or equivalent runtime config unless a user
-  explicitly overrides them. Native-trained defaults such as top-k matter for
-  quality and speed; do not replace them with synthetic Osaurus defaults.
-- Reasoning, tool, and chat-template behavior must be auto-detected from the
-  bundle/tokenizer/template/runtime config. Do not fake thinking envelopes,
-  strip visible output to hide parser bugs, or coerce one model family into
-  another family's template.
-- Runtime proof must separate proven, partial, failed, and unproven rows. A
-  load-only result, single prompt, or source-only assertion is not enough to
-  call a model family working.
-- RAM proof means Activity Monitor physical footprint stays within the intended
-  low-RAM gate. A row that reaches full model size in physical footprint is a
-  failure even if generation is coherent.
-- Every generation row must record token/s. Missing token/s is a blocked or
-  failed row, not production proof.
-- Multi-turn coherency is required: visible answer, reasoning channel behavior,
-  no looping, no hidden reasoning-only output, no length-cap fake pass, and no
-  raw parser marker leak.
-- Reasoning fixes must preserve the model's real contract. Do not inject fake
-  closers/openers, hide leaked reasoning markers by stripping visible text, or
-  treat a parser cleanup as correctness unless the live output, structured
-  reasoning field, and user-visible answer all prove the boundary is correct.
-- Cache proof must match the model architecture:
-  - Full-attention models need real KV, prefix/paged, L2 disk, and TurboQuant
-    KV proof when enabled.
-  - Qwen-style hybrid SSM needs KV plus SSM companion rederive/hit proof; a KV
-    hit alone is not enough.
-  - ZAYA/CCA and HY3-style models need companion cache and pooling proof.
-  - DeepSeek-V4 CSA/HSA/SWA hybrid pool needs prefix/L2 plus pool restore/hit
-    proof and must not use TurboQuant KV as a substitute.
-- VL/video rows require real media payloads, media cache salts, and cache-hit
-  validation; text-path evidence does not prove media-path correctness.
-- Big-model load cancellation must be live-proven before promotion: if the user
-  stops generation, closes chat, or exits during first load, startup must
-  cancel and cleanup must prevent zombie loads and OOM growth.
-- Qwen/JANG/JANGTQ RAM regressions require end-to-end Osaurus proof with
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Keychain-gated suites (e.g. `PluginAgentScopingTests`) fail by design under
+  `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`; run those without the flag when
+  their area was touched.
 
 ---
 > Source: [osaurus-ai/osaurus](https://github.com/osaurus-ai/osaurus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
