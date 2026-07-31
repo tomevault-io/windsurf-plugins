@@ -1,72 +1,126 @@
 ---
 trigger: always_on
-description: **Purpose:** Handle approved "Web We Want" submissions, produce wants, and keep issues ready for discussion conversion.
+description: Follow these detailed instructions when processing Want submissions for the Web We Want project.
 ---
 
-# Agents
+# Want Processing Instructions for GitHub Copilot
 
-## wants-processor
-**Purpose:** Handle approved "Web We Want" submissions, produce wants, and keep issues ready for discussion conversion.
+Follow these detailed instructions when processing Want submissions for the Web We Want project.
 
-**Key References:**
-- `.github/instructions/wants-processing.instructions.md`
-- `.github/workflows/process-submission.yml`
-- `.github/workflows/triage-submission.yml`
+> **⚠️ CRITICAL RULE: A pull request created during wants processing must contain only one change — the addition of a new Markdown file under `wants/`. Modifying any other file (issue bodies, existing want files, workflows, configuration, or any other repository file) is strictly prohibited.**
 
-### Core Rules
-- Treat `.github/instructions/wants-processing.instructions.md` as canonical guidance; do not pull direction from other docs unless explicitly referenced there.
-- Maintain respectful, professional tone. Keep responses concise and actionable.
-- Default to ASCII when editing or creating files. Avoid altering user-authored content outside the requested scope.
-- Never revert user changes unless explicitly asked. When unexpected edits appear, pause and confirm before proceeding.
-- When processing Azure requests, follow repository Azure policies and required tool usage.
-- Confirm final outputs in Markdown; reference files with backticks and relative paths.
-- **A pull request created during wants processing MUST contain only one change: the addition of a new Markdown file under `wants/`. Modifying any other file — including the original issue body, existing want files, workflows, or any other repository file — is strictly prohibited.**
+## Quick Reference
 
-### Quick Reference Checks
-- Required frontmatter fields: `title`, `date`, `submitter`, `number`, `tags`, `discussion` (issues URL as placeholder, e.g. `https://github.com/WebWeWant/webwewant.fyi/issues/<issue-number>`; updated to discussion URL by maintainer after conversion), `status` set to `discussing`.
-- Optional `related` entries include `title`, `url`, and `type`.
-- Commands: `npm run create-want`, `npm run check-duplicate "<title>"`, `npm run validate-want wants/<ID>.md`.
+### Required Markdown Fields
 
-### Acceptance Criteria
-1. Verify submission is not spam, abusive, commercial, or non-English noise.
-2. Confirm the request focuses on web platform evolution (HTML, CSS, JS, browser APIs, devtools, accessibility, etc.).
-3. Apply up to three precise technology labels; avoid broad over-labeling.
-4. Run duplicate check and escalate anything ≥70% similarity for human review.
-5. Enhance content for clarity while preserving submitter intent; add authoritative references when useful.
+- `title`: "I want [description]" format
+- `date`: ISO date string (current date/time)
+- `submitter`: Submitter's name or "Anonymous"
+- `number`: Submission ID from issue
+- `tags`: Array of relevant technology labels
+- `discussion`: GitHub issues URL pointing to the source issue as a placeholder (e.g. `https://github.com/WebWeWant/webwewant.fyi/issues/<issue-number>`). This will be updated to the discussion URL after a maintainer converts the issue to a discussion.
+- `status`: "discussing"
 
-### Processing Workflow
-1. **Spam detection:** Delete obvious spam (honeypot triggered, excessive promo links, abusive language, etc.) and close with the canned message.
-2. **Relevance check:** Reject off-topic issues with the `off-topic` label and standard response.
-3. **Technology classification:** Apply the most relevant labels (`html`, `css`, `javascript`, `accessibility`, `dom`, `api`, `devtools`, `web-apps`, `forms`, `typography`, `ux`, `urls`, `extensions`, `custom-elements`, etc.).
-4. **Duplicate detection:** `npm run check-duplicate "Title"`; flag 70–100% similarity with "possible duplicate" label and human follow-up.
-5. **Want creation:**
-   - Run `npm run create-want` to scaffold `wants/<ID>.md`.
-   - Populate fields from the issue, using `https://github.com/WebWeWant/webwewant.fyi/issues/<issue-number>` as the `discussion` placeholder. **GitHub now assigns a new net-new number when converting issues to discussions, so the issues URL is used as a placeholder that redirects after conversion.**
-   - Polish description, keeping the submitter’s intent intact. Write from the first person perspective of someone wanting the feature.
-   - Add `related` links when they improve context.
-   - Update the original issue body directly via the GitHub API (a direct issue edit, NOT a file in the PR) to match the cleaned want content (no frontmatter or automation metadata) so it is ready for conversion to a discussion.
-   - Validate via `npm run validate-want wants/<ID>.md`. A note about the `discussion` field using an issue URL placeholder is expected and can be ignored — it will be resolved after the maintainer converts the issue to a discussion.
-   - Open PR from `submission/<descriptive-name>` with title `Add want: <Title>` and reference the issue number.
-   - **The PR must contain only the new `wants/<ID>.md` file. Do not modify any other files.**
-   - **After opening the PR, post a comment** on the PR with conversion instructions for the maintainer (see template in `.github/instructions/wants-processing.instructions.md`).
+### Optional Fields
 
-### Content Quality Expectations
-- Start every want title with "I want" and ensure clarity.
-- Improve grammar, provide examples when helpful, and validate terminology.
-- Prefer official standards links (W3C, WHATWG, Ecma, IETF) and reputable documentation (MDN, vendor docs).
-- Keep markdown clean; the want file is the single source of truth.
+- `related`: Array of related specifications/articles with title, url, type
 
-### Communication Templates
-- **Spam:** `This submission was automatically detected as spam and removed.`
-- **Off-topic:** Provide standard scope reminder and close the issue.
-- **Missing info:** List missing fields, direct to resubmit form, close issue.
-- **Possible duplicate:** List matches, add "possible duplicate" label, note human review required.
-- **Approval:** Acknowledge approval and mention PR creation.
+### Essential Commands
 
-### Issue-to-Discussion Conversion (Post-Merge)
+- `npm run create-want -- <issue-number>` - Generate UUID and markdown template with discussion URL pre-populated (e.g. `npm run create-want -- 850`)
+- `npm run check-duplicate "Want Title"` - Check for potential duplicates (fuzzy matching)
+- `npm run validate-want wants/<ID>.md` - Validate markdown file
+- `npm run convert-to-discussion -- <issue-number> [category-name]` - Convert a GitHub issue to a discussion via the GraphQL API and print the new discussion URL (e.g. `npm run convert-to-discussion -- 850`)
+
+### Triage Decision Tree
+
+1. **Spam/abuse/honeypot triggered?** → DELETE and close issue immediately
+2. **Links to commercial services (>2 links)?** → FLAG as potential spam, review carefully
+3. **Off-topic (not web platform)?** → REJECT with "off-topic" label, close issue
+4. **Missing required fields?** → REJECT with explanation, close issue
+5. **Potential duplicate?** → Run `npm run check-duplicate`, flag for human review if similar
+6. **Passes all checks?** → CREATE markdown file and PR per "Creating Approved Submissions" section
+
+### Similarity Score Guidelines (for duplicate checking)
+
+- **90-100%** = Very likely duplicate → Flag for human review
+- **70-89%** = Possibly duplicate → Flag for human review
+- **<70%** = Probably unique → Proceed with processing
+
+## 🎯 Mission & Scope
+
+Web We Want focuses on **web platform evolution** including:
+
+- HTML elements and attributes
+- CSS properties and features
+- JavaScript APIs and language features
+- Browser behavior and standards
+- Developer tools improvements
+- Web accessibility enhancements
+
+## 📝 Processing Workflow
+
+### Step 1: Spam Detection ⚠️
+
+**Immediately delete and close submissions that:**
+
+1. **Triggered honeypot** - "website" field is filled (automated spam)
+2. **Contain excessive links** - More than 2 external links (likely promotional)
+3. **Commercial promotion** - Advertising services, products, or companies
+4. **Abusive content** - Hateful, threatening, or inappropriate language
+5. **Non-English content** - Unless directly related to internationalization features
+6. **Obvious bot submissions** - Generic text, random characters, or template spam
+
+**When deleting spam:**
+
+- Close the issue immediately
+- Add comment: "This submission was automatically detected as spam and removed."
+- Do not engage with or provide detailed feedback on spam submissions
+
+**Note:** Since GitHub Copilot cannot delete issues entirely, editing the content to remove harmful links and material is essential for security and preventing abuse.
+
+### Step 2: Relevance Check 🎯
+
+**Approve submissions that:**
+
+1. **Relate to web platform evolution** - HTML, CSS, JavaScript, browser APIs, developer tools
+2. **Include required information** - Clear title, detailed description, contact info
+3. **Are technically feasible** - Not requesting impossible or deprecated features
+4. **Show understanding** - Demonstrate knowledge of web development challenges
+5. **Are respectful** - Professional language and constructive tone
+
+**Common off-topic submissions (reject with "off-topic" label):**
+
+- Browser troubleshooting or bug reports for specific sites
+- Requests for help with personal projects
+- General software or non-web technology requests
+- Infrastructure or hosting questions
+- Questions about using existing APIs (rather than improving them)
+
+**If OFF-TOPIC:**
+
+1. Add label: `off-topic`
+2. Close issue
+3. Comment: "Thank you for your submission. This request appears to be outside the scope of Web We Want, which focuses on improvements to web platform standards (HTML, CSS, JavaScript) and browser implementations. For support questions, please refer to appropriate community forums."
+
+### Step 3: Technology Classification 🏷️
+
+**Apply appropriate labels (select 1-3 most relevant):**
+
+**Core Technologies:**
+
+- `html` - HTML elements, attributes, semantic markup
+- `css` - CSS properties, selectors, styling, layout
+- `javascript` - JS language features, Web APIs, ECMAScript
+
+**Specialized Areas:**
+
+- `accessibility` - Screen readers, WCAG, inclusive design
+- `dom` - Document Object Model, including window, navigator, CSSOM, etc.
+- `api` - Web APIs
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [WebWeWant/webwewant.fyi](https://github.com/WebWeWant/webwewant.fyi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
