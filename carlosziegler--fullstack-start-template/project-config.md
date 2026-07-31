@@ -96,4 +96,4 @@ description: Ultracite Rules
 
 ---
 > Source: [CarlosZiegler/fullstack-start-template](https://github.com/CarlosZiegler/fullstack-start-template) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
