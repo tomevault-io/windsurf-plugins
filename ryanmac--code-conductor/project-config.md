@@ -1,169 +1,158 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This directory is reserved for future template functionality. Currently, task and configuration templates are provided via the `examples/` directory at the repository root. Claude Code should use the existing examples to understand patterns for generating new tasks, configurations, and project-specific customizations.
 ---
 
-# CLAUDE.md
+# CLAUDE.md: Instructions for Claude Code - Templates & Examples
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Purpose
+This directory is reserved for future template functionality. Currently, task and configuration templates are provided via the `examples/` directory at the repository root. Claude Code should use the existing examples to understand patterns for generating new tasks, configurations, and project-specific customizations.
 
-## Project Overview
+## Current Template Sources
 
-Code Conductor is an AI agent coordination system designed to orchestrate multiple AI coding agents (like Claude Code, Conductor, Warp) working on the same codebase. It provides GitHub-native task management with automatic conflict prevention through git worktrees.
+### Task Templates
+Located in `examples/[stack-name]/example-tasks.json`:
+- React webapp tasks
+- Python microservices tasks
+- Mobile app tasks
+- Desktop app tasks
+- Go services tasks
+- And more...
 
-**IMPORTANT**: This is a template repository. When you encounter Code Conductor files in a project, they have been imported to enable automated agent coordination. Work autonomously based on GitHub Issues with the `conductor:task` label and the guidance in these files.
+### Configuration Templates
+Located in `examples/[stack-name]/config.yaml`:
+- Stack-specific configurations
+- Role recommendations
+- Build/test commands
 
-## Documentation Map
+## Guidelines for Template Usage
+- **Do**: Study existing examples before generating new content
+- **Do**: Maintain the JSON structure when creating tasks
+- **Do**: Include all required fields from templates
+- **Do**: Adapt templates to specific project needs
+- **Don't**: Create templates that bypass quality checks
+- **Don't**: Generate tasks without proper file locking
+- **Don't**: Omit required fields like success_criteria
 
-**CRITICAL**: When starting work on any task, check if `.conductor/documentation-map.yaml` exists. This file contains:
-- Comprehensive project analysis and structure
-- Technology stack details and dependencies  
-- List of completed vs. pending features
-- Implementation status and critical paths
-- Architectural decisions and constraints
+## Task Template Structure
 
-If this file exists, load it to understand the project context before beginning work. This map is created by the `[INIT]` discovery task and provides essential context for all subsequent tasks.
+When generating new tasks, follow this structure:
 
-## Key Development Commands
-
-### Running Tests
-```bash
-# Run all tests
-python -m pytest tests/ -v
-
-# Run specific test file
-python tests/test_basic.py
-python tests/test_stack_detection.py
+```json
+{
+  "id": "unique_id",
+  "title": "Clear, actionable title",
+  "description": "Detailed description of what needs to be done",
+  "specs": "path/to/specification.md",
+  "best_practices": [
+    "List of recommended approaches",
+    "Technology-specific guidelines"
+  ],
+  "success_criteria": {
+    "tests": "Testing requirements",
+    "performance": "Performance metrics",
+    "security": "Security requirements",
+    "accessibility": "Accessibility standards"
+  },
+  "required_skills": [],  // Empty for generalist, or ["frontend", "devops"]
+  "estimated_effort": "small|medium|large",
+  "files_locked": [
+    "paths/to/files/that/will/be/modified"
+  ],
+  "dependencies": ["task_ids_that_must_complete_first"]
+}
 ```
 
-### Linting and Formatting
-```bash
-# Check code formatting (without making changes)
-black --check .conductor/scripts/ setup.py
+## Autonomous Task Generation Algorithm
 
-# Apply formatting
-black .conductor/scripts/ setup.py
-
-# Run linting
-flake8 .conductor/scripts/ setup.py --max-line-length=88 --extend-ignore=E203,W503
+```python
+def generate_task(description, context):
+    # 1. Detect task type from description
+    task_type = classify_task(description)  # ui, api, devops, etc.
+    
+    # 2. Load appropriate template
+    template = load_template_for_type(task_type)
+    
+    # 3. Extract key requirements
+    requirements = extract_requirements(description)
+    
+    # 4. Auto-generate task fields
+    task = {
+        "id": generate_unique_id(task_type),
+        "title": extract_action_title(description),
+        "description": expand_description(description, context),
+        "specs": f"docs/{task_type}-{task['id']}-spec.md",
+        "best_practices": template["best_practices"] + requirements["practices"],
+        "success_criteria": merge_criteria(template["criteria"], requirements),
+        "required_skills": detect_required_skills(task_type, requirements),
+        "estimated_effort": estimate_effort(requirements),
+        "files_locked": predict_affected_files(task_type, requirements),
+        "dependencies": detect_dependencies(context["existing_tasks"])
+    }
+    
+    # 5. Validate before returning
+    validate_task_completeness(task)
+    validate_no_conflicts(task, context["active_tasks"])
+    
+    return task
 ```
 
-### Validation Commands
-```bash
-# Validate conductor configuration
-python .conductor/scripts/validate-config.py
+## Examples
 
-# Check system dependencies
-python .conductor/scripts/dependency-check.py
+### Example 1: Generate Frontend Task
+**Input**: "Implement user profile component with avatar upload"
 
-# Run health check
-python .conductor/scripts/health-check.py
+**Automated generation**:
+```json
+{
+  "id": "ui_profile_001",
+  "title": "Implement user profile component with avatar upload",
+  "description": "Build a responsive user profile component featuring avatar upload functionality, user details display, and edit capabilities",
+  "specs": "docs/ui-profile-001-spec.md",
+  "best_practices": [
+    "Use semantic HTML for accessibility",
+    "Implement keyboard navigation",
+    "Add proper ARIA labels",
+    "Ensure responsive design works on all screen sizes",
+    "Validate image uploads (size, format)",
+    "Add loading states for upload process"
+  ],
+  "success_criteria": {
+    "tests": "Component tests with 90% coverage including upload scenarios",
+    "accessibility": "WCAG AA compliant",
+    "responsive": "Works on mobile, tablet, desktop",
+    "performance": "Image upload < 3s on 3G connection",
+    "validation": "Handles invalid file types gracefully"
+  },
+  "required_skills": [],
+  "estimated_effort": "large",
+  "files_locked": [
+    "src/components/UserProfile/",
+    "src/components/UserProfile/UserProfile.tsx",
+    "src/components/UserProfile/AvatarUpload.tsx",
+    "src/services/upload.ts",
+    "src/types/user.ts"
+  ],
+  "dependencies": []
+}
 ```
 
-## Architecture Overview
+### Example 2: Generate API Integration Task
+**Prompt**: "Create a task for integrating with a payment API"
 
-### Core Components
+**Expected approach**:
+1. Study `examples/nodejs-api/example-tasks.json`
+2. Include security best practices
+3. Add proper error handling requirements
+4. Lock API service files and tests
+5. Consider dependencies on auth tasks
 
-1. **Setup System** (`setup.py`)
-   - Interactive/auto configuration wizard
-   - Detects technology stack automatically
-   - Configures agent roles based on project type
-   - Creates GitHub workflows for automation
+### Example 3: Generate DevOps Task
+**Prompt**: "Create a CI/CD pipeline setup task"
 
-2. **Task Management** (GitHub Issues)
-   - GitHub Issues with `conductor:task` label serve as tasks
-   - Issues have unique numbers, descriptions, success criteria
-   - GitHub's atomic operations prevent race conditions
-   - Native integration with GitHub Projects and Actions
-
-3. **Agent Roles** (`.conductor/roles/`)
-   - `dev.md` - Default generalist role for most tasks
-   - Specialized roles: `devops`, `security`, `frontend`, `mobile`, `ml-engineer`, `data`
-   - `code-reviewer` - AI-powered PR reviews (always included)
-   - Hybrid model: prefer `dev` role unless task requires specialization
-
-4. **Agent Coordination** (`.conductor/scripts/`)
-   - `conductor` - Universal agent command (primary interface)
-   - `task-claim.py` - Task assignment via GitHub Issue assignment
-   - `health-check.py` - Monitor agent heartbeats
-   - `cleanup-stale.py` - Remove abandoned work
-   - Git worktrees provide isolation between agents
-
-5. **GitHub Integration**
-   - Issues become tasks via `conductor:task` label
-   - Actions run health checks every 15 minutes
-   - AI code reviews on all PRs
-   - Status dashboard via `conductor:status` issue
-
-### Key Design Patterns
-
-1. **Atomic Operations**: GitHub's issue assignment API ensures atomic task claiming
-2. **Worktree Isolation**: Each agent works in separate git worktree (`worktrees/agent-{role}-{task_id}`)
-3. **Heartbeat System**: Agents update timestamps; stale work auto-cleaned after timeout
-4. **File Conflict Prevention**: Worktree isolation ensures agents work on separate branches
-5. **Self-Healing**: GitHub Actions monitor health, clean stale work, process issues
-
-### Configuration Structure
-
-```yaml
-# .conductor/config.yaml
-project_name: string
-documentation: 
-  main: string (path to main docs)
-  additional: [array of paths]
-technology_stack:
-  languages: [detected languages]
-  frameworks: [detected frameworks]
-  tools: [detected build tools]
-roles:
-  default: "dev"
-  specialized: [list of specialized roles]
-github_integration:
-  enabled: boolean
-  issue_to_task: boolean
-  pr_reviews: boolean
-worktree_retention_days: number (default 7)
-```
-
-## Development Workflow
-
-When modifying code-conductor itself:
-
-1. Make changes in appropriate files:
-   - Core scripts: `.conductor/scripts/`
-   - Role definitions: `.conductor/roles/`
-   - Setup logic: `setup.py`
-
-2. Run validation after changes:
-   ```bash
-   python .conductor/scripts/validate-config.py
-   black .conductor/scripts/ setup.py
-   flake8 .conductor/scripts/ setup.py --max-line-length=88
-   python -m pytest tests/ -v
-   ```
-
-3. Test setup flow:
-   ```bash
-   # Create test environment
-   mkdir /tmp/test-conductor && cd /tmp/test-conductor
-   git init
-   # Copy conductor files and run setup
-   python setup.py --auto
-   ```
-
-<!-- CONDUCTOR:START -->
-## 🤖 AI Agent Quick Start
-
-**IMPORTANT**: Always run from the project root directory where Code Conductor is configured!
-
-### 🚀 The Universal Kickoff Prompt
-
-Start every Code Conductor session with:
-
-```
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ryanmac/code-conductor](https://github.com/ryanmac/code-conductor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
