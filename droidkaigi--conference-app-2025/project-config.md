@@ -7,122 +7,147 @@ description: This file provides guidance to Claude Code (claude.ai/code) when wo
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This is the **DroidKaigi 2025 conference application** - a Kotlin Multiplatform project supporting Android, iOS, and Desktop platforms.
+## Project Overview
 
-# Requirements
+This is the iOS app for DroidKaigi 2025 conference. For general project information, architecture diagrams, and getting started guide, see [README.md](./README.md).
 
-- **Android Studio**: Narwhal or higher (latest version recommended)
-- **JVM**: 17 or higher (required by Gradle 9.0.0)
+## Build and Development Commands
 
-# Commands
+### Quick Setup
+```bash
+# Install nest (if not already installed)
+curl -s https://raw.githubusercontent.com/mtj0928/nest/main/Scripts/install.sh | bash
+# Add nest to PATH (if not already done)
+export PATH="$PATH:~/.nest/bin"
 
-## Development Commands
-- `./gradlew spotlessCheck`: Lint check - validates code formatting and style
-- `./gradlew spotlessApply`: Format code - applies consistent formatting across codebase
-- `./gradlew testDebugUnitTest`: Run unit tests for debug build variant
+# Initial setup (installs SwiftLint via nest)
+make setup
 
-## Platform-Specific Build Commands
-- `./gradlew :app-android:assembleDebug`: Build Android debug APK
-- `./gradlew :app-android:assembleDevDebug`: Build Android dev variant (development API)
-- `./gradlew :app-android:assembleProdDebug`: Build Android prod variant (production API)
-- `./gradlew :app-desktop:run`: Run desktop application
-- iOS builds are handled through Xcode project in `app-ios/` directory
+# Open in Xcode
+make xcode
+```
 
-## Testing Commands
-- `./gradlew check`: Run all checks including tests and lint
-- `./gradlew test`: Run all tests across platforms
-- `./gradlew testReleaseUnitTest`: Run unit tests for release build variant
-- `./gradlew recordRoborazziDebug`: Record screenshot tests (UI verification)
-- `./gradlew verifyRoborazziDebug`: Verify screenshot tests
-- `./gradlew compareRoborazziDebug`: Compare Roborazzi screenshots for debug variant
-- `./gradlew compareRoborazziJvm`: Compare Roborazzi screenshots for JVM platform
-- UI tests use Roborazzi for screenshot testing with multiplatform support
+### Building the App
+```bash
+# Build with Makefile (recommended)
+make build          # Build all packages with prebuilt SwiftSyntax
+make xcode-build    # Build with Xcode
 
-## Code Generation
-- `./gradlew kspCommonMainKotlinMetadata`: Generate KSP code (Metro dependency injection, context retention functions)
-- KSP generates `rememberXXXScreenContextRetained()` functions for configuration change persistence
+# Or build directly with xcodebuild
+xcodebuild build -project DroidKaigi2025.xcodeproj -scheme DroidKaigi2025 -configuration Debug
+xcodebuild build -project DroidKaigi2025.xcodeproj -scheme DroidKaigi2025 -configuration Release
 
-# Architecture Overview
+# Build specific packages
+cd Core && swift build
+cd Native && swift build
+```
 
-This is a Kotlin Multiplatform (KMP) conference application supporting Android, iOS, and Desktop platforms with sophisticated architecture patterns:
+### Running Tests
+```bash
+# Run tests with Makefile (recommended)
+make test           # Run Core tests (Linux-compatible)
+make test-native    # Run Native module tests (macOS only)
+make test-all       # Run all tests (Core + Native, macOS only)
+make xcode-test     # Run tests with Xcode
 
-## Core Architecture Components
+# Or run directly with xcodebuild
+xcodebuild test -project DroidKaigi2025.xcodeproj -scheme ComponentTests -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+xcodebuild test -project DroidKaigi2025.xcodeproj -scheme UseCaseTests -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
 
-### Dependency Injection with Metro
-- Uses compile-time safe dependency injection via [Metro](https://github.com/ZacSweers/metro)
-- Each screen receives dependencies through `ScreenContext` as context parameters
-- Dependencies are resolved at compile time, preventing runtime errors
-- Example: `TimetableScreenContext` provides all dependencies needed for timetable functionality
+# Run package tests
+cd Core && swift test
+cd Native && swift test
 
-### Data Management with Soil
-- Replaces traditional repository pattern with [Soil](https://github.com/soil-kt/soil) for composable-first data fetching
-- Uses `QueryKey` and `SubscriptionKey` for server/database state management
-- Runtime caching handled automatically by Soil's `SwrClient`
-- `SoilDataBoundary` separates data fetching logic from UI logic
+# Run Core Package tests on Ubuntu (cross-platform support)
+cd Core && swift test  # Works on Ubuntu/Linux environments
+```
 
-### Screen Structure Pattern
-- Entry point: `XXXScreenRoot` Composable functions
-- Data boundary: `SoilDataBoundary` ensures all required data is available before rendering UI
-- Presenters: Handle UI events and construct UI state as Composable functions
-- Context parameters provide semantic meaning and scope restriction
+### Available Schemes
+- `DroidKaigi2025` - Main app
+- `ComponentTests` - UI component tests
+- `Model` - Data model library
+- `Presentation` - Presentation layer
+- `Root` - Root navigation
+- `UseCaseTests` - Business logic tests
 
-### Navigation
-- **Android/JVM**: Uses Navigation3 library with `NavKey` and `NavEntry` pattern
-- **iOS**: Uses navigation-compose library due to Navigation3 not being available
-- Screens defined as serializable `NavKey` objects for type-safe navigation
-- `rememberXXXScreenContextRetained()` functions generated by KSP for configuration change persistence
+## Architecture
 
-## Module Structure
+See [README.md](./README.md#-architecture) for detailed architecture documentation with diagrams.
 
-### Apps
-- `app-android`: Android application module
-- `app-desktop`: Desktop (JVM) application module  
-- `app-ios`: iOS application with Xcode project
-- `app-shared`: Shared application code and navigation logic
+## Technical Requirements & Features
 
-### Core Modules
-- `core:common`: Common utilities and base classes
-- `core:model`: Data models and domain entities
-- `core:data`: Data layer with API clients and caching
-- `core:droidkaigiui`: UI components and theming
-- `core:designsystem`: Design system components
-- `core:testing`: Testing infrastructure and utilities
+See [README.md](./README.md#-getting-started) for technical requirements, dependencies, and feature list.
 
-### Features
-- `feature:sessions`: Timetable, search, and session detail screens
-- `feature:contributors`: Contributors listing
-- `feature:sponsors`: Sponsors information
-- `feature:eventmap`: Event venue map
-- `feature:about`: About screen
-- `feature:settings`: Application settings
-- `feature:favorites`: Bookmarked sessions
-- `feature:staff`: Staff information
-- `feature:profile`: User profile management
+## Code Quality Tools
 
-## Testing Strategy
+### Linting & Formatting
+```bash
+# Linting (SwiftLint installed via nest)
+make lint          # Check for linting issues
+make lint-fix      # Auto-fix linting issues
 
-### Multiplatform UI Testing
-- BDD-style tests using `describe`/`itShould` pattern for readability
-- Tests shared across Android, JVM, and iOS using expect/actual mechanism
-- Robot pattern for UI interactions and verifications
-- Test-specific dependency graphs created with Metro for isolation
-- Roborazzi used for screenshot testing across all platforms
+# Formatting (swift-format)
+make format        # Format code with swift-format
+make format-check  # Check formatting (fails on warnings)
 
-### Test Structure Example
-```kotlin
-@RunWith(UiTestRunner::class)
-class TimetableScreenTest {
-    val testAppGraph = createTimetableScreenTestGraph()
-    
-    @ComposeTest
-    fun runTest() {
-        describedBehaviors.forEach { behavior ->
-            val robot = testAppGraph.timetableScreenRobotProvider()
-            runComposeUiTest { behavior.execute(robot) }
-        }
+# Pre-commit checks
+make pre-commit    # Run all checks before committing
+```
+
+### Xcode Integration
+For faster incremental builds, install the Xcode build phase script:
+1. Open Xcode project
+2. Add Run Script Phase with: `"${SRCROOT}/scripts/xcode-lint.sh"`
+3. This will only lint modified files during builds
+
+See [scripts/README.md](./scripts/README.md) for detailed setup.
+
+### All Available Makefile Commands
+```bash
+make help          # Show all available commands
+make setup         # Initial project setup (installs SwiftLint via nest)
+make build         # Build all packages with prebuilt SwiftSyntax
+make test          # Run Core tests (Linux-compatible)
+make test-native   # Run Native module tests (macOS only)
+make test-all      # Run all tests (Core + Native, macOS only)
+make lint          # Run SwiftLint
+make lint-fix      # Auto-fix linting issues
+make format        # Format code with swift-format
+make format-check  # Check code formatting (fails on warnings)
+make pre-commit    # Run all checks before committing
+make clean         # Clean build artifacts
+make reset         # Reset project (clean + resolve dependencies)
+make xcode         # Open project in Xcode
+make xcode-build   # Build with Xcode
+make xcode-test    # Run tests with Xcode
+make ci            # Run CI checks (lint + Core tests)
+```
+
+See [README.md](./README.md#-development) for more details.
+
+## Claude-Specific Development Notes
+
+### Important Context
+- The project is part of a larger multi-platform repository
+- Android app documentation in root README.md shows architectural decisions that may influence iOS development
+- Uses modern Swift 6 features including strict concurrency checking
+- Linting and formatting tools are configured and should be used before completing work
+
+## Important Build and Debug Notes
+
+### SwiftLint Setup
+- SwiftLint is installed via nest (dependency manager)
+- Configuration file: `nestfile.yml` defines the SwiftLint version
+- Linting configuration: `.swiftlint.yml`
+- Runs via `make lint` or automatically during Xcode builds with `scripts/xcode-lint.sh`
+- For CI environments, SwiftLint needs to be installed separately
+
+### Build Issues
+- **Swift Dependencies Macro Error**: The project may encounter macro validation errors with swift-dependencies package when building. This is a known issue with the package itself, not your code changes.
+  - Error: "cannot load module 'SwiftDiagnostics' built with SDK 'macosx15.5' when using SDK 'iphonesimulator18.5'"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [DroidKaigi/conference-app-2025](https://github.com/DroidKaigi/conference-app-2025) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
