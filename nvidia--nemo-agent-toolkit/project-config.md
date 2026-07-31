@@ -1,88 +1,183 @@
 ---
 trigger: always_on
-description: Follow these rules when creating, modifying, or generating any code, tests, documentation, or configuration files
+description: Be consistent with number usage throughout documentation. When documenting examples or UI elements, duplicate numbers exactly as they appear in the interface.
 ---
 
+# Numbers and Dates Guidelines
 
-# NeMo Agent Toolkit General Coding Guidelines
+Be consistent with number usage throughout documentation. When documenting examples or UI elements, duplicate numbers exactly as they appear in the interface.
 
-These are the overarching standards that every **source, test, documentation and CI file** in this repository must follow. Adhering to these rules locally ensures the project's automated checks and pipelines succeed on your first push.
+## Numbers in Text
 
----
+### Basic Number Rules
 
-## Terminology and Naming
+#### Spell Out vs. Numerals
+- **Spell out**: Zero through nine in body text
+  - "five databases"
+  - "zero probability" 
+  - "seven years"
+- **Use numerals**: 10 and greater
+  - "10 screen savers"
+  - "28 days"
+  - "12 hrs"
 
-- Make sure to follow this naming convention for all the documentation. If there is any documentation not following this rule, you MUST update it.
-- **Full name (first use)**: "NVIDIA NeMo Agent Toolkit" — use for document titles, webpage headers, and any public descriptions
-- **Short name (subsequent references)**: "NeMo Agent Toolkit" or "the toolkit"
-- **Capitalization rules**:
-  - In document titles, headings, or any context where all words are capitalized, use "Toolkit" (capital T): e.g., "NVIDIA NeMo Agent Toolkit" or "NeMo Agent Toolkit"
-  - In all other contexts (body text, descriptions), use "toolkit" (lowercase t): e.g., "NVIDIA NeMo Agent Toolkit" or "NeMo Agent Toolkit"
-- **Technical identifiers** (code, CLI, packages, URLs):
-  - `nat` for the API namespace and CLI tool
-  - `nvidia-nat` for the package name
-  - `NAT_` prefix for environment variables
-  - `NeMo-Agent-Toolkit` for URLs, directory names, and contexts where capitalization is preserved (no underscores or spaces)
-- **"NAT" abbreviation**:
-  - OK in code comments
-  - NEVER use "NAT" or "nat" to refer to the toolkit in documentation
-- Examples:
-  - "In the NeMo Agent Toolkit, you can…"
-  - "Change directory to the NeMo Agent Toolkit repo root…"
-  - Heading: "# Getting Started with NeMo Agent Toolkit"
-- Consistently use this terminology throughout all documentation
-- NeMo Agent Toolkit was previously known as the Agent Intelligence toolkit, and AgentIQ. You should NEVER use the deprecated names, including Agent Intelligence toolkit, aiqtoolkit, AgentIQ, or AIQ/aiq. If you see any of these names in the documentation, you should update it based on the latest naming convention above, unless those names are intentionally used to refer to the deprecated names, or implementing a compatibility layer for the deprecated names.
-- DO NOT change the content of `CHANGELOG.md`
-- AIQ Blueprint is the intended name for the blueprint. DO NOT change it.
+#### Consistency Rule
+If one item in a group requires a numeral, use numerals for all items of that type:
+- **Correct**: "One article has 16 pages, one has 7 pages, and the third has only 5 pages"
+- **Correct**: "Christmas is only one month and 12 days away"
 
-## Project Structure
+#### Adjacent Numbers
+When two numbers referring to different things appear together, use a numeral for one and spell out the other:
+- **Example**: "fifteen 20-page articles"
 
-- All importable Python code lives under `src/` or `packages/<pkg>/src/` so namespace-packages resolve correctly.
-- Each example is an installable package in `examples/<example_name>` and exposes an `__main__.py` for `python -m <example_name>` execution.
-- **Examples directory guidelines**:
-  - At minimum, examples should contain a `README.md` or `README.ipynb` file.
-  - Python code should be placed in a `src/` subdirectory with a `pyproject.toml` file.
-  - Scripts should be placed in a `scripts/` subdirectory (optional).
-  - YAML files should be placed in a `configs/` subdirectory.
-  - Sample data files should be placed in a `data/` subdirectory and checked into git-lfs.
-- **Packages directory guidelines**:
-  - Each package should contain a `pyproject.toml` file.
-  - The `pyproject.toml` should declare a dependency on `nvidia-nat` or another package with a name starting with `nvidia-nat-`.
-  - Dependencies should use `~=<version>` format with two-digit versions (e.g., `~=1.0`).
-  - If packages contain Python code, they should have tests in a `tests/` directory at the same level as `pyproject.toml`.
-- Unit tests live in `tests/` (or `examples/*/tests`) and use the markers defined in `pyproject.toml` (e.g. `integration`).
-- Documentation sources are Markdown files under `docs/source`. Image files should be placed in `docs/source/_static` directory.
-- Configuration files consumed by code are stored next to that code in a `configs/` folder.
-- Large / binary assets **must** be committed with Git-LFS and placed in a neighbouring `data/` folder.
-- Shell or utility scripts belong in `scripts/` or `ci/scripts/` – never mix them with library code.
-- **Source code organization**:
-  - `packages/nvidia_nat_core/src/nat/**/*`: Contains core functionality. Changes should prioritize backward compatibility.
+#### Starting Sentences
+Never start a sentence with a numeral:
+- **Correct**: "More than 10 apps are included"
+- **Correct**: "Eleven apps are included"
+- **Acceptable in lists**: List items may start with numerals
 
-## Code Formatting & Imports
+### Special Number Formatting
 
-- Follow [PEP 20](https://peps.python.org/pep-0020/) and [PEP 8](https://peps.python.org/pep-0008/) for Python style guidelines.
-- Run **yapf** second (PEP 8 base, `column_limit = 120`).
-- Indent with 4 spaces, never tabs, and ensure every file ends with a single newline.
-- CI fails if formatting is wrong; run `pre-commit run --all-files` locally before pushing.
+#### Commas in Numbers
+- **Use commas**: For numbers with four or more digits
+  - "$1,024"
+  - "1,093 MB"
 
-## Linting
+#### Exceptions to Comma Rule
+For years, pixels, and baud, use commas only with five or more digits:
+- **Years**: "2500 B.C." but "10,000 B.C."
+- **Pixels**: "1920 × 1080 pixels" but "10,240 × 4320 pixels" 
+- **Baud**: "9600 baud" but "14,400 baud"
 
-- **ruff** (via `ruff check --fix`) also runs via pre-commit; is executed using the configuration embedded in `pyproject.toml`,
-  fix warnings unless they're explicitly ignored in `pyproject.toml`. ruff is only used as a linter not for formatting.
-- Respect the naming schemes: `snake_case` for functions & variables, `PascalCase` for classes, `UPPER_CASE` for constants.
+#### Never Use Commas In
+- **Page numbers**: "page 1091"
+- **Addresses**: "15601 NE 40th Street"
+- **After decimal points**: "1.06377 units"
 
-## Type Hints
+#### Negative Numbers
+Use an en dash (–), not a hyphen (-):
+- **Correct**: "–79"
+- **Incorrect**: "-79"
 
-- All public APIs require Python 3.11+ type hints on parameters and return values.
-- Prefer `collections.abc` / `typing` abstractions (`Sequence` over `list`).
-- Use `typing.Annotated` for units or extra metadata when useful.
-- Treat `pyright` warnings (configured in `pyproject.toml`) as errors during development.
+#### Compound Numbers
+Hyphenate spelled-out compound numbers:
+- "twenty-five fonts"
+- "the twenty-first day"
 
-## Exception Handling
+#### Ordinal Numbers
+Always spell out ordinals:
+- **Correct**: "the first row", "the twenty-first anniversary"
+- **Don't use**: "1st", "21st" in regular text
+- **Don't use**: Ordinal numbers for dates ("June first" → "June 1")
+- **Don't add**: "-ly" to ordinals ("firstly" → "first")
 
+### Number Ranges
+
+#### Preferred Format
+Use "from," "through," and "to":
+- **Example**: "from 9 through 17"
+
+#### Exceptions
+- **En dash for pages**: "pages 112–120"
+- **En dash for years**: "2016–2020"
+- **Use "to" for times**: "from 10:00 AM to 2:00 PM"
+- **Don't use "from" with en dash**: Wrong: "from 10–15"
+
+### Abbreviations
+
+#### General Rule
+Don't abbreviate thousand, million, billion as K, M, B:
+- **Preferred**: "65,000 people" or "sixty-five thousand people"
+- **Preferred**: "$30 million" not "$30M"
+
+#### When Abbreviations Are Necessary
+- **Capitalize**: K, M, B
+- **No space**: "8K", "30M", "2B"
+- **Avoid decimals with K**: "8,210" not "8.21K" (same character count)
+
+#### Global Considerations
+- Machine translation may not handle abbreviations correctly
+- Target languages may not have equivalent abbreviations
+- Allow space for expansion in localized content
+
+## Dates and Times
+
+### Date Format
+
+#### Standard Format
+Use "Month DD, YYYY" format:
+- **Correct**: "July 31, 2016"
+- **Incorrect**: "31 July 2016"
+
+#### Avoid Ordinals in Dates
+- **Correct**: "Jan 18"
+- **Incorrect**: "Jan 18th"
+
+#### Global Considerations
+Always spell out month names to avoid confusion:
+- "6/12/2017" could be June 12 or December 6 depending on region
+- "June 12, 2017" is unambiguous
+
+### Time Format
+
+#### AM/PM Format
+- **Use**: AM and PM with space before
+- **Capitalize**: Both letters
+- **Examples**: "10:45 AM", "6:30 PM"
+
+#### 24/7 Usage
+Don't use "24/7":
+- **Use instead**: "all day, every day", "always", "around the clock"
+
+### Days and Months
+
+#### Days of the Week
+- **Capitalize**: Sunday, Monday, Tuesday, etc.
+- **Don't abbreviate** unless space is severely limited
+- **Three-letter abbreviations**: Sun, Mon, Tue, Wed, Thu, Fri, Sat
+- **Use sentence case**: "Sun" not "SUN"
+
+#### Months
+- **Capitalize**: January, February, March, etc.
+- **Don't abbreviate** unless space is severely limited
+- **Three-letter abbreviations**: Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
+- **No periods**: "Jan" not "Jan."
+
+## Technical Context Numbers
+
+### Limited Space Contexts
+In tables and UI, numerals for 0-9 are acceptable:
+- Tables with space constraints
+- User interface labels
+- Dashboard displays
+- Mobile interfaces
+
+### Code and Technical Values
+Match exact formatting from code or systems:
+- API response values
+- Configuration parameters
+- Version numbers
+- Error codes
+
+### Measurements and Units
+- **Use numerals**: With units of measurement
+  - "5 GB", "32-bit", "1080p"
+- **Include units**: Always specify units for clarity
+- **Standard abbreviations**: Use accepted technical abbreviations
+
+## Best Practices
+
+### Consistency Within Documents
+- **Same type, same format**: Use consistent formatting for similar numbers
+- **Document-wide rules**: Apply the same number style throughout
+- **Style sheets**: Create guides for recurring number types
+
+### Readability
+- **Choose clarity**: When rules conflict, prioritize reader understanding
+- **Context matters**: Consider your audience's expectations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [NVIDIA/NeMo-Agent-Toolkit](https://github.com/NVIDIA/NeMo-Agent-Toolkit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
