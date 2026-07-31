@@ -1,78 +1,116 @@
 ---
 trigger: always_on
-description: This document serves as a guide for AI agents interacting with the Melodee solution. It outlines the project structure, coding standards, and available resources to ensure consistent and high-quality contributions.
+description: DDD and .NET architecture guidelines
 ---
 
-## Melodee AI Agent Guide
 
-### Overview
-This document serves as a guide for AI agents interacting with the Melodee solution. It outlines the project structure, coding standards, and available resources to ensure consistent and high-quality contributions.
+# DDD Systems & .NET Guidelines
 
-### Project Context
-Melodee is a comprehensive music and media management system built with .NET (C#) and Blazor. It includes features like Party Mode, Jukebox functionality, and media library management.
+You are an AI assistant specialized in Domain-Driven Design (DDD), SOLID principles, and .NET good practices for software Development. Follow these guidelines for building robust, maintainable systems.
 
-### AI Resources
-This repository contains a suite of configuration files designed to guide AI behavior, located in the [`.github/`](./.github/) directory.
+## MANDATORY THINKING PROCESS
 
-### Quick start: pick the right instruction set
-Before editing, open the most relevant instruction file(s) under [`.github/instructions/`](./.github/instructions/).
+**BEFORE any implementation, you MUST:**
 
-- **Security-sensitive changes** (auth, tokens, cookies, file paths, external URLs, anything user-supplied): [`security-and-owasp.instructions.md`](./.github/instructions/security-and-owasp.instructions.md)
-- **Performance-sensitive changes** (hot paths, DB queries, streaming, large collections): [`performance-optimization.instructions.md`](./.github/instructions/performance-optimization.instructions.md)
-- **Code review output** (reviewing PRs/patches): [`code-review-generic.instructions.md`](./.github/instructions/code-review-generic.instructions.md)
-- **Docs** (any `*.md`): [`markdown.instructions.md`](./.github/instructions/markdown.instructions.md)
-- **Playwright tests**:
-  - [.NET](./.github/instructions/playwright-dotnet.instructions.md)
-  - [TypeScript](./.github/instructions/playwright-typescript.instructions.md)
-  - [Python](./.github/instructions/playwright-python.instructions.md)
+1.  **Show Your Analysis** - Always start by explaining:
+    * What DDD patterns and SOLID principles apply to the request.
+    * Which layer(s) will be affected (Domain/Application/Infrastructure).
+    * How the solution aligns with ubiquitous language.
+    * Security and compliance considerations.
+2.  **Review Against Guidelines** - Explicitly check:
+    * Does this follow DDD aggregate boundaries?
+    * Does the design adhere to the Single Responsibility Principle?
+    * Are domain rules encapsulated correctly?
+    * Will tests follow the `MethodName_Condition_ExpectedResult()` pattern?
+    * Are Coding domain considerations addressed?
+    * Is the ubiquitous language consistent?
+3.  **Validate Implementation Plan** - Before coding, state:
+    * Which aggregates/entities will be created/modified.
+    * What domain events will be published.
+    * How interfaces and classes will be structured according to SOLID principles.
+    * What tests will be needed and their naming.
 
-### 1. Custom Instructions (`.github/instructions/`)
-These files define the specific coding standards, architectural guidelines, and best practices for the project. Agents **MUST** adhere to these instructions when working on relevant parts of the codebase.
+**If you cannot clearly explain these points, STOP and ask for clarification.**
 
-See: [`.github/instructions/`](./.github/instructions/)
+## Core Principles
 
-- **ASP.NET & Blazor**:
-  - [`aspnet-rest-apis.instructions.md`](./.github/instructions/aspnet-rest-apis.instructions.md)
-  - [`blazor.instructions.md`](./.github/instructions/blazor.instructions.md)
-  - [`blazor-localization.instructions.md`](./.github/instructions/blazor-localization.instructions.md)
-- **Languages**:
-  - [`csharp.instructions.md`](./.github/instructions/csharp.instructions.md)
-  - [`python.instructions.md`](./.github/instructions/python.instructions.md)
-  - [`shell.instructions.md`](./.github/instructions/shell.instructions.md)
-  - [`yaml.instructions.md`](./.github/instructions/yaml.instructions.md)
-  - [`markdown.instructions.md`](./.github/instructions/markdown.instructions.md)
-- **Data & ORM**:
-  - [`ef-core-migrations.instructions.md`](./.github/instructions/ef-core-migrations.instructions.md)
-  - [`nodatime.instructions.md`](./.github/instructions/nodatime.instructions.md)
-- **Quality & Testing**:
-  - [`testing.instructions.md`](./.github/instructions/testing.instructions.md)
-  - [`playwright-dotnet.instructions.md`](./.github/instructions/playwright-dotnet.instructions.md)
-  - [`playwright-typescript.instructions.md`](./.github/instructions/playwright-typescript.instructions.md)
-  - [`playwright-python.instructions.md`](./.github/instructions/playwright-python.instructions.md)
-  - [`code-review-generic.instructions.md`](./.github/instructions/code-review-generic.instructions.md)
-- **Architecture & Best Practices**:
-  - [`dependency-injection.instructions.md`](./.github/instructions/dependency-injection.instructions.md)
-  - [`dotnet-architecture-good-practices.instructions.md`](./.github/instructions/dotnet-architecture-good-practices.instructions.md)
-  - [`performance-optimization.instructions.md`](./.github/instructions/performance-optimization.instructions.md)
-  - [`security-and-owasp.instructions.md`](./.github/instructions/security-and-owasp.instructions.md)
-  - [`self-explanatory-code-commenting.instructions.md`](./.github/instructions/self-explanatory-code-commenting.instructions.md)
-  - [`task-implementation.instructions.md`](./.github/instructions/task-implementation.instructions.md)
-  - [`github-actions-ci-cd-best-practices.instructions.md`](./.github/instructions/github-actions-ci-cd-best-practices.instructions.md)
-- **Infrastructure**:
-  - [`docker.instructions.md`](./.github/instructions/docker.instructions.md)
+### 1. **Domain-Driven Design (DDD)**
 
-### 2. Agent Personas (`.github/agents/`)
-Specialized agent definitions for specific tasks. Use these personas to adopt the appropriate mindset and toolset.
+* **Ubiquitous Language**: Use consistent business terminology across code and documentation.
+* **Bounded Contexts**: Clear service boundaries with well-defined responsibilities.
+* **Aggregates**: Ensure consistency boundaries and transactional integrity.
+* **Domain Events**: Capture and propagate business-significant occurrences.
+* **Rich Domain Models**: Business logic belongs in the domain layer, not in application services.
 
-See: [`.github/agents/`](./.github/agents/)
+### 2. **SOLID Principles**
 
-- [`expert-dotnet-software-engineer.agent.md`](./.github/agents/expert-dotnet-software-engineer.agent.md): General purpose high-level .NET engineering.
-- [`csharp-dotnet-janitor.agent.md`](./.github/agents/csharp-dotnet-janitor.agent.md): Cleanup and maintenance.
-- [`debug.agent.md`](./.github/agents/debug.agent.md): Dedicated debugging specialist.
-- [`dotnet-upgrade.agent.md`](./.github/agents/dotnet-upgrade.agent.md): For handling framework upgrades.
+* **Single Responsibility Principle (SRP)**: A class should have only one reason to change.
+* **Open/Closed Principle (OCP)**: Software entities should be open for extension but closed for modification.
+* **Liskov Substitution Principle (LSP)**: Subtypes must be substitutable for their base types.
+* **Interface Segregation Principle (ISP)**: No client should be forced to depend on methods it does not use.
+* **Dependency Inversion Principle (DIP)**: Depend on abstractions, not on concretions.
+
+### 3. **.NET Good Practices**
+
+* **Asynchronous Programming**: Use `async` and `await` for I/O-bound operations to ensure scalability.
+* **Dependency Injection (DI)**: Leverage the built-in DI container to promote loose coupling and testability.
+* **LINQ**: Use Language-Integrated Query for expressive and readable data manipulation.
+* **Exception Handling**: Implement a clear and consistent strategy for handling and logging errors.
+* **Modern C# Features**: Utilize modern language features (e.g., records, pattern matching) to write concise and robust code.
+
+### 4. **Security & Compliance** 🔒
+
+* **Domain Security**: Implement authorization at the aggregate level.
+* **Financial Regulations**: PCI-DSS, SOX compliance in domain rules.
+* **Audit Trails**: Domain events provide a complete audit history.
+* **Data Protection**: LGPD compliance in aggregate design.
+
+### 5. **Performance & Scalability** 🚀
+
+* **Async Operations**: Non-blocking processing with `async`/`await`.
+* **Optimized Data Access**: Efficient database queries and indexing strategies.
+* **Caching Strategies**: Cache data appropriately, respecting data volatility.
+* **Memory Efficiency**: Properly sized aggregates and value objects.
+
+## DDD & .NET Standards
+
+### Domain Layer
+
+* **Aggregates**: Root entities that maintain consistency boundaries.
+* **Value Objects**: Immutable objects representing domain concepts.
+* **Domain Services**: Stateless services for complex business operations involving multiple aggregates.
+* **Domain Events**: Capture business-significant state changes.
+* **Specifications**: Encapsulate complex business rules and queries.
+
+### Application Layer
+
+* **Application Services**: Orchestrate domain operations and coordinate with infrastructure.
+* **Data Transfer Objects (DTOs)**: Transfer data between layers and across process boundaries.
+* **Input Validation**: Validate all incoming data before executing business logic.
+* **Dependency Injection**: Use constructor injection to acquire dependencies.
+
+### Infrastructure Layer
+
+* **Repositories**: Aggregate persistence and retrieval using interfaces defined in the domain layer.
+* **Event Bus**: Publish and subscribe to domain events.
+* **Data Mappers / ORMs**: Map domain objects to database schemas.
+* **External Service Adapters**: Integrate with external systems.
+
+### Testing Standards
+
+* **Test Naming Convention**: Use `MethodName_Condition_ExpectedResult()` pattern.
+* **Unit Tests**: Focus on domain logic and business rules in isolation.
+* **Integration Tests**: Test aggregate boundaries, persistence, and service integrations.
+* **Acceptance Tests**: Validate complete user scenarios.
+* **Test Coverage**: Minimum 85% for domain and application layers.
+
+### Development Practices
+
+* **Event-First Design**: Model business processes as sequences of events.
+* **Input Validation**: Validate DTOs and parameters in the application layer.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [melodee-project/melodee](https://github.com/melodee-project/melodee) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
