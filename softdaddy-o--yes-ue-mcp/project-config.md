@@ -1,155 +1,162 @@
 ---
 trigger: always_on
-description: This guide provides agentic coding agents with the essential information to work effectively in the yes-ue-mcp codebase.
+description: **Native C++ MCP Plugin for Unreal Engine 5.6+**
 ---
 
-# AGENTS.md - Development Guide for yes-ue-mcp
+# yes-ue-mcp - Claude Instructions
 
-This guide provides agentic coding agents with the essential information to work effectively in the yes-ue-mcp codebase.
+**Native C++ MCP Plugin for Unreal Engine 5.6+**
 
 ## Project Overview
 
-**yes-ue-mcp** is a native C++ Unreal Engine plugin implementing the Model Context Protocol (MCP) over HTTP. It enables AI assistants to inspect, analyze, and modify UE projects through a standardized JSON-RPC API.
+This plugin implements the Model Context Protocol (MCP) over HTTP, allowing AI assistants (Claude Code, Cursor, Windsurf, etc.) to inspect, analyze, and **modify** Unreal Engine projects through a standardized JSON-RPC API.
 
-- **Type**: Unreal Engine 5.6+ C++ plugin
-- **Architecture**: Two-module system (Runtime + Editor)
-- **Protocol**: MCP 2025-03-26 (Streamable HTTP) with JSON-RPC 2.0
-- **Transport**: HTTP server on localhost:8080/mcp
+## GitHub Repositories
 
-## Build System & Commands
+| Remote | Repository URL | Purpose |
+|--------|----------------|---------|
+| `origin` | https://github.com/softdaddy-o/yes-ue-mcp-private.git | Development (private) |
+| `public` | https://github.com/softdaddy-o/yes-ue-mcp.git | Release (public) |
 
-### Build Commands
+## Workflow Rules
+
+### Issue-Driven Development
+- **Every task MUST have a GitHub issue** - Create an issue before starting any task
+- **Close the issue** when the task is complete with a commit referencing it (e.g., `Closes #123`)
+- Use conventional commit format: `feat:`, `fix:`, `docs:`, `refactor:`
+
+### Git Workflow
+
+**Private Repository (origin)**
+- Commit frequently - whenever one issue/task is finished
+- Each commit should reference its issue number
+- Push to `origin` for development work
+
 ```bash
-# Build plugin with UnrealBuildTool
-<UE>/Engine/Build/BatchFiles/Build.bat YourProjectEditor Win64 Development
+git add -A && git commit -m "feat: add new tool
 
-# Regenerate project files after adding files
-<UE>/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe -projectfiles -project="YourProjectPath/YourProject.uproject" -game -rocket -progress
+Closes #123"
+git push origin main
 ```
 
-### Test Commands
-```bash
-# Run Python integration tests (requires UE Editor running with plugin)
-cd Tests
-python -m pytest test_mcp_tools.py -v
-python -m unittest test_mcp_tools -v
-python test_mcp_tools.py
+**Public Repository (public)**
+- Push aggregated changes only when a new version is ready
+- Use version tags (v1.0.0, v1.1.0, etc.)
+- Filter out `.claude/` directory when pushing to public
 
-# Run single test
-python -m pytest test_mcp_tools.py::TestConnection::test_server_responds -v
+```bash
+# Push to public with .claude/ filtered out
+git push public main --force-with-lease
+git tag v1.0.0
+git push public --tags
 ```
 
-### Environment Variables for Testing
-- `MCP_HOST`: MCP server host (default: 127.0.0.1)
-- `MCP_PORT`: MCP server port (default: 8080)
-
-### Development Workflow
+**Publishing to Public Repo**
+When pushing to the public repository, use git filter to exclude private files:
 ```bash
-# Deploy plugin to test projects
-.\copy_plugin.ps1                    # Copy to both projects
-.\copy_plugin.ps1 -Target Elpis      # Copy to Elpis only
-.\copy_plugin.ps1 -Target GameAnim   # Copy to GameAnimationSample56 only
+# Create a filtered branch for public release
+git checkout -b release-temp
+git filter-branch --tree-filter 'rm -rf .claude' HEAD
+git push public release-temp:main --force
+git checkout main
+git branch -D release-temp
 ```
 
-## Code Style Guidelines
+## Testing Environment
 
-### General Conventions
-- Follow Epic Games C++ coding standards
+**Primary Test Project:** Elpis (Action RPG - UE 5.7)
+- **Project Path:** `F:\src3\Covenant\ElpisClient\`
+- **Plugin Install Path:** `F:\src3\Covenant\ElpisClient\Plugins\yes-ue-mcp\`
+- **Version Control:** Perforce (plugin excluded via `.p4ignore`)
+- **MCP Endpoint:** `http://127.0.0.1:8080/mcp`
+- **Status:** Primary test environment
+
+**Secondary Test Project:** GameAnimationSample56 (UE 5.6)
+- **Project Path:** `F:\src_ue5\GameAnimationSample56\`
+- **Plugin Install Path:** `F:\src_ue5\GameAnimationSample56\Plugins\yes-ue-mcp\`
+- **MCP Endpoint:** `http://127.0.0.1:8081/mcp`
+- **Status:** Active test environment for UE 5.6
+
+### Deploying to Test Projects
+
+Use `copy_plugin.ps1` to safely copy the plugin to test projects:
+
+```powershell
+# Copy to both projects (default)
+.\copy_plugin.ps1
+
+# Copy to Elpis only
+.\copy_plugin.ps1 -Target Elpis
+
+# Copy to GameAnimationSample56 only
+.\copy_plugin.ps1 -Target GameAnim
+```
+
+**Excludes:** `.git`, `.claude`, `Tests`, `.pytest_cache`, `.github`, `Docs`, test files
+
+**Config Override:** Target projects can override settings (e.g., `ServerPort`) via their own `Config/DefaultYesUeMcp.ini`
+
+## Module Structure
+
+- **YesUeMcp** (Runtime) - Core MCP protocol layer
+- **YesUeMcpEditor** (Editor) - HTTP server + tool implementations
+
+## Coding Standards
+
+- Follow Epic's C++ coding conventions
 - Use `YESUEMCP_API` / `YESUEMCPEDITOR_API` for exported symbols
-- Copyright header: `// Copyright softdaddy-o 2024. All Rights Reserved.`
-- Use `TEXT()` macro for string literals
-- Use `TEXT()` for log messages and UE API calls
+- All tools inherit from `UMcpToolBase`
+- Register tools in `FYesUeMcpEditorModule::RegisterBuiltInTools()`
 
-### File Organization
-```
-Source/
-├── YesUeMcp/                    # Runtime module
-│   ├── Public/                  # Public headers
-│   │   ├── Protocol/           # MCP protocol types
-│   │   └── Tools/              # Base tool classes
-│   └── Private/                # Implementation files
-└── YesUeMcpEditor/             # Editor module
-    ├── Public/                  # Public headers
-    │   ├── Server/             # HTTP server
-    │   ├── Subsystem/          # Editor subsystems
-    │   ├── Tools/              # Tool implementations
-    │   │   ├── Blueprint/      # Blueprint tools
-    │   │   ├── Asset/          # Asset tools
-    │   │   ├── Level/          # Level tools
-    │   │   ├── Write/          # Write operations
-    │   │   └── ...
-    │   └── Utils/              # Utility classes
-    └── Private/                # Implementation files
-```
+## Version Management
 
-### Naming Conventions
-- **Classes**: `U` prefix for UObject classes, `F` for structs, `E` for enums
-- **Files**: Match class name (e.g., `QueryBlueprintTool.h` for `UQueryBlueprintTool`)
-- **Functions**: PascalCase (e.g., `GetToolName()`, `ExecuteTool()`)
-- **Variables**: camelCase (e.g., `toolName`, `assetPath`)
-- **Constants**: UPPER_CASE (e.g., `YESUEMCP_VERSION`)
+**Version is defined in TWO places (keep in sync):**
+1. `YesUeMcp.uplugin` - `VersionName` field (read by UE plugin system)
+2. `Source/YesUeMcp/Public/YesUeMcp.h` - `YESUEMCP_VERSION` macro (compile-time constant)
 
-### Tool Development Pattern
-```cpp
-// Header (.h)
-UCLASS()
-class YESUEMCPEDITOR_API UMyTool : public UMcpToolBase
-{
-    GENERATED_BODY()
+**IMPORTANT: Always increment version when modifying code!**
 
-public:
-    virtual FString GetToolName() const override { return TEXT("my-tool"); }
-    virtual FString GetToolDescription() const override;
-    virtual TMap<FString, FMcpSchemaProperty> GetInputSchema() const override;
-    virtual TArray<FString> GetRequiredParams() const override;
-    virtual FMcpToolResult Execute(const TSharedPtr<FJsonObject>& Arguments, const FMcpToolContext& Context) override;
-};
+- Use semantic versioning: `MAJOR.MINOR.PATCH`
+  - **MAJOR**: Breaking changes to existing tools or protocol
+  - **MINOR**: New features (new tools, new parameters)
+  - **PATCH**: Bug fixes, internal improvements, documentation
 
-// Implementation (.cpp)
-REGISTER_MCP_TOOL(UMyTool)  // Auto-registration
+**When to increment:**
+- Adding a new tool → MINOR
+- Adding new parameter to existing tool → MINOR
+- Changing tool input/output schema → MINOR (or MAJOR if breaking)
+- Bug fixes → PATCH
+- Internal refactoring → PATCH
+- Any code change that affects behavior → PATCH minimum
 
-FString UMyTool::GetToolDescription() const
-{
-    return TEXT("Tool description for tools/list");
-}
+## Key Files
 
-// ... other methods
-```
+- `Source/YesUeMcp/Public/Tools/McpToolBase.h` - Base class for all tools
+- `Source/YesUeMcp/Public/Tools/McpToolRegistry.h` - Tool registration
+- `Source/YesUeMcpEditor/Public/Server/McpServer.h` - HTTP server
+- `Source/YesUeMcpEditor/Public/Subsystem/McpEditorSubsystem.h` - Lifecycle management
+- `Source/YesUeMcpEditor/Public/Utils/McpAssetModifier.h` - Write operation utilities
 
-### Error Handling
-- Use `FMcpToolResult::Error()` for tool failures
-- Always validate required parameters before processing
-- Use `UE_LOG(LogYesUeMcp, Warning, TEXT("..."))` for warnings
-- Return structured error messages with context
+## MCP Server
 
-### Memory Management
-- Use `TSharedPtr` for JSON objects and smart pointers
-- Follow UE object ownership rules (UObjects are garbage collected)
-- Use `FScopedTransaction` for write operations to support undo/redo
+- **Protocol:** MCP 2025-03-26 (Streamable HTTP) with JSON-RPC 2.0
+- **Transport:** HTTP (Streamable HTTP)
+- **Endpoint:** `/mcp`
+- **Port:** 8080 (configurable)
+- **CORS:** Enabled for cross-origin requests
 
-## Module Architecture
+## Available Tools (28 total)
 
-### YesUeMcp (Runtime Module)
-- **Purpose**: Core MCP protocol layer
-- **Dependencies**: Core, CoreUObject, Json, JsonUtilities
-- **Key Classes**:
-  - `UMcpToolBase`: Abstract base class for all tools
-  - `FMcpToolRegistry`: Tool registration and discovery
-  - `FMcpTypes`: MCP protocol type definitions
+**Note:** Many tools support a `world` parameter: `"editor"` (default) or `"pie"` to target the Play-In-Editor world.
 
-### YesUeMcpEditor (Editor Module)
-- **Purpose**: HTTP server + UE Editor tool implementations
-- **Dependencies**: All YesUeMcp deps + HTTP, UnrealEd, Kismet, etc.
-- **Key Classes**:
-  - `FMcpServer`: HTTP server handling MCP requests
-  - `UMcpEditorSubsystem`: Lifecycle management
-  - Tool implementations in `Tools/` subdirectories
+### Read Tools (11) - Consolidated in v1.6.0
 
-### Tool Categories
-- **Read Tools (10)**: Query and analyze UE assets
+#### Blueprint Tools
+| Tool | Description |
+|------|-------------|
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [softdaddy-o/yes-ue-mcp](https://github.com/softdaddy-o/yes-ue-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
