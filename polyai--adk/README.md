@@ -1,18 +1,16 @@
 # adk
 
-> Source: [polyai/adk](https://github.com/polyai/adk) — distributed by [TomeVault](https://tomevault.io)
-
-Local development interface for building PolyAI agents
+> Source: [polyai/adk](https://github.com/polyai/adk). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [polyai/adk](https://github.com/polyai/adk).
+Original source: `CLAUDE.md` in [polyai/adk](https://github.com/polyai/adk).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
