@@ -3,7 +3,6 @@ trigger: always_on
 description: ato is a declarative DSL to design electronics (PCBs) with.
 ---
 
-# CLAUDE.md
 
 ato is a declarative DSL to design electronics (PCBs) with.
 It is part of the atopile project.
@@ -213,4 +212,4 @@ module DemoModule from AnotherBaseModule:
 
 ---
 > Source: [atopile/nonos](https://github.com/atopile/nonos) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
