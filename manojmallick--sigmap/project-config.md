@@ -1,203 +1,188 @@
 ---
 trigger: always_on
-description: Instructions for Codex-style agents working in this repository.
+description: Integrate SigMap with OpenCode, OpenHands, Cline, Aider, and local LLMs via Ollama, llama.cpp, vLLM. Model-agnostic context for any inference backend.
 ---
 
-# SigMap — AGENTS.md
 
-Instructions for Codex-style agents working in this repository.
+# Open-source agents and local LLM workflows
 
-## Append Strategy (Required)
+SigMap is **model-agnostic** — it works with any AI assistant or inference backend that consumes markdown context files. Whether you're using a proprietary cloud API or running an open-source model locally, SigMap handles context generation the same way.
 
-When writing generated signature content, never overwrite human-written notes above the marker.
+This guide shows how to integrate SigMap with popular open-source coding agents and local inference backends.
 
-Use this marker block for all appendable context files:
+## Model-agnostic context generation
 
-```
-## Tools
+SigMap produces plain markdown files containing your codebase signatures and context. Any tool that reads markdown can use SigMap output:
 
-<!-- sigmap-tools -->
-
-```json
-[
-  {
-    "name": "sigmap_ask",
-    "description": "Rank source files by relevance to a natural-language query. Run before exploring the codebase.",
-    "command": "sigmap ask \"$QUERY\""
-  },
-  {
-    "name": "sigmap_validate",
-    "description": "Validate SigMap config and measure context coverage. Run after changing config or source dirs.",
-    "command": "sigmap validate"
-  },
-  {
-    "name": "sigmap_judge",
-    "description": "Score an LLM response for groundedness against source context. Use to verify answer quality.",
-    "command": "sigmap judge --response \"$RESPONSE\" --context \"$CONTEXT\""
-  },
-  {
-    "name": "sigmap_query",
-    "description": "Rank all files by relevance using TF-IDF and write a focused mini-context.",
-    "command": "sigmap --query \"$QUERY\" --context"
-  },
-  {
-    "name": "sigmap_weights",
-    "description": "Show learned file-ranking multipliers accumulated from past sessions.",
-    "command": "sigmap weights"
-  }
-]
+```bash
+sigmap  # generates .github/copilot-instructions.md
 ```
 
-## Auto-generated signatures
-<!-- Updated by gen-context.js -->
-# Code signatures
+Your AI agent reads this file, either by:
+1. **Manual paste** — copy the markdown into your chat
+2. **File watcher** — auto-reload when you run `sigmap --watch`
+3. **IDE integration** — MCP, .cursor/mcp.json, or Claude Code settings
+4. **API integration** — HTTP fetch from a local endpoint
+5. **CLI pipe** — direct stdout stream to your model
 
-## changes (last 5 commits — 0 seconds ago)
-```
-src/learning/weights.js                       +exportWeights  +importWeights  ~resetWeights
-packages/adapters/codex.js                    ~write  ~format
-packages/adapters/claude.js                   ~format  ~write
-packages/adapters/gemini.js                   ~format
-packages/adapters/copilot.js                  ~format
-packages/adapters/cursor.js                   ~format
-packages/adapters/openai.js                   ~format
-packages/adapters/windsurf.js                 ~format
-```
+---
 
-## packages
+## Open-source coding agents
 
-### packages/cli/index.js
-```
-module.exports = { CLI_ENTRY, run }
-function run(argv, cwd) → void
-```
+### OpenCode
 
-### packages/adapters/index.js
-```
-module.exports = { getAdapter, listAdapters, adapt, outputsToAdapters }
-function getAdapter(name) → { name: string, format: F
-function listAdapters() → string[]
-function adapt(context, adapterName, opts = {}) → string
-function outputsToAdapters(outputs) → string[]
-```
+**Status:** ⭐ **Most popular** (157k GitHub stars)  
+**Type:** Open-source coding agent  
+**Model:** Works with OpenAI API (default) or OpenAI-compatible servers (Ollama, local vLLM)
 
-### packages/adapters/llm-full.js
-```
-module.exports = { name: 'llm-full', format, outputPath, write }
-function outputPath(cwd)
-function format(context, opts)
-function write(context, cwd, opts)
-```
+OpenCode is the most widely-adopted open-source coding agent in the LocalLLM community. It integrates with SigMap via file context injection.
 
-### packages/core/README.md
-```
-h1 sigmap-core
-h2 Installation
-h2 Quick start
-h2 API reference
-h3 `extract(src, language)` → `string[]`
-h3 `rank(query, sigIndex, opts?)` → `Result[]`
-h3 `buildSigIndex(cwd)` → `Map<string, string[]>`
-h3 `scan(sigs, filePath)` → `{ safe: string[], redacted: boolean }`
-h3 `score(cwd)` → `HealthResult`
-h2 Migration from v2.3 and earlier
-h2 v3.0 — Multi-Adapter Architecture (released)
-h2 Zero dependencies
-code-fence bash
-code-fence plain
-code-fence js
-code-fence ---
-```
+#### Setup with SigMap
 
-### packages/core/index.js
-```
-module.exports = { extract, rank, buildSigIndex, scan, score, adapt }
-function _resolveExtractor(language)
-function extract(src, language) → string[]
-function rank(query, sigIndex, opts) → { file: string, score: nu
-function buildSigIndex(cwd) → Map<string, string[]>
-function scan(sigs, filePath) → { safe: string[], redacte
-function score(cwd) → { * score: number, * grad
-function adapt(context, adapterName, opts = {}) → string
+1. **Generate base context**
+   ```bash
+   sigmap
+   # Writes: .github/copilot-instructions.md
+   ```
+
+2. **Start OpenCode**
+   ```bash
+   # With cloud LLM (OpenAI, Anthropic, etc.)
+   opencode --model gpt-4
+
+   # With local inference (see "Local LLM inference" section below)
+   opencode --api-base http://localhost:8000 --model local-model
+   ```
+
+3. **Inject context in OpenCode**  
+   When OpenCode opens the file editor, paste the contents of `.github/copilot-instructions.md` at the top of your current file as a comment block:
+   
+   ```javascript
+   // === SigMap context (paste from .github/copilot-instructions.md) ===
+   // ## File signatures
+   // auth/login.js: login(email, password) → Promise<{token, user}>
+   // auth/verify.js: verify(token) → boolean
+   // ... (rest of context)
+   // ===
+   
+   // Your actual code here
+   ```
+
+4. **Auto-refresh context during active development**  
+   Keep OpenCode running while you code:
+   ```bash
+   sigmap --watch
+   ```
+   OpenCode will see the updated `.github/copilot-instructions.md` when you reload the editor.
+
+#### Integration pattern
+
+OpenCode's strength is **local development with full IDE awareness**. Use SigMap to pre-select relevant files before asking:
+
+```bash
+# Before asking OpenCode about auth, rank the files
+sigmap ask "How is authentication handled?" --top 10
+# Copy those file signatures into the context
+
+# Then ask OpenCode: "Given the file signatures, explain the auth flow"
 ```
 
-### packages/adapters/codex.js
-```
-module.exports = { name, format, outputPath, write }
-function format(context, opts = {}) → string
-function outputPath(cwd) → string
-function write(context, cwd, opts = {})
-```
+---
 
-### packages/adapters/claude.js
-```
-module.exports = { name, format, outputPath, write }
-function format(context, opts = {}) → string
-function _confidenceMeta(opts)
-function outputPath(cwd) → string
-function write(context, cwd, opts = {})
-```
+### OpenHands
 
-### packages/adapters/gemini.js
-```
-module.exports = { name, format, outputPath, write }
-function format(context, opts = {}) → string
-function outputPath(cwd) → string
-function write(context, cwd, opts = {})
-function _confidenceMeta(opts)
-```
+**Status:** ⭐ **Growing** (75k GitHub stars)  
+**Type:** Open-source autonomous agent  
+**Model:** Works with any OpenAI-compatible API
 
-### packages/adapters/copilot.js
-```
-module.exports = { name, format, outputPath, write }
-function format(context, opts = {}) → string
-function _confidenceMeta(opts)
-function outputPath(cwd) → string
-function write(context, cwd, opts = {})
-```
+OpenHands runs as a web interface and can be configured to read codebase context.
 
-### packages/adapters/cursor.js
-```
-module.exports = { name, format, outputPath }
-function format(context, opts = {}) → string
-function _confidenceMeta(opts)
-function outputPath(cwd) → string
-```
+#### Setup with SigMap
 
-### packages/adapters/openai.js
-```
-module.exports = { name, format, outputPath }
-function format(context, opts = {}) → string
-function outputPath(cwd) → string
-function _confidenceMeta(opts)
-```
+1. **Generate context**
+   ```bash
+   sigmap --json > /tmp/sigmap-context.json
+   ```
 
-### packages/adapters/windsurf.js
-```
-module.exports = { name, format, outputPath }
-function format(context, opts = {}) → string
-function _confidenceMeta(opts)
-function outputPath(cwd) → string
-```
+2. **Start OpenHands with context path**
+   ```bash
+   CONTEXT_FILE=/path/to/.github/copilot-instructions.md openhands
+   ```
 
-## src
+3. **Use SigMap in prompts**  
+   In the OpenHands chat, reference the context:
+   ```
+   Review the files in .github/copilot-instructions.md and explain the auth system.
+   ```
 
-### src/security/patterns.js
-```
-module.exports = { PATTERNS }
-```
+---
 
-### src/security/scanner.js
-```
-module.exports = { scan }
-function scan(signatures, filePath) → { safe: string[], redacte
-```
+### Cline / Roo Code
 
-### src/extractors/cpp.js
-```
+**Status:** ⭐ **Popular** (61k GitHub stars)  
+**Type:** Open-source coding agent for VS Code/Cursor  
+**Model:** Works with OpenAI API or local models (via OpenAI-compatible Base URL)
+
+Cline and Roo Code are VSCode/Cursor extensions that provide agent-like coding assistance.
+
+#### Setup with SigMap
+
+1. **Install Cline or Roo Code**
+   ```bash
+   # In VS Code: Install from Extensions → search "Cline" or "Roo Code"
+   ```
+
+2. **Configure to use SigMap context**  
+   In your Cline settings (`.cline.md` in project root):
+   ```bash
+   # Auto-include SigMap context
+   sigmap
+   ```
+
+3. **Use in Cline prompts**  
+   Start your Cline request with:
+   ```
+   Read .github/copilot-instructions.md as project context, then implement X.
+   ```
+
+---
+
+### Aider
+
+**Status:** ⭐ **Established** (41k GitHub stars)  
+**Type:** Open-source AI pair programmer (CLI)  
+**Model:** Works with OpenAI API or local models
+
+Aider is a terminal-based AI pair programmer that can reference external context files.
+
+#### Setup with SigMap
+
+1. **Generate context**
+   ```bash
+   sigmap
+   ```
+
+2. **Add SigMap output to Aider's context**
+   ```bash
+   # Copy the context file to Aider's awareness
+   cp .github/copilot-instructions.md .aider.context.md
+   ```
+
+3. **Use Aider with context**
+   ```bash
+   aider --file src/auth.js \
+     --read .aider.context.md \
+     "Implement the login handler using the context provided"
+   ```
+
+---
+
+## Local LLM inference backends
+
+These are **inference engines**, not coding agents. They run the actual LLM model. Pair them with an agent (Cline, OpenCode, Aider) above using the "OpenAI-compatible Base URL" pattern (see next section).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [manojmallick/sigmap](https://github.com/manojmallick/sigmap) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
