@@ -1,113 +1,141 @@
 ---
 trigger: always_on
-description: **Name**: `@everworker/oneringai`
+description: This document provides context for AI assistants to continue development of the AMOS application.
 ---
 
-# Claude Development Guide
+# AMOS Development Guide
+
+This document provides context for AI assistants to continue development of the AMOS application.
 
 ## Project Overview
 
-**Name**: `@everworker/oneringai`
-**Purpose**: Unified AI agent library with multi-vendor support for text, image, video, audio, and agentic workflows
-**Language**: TypeScript (strict mode) | **Runtime**: Node.js 18+ | **Package**: ESM
+**Name**: AMOS (Advanced Multimodal Orchestration System)
+**Purpose**: Terminal-based agentic chat application with runtime configuration
+**Built on**: `@everworker/oneringai` library (UniversalAgent)
+**Language**: TypeScript (strict mode)
+**Runtime**: Node.js 18+
+**Package Type**: ESM
 
-## Architecture: Connector-First Design
+## Architecture
 
 ```
-User Code → Connector Registry → Agent → Provider Factory → ITextProvider
+┌─────────────────────────────────────────────────────────────────┐
+│                         AmosApp                                  │
+│  Main application class - ties all components together          │
+└────────────────┬────────────────────────────────────────────────┘
+                 │
+    ┌────────────┼────────────┬────────────┬────────────┬────────────┐
+    │            │            │            │            │            │
+    ▼            ▼            ▼            ▼            ▼            ▼
+┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Terminal│ │Command   │ │Connector │ │Tool      │ │Prompt    │ │Agent     │
+│   UI   │ │Processor │ │Manager   │ │Loader    │ │Manager   │ │Runner    │
+└────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+    │            │            │            │            │            │
+    │            │            │            │            │            ▼
+    │            │            │            │            │     ┌──────────────┐
+    │            │            │            │            │     │Universal     │
+    │            │            │            │            │     │Agent         │
+    │            │            │            │            │     │(@everworker)  │
+    │            │            │            │            │     └──────────────┘
+    ▼            ▼            ▼            ▼            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      data/ (filesystem)                          │
+│  config.json | connectors/*.json | sessions/ | tools/*.js       │
+│  prompts/*.md                                                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-**Key Principles:**
-1. **Connectors are single source of truth** for auth - no dual systems
-2. **Named connectors** - multiple keys per vendor (`openai-main`, `openai-backup`)
-3. **Explicit vendor** - uses `Vendor` enum, no auto-detection
-4. **Unified tool management** - `agent.tools === agent.context.tools` (same instance)
-
-## Core Classes
-
-- **Connector** (`src/core/Connector.ts`) — Static auth registry. `Connector.create()` / `Connector.get()`
-- **Agent** (`src/core/Agent.ts`) — Main agent extending BaseAgent. `Agent.create({ connector, model, tools })`
-- **AgentContextNextGen** (`src/core/context-nextgen/AgentContextNextGen.ts`) — Plugin-first context manager
-- **ToolManager** (`src/core/ToolManager.ts`) — Unified tool management + execution. `IToolExecutor`, `IDisposable`. Per-tool circuit breakers
-- **Vendor** (`src/core/Vendor.ts`) — Const object: `{ OpenAI, Anthropic, Google, GoogleVertex, Groq, Together, Grok, DeepSeek, Mistral, Perplexity, Ollama, Custom }`
-
-## AgentContextNextGen
-
-Plugin-first context manager. Features enable/disable plugins:
-
-```typescript
-interface ContextFeatures {
-  workingMemory?: boolean;         // default: true
-  inContextMemory?: boolean;       // default: true
-  persistentInstructions?: boolean; // default: false
-  userInfo?: boolean;              // default: false
-  toolCatalog?: boolean;           // default: false
-  sharedWorkspace?: boolean;       // default: false
-}
-```
-
-**Tool Catalog scoping:** `toolCategories` = built-in, `identities` = connector categories, `pinned` = always loaded. Plugin tools always available.
-
-**Key APIs:** `ctx.tools`, `ctx.memory`, `ctx.features`, `ctx.registerPlugin()`, `ctx.getPlugin<T>(name)`, `ctx.addUserMessage()`, `ctx.addAssistantResponse()`, `ctx.addToolResults()`, `ctx.prepare()`, `ctx.save()`, `ctx.load()`
-
-**Compaction:** Happens once before LLM call via `StrategyRegistry`. Default: algorithmic (75% threshold). Tool pairs always removed together.
-
-## Agent run() / stream()
-
-`RunOptions`: `thinking` (vendor-agnostic), `temperature`, `vendorOptions` — override per call.
-
-**Direct LLM access:** `agent.runDirect()` / `agent.streamDirect()` — bypasses context management. Options: `instructions`, `includeTools`, `temperature`, `maxOutputTokens`, `responseFormat`, `thinking`, `vendorOptions`
 
 ## Directory Structure
 
 ```
-src/
-├── index.ts                    # Main exports (~300 items)
-├── core/                       # Agent, BaseAgent, Connector, Vendor, ToolManager, constants
-│   ├── context-nextgen/        # AgentContextNextGen + plugins
-│   ├── orchestrator/           # createOrchestrator, orchestration tools
-│   ├── permissions/            # PermissionPolicyManager, policies, UserPermissionRulesEngine
-│   ├── mcp/                    # MCPClient, MCPRegistry
-│   └── StorageRegistry.ts      # Centralized storage backend registry
-├── domain/
-│   ├── entities/               # Model.ts, Tool.ts, Message.ts, Memory.ts, Services.ts (35+)
-│   ├── interfaces/             # ITextProvider, IAudioProvider, IToolExecutor, IDisposable, IContextStorage
-│   └── errors/                 # AIErrors.ts, MCPError.ts
-├── capabilities/               # search/, scrape/, images/, video/
-├── infrastructure/
-│   ├── providers/              # OpenAI, Anthropic, Google, Generic (+ base/)
-│   ├── resilience/             # CircuitBreaker, BackoffStrategy, RateLimiter
-│   └── storage/                # FileContextStorage, InMemoryStorage
-├── tools/                      # filesystem/, shell/, web/, desktop/, connector/, code/, json/
-├── connectors/                 # oauth/, storage/
-└── utils/
+apps/amos/
+├── src/
+│   ├── index.ts                    # Entry point, signal handlers
+│   ├── app.ts                      # AmosApp - main orchestrator
+│   │
+│   ├── config/
+│   │   ├── types.ts                # All type definitions + DEFAULT_CONFIG
+│   │   ├── ConfigManager.ts        # Load/save config to JSON
+│   │   └── index.ts
+│   │
+│   ├── commands/
+│   │   ├── CommandProcessor.ts     # Command routing, parsing, execution
+│   │   ├── BaseCommand.ts          # Abstract base class for commands
+│   │   ├── index.ts
+│   │   └── commands/
+│   │       ├── HelpCommand.ts      # /help
+│   │       ├── ModelCommand.ts     # /model - uses MODEL_REGISTRY
+│   │       ├── VendorCommand.ts    # /vendor - uses Vendor enum
+│   │       ├── ConnectorCommand.ts # /connector add|edit|delete|generate|use
+│   │       ├── ToolCommand.ts      # /tool list|enable|disable|reload
+│   │       ├── PromptCommand.ts    # /prompt list|show|use|clear|create|edit|delete
+│   │       ├── SessionCommand.ts   # /session save|load|list|new
+│   │       ├── ConfigCommand.ts    # /config get|set|reset
+│   │       ├── UtilCommands.ts     # /clear, /exit, /status, /history
+│   │       └── index.ts
+│   │
+│   ├── connectors/
+│   │   ├── ConnectorManager.ts     # CRUD + Connector.create() registration
+│   │   └── index.ts
+│   │
+│   ├── tools/
+│   │   ├── ToolLoader.ts           # Built-in + custom tool loading
+│   │   └── index.ts
+│   │
+│   ├── prompts/
+│   │   ├── PromptManager.ts        # Prompt template management
+│   │   └── index.ts
+│   │
+│   ├── agent/
+│   │   ├── AgentRunner.ts          # UniversalAgent wrapper
+│   │   └── index.ts
+│   │
+│   └── ui/
+│       ├── Terminal.ts             # readline, chalk, prompts, spinners
+│       └── index.ts
+│
+├── data/
+│   ├── config.json                 # App configuration (created on first run)
+│   ├── connectors/                 # Connector JSON files
+│   ├── sessions/                   # Session persistence
+│   ├── tools/                      # Custom tools (.js files)
+│   │   └── example-tool.js
+│   ├── prompts/                    # System prompt templates (.md files)
+│   │   ├── default.md              # Default helpful assistant
+│   │   ├── coding-assistant.md     # Expert coding assistant (basic)
+│   │   ├── coding-agent.md         # Autonomous coding agent with full tools
+│   │   ├── research-analyst.md     # Research and analysis
+│   │   └── writing-editor.md       # Writing and editing
+│   └── logs/                       # Log files (dev mode)
+│
+├── package.json
+├── tsconfig.json
+├── .gitignore
+├── README.md
+└── CLAUDE.md                       # This file
 ```
 
-## Unified Store Tools
+## Key Components
 
-All CRUD plugins share 5 generic tools routed by `StoreToolsManager`:
+### 1. AmosApp (`src/app.ts`)
 
-| Tool | Purpose |
-|------|---------|
-| `store_get(store, key?)` | Get entry or all entries |
-| `store_set(store, key, value, ...)` | Create/update entry |
-| `store_delete(store, key)` | Delete entry |
-| `store_list(store, options?)` | List with optional filtering |
-| `store_action(store, action, params?)` | Store-specific ops |
+Main orchestrator implementing `IAmosApp` interface:
 
-**Store IDs:** `"memory"`, `"context"`, `"instructions"`, `"user_info"`, `"workspace"` (+ custom `IStoreHandler` plugins)
+```typescript
+interface IAmosApp {
+  // Configuration
+  getConfig(): AmosConfig;
+  updateConfig(partial: Partial<AmosConfig>): void;
+  saveConfig(): Promise<void>;
 
-**Custom CRUD plugin:** Implement `IContextPluginNextGen` + `IStoreHandler` with `storeId`/`storeDescription` + handle methods. Register via `ctx.registerPlugin()` — auto-detected.
-
-## NextGen Plugins
-
-| Plugin | Store ID | Purpose |
-|--------|----------|---------|
-| **WorkingMemoryPluginNextGen** | `"memory"` | Tiered storage (raw/summary/findings), auto-eviction. `ctx.memory` shortcut |
-| **InContextMemoryPluginNextGen** | `"context"` | KV storage **directly in context** (no retrieval needed). Priority-based eviction (low→high, critical never evicted) |
+  // Component access
+  getConnectorManager(): IConnectorManager;
+  getToolLoader(): IToolLoader;
+  getPromptManager(): IPromptManager;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aantich/oneringai](https://github.com/aantich/oneringai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
