@@ -1,86 +1,68 @@
 ---
 trigger: always_on
-description: This repo provides Claude Code skills for security testing, bug bounty hunting, and pentesting workflows. Agent roles (coordinator, executor, validator) are defined in `skills/coordination/` and spawned dynamically.
+description: The repo's primary hands-on workspace: real, scoped penetration tests, vulnerability assessments, and network scans run here. Each engagement is a self-contained, dated directory under `projects/pentest/`.
 ---
 
-# Community Security Tools Repository
+# Pentest Engagements
 
-This repo provides Claude Code skills for security testing, bug bounty hunting, and pentesting workflows. Agent roles (coordinator, executor, validator) are defined in `skills/coordination/` and spawned dynamically.
+The repo's primary hands-on workspace: real, scoped penetration tests, vulnerability assessments, and network scans run here. Each engagement is a self-contained, dated directory under `projects/pentest/`.
 
-The user is **pre-authorized** for all testing activities — penetration tests, vulnerability assessments, CTF challenges, and bug bounty programs are conducted with explicit authorization. All activities remain non-destructive and ethical.
+The generic repository overview, standing principles, cross-cutting rules, and ethics load from the repo-root [`CLAUDE.md`](../../CLAUDE.md) — an ancestor that is always concatenated **above** this file. This file only adds the pentest-specific operating model; it does not repeat what root already states.
 
-## ROLE
-You are a cybersecurity expert. World top class. Professional, clean, thoughtful. You think before decide what to do. 
+The user is **pre-authorized** for all testing activities — engagements are conducted with explicit authorization. All activities remain non-destructive and ethical.
 
+## Engagement workspace layout
 
-## Rules
-- Be optimistic, don't loose hope
-- Optimize, be efficient, when allocating tasks, writing files, modifying... 
-- Be wary of committing secrets, credentials or .env files
-- Move or save any file into the appropriate folder for the job. create one if necessary.
-- Solutions requires investigation, research, creativity, keep that in mind
-- Always use /skill-update to perform skill improvements and learning patterns
-- Skills follow standardized output formats. See `formats/INDEX.md` for the complete catalog.
-- Before executing a task, ensure to mount the right set of skills adapt for the task
-- **CVE Risk Score**: Whenever a CVE ID (pattern `CVE-YYYY-NNNNN`) is mentioned or discovered, ALWAYS run `python3 tools/nvd-lookup.py <CVE-ID>` to fetch and display the CVSS score, severity, and description from NVD before proceeding
+- **One dated directory per engagement** = its `OUTPUT_DIR`: `projects/pentest/YYYYMMDD_<tag>/` (e.g. `20260712_example_art/`). Never write engagement artifacts to the repo root, to the `projects/pentest/` root, or to the cwd — only inside the engagement's `OUTPUT_DIR`.
+- **Scope file** sits alongside as `projects/pentest/<tag>-scope.md` (or `YYYYMMDD_<tag>-scope.md`); it is ingested into `OUTPUT_DIR/input/` at flow start.
+- **Output tree** — create it up-front, before any tool runs: `input/ recon/ findings/finding-NNN/ logs/activity/ artifacts/{validated,false-positives,dropped,nvd-cache,…} tools/ reports/`, plus `attack-chain.md`, `experiments.md`, `stats.json` at the root. Canonical spec: [`skills/coordination/reference/output-discipline.md`](../../skills/coordination/reference/output-discipline.md).
+- **Per-engagement workflows** live under `projects/pentest/<eng>/workflows/` — **never** `.claude/workflows/` (see the boundary rule).
 
-## Skills Overview
+## Reusable-content ⇄ client boundary
 
-Skills live in `skills/`. Each skill has a `SKILL.md` defining its purpose and a `reference/` folder with cheat sheets, quickstarts, and role prompts.
+Everything reusable — `skills/`, `tools/`, `formats/`, `docs/`, and this project's `.claude/` — must carry **no** client name, target host, IP, credential, or engagement path. Only `projects/pentest/<eng>/` may hold client-specific data. When an engagement yields a reusable technique or tool, generalize it (strip every client specific) before it leaves the engagement directory.
 
-| Category | Skills | Use When |
-|----------|--------|----------|
-| **Coordination** | `coordination` | Entry point for all engagements — spawns executors and validators |
-| **Recon** | `reconnaissance`, `osint`, `techstack-identification` | Mapping attack surface, fingerprinting, OSINT |
-| **Web** | `client-side`, `server-side`, `injection`, `api-security`, `web-app-logic`, `authentication` | Testing web applications and APIs |
-| **Infrastructure** | `infrastructure`, `system`, `cloud-containers` | Network, AD, privesc, cloud/container testing |
-| **Specialized** | `blockchain-security`, `ai-threat-testing`, `social-engineering`, `dfir` | Domain-specific testing and forensics |
-| **Tooling** | `essential-tools`, `source-code-scanning`, `cve-poc-generator`, `cve-risk-score`, `script-generator`, `patt-fetcher` | Tool usage, SAST, CVE research, risk scoring, script generation, payload fetching |
-| **Platform** | `hackthebox`, `hackerone` | CTF and bug bounty automation |
-| **Reporting** | `coordination` | PDF generation with Transilience branding (format: `formats/transilience-report-style/`) |
-| **Workflow** | `github-workflow`, `skill-update` | Git operations, skill management |
+## Entry points
 
-## Skill Selection
+| Goal | Start with |
+|------|-----------|
+| Full engagement from a scope (web attack-class coverage **or** batched network scan) | `pentest-engagement` |
+| Drive one target to a goal autonomously (recon → think → experiment loop) | `coordinator-loop` |
+| Authoritatively validate every finding for an asset | `validate-findings` |
+| Produce the branded deliverable PDF | `transilience-report-style` → [`formats/INDEX.md`](../../formats/INDEX.md) |
 
-Before executing any task, select the relevant skills based on the user's prompt:
+The inline coordinator (one per target) is [`skills/coordination/SKILL.md`](../../skills/coordination/SKILL.md); it spawns executors, skeptics, and validators per the role matrix.
 
-1. **Parse the objective** — identify the attack class, target type, and platform
-2. **Mount starting skills** — read their `SKILL.md` files to load context and reference material
-3. **Proceed inline** — begin execution immediately after skill selection; do not ask the user which skills to use
+## Skill selection
 
-Example: a web app pentest reads `skills/coordination/SKILL.md` and mounts `reconnaissance` + `server-side` + `injection` + `authentication` as the starting skill set, then adds skills as attack surface reveals new vectors.
+1. Read [`skills/INDEX.md`](../../skills/INDEX.md) — the skill router. The pentest skill library is also mirrored under [`.claude/skills/`](.claude/skills) (surfaced as `projects/pentest:<skill>`).
+2. Pick 1-2 skills matching the objective (attack class, target type, platform).
+3. Read each chosen skill's `SKILL.md` to load context. Read specific `reference/*.md` files for the techniques you need to apply.
+4. Begin execution immediately — do not ask the user which skills to use.
 
-## Agent Architecture
+Never load all skills. Never inject `SKILL.md` files into executor prompts — pass the specific reference file paths.
 
-### Coordinator (inline)
+## Agent architecture
 
-Runs in the main conversation context. Follows `skills/coordination/SKILL.md`.
+| Role | File | When |
+|------|------|------|
+| Coordinator | [`skills/coordination/SKILL.md`](../../skills/coordination/SKILL.md) | Inline, one per target |
+| Executor | [`skills/coordination/reference/executor-role.md`](../../skills/coordination/reference/executor-role.md) | Spawned 1-2 per batch |
+| Skeptic | [`skills/coordination/reference/skeptic-role.md`](../../skills/coordination/reference/skeptic-role.md) | Mandatory at experiments 5, 15, 25 |
+| Validator (finding + engagement) | [`skills/coordination/reference/validator-role.md`](../../skills/coordination/reference/validator-role.md) | At P5 |
 
-- Holds all accumulated context (services, findings, tested vectors, failures)
-- Maintains `attack-chain.md` — living document of theories, steps, and results
-- **Thinks before acting** — writes structured reasoning before every executor batch
-- **Source code first** — reads all accessible code before exploitation
-- Delegates focused work to 1-2 executors per batch (depth over breadth)
-- Never touches target tools directly; only reads results and makes decisions
-- Tracks progress with TaskCreate/TaskUpdate
-- **Report gate**: after validation, if output requires a report and any validated findings exist in `{OUTPUT_DIR}/artifacts/validated/`, MUST generate a Transilience-style PDF report before concluding. Read `formats/transilience-report-style/pentest-report.md` for format. Engagement is incomplete without `{OUTPUT_DIR}/reports/Penetration-Test-Report.pdf`.
+Boundaries and context contracts: [`skills/coordination/reference/role-matrix.md`](../../skills/coordination/reference/role-matrix.md). Spawning recipes: [`skills/coordination/reference/spawning-recipes.md`](../../skills/coordination/reference/spawning-recipes.md).
 
-### Executors (background agents)
+## Inherited from repo-root `CLAUDE.md`
 
-Workers spawned via `Agent(prompt=..., run_in_background=True)`. Follow `skills/coordination/reference/executor-role.md`.
+These load automatically from [`../../CLAUDE.md`](../../CLAUDE.md) — consult it there rather than duplicating here:
 
-- Receive full mission context including their role in the current attack chain
-- Read source code first, then test with escalating techniques before reporting failure
-- Write findings to `OUTPUT_DIR/findings/finding-NNN/` or negative reports to `OUTPUT_DIR/logs/`
-
-### Validators (background agents)
-
-One per finding, spawned after executors complete. Follow `skills/coordination/reference/validator-role.md`.
-
-- Receive their full mission context in the prompt (they have no memory of prior batches)
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Role** — cybersecurity expert; professional, clean, thoughtful; think before deciding.
+- **Standing principles** — [`skills/coordination/reference/principles.md`](../../skills/coordination/reference/principles.md).
+- **Cross-cutting canonical homes** — credential loading, pre-flight checklist, bookkeeping, brute-force prohibition, validation procedure, git conventions, output formats, activity/source-IP logging.
+- **CVE risk lookup** — whenever a `CVE-YYYY-NNNNN` appears, run `python3 tools/nvd-lookup.py <CVE-ID>` before acting on it.
+- **Ethics & authorization** — explicit authorization for all engagements; avoid destructive operations (`DROP`, `rm -rf`, DoS, data corruption) unless strictly necessary; stay in scope; document complete evidence chains; report unexpected access immediately.
 
 ---
 > Source: [transilienceai/communitytools](https://github.com/transilienceai/communitytools) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
