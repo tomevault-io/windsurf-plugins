@@ -1,107 +1,28 @@
 ---
 trigger: always_on
-description: This file defines repository-wide defaults for AI agents.
+description: 本目录是 `@weapp-vite/dashboard` 的真实 UI 验证项目。开发或优化 dashboard 页面时，优先使用本 app 反馈真实 analyze payload 和 CLI UI 链路，不要只启动 `packages/dashboard` 的包级 Vite dev server 作为最终判断依据。
 ---
 
-# AGENTS Guidelines (Global Baseline)
+# AGENTS Guidelines for dashboard-ui-lab
 
-This file defines repository-wide defaults for AI agents.
-If a deeper directory contains its own `AGENTS.md`, apply that local file first, then fall back to this one.
+本目录是 `@weapp-vite/dashboard` 的真实 UI 验证项目。开发或优化 dashboard 页面时，优先使用本 app 反馈真实 analyze payload 和 CLI UI 链路，不要只启动 `packages/dashboard` 的包级 Vite dev server 作为最终判断依据。
 
-## 1. Monorepo Routing
+## Required Workflow
 
-- Core bundler/compiler/runtime work:
-  - `packages/weapp-vite`
-  - `packages-runtime/wevu`
-  - `packages-runtime/wevu-compiler`
-  - `packages-runtime/weapi`
-  - `packages-runtime/web`
-  - `packages-runtime/web-apis`
-  - related integration checks in `e2e/` and `e2e-apps/github-issues`
-- Template/app parity work:
-  - source app in `apps/*`
-  - target template in `templates/*`
-- Docs and site:
-  - `website/`, `docs/`
+- 修改 `packages/dashboard/src/**` 后，通过本 app 验证前先同步 dashboard 构建产物：
+  - `pnpm --filter @weapp-vite/dashboard build`
+- 启动真实联调页面：
+  - `pnpm --filter dashboard-ui-lab dev:ui`
+- 如需验证生产态 UI：
+  - `pnpm --filter dashboard-ui-lab build:ui`
+- 包级 `pnpm --filter @weapp-vite/dashboard dev` 只允许用于组件空态或快速样式排查，不能作为 dashboard 页面优化的最终验收入口。
 
-Avoid cross-package edits unless the change is truly shared.
+## Validation Notes
 
-## 2. Fast-Path Commands (Prefer Smallest Verification First)
-
-- Install once:
-  - `pnpm install`
-- Narrow builds:
-  - `pnpm build:pkgs`
-  - `pnpm build:apps`
-  - `pnpm build:templates`
-- Targeted tests:
-  - `pnpm vitest run <single test file>`
-  - `pnpm vitest run <fileA> <fileB>`
-- Full regression (only when needed):
-  - `pnpm test`
-  - `pnpm e2e`
-
-Do not default to full monorepo test runs when a targeted test can prove the change.
-
-### 2.1 Dist Sync Guard (Prevent Stale CLI/Runtime)
-
-- When editing `packages/*/src/**` or `packages-runtime/*/src/**`, assume downstream apps/templates/e2e consume built artifacts from `dist` (not live `src`).
-- Do not assume `pnpm test`, `pnpm e2e:ci`, or `pnpm --filter <app> build/dev` will pick up fresh `src` changes automatically; if validation goes through a published package entry, CLI entry, or downstream app/template/e2e project, rebuild the touched package first so `dist` is up to date.
-- Before validating through `apps/*`, `templates/*`, or `e2e-apps/*`, rebuild each touched package first:
-  - `pnpm --filter <package-name> build`
-- If the same work session changes `packages/*/src/**` or `packages-runtime/*/src/**` again, rebuild again before the next downstream validation; do not reuse older `dist` from an earlier pass.
-- For `weapp-vite` CLI changes specifically (`packages/weapp-vite/src/cli/**`, `packages/weapp-vite/src/mcp.ts`, or other CLI entry dependencies), always run:
-  - `pnpm --filter weapp-vite build`
-  - then run app-level checks such as `pnpm --filter <app> dev` / `build` / `open` / `run mcp:*`
-- If a verification result does not reflect recent source edits, treat stale `dist` as the first suspect and rebuild before deeper debugging.
-
-### 2.2 Standard Execution Template (Required for CLI-linked App Validation)
-
-- Trigger condition:
-  - any changes under `packages/weapp-vite/src/cli/**`
-  - any changes that can affect `packages/weapp-vite/dist/cli.mjs` runtime behavior
-  - then validate via `apps/*`, `templates/*`, or `e2e-apps/*`
-- Required command sequence (minimal form):
-  1. `pnpm --filter weapp-vite build`
-  2. `pnpm --filter <target-app> <dev|build|open|run mcp:*>`
-  3. targeted assertion command (for example `rg`, `test`, or output-file existence check)
-- Required assistant status line before step 2:
-  - `dist sync: rebuilt weapp-vite before downstream validation`
-- If step 1 was skipped by mistake:
-  - stop current diagnosis
-  - rebuild `weapp-vite`
-  - rerun downstream validation once
-  - only then continue root-cause analysis
-
-### 2.3 Cross-Platform CI/CD Guard (Required for Windows/macOS/Linux-sensitive changes)
-
-- Trigger condition:
-  - any changes under `e2e/scripts/**`, workflow files, CLI/process-launch code, filesystem utilities, or path-normalization logic
-  - any failure pattern where Linux/macOS pass but Windows fails, or only one OS fails within the same matrix
-- Treat a matrix split by OS as a platform compatibility bug first, not a product-feature regression first.
-- Before editing, identify whether the failure happens:
-  - before tests start
-  - during process launch / command resolution
-  - during filesystem/path assertions
-  - only after runtime behavior diverges
-- For process execution code:
-  - prefer `execa` or an equivalent cross-platform wrapper unless there is a clear reason to use raw `spawn`
-  - if using `spawn` directly, explicitly evaluate Windows command resolution (`.cmd`, shell built-ins, quoting) and set `shell` only when needed
-  - never assume `pnpm`, `npm`, `git`, or other CLI commands resolve the same way on Windows as on Unix runners
-- For paths and files:
-  - normalize path separators in any persisted snapshot, report, matcher, or emitted label that can be consumed across OSes
-  - do not assume case-sensitive filesystems; double-check import path casing and fixture filenames
-  - avoid assertions that depend on native path separators, drive-letter shape, or platform-specific temp directories
-  - prefer repo-relative or normalized POSIX-style paths in logs, reports, and snapshot-like output
-- For shell behavior:
-  - avoid relying on `&&`, `;`, inline env assignment, `ulimit`, or other shell-specific syntax in shared scripts unless the workflow step is explicitly OS-scoped
-  - prefer Node/TypeScript orchestration over shell glue when the same logic must run on all runners
-- For files generated in tests or CI:
-  - account for CRLF vs LF when parsing multiline output
-  - avoid depending on executable bit semantics or POSIX-only permissions
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `dev:ui` 是首选本地反馈路径，因为它会通过 `wv dev --ui` 注入 dashboard 所需的真实分析上下文。
+- 页面优化必须在本 app 启动后查看可访问地址，再根据实际渲染调整布局、文字密度、状态区和响应式表现。
+- 如果 dashboard 源码在同一工作轮次再次变更，重新运行 `pnpm --filter @weapp-vite/dashboard build` 后再刷新或重启本 app 验证。
 
 ---
 > Source: [weapp-vite/weapp-vite](https://github.com/weapp-vite/weapp-vite) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
