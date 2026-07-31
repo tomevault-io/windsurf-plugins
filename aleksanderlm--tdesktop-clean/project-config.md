@@ -1,139 +1,98 @@
 ---
 trigger: always_on
-description: **Use `auto`:** In the actual codebase, variable types are almost always deduced using `auto` (or `const auto`, `const auto &`) rather than being written out explicitly. Examples in this guide may use explicit types for clarity, but prefer `auto` in practice.
+description: For tasks requiring working with user facing UI components.
 ---
 
-# RPL (Reactive Programming Library) Guide
+# Telegram Desktop UI Styling
 
-## Coding Style Note
+## Style Definition Files
 
-**Use `auto`:** In the actual codebase, variable types are almost always deduced using `auto` (or `const auto`, `const auto &`) rather than being written out explicitly. Examples in this guide may use explicit types for clarity, but prefer `auto` in practice.
+UI element styles (colors, fonts, paddings, margins, icons, etc.) are defined in `.style` files using a custom syntax. These files are located alongside the C++ source files they correspond to within specific UI component directories (e.g., `Telegram/SourceFiles/ui/chat/chat.style`).
 
-```cpp
-// Prefer this:
-auto intProducer = rpl::single(123);
-const auto &lifetime = existingLifetime;
-
-// Instead of this:
-rpl::producer<int> intProducer = rpl::single(123);
-const rpl::lifetime &lifetime = existingLifetime;
-
-// Sometimes needed if deduction is ambiguous or needs help:
-auto user = std::make_shared<UserData>();
-auto data = QByteArray::fromHex("...");
+Definitions from other `.style` files can be included using the `using` directive at the top of the file:
+```style
+using "ui/basic.style";
+using "ui/widgets/widgets.style";
 ```
 
-## Introduction
+The central definition of named colors happens in `Telegram/SourceFiles/ui/colors.palette`. This file allows for theme generation and loading colors from various sources.
 
-RPL is the reactive programming library used in this project, residing in the `rpl::` namespace. It allows handling asynchronous streams of data over time.
+### Syntax Overview
 
-The core concept is the `rpl::producer`, which represents a stream of values that can be generated over a certain lifetime.
+1.  **Built-in Types:** The syntax recognizes several base types inferred from the value assigned:
+    *   `int`: Integer numbers (e.g., `lineHeight: 20;`)
+    *   `bool`: Boolean values (e.g., `useShadow: true;`)
+    *   `pixels`: Pixel values, ending with `px` (e.g., `borderWidth: 1px;`). Generated as `int` in C++.
+    *   `color`: Named colors defined in `colors.palette` (e.g., `background: windowBg;`)
+    *   `icon`: Defined inline using a specific syntax (see below). Generates `style::icon`.
+    *   `margins`: Four pixel values for margins or padding. Requires `margins(top, right, bottom, left)` syntax (e.g., `margin: margins(10px, 5px, 10px, 5px);` or `padding: margins(8px, 8px, 8px, 8px);`). Generates `style::margins` (an alias for `QMargins`).
+    *   `size`: Two pixel values for width and height (e.g., `iconSize: size(16px, 16px);`). Generates `style::size`.
+    *   `point`: Two pixel values for x and y coordinates (e.g., `textPos: point(5px, 2px);`). Generates `style::point`.
+    *   `align`: Alignment keywords (e.g., `textAlign: align(center);` or `iconAlign: align(left);`). Generates `style::align`.
+    *   `font`: Font definitions (e.g., `font: font(14px semibold);`). Generates `style::font`.
+    *   `double`: Floating point numbers (e.g., `disabledOpacity: 0.5;`)
 
-## Producers: `rpl::producer<Type, Error = no_error>`
+    *Note on Borders:* Borders are typically defined using multiple fields like `border: pixels;` (for width) and `borderFg: color;` (for color), rather than a single CSS-like property.
 
-The fundamental building block is `rpl::producer<Type, Error>`. It produces values of `Type` and can optionally signal an error of type `Error`. By default, `Error` is `rpl::no_error`, indicating that the producer does not explicitly handle error signaling through this mechanism.
+2.  **Structure Definition:** You can define complex data structures directly within the `.style` file:
+    ```style
+    MyButtonStyle { // Defines a structure named 'MyButtonStyle'
+      textPadding: margins; // Field 'textPadding' expects margins type
+      icon: icon;         // Field 'icon' of type icon
+      height: pixels;     // Field 'height' of type pixels
+    }
+    ```
+    This generates a `struct MyButtonStyle { ... };` inside the `namespace style`. Fields will have corresponding C++ types (`style::margins`, `style::icon`, `int`).
 
-```cpp
-// A producer that emits integers.
-auto intProducer = /* ... */; // Type: rpl::producer<int>
+3.  **Variable Definition & Inheritance:** Variables are defined using `name: value;` or `groupName { ... }`. They can be of built-in types or custom structures. Structures can be initialized inline or inherit from existing variables.
 
-// A producer that emits strings and can potentially emit a CustomError.
-auto stringProducerWithError = /* ... */; // Type: rpl::producer<QString, CustomError>
-```
+    **Icon Definition Syntax:** Icons are defined inline using the `icon{...}` syntax. The generator probes for `.svg` files or `.png` files (including `@2x`, `@3x` variants) based on the provided path stem.
+    ```style
+    // Single-part icon definition:
+    myIconSearch: icon{{ "gui/icons/search", iconColor }};
+    // Multi-part icon definition (layers drawn bottom-up):
+    myComplexIcon: icon{
+      { "gui/icons/background", iconBgColor },
+      { "gui/icons/foreground", iconFgColor }
+    };
+    // Icon with path modifiers (PNG only for flips, SVG only for size):
+    myFlippedIcon: icon{{ "gui/icons/arrow-flip_horizontal", arrowColor }};
+    myResizedIcon: icon{{ "gui/icons/logo-128x128", logoColor }}; // Forces 128x128 for SVG
+    ```
 
-Producers are typically lazy; they don't start emitting values until someone subscribes to them.
+    **Other Variable Examples:**
+    ```style
+    // Simple variables
+    buttonHeight: 30px;
+    activeButtonColor: buttonBgActive; // Named color from colors.palette
 
-## Lifetime Management: `rpl::lifetime`
+    // Variable of a custom structure type, initialized inline
+    defaultButton: MyButtonStyle {
+      textPadding: margins(10px, 15px, 10px, 15px); // Use margins(...) syntax
+      icon: myIconSearch; // Assign the previously defined icon variable
+      height: buttonHeight; // Reference another variable
+    }
 
-Reactive pipelines have a limited duration, managed by `rpl::lifetime`. An `rpl::lifetime` object essentially holds a collection of cleanup callbacks. When the lifetime ends (either explicitly destroyed or goes out of scope), these callbacks are executed, tearing down the associated pipeline and freeing resources.
+    // Another variable inheriting from 'defaultButton' and overriding/adding fields
+    primaryButton: MyButtonStyle(defaultButton) {
+      icon: myComplexIcon; // Override icon with the multi-part one
+      backgroundColor: activeButtonColor; // Add a field not in MyButtonStyle definition
+    }
 
-```cpp
-rpl::lifetime myLifetime;
-// ... later ...
-// myLifetime is destroyed, cleanup happens.
+    // Style group (often used for specific UI elements)
+    chatInput { // Example using separate border properties and explicit padding
+      border: 1px;                          // Border width
+      borderFg: defaultInputFieldBorder;    // Border color (named color)
+      padding: margins(5px, 10px, 5px, 10px); // Use margins(...) syntax for padding field
+      backgroundColor: defaultChatBg;       // Background color
+    }
+    ```
 
-// Or, pass a lifetime instance to manage a pipeline's duration.
-rpl::lifetime &parentLifetime = /* ... get lifetime from context ... */;
-```
+## Code Generation
 
-## Starting a Pipeline: `rpl::start_...`
-
-To consume values from a producer, you start a pipeline using one of the `rpl::start_...` methods. These methods subscribe to the producer and execute callbacks for the events they handle.
-
-The most common method is `rpl::start_with_next`:
-
-```cpp
-auto counter = /* ... */; // Type: rpl::producer<int>
-rpl::lifetime lifetime;
-
-// Counter is consumed here, use std::move if it's an l-value.
-std::move(
-    counter
-) | rpl::start_with_next([=]\(int nextValue) {
-    // Process the next integer value emitted by the producer.
-    qDebug() << "Received: " << nextValue;
-}, lifetime); // Pass the lifetime to manage the subscription.
-// Note: `counter` is now in a moved-from state and likely invalid.
-
-// If you need to start the same producer multiple times, duplicate it:
-// rpl::duplicate(counter) | rpl::start_with_next(...);
-
-// If you DON'T pass a lifetime to a start_... method:
-auto counter2 = /* ... */; // Type: rpl::producer<int>
-rpl::lifetime subscriptionLifetime = std::move(
-    counter2
-) | rpl::start_with_next([=]\(int nextValue) { /* ... */ });
-// The returned lifetime MUST be stored. If it's discarded immediately,
-// the subscription stops instantly.
-// `counter2` is also moved-from here.
-```
-
-Other variants allow handling errors (`_error`) and completion (`_done`):
-
-```cpp
-auto dataStream = /* ... */; // Type: rpl::producer<QString, Error>
-rpl::lifetime lifetime;
-
-// Assuming dataStream might be used again, we duplicate it for the first start.
-// If it's the only use, std::move(dataStream) would be preferred.
-rpl::duplicate(
-    dataStream
-) | rpl::start_with_error([=]\(Error &&error) {
-    // Handle the error signaled by the producer.
-    qDebug() << "Error: " << error.text();
-}, lifetime);
-
-// Using dataStream again, perhaps duplicated again or moved if last use.
-rpl::duplicate(
-    dataStream
-) | rpl::start_with_done([=] {
-    // Execute when the producer signals it's finished emitting values.
-    qDebug() << "Stream finished.";
-}, lifetime);
-
-// Last use of dataStream, so we move it.
-std::move(
-    dataStream
-) | rpl::start_with_next_error_done(
-    [=]\(QString &&value) { /* handle next value */ },
-    [=]\(Error &&error) { /* handle error */ },
-    [=] { /* handle done */ },
-    lifetime);
-```
-
-## Transforming Producers
-
-RPL provides functions to create new producers by transforming existing ones:
-
-*   `rpl::map`: Transforms each value emitted by a producer.
-    ```cpp
-    auto ints = /* ... */; // Type: rpl::producer<int>
-    // The pipe operator often handles the move implicitly for chained transformations.
-    auto strings = std::move(
-        ints // Explicit move is safer
-    ) | rpl::map([](int value) {
-        return QString::number(value * 2);
-    }); // Emits strings like "0", "2", "4", ...
+A code generation tool processes these `.style` files and `colors.palette` to create C++ objects.
+- The `using` directives resolve dependencies between `.style` files.
+- Custom structure definitions (like `MyButtonStyle`) generate corresponding `struct MyButtonStyle { ... };` within the `namespace style`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
