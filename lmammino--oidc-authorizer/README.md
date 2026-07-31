@@ -5,10 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lmammino/oidc-authorizer](https://github.com/lmammino/oidc-authorizer).
+Original source: `` in [lmammino/oidc-authorizer](https://github.com/lmammino/oidc-authorizer).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
