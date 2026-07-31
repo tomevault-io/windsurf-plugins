@@ -1,134 +1,100 @@
 ---
 trigger: always_on
-description: We use bd (beads) for issue tracking instead of Markdown TODOs or external tools.
+description: This repository contains a Rust library and binary crate that converts Markdown text to
 ---
 
-# Quarto Rust monorepo
+This repository contains a Rust library and binary crate that converts Markdown text to
+Pandoc's AST representation using custom tree-sitter grammars for Markdown.
 
-## **WORK TRACKING**
+The Markdown variant in this repository is close but **not identical** to Pandoc's grammar.
 
-We use bd (beads) for issue tracking instead of Markdown TODOs or external tools.
-We use plans for additional context and bookkeeping. Write plans to `claude-notes/plans/YYYY-MM-DD-<description>.md`, and reference the plan file in the issues.
+Crucially, this converter is willing and able to emit error messages when Markdown constructs
+are written incorrectly on disk.
 
-### Quick Reference
+This tree-sitter setup is somewhat unique because Markdown requires a two-step process:
+one tree-sitter grammar to establish the block structure, and another tree-sitter grammar
+to parse the inline structure within each block.
 
-```bash
-# Find ready work (no blockers)
-bd ready --json
+As a result, in this repository all traversals of the tree-sitter data structure
+need to be done with the traversal helpers in traversals.rs.
 
-# Create new issue
-bd create "Issue title" -t bug|feature|task -p 0-4 -d "Description" --json
+## Best practices in this repo
 
-# Create with explicit ID (for parallel workers)
-bd create "Issue title" --id worker1-100 -p 1 --json
+- If you want to create a test file, do so in the `tests/` directory.
+- **IMPORTANT**: When making changes to the code, ALWAYS run both `cargo check` AND `cargo test` to ensure changes compile and don't affect behavior. The test suite is fast enough to run after each change. Never skip running `cargo test` - it must always be executed together with `cargo check`.
+- **CRITICAL**: Do NOT assume changes are safe if ANY tests fail, even if they seem unrelated. Some tests require pandoc to be properly installed to pass. Always ensure ALL tests pass before and after changes.
 
-# Create with labels
-bd create "Issue title" -t bug -p 1 -l bug,critical --json
+## **CRITICAL**: HOW TO DO CODING WORK IN THIS REPO
 
-# Create multiple issues from markdown file
-bd create -f feature-plan.md --json
+Whenever you start working on a coding task, follow these steps:
 
-# Update issue status
-bd update <id> --status in_progress --json
+- Make a plan to yourself.
+  - The plan should include adding appropriate tests to the test suite.
+  - **FIRST**: Write the test that you think should fail
+  - **SECOND**: Run ONLY that test and verify it fails with the expected error
+  - **THIRD**: Implement the fix
+  - **FOURTH**: Run the test again and verify it now passes
+- Work on the plan item by item.
+- You are not done until the test you wrote passes.
+- You are not done until the test you wrote is integrated to our test suite.
+- If you run out of ideas and still can't make the test pass, do not erase the test. Report back to me and we will work on it together.
+- If in the process of writing tests you run into an unexpected parse error, store it in a separate file and report it to me. We're still improving the parser and it's possible that you will run into bugs.
 
-# Link discovered work (old way)
-bd dep add <discovered-id> <parent-id> --type discovered-from
+## BEFORE YOU IMPLEMENT ANY BUG FIX - MANDATORY CHECKLIST
 
-# Create and link in one command (new way)
-bd create "Issue title" -t bug -p 1 --deps discovered-from:<parent-id> --json
+Before implementing ANY bug fix, you MUST complete this checklist in order:
 
-# Label management
-bd label add <id> <label> --json
-bd label remove <id> <label> --json
-bd label list <id> --json
-bd label list-all --json
+- [ ] Have you written the test?
+- [ ] Have you run the test and confirmed it fails?
+- [ ] Have you verified the failure is exactly what you expected?
+- [ ] Only after all three above are complete: proceed with implementation
 
-# Filter issues by label
-bd list --label bug,critical --json
+This is non-negotiable. Do not skip this process.
 
-# Complete work
-bd close <id> --reason "Done" --json
+# Error messages
 
-# Show dependency tree
-bd dep tree <id>
+The error message infrastructure is based on Clinton Jeffery's TOPLAS 2003 paper "Generating Syntax Errors from Examples". You don't need to read the entire paper to understand what's happening. The abstract of the paper is:
 
-# Get issue details
-bd show <id> --json
+LR parser generators are powerful and well-understood, but the parsers they generate are not suited to provide good error messages. Many compilers incur extensive modifications to the source grammar to produce useful syntax error messages. Interpreting the parse state (and input token) at the time of error is a nonintrusive alternative that does not entangle the error recovery mechanism in error message production. Unfortunately, every change to the grammar may significantly alter the mapping from parse states to diagnostic messages, creating a maintenance problem. Merr is a tool that allows a compiler writer to associate diagnostic messages with syntax errors by example, avoiding the need to add error productions to the grammar or interpret integer parse states. From a specification of errors and messages, Merr runs the compiler on each example error to obtain the relevant parse state and input token, and generates a yyerror() function that maps parse states and input tokens to diagnostic messages. Merr enables useful syntax error messages in LR-based compilers in a manner that is robust in the presence of grammar changes.
 
-# Import with collision detection
-bd import -i .beads/issues.jsonl --dry-run             # Preview only
-bd import -i .beads/issues.jsonl --resolve-collisions  # Auto-resolve
-```
+We're not using "merr" here; we are merely implementing the same technique.
 
-### Workflow
+## Creating error examples
 
-1. **Check for ready work**: Run `bd ready` to see what's unblocked
-2. **Claim your task**: `bd update <id> --status in_progress`
-3. **Work on it**: Implement, test, document
-4. **Discover new work**: If you find bugs or TODOs, create issues:
-   - Old way (two commands): `bd create "Found bug in auth" -t bug -p 1 --json` then `bd dep add <new-id> <current-id> --type discovered-from`
-   - New way (one command): `bd create "Found bug in auth" -t bug -p 1 --deps discovered-from:<current-id> --json`
-5. **Complete**: `bd close <id> --reason "Implemented"`
-6. **Export**: Changes auto-sync to `.beads/issues.jsonl` (5-second debounce)
+The corpus of error examples in this repository uses a consolidated format where each error code has a single JSON file with multiple test cases.
 
-### Issue Types
+### Error Corpus Structure
 
-- `bug` - Something broken that needs fixing
-- `feature` - New functionality
-- `task` - Work item (tests, docs, refactoring)
-- `epic` - Large feature composed of multiple issues
-- `chore` - Maintenance work (dependencies, tooling)
+- **Source files**: `resources/error-corpus/Q-*.json` - One file per error code
+- **Generated files**: `resources/error-corpus/case-files/*.qmd` - Test case files (generated by build script)
+- **Autogen table**: `resources/error-corpus/_autogen-table.json` - Parser state mappings (generated)
 
-### Priorities
+### JSON Format
 
-- `0` - Critical (security, data loss, broken builds)
-- `1` - High (major features, important bugs)
-- `2` - Medium (nice-to-have features, minor bugs)
-- `3` - Low (polish, optimization)
-- `4` - Backlog (future ideas)
+Each `Q-*.json` file contains:
+- Error metadata (code, title, message, notes) - appears once
+- `cases` array - multiple test scenarios that trigger the error in different contexts
 
-### Dependency Types
-
-- `blocks` - Hard dependency (issue X blocks issue Y)
-- `related` - Soft relationship (issues are connected)
-- `parent-child` - Epic/subtask relationship
-- `discovered-from` - Track issues discovered during work
-
-Only `blocks` dependencies affect the ready work queue.
-
-## **CRITICAL - TEST-DRIVEN DEVELOPMENT**
-
-When fixing ANY bug:
-1. **FIRST**: Write the test
-2. **SECOND**: Run the test and verify it fails as expected
-3. **THIRD**: Implement the fix
-4. **FOURTH**: Run the test and verify it passes
-
-**This is non-negotiable. Never implement a fix before verifying the test fails. Stop and ask the user if you cannot think of a way to mechanically test the bad behavior. Only deviate if writing new features.**
-
-## Workspace structure
-
-### `crates` - corresponds to the crates in the public quarto-markdown repo
-
-- `crates/qmd-syntax-helper`: a binary to help users convert qmd files to the new syntax
-- `crates/quarto-error-reporting`: a library to help create uniform, helpful, beautiful error messages
-- `crates/quarto-markdown-pandoc`: a binary to parse qmd text and produce Pandoc AST and other formats
-- `crates/quarto-source-map`: a library to help maintain information about the source location of data structures in text files
-- `crates/quarto-yaml`: a YAML parser that produces YAML objects and accurate fine-grained source location of elements
-- `crates/tree-sitter-qmd`: tree-sitter grammars for block and inline parsers
-- `crates/wasm-qmd-parser`: A WASM module with some entry points from `crates/quarto-markdown-pandoc`
-
-## General Instructions
-
-- in this repository, "qmd" means "quarto markdown", the dialect of markdown we are developing. Although we aim to be largely compatible with Pandoc, discrepancies in the behavior might not be bugs.
-- the qmd format only supports the inline syntax for a link [link](./target.html), and not the reference-style syntax [link][1].
-- Always strive for test documents as small as possible. Prefer a large number of small test documents instead of small number of large documents.
-- When fixing bugs, always try to isolate and fix one bug at a time.
-- **CRITICAL - TEST FIRST**: When fixing bugs using tests, you MUST run the failing test BEFORE implementing any fix. This is non-negotiable. Verify the test fails in the expected way, then implement the fix, then verify the test passes.
-- If you need to fix parser bugs, you will find use in running the application with "-v", which will provide a large amount of information from the tree-sitter parsing process, including a print of the concrete syntax tree out to stderr.
+Example structure:
+```json
+{
+  "code": "Q-2-10",
+  "title": "Error Title",
+  "message": "Error message text",
+  "notes": [
+    {
+      "message": "Additional context",
+      "label": "capture-label",
+      "noteType": "simple"
+    }
+  ],
+  "cases": [
+    {
+      "name": "simple",
+      "description": "Description of this test case",
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [quarto-dev/quarto-markdown](https://github.com/quarto-dev/quarto-markdown) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
