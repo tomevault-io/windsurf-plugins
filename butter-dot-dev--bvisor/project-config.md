@@ -1,109 +1,39 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: index.ts              # Package entry point, re-exports Sandbox
 ---
 
-# CLAUDE.md
+# Node SDK
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-bVisor is an in-process Linux sandbox SDK and runtime written in Zig. It intercepts and virtualizes Linux syscalls from userspace using seccomp user notifier, providing isolation without VM overhead. Unlike gVisor (which runs as a separate service), bVisor runs directly in your application for millisecond-level sandbox lifecycle.
-
-The goal of bVisor is to be a lightweight sandbox for untrusted user or LLM-generated code run on the server. Its most minimal implementation creates a virtualized filesystem and runs a bash command inside of it, but the goal is to increase sandboxing over time. This is intended as alternative to docker, gvisor, or other vm-based sandboxes.
-
-**Status**: Early proof-of-concept. Core seccomp interception works; syscall virtualization is incomplete.
-
-**Greenfield project**: No users, no backward compatibility concerns. Delete dead code freely.
-
-## Build Commands
-
-```bash
-zig build                    # Build all targets (exe, tests, node .node binaries)
-zig build test               # Run unit tests in Docker container
-zig build run                # Run executable in Docker container
-zig build run-node           # Run E2E node SDK tests with current zig core build
-```
-
-
-**Requires**: Zig 0.16.0-dev or later, Docker
-
-
-## Architecture
-
-**Supervisor-child process model with syscall interception:**
+## Layout
 
 ```
-src/
-  core/                 # Zig sandbox runtime
-    root.zig            # Public exports for SDK usage
-    main.zig            # Entry point, runs smoke test
-    setup.zig           # Fork into child/supervisor, seccomp BPF installation
-    Supervisor.zig      # Main loop: recv notif → handle → send response
-    types.zig           # LinuxResult, Logger
-    LogBuffer.zig       # Thread-safe buffered output capture (stdout/stderr)
-    smoke_test.zig      # TDD-style smoke test scorecard
+src/sdks/node/
+  index.ts              # Package entry point, re-exports Sandbox
+  src/
+    native.ts        # FFI contract: NativeModule interface, platform check, require()
+    napi.ts             # External<T> phantom type for opaque native handles
+    sandbox.ts          # Sandbox class, public API
+  test.ts               # Smoke test, run via `npm run dev`
+  platforms/
+    linux-arm64/        # @bvisor/linux-arm64 package
+    linux-x64/          # @bvisor/linux-x64 package
+  zig/                  # Zig source for native bindings
+    lib.zig             # Entry point, napi module registration
+    napi.zig            # N-API helpers, ZigExternal(T)
+    Sandbox.zig         # Sandbox implementation
+```
 
-    seccomp/
-      filter.zig        # BPF filter installation, returns notify FD
-      notif.zig         # Helper to construct test notifications
+## FFI boundary
 
-    utils/              # Linux utility modules
-      memory_bridge.zig # process_vm_readv/writev (test mode: local pointer access)
-      pidfd.zig         # pidfd_open/pidfd_getfd (test mode: passthrough)
-      proc_info.zig     # TID/TGID info, clone flags via /proc (test mode: mock maps)
+`src/native.ts` is the single source of truth for the Zig-TS contract. When adding a new native function: add it to the `NativeModule` interface in `native.ts`, implement in Zig.
 
-    virtual/            # Virtualization layer
-      OverlayRoot.zig   # Root overlay filesystem management
-      path.zig          # Path routing: prefix-tree rules (block/passthrough/cow/tmp/proc)
-      proc/             # Thread/process virtualization
-        Threads.zig     # Manages all threads, kernel TID → Thread mapping
-        Thread.zig      # Single thread: tid, thread_group, namespace, fd_table, parent/children
-        ThreadGroup.zig # Thread group (process): tgid, threads map
-        ThreadStatus.zig # Thread status information
-        Namespace.zig   # TID namespace with refcounting, NsTid allocation
-      fs/               # File descriptor virtualization
-        FdTable.zig     # Per-process fd table, refcounted (shared on CLONE_FILES)
-        FdEntry.zig     # Entry type in fd table, containing pointer to File and CLOEXEC flag
-        File.zig        # Virtual file with Backend union and refcounting
-        backend/        # File backend implementations
-          passthrough.zig # Kernel FD passthrough (/dev/null, /dev/zero, /dev/random, /dev/urandom)
-          cow.zig       # Copy-on-write files (default for most paths)
-          tmp.zig       # Overlay-redirected /tmp files
-          procfile.zig  # Virtualized /proc files
-      syscall/          # Syscall handlers
-        syscalls.zig    # Switch statement over syscalls, parsing notifications
-        e2e_test.zig    # End-to-end syscall tests
-        handlers/       # Individual syscall handlers
-          openat.zig    # openat handler with path rules (block/allow/virtualize)
-          close.zig     # close handler
-          read.zig, write.zig, readv.zig, writev.zig  # I/O handlers
-          lseek.zig     # File seek
-          dup.zig, dup3.zig  # FD duplication
-          fstat.zig, fstatat64.zig  # File metadata
-          getpid.zig, getppid.zig, gettid.zig         # ID handlers
-          exit.zig, exit_group.zig                    # Exit handlers
-          kill.zig, tkill.zig                         # Signal handlers
-          uname.zig     # System info (virtualizes hostname/domainname)
-          sysinfo.zig   # System stats (virtualizes uptime/procs)
-          lseek.zig     # repositioning file offsets
-          faccessat.zig # checking user permissions to directory
-          fcntl.zig     # file descriptor control
-          pipe2.zig     # pipe creation
-          getdents64.zig # directory listing
-          mkdirat.zig   # directory creation
-          unlinkat.zig  # file/directory removal
-          execve.zig    # program execution
-          socket.zig, socketpair.zig, connect.zig, shutdown.zig  # Socket lifecycle
-          ioctl.zig     # device I/O control
-          sendto.zig, recvfrom.zig, sendmsg.zig, recvmsg.zig    # Socket I/O
+Opaque handles use `External<T>` (defined in `napi.ts`) on the TS side. On the Zig side, `ZigExternal(T)` in `zig/napi.zig` handles wrapping/unwrapping — all JS-facing values are plain `c.napi_value`.
 
-  sdks/
-    node/               # Node.js SDK (see src/sdks/node/CLAUDE.md)
+## Platform packages
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+The `platforms/` subdirectories are npm workspace packages. `npm install` on Linux resolves them locally via workspaces. On macOS, `npm install` will fail due to `os`/`cpu` filtering in the platform package.json files -- use `npm run dev` to build and test in Docker instead.
 
 ---
 > Source: [butter-dot-dev/bVisor](https://github.com/butter-dot-dev/bVisor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
