@@ -1,37 +1,179 @@
 ---
 trigger: always_on
-description: `src/` contains the main CLI and shared libraries, organized by feature areas such as `cli/`, `utils/`, `services/`, `generation/`, and `brain/`. Cross-package work lives in `packages/`: `ccjk-app` (Expo client), `ccjk-daemon`, `ccjk-wire`, `ccjk-server`, and related workspace modules. Tests live under `tests/` for integration, e2e, and v2 coverage, while some units also sit beside code in `src/**/__tests__`. Docs and the VitePress site live in `docs/`; reusable templates are in `templates/`; re
+description: **Last Updated**: Mon Oct 27 19:39:26 CST 2025
 ---
 
-# Repository Guidelines
+# Templates Module
 
-## Project Structure & Module Organization
-`src/` contains the main CLI and shared libraries, organized by feature areas such as `cli/`, `utils/`, `services/`, `generation/`, and `brain/`. Cross-package work lives in `packages/`: `ccjk-app` (Expo client), `ccjk-daemon`, `ccjk-wire`, `ccjk-server`, and related workspace modules. Tests live under `tests/` for integration, e2e, and v2 coverage, while some units also sit beside code in `src/**/__tests__`. Docs and the VitePress site live in `docs/`; reusable templates are in `templates/`; release and maintenance scripts are in `scripts/`.
+**Last Updated**: Mon Oct 27 19:39:26 CST 2025
+[Root](../CLAUDE.md) > **templates**
 
-## Build, Test, and Development Commands
-Use `pnpm` with Node 20+.
+## Module Responsibilities
 
-- `pnpm dev`: run the CLI entrypoint with `tsx`.
-- `pnpm build`: build the root package with `unbuild`.
-- `pnpm typecheck`: run TypeScript without emitting files.
-- `pnpm lint` / `pnpm lint:fix`: run ESLint, optionally auto-fixing issues.
-- `pnpm test:run`: run the main Vitest suite once.
-- `pnpm test:coverage`: collect coverage; the repo enforces 80% thresholds.
-- `pnpm test:integration:run` and `pnpm test:e2e:run`: run higher-level suites.
-- `pnpm --filter @ccjk/daemon test`: target a workspace package directly.
+Template configuration module providing multilingual configuration templates, workflow templates, and AI memory templates, supporting both Chinese and English environments for comprehensive Claude Code environment setup.
 
-## Coding Style & Naming Conventions
-The codebase is TypeScript-first, ESM by default, with 2-space indentation, semicolons, single quotes, trailing commas (`es5`), and `printWidth: 100`. ESLint uses `@antfu/eslint-config`; Prettier handles formatting. Prefer descriptive file names matching the exported responsibility, such as `provider-registry.ts` or `setup-wizard.test.ts`. Use `camelCase` for variables/functions, `PascalCase` for types/classes/components, and `SCREAMING_SNAKE_CASE` only for true constants and environment keys.
+## Entry Points and Startup
 
-## Testing Guidelines
-Vitest is the primary test runner; Jest remains configured for legacy `src/**/__tests__` patterns. Name tests `*.test.ts` or `*.spec.ts`. Keep fast unit tests near the module when practical, and place scenario-driven coverage in `tests/integration` or `tests/e2e`. Before opening a PR, run the smallest relevant suite plus `pnpm typecheck`.
+- **Main Entry Points**:
+  - `common/` - Common configuration templates
+  - `zh-CN/` - Chinese template collection
+  - `en/` - English template collection
 
-## Commit & Pull Request Guidelines
-Commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, with optional scopes and headers under 100 characters. Recent history favors concise subjects such as `fix: remove duplicate prompt hints in model config`. PRs should explain user-visible impact, list validation commands run, link issues when applicable, and include screenshots or terminal output for UI, docs, or CLI behavior changes.
+## External Interfaces
 
-## Security & Configuration Tips
-Do not commit secrets; use `.env.example` as the reference for new variables. Treat `tests/analyzers/fixtures/` and similar sample projects as fixtures, not production code. For contract or release work, run `pnpm contract:check` and `pnpm release:verify` before publishing.
+### Template Structure
+
+```
+templates/
+├── common/                    # Common configuration templates
+│   ├── CLAUDE.md             # Base CLAUDE.md template
+│   └── settings.json         # Claude settings template
+├── zh-CN/                    # Chinese template collection
+│   ├── memory/               # AI memory templates
+│   └── workflow/             # Workflow templates
+└── en/                       # English template collection
+    ├── memory/               # AI memory templates
+    └── workflow/             # Workflow templates
+```
+
+### Template Category System
+
+```typescript
+// Template categories
+interface TemplateCategories {
+  memory: {
+    'mcp.md': string // MCP service guidance
+    'technical-guides.md': string // Technical implementation guides
+    'personality.md': string // AI personality configuration
+    'rules.md': string // Core programming principles
+  }
+  workflow: {
+    common: WorkflowCommands // Common tools workflow
+    plan: WorkflowCommands // Feature planning workflow
+    sixStep: WorkflowCommands // Six-step development workflow
+    bmad: WorkflowCommands // BMad enterprise workflow
+    git: WorkflowCommands // Git operation workflow
+  }
+}
+```
+
+## Key Dependencies and Configuration
+
+### Template Installation Process
+
+- Templates are copied to `~/.claude/` directory during initialization
+- Language-specific templates selected based on user configuration
+- Automatic template merging and update mechanisms
+- Template validation and consistency checking
+
+### Configuration Files
+
+- `common/settings.json` - Base Claude settings template
+- `common/CLAUDE.md` - Project guidance template
+- Language-specific memory and workflow templates
+
+## Data Models
+
+### Workflow Template Structure
+
+#### Common Tools Workflow (`common/`)
+
+- **Commands**: `init-project.md` - Project initialization command
+- **Agents**: `init-architect.md`, `get-current-datetime.md` - Core utility agents
+
+#### Feature Planning Workflow (`plan/`)
+
+- **Commands**: `feat.md` - Feature development command
+- **Agents**: `planner.md`, `ui-ux-designer.md` - Planning and design agents
+
+#### Six-Step Development Workflow (`sixStep/`)
+
+- **Commands**: `workflow.md` - Six-step development process
+- **Agents**: None - Process-oriented workflow
+
+#### BMad Enterprise Workflow (`bmad/`)
+
+- **Commands**: `bmad-init.md` - BMad initialization
+- **Agents**: Complete enterprise development team simulation
+
+#### Git Workflow (`git/`)
+
+- **Commands**: `git-commit.md`, `git-worktree.md`, `git-cleanBranches.md`, `git-rollback.md`
+- **Agents**: None - Git operation commands
+
+### Memory Template Structure
+
+#### AI Memory Templates
+
+- **mcp.md**: MCP service usage guidelines and best practices
+- **technical-guides.md**: Technical execution guidelines and standards
+- **personality.md**: AI assistant behavior and personality configuration
+- **rules.md**: Core programming principles and workflow methodology
+
+### Template Language Support
+
+#### Chinese Templates (`zh-CN/`)
+
+- Complete Chinese localization for all templates
+- Chinese AI interaction patterns
+- Chinese technical documentation standards
+- Chinese workflow descriptions
+
+#### English Templates (`en/`)
+
+- Complete English localization for all templates
+- English AI interaction patterns
+- English technical documentation standards
+- English workflow descriptions
+
+## Testing and Quality
+
+### Template Validation Strategy
+
+- **Consistency Testing**: Verify Chinese-English template correspondence
+- **Syntax Testing**: Validate markdown syntax and formatting
+- **Content Testing**: Verify template completeness and accuracy
+- **Integration Testing**: Test template installation and configuration
+
+### Quality Metrics
+
+#### ✅ Template Completeness
+
+- Chinese-English template parity: **100%**
+- Workflow category coverage: **5/5 categories**
+- Memory template coverage: **4/4 templates**
+- Command template coverage: **Complete**
+
+#### ✅ Language Support
+
+- Chinese localization: **Complete**
+- English localization: **Complete**
+- Template structure consistency: **Validated**
+- Content accuracy: **Verified**
+
+#### ✅ Installation Testing
+
+- Template copying mechanism: **Tested**
+- Language selection logic: **Verified**
+- Template merging: **Functional**
+- Update mechanism: **Working**
+
+### Test Coverage
+
+- **Template Tests**: `tests/templates/chinese-templates.test.ts`
+- **Installation Tests**: Integration tests for template deployment
+- **Validation Tests**: Template structure and content verification
+
+## FAQ
+
+### Q: How to add new workflow templates?
+
+1. Add template files in both `zh-CN/workflow/` and `en/workflow/`
+2. Update workflow configuration in `src/config/workflows.ts`
+3. Add corresponding translation keys in i18n files
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [miounet11/ccjk](https://github.com/miounet11/ccjk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
