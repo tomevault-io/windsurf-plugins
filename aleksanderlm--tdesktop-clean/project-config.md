@@ -1,9 +1,9 @@
 ---
 trigger: always_on
-description: For tasks requiring changing or adding user facing phrases and text parts.
+description: **Use `auto`:** In the actual codebase, variable types are almost always deduced using `auto` (or `const auto`, `const auto &`) rather than being written out explicitly. Examples in this guide may use explicit types for clarity, but prefer `auto` in practice.
 ---
 
-# Telegram Desktop Localization
+# RPL (Reactive Programming Library) Guide
 
 ## Coding Style Note
 
@@ -11,103 +11,129 @@ description: For tasks requiring changing or adding user facing phrases and text
 
 ```cpp
 // Prefer this:
-auto currentTitle = tr::lng_settings_title(tr::now);
-auto nameProducer = GetNameProducer(); // Returns rpl::producer<...>
+auto intProducer = rpl::single(123);
+const auto &lifetime = existingLifetime;
 
 // Instead of this:
-QString currentTitle = tr::lng_settings_title(tr::now);
-rpl::producer<QString> nameProducer = GetNameProducer();
+rpl::producer<int> intProducer = rpl::single(123);
+const rpl::lifetime &lifetime = existingLifetime;
+
+// Sometimes needed if deduction is ambiguous or needs help:
+auto user = std::make_shared<UserData>();
+auto data = QByteArray::fromHex("...");
 ```
 
-## String Resource File
+## Introduction
 
-Base user-facing English strings are defined in the `lang.strings` file:
+RPL is the reactive programming library used in this project, residing in the `rpl::` namespace. It allows handling asynchronous streams of data over time.
 
-`Telegram/Resources/langs/lang.strings`
+The core concept is the `rpl::producer`, which represents a stream of values that can be generated over a certain lifetime.
 
-This file uses a key-value format with named placeholders:
+## Producers: `rpl::producer<Type, Error = no_error>`
 
-```
-"lng_settings_title" = "Settings";
-"lng_confirm_delete_item" = "Are you sure you want to delete {item_name}?";
-"lng_files_selected" = "{count} files selected"; // Simple count example (see Pluralization)
-```
-
-Placeholders are enclosed in curly braces, e.g., `{name}`, `{user}`. A special placeholder `{count}` is used for pluralization rules.
-
-### Pluralization
-
-For keys that depend on a number (using the `{count}` placeholder), English typically requires two forms: singular and plural. These are defined in `lang.strings` using `#one` and `#other` suffixes:
-
-```
-"lng_files_selected#one" = "{count} file selected";
-"lng_files_selected#other" = "{count} files selected";
-```
-
-While only `#one` and `#other` are defined in the base `lang.strings`, the code generation process creates C++ accessors for all six CLDR plural categories (`#zero`, `#one`, `#two`, `#few`, `#many`, `#other`) to support languages with more complex pluralization rules.
-
-## Translation Process
-
-While `lang.strings` provides the base English text and the keys, the actual translations are managed via Telegram's translations platform (translations.telegram.org) and loaded dynamically at runtime from the API. The keys from `lang.strings` (including the `#one`/`#other` variants) are used on the platform.
-
-## Code Generation
-
-A code generation tool processes `lang.strings` to create C++ structures and accessors within the `tr` namespace. These allow type-safe access to strings and handling of placeholders and pluralization. Generated keys typically follow the pattern `tr::lng_key_name`.
-
-## String Usage in Code
-
-Strings are accessed in C++ code using the generated objects within the `tr::` namespace. There are two main ways to use them: reactively (returning an `rpl::producer`) or immediately (returning the current value).
-
-### 1. Reactive Usage (rpl::producer)
-
-Calling a generated string function directly returns a reactive producer, typically `rpl::producer<QString>`. This producer automatically updates its value whenever the application language changes.
+The fundamental building block is `rpl::producer<Type, Error>`. It produces values of `Type` and can optionally signal an error of type `Error`. By default, `Error` is `rpl::no_error`, indicating that the producer does not explicitly handle error signaling through this mechanism.
 
 ```cpp
-// Key: "settings_title" = "Settings";
-auto titleProducer = tr::lng_settings_title(); // Type: rpl::producer<QString>
+// A producer that emits integers.
+auto intProducer = /* ... */; // Type: rpl::producer<int>
 
-// Key: "confirm_delete_item" = "Are you sure you want to delete {item_name}?";
-auto itemNameProducer = /* ... */; // Type: rpl::producer<QString>
-auto confirmationProducer = tr::lng_confirm_delete_item( // Type: rpl::producer<QString>
-    tr::now, // NOTE: tr::now is NOT passed here for reactive result
-    lt_item_name,
-    std::move(itemNameProducer)); // Placeholder producers should be moved
+// A producer that emits strings and can potentially emit a CustomError.
+auto stringProducerWithError = /* ... */; // Type: rpl::producer<QString, CustomError>
 ```
 
-### 2. Immediate Usage (Current Value)
+Producers are typically lazy; they don't start emitting values until someone subscribes to them.
 
-Passing `tr::now` as the first argument retrieves the string's current value in the active language (typically as a `QString`).
+## Lifetime Management: `rpl::lifetime`
+
+Reactive pipelines have a limited duration, managed by `rpl::lifetime`. An `rpl::lifetime` object essentially holds a collection of cleanup callbacks. When the lifetime ends (either explicitly destroyed or goes out of scope), these callbacks are executed, tearing down the associated pipeline and freeing resources.
 
 ```cpp
-// Key: "settings_title" = "Settings";
-auto currentTitle = tr::lng_settings_title(tr::now); // Type: QString
+rpl::lifetime myLifetime;
+// ... later ...
+// myLifetime is destroyed, cleanup happens.
 
-// Key: "confirm_delete_item" = "Are you sure you want to delete {item_name}?";
-const auto currentItemName = QString("My Document"); // Type: QString
-auto currentConfirmation = tr::lng_confirm_delete_item( // Type: QString
-    tr::now, // Pass tr::now for immediate value
-    lt_item_name, currentItemName); // Placeholder value is a direct QString (or convertible)
+// Or, pass a lifetime instance to manage a pipeline's duration.
+rpl::lifetime &parentLifetime = /* ... get lifetime from context ... */;
 ```
 
-### 3. Placeholders (`{tag}`)
+## Starting a Pipeline: `rpl::start_...`
 
-Placeholders like `{item_name}` are replaced by providing arguments after `tr::now` (for immediate) or as the initial arguments (for reactive). A corresponding `lt_tag_name` constant is passed before the value.
+To consume values from a producer, you start a pipeline using one of the `rpl::start_...` methods. These methods subscribe to the producer and execute callbacks for the events they handle.
 
-*   **Immediate:** Pass the direct value (e.g., `QString`, `int`).
-*   **Reactive:** Pass an `rpl::producer` of the corresponding type (e.g., `rpl::producer<QString>`). Remember to `std::move` the producer or use `rpl::duplicate` if you need to reuse the original producer afterwards.
+The most common method is `rpl::start_with_next`:
 
-### 4. Pluralization (`{count}`)
+```cpp
+auto counter = /* ... */; // Type: rpl::producer<int>
+rpl::lifetime lifetime;
 
-Keys using `{count}` require a numeric value for the `lt_count` placeholder. The correct plural form (`#zero`, `#one`, ..., `#other`) is automatically selected based on this value and the current language rules.
+// Counter is consumed here, use std::move if it's an l-value.
+std::move(
+    counter
+) | rpl::start_with_next([=]\(int nextValue) {
+    // Process the next integer value emitted by the producer.
+    qDebug() << "Received: " << nextValue;
+}, lifetime); // Pass the lifetime to manage the subscription.
+// Note: `counter` is now in a moved-from state and likely invalid.
 
-*   **Immediate (`tr::now`):** Pass a `float64` or `int` (which is auto-converted to `float64`).
+// If you need to start the same producer multiple times, duplicate it:
+// rpl::duplicate(counter) | rpl::start_with_next(...);
+
+// If you DON'T pass a lifetime to a start_... method:
+auto counter2 = /* ... */; // Type: rpl::producer<int>
+rpl::lifetime subscriptionLifetime = std::move(
+    counter2
+) | rpl::start_with_next([=]\(int nextValue) { /* ... */ });
+// The returned lifetime MUST be stored. If it's discarded immediately,
+// the subscription stops instantly.
+// `counter2` is also moved-from here.
+```
+
+Other variants allow handling errors (`_error`) and completion (`_done`):
+
+```cpp
+auto dataStream = /* ... */; // Type: rpl::producer<QString, Error>
+rpl::lifetime lifetime;
+
+// Assuming dataStream might be used again, we duplicate it for the first start.
+// If it's the only use, std::move(dataStream) would be preferred.
+rpl::duplicate(
+    dataStream
+) | rpl::start_with_error([=]\(Error &&error) {
+    // Handle the error signaled by the producer.
+    qDebug() << "Error: " << error.text();
+}, lifetime);
+
+// Using dataStream again, perhaps duplicated again or moved if last use.
+rpl::duplicate(
+    dataStream
+) | rpl::start_with_done([=] {
+    // Execute when the producer signals it's finished emitting values.
+    qDebug() << "Stream finished.";
+}, lifetime);
+
+// Last use of dataStream, so we move it.
+std::move(
+    dataStream
+) | rpl::start_with_next_error_done(
+    [=]\(QString &&value) { /* handle next value */ },
+    [=]\(Error &&error) { /* handle error */ },
+    [=] { /* handle done */ },
+    lifetime);
+```
+
+## Transforming Producers
+
+RPL provides functions to create new producers by transforming existing ones:
+
+*   `rpl::map`: Transforms each value emitted by a producer.
     ```cpp
-    int count = 1;
-    auto filesText = tr::lng_files_selected(tr::now, lt_count, count); // Type: QString
-    count = 5;
-    filesText = tr::lng_files_selected(tr::now, lt_count, count); // Uses "files_selected#other"
-    ```
-
+    auto ints = /* ... */; // Type: rpl::producer<int>
+    // The pipe operator often handles the move implicitly for chained transformations.
+    auto strings = std::move(
+        ints // Explicit move is safer
+    ) | rpl::map([](int value) {
+        return QString::number(value * 2);
+    }); // Emits strings like "0", "2", "4", ...
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
