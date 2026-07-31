@@ -1,6 +1,6 @@
 # vcspull
 
-> Tome by [vcs-python](https://github.com/vcs-python/vcspull) — distributed by [TomeVault](https://tomevault.io/claim/vcs-python)
+> Tome by [vcs-python](https://github.com/vcs-python/vcspull), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
@@ -15,7 +15,7 @@ Original source: `.cursor/rules/*.mdc` in [vcs-python/vcspull](https://github.co
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. [Browse all formats](https://tomevault.io/claim/vcs-python)
+Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/vcs-python/vcspull](https://github.com/vcs-python/vcspull)
 
 ---
 
@@ -23,6 +23,6 @@ Install this config instantly:
 ```
 npx tomevault install vcs-python/vcspull
 ```
-Or browse all formats at [https://tomevault.io/claim/vcs-python](https://tomevault.io/claim/vcs-python).
+Source: [github.com/vcs-python/vcspull](https://github.com/vcs-python/vcspull).
 
 <!-- genome:t-i-p -->
