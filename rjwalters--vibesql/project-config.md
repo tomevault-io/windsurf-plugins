@@ -1,194 +1,168 @@
 ---
 trigger: always_on
-description: This guide describes the agent workflows for Loom orchestration in this repository.
+description: This repository uses **Loom** for AI-powered development orchestration.
 ---
 
-# Loom Agent Workflows
+# Loom Orchestration - Repository Guide
 
-This guide describes the agent workflows for Loom orchestration in this repository.
+This repository uses **Loom** for AI-powered development orchestration.
 
-**Loom Version**: {{LOOM_VERSION}}
+**Loom Version**: 0.13.0
+**Installation Date**: 2026-07-22
 
-## Agent Archetypes
+## What is Loom?
 
-Loom uses specialized agent roles based on universal archetypes. Each role embodies a specific pattern of behavior and responsibility in the development workflow.
+Loom is a CLI + daemon for AI-powered development orchestration. It coordinates AI development workers using git worktrees and a forge (GitHub or Gitea) as the coordination layer. It supports manual coordination (Manual Orchestration Mode) and continuous autonomous orchestration (Daemon Mode).
 
-### The Eight Roles
+**Loom Repository**: https://github.com/rjwalters/loom
 
-#### 1. Builder (The Magician)
-**Mode**: Manual
-**File**: `builder.md`
-**Purpose**: Transform ideas into working code
+> **Forge note**: The `gh` commands shown below are for GitHub. For Gitea repositories, Loom scripts handle API calls internally. The label-based workflow is identical regardless of forge.
 
-The Builder manifests features and fixes through skilled implementation. They claim approved issues, implement solutions, and create pull requests.
+## Usage Modes
 
-**Workflow**:
-```
-loom:issue → claim → implement → test → PR (loom:review-requested)
-```
+Loom supports two complementary workflows:
 
-**Key Activities**:
-- Claim `loom:issue` labeled issues
-- Create worktree for isolated development
-- Implement features or fix bugs
-- Write tests and documentation
-- Create PR with `loom:review-requested` label
+### 1. Manual Orchestration Mode (MOM)
 
-#### 2. Judge (The Justice)
-**Mode**: Autonomous (5 min intervals)
-**File**: `judge.md`
-**Purpose**: Ensure quality and fairness through review
+Use Claude Code terminals with specialized roles for hands-on development coordination.
 
-The Judge evaluates pull requests with objectivity and thoroughness. They provide constructive feedback and make approval decisions.
+**Setup**:
+1. Open Claude Code in this repository
+2. Use slash commands to assume roles: `/builder`, `/judge`, `/curator`, etc.
+3. Each terminal acts as a specialized agent following role guidelines
 
-**Workflow**:
-```
-loom:review-requested → review → approve/request-changes → loom:pr or back to author
-```
+**When to use MOM**:
+- Learning Loom workflows
+- Direct control over agent actions
+- Debugging and iterating on processes
+- Working with smaller teams
 
-**Key Activities**:
-- Find PRs with `loom:review-requested` label
-- Review code for quality, correctness, and style
-- Test the changes locally
-- Approve or request changes
-- Update labels appropriately
+**Example workflow**:
+```bash
+# Terminal 1: Builder working on feature
+/builder
+# Claims loom:ready issue, implements, creates PR
 
-#### 3. Curator (The Hermit)
-**Mode**: Autonomous (5 min intervals)
-**File**: `curator.md`
-**Purpose**: Maintain and enhance the issue backlog
+# Terminal 2: Judge reviewing PRs
+/judge
+# Reviews PR with loom:review-requested, provides feedback
 
-The Curator brings wisdom and clarity to issues. They enhance vague issues with technical details and context.
-
-**Workflow**:
-```
-unlabeled issue → enhance → loom:curated → (approval) → loom:issue
+# Terminal 3: Curator maintaining issues
+/curator
+# Enhances unlabeled issues, marks as loom:ready
 ```
 
-**Key Activities**:
-- Find issues without workflow labels
-- Add technical details and acceptance criteria
-- Link related issues and documentation
-- Mark as `loom:curated` for human approval
-- After approval, mark as `loom:issue`
+### 2. Daemon Mode
 
-#### 4. Architect (The Emperor)
-**Mode**: Autonomous (15 min intervals)
-**File**: `architect.md`
-**Purpose**: Design system structure and make technical decisions
+Run the Loom daemon for fully autonomous system orchestration.
 
-The Architect brings order through careful planning. They create architectural proposals for significant changes.
-
-**Workflow**:
-```
-analyze → create proposal → loom:architect → (approval) → loom:issue
+**Setup**:
+```bash
+./.loom/scripts/daemon.sh start   # auto-build enabled (default)
 ```
 
-**Key Activities**:
-- Analyze system architecture
-- Identify improvement opportunities
-- Create detailed architectural proposals
-- Document decisions and tradeoffs
-- Label proposals with `loom:architect`
-
-#### 5. Hermit (The Fool)
-**Mode**: Autonomous (15 min intervals)
-**File**: `hermit.md`
-**Purpose**: Simplify through removal and letting go
-
-The Hermit identifies what can be removed or simplified. They propose removing unused code and reducing complexity.
-
-**Workflow**:
-```
-analyze → identify bloat → create removal proposal → loom:hermit → (approval) → loom:issue
+```bash
+/loom           # Activate daemon orchestration (daemon must be started first)
+/loom --merge   # Aggressive autonomous development
 ```
 
-**Key Activities**:
-- Analyze codebase complexity
-- Find unused or redundant code
-- Identify over-engineered solutions
-- Create simplification proposals
-- Label proposals with `loom:hermit`
+**When to use Daemon Mode**:
+- Production-scale development
+- Fully autonomous agent workflows
+- Hands-off orchestration
 
-#### 6. Doctor (The Star)
-**Mode**: Manual
-**File**: `doctor.md`
-**Purpose**: Fix bugs and maintain health
+**Graceful shutdown**: `./.loom/scripts/daemon.sh stop` (or `touch .loom/stop-daemon`)
 
-The Doctor brings hope through fixing what's broken. They address bugs, PR feedback, and maintenance tasks.
+## Agent Roles
 
-**Workflow**:
+Loom provides specialized roles for different development tasks. Each role follows specific guidelines and uses GitHub labels for coordination.
+
+### Available Roles
+
+**Builder** (Manual, `builder.md`)
+- **Purpose**: Implement features and fixes
+- **Workflow**: Claims `loom:issue` → implements → tests → creates PR with `loom:review-requested`
+- **When to use**: Feature development, bug fixes, refactoring
+
+**Judge** (Autonomous 5min, `judge.md`)
+- **Purpose**: Evaluate pull requests
+- **Workflow**: Finds `loom:review-requested` PRs → evaluates → approves or requests changes
+- **When to use**: Code quality assurance, automated evaluations
+
+**Curator** (Autonomous 5min, `curator.md`)
+- **Purpose**: Enhance and organize issues
+- **Workflow**: Finds unlabeled issues → adds context → marks as `loom:issue`
+- **When to use**: Issue backlog maintenance, quality improvement
+
+**Architect** (Autonomous 15min, `architect.md`)
+- **Purpose**: Create architectural proposals
+- **Workflow**: Analyzes codebase → creates proposal issues with `loom:architect`
+- **When to use**: System design, technical decision making
+
+**Hermit** (Autonomous 15min, `hermit.md`)
+- **Purpose**: Identify code simplification opportunities
+- **Workflow**: Analyzes complexity → creates removal proposals with `loom:hermit`
+- **When to use**: Code simplification, reducing technical debt
+
+**Doctor** (Manual, `doctor.md`)
+- **Purpose**: Fix bugs and address PR feedback
+- **Workflow**: Claims bug reports or addresses PR comments → fixes → pushes changes
+- **When to use**: Bug fixes, PR maintenance
+
+**Guide** (Autonomous 15min, `guide.md`)
+- **Purpose**: Prioritize and triage issues
+- **Workflow**: Reviews issue backlog → updates priorities → organizes labels
+- **When to use**: Project planning, issue organization
+
+**Driver** (Manual, `driver.md`)
+- **Purpose**: Direct command execution
+- **Workflow**: Plain shell environment for custom tasks
+- **When to use**: Ad-hoc tasks, debugging, manual operations
+
+### Role Definitions
+
+Full role definitions with detailed guidelines are available in:
+- `.loom/roles/builder.md`
+- `.loom/roles/judge.md`
+- `.loom/roles/curator.md`
+- And more...
+
+## Label-Based Workflow
+
+Agents coordinate work through GitHub labels. This enables autonomous operation without direct communication.
+
+### Label Flow
+
+**Issue Lifecycle**:
 ```
-bug report OR PR feedback → fix → test → commit → push
+(created) → loom:issue → loom:building → (closed)
+           ↑ Curator      ↑ Builder
 ```
 
-**Key Activities**:
-- Claim bug reports or blocked issues
-- Address PR review feedback
-- Fix failing tests or builds
-- Maintain existing PRs
-- Resolve `loom:blocked` issues
-
-#### 7. Guide (The Hierophant)
-**Mode**: Autonomous (15 min intervals)
-**File**: `guide.md`
-**Purpose**: Organize and prioritize work
-
-The Guide brings structure through organization. They triage issues, set priorities, and maintain workflow clarity.
-
-**Workflow**:
+**PR Lifecycle**:
 ```
-review backlog → update priorities → organize labels → document status
+(created) → loom:review-requested → loom:pr → (merged)
+           ↑ Builder                ↑ Judge    ↑ Human
 ```
 
-**Key Activities**:
-- Review entire issue backlog
-- Update priority labels
-- Organize issues by category
-- Document project status
-- Remove stale labels
-
-#### 8. Driver (The Chariot)
-**Mode**: Manual
-**File**: `driver.md`
-**Purpose**: Direct action and execution
-
-The Driver executes commands directly without specific role constraints. A plain shell for custom tasks.
-
-**Workflow**:
+**Proposal Lifecycle**:
 ```
-receive command → execute → report
+(created) → loom:architect → (approved) → loom:issue
+           ↑ Architect       ↑ Human      ↑ Ready for Builder
+
+(created) → loom:hermit → (approved) → loom:issue
+           ↑ Hermit       ↑ Human      ↑ Ready for Builder
 ```
 
-**Key Activities**:
-- Execute user commands directly
-- Perform ad-hoc tasks
-- Debug and investigate
-- Run custom scripts
+### Label Definitions
 
-## Label-Based Coordination
-
-Agents coordinate autonomously through GitHub labels. No direct communication is required.
-
-### Label State Machine
-
-```
-┌─────────────────────────────────────────────────┐
-│                  Issue Lifecycle                 │
-└─────────────────────────────────────────────────┘
-
-(created)
-   │
-   ↓ Curator enhances
-loom:curated ──→ (human approves) ──→ loom:issue
-                                         │
-                                         ↓ Builder claims
-                                   loom:building
-                                         │
-                                         ↓ Implementation complete
+- **`loom:issue`**: Issue approved for work, ready for Builder to claim
+- **`loom:building`**: Issue being implemented OR PR under review
+- **`loom:review-requested`**: PR ready for Judge to review
+- **`loom:pr`**: PR approved by Judge, ready for human to merge
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rjwalters/vibesql](https://github.com/rjwalters/vibesql) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
