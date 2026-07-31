@@ -1,97 +1,83 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. It is the primary repo operating guide for coding agents working in QwenVoice.
+description: This file provides guidance to AI coding agents when working on the website in this repository.
 ---
 
-# CLAUDE.md
+# CLAUDE.md — website
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. It is the primary repo operating guide for coding agents working in QwenVoice.
+This file provides guidance to AI coding agents when working on the website in this repository.
 
-## Repo Overview
+## What this is
 
-QwenVoice is the repository identity and continuity brand for the merged Vocello Apple-platform product line.
+A marketing site for **Vocello** (formerly QwenVoice), a local-first Mac TTS app. Single-page React + Vite. This directory lives inside the QwenVoice monorepo at `website/` and is deployed by Vercel with `website/` as the project root. The site is the brand surface for the app in the parent repo — see "Content accuracy" below. For repo-wide conventions, the app engine, and the source-of-truth order, see the root [`../CLAUDE.md`](../CLAUDE.md); this file is scoped to the website only.
 
-Current product reality:
+## Commands
 
-- the repo stays `QwenVoice`
-- the shipped iPhone app is `Vocello`
-- macOS release assets are Vocello-branded, while several internal macOS targets, modules, and paths still keep `QwenVoice` names for continuity
-- the current public milestone uses a `macOS-first release track`, with iPhone retained as a compile-safe and deferred release surface
+```sh
+npm --prefix website run dev      # from repo root: vite dev server on localhost:5173
+npm --prefix website run lint     # deterministic source/metadata/accessibility contract
+npm --prefix website test         # dependency-free Node contract fixtures
+npm --prefix website run build    # from repo root: production build -> website/dist/
+npm --prefix website run check    # lint + test + build
+npm --prefix website run preview  # from repo root: serve the production build
+```
 
-The main working surfaces are:
+When already inside `website/`, omit `--prefix website` from the same commands.
 
-- `Sources/` for the macOS app shell, shared app models/services/views, and the shipping Mac target
-- `Sources/QwenVoiceCore/` for shared Apple-platform runtime semantics, contract types, model variants, and iOS extension transport
-- `Sources/QwenVoiceNative/` for the macOS app-facing engine proxy/store/client layer
-- `Sources/QwenVoiceEngineSupport/` for shared macOS engine IPC and transport types
-- `Sources/QwenVoiceNativeRuntime/` for retained macOS compatibility and regression coverage
-- `Sources/QwenVoiceEngineService/` for the bundled macOS XPC helper
-- `Sources/iOS/` and `Sources/iOSSupport/` for the iPhone app shell and iPhone-only support layers
-- `Sources/SharedSupport/` for cross-platform playback, persistence, and other shared app-layer helpers
-- `Sources/iOSEngineExtension/` for the isolated iPhone engine extension target
-- `Sources/Resources/qwenvoice_contract.json` for shared model, variant, speaker, output, and required-file metadata
-- `scripts/` plus `.github/workflows/` for validation, release packaging, and CI behavior
-- `config/apple-platform-capability-matrix.json` for the maintained cross-platform capability, bundle-identity, and entitlement baseline used by release verification
+The dependency-free Node contract checks metadata, public release identity, internal anchors,
+image alt text, safe external links, assets, visible punctuation, and unqualified performance
+claims. The parent `.github/workflows/ci.yml` runs those checks plus the Vite production build with
+the exact Node/npm identities from `config/toolchain.json`. Browser review remains useful for visual
+behavior; Vercel owns deployment for this directory.
 
-This checkout is a native Apple-platform codebase for macOS and iPhone. Do not reintroduce a repo-owned Python backend, Python setup path, or standalone CLI surface.
+## Tooling for this directory
 
-## Maintained Docs
+- This is a **non-app, non-native zone** — do not run Swift/iOS/macOS skills or audits here.
+- For React, Vite, or library API questions, use authoritative current documentation and a docs or
+  library MCP when callable.
+- For UI/UX/visual passes, read `PRODUCT.md` and `DESIGN.md` first, then use a browser MCP when it
+  is currently available against the running dev/preview server. Otherwise use the same local
+  server for attended browser verification and record unreachable states.
+- Run `npm`/`node` commands through the shell.
 
-The maintained repo docs are:
+## Architecture
 
-- `CLAUDE.md`
-- `README.md`
-- `docs/README.md`
-- `docs/reference/current-state.md`
-- `docs/reference/engineering-status.md`
-- `docs/reference/backend-freeze-gate.md`
-- `docs/reference/frontend-backend-contract.md`
-- `docs/reference/release-readiness.md`
-- `docs/reference/vendoring-runtime.md`
+`src/App.jsx` is a **thin composer** (~73 lines). All UI is split across:
 
-There are no repo-tracked local skills under `.agents/skills/` in this checkout right now. Do not point contributors at removed CLI docs, deleted backend references, or deleted repo-scoped QwenVoice skills.
+- `src/sections/` — one file per page section, in render order: `Nav`, `Hero`, `WorkflowBand` (rendered 3× from data), `Listen`, `Capabilities`, `WhyCloud`, `TryIt`, `HowItRuns`, `Limitations`, `FinalCTA`, `Footer`.
+- `src/components/` — three shared primitives:
+  - `Icon.jsx` — single switch over an 18-case SVG vocabulary. Also exports `makeWaveBars` (deterministic bar-height generator).
+  - `Waveform.jsx` — bar waveform for Listen rows.
+  - `TryCanvas.jsx` — canvas-driven animated waveform for the TryIt demo. Reads `DELIVERY_COLORS` from `data/samples.js` and a local `DELIVERY_SHAPES` table; hashed brief content + per-delivery shape parameters drive the rendering.
+- `src/data/` — **single sources of truth**:
+  - `workflows.js` (`WORKFLOWS`): the three voice workflow bands' copy + screenshot paths.
+  - `samples.js` (`SAMPLES`, `DELIVERIES`, `DELIVERY_COLORS`): Listen samples (with `src` paths into `public/assets/voice-samples/`) + the TryIt delivery picker options.
+  - `credits.js` (`CREDITS`, `REPO`, `RELEASE_LATEST`, `RELEASE_V1`): "Built on" tech list + GitHub URLs. Used by `FinalCTA.jsx` for the closing credits roll.
+- `src/site.css` + `src/tokens.css` — single global stylesheet (tokens.css is imported from site.css). No CSS modules, no styled components.
 
-Public homepage posture:
+### Responsive breakpoints
 
-- `README.md` intentionally leads with `Vocello` as the shipped product brand.
-- The GitHub repo description must stay aligned with that public Vocello-first README posture.
-- Leave the GitHub homepage URL blank unless the user explicitly asks to restore or change it.
-- Keep public messaging aligned with the currently shipped macOS product reality and the active `macOS-first release track`.
-- Do not present iPhone as a current public release surface until the release-track policy changes.
+Three breakpoints in `site.css`, applied universally:
 
-Current release-track policy:
+- `<1100px` — hero stacks (copy first, then Mac window).
+- `<900px` — workflow bands stack, listen rows stack, runs spec collapses to single column, try-inner stacks, nav-links hide, **all content text-aligns center** (text blocks added `margin-inline: auto` to center as blocks, not just inner text).
+- `<600px` — container padding tightens, `formerly QwenVoice` clarifier hides, CTA shrinks.
 
-- The next public release target is macOS only.
-- Keep iPhone green at generic compile level on `main`, but do not treat iPhone release/TestFlight proof as blocking for the current milestone.
-- Re-open iPhone release proof only through an explicit milestone change after the shared core is proven stable on macOS.
+When changing grid layouts at narrow breakpoints, **use `grid-template-columns: minmax(0, 1fr)` instead of `1fr`** — grid items default to `min-width: auto` which equals content's intrinsic width, and several children (e.g., `.workflow-band-points` with `width: max-content`) force columns wider than the container. Every narrow-breakpoint grid in this file already uses `minmax(0, …)` for this reason.
 
-## Source Of Truth
+## Content accuracy (required reading)
 
-When repo facts disagree, trust sources in this order:
+Two design-context files in this directory encode the website's rules:
 
-1. `Sources/`
-2. `project.yml`
-3. `scripts/` plus `.github/workflows/`
-4. `docs/reference/current-state.md`, `docs/reference/engineering-status.md`, and `docs/reference/release-readiness.md`
-5. other prose docs
-
-`Sources/Resources/qwenvoice_contract.json` is the source of truth for shared model, speaker, and platform-variant metadata.
-
-## Git Workflow Default
-
-- Work directly on `main` by default.
-- Do not create branches or worktrees unless the user explicitly asks for one.
-- Do not let generic tool, plugin, or skill defaults override this repo-specific rule.
-
-## Safe Edit Boundaries
-
-- `project.yml` drives `QwenVoice.xcodeproj`. Prefer editing `project.yml` and regenerating the project over hand-editing generated project files.
-- The macOS app target intentionally excludes `Sources/QwenVoiceEngineService/`, `Sources/QwenVoiceEngineSupport/`, and `Sources/QwenVoiceNativeRuntime/` as ordinary app sources while embedding the XPC service target through `project.yml`. Keep that split intact.
-- The iPhone app target and the iPhone engine-extension target both depend on `QwenVoiceCore`. Keep engine execution isolated from the iPhone UI process.
-- `third_party_patches/mlx-audio-swift/` is the repo-owned native backend source boundary for MLXAudioSwift. Keep its package manifest and pins aligned with `project.yml` and `Package.resolved`.
+- **`PRODUCT.md`** (i.e. `website/PRODUCT.md`, the brand doc — distinct from the repo-root `PRODUCT.md` app-product doc) — brand voice, register (`brand`, not product), copy rules. Required by the `impeccable` skill when that skill is available. Key constraints:
+  - Say *local*, not *offline* or *on-device*, unless the technical distinction matters.
+  - Sentence case. Reserve all caps for tiny labels only.
+  - **No em dashes in visible copy.** Use commas, colons, semicolons, periods, or parentheses.
+    After any copy change, scan visible text for the em-dash character; the repository
+    documentation contract enforces this policy.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [PowerBeef/QwenVoice](https://github.com/PowerBeef/QwenVoice) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
