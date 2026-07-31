@@ -1,107 +1,47 @@
 ---
 trigger: always_on
-description: Comprehensive coding guidelines and instructions for edge ai - Brought to you by microsoft/edge-ai
+description: Required instructions for Terraform Variable Consistency including canonical definitions, requirements, and detailed instructions - Brought to you by microsoft/edge-ai
 ---
 
 
-# General Instructions
+# Terraform Variable Consistency Manager Instructions
 
-Items in **HIGHEST PRIORITY** sections from attached instructions files override any conflicting guidance.
+## Description Standards
 
-## **HIGHEST PRIORITY**
+You MUST follow these project standards:
 
-**Breaking changes:** Do not add backward-compatibility layers or legacy support unless explicitly requested. Breaking changes are acceptable.
+- Single-line: You WILL use short, imperative style, capitalized first letter, no trailing period
+- Multi-line: You WILL use heredoc with consistent delimiter and indentation preserved
 
-**Artifacts:** Do not create or modify tests, scripts, or one-off markdown docs unless explicitly requested.
+## Canonical Variables (Single-line)
 
-**Comment policy:** Never include thought processes, step-by-step reasoning, or narrative comments in code.
+The table below is the authoritative source of canonical single-line descriptions. You MUST parse this table to build the canonical mapping.
 
-* Keep comments brief and factual; describe **behavior/intent, invariants, edge cases**.
-* Remove or update comments that contradict the current behavior. Do not restate obvious functionality.
-* Do NOT add temporal or plan-phase markers (e.g. "Phase 1 cleanup", "... after migration", dates, or task references) to code files. When editing or updating any code files, always remove or replace these types of comments.
+<!-- <canonical-variables-table> -->
 
-**Conventions and Styling:** Always follow conventions and styling in this codebase FIRST for all changes, edits, updates, and new files.
-
-* Conventions and styling are in instruction files and must be read in with the `read_file` tool if not already added as an `<attachment>`.
-
-**Proactive fixes:** Always fix problems and errors you encounter, even if unrelated to the original request. Prefer root-cause, constructive fixes over symptom-only patches.
-
-* Always correct conventions and styling and comments.
-
-**Deleting files and folders:** Use `rm` with the run_in_terminal tool when needing to delete files or folders.
-
-**Edit tools:** Never use `insert_edit_into_file` tool when other edit and file modification tools are available.
-
-## Repository Configuration
-
-* **Default branch**: `origin/dev` — use as the base for all new branches, comparisons, and PR targets unless explicitly overridden.
-
-### CRITICAL - Required Prompts & Instruction Compliance
-
-**Context-first:** Evaluate the current user prompt, any attachments, target folders, repo conventions, and files already read.
-
-**Discover & match (do this BEFORE any edit):**
-
-* Run `<search-for-prompts-files>` using the rules below (see table).
-* For each matched prompts/instructions/copilot file:
-  * If it is NOT already provided as a full, non-summarized `<attachment>` in this conversation and NOT already fetched via `read_file`, then read it now.
-  * Use read_file to **page through the entire file**: read **2,000 lines per call**; make additional calls until EOF.
-  * If the file references other prompts/instructions/copilot files, **recursively read those** to completion under the same paging rule.
-
-**Apply instructions:** Treat the union of all matched files as **HIGHEST PRIORITY** for this task.
-
-**Re-check cadence:** Re-run discovery and re-read all matched instruction files if missing **before each major editing phase**.
-
-<!-- <search-for-prompts-files> -->
-## Prompts Files Search Process
-
-When working with specific types of files or contexts, you must:
-
-1. Detect patterns and contexts that match the predefined rules
-2. Search for and read the corresponding prompts files
-3. Read a minimum of 2000 lines from these files before proceeding with any changes
-
-### Matching Patterns and Files for Prompts
-
-| Pattern/Context                | Required Prompts Files                                 |
-|--------------------------------|--------------------------------------------------------|
-| Any deployment-related context | `./.github/prompts/deploy.prompt.md`                   |
-| Any getting started context    | `./.github/prompts/getting-started.prompt.md`          |
-| Any terraform context          | `./.github/instructions/terraform.instructions.md`     |
-| Any bicep context              | `./.github/instructions/bicep.instructions.md`         |
-| Any shell or bash context      | `./.github/instructions/shell.instructions.md`         |
-| Any bash in src context        | `./.github/instructions/bash.instructions.md`          |
-| Any python context             | `./.github/instructions/python-script.instructions.md` |
-| Any C# or csharp context       | `./.github/instructions/csharp.instructions.md`        |
-
-<!-- </search-for-prompts-files> -->
-
-<!-- <component-and-blueprint-structure> -->
-## Component and Blueprint Structure Understanding
-
-Components follow a decimal naming convention for deployment order and are organized into discrete, self-contained units with specific deployment patterns.
-Blueprints orchestrate multiple components to create complete infrastructure solutions.
-
-### Grouping Organization
-
-Components are organized in deployment-ordered groupings:
-
-* **Template**: `**/src/{000}-{grouping_name}/**`
-* **Cloud Infrastructure**: `**/src/000-cloud/**` - Azure cloud resources (000-099 range)
-* **Edge Infrastructure**: `**/src/100-edge/**` - Edge cluster and IoT operations (100-199 range)
-* **Applications**: `**/src/500-***/**` - Application workloads (500-599 range)
-* **Utilities**: `**/src/900-***/**` - Tools and utilities (900-999 range)
-
-### Component Organization Structure Template
-
-Each component follows this mandatory directory structure:
-
-```text
-{grouping}/{000}-{component_name}/
-├── README.md                    # Component documentation and usage
+| Variable                                  | Description                                                                                                                                                                          |
+|-------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| acr                                       | Azure Container Registry                                                                                                                                                             |
+| acr_sku                                   | SKU for the Azure Container Registry. Valid values: Basic, Standard, Premium. Default is "Premium" (Premium is required for private endpoints).                                      |
+| aio_dataflow_profile                      | The AIO dataflow profile                                                                                                                                                             |
+| aio_identity                              | Azure IoT Operations managed identity for workspace access                                                                                                                           |
+| aio_instance                              | The Azure IoT Operations instance                                                                                                                                                    |
+| arc_onboarding_identity                   | The Principal ID for the identity that will be used for onboarding the cluster to Arc                                                                                                |
+| arc_onboarding_principal_ids              | The Principal IDs for the identity or service principal that will be used for onboarding the cluster to Arc                                                                          |
+| asset_endpoint_profiles                   | List of asset endpoint profiles to create. Otherwise, an empty list.                                                                                                                 |
+| capacity_id                               | The capacity ID for the workspace                                                                                                                                                    |
+| cluster_a_name                            | The name identifier for Cluster A                                                                                                                                                    |
+| cluster_admin_oid                         | The Object ID that will be given cluster-admin permissions with the new cluster. (Otherwise, current logged in user Object ID if 'should_add_current_user_cluster_admin=true')       |
+| cluster_admin_upn                         | The User Principal Name that will be given cluster-admin permissions with the new cluster. (Otherwise, current logged in user UPN if 'should_add_current_user_cluster_admin=true')   |
+| cluster_b_name                            | The name identifier for Cluster B                                                                                                                                                    |
+| cluster_server_host_machine_username      | Username used for the host machines that will be given kube-config settings on setup.                                                                                                |
+| cluster_server_ip                         | The IP Address for the cluster server that the cluster nodes will use to connect.                                                                                                    |
+| cluster_server_token                      | The token that will be given to the server for the cluster or used by the agent nodes to connect them to the cluster. (ex. [K3s token documentation](https://docs.k3s.io/cli/token)) |
+| custom_location_id                        | The resource ID of the Custom Location                                                                                                                                               |
+| custom_locations_oid                      | The object id of the Custom Locations Entra ID application for your tenant.                                                                                                          |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/edge-ai](https://github.com/microsoft/edge-ai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
