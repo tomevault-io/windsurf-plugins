@@ -1,184 +1,61 @@
 ---
 trigger: always_on
-description: This file provides guidance to LLM Agents such as Codex, Gemini, Claude Code (claude.ai/code), etc. when working with code in this repository.
+description: When stuck in debugging loops, break the cycle by minimizing to an MVP, removing debugging cruft, and documenting the issue completely for a fresh approach
 ---
 
-# AGENTS.md
+# Avoid Debug Loops
 
-This file provides guidance to LLM Agents such as Codex, Gemini, Claude Code (claude.ai/code), etc. when working with code in this repository.
+When debugging becomes circular and unproductive, follow these steps:
 
-## CRITICAL REQUIREMENTS
+## Detection
+- You have made multiple unsuccessful attempts to fix the same issue
+- You are adding increasingly complex code to address errors
+- Each fix creates new errors in a cascading pattern
+- You are uncertain about the root cause after 2-3 iterations
 
-### Test Success
-- ALL tests MUST pass for code to be considered complete and working
-- Never describe code as "working as expected" if there are ANY failing tests
-- Even if specific feature tests pass, failing tests elsewhere indicate broken functionality
-- Changes that break existing tests must be fixed before considering implementation complete
-- A successful implementation must pass linting, type checking, AND all existing tests
+## Action Plan
 
-## Project Overview
+1. **Pause and acknowledge the loop**
+   - Explicitly state that you are in a potential debug loop
+   - Review what approaches have been tried and failed
 
-libvcs is a lite, typed Python tool for:
-- Detecting and parsing URLs for Git, Mercurial, and Subversion repositories
-- Providing command abstractions for git, hg, and svn
-- Synchronizing repositories locally
-- Creating pytest fixtures for testing with temporary repositories
+2. **Minimize to MVP**
+   - Remove all debugging cruft and experimental code
+   - Revert to the simplest version that demonstrates the issue
+   - Focus on isolating the core problem without added complexity
 
-The library powers [vcspull](https://www.github.com/vcs-python/vcspull/), a tool for managing and synchronizing multiple git, svn, and mercurial repositories.
+3. **Comprehensive Documentation**
+   - Provide a clear summary of the issue
+   - Include minimal but complete code examples that reproduce the problem
+   - Document exact error messages and unexpected behaviors
+   - Explain your current understanding of potential causes
 
-## Development Environment
+4. **Format for Portability**
+   - Present the problem in quadruple backticks for easy copying:
 
-This project uses:
-- Python 3.9+
-- [uv](https://github.com/astral-sh/uv) for dependency management
-- [ruff](https://github.com/astral-sh/ruff) for linting and formatting
-- [mypy](https://github.com/python/mypy) for type checking
-- [pytest](https://docs.pytest.org/) for testing
+````
+# Problem Summary
+[Concise explanation of the issue]
 
-## Common Commands
-
-### Setting Up Environment
-
-```bash
-# Install dependencies
-uv pip install --editable .
-uv pip sync
-
-# Install with development dependencies
-uv pip install --editable . -G dev
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-just test
-# or directly with pytest
-uv run pytest
-
-# Run a single test file
-uv run pytest tests/sync/test_git.py
-
-# Run a specific test
-uv run pytest tests/sync/test_git.py::test_remotes
-
-# Run tests with test watcher
-just start
-# or
-uv run ptw .
-```
-
-### Linting and Type Checking
-
-```bash
-# Run ruff for linting
-just ruff
-# or directly
-uv run ruff check .
-
-# Format code with ruff
-just ruff-format
-# or directly
-uv run ruff format .
-
-# Run ruff linting with auto-fixes
-uv run ruff check . --fix --show-fixes
-
-# Run mypy for type checking
-just mypy
-# or directly
-uv run mypy src tests
-
-# Watch mode for linting (using entr)
-just watch-ruff
-just watch-mypy
-```
-
-### Development Workflow
-
-Follow this workflow for code changes:
-
-1. **Format First**: `uv run ruff format .`
-2. **Run Tests**: `uv run pytest`
-3. **Run Linting**: `uv run ruff check . --fix --show-fixes`
-4. **Check Types**: `uv run mypy`
-5. **Verify Tests Again**: `uv run pytest`
-
-### Documentation
-
-```bash
-# Build documentation
-just build-docs
-
-# Start documentation server with auto-reload
-just start-docs
-
-# Update documentation CSS/JS
-just design-docs
-```
-
-## Code Architecture
-
-libvcs is organized into three main modules:
-
-1. **URL Detection and Parsing** (`libvcs.url`)
-   - Base URL classes in `url/base.py`
-   - VCS-specific implementations in `url/git.py`, `url/hg.py`, and `url/svn.py`
-   - URL registry in `url/registry.py`
-   - Constants in `url/constants.py`
-
-2. **Command Abstraction** (`libvcs.cmd`)
-   - Command classes for git, hg, and svn in `cmd/git.py`, `cmd/hg.py`, and `cmd/svn.py`
-   - Built on top of Python's subprocess module (via `_internal/subprocess.py`)
-
-3. **Repository Synchronization** (`libvcs.sync`)
-   - Base sync classes in `sync/base.py`
-   - VCS-specific sync implementations in `sync/git.py`, `sync/hg.py`, and `sync/svn.py`
-
-4. **Internal Utilities** (`libvcs._internal`)
-   - Subprocess wrappers in `_internal/subprocess.py`
-   - Data structures in `_internal/dataclasses.py` and `_internal/query_list.py`
-   - Runtime helpers in `_internal/run.py` and `_internal/shortcuts.py`
-
-5. **pytest Plugin** (`libvcs.pytest_plugin`)
-   - Provides fixtures for creating temporary repositories for testing
-
-## Testing Strategy
-
-libvcs uses pytest for testing with many custom fixtures. The pytest plugin (`pytest_plugin.py`) defines fixtures for creating temporary repositories for testing. These include:
-
-- `create_git_remote_repo`: Creates a git repository for testing
-- `create_hg_remote_repo`: Creates a Mercurial repository for testing
-- `create_svn_remote_repo`: Creates a Subversion repository for testing
-- `git_repo`, `svn_repo`, `hg_repo`: Pre-made repository instances
-- `set_home`, `vcs_gitconfig`, `vcs_hgconfig`, `git_commit_envvars`: Environment fixtures
-
-These fixtures handle setup and teardown automatically, creating isolated test environments.
-
-For running tests with actual VCS commands, tests will be skipped if the corresponding VCS binary is not installed.
-
-### Testing Guidelines
-
-1. **Use functional tests only**: Write tests as standalone functions (`test_*`), not classes. Avoid `class TestFoo:` groupings - use descriptive function names and file organization instead. This applies to pytest tests, not doctests.
-
-### Example Fixture Usage
-
+## Minimal Reproduction Code
 ```python
-def test_repo_sync(git_repo):
-    # git_repo is already a GitSync instance with a clean repository
-    # Use it directly in your tests
-    assert git_repo.get_revision() == "initial"
+# Minimal code example that reproduces the issue
 ```
 
-### Parameterized Tests
+## Error/Unexpected Output
+```
+[Exact error messages or unexpected output]
+```
 
-Use `typing.NamedTuple` for parameterized tests:
+## Failed Approaches
+[Brief summary of approaches already tried]
 
-```python
-class RepoFixture(t.NamedTuple):
+## Suspected Cause
+[Your current hypothesis about what might be causing the issue]
+````
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+This format enables the user to easily copy the entire problem statement into a fresh conversation for a clean-slate approach.
 
 ---
 > Source: [vcs-python/libvcs](https://github.com/vcs-python/libvcs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
