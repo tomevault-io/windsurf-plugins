@@ -1,133 +1,95 @@
 ---
 trigger: always_on
-description: Copyright (C) 2024-2026 AgValoniaGPS Contributors
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-<!--
-AgValoniaGPS
-Copyright (C) 2024-2026 AgValoniaGPS Contributors
+# CLAUDE.md
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
--->
-
-# CLAUDE.md - AgValoniaGPS3
-
-This file provides guidance to Claude Code when working with this repository.
-
-**Key documentation:**
-- **[Plans/ARCHITECTURE.md](Plans/ARCHITECTURE.md)** - Full architecture: services, state management, data flow
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributor guide with cross-platform parity rules
-- **[PGN.md](PGN.md)** - UDP packet protocol for hardware communication
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-
-AgValoniaGPS3 is a cross-platform agricultural GPS guidance application built with Avalonia UI. It's a clean rewrite achieving **91.7% shared code** across platforms.
-
-**What it does:**
-- Real-time GPS guidance for agricultural equipment
-- Field boundary management and recording
-- Unified track guidance (AB lines and curves use same system)
-- U-turn path generation and following
-- Section control for sprayers/planters
-- NTRIP RTK corrections support
-- Configurable keyboard hotkeys
-- Integration with AgOpenGPS ecosystem via UDP
-
-## Architecture
-
-```
-AgValoniaGPS3/
-├── Shared/                              # ~92% - Platform-agnostic code
-│   ├── AgValoniaGPS.Models/            # Data models, geometry, configuration, DTOs
-│   ├── AgValoniaGPS.Services/          # Business logic, GPS, NTRIP, UDP
-│   ├── AgValoniaGPS.ViewModels/        # MVVM ViewModels (ReactiveUI)
-│   └── AgValoniaGPS.Views/             # Shared UI controls, panels, dialogs
-│
-├── Platforms/                           # ~8% - Platform-specific code
-│   ├── AgValoniaGPS.Desktop/           # Windows/macOS/Linux
-│   ├── AgValoniaGPS.iOS/              # iOS/iPadOS
-│   └── AgValoniaGPS.Android/          # Android
-│
-├── Tests/                              # NUnit test projects
-│   ├── AgValoniaGPS.Models.Tests/     # Geometry, coordinate conversion (72 tests)
-│   ├── AgValoniaGPS.Services.Tests/   # NMEA parsing, guidance (21 tests)
-│   └── AgValoniaGPS.UI.Tests/         # Headless UI tests via Avalonia.Headless (18 tests)
-│
-├── TestRunner/                         # Legacy test harness for guidance algorithms
-└── AgValoniaGPS.sln                    # Solution file
-```
-
-### Platform Support
-
-| Platform | Project | Notes |
-|----------|---------|-------|
-| Windows | AgValoniaGPS.Desktop | Same codebase as macOS/Linux |
-| macOS | AgValoniaGPS.Desktop | Same codebase as Windows/Linux |
-| Linux | AgValoniaGPS.Desktop | Same codebase as Windows/macOS |
-| iOS/iPadOS | AgValoniaGPS.iOS | Requires Xcode 26.3+, runs on ARM64 simulator |
-| Android | AgValoniaGPS.Android | APK build, sideload install |
+AgOpenGPS is a precision agriculture guidance software written in C# (.NET Framework 4.8) that provides GPS guidance, field mapping, and section control for agricultural equipment. The project consists of two main applications: AgIO (communication hub) and AgOpenGPS (main application).
 
 ## Build Commands
 
 ```bash
-# Build and run Desktop (works on Windows, macOS, Linux)
-dotnet build Platforms/AgValoniaGPS.Desktop/AgValoniaGPS.Desktop.csproj
-dotnet run --project Platforms/AgValoniaGPS.Desktop/AgValoniaGPS.Desktop.csproj
+# Restore dependencies
+dotnet restore --runtime win-x64 ./SourceCode/AgOpenGPS.sln
 
-# Build iOS (requires macOS with Xcode 26.3+)
-dotnet build Platforms/AgValoniaGPS.iOS/AgValoniaGPS.iOS.csproj -c Debug -f net10.0-ios -r iossimulator-arm64
+# Build solution
+dotnet build --no-restore ./SourceCode/AgOpenGPS.sln
 
-# Deploy and run iOS on simulator
-dotnet build Platforms/AgValoniaGPS.iOS/AgValoniaGPS.iOS.csproj -c Debug -f net10.0-ios -r iossimulator-arm64 -t:Run
+# Run all tests
+dotnet test --no-restore --no-build ./SourceCode/AgOpenGPS.sln
 
-# Alternative iOS deployment (if -t:Run doesn't work)
-xcrun simctl install booted Platforms/AgValoniaGPS.iOS/bin/Debug/net10.0-ios/iossimulator-arm64/AgValoniaGPS.iOS.app
-xcrun simctl launch booted com.agvaloniaagps.ios
+# Run specific test project
+dotnet test ./SourceCode/AgLibrary.Tests/AgLibrary.Tests.csproj
+dotnet test ./SourceCode/AgOpenGPS.Core.Tests/AgOpenGPS.Core.Tests.csproj
 
-# Build Android APK
-dotnet build Platforms/AgValoniaGPS.Android/AgValoniaGPS.Android.csproj
-
-# Build entire solution
-dotnet build AgValoniaGPS.sln
-
-# Run tests
-dotnet test Tests/
+# Publish (creates AgOpenGPS folder with all applications)
+dotnet publish ./SourceCode/AgOpenGPS.sln
 ```
 
-## Key Design Decisions
+## Architecture
 
-### Rendering: SkiaMapControl via CompositionCustomVisualHandler
-All platforms render the map through `SkiaMapControl`, which leases the Skia
-GPU surface inside a `CompositionCustomVisualHandler` and re-arms via
-`RegisterForNextAnimationFrameUpdate`. This bucket sits outside the Av12
-commit throttle that capped `OpenGlControlBase` at ~32 FPS on iPad
-([issue #21409](https://github.com/AvaloniaUI/Avalonia/issues/21409)).
-True perspective comes from `SKMatrix44`; top-down mode is just
-`pitch = 90°` on the same control — no second renderer behind a toggle.
+### Core Structure
+- **MVP Pattern**: AgOpenGPS.Core implements Model-View-Presenter pattern with dependency injection
+- **ApplicationCore**: Main composition root at `AgOpenGPS.Core/ApplicationCore.cs`
+- **Separation of Concerns**: Models, ViewModels, Presenters, and Interfaces are cleanly separated
 
-### Shared UI Components
-All panels, dialogs, and controls live in `AgValoniaGPS.Views`:
-- `Controls/SkiaMapControl.cs` - Main map rendering
-- `Controls/DialogOverlayHost.axaml` - Hosts all modal dialog overlays (shared across platforms)
-- `Controls/Panels/` - LeftNavigationPanel, SimulatorPanel, SectionControlPanel, etc.
-- `Controls/Dialogs/` - All modal dialogs (FieldSelection, DataIO, AgShare, etc.)
-- `Converters/` - Shared value converters (BoolToColor, FixQualityToColor, etc.)
+### Key Components
+- **GPS/**: Main Windows Forms application with OpenGL graphics rendering
+- **AgIO/**: Communication hub for hardware interfaces
+- **AgOpenGPS.Core/**: Business logic library using MVP pattern
+- **AgLibrary/**: Shared utilities and settings management
+- **AgOpenGPS.WpfApp/**: WPF version of the application
 
-### Dialog System
+### Main Entry Points
+- GPS Application: `GPS/Program.cs`
+- Core Logic: `AgOpenGPS.Core/ApplicationCore.cs`
+- Settings: `AgLibrary/Settings/` namespace
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Development Workflow
+
+### Version Control
+- **Main development branch**: `develop` (submit PRs here)
+- **Stable branch**: `master`
+- **Version management**: GitVersion handles semantic versioning automatically
+- **Version file**: Manual patch increments in `./sys/version.h` when fixing bugs
+
+### Testing
+- **Framework**: NUnit 4.3.2
+- **Test pattern**: AAA (Arrange, Act, Assert) with Assert.That syntax
+- **Test projects**: AgLibrary.Tests, AgOpenGPS.Core.Tests
+
+### Key Technologies
+- .NET Framework 4.8 (Windows-only)
+- Windows Forms (main UI) and WPF (newer components)
+- OpenTK.GLControl for OpenGL graphics
+- SQLite for data storage
+- NMEA protocol for GPS communication
+
+## Common Development Tasks
+
+### Running the Application
+1. Set GPS project as startup project in Visual Studio
+2. Build and run (F5)
+
+### Adding New Features
+- Business logic goes in AgOpenGPS.Core
+- Shared utilities in AgLibrary
+- UI components in GPS (Windows Forms) or AgOpenGPS.WpfApp (WPF)
+
+### Debugging Hardware Communication
+- AgIO handles all hardware communication
+- Check AgIO logs for connection issues
+- ModSim project provides hardware simulation
+
+### Working with Translations
+- Uses Weblate for internationalization
+- Resource files (.resx) contain UI strings
+- Located in each project's Properties folder
 
 ---
 > Source: [AgOpenGPS-Official/AgValoniaGPS](https://github.com/AgOpenGPS-Official/AgValoniaGPS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
