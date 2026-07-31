@@ -1,103 +1,167 @@
 ---
 trigger: always_on
-description: The **MCP Gateway** is a production-ready API gateway for Model Context Protocol (MCP) servers, providing enterprise-grade infrastructure with authentication, logging, rate limiting, server discovery, and multi-protocol transport support.
+description: This guide provides comprehensive instructions for AI coding agents on working with the MCP Gateway Gateway frontend test suite. The project uses Jest with jsdom environment and follows a structured testing approach.
 ---
 
-# MCP Gateway - Claude Development Guide
+# Frontend Testing Guide - MCP Gateway Gateway
 
-## Project Overview
+## Overview
 
-The **MCP Gateway** is a production-ready API gateway for Model Context Protocol (MCP) servers, providing enterprise-grade infrastructure with authentication, logging, rate limiting, server discovery, and multi-protocol transport support.
+This guide provides comprehensive instructions for AI coding agents on working with the MCP Gateway Gateway frontend test suite. The project uses Jest with jsdom environment and follows a structured testing approach.
 
-### Core Purpose
-- **Enterprise Infrastructure**: JWT authentication, RBAC, and flexible policies
-- **Multi-Protocol Support**: JSON-RPC, WebSocket, SSE, HTTP, and STDIO transports
-- **Service Virtualization**: Wrap REST/GraphQL/gRPC services as virtual MCP servers
-- **Production Ready**: Comprehensive logging, IP rate limiting with Redis/memory backends, and health monitoring
-- **Namespace Management**: Group MCP servers into logical namespaces within an organization
-- **Developer Tools**: MCP Inspector for real-time debugging and testing
+## Testing Architecture
 
-### Key Features
-- 🔐 **Authentication & Authorization** - JWT-based auth with API keys, RBAC, and OAuth2
-- 📊 **Comprehensive Logging** - Request/response logging, audit trails, performance metrics
-- ⚡ **Rate Limiting** - IP-based rate limiting with sliding window algorithms
-- 🛡️ **Smart Rate Limiting** - Redis-backed with memory fallback and proxy detection
-- 🔍 **MCP Server Discovery** - Dynamic registration and health checking
-- 🌐 **Service Virtualization** - Wrap non-MCP services as virtual MCP servers
-- 🔌 **Multi-Protocol Support** - JSON-RPC, WebSocket, SSE, HTTP, and STDIO transports
-- 🚀 **High Performance** - Built with Go and Gin for maximum throughput and low latency
-- 🏢 **Namespace Management** - Group and organize MCP servers into logical namespaces
-- 🔍 **MCP Inspector** - Real-time debugging and testing interface
-- 🤝 **Agent-to-Agent (A2A)** - Agent-to-agent authentication and communication
-- 🔧 **Plugin System** - Extensible middleware with content filters and AI integrations
-- 📡 **Endpoint Management** - Dynamic REST endpoint creation with OpenAPI generation
-- 🛠️ **Content Filtering** - PII detection, regex filtering, and resource protection
+### Framework & Tools
+- **Test Runner**: Jest with jsdom environment 
+- **React Testing**: React Testing Library (for component tests)
+- **API Mocking**: Mock Service Worker (MSW) for integration tests
+- **File Naming**: `*.simple.test.ts` for unit tests, `*.test.ts` for integration tests
+- **Configuration**: Uses `jest.simple.config.cjs` for simple unit tests
 
-## Architecture
+### Test Categories
 
-### Technology Stack
-- **Backend**: Go 1.25 with Gin framework
-- **Database**: PostgreSQL with comprehensive migration system
-- **Cache**: Redis (optional, falls back to in-memory when disabled)
-- **Frontend**: Next.js 14 TypeScript dashboard
-- **Testing**: Extensive test suites for all transport layers
+#### 1. Simple Unit Tests (`*.simple.test.ts`)
+- **Purpose**: Fast, isolated tests with minimal dependencies
+- **Mocking**: Uses Jest `mockFn()` to mock `fetch` globally
+- **Environment**: jsdom with polyfills for browser APIs
+- **Focus**: Pure functions, API clients, validation, utilities
 
-### Architectural Decisions
-- **Rate Limiting**: Uses industry-standard `ulule/limiter` library instead of custom implementations
-- **Redis Integration**: Sliding window rate limiting for distributed deployments with memory fallback
-- **Middleware Pattern**: Composable middleware chain for cross-cutting concerns
-- **Clean Architecture**: Separation of concerns with internal packages for different domains
+#### 2. Integration Tests (`*.test.ts`) 
+- **Purpose**: Tests with MSW server, React components
+- **Mocking**: Uses Mock Service Worker for realistic API interactions
+- **Environment**: Full browser simulation with MSW handlers
+- **Focus**: Component behavior, user interactions, API integration
 
-### Project Structure
+## Project Structure
+
+### Test Directory Structure
 ```
-mcp-gateway/
-├── apps/
-│   ├── backend/              # Go API backend
-│   │   ├── cmd/
-│   │   │   ├── api/          # API server entrypoint (main.go)
-│   │   │   ├── migrate/      # Database migration tool
-│   │   │   └── worker/       # Background worker for health checks
-│   │   ├── internal/         # Core business logic modules
-│   │   │   ├── auth/         # Authentication & Authorization
-│   │   │   │   ├── jwt.go    # JWT token management
-│   │   │   │   ├── middleware.go # Auth middleware
-│   │   │   │   ├── policies.go # Policy engine
-│   │   │   │   ├── rbac.go   # Role-based access control
-│   │   │   │   ├── cache.go  # JWT blacklist cache
-│   │   │   │   ├── cleanup.go # Token cleanup service
-│   │   │   │   └── service.go # Auth service
-│   │   │   ├── a2a/          # Agent-to-Agent Auth
-│   │   │   │   ├── service.go # A2A service
-│   │   │   │   ├── client.go # A2A client
-│   │   │   │   └── adapter.go # A2A adapters
-│   │   │   ├── config/       # Configuration management
-│   │   │   │   ├── config.go # Config structs and loading
-│   │   │   │   ├── policy.go # Policy configuration
-│   │   │   │   └── validation.go # Config validation
-│   │   │   ├── database/     # Database layer
-│   │   │   │   ├── database.go # Database connection
-│   │   │   │   ├── models/   # Database models
-│   │   │   │   │   ├── base.go # Base model
-│   │   │   │   │   ├── user.go # User model
-│   │   │   │   │   ├── organization.go # Organization model
-│   │   │   │   │   ├── namespace.go # Namespace model
-│   │   │   │   │   ├── server.go # MCP server model
-│   │   │   │   │   ├── session.go # Session model
-│   │   │   │   │   ├── virtual_server.go # Virtual server model
-│   │   │   │   │   ├── a2a.go   # Agent-to-Agent models
-│   │   │   │   │   ├── config.go # Configuration models
-│   │   │   │   │   ├── content_filter.go # Content filter models
-│   │   │   │   │   ├── logging.go # Logging models
-│   │   │   │   │   └── ratelimit.go # Rate limiting models
-│   │   │   │   └── repositories/ # Database repositories
-│   │   │   │       └── namespace_repo.go # Namespace repository
-│   │   │   ├── discovery/    # MCP Server Discovery
-│   │   │   │   ├── health.go # Health checking
-│   │   │   │   ├── registry.go # Server registry
-│   │   │   │   ├── mcp_discovery.go # MCP discovery service
+src/test/
+├── __mocks__/          # Mock files for modules
+├── handlers/           # MSW request handlers
+├── polyfills.ts        # Browser API polyfills
+├── server.ts           # MSW server setup
+├── setup-simple.ts     # Jest setup for simple tests
+└── setup.ts           # Jest setup for integration tests
+```
+
+### Test File Locations
+```
+src/lib/__tests__/                    # API client tests
+src/lib/validation/__tests__/         # Schema validation tests  
+src/hooks/__tests__/                  # Custom hook tests
+src/@auth/__tests__/                  # Auth context tests
+src/app/(controlpanel)/*/api/hooks/__tests__/  # TanStack Query hooks
+```
+
+## Test Types & Coverage Areas
+
+### API Client Testing
+- **Authentication API** (`src/lib/auth-api.ts`)
+  - File: `src/lib/__tests__/auth-api-extended.simple.test.ts`
+  - Tests: Token management, auth flow, API key CRUD, error handling
+
+- **Client API** (`src/lib/client-api.ts`)
+  - File: `src/lib/__tests__/client-api.simple.test.ts`
+  - Tests: All API classes, CRUD operations, HTTP status handling
+
+- **Configuration API** (`src/lib/config-api.ts`)
+  - File: `src/lib/__tests__/config-api.simple.test.ts` 
+  - Tests: Export/import functionality, FormData handling, Blob responses
+
+### Validation & Data Integrity
+- **Validation Schemas** (`src/lib/validation/`)
+  - Files: `src/lib/validation/__tests__/*.simple.test.ts`
+  - Tests: Zod schema validation, constraint validation, enum validation
+
+- **Utility Functions** (`src/lib/utils.ts`)
+  - File: `src/lib/__tests__/utils.simple.test.ts`
+  - Tests: `cn` function, className merging, Tailwind conflicts
+
+### React Hooks & State Management
+- **Custom Hooks** (`src/hooks/`)
+  - Files: `src/hooks/__tests__/*.simple.test.ts`
+  - Tests: Hook behavior, state updates, cleanup functions, edge cases
+
+- **Authentication Context** (`src/@auth/AuthContext.tsx`)
+  - File: `src/@auth/__tests__/AuthContext.simple.test.tsx`
+  - Tests: Provider initialization, auth state, token refresh
+
+### Data Fetching & API Integration
+- **TanStack Query Hooks**
+  - Files: `src/app/(controlpanel)/*/api/hooks/__tests__/*.simple.test.ts`
+  - Tests: Query behavior, mutations, cache management, error states
+
+## Test Implementation Guidelines
+
+### File Structure Pattern
+```typescript
+import { apiClient } from '../api-module';
+
+// Mock fetch globally for simple tests
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
+
+describe('API Module - Simple Tests', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+    // Clear storage if needed
+    if (typeof localStorage !== 'undefined') {
+      localStorage.clear();
+    }
+  });
+
+  describe('method group', () => {
+    it('should do expected behavior', async () => {
+      // Arrange: Setup mocks
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: jest.fn().mockReturnValue('application/json') },
+        json: jest.fn().mockResolvedValueOnce({ data: 'expected' })
+      });
+
+      // Act: Call the function
+      const result = await apiClient.someMethod();
+
+      // Assert: Verify behavior
+      expect(mockFetch).toHaveBeenCalledWith(/* expected args */);
+      expect(result).toEqual(/* expected result */);
+    });
+  });
+});
+```
+
+### Mock Patterns
+
+#### 1. Fetch API Mocking (Simple Tests)
+```typescript
+// Success response
+mockFetch.mockResolvedValueOnce({
+  ok: true,
+  status: 200,
+  headers: { get: jest.fn().mockReturnValue('application/json') },
+  json: jest.fn().mockResolvedValueOnce({ data: 'result' })
+});
+
+// Error response  
+mockFetch.mockResolvedValueOnce({
+  ok: false,
+  status: 400,
+  statusText: 'Bad Request'
+});
+
+// Network error
+mockFetch.mockRejectedValueOnce(new Error('Network error'));
+```
+
+#### 2. LocalStorage Handling
+```typescript
+beforeEach(() => {
+  // Clear storage safely
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [theognis1002/mcp-gateway](https://github.com/theognis1002/mcp-gateway) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
