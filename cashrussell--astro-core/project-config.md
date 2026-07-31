@@ -1,133 +1,112 @@
 ---
 trigger: always_on
-description: This guide provides comprehensive instructions for AI agents working on the Reth codebase. It covers the architecture, development workflows, and critical guidelines for effective contributions.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Reth Development Guide for AI Agents
+# CLAUDE.md
 
-This guide provides comprehensive instructions for AI agents working on the Reth codebase. It covers the architecture, development workflows, and critical guidelines for effective contributions.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Reth is a high-performance Ethereum execution client written in Rust, focusing on modularity, performance, and contributor-friendliness. The codebase is organized into well-defined crates with clear boundaries and responsibilities.
+This is the **Reth documentation website** built with [Vocs](https://vocs.dev), a modern documentation framework. The site contains comprehensive documentation for Reth, the Ethereum execution client, including installation guides, CLI references, SDK documentation, and tutorials.
 
-## Architecture Overview
+## Repository Structure
 
-### Core Components
+- **`docs/pages/`**: All documentation content in MDX format
+  - `cli/`: Command-line interface documentation and references
+  - `exex/`: Execution Extensions (ExEx) guides and examples
+  - `installation/`: Installation and setup guides
+  - `introduction/`: Introduction, benchmarks, and why-reth content
+  - `jsonrpc/`: JSON-RPC API documentation
+  - `run/`: Node running guides and configuration
+  - `sdk/`: SDK documentation and examples
+- **`docs/snippets/`**: Code examples and snippets used in documentation
+- **`sidebar.ts`**: Navigation configuration
+- **`vocs.config.ts`**: Vocs configuration file
 
-1. **Consensus (`crates/consensus/`)**: Validates blocks according to Ethereum consensus rules
-2. **Storage (`crates/storage/`)**: Hybrid database using MDBX + static files for optimal performance
-3. **Networking (`crates/net/`)**: P2P networking stack with discovery, sync, and transaction propagation
-4. **RPC (`crates/rpc/`)**: JSON-RPC server supporting all standard Ethereum APIs
-5. **Execution (`crates/evm/`, `crates/ethereum/`)**: Transaction execution and state transitions
-6. **Pipeline (`crates/stages/`)**: Staged sync architecture for blockchain synchronization
-7. **Trie (`crates/trie/`)**: Merkle Patricia Trie implementation with parallel state root computation
-8. **Node Builder (`crates/node/`)**: High-level node orchestration and configuration
-9  **The Consensus Engine (`crates/engine/`)**: Handles processing blocks received from the consensus layer with the Engine API (newPayload, forkchoiceUpdated)
+## Essential Commands
 
-### Key Design Principles
+```bash
+# Install dependencies
+bun install
 
-- **Modularity**: Each crate can be used as a standalone library
-- **Performance**: Extensive use of parallelism, memory-mapped I/O, and optimized data structures
-- **Extensibility**: Traits and generic types allow for different implementations (Ethereum, Optimism, etc.)
-- **Type Safety**: Strong typing throughout with minimal use of dynamic dispatch
+# Start development server
+bun run dev
+
+# Build for production
+bun run build
+
+# Preview production build
+bun run preview
+```
 
 ## Development Workflow
 
-### Code Style and Standards
+### Content Organization
 
-1. **Formatting**: Always use nightly rustfmt
-   ```bash
-   cargo +nightly fmt --all
-   ```
+1. **MDX Files**: All content is written in MDX (Markdown + React components)
+2. **Navigation**: Update `sidebar.ts` when adding new pages
+3. **Code Examples**: Place reusable code snippets in `docs/snippets/`
+4. **Assets**: Place images and static assets in `docs/public/`
 
-2. **Linting**: Run clippy with all features
-   ```bash
-   RUSTFLAGS="-D warnings" cargo +nightly clippy --workspace --lib --examples --tests --benches --all-features --locked
-   ```
+### Adding New Documentation
 
-3. **Testing**: Use nextest for faster test execution
-   ```bash
-   cargo nextest run --workspace
-   ```
+1. Create new `.mdx` files in appropriate subdirectories under `docs/pages/`
+2. Update `sidebar.ts` to include new pages in navigation
+3. Use consistent heading structure and markdown formatting
+4. Reference code examples from `docs/snippets/` when possible
 
-### Common Contribution Types
+### Code Examples and Snippets
 
-Based on actual recent PRs, here are typical contribution patterns:
+- **Live Examples**: Use the snippets system to include actual runnable code
+- **Rust Code**: Include cargo project examples in `docs/snippets/sources/`
+- **CLI Examples**: Show actual command usage with expected outputs
 
-#### 1. Small Bug Fixes (1-10 lines)
-Real example: Fixing beacon block root handling ([#16767](https://github.com/paradigmxyz/reth/pull/16767))
-```rust
-// Changed a single line to fix logic error
-- parent_beacon_block_root: parent.parent_beacon_block_root(),
-+ parent_beacon_block_root: parent.parent_beacon_block_root().map(|_| B256::ZERO),
-```
+### Configuration
 
-#### 2. Integration with Upstream Changes
-Real example: Integrating revm updates ([#16752](https://github.com/paradigmxyz/reth/pull/16752))
-```rust
-// Update code to use new APIs from dependencies
-- if self.fork_tracker.is_shanghai_activated() {
--     if let Err(err) = transaction.ensure_max_init_code_size(MAX_INIT_CODE_BYTE_SIZE) {
-+ if let Some(init_code_size_limit) = self.fork_tracker.max_initcode_size() {
-+     if let Err(err) = transaction.ensure_max_init_code_size(init_code_size_limit) {
-```
+- **Base Path**: Site deploys to `/reth` path (configured in `vocs.config.ts`)
+- **Theme**: Custom accent colors for light/dark themes
+- **Vite**: Uses Vite as the underlying build tool
 
-#### 3. Adding Comprehensive Tests
-Real example: ETH69 protocol tests ([#16759](https://github.com/paradigmxyz/reth/pull/16759))
-```rust
-#[tokio::test(flavor = "multi_thread")]
-async fn test_eth69_peers_can_connect() {
-    // Create test network with specific protocol versions
-    let p0 = PeerConfig::with_protocols(NoopProvider::default(), Some(EthVersion::Eth69.into()));
-    // Test connection and version negotiation
-}
-```
+### Content Guidelines
 
-#### 4. Making Components Generic
-Real example: Making EthEvmConfig generic over chainspec ([#16758](https://github.com/paradigmxyz/reth/pull/16758))
-```rust
-// Before: Hardcoded to ChainSpec
-- pub struct EthEvmConfig<EvmFactory = EthEvmFactory> {
--     pub executor_factory: EthBlockExecutorFactory<RethReceiptBuilder, Arc<ChainSpec>, EvmFactory>,
+1. **Be Practical**: Focus on actionable guides and real-world examples
+2. **Code First**: Show working code examples before explaining concepts
+3. **Consistent Structure**: Follow existing page structures for consistency
+4. **Cross-References**: Link between related pages and sections
+5. **Keep Current**: Ensure documentation matches latest Reth features
 
-// After: Generic over any chain spec type
-+ pub struct EthEvmConfig<C = ChainSpec, EvmFactory = EthEvmFactory>
-+ where
-+     C: EthereumHardforks,
-+ {
-+     pub executor_factory: EthBlockExecutorFactory<RethReceiptBuilder, Arc<C>, EvmFactory>,
-```
+### File Naming Conventions
 
-#### 5. Resource Management Improvements
-Real example: ETL directory cleanup ([#16770](https://github.com/paradigmxyz/reth/pull/16770))
-```rust
-// Add cleanup logic on startup
-+ if let Err(err) = fs::remove_dir_all(&etl_path) {
-+     warn!(target: "reth::cli", ?etl_path, %err, "Failed to remove ETL path on launch");
-+ }
-```
+- Use kebab-case for file and directory names
+- Match URL structure to file structure
+- Use descriptive names that reflect content purpose
 
-#### 6. Feature Additions
-Real example: Sharded mempool support ([#16756](https://github.com/paradigmxyz/reth/pull/16756))
-```rust
-// Add new filtering policies for transaction announcements
-pub struct ShardedMempoolAnnouncementFilter<T> {
-    pub inner: T,
-    pub shard_bits: u8,
-    pub node_id: Option<B256>,
-}
-```
+### Common Tasks
 
-### Testing Guidelines
+**Adding a new CLI command documentation:**
+1. Create `.mdx` file in `docs/pages/cli/reth/`
+2. Add to sidebar navigation
+3. Include usage examples and parameter descriptions
 
-1. **Unit Tests**: Test individual functions and components
-2. **Integration Tests**: Test interactions between components
-3. **Benchmarks**: For performance-critical code
-4. **Fuzz Tests**: For parsing and serialization code
+**Adding a new guide:**
+1. Create `.mdx` file in appropriate category
+2. Update sidebar with new entry
+3. Include practical examples and next steps
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Updating code examples:**
+1. Modify files in `docs/snippets/sources/`
+2. Ensure examples compile and run correctly
+3. Test that documentation references work properly
+
+## Development Notes
+
+- This is a TypeScript/React project using Vocs framework
+- Content is primarily MDX with some TypeScript configuration
+- Focus on clear, practical documentation that helps users succeed with Reth
+- Maintain consistency with existing documentation style and structure
 
 ---
 > Source: [CashRussell/astro-core](https://github.com/CashRussell/astro-core) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
