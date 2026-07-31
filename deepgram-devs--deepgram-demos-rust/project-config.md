@@ -1,77 +1,107 @@
 ---
 trigger: always_on
-description: - Be sure to use modules to segment code into logical components
+description: `dg-flux` is a Rust CLI client for Deepgram's **Flux** streaming speech-to-text API
 ---
 
-# AGENTS.md
+# Flux Turn-Taking Client (dg-flux) Implementation Notes
 
-## Code Structure
+## Product Direction
 
-- Be sure to use modules to segment code into logical components
-- Do not write excessively long code files, use separation of concerns
-- For TUI applications, design custom widgets that are reusable, and put those into separate modules
-- TUI applications must reset the terminal to default state before exiting the process
-- Avoid duplication of code wherever possible, don't repeat yourself
+`dg-flux` is a Rust CLI client for Deepgram's **Flux** streaming speech-to-text API
+(`/v2/listen`, model `flux-general-en`). It exists to exercise and demonstrate Flux's
+turn-taking behavior — it is **not** a bidirectional Voice Agent example, and it never
+sends or expects audio back from Deepgram.
 
-## Configuration
+It supports two input modes, selected as subcommands:
 
-- If an application needs any user configuration, use a TOML file syntax in the user's home ".config" directory
-  - The TOML file name should correspond to the application
-  - Add appropriate inline comments describing each TOML section and option
-  - Each comment should include the option's valid values, and guidance on when and how to configure it
-- Users can specify environment variables that can override the TOML configuration
-- Users can specify CLI options, such as --option1 --option2 to override settings in the TOML configuration file
-  - CLI options have higher priority than corresponding environment variables, if both are specified
-- At application startup time, create a wizard that allows the user to specify any mandatory configuration values, such as an API key
-  - The user should be able to skip entry, but be warned that failure to provide mandatory values may degrade application functionality
+- `microphone` - streams live audio captured from the default input device
+- `file` - decodes an audio file (WAV, MP3, M4A, AAC via Symphonia) and streams it back
+  at real-time speed (100ms chunks, sized to the decoded sample rate)
 
-## User Interface Design
+Both subcommands accept the same superset of Flux-related options and share the same
+connection, transcript-display, and statistics machinery.
 
-For Terminal User Interface (TUI) applications, keep the following items in mind regarding the user interface design:
+## Output Modes Are Mutually Exclusive
 
-- **Colors**: Use colors, and shades of colors, creatively to indicate what is currently selected or in focus
-  - Use colors that are consistent with the brand. If you're unsure of brand colors, ask for additional guidance.
-- **Themes**: Applications should support theme selection, with some common themes built-in
-- **Help**: Always implement a help screen that shows the implemented keyboard shortcuts and mouse controls, if applicable.
-  - The help should be displayed in a popup box, unless otherwise specified. If there's too much info to display on the screen, the user can scroll this popup dialog box to obtain a full list of help.
-  - Use a question mark as the standard keyboard shortcut to display help
-- **Command Palette**: Implement a feature similar to a Command Palette, which allows the user to perform a text search for, and invoke, any and all application functionality
-  - The Command Palette should display the corresponding keyboard shortcut next to each item, but only if it has one
-- **Progress**: Implement progress bars to show the status of long-running operations that will take more than a couple seconds
-  - For long-running steps with an unknown end state, use a loading, throbber, spinner, or similar indicator to show that there's background activity happening
-- **Logging**: Ensure that an application log is accessible with a keyboard shortcut, and provide detailed error messages in case a problem occurs
-- **Input Validation**: When appropriate, perform user input validation and use colors or shades of color to indicate when user input is invalid, as close to real-time as possible
-- **Status Bar**: Implement a status bar that provides essential information, but make sure it is subtle, not distracting, and not intrusive
-- **Animations**: Use animations to show changes and activity in Terminal User Interface (TUI) applications; avoid implementing jarring user interfaces that could confuse the user
-- **List Views**: Make sure that list view controls scroll correctly, as the user navigates to the top or bottom of the list.
-  - Clicking on an item in a list view with the mouse should select the item
+There are three top-level output modes. Exactly one is active per run, in this priority
+order:
 
-## User Interaction
+1. **`--verbose`** - prints the full raw JSON for every message on every connection.
+   Overrides `--stats` and the regular transcript output.
+2. **`--stats`** - prints a periodic (500ms), full-redraw statistics table across all
+   connections (bytes sent/received, and Flux event counts). Suppresses the transcript
+   output for the selected connection, since a full-screen redraw loop and printed
+   transcript lines would otherwise clobber each other on the terminal.
+3. **Default (neither flag passed)** - prints the transcript for a single selected
+   connection only (`--connection`, default `0`, the first connection spawned). Other
+   connections keep streaming and updating their counters in the background but produce
+   no output of their own.
 
-For applications that implement a Terminal User Interface (TUI), adhere to the following guidelines:
+Do not make `--stats` and the transcript output run concurrently, and do not make the
+transcript output default to "all connections" — both were tried and both fight over the
+same terminal region (the stats table clears the screen and redraws from the cursor's
+home position every tick).
 
-- Keyboard shortcuts should be supported for all common operations
-- Suggest ideas for and implement mouse controls such as clicking, right-clicking, scrolling, and click and drag, and drop
-- Keep in mind that some terminals may not implement mouse controls, so be sure there's always a keyboard option for any mouse-driven operations
-- Do not block user input for any long-running operations; the user should always be in control of the application
-- The user should have the option of aborting or canceling any long-running operations running async or in separate threads
-- Arrow keys should be used to navigate UI elements, such as lists of items
-- Implement Page Up and Page Down keyboard commands for navigating list views
-- Make sure that keyboard keys used to enter text into text fields do not conflict with any keyboard navigation shortcuts
-- If you're creating a form for the user to fill out, make sure TAB and SHIFT+TAB are implemented to navigate between form fields, unless otherwise specified
-- The mouse should scroll the Help popup screen, if it's needed
+## Transcript Line Format
 
-## Security
+Each turn (`turn_index`) occupies exactly one terminal line in the default (regular)
+output mode. Every Flux `TurnInfo` message for that turn redraws the line in place —
+move to column 0, clear the current line, then print:
 
-- Do not ever commit any kind of secret value to source control, such as API keys, SSH keys, passwords, and other sensitive information
-- Ensure TLS connections are used for network operations, such as wss for WebSockets, or https for HTTP operations
-  - Sometimes unencrypted non-TLS connections may be allowed for local network access, or across connections secured with a VPN
+```
+<EventName>: <transcript>[ <confidence suffix>]
+```
 
-## Testing
+- `<EventName>` is the Flux `event` field, one of `StartOfTurn`, `Update`,
+  `EagerEndOfTurn`, `TurnResumed`, `EndOfTurn` (see `TurnEvent` in `src/main.rs`).
+- `<transcript>` is the message's `transcript` field, printed verbatim (not word-diffed)
+  — Flux resends the full transcript-so-far for the turn on every message, not just the
+  new words, so redrawing the whole line each time is both simpler and more correct than
+  trying to append only a computed delta (which would break if Flux ever revises earlier
+  words instead of purely appending).
+- The confidence suffix only appears on `EagerEndOfTurn` (`[eager_eot_confidence: X.XXXX]`)
+  and `EndOfTurn` (`[eot_confidence: X.XXXX]`) redraws, sourced from the message's
+  `end_of_turn_confidence` field. Other event types never get a confidence suffix, even if
+  Flux happens to include that field on them.
 
+The line is only finalized with a trailing newline when the turn actually ends
+(`event == EndOfTurn`) or when a new turn begins (`turn_index` changes) — do not print a
+newline after every message; that was tried and produced one scrolling line per message
+instead of a single line that updates in place per turn.
+
+Color is keyed off `turn_index % colors.len()` (not an incrementing counter), applied
+immediately before each redraw and reset immediately after. Color must never be applied
+to the statistics table — `display_stats_table` defensively issues a `ResetColor` before
+drawing, specifically to guard against a transcript line's color still being active when
+the table redraws on its own timer.
+
+## Flux Message Schema
+
+Flux's WebSocket schema differs from Nova-3 streaming and must not be confused with it:
+
+- The top-level `type` field is one of `Connected`, `TurnInfo`, `ConfigureSuccess`,
+  `ConfigureFailure`, or `Error`. Flux does **not** send separate `Results`,
+  `SpeechStarted`, `UtteranceEnd`, or `Metadata` message types the way Nova-3 does.
+- All transcription and turn-state updates arrive as `TurnInfo` messages; the actual
+  turn-state transition lives in the nested `event` field (`TurnEvent` enum), not in
+  `type`.
+- `TurnEvent` has a `#[serde(other)] Unknown` catch-all variant. Keep it — it lets the
+  client keep parsing forward-compatibly if Flux ever adds a new event value, instead of
+  hard-failing JSON parsing for every message on the connection.
+- `eager_eot_threshold` (0.3-0.9) and `numerals` are the only two query-string options
+  this client sets on connect. `numerals` must be set at connect time; Flux does not
+  support toggling it mid-stream via a `Configure` message. `eager_eot_threshold` could in
+  principle be changed via `Configure`, but this client only ever sets it at connect time.
+
+## CLI Surface
+
+Flags shared by both `microphone` and `file` (see `src/main.rs` `Commands` enum for the
+authoritative list and current defaults):
+
+- `--numerals` - adds `numerals=true` to the connect URL
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [deepgram-devs/deepgram-demos-rust](https://github.com/deepgram-devs/deepgram-demos-rust) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
