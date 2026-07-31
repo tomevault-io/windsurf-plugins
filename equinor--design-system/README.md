@@ -5,11 +5,10 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [equinor/design-system](https://github.com/equinor/design-system).
+Original source: `CLAUDE.md` in [equinor/design-system](https://github.com/equinor/design-system).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
