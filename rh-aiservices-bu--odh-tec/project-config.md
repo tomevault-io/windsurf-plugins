@@ -1,130 +1,144 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > **Note for AI Assistants**: This is a frontend-specific context file for the ODH-TEC React application. For project overview, see root [CLAUDE.md](../CLAUDE.md). For backend context, see [backend/CLAUDE.md](../backend/CLAUDE.md).
 ---
 
-# CLAUDE.md
+# CLAUDE.md - ODH-TEC Frontend Context
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Note for AI Assistants**: This is a frontend-specific context file for the ODH-TEC React application. For project overview, see root [CLAUDE.md](../CLAUDE.md). For backend context, see [backend/CLAUDE.md](../backend/CLAUDE.md).
 
-## Project Overview
+## 🎯 Frontend Overview
 
-ODH-TEC (Open Data Hub Tools & Extensions Companion) is a full-stack TypeScript application for managing S3 storage and GPU resources. The application runs as a single container with both frontend and backend, designed to work as an ODH/RHOAI workbench or standalone deployment.
+**odh-tec-frontend** - React 18 application with TypeScript, Webpack, and PatternFly 6 component library.
 
-**For detailed project information**, see:
+**Technology Stack**: React 18, PatternFly 6, React Router v7, TypeScript, Webpack
+**Development**: Port 9000 with Webpack HMR (Hot Module Replacement)
+**Production**: Built and served statically by Fastify backend on port 8888
 
-- [Architecture Documentation](docs/architecture/README.md) - System design, components, and technical details
-- [Development Documentation](docs/development/README.md) - Build process, testing, and development workflow
-- [Deployment Documentation](docs/deployment/README.md) - Container build and deployment scenarios
-- [Project Structure](docs/architecture/monorepo-structure.md) - Full project tree
+**For detailed architecture**, see [Frontend Architecture](../docs/architecture/frontend-architecture.md).
 
-## Quick Architecture Reference
+## 🎨 PatternFly 6 Critical Requirements
 
-**Monorepo Structure**:
+⚠️ **MANDATORY**: Follow the [PatternFly 6 Development Guide](../docs/development/pf6-guide/README.md) as the **AUTHORITATIVE SOURCE** for all UI development.
 
-- **Root**: Monorepo scripts using `npm-run-all` to orchestrate both packages
-- **Backend** (`backend/`): Fastify-based API server (TypeScript, port 8888)
-- **Frontend** (`frontend/`): React + PatternFly 6 UI (TypeScript, Webpack)
-- **Deployment**: Multi-stage Containerfile, production build serves static frontend from backend
+### Essential Rules
 
-**Technology Stack**:
+1. **Class Prefix**: ALL PatternFly classes MUST use `pf-v6-` prefix
+2. **Design Tokens**: Use semantic tokens only, never hardcode colors
+3. **Component Import**: Import from `@patternfly/react-core` v6 and other @patternfly libraries
+4. **Theme Testing**: Test in both light and dark themes
+5. **Table Patterns**: Follow guide's table implementation (current code may be outdated)
 
-- Backend: Fastify 4, Node.js 18+, AWS SDK v3, TypeScript
-- Frontend: React 18, PatternFly 6, React Router v7, Webpack
-- Container: UBI9 Node.js 18, runs on port 8888
+### Common Mistakes and Token Usage
 
-**For complete technical details**, see [Technology Stack](docs/architecture/technology-stack.md).
+**Critical rules** - See [`docs/development/pf6-guide/guidelines/styling-standards.md`](../docs/development/pf6-guide/guidelines/styling-standards.md) for complete guide:
 
-## Essential Development Commands
+- ✅ **ALWAYS** use `pf-v6-` prefix for component classes
+- ✅ **ALWAYS** use `--pf-t--` prefix for design tokens (semantic tokens with `-t-`)
+- ✅ Choose tokens by **meaning** (e.g., `--pf-t--global--color--brand--default`), not appearance
+- ❌ **NEVER** hardcode colors or measurements
+- ❌ **NEVER** use legacy `--pf-v6-global--` tokens or numbered base tokens
+
+### Component Import Pattern
+
+```tsx
+import { Button, Card, Page, PageSection } from '@patternfly/react-core';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
+import { TrashIcon, UploadIcon } from '@patternfly/react-icons';
+```
+
+**Version**: PatternFly 6.2.x (NOT PatternFly 5)
+
+## 🗃️ State Management Philosophy
+
+- **Local State First**: Use `useState` for component-specific state
+- **Context for Global**: UserContext for shared state
+- **EventEmitter for Cross-Component**: Use emitter for decoupled communication (upload progress, notifications)
+- **No Redux Active**: Redux folder exists but not actively used
+- **No React Query**: Direct API calls with axios and local loading/error states
+
+## 🎯 Component Development Checklist
+
+### Before Creating ANY Component
+
+1. **Search for similar components first** - Use `find_symbol` and `search_for_pattern`
+2. **Follow PatternFly 6 requirements** - ALWAYS use `pf-v6-` prefix, semantic tokens, v6 imports
+3. **Use established patterns** - Check existing components (StorageBrowser, Buckets, Settings)
+
+### Critical Rules for ALL Components
+
+1. **Error Handling**: MUST use `Emitter.emit('notification', { variant, title, description })` for user-facing errors
+   - Use `.catch()` with axios calls
+   - Log errors with `console.error()` for debugging
+   - Display user-friendly notifications via EventEmitter
+
+2. **Data Fetching**: Use direct axios calls with local state
+   - Set loading state before call
+   - Handle errors in `.catch()`
+   - Update component state on success
+
+3. **Internationalization**: MUST use `t()` function - never hardcode user-facing text
+   - Import from `react-i18next`
+   - Wrap all strings in `t('key')`
+
+4. **Accessibility**: MUST include ARIA labels and keyboard navigation
+   - Add `aria-label` to interactive elements
+   - Ensure keyboard navigation works
+   - Test with screen readers when possible
+
+5. **PatternFly 6**: MUST use `pf-v6-` prefix and semantic design tokens
+   - Never hardcode colors or spacing
+   - Use `--pf-t--` tokens for styling
+   - Test in both light and dark themes
+
+### Component Pattern Example
+
+```tsx
+const MyComponent: React.FC = () => {
+  const [loading, setLoading] = React.useState(false);
+  const [data, setData] = React.useState(null);
+  const { t } = useTranslation();
+
+  const fetchData = () => {
+    setLoading(true);
+    axios.get('/api/endpoint')
+      .then(response => {
+        setData(response.data);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching data:', error);
+        Emitter.emit('notification', {
+          variant: 'warning',
+          title: t('error.fetch.title'),
+          description: error.response?.data?.message || t('error.fetch.default')
+        });
+        setLoading(false);
+      });
+  };
+
+  return <div>{/* Component JSX */}</div>;
+};
+```
+
+## 🚀 Essential Development Commands
 
 ```bash
-# Initial setup
-npm install                  # Installs all dependencies (root + backend + frontend)
-
-# Development (runs both backend and frontend)
-npm run dev                  # Starts both in dev mode with hot reload
+# Development server with HMR
+npm run start:dev
 
 # Building
-npm run build                # Builds both backend and frontend
+npm run build          # TypeScript check + clean + webpack production build
 
 # Testing
-npm test                     # Runs all tests (backend + frontend)
+npm run test           # Run Jest tests
+npm run test:coverage  # Coverage report
 
-# Container operations
-podman build -t odh-tec -f Containerfile .
-podman run --rm -it -p 8888:8888 --env-file=.env odh-tec:latest
-```
+# Code quality
+npm run lint           # ESLint check
 
-**For complete development workflow**, see [Development Workflow](docs/development/development-workflow.md).
-
-## Key Architectural Principles
-
-1. **Streaming-First**: All file transfers use streaming to minimize memory usage (~256MB for 7B model imports)
-2. **Plugin-Based**: Backend uses Fastify's autoload pattern for routes and plugins
-3. **Stateless**: Backend is stateless - configuration from environment only
-4. **Single Container**: Production deployment serves both API and frontend on port 8888
-5. **Memory-Efficient**: Concurrent transfer limits via `p-limit` to prevent memory spikes
-
-**For detailed architecture**, see:
-
-- [System Architecture](docs/architecture/system-architecture.md)
-- [Backend Architecture](docs/architecture/backend-architecture.md)
-- [Frontend Architecture](docs/architecture/frontend-architecture.md)
-- [Data Flow](docs/architecture/data-flow.md)
-
-## Important Notes for AI Assistants
-
-- **No Authentication**: Currently no user auth, OAuth, or role-based access control
-- **Node.js 18+ Required**: Specified in engines
-- **Single Process in Production**: Backend serves both API and frontend static files
-- **Dev vs Production**: Development runs separate processes, production is single container
-- **S3 Compatibility**: Supports both AWS S3 and S3-compatible endpoints
-- **Runtime Configuration**: Settings UI allows ephemeral overrides (not persisted)
-- **Environment Auto-Detection**: Automatically picks up ODH/RHOAI Data Connection environment variables
-- **URL Path Prefix Support**: Configurable via `NB_PREFIX` environment variable for Gateway API/Ingress routing
-
-## Documentation Map
-
-```
-docs/
-├── architecture/          # System design and component architecture
-│   ├── overview.md       # Project overview and capabilities
-│   ├── system-architecture.md
-│   ├── backend-architecture.md
-│   ├── frontend-architecture.md
-│   ├── monorepo-structure.md
-│   ├── data-flow.md
-│   └── technology-stack.md
-│
-├── development/          # Development practices and workflows
-│   ├── development-workflow.md
-│   └── pf6-guide/       # PatternFly 6 comprehensive guide
-│
-├── deployment/          # Deployment and configuration
-│   ├── deployment.md
-│   └── configuration.md
-│
-└── features/            # Feature specifications
-    └── pvc-storage-support.md
-```
-
-## Component-Specific Context
-
-For detailed context specific to backend or frontend development:
-
-- **Backend**: See [backend/CLAUDE.md](backend/CLAUDE.md)
-- **Frontend**: See [frontend/CLAUDE.md](frontend/CLAUDE.md)
-
-### Context7 Usage Guidelines
-
-⚠️ **Important for AI tools using Context7**:
-
-- ✅ **Use Context7 for**: Backend libraries, non-UI frontend libraries (React, Axios,...)
-- ❌ **Don't use Context7 for**: PatternFly 6 components. use `docs/development/pf6-guide/` + PatternFly.org instead)
-- ✅ **Use `docs/development/pf6-guide/` + PatternFly.org** for Patternfly 6 components
-
-Context7 may contain outdated PatternFly versions. For all PatternFly 6 UI development, refer to the local PF6 guide and official PatternFly.org documentation.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rh-aiservices-bu/odh-tec](https://github.com/rh-aiservices-bu/odh-tec) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
