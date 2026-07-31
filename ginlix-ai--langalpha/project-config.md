@@ -1,119 +1,35 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: FastAPI server for langalpha — REST + SSE APIs for PTC-agent workflow execution, conversation/thread management, and workspaces. Endpoints live under `/api/v1/threads/*` and `/api/v1/workspaces/*` (discover the current set from the routers in `app/`).
 ---
 
-# CLAUDE.md
+# langalpha server
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+FastAPI server for langalpha — REST + SSE APIs for PTC-agent workflow execution, conversation/thread management, and workspaces. Endpoints live under `/api/v1/threads/*` and `/api/v1/workspaces/*` (discover the current set from the routers in `app/`).
 
-## What This Is
+> Single source of truth for AI coding agents in `src/server/`. `CLAUDE.md` imports this via `@AGENTS.md`; Codex/Cursor read it directly. Edit here, not there.
 
-langalpha is the core AI agent service of the Ginlix financial research platform. It runs a LangGraph-based research agent with PTC (Programmatic Tool Calling) — the agent writes and executes Python code in Daytona sandboxes to call MCP-backed financial data tools, produce charts, and analyze data. It also has a Flash mode for quick answers without a sandbox.
+## Layering (put code in the right tier)
 
-## Common Commands
+`app/` = route definitions + request orchestration (no raw SQL — DB access goes through services) · `handlers/` = per-request logic (chat streaming, workflow control, the error funnel) · `services/` = business logic + process singletons (session/workspace managers, `persistence/` DB services) · `database/` = raw-SQL query + pool layer · `models/` = Pydantic request/response · `dependencies/` = FastAPI `Depends` gates (auth + request admission).
 
-```bash
-# Run backend (port 8000)
-uv run python server.py --reload
+Inside those tiers, the run machinery groups into **domain namespaces**: `app/threads/` (thread routes), `handlers/chat/` (the flash/PTC run generators, request prep, stream readers), `services/runs/` (the run lifecycle: admission → coordinator → executor → finalization → recovery, plus SSE production/transport), `services/report_back/` (flash + subagent report-back hooks), and `database/runs/` (run-ledger SQL: lifecycle, outbox, subagent runs). The namespaces live *inside* the horizontal contract — they never invert it (`services/**` must not import `handlers/**`; enforced by `tests/unit/server/test_import_layering.py`).
 
-# Run frontend dev server (port 5173)
-cd web && pnpm dev
+## Landmines (non-obvious)
 
-# Lint
-uv run ruff check src/                    # backend
-cd web && pnpm lint                        # frontend (ESLint 9 flat config)
+- **Two separate async psycopg3 pools, opened/closed in the `app/setup.py` lifespan** — the LangGraph checkpointer (workflow state; the LangGraph Store shares it) and the conversation-history (app-data) pool. Don't reuse one for the other.
+- **Mid-flight reconnection is Redis-only, not the checkpoint.** Live events are buffered in a per-run Redis **Stream** `workflow:stream:{thread_id}:{run_id}` (XADD + `MAXLEN` trim, 24h TTL, 150k-event cap). `GET /api/v1/threads/{id}/messages/stream` XREAD-BLOCK-replays the buffer then tails live; `last_event_id` is a resume cursor (resumes at seq N+1), not post-hoc dedup. An abandoned running workflow is reaped after ~6h; a completed workflow's reconnect returns `410` once its task-info key expires.
+- **Historical replay is projected from the LangGraph checkpoint, not from stored SSE events** (re-homed in #315). `GET /api/v1/threads/{id}/messages/replay` (`source=auto`) rebuilds the transcript from checkpoint state via `CheckpointHistoryReader` + a pure projector (`services/history/`), falling back to persisted `conversation_responses.sse_events` only when checkpoint coverage is missing (that column is still dual-written every turn, but it's now the transitional fallback). **So the durable replay contract is the checkpoint state schema: `messages` (a `DeltaChannel`) + the `ui` channel** (`langgraph.graph.ui`; an id-keyed upsert accumulator of compact, non-rederivable records — image-URL maps, `model_fallback` notices).
+- **What silently breaks replay of already-stored checkpoints:** renaming a `ui`-record's `name`/`props`, or emitting one without a stable pre-stamped `id` (the reducer upserts by id — keep the projector's field whitelists in sync); putting rederivable or bulk data in graph state (the projector rebuilds artifacts from tool-call *args* + message `additional_kwargs`, and >32KB widget data must be a content-addressed `data_ref`, not inlined); or adding a chat-wire SSE type without a checkpoint- or table-sourced home — `tests/unit/server/services/history/test_event_ledger.py` fails CI until every type is classified, so build the replay source before you emit.
+- **Error funnel (`handlers/chat/error_handling.py`, `classify_error()`):** recoverable errors (DB/connection drop, timeout, network, API 5xx/429) emit a `retry` SSE event (`auto_retry`; thread → `interrupted`, and the client/gateway re-submits) up to 3× (`get_max_workflow_retries`), then convert to a terminal `error`. Non-recoverable *code bugs* (`AttributeError`/`NameError`/`TypeError`/`ImportError`/`SyntaxError`/`KeyError`) fail immediately with a stable `error` payload. Don't add ad-hoc try/except that swallows this path.
+- **Cancelled ≠ disconnected:** an explicit cancel stops the workflow; a client disconnect lets it keep running in the background (`LocalRunExecutor` keeps executing; the run's `in_progress` ledger row is the durable record), and a reconnect resumes the live stream.
+- **`steer_only: true`** on `POST .../messages` only steers an in-flight workflow; if none is running it's rejected with an admission-conflict `error` event (`error_type="admission_conflict"`, `code="not_running"`) — it never starts a new turn.
 
-# Tests — backend
-uv run pytest tests/unit/ -v --tb=short                     # unit only (default)
-uv run pytest tests/unit/path/to/test.py -v                 # single file
-uv run pytest tests/unit/path/to/test.py::test_name -v      # single test
-uv run pytest tests/integration/ -v -m integration          # integration (needs DB + Redis + API keys)
+## Config
 
-# Tests — frontend
-cd web && pnpm vitest run                  # all tests (CI)
-cd web && pnpm vitest run path/to/test.js  # single file
-cd web && pnpm vitest                      # watch mode
-
-# Database setup
-make setup-db     # start postgres + redis via docker, run all migrations
-make migrate      # run migrations only
-
-# Create a new database migration
-uv run alembic revision -m "description of change"
-
-# Check migration status
-uv run alembic current
-uv run alembic history
-
-# Install dependencies
-uv sync --group dev --extra test           # backend
-cd web && pnpm install                     # frontend
-```
-
-## Architecture Overview
-
-### Backend (`src/`)
-
-| Directory | Purpose |
-|---|---|
-| `src/server/` | FastAPI app, routers (`app/`), handlers, models, services. Has its own [CLAUDE.md](src/server/CLAUDE.md) with detailed SSE event types and endpoint docs. |
-| `src/ptc_agent/` | Core agent library — agent factory, middleware stack, subagents, prompts, sandbox/MCP integration |
-| `src/tools/` | LangChain tools: web search, web fetch, market data, SEC filings, crawl |
-| `src/llms/` | LLM wrappers, token counting, pricing, model manifest (`models.json`) |
-| `src/config/` | Settings (`settings.py`), logging config |
-| `src/data_client/` | Financial data protocol abstraction |
-| `src/utils/` | Redis cache, shared utilities |
-
-### Frontend (`web/src/`)
-
-React 19 + Vite 7, TypeScript, Tailwind CSS 3, shadcn/ui. State via React Query (`@tanstack/react-query`). Auth via Supabase (optional — disabled locally with `VITE_SUPABASE_URL` unset).
-
-| Directory | Purpose |
-|---|---|
-| `api/client.js` | Axios instance with Bearer token interceptor |
-| `lib/queryKeys.js` | React Query key factory for cache management |
-| `contexts/` | `AuthContext` (Supabase session), `ThemeContext` |
-| `hooks/` | Shared React Query hooks (`useUser`, `useWorkspaces`, etc.) |
-| `pages/ChatAgent/` | Main AI chat interface — SSE streaming via raw `fetch()` + `ReadableStream` |
-| `pages/Dashboard/` | Overview with watchlist, portfolio, news |
-| `pages/MarketView/` | Real-time market chart with WebSocket data |
-| `pages/Automations/` | Scheduled automation CRUD |
-| `components/ui/` | Primitive UI components (Radix-based) |
-
-Pages are lazy-loaded in `Main.jsx`. Each page group has its own `utils/api.js` for API calls. Path alias: `@` → `web/src/`.
-
-### Key Config Files
-
-| File | Purpose |
-|---|---|
-| `agent_config.yaml` | Agent capabilities: LLM models, MCP servers, subagents, tools, sandbox config |
-| `config.yaml` | Infrastructure: CORS origins, Redis TTLs, workflow timeouts, market data providers |
-| `.env` / `.env.example` | Credentials and service URLs |
-
-### Agent Architecture
-
-The agent does NOT use a hand-written `StateGraph`. It uses `create_agent()` from the `deepagents` library, wrapped in a deep middleware stack:
-
-**`src/ptc_agent/agent/agent.py` — `PTCAgent.create_agent()`** assembles:
-1. **Tools**: `execute_code`, `bash`, filesystem ops (read/write/edit/glob/grep), `show_widget` (inline HTML visualizations), `web_search`, `web_fetch`, SEC/market tools
-2. **Middleware chain** (~23 layers): tool argument parsing → protected paths → error handling → leak detection → file/todo artifact emission → multimodal support → skills → steering → background subagents → HITL → compaction → model retry/fallback → prompt caching → workspace context injection
-3. **`BackgroundSubagentOrchestrator`** wraps the agent for parallel background task coordination
-
-**Subagents** (`src/ptc_agent/agent/subagents/`): `general-purpose` and `research` built-in; registry loads additional from `agent_config.yaml`.
-
-**Flash mode** (`src/ptc_agent/agent/flash/`): lightweight agent — no sandbox, no MCP, no subagents, external tools only (web search, market data, SEC).
-
-### PTC Pattern
-
-The core differentiator: the LLM doesn't call MCP tools directly. Instead, it writes Python code via `execute_code` that imports generated wrapper modules and calls MCP-backed functions in the Daytona sandbox. This enables data manipulation, charting, and multi-step analysis in a single code execution.
-
-### Data Flow
-
-```
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ginlix-ai/LangAlpha](https://github.com/ginlix-ai/LangAlpha) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
