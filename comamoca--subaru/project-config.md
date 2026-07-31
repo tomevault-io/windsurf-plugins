@@ -1,142 +1,140 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: AGENTS_POLICY: gateway-v1.1
 ---
 
-# CLAUDE.md
+<!--
+AGENTS_POLICY: gateway-v1.1
+repo_namespace: .agentplane
+default_initiator: ORCHESTRATOR
+-->
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## CRITICAL PRIORITY INSTRUCTIONS
+# PURPOSE
 
-**MOST IMPORTANT**: When evaluating Gleam script execution via `deno task cli`, NEVER use simulation. Always base script evaluation on the actual Deno execution results. The runner executes real HTTP requests and should return real data, not simulated output.
+`AGENTS.md` is the policy gateway for agents in this repository.
+It provides strict routing, hard constraints, and command contracts.
+Detailed procedures live in canonical modules from `## CANONICAL DOCS`.
 
-- Execute scripts using `deno task cli <script.gleam>`
-- Evaluate success/failure based on actual console output
-- Debug issues using real execution results
-- No simulation or fake data generation allowed
 
-## Project Overview
 
-This is "subaru" - a Gleam WASM runner that allows executing Gleam code dynamically using WebAssembly. The project uses:
+## PROJECT
 
-- **Gleam**: Main programming language (functional language that compiles to Erlang/JavaScript)
-- **Deno**: TypeScript/JavaScript runtime for the WASM runner
-- **WASM**: WebAssembly version of Gleam compiler for dynamic compilation
-- **Nix Flakes**: Development environment management with devenv
-- **Pre-commit hooks**: Security scanning with git-secrets and ripsecrets
+- Repository type: user project initialized with `agentplane`.
+- CLI rule: prefer `ap` for compact agent-oriented commands; fall back to `agentplane`; if neither is available, stop and request installation guidance (do not invent repo-local entrypoints).
+- Startup shortcut: run `## COMMANDS -> Preflight`; use `ap quickstart`; activate `ap role ORCHESTRATOR` for planning and `ap role <ROLE>` for execution; then apply `## LOAD RULES` before mutation. The guarded route is determined by `workflow.mode` in `.agentplane/WORKFLOW.md`; treat `ap task brief <task-id>` and `ap task next-action <task-id> --explain` as the route oracle: follow the emitted checkout, blocker, and next command instead of reconstructing workflow state.
 
-## Development Commands
 
-### Setup
+## SOURCES OF TRUTH
 
-```bash
-deno task setup     # Download Gleam WASM compiler
-```
+Priority order (highest first):
 
-### Gleam Operations
+1. Enforcement: CI, tests, linters, hooks, CLI validations.
+2. Policy gateway: `AGENTS.md`.
+3. Canonical policy modules from `## CANONICAL DOCS`.
+4. CLI guidance: `ap quickstart`, `ap role <ROLE>`, `.agentplane/WORKFLOW.md`.
+5. Reference examples from `## REFERENCE EXAMPLES`.
 
-```bash
-gleam run      # Run the main Gleam application
-gleam test     # Run Gleam tests using gleeunit
-```
+Conflict rule:
 
-### WASM Runner Operations
+- If documentation conflicts with enforcement, enforcement wins.
+- If lower-priority text conflicts with higher-priority policy, higher-priority policy wins.
 
-```bash
-# CLI usage
-deno task cli --help                    # Show CLI help
-deno task cli example.gleam             # Execute Gleam file directly (preferred)
-deno task cli --file example.gleam     # Execute Gleam code from file (alternative)  
-deno task cli --code "gleam_code_here"  # Execute Gleam code directly
-deno task cli --url https://example.com/script.gleam  # Execute remote script
 
-# Debug control (silent is default)
-deno task cli --debug --code "..."      # Enable debug output
-deno task cli --log-level error --code "..."   # Show compilation errors/warnings
+## SCOPE BOUNDARY
 
-# Configuration
-deno task init-config                   # Create example config file
-deno task cli --config my-config.json script.gleam  # Use custom config with direct file
+- MUST keep all actions inside this repository unless the user explicitly approves outside-repo access.
+- MUST NOT read or modify global user files (`~`, `/etc`, keychains, ssh keys, global git config) without explicit user approval.
+- MUST treat network access as approval-gated when `agents.approvals.require_network=true`.
 
-# Examples and testing
-deno task example                       # Run usage examples
-deno task example:debug                 # Run debug mode examples
-deno task example:preload               # Run preload scripts example
-deno task test                          # Run Deno tests
-```
 
-### Development Environment
+## COMMANDS
+
+### Preflight
 
 ```bash
-deno task dev        # Setup and run development environment
-# OR use Nix/direnv for reproducible environment:
-nix develop          # Enter the development shell (if using Nix)
-direnv allow         # Auto-load development environment (if direnv is configured)
+ap config show
+ap quickstart
+ap task list
+ap task active
+git status --short --untracked-files=no
+git status --short --untracked-files=all
+git rev-parse --abbrev-ref HEAD
 ```
 
-### Code Quality
+### Route commands
 
 ```bash
-deno task fmt            # Format TypeScript code
-deno task lint           # Lint TypeScript code
-deno task check          # Type check TypeScript code
-deno task test           # Run Deno tests
-deno task build-gleam    # Build Gleam project
-deno task run-gleam      # Run Gleam project
-deno task clean          # Clean generated files
-nix run .#treefmt        # Format Nix code
-git secrets --scan       # Scan for secrets (pre-commit hook)
+ap task brief <task-id>
+ap task next-action <task-id> --explain
+ap work resume <task-id>
 ```
 
-**IMPORTANT**: Always run `deno fmt` and `deno test` during development before committing changes. These commands should be used frequently to catch formatting issues and test failures early.
+### Task lifecycle
 
-## Project Structure
+```bash
+ap task new --title "..." --description "..." --priority med --owner <ROLE> --tag <tag>
+ap task plan set <task-id> --text "..." --updated-by <ROLE>
+ap task plan approve <task-id> --by ORCHESTRATOR
+ap task start-ready <task-id> --author <ROLE> --body "Start: ..."
+ap verify <task-id> --ok|--rework --by <ROLE> --note "..." [--observation "..." --impact "..." --resolution "..."] [--local-only]
+ap finish <task-id> --author <ROLE> --body "Verified: ..." --result "..." --commit <git-rev>
+```
 
-### Gleam Files
+### branch_pr lifecycle
 
-- `src/subaru.gleam`: Main Gleam application entry point
-- `test/subaru_test.gleam`: Gleam test suite using gleeunit
+```bash
+ap work start <task-id> --agent <ROLE> --slug <slug> --worktree
+ap task start-ready <task-id> --author <ROLE> --body "Start: ..."
+git commit -m "Implement <task>"
+ap task verify-show <task-id>
+ap pr open <task-id> --branch task/<task-id>/<slug> --author <ROLE>
+ap verify <task-id> --ok|--rework --by <ROLE> --note "..."
+ap evaluator run <task-id> --verdict pass|rework|blocked|human_review --summary "..." --finding "..." --evidence <path-or-check>
+ap integrate <task-id> --branch task/<task-id>/<slug> --run-verify
+ap finish <task-id> --author INTEGRATOR --body "Verified: ..." --result "..." --commit <git-rev> --close-commit
+```
 
-### TypeScript/WASM Runner
+### Verification
 
-- `src/gleam_runner.ts`: Core WASM runner implementation
-- `src/subaru_runner.ts`: High-level API for Gleam code execution
-- `src/cli.ts`: Command-line interface for the runner
-- `src/hex/`: Hex.pm package integration
-  - `hex_client.ts`: Hex.pm API client
-  - `tarball_extractor.ts`: Hex tarball extraction
-  - `package_cache.ts`: Package caching
-- `src/stdlib/`: Standard library loading
-  - `builtin_packages.ts`: Builtin package definitions
-  - `stdlib_loader.ts`: Library loading orchestration
-- `test/subaru_runner_test.ts`: Deno tests for WASM functionality
-- `test/hex/`: Tests for Hex.pm integration
-- `test/stdlib/`: Tests for stdlib loading
-- `examples/simple_usage.ts`: Usage examples
+```bash
+ap vshow <task-id>
+ap verify <task-id> --ok|--rework --by <ROLE> --note "..." [--observation "..." --impact "..." --resolution "..."] [--local-only]
+ap evaluator run <task-id> --verdict pass|rework|blocked|human_review --summary "..." --finding "..." --evidence <path-or-check> [--missing-test "..." --hidden-assumption "..." --residual-risk "..."]
+ap incidents advise <task-id>
+ap incidents collect <task-id> --check
+ap doctor
+node .agentplane/policy/check-routing.mjs
+```
 
-### Configuration & Scripts
 
-- `gleam.toml`: Gleam project configuration and dependencies
-- `deno.json`: Deno configuration and development task definitions
-- `flake.nix`: Nix development environment with custom Gleam build
-- `src/setup.ts`: WASM compiler setup script
+## TOOLING
 
-## Architecture Notes
+- Use `## COMMANDS` as the canonical command source.
+- Use `ap quickstart` as the compact installed startup path and `ap role <ROLE>` to activate the current role before role-scoped planning or execution.
+- For policy changes, routing validation MUST pass via `node .agentplane/policy/check-routing.mjs`.
 
-- **Dual Runtime**: Gleam for static compilation, Deno for dynamic WASM execution
-- **WASM Integration**: Uses Gleam's WebAssembly compiler for dynamic code compilation
-- **Worker-based Execution**: Isolates compiled JavaScript execution in Web Workers
-- **CLI Interface**: Provides easy command-line access to WASM functionality
-- **Testing Strategy**: Gleam tests for static code, Deno tests for WASM functionality
-- **Custom Gleam Build**: The flake.nix builds Gleam v1.9.1 from source using Rust nightly
-- **Security**: Pre-commit hooks scan for secrets using git-secrets and ripsecrets
 
-## Key Features
+## SHARED PROMPT CONTRACT
+
+- Outcome-first, concise, evidence-first: state goal, success criteria, constraints, stop rules, and output; use procedure only for command contracts, state machines, or irreversible gates.
+- Ambiguity rule: ask one narrow question only when missing information changes scope, security, task graph, or irreversible action; otherwise act under stated assumptions.
+- Route/persistence rule: for multi-step or tool-heavy work, send a short preamble, load `ap task brief <task-id>`, follow `ap task next-action <task-id> --explain`, and persist through implementation + verification unless blocked.
+- Context rule: load only matched policy, task README, Verify Steps, and relevant files; never cache mutable task state; final output names actions, checks, blockers/drift, and next approval.
+
+
+IF `.agentplane/user-instructions.md` exists THEN LOAD it as `gateway.user.instructions`.
+
+
+## LOAD RULES
+
+Routing is strict. Load only modules that match the current task.
+
+### Always imports for mutating tasks
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Comamoca/subaru](https://github.com/Comamoca/subaru) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
