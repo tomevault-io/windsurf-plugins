@@ -1,75 +1,117 @@
 ---
 trigger: always_on
-description: This project is the Microsoft JDBC Driver for SQL Server, enabling Java applications to interact with SQL Server and Azure SQL databases. It implements the JDBC 4.2/4.3 specification, communicating over the TDS (Tabular Data Stream) protocol. It supports features like connection pooling, Always Encrypted, Azure AD authentication, bulk copy, configurable retry logic, and idle connection resiliency.
+description: This document describes the high-level architecture of the Microsoft JDBC Driver for SQL Server.
 ---
 
-# Copilot Instructions — mssql-jdbc
+# mssql-jdbc Architecture
 
-## 📚 Project Overview
+This document describes the high-level architecture of the Microsoft JDBC Driver for SQL Server.
 
-This project is the Microsoft JDBC Driver for SQL Server, enabling Java applications to interact with SQL Server and Azure SQL databases. It implements the JDBC 4.2/4.3 specification, communicating over the TDS (Tabular Data Stream) protocol. It supports features like connection pooling, Always Encrypted, Azure AD authentication, bulk copy, configurable retry logic, and idle connection resiliency.
+## Overview
 
-The project builds from a single Maven project (`pom.xml`) with multiple JRE profiles (`jre8`, `jre11`, `jre17`, `jre21`, `jre25`, `jre26`). Each profile compiles against a different Java source level and produces a profile-specific JAR.
+The driver implements the JDBC 4.2/4.3 specification and communicates with SQL Server using the TDS (Tabular Data Stream) protocol. It supports SQL Server 2012 and later, as well as Azure SQL Database.
 
-The project includes:
+## Layer Architecture
 
-- **Driver source**: All source code in `src/main/java/com/microsoft/sqlserver/jdbc/`.
-- **Error resources**: Localized error messages in `SQLServerResource.java`.
-- **Tests**: Located in `src/test/java/com/microsoft/sqlserver/jdbc/`.
-  - **Unit Tests**: Many tests in `src/test/java/com/microsoft/sqlserver/jdbc/unit/` are isolated, but this tree is not guaranteed to be SQL-Server-free; tests that extend `AbstractTest` or call `setConnection()` / `getConnection()` require test database configuration.
-  - **Integration Tests**: In feature-specific packages (`connection/`, `datatypes/`, `bulkCopy/`, `AlwaysEncrypted/`, etc.) — generally require a SQL Server instance.
-  - **BVT Tests**: In `src/test/java/com/microsoft/sqlserver/jdbc/bvt/` — build verification / smoke tests.
-  - **State Machine Tests**: In `src/test/java/com/microsoft/sqlserver/jdbc/statemachinetest/` — model-based testing for complex state interactions.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Application Layer                            │
+│                  (User Application Code)                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      JDBC API Layer                              │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
+│  │ Connection  │  │  Statement   │  │     ResultSet       │    │
+│  │   Pool      │  │   Cache      │  │     Handling        │    │
+│  └─────────────┘  └──────────────┘  └─────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Protocol Layer (TDS)                          │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
+│  │  IOBuffer   │  │  TDSParser   │  │   Stream Handlers   │    │
+│  │  (I/O)      │  │  (Tokens)    │  │   (Data Types)      │    │
+│  └─────────────┘  └──────────────┘  └─────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Transport Layer                               │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
+│  │   Socket    │  │     SSL      │  │   Authentication    │    │
+│  │   I/O       │  │   Handler    │  │   (Kerberos/NTLM)   │    │
+│  └─────────────┘  └──────────────┘  └─────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      SQL Server                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-## 🔧 Working with Issues
+## Package Structure
 
-- If the issue is a bug, reproduce it and identify the root cause in source code.
-- If the issue is a feature request, review the proposal and assess its feasibility.
-- If the issue is a task, follow the instructions provided in the issue description.
-- Cross-reference issue descriptions with code in `src/main/java/com/microsoft/sqlserver/jdbc/`.
-- If public APIs are changed, update Javadoc comments on all affected public members.
-- Add or update tests in `src/test/java/` to validate the fix.
+```
+com.microsoft.sqlserver.jdbc/
+│
+├── Connection Management
+│   ├── SQLServerConnection.java         # Main connection implementation
+│   ├── SQLServerConnection43.java       # JDBC 4.3 extensions
+│   ├── SQLServerDataSource.java         # DataSource implementation
+│   ├── SQLServerConnectionPoolDataSource.java
+│   ├── SQLServerPooledConnection.java
+│   ├── SQLServerConnectionPoolProxy.java
+│   ├── SQLServerXAConnection.java       # XA transaction support
+│   ├── SQLServerXADataSource.java
+│   └── SQLServerXAResource.java
+│
+├── Statement Execution
+│   ├── SQLServerStatement.java          # Basic statements
+│   ├── SQLServerPreparedStatement.java  # Parameterized queries
+│   ├── SQLServerCallableStatement.java  # Stored procedures
+│   ├── Parameter.java                   # Parameter binding
+│   ├── ParameterMetaDataCache.java      # Prepared statement cache
+│   └── SQLServerParameterMetaData.java
+│
+├── Result Processing
+│   ├── SQLServerResultSet.java          # Result set implementation
+│   ├── SQLServerResultSetMetaData.java  # Column metadata
+│   ├── SQLServerDatabaseMetaData.java   # Database metadata
+│   ├── Column.java                      # Column data handling
+│   └── ScrollWindow.java                # Scrollable cursors
+│
+├── TDS Protocol
+│   ├── IOBuffer.java                    # TDS packet I/O
+│   ├── tdsparser.java                   # Token stream parsing
+│   ├── StreamPacket.java                # Base packet handler
+│   ├── StreamColInfo.java               # Column info token
+│   ├── StreamColumns.java              # Column metadata token
+│   ├── StreamDone.java                  # Done token
+│   ├── StreamLoginAck.java             # Login acknowledgment
+│   ├── StreamRetStatus.java             # Return status
+│   ├── StreamRetValue.java              # Return value
+│   └── StreamTabName.java               # Table name token
+│
+├── Data Types
+│   ├── DataTypes.java                   # Type mappings
+│   ├── DDC.java                         # Data type conversion
+│   ├── dtv.java                         # Data type value handling
+│   ├── SQLServerBlob.java              # BLOB support
+│   ├── SQLServerClob.java              # CLOB support
+│   ├── SQLServerNClob.java             # NCLOB support
+│   ├── SQLServerSQLXML.java             # XML support
+│   ├── Geography.java                   # Spatial - Geography
+│   ├── Geometry.java                    # Spatial - Geometry
+│   ├── SQLServerSpatialDatatype.java    # Spatial base class
+│   └── SqlVariant.java                  # sql_variant support
+│
+├── Bulk Operations
 
-### 🧪 Writing Tests
-
-- For every bug fix, ensure there are unit tests and integration tests that cover the scenario.
-- For new features, write tests that validate the functionality.
-- **Write a failing test before implementing the fix** (test-driven approach).
-- Use the existing test framework: extend `AbstractTest` for tests needing SQL Server, use JUnit 5 annotations (`@Test`, `@Tag`, `@BeforeAll`, `@AfterAll`).
-- Follow the naming conventions and structure of existing tests.
-- Ensure tests are comprehensive and cover edge cases.
-- Do NOT hardcode connection strings — use `AbstractTest` utilities and test config.
-- Tag tests requiring external resources with appropriate group annotations (`xSQLv12`, `xSQLv15`, `reqExternalSetup`, `fedAuth`, `kerberos`, etc.).
-- Consider state machine tests for complex stateful features (see `.github/instructions/state-machine-testing.instructions.md`).
-
-### ⚙️ Automating Workflows
-
-- Use the `getting-started` prompt (`#getting-started`) for an interactive guide to all available Copilot prompts.
-- Auto-label PRs based on folder paths (e.g., changes in `src/main/java/` → `area-driver`, changes in `src/test/java/` → `area-testing`).
-- Suggest CHANGELOG entries for fixes in `CHANGELOG.md`.
-- Tag reviewers based on area of change.
-
-## 🧠 Contextual Awareness
-
-- All source code is in `src/main/java/com/microsoft/sqlserver/jdbc/`. Follow the package structure described in `.github/instructions/architecture.instructions.md`.
-- The driver must work cross-platform: Windows, Linux, and macOS. Do not make platform-specific assumptions.
-- Code must compile across all JRE profiles (`jre8` through `jre26`). Avoid using APIs unavailable in older JDK versions without profile guards.
-- Respect API compatibility rules — do not introduce breaking changes without proper justification and documentation.
-- Follow exception handling patterns: `SQLServerException.makeFromDriverError(...)` with error keys from `SQLServerResource.java` (see `.github/instructions/patterns.instructions.md`).
-- Guard log statements: `if (logger.isLoggable(Level.FINER))` — never log sensitive data (passwords, tokens, connection strings with credentials).
-
-## Constraints
-
-- Do not change repository ownership or review-routing conventions without team discussion.
-- Do not close issues without a fix or without providing a clear reason.
-- All changed code must be formatted with Eclipse formatter `mssql-jdbc_formatter.xml`.
-
-## 📝 Notes
-
-- Follow `Coding_Guidelines.md` for code style and `coding-best-practices.md` for engineering practices.
-- Follow `review-process.md` for PR review guidelines.
-- Regularly review and update documentation to ensure it reflects the current state of the project.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/mssql-jdbc](https://github.com/microsoft/mssql-jdbc) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
