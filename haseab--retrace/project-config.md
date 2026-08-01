@@ -1,120 +1,128 @@
 ---
 trigger: always_on
-description: > **Standard**: This file follows the [AGENTS.md](https://agents.md) specification - a vendor-agnostic standard for AI agent guidance. For human-readable project information, see [README.md](README.md).
+description: You are responsible for the **Processing** module of Retrace. Your job is to implement text extraction from captured frames using Vision framework OCR and the Accessibility API.
 ---
 
-# Retrace - Agent Guide
+# PROCESSING Agent Instructions
 
-> **Standard**: This file follows the [AGENTS.md](https://agents.md) specification - a vendor-agnostic standard for AI agent guidance. For human-readable project information, see [README.md](README.md).
+You are responsible for the **Processing** module of Retrace. Your job is to implement text extraction from captured frames using Vision framework OCR and the Accessibility API.
 
-Retrace is a local-first screen recording and search application for macOS, inspired by Rewind AI. It captures screens, extracts text via OCR, and makes everything searchable—all locally on-device.
+**Status**: ✅ Vision OCR and Accessibility API fully implemented. **No audio transcription yet** (planned for future release).
 
-**Status**: Core screen capture (CGWindowListCapture), OCR (Vision), full-text search (FTS5), HEVC encoding, and Rewind import are working. Audio transcription and vector search are planned for future releases.
-
----
-
-## Quick Reference
-
-- **Module-Specific Instructions**: Each module has its own `AGENTS.md` file in its directory
-- **Human Documentation**: [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [AI_ISSUE_TEMPLATE.md](AI_ISSUE_TEMPLATE.md)
-- **Issue Reporting**: Use `AI_ISSUE_TEMPLATE.md` and `gh issue create --body-file ...` for AI-authored GitHub issues
-- **Bug Fixes by Non-Owners**: If the user is fixing a bug/crash and does not appear to be the repo owner, encourage them to create or link a GitHub issue before making code changes
-- **Technical Audit Docs**: `local/docs/` (includes deep-dive implementation and performance audit notes)
-
----
-
-## Project Commands
-
-### Build & Test
-
-```bash
-# Build all targets
-swift build
-
-# Run all tests
-swift test
-
-# Run specific module tests
-swift test --filter DatabaseTests
-
-# Run specific test
-swift test --filter testSpecificMethod
-
-# Clean build artifacts
-rm -rf .build/
-```
-
----
-
-## Project Structure
+## Your Directory
 
 ```
-retrace/
-├── AGENTS.md                    # This file - main agent coordination
-├── .env.example                 # Template for local release credentials (copy to .env)
-├── .github/                     # GitHub configuration
-│   ├── CODEOWNERS
-│   ├── FUNDING.yml
-│   └── ISSUE_TEMPLATE/
-│       └── bug_report.yml       # GitHub bug report form aligned with AI issue template
-├── AI_ISSUE_TEMPLATE.md         # Canonical markdown template for AI-authored bug reports
-├── README.md                    # Human-readable project overview
-├── CONTRIBUTING.md              # Contribution guidelines
-├── Package.swift                # Swift Package Manager configuration
-├── scripts/                     # Build/release/validation scripts
-│   ├── release.sh               # End-to-end release automation
-│   ├── create-release.sh        # Release build + packaging helper
-│   ├── check_no_nanoseconds_sleep.sh # Guardrail for Task.sleep(nanoseconds:)
-│   ├── validate_sleep_wake_stability.sh # Sleep/wake soak validation workflow
-│   └── validate_darkwake_watchdog.sh # Automated darkwake watchdog regression validation
+Processing/
+├── ExtractMemoryInstrumentation.swift # Request-scoped extract residual/handoff instrumentation helper
+├── ExtractRequestInstrumentation.swift # Request wrapper that drives extract-stage residual accounting
+├── ProcessingManager.swift        # Main ProcessingProtocol implementation
+├── FrameProcessingQueue.swift     # OCR pipeline orchestration + queue telemetry
+├── URLExtractor.swift             # URL extraction from OCR text
+├── OCR/
+│   ├── VisionOCR.swift            # Vision framework OCR implementation
+│   ├── VisionOCRHelpers.swift     # OCR output structs plus geometry/image helper methods
+│   ├── VisionOCRInstrumentation.swift # OCR-local memory ledger runtime and tracker plumbing
+│   ├── VisionOCRRequestConfig.swift # OCR request config type plus full-frame/region config builders
+│   ├── VisionOCRResidualSupport.swift # OCR residual reset tables and reconciliation helpers
+│   ├── FullFrameOCRCache.swift    # Cached full-frame OCR results for region re-OCR
+│   ├── OCRTileCache.swift         # Tile cache support for region OCR
+│   ├── RegionOCRMerger.swift      # Region OCR merge helpers
+│   ├── RegionOCRResult.swift      # Region OCR result/stat models
+│   ├── TileChangeDetector.swift   # Tile-based change detection
+│   ├── TileGridConfig.swift       # Tile grid tuning
+│   └── TileOCRProcessor.swift     # Tile OCR processing helpers
+├── Accessibility/
+│   ├── AccessibilityService.swift  # AccessibilityProtocol implementation
+│   └── TextElementFilter.swift     # Filter relevant text elements
 │
-├── Shared/                      # CRITICAL: Shared types and protocols
-│   ├── Logging.swift            # Central log utility (Log.debug/info/warning/error)
-│   ├── AppPaths.swift           # Application path configuration
-│   ├── BGRAImageUtilities.swift # Shared BGRA conversion + patch extraction helpers
-│   ├── MasterKeyManager.swift   # Keychain-backed master key creation + recovery phrase export
-│   ├── ReversibleOCRScrambler.swift # Deterministic reversible OCR patch scrambling + text protection
-│   ├── Models/                  # Data types used across modules
-│   │   ├── Frame.swift          # FrameID, CapturedFrame, VideoSegment
-│   │   ├── Text.swift           # ExtractedText, OCRTextRegion
-│   │   ├── TextRegion.swift     # OCR text region types
-│   │   ├── Search.swift         # SearchQuery, SearchResult
-│   │   ├── Segment.swift        # Segment data model
-│   │   ├── Config.swift         # Configuration types
-│   │   ├── Errors.swift         # Error types
-│   │   ├── Audio.swift          # Audio model types (Release 2)
-│   │   ├── FilterCriteria.swift # Timeline/search filter criteria
-│   │   ├── Source.swift         # Data source enum (native, rewind, etc.)
-│   │   ├── Tag.swift            # Tag model types
-│   │   └── Comment.swift        # Segment comment and attachment models
-│   └── Protocols/               # Module interfaces
-│       ├── DatabaseProtocol.swift
-│       ├── StorageProtocol.swift
-│       ├── CaptureProtocol.swift
-│       ├── ProcessingProtocol.swift
-│       ├── SearchProtocol.swift
-│       └── MigrationProtocol.swift
-│
-├── Database/                    # SQLite + FTS5 storage
-│   ├── AGENTS.md                # Module-specific agent instructions
-│   ├── DatabaseManager.swift    # Main database coordinator
-│   ├── DatabaseConnection.swift # SQLite connection management
-│   ├── DatabaseConfig.swift     # Database configuration
-│   ├── FTSManager.swift         # Full-text search management
-│   ├── IDMappingService.swift   # ID mapping between sources
-│   ├── Schema.swift             # Current schema definition
-│   ├── Migrations/              # Schema migration scripts
-│   ├── Queries/                 # Query implementations
-│   └── Tests/
-│
-├── Storage/                     # File I/O, HEVC encoding
-│   ├── AGENTS.md
-│   ├── StorageManager.swift
-│   ├── ImageExtractor.swift     # Extract frames from video files
-│   ├── IncrementalSegmentWriter.swift
+├── TextMerger/
+│   └── TextMerger.swift            # Combine OCR + AX results
+└── Tests/
+    ├── ExtractRequestInstrumentationTests.swift # Region tail aggregation and coordinator helper coverage
+    ├── InPageURLMetadataResolutionTests.swift # In-page URL metadata retry and rewrite scheduling regression coverage
+    ├── OCRMemoryBackpressurePolicyTests.swift # OCR memory backpressure threshold/default coverage
+    ├── PhraseLevelRedactionTests.swift        # Manual + automatic OCR phrase-level redaction coverage
+    ├── RewriteRetryPolicyTests.swift          # Bounded automatic rewrite retry coverage
+    ├── TestLogger.swift                       # Shared processing test logging helpers
+    └── _future/
+        ├── AccessibilityTests.swift
+        └── VisionOCRTests.swift
+```
+
+## Protocols You Must Implement
+
+### 1. `ProcessingProtocol` (from `Shared/Protocols/ProcessingProtocol.swift`)
+- Text extraction (combined OCR + Accessibility)
+- Configuration
+
+### 2. `OCRProtocol` (from `Shared/Protocols/ProcessingProtocol.swift`)
+- Vision framework text recognition
+
+### 3. `AccessibilityProtocol` (from `Shared/Protocols/ProcessingProtocol.swift`)
+- Permission checking
+- Text extraction from AX tree
+
+## Key Implementation Details
+
+### 1. Vision Framework OCR
+
+```swift
+import Vision
+
+struct VisionOCR: OCRProtocol {
+    func recognizeText(
+        imageData: Data,
+        width: Int,
+        height: Int,
+        config: ProcessingConfig
+    ) async throws -> [TextRegion] {
+        // Create CGImage from raw data
+        guard let cgImage = createCGImage(from: imageData, width: width, height: height) else {
+            throw ProcessingError.imageConversionFailed
+        }
+
+        // Create request
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = config.ocrAccuracyLevel == .accurate ? .accurate : .fast
+        request.recognitionLanguages = config.recognitionLanguages
+        request.usesLanguageCorrection = true
+
+        // Perform recognition
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+
+        return try await withCheckedThrowingContinuation { continuation in
+            do {
+                try handler.perform([request])
+
+                guard let observations = request.results else {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                let regions = observations.compactMap { observation -> TextRegion? in
+                    guard observation.confidence >= config.minimumConfidence else { return nil }
+
+                    let text = observation.topCandidates(1).first?.string ?? ""
+                    let box = observation.boundingBox
+
+                    return TextRegion(
+                        text: text,
+                        confidence: observation.confidence,
+                        boundingBox: NormalizedRect(
+                            x: box.origin.x,
+                            y: box.origin.y,
+                            width: box.width,
+                            height: box.height
+                        ),
+                        source: .ocr
+                    )
+                }
+
+                continuation.resume(returning: regions)
+            } catch {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [haseab/retrace](https://github.com/haseab/retrace) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
