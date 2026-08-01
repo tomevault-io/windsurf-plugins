@@ -1,0 +1,92 @@
+---
+trigger: always_on
+description: The Metal suites here are wall-time-expensive (model loads dominate; a full pass holds 40GB
+---
+
+# modules/dasLLAMA/tests — testing discipline
+
+The Metal suites here are wall-time-expensive (model loads dominate; a full pass holds 40GB
+GGUFs). The rules below exist because one session spent 5.75 of 6 hours re-running full suites
+to verify one-arm fixes. They are enforcement, not advice.
+
+## Run suites ONLY through the runner
+
+```
+./bin/daslang -jit modules/dasLLAMA/tests/run.das -- --arm <filter> [--suite decode|prefill|matrix|all] [--family llama]
+```
+
+Never invoke `dastest/dastest.das --test modules/dasLLAMA/tests/...` directly for the metal suites.
+`--full` is REFUSED while the Metal build-out is in progress ("please narrow the scope...") —
+scope every gate with `--arm` to the arms the change can actually affect (a whole-zoo pass
+buys soak time, not coverage; e.g. a driver change gates on `--arm arm,batch --suite decode`).
+The runner refuses to run without exactly one of `--arm` / `--full`, tees the COMPLETE output
+to a log file (path printed on the DONE line), owns the dastest timeout (1200s), and repeats
+only when `--nreps` is passed explicitly (default 1, never best-of-N).
+
+## The iteration loop
+
+1. Fixing/adding one arm → run exactly that arm: `--arm arm12 --suite decode` (~minutes).
+   Scratchpad probes that replicate one arm in isolation are encouraged for kernel/driver
+   fixes — cheaper still.
+2. Batch every pending fix. Do NOT re-run a full suite per fix.
+3. The pre-commit gate is the `--arm` set covering every arm the batched fixes can affect
+   (e.g. `--arm arm,batch --suite decode` + the touched suites' arms). `--full` is refused
+   while the Metal build-out is in progress.
+4. Before launching ANY suite, state what the change can affect; a default-off knob or a
+   comment edit does not need a rerun.
+
+## Arm filter mechanics
+
+`DASLLAMA_TEST_ARMS` (set by `--arm`) is a comma list of substrings matched against arm names
+by `arm_on(t, name)` in `_model_tier.das`. Filtered arms register a LOUD `t |> skip`, so a
+filtered run reports SKIPPED, never PASS — partial coverage cannot masquerade as full. A
+failed assert still FAILS the test (dastest: `failed` beats `skipped`), so filtering can
+never mask a red.
+
+Arm names — decode parity: `arm1-basic arm2-hybrid arm3-step arm4-paged arm5-rewind
+arm6-churn arm7-q8kv arm7b-tq4kv arm8-s16 arm9-reload arm10-kq arm11-depth arm12-dim
+arm13-conc`,
+batch test: `batch` (whole test), `batchB7-partd`, `batchB8-kq`. Prefill parity: `base s16
+kq cont dim qkv`. Support matrix: `cells-q8 window cells-s16 mode kq dim8b dim70b` + the
+family matrix `fam-qwen3 fam-qwen2 fam-phi3 fam-gemma2 fam-gemma3 fam-gemma4 fam-qwen3moe
+fam-gemma4moe fam-gptoss fam-qwen35 fam-qwen35moe fam-qwen2moe` (needs-derivation pins +
+per-path cells; fam-gemma2 also carries the sliding-window masking parity row;
+fam-gemma4/fam-qwen3moe/fam-gemma4moe/fam-gptoss/fam-qwen35moe/fam-qwen2moe are
+DASLLAMA_PARITY_FULL-gated — 7.4/18.5/26.9/12.1/22/15GB; fam-gemma4moe and fam-gptoss are ENGAGE
++ shallow logits TOLERANCE cells only — token parity is not a valid instrument for the 26B, whose double-router
+CPU differs from any float implementation by ~2.5 logits/step by construction;
+fam-qwen35/fam-qwen35moe are deltanet hybrids whose batch cell asserts the per-row FALLBACK
+shape — metal batch steps 0, both rows served on the single-decode path; fam-qwen2moe's
+batch cell asserts the `graph` DECLINE on the planar model — shexp has no batch arm, and a
+blob twin's CPU batch fallback would trip the blob-only panic). The
+`kernels` suite (test_metal_prefill_kernels — model-less kernel units, ~80s) has no arms;
+remember it exists — kernel uniform/binding changes MUST update its hand-bound dispatches.
+The `image` suite (test_model_image — the prepared-image .dlim rail): `mechanics` (synthetic
+carrier, model-free, runs in CI) `smol metal tower whisper voxtral`; the voxtral arm re-saves a
+5.4 GB image from cold every run by design (it IS the >2 GiB-plane IO coverage); the `metal`
+arm mints/maps the blob-only metal flavor (SmolLM2) incl. the CPU-tripwire and a
+teacher-forced logits-tolerance parity cell (greedy token equality is NOT a valid bar on a
+135M — genuine near-ties flip on ~0.02 gaps under ~0.75 cross-backend noise).
+
+## Blob-only Metal fixtures (the two-model pattern)
+
+The Metal drivers serve ONLY blob-form models (`convert_model_to_metal_blob` /
+metal-flavor images), and CPU inference on a blob model PANICS. Every CPU-vs-GPU arm
+therefore runs a PLANAR model for CPU stages and its `blob_twin(t, path, seq_cap)` for
+override-selected stages — sessions are geometry-bound, so one session spans both models
+(CPU prefill on the planar model, GPU decode on the twin, etc.). Decline-reason cells keep
+the planar model: capability reasons (`feature`, `graph`, `shape`, ...) out-rank the
+`planar` decline in every gate, and the planar CPU fallback serves quietly. The prefill
+npos POLICY window is planar-only now (a blob model serves any npos — no CPU fallback
+exists); the legacy quantized-X prefill rail is dead (`set_metal_prefill_mulmm_legacy`
+forces a `planar` capability decline — the required-mode panic cell uses it).
+
+## Family filter (profiling cadence)
+
+`--family <tokens>` (env `DASLLAMA_TEST_FAMILY`, comma list) composes with `--arm`: only
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [GaijinEntertainment/daScript](https://github.com/GaijinEntertainment/daScript) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
