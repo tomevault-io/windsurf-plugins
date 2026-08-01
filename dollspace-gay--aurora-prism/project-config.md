@@ -1,153 +1,91 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/claude-code) when working with code in this repository.
+description: This document explains the background "agents" that power the AT Protocol App View: how data flows from the Bluesky network into your database, how processing is distributed, and how to configure, operate, and extend these workers.
 ---
 
-# CLAUDE.md
+## Agents and Background Services
 
-This file provides guidance to Claude Code (claude.ai/claude-code) when working with code in this repository.
+This document explains the background "agents" that power the AT Protocol App View: how data flows from the Bluesky network into your database, how processing is distributed, and how to configure, operate, and extend these workers.
 
-## Project Overview
+### TL;DR
+- **Ingest**: Worker 0 connects to the relay via `firehose` and writes events to Redis Streams.
+- **Distribute**: All workers run parallel consumer pipelines that read from Redis and call the `eventProcessor`.
+- **Persist**: The `eventProcessor` validates lexicons, enforces ordering, writes to PostgreSQL, and emits labels/notifications.
+- **Backfill**: Optional historical import via `@atproto/sync` firehose backfill or full-repo CAR backfill.
+- **Maintain**: Data pruning, DB health checks, metrics, and label streaming run continuously.
 
-Aurora-Prism is an AT Protocol App View that ingests data from the Bluesky network, processes events, and serves API endpoints. It uses a multi-worker architecture with Redis Streams for event distribution and PostgreSQL for persistence.
+---
 
-## Common Commands
+## Architecture Overview
 
-```bash
-# Development
-npm install          # Install dependencies
-npm run db:push      # Push database schema
-npm run dev          # Start development server
-npm run check        # Run type checking
+- **App Server** (`server/index.ts`, `server/routes.ts`)
+  - Boots Express, initializes Redis connections, starts WebSocket endpoints, and spins up agents.
+  - Sets worker identity via `NODE_APP_INSTANCE`/`pm_id` and runs role-specific tasks.
 
-# Docker
-docker-compose up    # Start full stack (Redis + Postgres + App)
-```
+- **Firehose Ingestion Agent** (`server/services/firehose.ts`)
+  - Connects to the relay (`RELAY_URL`), handles keepalive ping/pong, stall detection, auto-reconnect, and cursor persistence to DB every 5s.
+  - Only worker 0 connects to the relay and publishes events to Redis.
 
-## Architecture
+- **Redis Queue (Event Bus)** (`server/services/redis-queue.ts`)
+  - Uses Redis Streams with a single stream (`firehose:events`) and consumer group (`firehose-processors`).
+  - Buffers cluster metrics and exposes status/recents via keys (`cluster:metrics`, `firehose:status`, `firehose:recent_events`).
+  - Provides dead-consumer recovery via periodic `XAUTOCLAIM`-like behavior (`claimPendingMessages`).
 
-### Core Components
+- **Consumer Pipelines (Workers)** (`server/routes.ts`)
+  - All workers run 5 parallel pipelines each to consume from Redis (`consume(..., 300)`), process with `eventProcessor`, and `xack` on success.
+  - Duplicate (`23505`) and FK race (`23503`) errors are treated as success to ensure idempotency.
 
-- **App Server** (`server/index.ts`, `server/routes.ts`) - Express server, WebSocket endpoints, worker initialization
-- **Firehose Ingestion** (`server/services/firehose.ts`) - Worker 0 connects to relay, publishes to Redis
-- **Redis Queue** (`server/services/redis-queue.ts`) - Redis Streams for event distribution
-- **Event Processor** (`server/services/event-processor.ts`) - Validates and persists events to PostgreSQL
-- **Backfill Agents** (`server/services/backfill.ts`, `server/services/repo-backfill.ts`) - Historical data import
-- **Maintenance** (`server/services/data-pruning.ts`, `server/services/database-health.ts`) - Cleanup and health checks
+- **Event Processor** (`server/services/event-processor.ts`)
+  - Validates against lexicons, sanitizes content, writes posts/likes/reposts/follows/lists/etc., and creates notifications.
+  - Maintains TTL queues for out-of-order events (e.g., like before post) and flushes once dependencies arrive.
+  - Auto-resolves handles/DIDs on-demand and respects per-user collection opt-out (`dataCollectionForbidden`).
 
-### Worker Model
+- **Backfill Agents**
+  - `server/services/backfill.ts` (Firehose Backfill via `@atproto/sync`)
+    - Historical replay with optional cutoff (`BACKFILL_DAYS`), dedicated DB pool, periodic progress save, batching, and backpressure.
+  - `server/services/repo-backfill.ts` (Repo CAR Backfill via `@atproto/api`)
+    - Full per-repo import from PDS, parses CAR, walks MST for real CIDs (synthetic fallback), concurrent fetches.
 
-- `PM2_INSTANCES` controls worker count
-- Worker 0: Firehose ingestion to Redis
-- All workers: Run 5 parallel consumer pipelines each
-- Workers identified by `NODE_APP_INSTANCE`/`pm_id`
+- **Maintenance Agents**
+  - `server/services/data-pruning.ts`: Periodic deletion beyond `DATA_RETENTION_DAYS` (safety minimums and batch caps).
+  - `server/services/database-health.ts`: Periodic DB connectivity/table existence/count checks and loss detection.
+  - `server/services/metrics.ts` and `server/services/log-collector.ts`: In-memory metrics and rolling logs (also surfaced to the dashboard).
+  - `server/services/instance-moderation.ts`: Operator-driven label application and policy transparency.
 
-### Event Flow
+---
 
-1. Firehose connects to `RELAY_URL` and emits events
-2. Worker 0 publishes to Redis Stream `firehose:events`
-3. All workers consume via `redisQueue.consume()` with parallel pipelines
-4. `eventProcessor` validates, writes to PostgreSQL, creates notifications
-5. Messages acknowledged via `xack`
+## Event Flow
 
-## Key Configuration
+1. Firehose connects to `RELAY_URL` and emits `#commit`, `#identity`, `#account` events.
+2. Worker 0 serializes them into lightweight objects and pushes to Redis Stream `firehose:events`.
+3. Every worker runs multiple pipelines that call `redisQueue.consume()` to fetch batches (blocking for ~100ms), then `processEvent` with `eventProcessor`.
+4. On success, the message is acknowledged (`xack`); every ~5s each pipeline also claims abandoned messages.
+5. `eventProcessor` performs:
+   - User ensure/creation with handle resolution.
+   - Validation (lexicon), sanitization, and writes to PostgreSQL.
+   - Deferred queueing and later flush for out-of-order dependencies.
+   - Label application and notification fanout.
 
-| Variable | Description |
-|----------|-------------|
-| `RELAY_URL` | Bluesky relay (default: `wss://bsky.network`) |
-| `REDIS_URL` | Redis connection string |
-| `DB_POOL_SIZE` | Main database pool size |
-| `BACKFILL_DAYS` | 0=off, >0=days cutoff, -1=full history |
-| `DATA_RETENTION_DAYS` | 0=keep forever, >0=prune older data |
-| `FIREHOSE_ENABLED` | Toggle live ingestion |
-| `MAX_CONCURRENT_OPS` | Per-worker processing limit |
+Cursor persistence:
+- Live firehose: worker 0 saves cursor to DB every 5 seconds (`firehoseCursor` table).
+- Backfill: a dedicated runner updates progress (`saveBackfillProgress`), including counts and last update time.
 
-## Issue Tracking with Crosslink
+---
 
-This project uses `crosslink` for issue tracking - a simple, lean issue tracker CLI with dependency support, timers, and milestones.
+## Agents in Detail
 
-### Quick Reference
+### Firehose Ingestion (`server/services/firehose.ts`)
+- Keepalive (ping every 30s), pong timeout (45s), stall threshold (2m) with forced reconnect.
+- Concurrency guard for commit handling (`MAX_CONCURRENT_OPS`) with queue backpressure and drop policy when overloaded.
+- Status and recent events are mirrored into Redis for the dashboard.
 
-```bash
-# View issues
-crosslink list             # List all open issues
-crosslink show <id>        # Show issue details
-crosslink ready            # Show issues ready to work on (no open blockers)
-crosslink blocked          # List blocked issues
-crosslink tree             # Show issues as a tree hierarchy
-crosslink next             # Suggest the next issue to work on
-
-# Create and manage
-crosslink create           # Create a new issue
-crosslink subissue <parent> # Create a subissue under a parent
-crosslink update <id>      # Update an issue
-crosslink close <id>       # Close an issue
-crosslink reopen <id>      # Reopen a closed issue
-crosslink delete <id>      # Delete an issue
-
-# Dependencies
-crosslink block <id> <blocker>   # Mark issue as blocked by another
-crosslink unblock <id> <blocker> # Remove a blocking relationship
-
-# Relations
-crosslink relate <id1> <id2>     # Link two related issues
-crosslink unrelate <id1> <id2>   # Remove a relation
-crosslink related <id>           # List related issues
-
-# Labels
-crosslink label <id> <label>     # Add a label to an issue
-crosslink unlabel <id> <label>   # Remove a label from an issue
-
-# Comments
-crosslink comment <id>           # Add a comment to an issue
-
-# Search
-crosslink search "query"         # Search issues by text
-
-# Time tracking
-crosslink start <id>             # Start a timer for an issue
-crosslink stop                   # Stop the current timer
-crosslink timer                  # Show current timer status
-
-# Milestones
-crosslink milestone              # Milestone management
-
-# Import/Export
-crosslink export                 # Export issues to file
-crosslink import                 # Import issues from JSON file
-```
-
-### Workflow Tips
-
-- Use `crosslink ready` to see what you can work on next (no blockers)
-- Use `crosslink blocked` to identify what's waiting on other work
-- Use `crosslink next` to get a suggestion for what to work on
-- Use `crosslink tree` to visualize issue hierarchy
-- Use `crosslink start <id>` to track time spent on issues
-
-### When Working on Issues
-
-1. Check `crosslink ready` for available work
-2. Start timer: `crosslink start <id>`
-3. Reference issue ID in commits when relevant
-4. Stop timer when done: `crosslink stop`
-5. Close when complete: `crosslink close <id>`
-
-## API Endpoints
-
-- `/health`, `/ready` - Health checks
-- `/api/database/health` - Database connectivity
-- `/ws` - WebSocket dashboard (metrics, events, status)
-- `/xrpc/com.atproto.label.subscribeLabels` - Label subscription stream
-- `/api/user/backfill` - User-initiated backfill
-- `/api/backfill/repo` - Admin repo backfill
-
-## Troubleshooting
-
-- **No events**: Check `FIREHOSE_ENABLED`, Redis connectivity, relay access
+### Redis Queue (`server/services/redis-queue.ts`)
+- Stream: `firehose:events`, group: `firehose-processors`.
+- `consume(consumerId, count)` uses `XREADGROUP` with short block; `ack(messageId)` acks processed entries.
+- `claimPendingMessages(consumerId, idleMs)` reclaims abandoned messages for resilience.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dollspace-gay/Aurora-Prism](https://github.com/dollspace-gay/Aurora-Prism) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
