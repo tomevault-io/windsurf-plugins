@@ -1,0 +1,103 @@
+---
+trigger: always_on
+description: - `formula/` - Core framework (state management, actions, formulas)
+---
+
+# Formula - AI Assistant Instructions
+
+## Project Structure
+
+- `formula/` - Core framework (state management, actions, formulas)
+- `formula-android/` - Android integration (fragments, activities, views, Jetpack Compose)
+- `formula-android-tests/` - Android tests
+- `formula-test/` - Testing utilities and test formulas
+- `formula-rxjava3/` - RxJava3 interop
+- `formula-lint/` - Custom lint rules
+- `formula-performance/` - JMH benchmarks
+- `test-utils/` - Test utils used by formula-android and formula-android-tests
+- `samples/` - Sample applications
+
+## Core Concepts
+
+**Input/Output/State:**
+- `Input` - Immutable data from parent containing data and event listeners. Changes trigger re-evaluation. Use `Unit` if none needed.
+- `State` - Internal mutable state managed by formula. Changes trigger re-evaluation.
+- `Output` - Immutable data returned containing data and event listeners. Called "render model" when used for UI.
+
+**Evaluate:**
+- Pure function called on Input/State/Child changes. Receives `Snapshot<Input, State>` with current values and `FormulaContext`.
+- Returns `Evaluation<Output>` containing output and optional actions.
+- Must be side-effect free. Side effects only in event listeners or transition effects.
+
+**Transitions:**
+- State changes happen via `Transition<Input, State, Event>` function that returns `Transition.Result<State>`.
+- Result types: `Stateful(state, effects)` (new state + optional effects), `OnlyEffects(effects)` (no state change), `None` (nothing).
+- Effects execute after state changes. Types: `Effect.Main`, `Effect.Background`, `Effect.Unconfined`.
+- Use `TransitionContext.transition(state)` to create results.
+
+**Listeners:**
+- Created via `context.onEvent<Event>(key?) { transition() }` - returns `Listener<Event>` which is `(Event) -> Unit`.
+- Created via `context.callback(key?) { transition() }` - returns `() -> Unit`.
+- Listeners must be returned in Output or passed to children via Input to remain active.
+- Keying: Listeners use transition type + optional key. Same key + type = same listener.
+
+**Remember:**
+- `context.remember { computeValue() }` - caches a value across re-evaluations, factory called once.
+- Value cleaned up when `remember` is not called in an evaluation (conditional/removed).
+- Keying: Uses factory class (positional memoization) + optional key.
+
+**Actions:**
+- Declarative async operations. Declared in `context.actions { }` block within Evaluation.
+- Actions run when returned in Evaluation, cancelled when not returned or key changes.
+- Common: `Action.onInit()`, `Action.onData(value)`, `Action.onTerminate()`, `Action.fromFlow { }`, `Action.launch { }`.
+- Attach handler: `action.onEvent { event -> transition() }`.
+- Actions identified by key + call site (positional memoization).
+
+**Composition:**
+- `context.child(formula, input)` - runs child formula, returns latest output, manages lifecycle.
+- Child re-evaluates when its input changes or its internal state changes.
+- Parent re-evaluates when child output changes.
+
+**Formula Lifecycle:**
+- `initialState(input)` - creates initial state when formula starts or when `key(input)` changes.
+- `onInputChanged(oldInput, input, state)` - called before evaluate when Input changes. Returns new state or existing state.
+- `key(input)` - optional identity for formula instance. If key changes, formula restarts with `initialState`.
+- Evaluate called on: initial start, input change, state change, child output change.
+
+**ExecutionType:**
+- Controls threading/timing for transitions and actions.
+- `Transition.Immediate` - process on arrival thread immediately (for UI events/navigation).
+- `Transition.Background` - process on background thread (for expensive operations).
+- `Transition.Batched(scheduler)` - collect and process as batch (experimental).
+- Apply to transitions: `context.onEventWithExecutionType(type, key) { }` or `context.callbackWithExecutionType(type, key) { }`.
+- Apply to actions: `action.onEventWithExecutionType(type) { }`.
+
+**Helper Formulas:**
+- `StatelessFormula<Input, Output>` - formula without state (State = Unit).
+- `ActionFormula<Input, Output>` - converts Action to Formula, emits initialValue until action produces value. Resubscribes on input change.
+
+**Mental Model (Jetpack Compose similarities):**
+- `evaluate()` ~ Composable function - pure, re-executed on state/input/child changes (recomposition).
+- `Action` ~ `LaunchedEffect` - declarative side effects tied to keys, cancelled when removed.
+- `Transition` ~ state updates in Compose - deferred effects after state change.
+- `context.child()` ~ calling composables - automatic lifecycle management.
+- `context.remember {}` ~ `remember {}` - cached computation, re-created when removed from composition.
+
+## Key Classes
+
+**Core API:**
+- `Formula<Input, State, Output>` - Base stateful formula class
+- `StatelessFormula<Input, Output>` - Formula without internal state
+- `ActionFormula<Input, Output>` - Converts Action to Formula
+- `FormulaContext` - Provides composition and action APIs
+- `Action` - Represents asynchronous side effects
+- `Transition` - Represents state changes
+- `Evaluation` - Contains output and optional actions
+- `Snapshot` - Contains current Input, State, and FormulaContext
+- `FormulaRuntime` - Entry point for starting formulas
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [instacart/formula](https://github.com/instacart/formula) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
