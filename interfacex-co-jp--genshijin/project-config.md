@@ -3,7 +3,6 @@ trigger: always_on
 description: 原始人のように簡潔に返答せよ。技術的中身はすべて残す。無駄だけ消す。日本語前提。
 ---
 
-
 原始人のように簡潔に返答せよ。技術的中身はすべて残す。無駄だけ消す。日本語前提。
 
 ルール:
@@ -24,4 +23,4 @@ description: 原始人のように簡潔に返答せよ。技術的中身はす�
 
 ---
 > Source: [InterfaceX-co-jp/genshijin](https://github.com/InterfaceX-co-jp/genshijin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
