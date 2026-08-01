@@ -1,251 +1,133 @@
 ---
 trigger: always_on
-description: This file provides guidance to GitHub Copilot when working with code in this repository.
+description: daisyUI 5
 ---
 
-# Copilot Instructions for Zealot
 
-This file provides guidance to GitHub Copilot when working with code in this repository.
+# daisyUI 5
 
-## Project Overview
+daisyUI 5 is a CSS library for Tailwind CSS 4
+daisyUI 5 provides class names for common UI components
 
-Zealot is an open-source self-hosted continuous integration platform for mobile app distribution. It provides:
+- [daisyUI 5 docs](http://daisyui.com)
+- [Guide: How to use this file in LLMs and code editors](https://daisyui.com/docs/editor/)
+- [daisyUI 5 release notes](https://daisyui.com/docs/v5/)
+- [daisyUI 4 to 5 upgrade guide](https://daisyui.com/docs/upgrade/)
 
-- Multi-platform application hosting (macOS, iOS, Android, Windows, Linux)
-- Automated test device management and Apple Developer integration
-- Rich developer toolkits with REST API, iOS/Android SDKs, and fastlane plugin
-- Application metadata parsing for iOS and Android apps
-- Built-in event notifications and webhook integrations
-- Multi-channel application management
-- Third-party authentication (Feishu, GitLab, GitHub, Google, LDAP, OIDC)
+## daisyUI 5 install notes
 
-## Technology Stack
+[install guide](https://daisyui.com/docs/install/)
 
-### Backend
+1. daisyUI 5 requires Tailwind CSS 4
+2. `tailwind.config.js` file is deprecated in Tailwind CSS v4. do not use `tailwind.config.js`. Tailwind CSS v4 only needs `@import "tailwindcss";` in the CSS file if it's a node dependency.
+3. daisyUI 5 can be installed using `npm i -D daisyui@latest` and then adding `@plugin "daisyui";` to the CSS file
+4. daisyUI is suggested to be installed as a dependency but if you really want to use it from CDN, you can use Tailwind CSS and daisyUI CDN files:
 
-- **Primary Language**: Ruby 3.4+
-- **Framework**: Ruby on Rails 8.0+
-- **Database**: PostgreSQL
-- **Cache**: Solid Cache
-- **API**: GraphQL, Active Model Serializers
-- **Background Jobs**: ActiveJob with GoodJob
-
-### Frontend
-
-- **JavaScript Framework**: Hotwired Stimulus 3.2+, Turbo Rails
-- **Build Tool**: vite
-- **CSS**: TailwindCSS 4+, DaisyUI 5+, FontAwesome 7+
-
-### Tools & Infrastructure
-
-- **Linter**: RuboCop (with rubocop-rails)
-- **Server**: Puma
-- **Containerization**: Docker
-- **Package Manager**: Bundler (Ruby), pnpm (JavaScript)
-
-## Coding Guidelines
-
-### Ruby/Rails Standards
-
-- **Ruby Version**: Target Ruby 3.4+ features
-- **Rails Version**: Target Rails 8.0+ features
-- **Style Guide**: Follow RuboCop configuration in `.rubocop.yml`
-- **Frozen String Literals**: Always include `# frozen_string_literal: true` at the top of Ruby files (except config.ru, Gemfile, Rakefile, and config files)
-- **Indentation**: 2 spaces (configured in `.editorconfig`)
-- **Line Length**: Maximum 120 characters (with exceptions for config and spec files)
-- **Method Length**: Maximum 60 lines
-- **Class Length**: Maximum 250 lines
-
-### File Organization
-
-- **Controllers**: `app/controllers/` - Handle HTTP requests
-- **Models**: `app/models/` - Business logic and database interactions
-- **Services**: `app/services/` - Complex business operations
-- **Jobs**: `app/jobs/` - Background job processing
-- **Policies**: `app/policies/` - Authorization logic (Pundit)
-- **Serializers**: `app/serializers/` - API response formatting
-- **GraphQL**: `app/graphql/` - GraphQL schema and resolvers
-- **Views**: `app/views/` - HTML templates (Slim format)
-- **JavaScript**: `app/frontend/javascript` - Stimulus controllers and frontend code
-- **Stylesheets**: `app/frontend/stylesheets/` - Sass/SCSS files
-
-### JavaScript/Frontend Standards
-
-- **Framework**: Use Hotwired Stimulus for JavaScript interactions
-- **Turbo**: Leverage Turbo Drive, Frames, and Streams for dynamic updates
-- **Build**: Use vite for CSS/JavaScript bundling
-- **Indentation**: 2 spaces for JavaScript
-- **Target**: ES2017+ features
-
-### Database & Migrations
-
-- **Always create reversible migrations** when possible
-- **Add indexes** for foreign keys and frequently queried columns
-- **Include comments** on complex migrations
-- **Test migrations** both up and down
-- **Use strong parameters** in controllers
-
-## Styling
-
-- **TailwindCSS** or **DaisyUI** Only:
-  - Do not write custom CSS
-  - Do not use scoped CSS
-  - Do not use inline styles
-  - Always use TailwindCSS or DaisyUI utility classes
-  - **Responsive Design**: Ensure components are responsive using Tailwind's responsive utilities
-
-## Testing Expectations
-
-Ignore test files for Copilot suggestions.
-
-## Build & Validation
-
-### Ruby/Rails Commands
-
-```bash
-# Install dependencies
-bundle install
-
-# Run RuboCop linter
-bundle exec rubocop
-
-# Auto-fix RuboCop issues
-bundle exec rubocop -a
-
-# Run database migrations
-bundle exec rails db:migrate
-
-# Run Rails server
-bundle exec rails server
-
-# Run Rails console
-bundle exec rails console
+```html
+<link
+  href="https://cdn.jsdelivr.net/npm/daisyui@5"
+  rel="stylesheet"
+  type="text/css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 ```
 
-### JavaScript/Frontend Commands
+5. A CSS file with Tailwind CSS and daisyUI looks like this (if it's a node dependency)
 
-```bash
-# Install dependencies
-pnpm install
-
-# Build JavaScript/CSS assets
-pnpm build
+```css
+@import "tailwindcss";
+@plugin "daisyui";
 ```
 
-### Database Commands
+## daisyUI 5 usage rules
 
-```bash
-# Create database
-bundle exec rails db:create
+1. We can give styles to a HTML element by adding daisyUI class names to it. By adding a component class name, part class names (if there's any available for that component), and modifier class names (if there's any available for that component)
+2. Components can be customized using Tailwind CSS utility classes if the customization is not possible using the existing daisyUI classes. For example `btn px-10` sets a custom horizontal padding to a `btn`
+3. If customization of daisyUI styles using Tailwind CSS utility classes didn't work because of CSS specificity issues, you can use the `!` at the end of the Tailwind CSS utility class to override the existing styles. For example `btn bg-red-500!` sets a custom background color to a `btn` forcefully. This is a last resort solution and should be used sparingly
+4. If a specific component or something similar to it doesn't exist in daisyUI, you can create your own component using Tailwind CSS utility
+5. when using Tailwind CSS `flex` and `grid` for layout, it should be responsive using Tailwind CSS responsive utility prefixes.
+6. Only allowed class names are existing daisyUI class names or Tailwind CSS utility classes.
+7. Ideally, you won't need to write any custom CSS. Using daisyUI class names or Tailwind CSS utility classes is preferred.
+8. suggested - if you need placeholder images, use https://picsum.photos/200/300 with the size you want
+9. suggested - when designing , don't add a custom font unless it's necessary
+10. don't add `bg-base-100 text-base-content` to body unless it's necessary
+11. For design decisions, use Refactoring UI book best practices
 
-# Run migrations
-bundle exec rails db:migrate
+daisyUI 5 class names are one of the following categories. These type names are only for reference and are not used in the actual code
 
-# Seed database
-bundle exec rails db:seed
+- `component`: the required component class
+- `part`: a child part of a component
+- `style`: sets a specific style to component or part
+- `behavior`: changes the behavior of component or part
+- `color`: sets a specific color to component or part
+- `size`: sets a specific size to component or part
+- `placement`: sets a specific placement to component or part
+- `direction`: sets a specific direction to component or part
+- `modifier`: modifies the component or part in a specific way
+- `variant`: prefixes for utility classes that conditionally apply styles. syntax is `variant:utility-class`
 
-# Reset database
-bundle exec rails db:reset
+## Config
+
+daisyUI 5 config docs: https://daisyui.com/docs/config/
+daisyUI without config:
+
+```css
+@plugin "daisyui";
 ```
 
-## Development Workflow
+daisyUI config with `light` theme only:
 
-### Before Making Changes
-
-1. **Check current state**: Run tests and linter to understand baseline
-2. **Read related code**: Understand the context and existing patterns
-3. **Plan your changes**: Make minimal, focused modifications
-
-### Making Changes
-
-1. **Follow existing patterns** in similar files
-2. **Write tests first** or alongside code changes
-3. **Run linter frequently**: `bundle exec rubocop -a`
-4. **Keep commits focused**: One logical change per commit
-5. **Write descriptive commit messages**
-
-### Before Submitting
-
-2. **Fix all linting issues**: `bundle exec rubocop`
-3. **Verify migrations**: Test both up and down
-4. **Check for N+1 queries**: Review database query performance
-5. **Update documentation**: If adding/changing features
-
-## Common Patterns
-
-### Service Objects
-
-```ruby
-# frozen_string_literal: true
-
-class MyService
-  def initialize(params)
-    @params = params
-  end
-
-  def call
-    # Implementation
-  end
-
-  private
-
-  attr_reader :params
-end
+```css
+@plugin "daisyui" {
+  themes: light --default;
+}
 ```
 
-### GraphQL Mutations
+daisyUI with all the default configs:
 
-- Follow existing mutation patterns in `app/graphql/mutations/`
-- Include proper authorization checks
-- Return appropriate error messages
+```css
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark;
+  root: ":root";
+  include: ;
+  exclude: ;
+  prefix: ;
+  logs: true;
+}
+```
 
-### API Endpoints
+An example config:
+In below config, all the built-in themes are enabled while bumblebee is the default theme and synthwave is the prefersdark theme (default dark mode)
+All the other themes are enabled and can be used by adding `data-theme="THEME_NAME"` to the `<html>` element
+root scrollbar gutter is excluded. `daisy-` prefix is used for all daisyUI classes and console.log is disabled
 
-- Use Active Model Serializers for JSON responses
-- Follow RESTful conventions
-- Include proper authentication/authorization
-- Version APIs when making breaking changes
+```css
+@plugin "daisyui" {
+  themes: light, dark, cupcake, bumblebee --default, emerald, corporate, synthwave
+      --prefersdark, retro, cyberpunk, valentine, halloween, garden, forest,
+    aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk,
+    autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset,
+    caramellatte, abyss, silk;
+  root: ":root";
+  include: ;
+  exclude: rootscrollgutter, checkbox;
+  prefix: daisy-;
+  logs: false;
+}
+```
 
-### Background Jobs
+## daisyUI 5 colors
 
-- Keep jobs idempotent
-- Handle failures gracefully
-- Use appropriate queue names
+### daisyUI color names
 
-## Internationalization (i18n)
+- `primary`: Primary brand color, The main color of your brand
+- `primary-content`: Foreground content color to use on primary color
+- `secondary`: Secondary brand color, The optional, secondary color of your brand
+- `secondary-content`: Foreground content color to use on secondary color
+- `accent`: Accent brand color, The optional, accent color of your brand
 
-- **Locale files**: `config/locales/`
-- **Supported languages**: English (en), Simplified Chinese (zh-CN)
-- **Always use i18n keys** in views and controllers
-- **Add translations** for both English and Chinese when adding new text
-- **Use Crowdin** for managing translations
-
-## Security Considerations
-
-- **Never commit secrets** or sensitive data
-- **Use Rails credentials** for sensitive configuration
-- **Validate user input** thoroughly
-- **Use parameterized queries** to prevent SQL injection
-- **Implement proper authorization** using Pundit policies
-- **Sanitize HTML output** when rendering user content
-
-## Documentation
-
-- **Update README.md** when adding major features
-- **Comment complex logic** but prefer self-documenting code
-- **Document API changes** in appropriate guides
-- **Keep CHANGELOG.md updated** for notable changes
-
-## Pull Request Guidelines
-
-- **Keep PRs focused**: One feature or fix per PR
-- **Write clear descriptions**: Explain what and why
-- **Reference issues**: Use "fixes #123" format
-- **Request reviews**: Get feedback before merging
-- **Ensure CI passes**: All tests and checks must pass
-- **Update documentation**: Include relevant docs updates
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/tryzealot)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/tryzealot)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [tryzealot/zealot](https://github.com/tryzealot/zealot) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
