@@ -1,74 +1,162 @@
 ---
 trigger: always_on
-description: All documentation, comments, variable names, function names, and user-facing strings **must use British English spelling** (`optimise`, `behaviour`, `colour`, `initialise`, `serialise`, `catalogue`). Exceptions: protocol identifiers (LSP `initialize`), CSS/HTML properties (`color`), Go stdlib names.
+description: Use when: interactive web UIs, real-time dashboards, forms, admin panels.
 ---
 
-# CLAUDE.md
+# CLAUDE.md — Sky Language Project
 
-## Language Convention
+This is a [Sky](https://github.com/anzellai/sky) project. Sky is a pure functional language inspired by Elm, compiling to Go. The compiler is fully self-hosted (written in Sky, ~6MB native binary, zero Node/TypeScript dependencies).
 
-All documentation, comments, variable names, function names, and user-facing strings **must use British English spelling** (`optimise`, `behaviour`, `colour`, `initialise`, `serialise`, `catalogue`). Exceptions: protocol identifiers (LSP `initialize`), CSS/HTML properties (`color`), Go stdlib names.
+**Core principle: if it compiles, it works.** All side effects flow through `Task`. No runtime panics, no nil leakage, no partial bindings.
 
-## Core Principles (Non-Negotiable)
+## Quick Reference
 
-1. **If it compiles, it works.** The 2026-04-15 adversarial audit
-   documented 23 counterexamples across P0 (soundness floor), P1
-   (security), P2 (soundness cleanup), and P3 (tooling). All 23 are
-   remediated with regression tests (see `docs/AUDIT_REMEDIATION.md`
-   — completion marker landed 2026-04-16). The principle now holds
-   for every path exercised by `cabal test`, `scripts/example-sweep.sh`,
-   and `runtime-go/rt/*_test.go`. Residual P4 items (fully-typed
-   codegen to eliminate `any` in emitted Go, and Sky-test harness
-   port) remain as future-work tracked in `docs/PRODUCTION_READINESS.md`.
-   Defence in depth (panic recovery + `Err` return at Task boundaries)
-   remains the reliability floor under the v1.0 milestone.
-2. **Dev experience is top priority.** Clear errors, predictable behaviour, no user-written FFI.
-3. **Root-cause fixes only.** Fix at the correct abstraction layer. **Never suppress type errors or warnings.**
-4. **Production-grade architecture.** Must scale to large Go packages (Stripe SDK). Must remain maintainable.
+```bash
+sky init [name]           # Create a new Sky project (sky.toml, src/Main.sky, .gitignore, CLAUDE.md)
+sky build src/Main.sky    # Compile to Go binary (output: sky-out/app)
+sky run src/Main.sky      # Build and run
+sky check src/Main.sky    # Type-check without compiling (cross-module ADT + alias resolution)
+sky fmt src/Main.sky      # Format code (Elm-style: 4-space indent, leading commas)
+sky add <package>         # Add dependency + generate bindings + update sky.toml
+sky remove <package>      # Remove dependency from sky.toml + clean cache
+sky install               # Install all deps + auto-generate missing bindings
+sky update                # Update sky.toml dependencies to latest
+sky upgrade               # Self-upgrade Sky compiler to latest release
+sky lsp                   # Start Language Server
+sky clean                 # Remove build artifacts
+sky --version             # Show version
+```
 
-## Non-Regression Rules
+## Language Syntax
 
-These constraints are enforced by `sky verify`, `test/Sky/ErrorUnificationSpec.hs`, and the audit-remediation specs under `test/Sky/**`. Violating them breaks the repo:
+```elm
+module Main exposing (main)
 
-- **No `Result String a`** in any public surface. Use `Result Error a`.
-- **No `Task String a`** in any public surface. Use `Task Error a`.
-- **No `Std.IoError`** — the pre-v1 error ADT was deleted.
-- **No `RemoteData`** — the pre-v1 async-state type was deleted.
-- **No runtime panic from well-typed Sky code.** Every known panic class has a regression test in `runtime-go/rt/*_test.go` or `test/Sky/**Spec.hs`.
-- **No silent numeric coercion.** `AsInt` / `AsBool` / `AsFloat` returning zero on type mismatch is a violation of P0-2 (see `docs/AUDIT_REMEDIATION.md`). New code uses the fallible `AsIntChecked` variants; lenient display-only helpers carry the suffix `OrZero` so the intent is visible at every call site.
-- **No raw `.(T)` assertions on generated any-typed thunks.** Typed codegen must route through a runtime `Coerce` helper (see P0-3). Grep gate: `sky-out/main.go` files contain no `any(body).(T)` patterns outside the `Coerce*` helpers.
-- **Record field enumeration sorts by `_fieldIndex`.** Any `Map.toList fields` in codegen that feeds field order (struct decl, auto-ctor, destructure) sorts by declaration index before emission. Violating this swaps auto-ctor parameters (P0-4).
-- **Secrets are typed.** `Auth.signToken` / `Auth.verifyToken` take `String`, not `any`. `fmt.Sprintf("%v", secret)` is forbidden — explicit `.(string)` assertion on a typed boundary, with minimum-length validation (P1-4).
-- **`sky check` is a superset of `sky build`.** `sky check` runs the Go emitter and invokes `go build` on the output. If `sky build` would fail, `sky check` fails (P0-1). Regression test: for every fixture in `test-files/`, both commands agree on accept/reject.
+import Sky.Core.Prelude exposing (..)    -- auto-imported: Result, Maybe, identity, errorToString
+import Sky.Core.String as String
+import Sky.Core.List as List
+import Sky.Core.Dict as Dict
+import Std.Log exposing (println)
 
-## Testing Rules
+-- Type annotations are optional (Hindley-Milner inference)
+greet : String -> String
+greet name =
+    "Hello, " ++ name
 
-- **Every new language feature or runtime helper needs a test.** Cabal specs for compile-time behaviour; `runtime-go/rt/*_test.go` for runtime helpers; `tests/**/*Test.sky` for stdlib semantics.
-- **Every bug becomes a regression test** *before* landing the fix. The failing test is the discovery artefact; without it, the class comes back. Audit items specifically require the test to fail against HEAD~1 and pass at HEAD.
-- **`sky test <file>` is the user-facing runner.** See `sky-stdlib/Sky/Test.sky` for the API.
-- **Runtime verification on every push.** `sky verify` builds and runs each example, catching panics and HTTP failures that `--build-only` misses.
+-- Algebraic data types
+type Shape
+    = Circle Float
+    | Rectangle Float Float
 
-## Tooling Rules
+-- Records (type aliases)
+type alias Point = { x : Int, y : Int }
 
-- **CLI commands must be correct end-to-end.** `sky build` / `sky run` / `sky check` / `sky fmt` / `sky test` all auto-regen missing FFI bindings and propagate exit codes.
-- **LSP capabilities must match `docs/tooling/lsp.md`.** If you add a capability, document it. If a feature is incomplete, narrow the claim — don't lie in docs.
-- **Formatter must be idempotent.** Two passes produce byte-identical output. Fixtures in `test/Sky/Format/FormatSpec.hs` guard this.
+-- Pattern matching (exhaustiveness checked by compiler)
+area : Shape -> Float
+area shape =
+    case shape of
+        Circle r -> 3.14 * r * r
+        Rectangle w h -> w * h
 
-## Effect Boundary: Task
+-- Let-in expressions
+main =
+    let
+        p = { x = 10, y = 20 }
+        updated = { p | x = 99 }     -- immutable record update
+        items = [1, 2, 3]
+            |> List.map (\x -> x * 2)  -- pipeline operator
+            |> List.filter (\x -> x > 3)
+    in
+    println "Result:" (String.fromInt updated.x)
+```
 
-ALL effectful operations flow through `Task`:
-- **Pure** (`String.length`, `List.map`) — no wrapping
-- **Fallible** (`String.toInt`, `Dict.get`) — `Result` or `Maybe`
-- **Effectful** (`File.readFile`, `Http.get`, `println`) — `Task Error a`
-- **Entry** (`main`) — may return `Task`; runtime auto-executes
+### Types
 
-FFI boundary mapping: Go `(T, error)` → `Result Error T` | Go `error` → `Result Error ()` | panics → `Err` | nil → `Maybe`/`Result`
+`Int`, `Float`, `String`, `Bool`, `Char`, `Unit` (`()`), `List a`, `Maybe a` (`Just a | Nothing`), `Result err ok` (`Ok ok | Err err`), `Dict k v`, tuples `(a, b)`, records `{ field : Type }`
 
-## Environment Variable Precedence
+### Operators
 
+`++` (concat), `|>` `<|` (pipe), `>>` `<<` (compose), `==` `!=` `/=` `<` `>` `<=` `>=`, `&&` `||`, `+` `-` `*` `/` `//` `%`, `::` (cons)
+
+Note: `/=` is Elm-compatible not-equal (alias for `!=`). `//` is integer division (always returns `Int`). Both forms are supported.
+
+### Multiline Strings
+
+Triple-quoted strings preserve newlines. Interpolation uses double braces `{{expr}}`:
+
+```elm
+html =
+    """<div class="card">
+    <h1>{{title}}</h1>
+    <p>{{description}}</p>
+</div>"""
+
+sql =
+    """CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL
+    )"""
+```
+
+Single braces `{` are literal — safe for JavaScript, CSS, JSON, SQL. Interpolation expressions support identifiers, field access, qualified names, and function calls.
+
+### Patterns
+
+Literals, constructors (`Just x`, `Ok v`, `Err e`), tuples `(a, b)`, lists `[]`, `[x]`, `x :: xs`, wildcards `_`, as-patterns `Just x as original`, nested `Ok (Just x)`
+
+### Record Patterns
+
+```elm
+-- Record patterns (destructuring)
+case user of
+    { name, age } -> name ++ " is " ++ String.fromInt age
+
+-- In function params
+greet { name } = "Hello, " ++ name
+
+-- In let bindings
+let { x, y } = point in x + y
+```
+
+## Task — Effect Boundary
+
+All side effects (IO, HTTP, file access) flow through `Task`. Tasks are lazy — they only execute when `perform` is called. Panics are caught and converted to `Err`.
+
+```elm
+import Sky.Core.Task as Task
+
+-- Create and compose Tasks
+pipeline =
+    Task.succeed "Sky"
+        |> Task.andThen (\name -> Task.succeed ("Hello, " ++ name ++ "!"))
+        |> Task.map (\msg -> msg ++ " Pure and reliable.")
+
+-- Execute at the boundary
+result = Task.perform pipeline
+-- result : Result String String
+```
+
+**Task API:**
+- `Task.succeed : a -> Task err a`
+- `Task.fail : err -> Task err a`
+- `Task.map : (a -> b) -> Task err a -> Task err b`
+- `Task.andThen : (a -> Task err b) -> Task err a -> Task err b`
+- `Task.perform : Task err a -> Result err a`
+- `Task.sequence : List (Task err a) -> Task err (List a)` -- run sequentially
+- `Task.parallel : List (Task err a) -> Task err (List a)` -- run concurrently (goroutines)
+- `Task.lazy : (() -> a) -> Task err a` -- defer computation until executed
+- `Task.map2/3/4/5` -- combine N independent Tasks (sequential, like Result.mapN) (v0.7.25+)
+- `Task.andMap : Task e a -> Task e (a -> b) -> Task e b` -- pipeline-style applicative (v0.7.25+)
+
+**Concurrency:**
+
+`Task.parallel` runs tasks concurrently using Go goroutines. Results are collected in order; the first error short-circuits.
+
+```elm
+-- Parallel HTTP requests (total time = slowest request, not sum)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [anzellai/sky](https://github.com/anzellai/sky) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
