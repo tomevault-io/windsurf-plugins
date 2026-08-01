@@ -3,7 +3,7 @@ trigger: always_on
 description: You are working on agent-ws, a standalone WebSocket bridge for CLI AI agents (Claude Code, Codex).
 ---
 
-# agent-ws - Claude Context
+# agent-ws
 
 You are working on agent-ws, a standalone WebSocket bridge for CLI AI agents (Claude Code, Codex).
 
@@ -48,14 +48,20 @@ npm start            # Run from dist/
 npm run dev          # Run with --watch
 ```
 
+## Documentation
+
+- When creating new docs for this repo, prefer standalone HTML/CSS by default: use semantic HTML, responsive accessible CSS, a readable max-width and line-height, clear visual hierarchy, and concise plain language.
+
 ## CLI Options
 
 ```
 -p, --port <port>            WebSocket port (default: 9999)
 -H, --host <host>            Hostname (default: localhost)
+-m, --mode <mode>            Permission mode: safe, agentic, unrestricted (default: safe)
+    --sandbox <preference>   Sandbox: auto, none, os, seatbelt, bwrap (default: none)
 -c, --claude-path <path>     Path to Claude CLI (default: claude)
     --codex-path <path>      Path to Codex CLI (default: codex)
--t, --timeout <seconds>      Process timeout (default: 300)
+-t, --timeout <seconds>      Process timeout (default: 600)
     --log-level <level>      debug, info, warn, error (default: info)
     --origins <origins>      Comma-separated allowed origins
 -V, --version                Show version
@@ -74,16 +80,29 @@ agent-ws/
 │   │   ├── websocket.ts       # WS server, heartbeat, per-connection state
 │   │   └── protocol.ts        # Message types, validation
 │   ├── process/
-│   │   ├── claude-runner.ts   # Claude Code process spawn/kill/timeout
-│   │   ├── codex-runner.ts    # Codex process spawn/kill/timeout
-│   │   └── output-cleaner.ts  # ANSI stripping via node:util
+│   │   ├── base-runner.ts          # Abstract BaseRunner: spawn/kill/timeout, file-write sandbox, isWithin helper. Spawns through sandbox.wrapSpawn
+│   │   ├── claude-runner.ts        # ClaudeRunner (extends BaseRunner): wires the parser, post-edit reads
+│   │   ├── claude-stream-parser.ts # Stateless parser for Claude's stream-json NDJSON output
+│   │   ├── codex-runner.ts         # CodexRunner (extends BaseRunner): JSONL parsing, thread resumption
+│   │   ├── output-cleaner.ts       # ANSI stripping via node:util
+│   │   └── sandbox/
+│   │       ├── index.ts            # selectSandbox factory + probeAvailableSandboxes
+│   │       ├── types.ts            # Sandbox interface + SandboxSpawnOpts/Result
+│   │       ├── noop.ts             # NoopSandbox (default, no isolation)
+│   │       ├── seatbelt.ts         # macOS sandbox-exec backend + buildSeatbeltProfile
+│   │       └── bwrap.ts            # Linux bubblewrap backend + buildBwrapArgs
 │   └── utils/
 │       ├── logger.ts          # Pino logger factory
-│       └── claude-check.ts    # Claude CLI availability check
+│       └── claude-check.ts    # CLI availability probe (used by capabilities)
 ├── test/
 │   ├── protocol.test.ts       # Message parsing, validation
+│   ├── base-runner.test.ts    # BaseRunner: caching, disposal, spawn failure
+│   ├── claude-runner.test.ts  # Claude NDJSON stream parsing
+│   ├── codex-runner.test.ts   # Codex JSONL stream parsing
+│   ├── runner-args.test.ts    # CLI argument building for both runners
 │   ├── output-cleaner.test.ts # ANSI/VT sequence stripping
-│   └── websocket.test.ts      # Integration: WS server with mock runner
+│   ├── sandbox.test.ts        # Sandbox interface, Seatbelt/bwrap arg construction, BaseRunner integration
+│   └── websocket.test.ts      # Integration: WS server, rate limiting, auth, capabilities handshake
 ├── build.js                   # esbuild bundler config
 ├── tsconfig.json
 ├── vitest.config.ts
@@ -92,46 +111,20 @@ agent-ws/
 
 ## Message Protocol
 
+Protocol version is `1.1` (`PROTOCOL_VERSION` in `src/server/protocol.ts`).
+
 ### Client → Agent
 
 ```typescript
-{ type: "prompt", prompt: string, requestId: string, model?: string, provider?: "claude" | "codex", projectId?: string, systemPrompt?: string, thinkingTokens?: number, images?: PromptImage[] }
+{ type: "prompt", prompt: string, requestId: string, model?: string, provider?: "claude" | "codex", projectId?: string, systemPrompt?: string, thinkingTokens?: number, images?: PromptImage[], files?: PromptFile[] }
 { type: "cancel", requestId?: string }
+{ type: "capabilities" }
 ```
 
-- `projectId` scopes CLI session by CWD and enables `--continue` for multi-turn. Alphanumeric/hyphens/underscores/dots only, max 128 chars.
-- `systemPrompt` is passed via `--append-system-prompt` (max 64KB).
-- `thinkingTokens` controls thinking budget. `0` disables thinking. Omit to let Claude decide.
-- `images` is an optional array of `{ media_type: string, data: string }` (base64). Up to 4 images, max 10MB base64 each. Allowed types: `image/png`, `image/jpeg`, `image/gif`, `image/webp`. Claude uses `--input-format stream-json` with content blocks; Codex writes temp files and passes via `-i` flags.
-
-### Agent → Client
-
-```typescript
-{ type: "connected", version: "1.0", agent: "agent-ws" }
-{ type: "chunk", content: string, requestId: string, thinking?: boolean }
-{ type: "complete", requestId: string }
-{ type: "error", message: string, requestId?: string }
-```
-
-Chunks with `thinking: true` contain Claude's reasoning (streamed when `thinkingTokens > 0`).
-
-## Key Architecture Decisions
-
-- **Dumb pipe**: No prompt engineering. All prompt construction happens in the client.
-- **Per-connection processes**: Each WebSocket gets its own `Runner` instance.
-- **Runner interface**: `Runner` interface allows test injection without real process spawning.
-- **Configurable identity**: `agentName` and `sessionDir` options let consumers customise the agent.
-- **No `strip-ansi` dep**: Uses `node:util.stripVTControlCharacters` (built-in since Node 16.11).
-- **OSC-first stripping**: OSC sequences (which use BEL as terminator) are removed before BEL characters.
-
-## Security
-
-- Only listens on localhost by default
-- Optional origin validation (`--origins`)
-- No API keys stored or transmitted
+- `requestId` max 256 chars.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Lisovate/agent-ws](https://github.com/Lisovate/agent-ws) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
