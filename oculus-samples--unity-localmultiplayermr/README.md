@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [oculus-samples/Unity-LocalMultiplayerMR](https://github.com/oculus-samples/Unity-LocalMultiplayerMR).
+Original source: `AGENTS.md` in [oculus-samples/Unity-LocalMultiplayerMR](https://github.com/oculus-samples/Unity-LocalMultiplayerMR).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
