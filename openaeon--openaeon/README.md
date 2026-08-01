@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [openaeon/OpenAEON](https://github.com/openaeon/OpenAEON).
+Original source: `AGENTS.md` in [openaeon/OpenAEON](https://github.com/openaeon/OpenAEON).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
