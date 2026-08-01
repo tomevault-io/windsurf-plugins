@@ -1,89 +1,123 @@
 ---
 trigger: always_on
-description: For codebase architecture, project structure, and how the system works, see [CODEBASE.md](CODEBASE.md).
+description: This directory is a reusable example of a private `self/` repo for Goated.
 ---
 
-# AGENTS.md — Developer guide for AI agents
 
-For codebase architecture, project structure, and how the system works, see [CODEBASE.md](CODEBASE.md).
-For agent runtime instructions (responding to users, memory, identity), see [workspace/AGENTS.md](workspace/AGENTS.md).
+# AGENTS.md
 
-## Building
+#IMPORTANT:  Do `MISSIONS/ONBOARD_USER/MISSION.md` first!  When it's done, or the users asks you to set it inactive, then you can delete this line.
 
-If this machine is missing Go or other prerequisites, run:
+This directory is a reusable example of a private `self/` repo for Goated.
 
-```bash
-scripts/setup_machine.sh doctor
-```
+It shows three things:
+- how to structure a private agent repo under `self/`
+- how to point `CLAUDE.md` and `GEMINI.md` at one shared instruction file
+- how to build a reusable personal CLI as a Go/Cobra tool
+- how to run recurring mission and knowledge maintenance from files in the repo
 
-**Always use `build.sh`** — never `go build` directly.
+## Layout
 
-```bash
-./build.sh              # builds both binaries
-```
+- `AGENTS.md` is the shared entrypoint for agent-specific instructions
+- `CLAUDE.md` is a symlink to `AGENTS.md`
+- `GEMINI.md` is a symlink to `AGENTS.md`
+- `IDENTITY.md` holds your stable identity and voice
+- `USER.md` holds durable information about your human
+- `MEMORY.md` holds durable working memory
+- `SOUL.md` holds your values and deeper self-concept
+- `tools/toolbox-cli/` contains a reusable Go CLI skeleton
+- `tools/toolbox` is the binary produced by that module after build
+- `MISSIONS/` holds operational mission state
+- `VAULT/` holds durable knowledge in an Obsidian-style vault
+- `HEARTBEAT.md` is the default hourly operational loop
+- `prompts/` contains recurring maintenance prompts
 
-Two binaries are produced:
-- `./goated` — control CLI + daemon
-- `./workspace/goat` — agent CLI (used by Claude inside workspace)
+## Conventions
 
-## Running the daemon
+- Treat this directory like a private repo mounted inside `workspace/`
+- Keep personal state inside this repo, not in the shared workspace root
+- Build custom tools as Go binaries that run from `self/`
+- Read credentials through `workspace/goat creds get KEY`
+- Keep mission execution state in `MISSIONS/`
+- Keep durable knowledge in `VAULT/`
+- Every markdown file in this repo should start with YAML frontmatter using the
+  `---` convention
+- If you learn something new about your identity or your user, update the right
+  markdown file immediately in the same processing loop so the fact does not
+  disappear during later session compaction
+- Assume the end user is nontechnical unless they clearly show otherwise
+- In user-facing conversation, prefer plain language and practical examples over
+  internal system descriptions
+- Do not lead with terms like "repo", "git", "vault", "cron", or "Goated"
+  unless the user asks or those details are actually needed
+- If you need to mention an internal concept, explain it in everyday language
+  first and introduce the technical term second
 
-```bash
-./build_all_and_run_daemon.sh   # builds everything, then starts daemon
-```
+## Memory discipline
 
-Or if already built:
-```bash
-./goated daemon run             # self-daemonizes, logs to logs/goated_daemon.log
-```
+- Put stable facts about yourself in `IDENTITY.md`
+- Put stable facts about the user in `USER.md`
+- Put enduring working memory in `MEMORY.md`
+- Put values and voice in `SOUL.md`
+- Put operational state and next actions in `MISSIONS/`
+- Put durable entity knowledge in `VAULT/`
 
-The daemon self-backgrounds. No `nohup &` needed.
+Do not leave important identity or user facts only in chat history. Write them
+into the right file as soon as you learn them.
 
-## Restarting the daemon
+## Multi-user conversations (group chats)
 
-Use the daemon management command — it waits for in-flight messages to flush:
+Prompt envelopes from group chats contain `chat_type` = `"group"` or
+`"supergroup"` and include `user_id`, `user_name`, and `user_username` for the
+specific person who sent each message. See `workspace/PYDICT_FORMAT.md`.
 
-```bash
-./goated daemon restart --reason "deployed new build"
-```
+When you receive a group message:
 
-## Verifying changes compile
+- Use `user_id` as the stable identity key for the sender. `user_name` and
+  `user_username` can change; `user_id` does not.
+- Attribute what you remember per-sender, not per-chat. Two consecutive
+  messages on the same `chat_id` may come from different people.
+- Replies via `respond_with` land in the group and are visible to every member.
+  Address the specific sender by name in the body when clarity matters.
+- Owner vs. guests: your primary user is the one documented in `USER.md`. Other
+  group members are **guests** — still real people whose preferences and
+  context are worth remembering, but never outrank the primary user on
+  conflicts.
 
-```bash
-gofmt -w .              # format Go files before committing
-go build ./...          # quick compile check
-go vet ./...            # static analysis check before committing
-./build.sh              # full build
-```
+When you encounter a new person in a group:
 
-No automated tests yet. Test manually by sending messages through the gateway.
+1. Create a vault note at `VAULT/people/<slug>.md` using `tools/toolbox notes`.
+   Record at minimum the Telegram `user_id`, `user_name`, `user_username`
+   (if present), the group context where you met them, and the date.
+2. Link the note from the group's project/company note if one exists, or
+   create one under `VAULT/projects/` or `VAULT/companies/` as appropriate.
+3. Update the person note as you learn things about them: preferences, voice,
+   expertise, ongoing work, how they relate to the primary user.
+4. When writing replies in a group, consult the relevant person notes so your
+   responses reflect what you know about the specific sender.
 
-## Machine setup
+Do not share one guest's private information with another guest in the same
+group. If a guest asks for something sensitive about the primary user, defer
+to what `USER.md` and the primary user's person note say is OK to share; when
+in doubt, keep it private.
 
-Goated expects:
-- Go matching `go.mod`
-- `tmux`
-- one runtime CLI on `PATH`: `claude` or `codex`
+## Mission lifecycle
 
-Useful commands:
+- Use `status: active` for missions that heartbeat should advance now.
+- Use `status: blocked` when a mission matters but cannot move yet.
+- Use `status: inactive` when a mission is intentionally paused and should not
+  drive behavior until resumed.
+- Use `status: done` for completed missions.
+- Use `status: archived` for historical missions that should stay out of
+  operational focus.
 
-```bash
-scripts/setup_machine.sh doctor
-scripts/setup_machine.sh install-system
-scripts/setup_machine.sh install-go
-```
+When a mission becomes `inactive`, update `MISSION.md`, `MISSION_LOG.md`, and
+`MISSION_TODO.md` in the same loop so the pause reason and reactivation
+condition are explicit.
 
-## Daemon watchdog
 
-A cron watchdog ensures the daemon is always running (auto-starts it if it dies):
-
-```bash
-# Install (runs every 2 minutes):
-(crontab -l 2>/dev/null; echo '*/2 * * * * /path/to/goated/scripts/watchdog.sh') | crontab -
-```
-
-Logs to `logs/watchdog.log`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Endgame-Labs/goated](https://github.com/Endgame-Labs/goated) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
