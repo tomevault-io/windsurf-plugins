@@ -88,4 +88,4 @@ When troubleshooting a Kustomization, follow these steps:
 
 ---
 > Source: [Mafyuh/iac](https://github.com/Mafyuh/iac) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
