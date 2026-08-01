@@ -1,121 +1,128 @@
 ---
 trigger: always_on
-description: This file provides comprehensive guidance for AI assistants (Claude, Gemini, ChatGPT, etc.) working with this security operations repository. It serves as the primary orientation document for understanding the project structure, capabilities, and specialized workflows.
+description: This repository contains a comprehensive security operations (SOC) runbook and persona system designed to guide LLM agents through standardized security workflows.
 ---
 
-# LLM Agent Instructions
+# AI Runbooks for Security Operations
 
-This file provides comprehensive guidance for AI assistants (Claude, Gemini, ChatGPT, etc.) working with this security operations repository. It serves as the primary orientation document for understanding the project structure, capabilities, and specialized workflows.
+This repository contains a comprehensive security operations (SOC) runbook and persona system designed to guide LLM agents through standardized security workflows.
 
-## Project Overview
+## Overview
 
-This is a security operations (SOC) runbook and persona system designed to guide LLM agents through standardized security workflows. The repository contains documentation, procedural guides, and configuration scripts for AI-assisted security operations.
+The project provides structured documentation, procedural guides, and configuration scripts that enable AI assistants (Claude Code, Cline, and Gemini CLI) to effectively assist with security operations tasks.
 
 ## Repository Structure
 
-- `rules_bank/` - Master source directory containing all documentation, personas, and runbooks
-  - `personas/` - Security role definitions (SOC Analysts, Threat Hunters, Incident Responders, etc.)
-  - `run_books/` - Step-by-step procedural guides for security tasks
-    - `common_steps/` - Reusable procedure components
-    - `irps/` - Incident Response Plans for major incidents
-    - `guidelines/` - Best practices and documentation guides
-- `.claude/` - Claude Code configuration directory
-  - `rules_bank/` - Symlink to ../rules_bank (provides access to all content)
-- `.clinerules/` - Cline configuration directory
-  - `rules_bank/` - Symlink to ../rules_bank (provides access to all content)
-- `.gemini/` - Gemini CLI configuration directory
-  - `rules_bank/` - Symlink to ../rules_bank (provides access to all content)
-- `reports/` - Generated security reports and examples
+```
+dandye_ai_runbooks/
+├── rules_bank/                    # Master source directory for all content
+│   ├── personas/                  # Security role definitions
+│   ├── run_books/                 # Procedural guides for security tasks
+│   │   ├── common_steps/         # Reusable procedure components
+│   │   ├── irps/                 # Incident Response Plans
+│   │   └── guidelines/           # Best practices and documentation
+│   └── [other documentation]     # Configuration and reference files
+├── .claude/                      # Claude Code configuration directory
+│   └── rules_bank/               # Symlink to ../rules_bank
+├── .clinerules/                  # Cline configuration directory
+│   └── rules_bank/               # Symlink to ../rules_bank
+├── .gemini/                      # Gemini CLI configuration directory
+│   └── rules_bank/               # Symlink to ../rules_bank
+├── reports/                      # Generated security reports
+├── set_persona_rules.py          # Script to configure active personas
+└── symlink_common_steps.py       # Script to manage common steps symlinks
+```
 
-## Multi-LLM Architecture
+## AI Tool Integration
 
-This repository is designed for seamless integration across multiple AI assistants through a unified content structure:
+This repository is designed to work with three AI coding assistants:
 
-### Supported AI Tools
-- **Claude Code**: Accesses content through `.claude/rules_bank/` symlinks
-- **Cline**: Utilizes `.clinerules/rules_bank/` directory structure  
-- **Gemini CLI**: Reads from `.gemini/rules_bank/` configuration
-- **Other LLMs**: Can directly access `rules_bank/` master content
+### Claude Code (claude.ai/code)
+- Uses the `.claude/` directory for configuration
+- Reads context from `.claude/rules_bank/` symlink
+- See `CLAUDE.md` for Claude-specific guidance
 
-### Unified Content Access
-All AI tools access identical content through symlinks to the master `rules_bank/` directory. This architecture:
-- Ensures consistency across different AI platforms
-- Eliminates content duplication and maintenance overhead
-- Provides standardized security workflows regardless of the AI assistant used
-- Maintains specialized tool configurations while sharing core knowledge
+### Cline
+- Uses the `.clinerules/` directory for configuration
+- Reads context from `.clinerules/rules_bank/` symlink
+- Follows the same runbook and persona system
+
+### Gemini CLI
+- Uses the `.gemini/` directory for configuration
+- Reads context from `.gemini/rules_bank/` symlink
+- Compatible with the same documentation structure
+
+## Symlink Architecture
+
+The project uses a symlink-based system to share the same content across all three AI tools:
+
+1. **Master Content**: All documentation, personas, and runbooks are maintained in `rules_bank/`
+2. **Symlinks**: Each AI tool's configuration directory contains a symlink to `rules_bank/`
+3. **Benefits**: 
+   - Single source of truth for all content
+   - Updates automatically propagate to all AI tools
+   - No duplication or synchronization needed
+
+## Key Components
+
+### Personas
+Security role definitions including:
+- SOC Analysts (Tier 1-3)
+- Threat Hunters
+- Incident Responders
+- CTI Researchers
+- Security Engineers
+- And more...
+
+### Runbooks
+Step-by-step procedural guides for:
+- Alert triage
+- IOC enrichment and investigation
+- Threat hunting
+- Incident response
+- Case management
+- And many more security operations tasks
+
+### Incident Response Plans (IRPs)
+Comprehensive end-to-end strategies for:
+- Malware incidents
+- Phishing attacks
+- Ransomware
+- Compromised accounts
+
+## Usage
+
+1. **For AI Assistants**: The symlinked `rules_bank` directory in each tool's configuration folder provides access to all personas, runbooks, and documentation.
+
+2. **For Developers**: 
+   - Edit content only in the `rules_bank/` directory
+   - Never edit files through the symlinks
+   - Use the provided Python scripts for persona configuration if needed
+
+3. **For Security Teams**: Use this repository to standardize and document your security operations procedures for AI-assisted workflows.
 
 ## Configuration Scripts
 
-### Setting Active Persona
-```bash
-python set_persona_rules.py <persona_name>
-# Example: python set_persona_rules.py tier1_soc_analyst
-```
-Currently supported personas: `tier1_soc_analyst`, `threat_hunter`
+- `set_persona_rules.py`: Configure active personas (legacy - may need updates for new structure)
+- `symlink_common_steps.py`: Manage common steps symlinks (legacy - may need updates)
 
-### Linking Common Steps
-```bash
-python symlink_common_steps.py
-```
-Run this after changing personas to ensure common steps remain accessible.
+## Integration
 
-## Key Concepts & Capabilities
+This project is designed to work with:
+- Chronicle SIEM
+- SOAR platforms
+- Google Threat Intelligence (GTI)
+- Security Command Center (SCC)
+- Various MCP (Model Context Protocol) tools
 
-### Core Components
-- **Runbooks**: Tactical, step-by-step procedures for specific security tasks (alert triage, IOC enrichment, threat hunting)
-- **IRPs**: End-to-end incident response plans for major incidents following PICERL lifecycle  
-- **Personas**: Predefined security roles with specific responsibilities, skills, tool access, and specialized slash commands
-- **MCP Integration**: Model Context Protocol tools for Chronicle SIEM, SOAR, Google Threat Intelligence, and Security Command Center
+## Contributing
 
-### Advanced Features
-- **Slash Commands**: Specialized commands for security workflows (primarily supported in Claude)
-- **Dynamic Configuration**: Persona-based context switching and tool access management
-- **Report Generation**: Automated security report creation with standardized templates
-- **Threat Intelligence**: Active integration with Google Threat Intelligence and security feeds
-- **Multi-Platform SIEM**: Chronicle, SOAR case management, and cloud security integration
+See `CONTRIBUTING` file for guidelines on contributing to this project.
 
-## Skills & Persona System
+## License
 
-The repository includes a skills-based workflow system with persona-driven orchestration.
-
-### Skills Directory Structure
-
-```
-skills/
-├── _personas/          # Persona manifest files (YAML)
-│   ├── tier1-analyst.yaml
-│   ├── tier2-analyst.yaml
-│   ├── threat-hunter.yaml
-│   └── incident-responder.yaml
-├── _workflows/         # Composite/meta-skills
-│   ├── full-alert-triage/
-│   └── full-investigation/
-├── _roles/             # IAM role documentation
-│   └── iam-matrix.md
-└── <skill-name>/       # Individual atomic skills
-    └── SKILL.md
-```
-
-### Using Personas
-
-Persona manifests define which skills each security role can use and their typical workflows.
-
-**Available Personas:**
-
-| Persona | Primary Function | Key Skills |
-|---------|-----------------|------------|
-| `tier1-analyst` | Alert triage, initial assessment | triage-alert, enrich-ioc, check-duplicates |
-| `tier2-analyst` | Deep investigation, escalated cases | deep-dive-ioc, correlate-ioc, triage-malware |
-| `threat-hunter` | Proactive hunting | hunt-apt, hunt-ioc, hunt-threat, hunt-lateral-movement |
-| `incident-responder` | PICERL lifecycle management | respond-ransomware, respond-malware, respond-phishing |
-
-**Activating a Persona:**
-
-Each LLM platform activates personas differently:
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
 
 ---
 > Source: [dandye/ai-runbooks](https://github.com/dandye/ai-runbooks) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
