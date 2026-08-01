@@ -1,206 +1,225 @@
 ---
 trigger: always_on
-description: This document provides a comprehensive reference for LLMs (Claude, GPT, etc.) working with the Irgo framework.
+description: This app is built with **Irgo**, a hypermedia-driven framework for cross-platform apps using Go + Datastar + Templ.
 ---
 
-# Irgo Framework - LLM Reference
+# Irgo App Development Guide
 
-This document provides a comprehensive reference for LLMs (Claude, GPT, etc.) working with the Irgo framework.
+This app is built with **Irgo**, a hypermedia-driven framework for cross-platform apps using Go + Datastar + Templ.
 
-## Framework Overview
-
-Irgo is a **hypermedia-driven application framework** for building cross-platform apps (iOS, Android, desktop, web) using Go + Datastar + Templ. It follows the hypermedia architecture where the server returns HTML fragments via SSE (Server-Sent Events), not JSON.
-
-### Core Concept
+## Architecture
 
 ```
 User Interaction → Datastar Request → Go Handler → Templ Template → SSE Response → DOM Update
 ```
 
-### Datastar Overview
-
-[Datastar](https://data-star.dev) is a lightweight (~11KB) hypermedia framework that uses:
-- **SSE (Server-Sent Events)** for server responses
-- **Reactive signals** for client-side state
-- **`data-*` attributes** for declarative behavior
-
-### Platform Modes
-
-| Mode | Architecture | Entry Point | Build Tag |
-|------|-------------|-------------|-----------|
-| **Mobile** | Virtual HTTP via gomobile bridge | `main.go` | `!desktop` |
-| **Desktop** | Real HTTP server + native webview | `main_desktop.go` | `desktop` |
-| **Web/Dev** | Real HTTP server + browser | `main.go` (serve mode) | `!desktop` |
+**Key principle:** The server returns HTML fragments via SSE (Server-Sent Events), not JSON. Datastar handles DOM updates.
 
 ## Project Structure
 
 ```
-myapp/
 ├── main.go              # Mobile/web entry (//go:build !desktop)
 ├── main_desktop.go      # Desktop entry (//go:build desktop)
-├── go.mod
 ├── app/
-│   └── app.go           # Router setup
+│   └── app.go           # Router setup and route definitions
 ├── handlers/
-│   └── handlers.go      # HTTP handlers
+│   └── handlers.go      # HTTP handlers returning HTML or SSE
 ├── templates/
 │   ├── layout.templ     # Base HTML layout
-│   └── *.templ          # Page/component templates
+│   └── *.templ          # Page and component templates
 ├── static/
-│   ├── css/output.css   # Tailwind CSS
+│   ├── css/output.css   # Tailwind CSS (generated)
 │   └── js/datastar.js   # Datastar library
 └── mobile/
     └── mobile.go        # Mobile bridge (optional)
 ```
 
-## Key Packages
+## CLI Commands
 
-### `github.com/stukennedy/irgo/pkg/router`
-
-Chi-based router with Datastar SSE conveniences.
-
-```go
-import "github.com/stukennedy/irgo/pkg/router"
-
-r := router.New()
-
-// Standard handlers return (string, error) for HTML responses
-r.GET("/path", func(ctx *router.Context) (string, error) {
-    return "<div>HTML</div>", nil
-})
-
-// Datastar SSE handlers return error only, use ctx.SSE() for responses
-r.DSGet("/path", func(ctx *router.Context) error {
-    sse := ctx.SSE()
-    return sse.PatchTempl(templates.MyComponent())
-})
-
-r.DSPost("/path", handler)
-r.DSPut("/path", handler)
-r.DSPatch("/path", handler)
-r.DSDelete("/path", handler)
-
-// URL parameters
-r.DSGet("/users/{id}", func(ctx *router.Context) error {
-    id := ctx.Param("id")
-    // ...
-    return nil
-})
-
-// Route groups
-r.Route("/api", func(r *router.Router) {
-    r.DSGet("/users", listUsers)
-})
-
-// Static files
-r.Static("/static", http.Dir("static"))
-
-// Get the http.Handler
-handler := r.Handler()
+```bash
+irgo dev                 # Web dev server with hot reload
+irgo run desktop         # Run as desktop app
+irgo run desktop --dev   # Desktop with devtools
+irgo run ios --dev       # iOS Simulator
+irgo run android --dev   # Android Emulator
+irgo templ               # Regenerate templ files
 ```
 
-### `router.Context` - Request/Response Helpers
+## Router & Handlers
+
+### Standard Handlers (Full Page Loads)
+
+Standard handlers return `(string, error)`. The string is HTML.
 
 ```go
-// Standard handler (returns HTML string)
-func handler(ctx *router.Context) (string, error) {
-    // Input
-    ctx.Param("id")           // URL path parameter
-    ctx.Query("q")            // Query string parameter
-    ctx.FormValue("name")     // Form field value
-    ctx.Header("X-Custom")    // Request header
+import (
+    "github.com/stukennedy/irgo/pkg/router"
+    "github.com/stukennedy/irgo/pkg/render"
+)
 
-    // Datastar detection
-    ctx.IsDatastar()          // true if Accept: text/event-stream
+// Full page load
+r.GET("/", func(ctx *router.Context) (string, error) {
+    return renderer.Render(templates.HomePage())
+})
+```
 
-    // Output - HTML responses (for full page loads)
-    ctx.HTML("<div>content</div>")
-    ctx.HTMLStatus(201, "<div>created</div>")
+### Datastar SSE Handlers
 
-    // Output - JSON responses
-    ctx.JSON(data)
-    ctx.JSONStatus(201, data)
+Datastar handlers return `error` only and use `ctx.SSE()` for responses.
 
-    // Output - Errors
-    ctx.Error(err)
-    ctx.ErrorStatus(500, "message")
-    ctx.NotFound("not found")
-    ctx.BadRequest("invalid input")
-
-    // Output - Redirects
-    ctx.Redirect("/new-url")
-
-    // Output - No content
-    ctx.NoContent()
-
-    return "<div>response</div>", nil
-}
-
-// Datastar SSE handler (returns error only)
-func sseHandler(ctx *router.Context) error {
-    // Read signals from request body
+```go
+// Datastar SSE endpoint
+r.DSGet("/greeting", func(ctx *router.Context) error {
     var signals struct {
         Name string `json:"name"`
-        Page int    `json:"page"`
     }
     ctx.ReadSignals(&signals)
 
-    // Get SSE writer
     sse := ctx.SSE()
+    return sse.PatchTempl(templates.Greeting(signals.Name))
+})
 
-    // Patch HTML into DOM (morphs elements by ID)
-    sse.PatchTempl(templates.MyComponent(data))
-    sse.PatchHTML(`<div id="result">Updated</div>`)
+r.DSPost("/todos", createTodo)
+r.DSPut("/todos/{id}", updateTodo)
+r.DSPatch("/todos/{id}", toggleTodo)
+r.DSDelete("/todos/{id}", deleteTodo)
+```
 
-    // Update client-side signals
-    sse.PatchSignals(map[string]any{"count": 5})
+### Context Methods
 
-    // Remove elements
-    sse.Remove("#old-element")
+**Input:**
+- `ctx.Param("id")` - URL path parameter
+- `ctx.Query("q")` - Query string parameter
+- `ctx.FormValue("name")` - Form field value
+- `ctx.Header("X-Custom")` - Request header
+- `ctx.ReadSignals(&signals)` - Parse Datastar signals from request
 
-    // Redirect browser
-    sse.Redirect("/new-url")
+**Datastar Detection:**
+- `ctx.IsDatastar()` - true if Accept: text/event-stream
 
-    return nil
+**SSE Output (for Datastar handlers):**
+```go
+sse := ctx.SSE()
+sse.PatchTempl(templates.Component())      // Patch templ component
+sse.PatchHTML(`<div id="x">HTML</div>`)    // Patch raw HTML
+sse.PatchSignals(map[string]any{...})      // Update client signals
+sse.Remove("#element-id")                   // Remove element
+sse.Redirect("/new-url")                    // Navigate browser
+```
+
+**Standard Output (for full page handlers):**
+- Return HTML string from handler
+- `ctx.Redirect("/path")` - HTTP redirect
+- `ctx.NotFound("message")` - 404 response
+- `ctx.BadRequest("message")` - 400 response
+- `ctx.NoContent()` - 204 response
+
+## Templ Templates
+
+Templ is a type-safe HTML templating language that compiles to Go.
+
+### Basic Syntax
+
+```go
+// templates/components.templ
+package templates
+
+// Component with parameters
+templ UserCard(name string, email string) {
+    <div class="card">
+        <h2>{ name }</h2>
+        <p>{ email }</p>
+    </div>
+}
+
+// Component with children
+templ Card(title string) {
+    <div class="card">
+        <h3>{ title }</h3>
+        { children... }
+    </div>
+}
+
+// Usage
+templ ProfilePage() {
+    @Card("Profile") {
+        <p>Content goes here</p>
+    }
+}
+
+// Conditionals
+templ Status(active bool) {
+    if active {
+        <span class="text-green-500">Active</span>
+    } else {
+        <span class="text-red-500">Inactive</span>
+    }
+}
+
+// Loops
+templ UserList(users []User) {
+    <ul>
+        for _, user := range users {
+            <li>{ user.Name }</li>
+        }
+    </ul>
+}
+
+// Conditional attributes
+templ Checkbox(checked bool) {
+    <input type="checkbox" checked?={ checked }/>
+}
+
+// Dynamic classes
+templ Item(done bool) {
+    <span class={ "item", templ.KV("line-through", done) }>Item</span>
+}
+
+// Safe URLs
+templ Link(url string) {
+    <a href={ templ.SafeURL(url) }>Link</a>
+}
+
+// Raw HTML (use sparingly)
+templ RawContent(html string) {
+    @templ.Raw(html)
 }
 ```
 
-### `github.com/stukennedy/irgo/pkg/datastar`
-
-SSE wrapper for Datastar responses with templ integration.
+### Rendering in Handlers
 
 ```go
-import "github.com/stukennedy/irgo/pkg/datastar"
+renderer := render.NewTemplRenderer()
 
-// Create SSE writer manually (usually use ctx.SSE() instead)
-sse := datastar.NewSSE(w, r)
+// Standard handler
+func handler(ctx *router.Context) (string, error) {
+    return renderer.Render(templates.MyComponent(data))
+}
 
-// Patch operations (morph DOM elements)
-sse.PatchTempl(templates.Component())           // Render templ and patch
-sse.PatchHTML(`<div id="x">HTML</div>`)         // Patch raw HTML
+// Datastar handler
+func sseHandler(ctx *router.Context) error {
+    sse := ctx.SSE()
+    return sse.PatchTempl(templates.MyComponent(data))
+}
+```
 
-// With options
-sse.PatchTempl(comp, datastar.WithModeOuter)    // Replace entire element
-sse.PatchTempl(comp, datastar.WithModeAppend)   // Append to element
+## Datastar Patterns
 
-// Update client signals
-sse.PatchSignals(map[string]any{
-    "count": 10,
-    "name": "John",
-})
+This project uses **Datastar** from `https://data-star.dev/`. Key concepts:
+- **Signals**: Reactive client-side state
+- **SSE**: Server responses as event streams
+- **`data-*` attributes**: Declarative behavior
 
-// Remove elements by selector
-sse.Remove("#element-id")
-sse.Remove(".class-name")
+### Signals (Client-Side State)
 
-// Browser navigation
-sse.Redirect("/new-page")
-
-// Read signals from request
-var signals MyStruct
+```go
+// Initialize signals
+templ Counter() {
+    <div data-signals="{count: 0}">
+        <span data-text="$count">0</span>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [stukennedy/irgo](https://github.com/stukennedy/irgo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
