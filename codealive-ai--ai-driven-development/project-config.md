@@ -31,7 +31,7 @@ Examples:
 Documentation-only changes don't need tagging:
 
 - `README.md` — documentation and use-case updates
-- `CLAUDE.md` — this file
+- `AGENTS.md` and the `CLAUDE.md` import shim — repository instructions
 - Commit messages
 - GitHub-specific files (`.github/*`)
 
@@ -76,7 +76,8 @@ ai-driven-development/
 ├── hooks/
 │   └── <hook-name>/         ← Claude Code hooks (Go binary + install scripts)
 ├── README.md
-├── CLAUDE.md
+├── AGENTS.md               ← canonical repository instructions
+├── CLAUDE.md               ← imports AGENTS.md for Claude Code
 └── LICENSE
 ```
 
@@ -98,4 +99,4 @@ ai-driven-development/
 
 ---
 > Source: [CodeAlive-AI/ai-driven-development](https://github.com/CodeAlive-AI/ai-driven-development) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
