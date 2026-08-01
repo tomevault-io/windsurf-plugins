@@ -1,134 +1,142 @@
 ---
 trigger: always_on
-description: `duploctl` is a **CLI and Python package** for interacting with DuploCloud portals. It provides a command-line interface and extensible Python module for managing DuploCloud resources (Tenants, Services, Infrastructure, etc.) within CI/CD pipelines and interactive workflows.
+description: YAML coding conventions and guidelines
 ---
 
-# GitHub Copilot Instructions for duploctl
 
-## Project Overview
+# YAML Coding Conventions
 
-`duploctl` is a **CLI and Python package** for interacting with DuploCloud portals. It provides a command-line interface and extensible Python module for managing DuploCloud resources (Tenants, Services, Infrastructure, etc.) within CI/CD pipelines and interactive workflows.
+Use YAML best practices to format YAML files correctly.
 
-**Key Characteristics:**
-- **Dual Interface**: Works as both a CLI (`duploctl <resource> <command>`) and Python module
-- **Plugin Architecture**: Uses Python entry points for dynamic resource loading
-- **Decorator-Based**: `@Resource` and `@Command` decorators register resources and commands
-- **Scope System**: Resources can be portal-scoped or tenant-scoped with automatic injection
-- **API Versioning**: Supports v1, v2, and v3 DuploCloud API endpoints with appropriate base classes
-- **CRUD Patterns**: V2/V3 base classes provide standardized CRUD operations for applicable resources
+## General Instructions
 
-## Core Architecture
+- YAML arrays should be aligned with the parent key versus two spaces in
+  - Example:
+    ```yaml
+    fruits:
+    - apple
+    - banana
+    - cherry
+    ```
+- Use spaces instead of tabs for indentation (2 spaces per level).
+- Maintain consistent indentation throughout the file.
+- Use lowercase letters for keys and separate words with underscores or hyphens.
+- Don't use double or single quotes unless the string has special characters or starts with a number
+- Use comments (`#`) to explain complex sections or provide context.
 
-### Resource Registration System
+## DuploCloud Resource YAML Format
 
-Resources are registered via **entry points** in `pyproject.toml` and decorated classes:
+When creating resource definition files:
+
+```yaml
+# Service definition example
+Name: myservice
+Image: nginx:latest
+Replicas: 2
+Volumes:
+- Name: data
+  Path: /data
+ExtraConfig: |
+  worker_processes auto;
+  events {
+    worker_connections 1024;
+  }
+```
+
+## Entry Points in pyproject.toml
+
+Resources must be registered in `pyproject.toml`:
 
 ```toml
 [project.entry-points."duplocloud.net"]
+infrastructure = "duplo_resource.infrastructure:DuploInfrastructure"
 tenant = "duplo_resource.tenant:DuploTenant"
 service = "duplo_resource.service:DuploService"
-infrastructure = "duplo_resource.infrastructure:DuploInfrastructure"
+myresource = "duplo_resource.myresource:DuploMyResource"
 ```
 
-Each resource class must:
-1. Be decorated with `@Resource(name, scope="portal"|"tenant")`
-2. Accept `DuploCtl` in `__init__`
-3. Define commands using `@Command()` decorator
-4. Be registered in `pyproject.toml` entry points
+**Key Points:**
+- Entry point name is the CLI resource name
+- Value format: `"module_path:ClassName"`
+- Module path relative to `src/` directory
+- Class name must match decorated class
 
-### Decorator Pattern
+## Test Data YAML
 
-#### `@Resource(name: str, scope: str = "portal")`
+Test fixtures should be in `src/tests/data/`:
 
-Registers a class as a resource and optionally injects scope-specific functionality.
-
-**Parameters:**
-- `name`: Resource name (used in CLI: `duploctl <name> ...`)
-- `scope`: Either `"portal"` (default) or `"tenant"`
-
-**Scope Behaviors:**
-- **Portal scope**: Resource operates at portal level, no tenant context required
-- **Tenant scope**: Automatically injected with:
-  - `tenant` property (lazy-loaded tenant object)
-  - `tenant_id` property (lazy-loaded tenant ID)
-  - `prefix` property (returns `duploservices-{tenant_name}-`)
-  - `prefixed_name(name)` method (prepends tenant prefix)
-  - `endpoint()` method (tenant-aware endpoint builder)
-
-#### `@Command(*aliases)`
-
-Registers a method as an executable command. Arguments are automatically parsed from function signature using type hints.
-
-```python
-@Command()
-def create(self, body: args.BODY, wait: args.WAIT = False) -> dict:
-    """Create a resource."""
-    # Implementation
+```yaml
+# src/tests/data/service.yaml
+Name: test-service
+Image: nginx:latest
+Replicas: 1
+Env:
+- Name: ENV_VAR
+  Value: test_value
 ```
 
-### Base Classes and API Versions
+## MkDocs Configuration
 
-**When to extend base classes:**
-- Only extend `DuploResourceV2` or `DuploResourceV3` if the resource has **CRUD operations** (find, create, update, delete, apply)
-- Resources with only custom methods (like `version`, `jit`, `system`, `plan`) should **not extend anything** - just use `@Resource` decorator
+Documentation snippets can reference YAML files:
 
-**Base Class Hierarchy:**
-
-1. **`DuploResource`** (v1 API - base class)
-   - Default `api_version = "v1"`
-   - Minimal functionality: `wait()`, `command()`, `__call__()`
-   - Use for: Non-CRUD resources like `jit`, `system`, `plan`, `version`
-
-2. **`DuploResourceV2`** (v2 API)
-   - Default `api_version = "v2"`
-   - Provides: `list()`, `find()`, `apply()` commands
-   - Portal endpoint: `endpoint(path)` returns `path`
-   - Tenant endpoint: `endpoint(path)` returns `subscriptions/{tenant_id}/{path}`
-   - Use for: CRUD resources on v2 API (e.g., `user`, `infrastructure`, `asg`, `hosts`, `lambda`)
-
-3. **`DuploResourceV3`** (v3 API)
-   - Default `api_version = "v3"`
-   - Provides: `list()`, `find()`, `create()`, `update()`, `delete()`, `apply()` commands
-   - Portal endpoint: `endpoint(name, path)` returns `v3/{slug}/{name}/{path}`
-   - Tenant endpoint: `endpoint(name, path)` returns `v3/subscriptions/{tenant_id}/{slug}/{name}/{path}`
-   - Use for: CRUD resources on v3 API (e.g., `configmap`, `secret`, `batch_*`, `cloudfront`)
-
-**Endpoint Method Behavior:**
-
-The `endpoint()` method is **version-aware** and **scope-aware**:
-
-```python
-# V2 Portal: endpoint(path)
-self.endpoint("mypath")  # → "mypath"
-
-# V2 Tenant: endpoint(path)
-self.endpoint("mypath")  # → "subscriptions/{tenant_id}/mypath"
-
-# V3 Portal: endpoint(name, path)
-self.endpoint("myresource", "details")  # → "v3/{slug}/myresource/details"
-
-# V3 Tenant: endpoint(name, path)
-self.endpoint("myresource", "details")  # → "v3/subscriptions/{tenant_id}/{slug}/myresource/details"
+```markdown
+Contents of the `service.yaml` file
+```yaml
+--8<-- "src/tests/data/service.yaml"
+```
 ```
 
-### Tenant Scope Injection Pattern
+## Common Patterns
 
-When `@Resource(scope="tenant")` is used, the decorator **dynamically injects** tenant functionality using a **mixin pattern** (`_inject_tenant_scope`):
+### Boolean Values
+```yaml
+enabled: true
+disabled: false
+```
 
-1. Wraps `__init__` to add private attributes (`_tenant`, `_tenant_id`)
-2. Injects lazy-loading properties using `setattr()`
-3. Overrides `endpoint()` method with tenant-aware version
-4. No deep inheritance required - clean separation of concerns
+### Lists
+```yaml
+# Inline style (for short lists)
+ports: [80, 443, 8080]
 
-**Why this matters:**
-- Avoids deep inheritance hierarchies
-- Properties are lazy-loaded (no API calls until accessed)
-- Single decorator parameter controls behavior
-- Works across V2 and V3 APIs consistently
+# Block style (preferred for readability)
+volumes:
+- name: data
+  path: /data
+- name: config
+  path: /config
+```
 
+### Multi-line Strings
+```yaml
+# Literal block (preserves newlines)
+script: |
+  #!/bin/bash
+  echo "Hello"
+  echo "World"
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+# Folded block (joins lines)
+description: >
+  This is a long description
+  that spans multiple lines
+  but will be joined.
+```
+
+### Dictionaries
+```yaml
+metadata:
+  name: myresource
+  labels:
+    app: myapp
+    env: prod
+```
+
+## Validation
+
+- Use YAML linters to validate syntax
+- Test resource definitions with `duploctl <resource> create -f file.yaml --dry-run` if supported
+- Keep test data minimal and focused on specific test cases
 
 ---
 > Source: [duplocloud/duploctl](https://github.com/duplocloud/duploctl) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
