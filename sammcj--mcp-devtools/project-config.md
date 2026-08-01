@@ -1,156 +1,116 @@
 ---
 trigger: always_on
-description: **MCP DevTools** is a single, high-performance MCP (Model Context Protocol) server written in Go that replaces many Node.js and Python-based MCP servers with one efficient binary. It provides access to essential developer tools through a unified, modular interface that can be easily extended with new tools.
+description: This file provides guidance to AI coding agents when working with code in this repository.
 ---
 
-# GitHub Copilot Instructions for MCP DevTools
+This file provides guidance to AI coding agents when working with code in this repository.
 
-## Project Overview
+## Commands
 
-**MCP DevTools** is a single, high-performance MCP (Model Context Protocol) server written in Go that replaces many Node.js and Python-based MCP servers with one efficient binary. It provides access to essential developer tools through a unified, modular interface that can be easily extended with new tools.
-
-**Key Features:**
-- Single binary solution replacing multiple resource-heavy servers
-- 16+ essential developer tools in one package
-- Built in Go for speed, efficiency, and minimal memory footprint
-- Fast startup and response times
-- Modular tool registry architecture allowing easy addition of new tools
-- Supports multiple transports: stdio (default) and streamable HTTP
-
-## Development Setup
-
-### Building the Project
-
-```bash
-# Build the server
-make build
-
-# The binary will be created at: bin/mcp-devtools
-```
-
-### Running the Server
-
-```bash
-# Run with stdio transport (default)
-make run
-
-# Run with HTTP transport
-make run-http
-```
+### Build and Run
+- `make build` - Build the server binary to `bin/mcp-devtools`
+- `make run` - Build and run server with stdio transport (default)
+- `make run-http` - Build and run server with HTTP transport on port 18080
 
 ### Testing
+- `make test` - Run all tests including external dependencies
+- `go test -short -v ./tests/...` - Run specific test suites
 
-```bash
-# Run all tests (includes external API integration tests, ~10s)
-make test
-
-# Run fast tests (skips external dependencies, ~7s)
-make test-fast
-
-# Run tests with detailed timing
-make test-verbose
-```
-
-### Linting and Code Quality
-
-```bash
-# Format code
-make fmt
-
-# Run linters and modernisation checks
-make lint
-# This runs: gofmt, golangci-lint, and gopls modernize
-```
+### Code Quality
+- `make lint` - Run linting, formatting and modernisation checks
 
 ### Dependencies
+- `make deps` - Install dependencies
+- `make update-deps` - Update dependencies
+- `go mod tidy` - Clean up go.mod
 
-```bash
-# Install Go dependencies
-make deps
+## Architecture
 
-# Install all dependencies (Go + Python for document processing)
-make install-all
-```
+This is a modular MCP (Model Context Protocol) server built in Go that provides developer tools through a plugin-like architecture.
 
-## Project Structure
+Please read the `README.md` for more information, and `docs/creating-new-tools.md` for details on how to create new tools.
 
-```
-mcp-devtools/
-├── internal/
-│   ├── tools/           # All tool implementations
-│   ├── registry/        # Tool registration system
-│   ├── security/        # Security framework for file/network operations
-│   ├── handlers/        # MCP protocol handlers
-│   ├── config/          # Configuration management
-│   ├── oauth/           # OAuth functionality
-│   ├── cache/           # Caching utilities
-│   ├── utils/           # Utility functions
-│   └── imports/         # Import management
-├── tests/
-│   ├── tools/           # Unit tests for tools (REQUIRED for all tools)
-│   ├── benchmarks/      # Performance and token cost tests
-│   ├── oauth/           # OAuth tests
-│   └── unit/            # Unit tests for internal packages
-├── docs/
-│   └── tools/           # Tool documentation (REQUIRED when adding tools)
-├── main.go              # Entry point - import new tools here
-├── Makefile             # Build, test, and development commands
-└── mcp.json             # MCP server configuration
-```
+### Core Components
 
-## Contribution Guidelines
+1. **Tool Registry** (`internal/registry/`) - Central registry that manages tool registration and discovery
+2. **Tool Interface** (`internal/tools/tools.go`) - Defines the interface all tools must implement
+3. **Main Server** (`main.go`) - MCP server that supports multiple transports (stdio, SSE, HTTP)
 
-### Before Committing
+### Tool Categories
 
-1. **Format your code:** `make fmt`
-2. **Run linters:** `make lint` (must pass without errors)
-3. **Run tests:** `make test-fast` (must pass all tests)
-4. **Build successfully:** `make build` (must compile without errors)
-
-### Code Standards
-
-- Follow Go best practices and idiomatic patterns
-- Use British English spelling throughout code and documentation
-- No marketing terms like "comprehensive" or "production-grade"
-- Focus on clear, concise, actionable technical guidance
-- Keep responses token-efficient (avoid returning unnecessary data)
+Tools are organised into categories under `internal/tools/`, e.g:
+- `internetsearch/` - Internet Search API integrations (web, image, news, video, local)
+- `packageversions/` - Package version checking across ecosystems (npm, python, go, java, swift, docker, github-actions, bedrock, rust)
+- `shadcnui/` - shadcn/ui component information and examples
+- `think/` - Structured reasoning tool for AI agents
+- `webfetch/` - Web content fetching and conversion to markdown
+- `utils/` - Shared utilities for tools (e.g. proxy)
+- etc..
 
 ### Adding New Tools
 
 1. Create package under `internal/tools/[category]/[toolname]/`
-2. Implement `tools.Tool` interface with `Definition()` and `Execute()` methods
+2. Implement the `tools.Tool` interface with `Definition()` and `Execute()` methods
 3. Register tool in `init()` function using `registry.Register(&YourTool{})`
-4. Import the package in `internal/imports/tools.go` (NOT in `main.go`)
-5. Add unit tests in `tests/tools/` directory
-6. Add documentation in `docs/tools/` with clear, concise information
-7. Update `docs/tools/overview.md`
-8. Integrate with security framework if accessing files/URLs
-9. Verify token cost with `ENABLE_ADDITIONAL_TOOLS=your_tool_name make benchmark-tokens`
+4. Import the package in `main.go` to trigger registration
 
-**Important**: Do NOT add tool imports directly to `main.go`. Use the imports registry system in `internal/imports/tools.go` instead.
+Tools automatically get:
+- Shared cache (`sync.Map`)
+- Logger (`logrus.Logger`)
+- Context and parsed arguments
 
-## Architecture & Structure
+### Transport Support
 
-This is a modular MCP (Model Context Protocol) server written in Go with a tool registry architecture. Each tool implements the `tools.Tool` interface and registers itself through `internal/registry/`. The main server supports multiple transports (stdio, streamable HTTP).
+The server supports three transport modes:
+- **stdio** (default) - Standard input/output for MCP clients
+- **http** - Streamable HTTP with optional authentication, optional upgrade to SSE if needed
+- **sse** - Legacy Server-Sent Events for web clients (deprecated in favour of streamable HTTP), will be removed in future versions
 
-## ⚠️ CRITICAL: stdio Mode Logging Violations
+## Important Files
 
-**MOST IMPORTANT CHECK IN EVERY REVIEW:**
+- `main.go` - Server entry point and transport configuration
+- `internal/registry/registry.go` - Tool registry implementation
+- `internal/tools/tools.go` - Tool interface definition
+- `Makefile` - Build and development commands
+- `go.mod` - Go module dependencies
 
-When the server runs in stdio mode (default transport), ANY output to stdout/stderr will break the MCP protocol and cause catastrophic failures. This is the #1 bug to prevent.
+## Testing Strategy
 
-### What to Check in EVERY Pull Request:
-1. **No direct stdout/stderr writes:**
-   - ❌ NEVER: `fmt.Println()`, `fmt.Printf()`, `log.Println()`, `fmt.Fprintf(os.Stdout, ...)`
-   - ❌ NEVER: `os.Stdout.Write()`, `os.Stderr.Write()`, `print()`, `println()`
-   - ✅ ALWAYS: Use `logger.Info()`, `logger.Debug()`, `logger.Error()`, etc.
+Tests are organised in `tests/` directory:
+- `testutils/` - Test helpers and mocks
+- `tools/` - Tool-specific tests
+- `unit/` - Unit tests for core components
 
-2. **No external commands that write to stdout/stderr in stdio mode:**
-   - Check all `exec.Command()` calls
-   - Ensure stdout/stderr are captured or redirected when server is in stdio mode
+Use `make test-fast` for development to avoid external API calls.
+
+## Build System
+
+Uses Go modules with version information injected at build time through ldflags in the Makefile. The binary includes version, commit hash, and build date.
+
+## Tool Development Pattern
+
+All tools follow this pattern:
+1. Define struct implementing `tools.Tool`
+2. Register in `init()` with `registry.Register()`
+3. Implement `Definition()` for MCP tool schema
+4. Implement `Execute()` for tool logic
+5. Use shared logger and cache for consistency
+
+## General Guidelines
+
+- CRITICAL: Ensure that when running in stdio mode that we NEVER log to stdout or stderr, as this will break the MCP protocol.
+- Any tools we create must work on both macOS and Linux unless the user states otherwise (we don't care about MS Windows).
+- When testing the docprocessing tool, unless otherwise instructed always call it with "clear_file_cache": true and do not enable return_inline_only
+- If you're wanting to call a tool you've just made changes to directly (rather than using the command line approach), you have to let the user know to restart the conversation otherwise you'll only have access to the old version of the tool functions directly.
+- When adding new tools ensure they are registered in the list of available tools in the server (within their init function), ensure they have a basic unit test, and that they have docs/tools/<toolname>.md with concise, clear information about the tool and that they're mentioned in the main README.md and docs/tools/overview.md.
+- Always use British English spelling, we are not American.
+- Follow the principle of least privileged security.
+- Tool responses should be limited to only include information that is actually useful, there's no point in returning the information an agent provides to call the tool back to them, or any generic information or null / empty fields - these just waste tokens.
+- Use 0600 and 0700 permissions for files and directories respectively, unless otherwise specified avoid using 0644 and 0755.
+- Unit tests for tools should be located within the tests/tools/ directory, and should be named <toolname>_test.go.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sammcj/mcp-devtools](https://github.com/sammcj/mcp-devtools) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
