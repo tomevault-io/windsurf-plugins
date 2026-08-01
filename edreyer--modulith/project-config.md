@@ -1,100 +1,154 @@
 ---
 trigger: always_on
-description: This repository is a Kotlin/Spring Boot modular monolith built around hexagonal architecture, CQRS, DDD, and functional programming practices.
+description: This project is a Kotlin-based Spring Boot application that follows a hexagonal architecture combined with Domain-Driven Design (DDD) principles. It's designed as a "Modulith" - essentially a microservice architecture deployed as a monolith, providing the benefits of microservices without the operational complexity.
 ---
 
-# Project Guidelines
+# Project Coding Guidelines
 
-## Purpose
-This repository is a Kotlin/Spring Boot modular monolith built around hexagonal architecture, CQRS, DDD, and functional programming practices.
+## Overview
+This project is a Kotlin-based Spring Boot application that follows a hexagonal architecture combined with Domain-Driven Design (DDD) principles. It's designed as a "Modulith" - essentially a microservice architecture deployed as a monolith, providing the benefits of microservices without the operational complexity.
 
-The primary architectural rule is strict isolation:
+The codebase emphasizes functional programming, type safety, and clean separation of concerns. It uses Kotlin's advanced features like coroutines, context receivers, and algebraic data types to create a robust and maintainable codebase.
 
-- Each Maven module is an isolation boundary.
-- A module may support one or more bounded contexts, but those boundaries must remain explicit.
-- Boundaries are enforced at compile time through Maven artifacts and at runtime through separate Spring application contexts.
-- Preserve that separation. Do not introduce shortcuts that couple one module's implementation to another module's implementation.
+## Code Style
 
-## Current Module Layout
+### Comments and Documentation
+- Use KDoc comments for public APIs and important internal components
+- Use single-line comments for implementation details
+- Document non-obvious behavior and design decisions
+- Include examples in documentation where helpful
 
-The root build is Maven-based. Current modules include:
+```kotlin
+/**
+ * Delegate UserData class to cut down on copy-pasta in each ADT instance of User
+ * see: https://proandroiddev.com/simpler-kotlin-class-hierarchies-using-class-delegation-35464106fed5
+ */
+internal interface UserFields {
+  val id: UserId
+  val msisdn: Msisdn
+  val email: EmailAddress
+  val encryptedPassword: NonEmptyString
+}
+```
 
-- `common`
-- `server`
-- `user`
-- `user-api`
-- `booking`
-- `booking-api`
-- `payment`
-- `payment-api`
+## Naming Conventions
 
-In the current structure, the `*-api` modules define contracts that other modules can depend on. The concrete bounded-context modules (`user`, `booking`, `payment`) depend on `common` plus their own API module. The `server` module composes the application.
+### General Naming Rules
+- Use descriptive, meaningful names
+- Avoid abbreviations except for common ones (e.g., ID, DTO)
+- Use domain terminology consistently
 
-## Architecture Rules
+### Class and Interface Naming
+- Use PascalCase for class and interface names
+- Use nouns for entity classes (User, Appointment)
+- Use adjective+noun for state-based classes (ActiveUser, UnregisteredUser)
+- Use verb+noun+suffix for workflow classes (RegisterUserWorkflow, CancelAppointmentWorkflow)
+- Use noun+suffix for interfaces (FindUserPort, UserEventPort)
 
-### Module Boundaries
-- Treat every Maven module as a hard boundary.
-- Do not add direct implementation dependencies from one bounded-context module to another.
-- Cross-module communication should happen through published contracts, not through importing another module's internal implementation classes.
-- If a new bounded context is needed, prefer a new Maven module rather than folding unrelated behavior into an existing one.
+```kotlin
+// Class naming examples
+sealed class User
+data class ActiveUser(private val data: UserData) : User(), UserFields by data
+internal class RegisterUserWorkflow(/*...*/) : BaseSafeWorkflow<RegisterUserCommand, UserRegisteredEvent>()
+internal interface FindUserPort
+```
 
-### Package Layout
-Within a bounded context, follow this package structure:
+### Function and Method Naming
+- Use camelCase for function and method names
+- Use verbs for functions that perform actions
+- Use "get" prefix for accessor methods
+- Use "is/has/can" prefix for boolean methods
+- Use "to" prefix for conversion methods
 
-- `domain`
-- `application.workflows`
-- `application.port.in`
-- `application.port.out`
-- `application.service` when orchestration or reusable application logic is needed
-- `adapter.in.web`
-- `adapter.out.persistence`
-- `config`
+```kotlin
+// Function naming examples
+fun findUserById(userId: String): User?
+fun isValid(value: String): Boolean
+fun toUserDto(): UserDto
+```
 
-Keep names aligned with the actual package structure already used in this repository. Do not collapse everything into generic `application` or `adapter` packages when a more specific subpackage already exists.
+### Variable Naming
+- Use camelCase for variable names
+- Use descriptive names that indicate purpose
+- Use single-letter names only for local variables with limited scope (e.g., loop counters)
 
-### Dependency Direction
-- `domain` is the core and must not depend on `application`, `adapter`, or framework details.
-- `application` coordinates use cases and depends on the domain plus ports.
-- `application.workflows` must not depend directly on adapter implementations.
-- `adapter.in` drives the application through `application.port.in`.
-- `adapter.out` implements `application.port.out`.
-- `config` wires the module together without leaking framework concerns into the domain.
+```kotlin
+// Variable naming examples
+val userRepository: UserRepository
+val passwordEncoder: PasswordEncoder
+for (i in items.indices) { /*...*/ }
+```
 
-These constraints are not aspirational only; the repository already enforces key parts of them with ArchUnit tests. Changes should preserve or strengthen those tests.
+### File Naming
+- Use PascalCase for file names containing a single primary class
+- Match the file name to the primary class name
+- Use plural for files containing multiple related classes
 
-## Coding Style
+```kotlin
+// File naming examples
+User.kt         // Contains User class and related classes
+Workflows.kt    // Contains multiple workflow classes
+SimpleTypes.kt  // Contains multiple simple type classes
+```
 
-### Kotlin Style
-- Write idiomatic Kotlin, not Java written in Kotlin syntax.
-- Prefer properties over trivial `get...()` accessors unless a framework interface requires a getter-style method name.
-- Use descriptive names based on domain language.
-- Prefer immutable data and narrow, specific types over primitive strings and numbers where business meaning exists.
-- Prefer sealed interfaces/classes, exhaustive `when` expressions, and explicit variant types over open-ended hierarchies and flag-based modeling.
+### Package Naming
+- Use lowercase with dots as separators
+- Follow the hexagonal architecture structure:
+  - domain: Core domain models
+  - application: Application services, ports, and workflows
+  - adapter.in: Input adapters (web controllers, etc.)
+  - adapter.out: Output adapters (persistence, external services, etc.)
 
-### Domain Modeling
-- Model domain concepts with ADTs, sealed hierarchies, and value objects where appropriate.
-- Keep domain objects immutable.
-- Push invariants into types and constructors/factories so failures happen as early as possible.
-- Prefer compile-time and validation guarantees over scattered runtime checks.
-- Make illegal states unrepresentable whenever practical.
-- Prefer refined domain primitives built with `@JvmInline value class` when they encode meaningful invariants without adding object overhead.
-- Use private constructors plus companion factory methods or extension-based factories to ensure invalid instances cannot be created directly.
-- Prefer non-nullability by design. Represent optionality, lifecycle, and state variants with types rather than nullable fields when the distinction is domain-significant.
-- Encode valid state transitions in function signatures when possible so the compiler prevents invalid flows.
-- Keep construction-time validation centralized near the type being created rather than scattered across workflows, controllers, and adapters.
+```kotlin
+// Package naming examples
+io.liquidsoftware.base.user.domain
+io.liquidsoftware.base.user.application.workflows
+io.liquidsoftware.base.user.adapter.in.web
+io.liquidsoftware.base.user.adapter.out.persistence
+```
 
-### Functional Error Handling
-- Use Arrow-based error handling patterns already present in the codebase.
-- Prefer `Either`, `Raise`, `either {}`, and related helpers for business logic.
-- Prefer typesafe error handling to exceptions in domain and workflow code.
-- Avoid throwing exceptions in workflows and domain logic except at clear framework boundaries.
-- Model failure modes explicitly as sealed error types or other closed algebraic hierarchies.
-- Treat `context(_: Raise<...>)` requirements as part of a function's effective signature.
-- Use `either {}` at the same architectural points where exception handling would otherwise be introduced, so error handling remains explicit and compile-time enforced.
-- Translate low-level errors into higher-level domain or workflow errors at layer and module boundaries rather than leaking infrastructure-shaped errors upward.
+## Architecture Patterns
+
+### Hexagonal Architecture
+The project follows a hexagonal architecture (also known as ports and adapters) with the following components:
+
+- **Domain Layer**: Contains the core domain models and business logic
+  - Located in the `domain` package
+  - Has no dependencies on other layers
+  - Uses algebraic data types (sealed classes) to model domain entities
+
+- **Application Layer**: Contains the application services, ports, and workflows
+  - Located in the `application` package
+  - Depends only on the domain layer
+  - Defines ports (interfaces) for communication with adapters
+  - Implements workflows that orchestrate domain logic
+
+- **Adapter Layer**: Contains the adapters that connect to external systems
+  - Located in the `adapter` package
+  - Divided into `in` (driving) and `out` (driven) adapters
+  - Implements the ports defined by the application layer
+
+```kotlin
+// Domain model example
+internal sealed class User: UserFields {
+  // Domain logic
+}
+
+// Application port example
+internal interface FindUserPort {
+  suspend fun findUserById(userId: String): User?
+}
+
+// Adapter implementation example
+internal class UserPersistenceAdapter(
+  private val userRepository: UserRepository,
+  private val ac: AclChecker
+) : FindUserPort, UserEventPort {
+  // Implementation
+}
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [edreyer/modulith](https://github.com/edreyer/modulith) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
