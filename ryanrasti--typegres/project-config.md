@@ -13,4 +13,4 @@ description: - Prefer inlining functions and constants when simple and used <3 t
 
 ---
 > Source: [ryanrasti/typegres](https://github.com/ryanrasti/typegres) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
