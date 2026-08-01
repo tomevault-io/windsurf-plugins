@@ -1,16 +1,15 @@
 # AI instruction files for vibe-tools
 
-> Sourced from [eastlondoner/vibe-tools](https://github.com/eastlondoner/vibe-tools) and converted for every major platform by [TomeVault](https://tomevault.io)
-
-Give Cursor Agent an AI Team and Advanced Skills
+> Sourced from [eastlondoner/vibe-tools](https://github.com/eastlondoner/vibe-tools), graded against the public Tome Standard and kept consistent across every major platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [eastlondoner/vibe-tools](https://github.com/eastlondoner/vibe-tools).
+Original source: `` in [eastlondoner/vibe-tools](https://github.com/eastlondoner/vibe-tools).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
