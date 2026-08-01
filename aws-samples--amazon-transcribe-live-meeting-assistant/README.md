@@ -5,10 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [aws-samples/amazon-transcribe-live-meeting-assistant](https://github.com/aws-samples/amazon-transcribe-live-meeting-assistant).
+Original source: `` in [aws-samples/amazon-transcribe-live-meeting-assistant](https://github.com/aws-samples/amazon-transcribe-live-meeting-assistant).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
