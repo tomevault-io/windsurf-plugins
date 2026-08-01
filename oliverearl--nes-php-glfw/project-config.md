@@ -3,15 +3,15 @@ trigger: always_on
 description: This document provides guidelines for AI-assisted development of this NES (Nintendo Entertainment System) emulator written in PHP.
 ---
 
-# Codex Development Guidelines for NES Emulator
+# Junie Development Guidelines for NES Emulator
 
 This document provides guidelines for AI-assisted development of this NES (Nintendo Entertainment System) emulator written in PHP.
 
 ## Agent Document Source of Truth
 
 - `AGENTS.md` is the master agentic development document for this repository.
-- If another agentic development document disagrees with `AGENTS.md`, follow `AGENTS.md`.
-- Keep all other agentic development documents in sync with `AGENTS.md`, including `.cursorrules`, `CLAUDE.md`, `.github/copilot-instructions.md`, and `.junie/guidelines.md`.
+- If this document disagrees with `AGENTS.md`, follow `AGENTS.md`.
+- Keep this document and all other agentic development documents in sync with `AGENTS.md`, including `.cursorrules`, `CLAUDE.md`, and `.github/copilot-instructions.md`.
 - When changing agent guidance, update `AGENTS.md` first, then update the corresponding Cursor, Claude, Copilot, Junie, and contributor-facing documentation in the same change.
 
 ## Project Overview
@@ -168,7 +168,7 @@ final class RamTest extends TestCase
     {
         $ram = new Ram(256);
         $ram->write(100, 0x42);
-
+        
         $this::assertSame(0x42, $ram->read(100));
     }
 }
@@ -194,4 +194,4 @@ final class RamTest extends TestCase
 
 ---
 > Source: [oliverearl/nes-php-glfw](https://github.com/oliverearl/nes-php-glfw) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
