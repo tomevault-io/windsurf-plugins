@@ -1,173 +1,66 @@
 ---
 trigger: always_on
-description: | Change Type | Read This File |
+description: Context for AI coding assistants (Claude Code, Cursor, Codex, Kiro, Copilot, etc.) editing files in `src/agentic_platform/agent/coding_agent/`. Pair this with the repo-root [`AGENTS.md`](../../../../AGENTS.md) for cross-cutting rules.
 ---
 
-# Agentic Platform - Agent Guide
+# AGENTS.md — Coding Agent
 
-## Quick Reference: Which AGENTS.md to Read
+Context for AI coding assistants (Claude Code, Cursor, Codex, Kiro, Copilot, etc.) editing files in `src/agentic_platform/agent/coding_agent/`. Pair this with the repo-root [`AGENTS.md`](../../../../AGENTS.md) for cross-cutting rules.
 
-| Change Type | Read This File |
-|-------------|----------------|
-| **Agent/Service code** | [`src/agentic_platform/AGENTS.md`](src/agentic_platform/AGENTS.md) |
-| **Infrastructure (Terraform)** | [`infrastructure/AGENTS.md`](infrastructure/AGENTS.md) |
-| **Kubernetes/Helm** | [`k8s/AGENTS.md`](k8s/AGENTS.md) |
-| **Bootstrap/CloudFormation** | [`bootstrap/AGENTS.md`](bootstrap/AGENTS.md) |
-| **Tests** | [`tests/AGENTS.md`](tests/AGENTS.md) |
-| **Labs (learning only)** | [`labs/AGENTS.md`](labs/AGENTS.md) |
+> **The operator-facing setup/deploy guide is in [`README.md`](README.md)** — it has the end-to-end CDK deploy walkthrough, environment-variable reference, secret/key handling, teardown procedure, and troubleshooting. If a human ran into a problem standing the agent up, send them there. This file is for *contributors changing the code*.
 
-## Critical Rules (All Changes)
+## What this agent is
 
-```bash
-# After code changes
-make test
+A **FastAPI shim around the `claude` CLI**. The Python code in this folder is *not* the coding intelligence — Claude Code is. The server's only job is:
 
-# After EVERY commit
-make security
+1. accept a JSON payload over HTTP,
+2. clone a target repo (optional),
+3. shell out to `claude -p --dangerously-skip-permissions --output-format stream-json …`,
+4. log the CLI's events to CloudWatch and capture the final `result` envelope.
 
-# After Terraform changes
-checkov -d .
-```
+The HTTP response is an immediate `202 Accepted` with a `task_id`; the actual `claude` run continues in the background inside the AgentCore microVM. When you change something in this folder, hold that mental model. The "brain" lives in the CLI subprocess; your job is to keep the harness around it small, predictable, and safe. If you find yourself reaching for the Python SDK or a multi-step state machine, push back and ask whether the CLI already does it.
 
-## Make Commands
+## Where things live
 
-Run `make help` for all available commands. Key commands:
+### In this folder (`src/agentic_platform/agent/coding_agent/`)
 
-```bash
-# Setup
-make install              # Install dependencies
+| File | Purpose | Edit when… |
+|------|---------|------------|
+| `Dockerfile` | Builds the runtime image. Python 3.12 + Node 24 + Claude Code CLI + git + gh. | The runtime contract changes (Python version, CLI version, system deps). |
+| `server.py` | FastAPI app, payload parsing, repo cloning, `claude` subprocess driver. | The invocation contract changes or the CLI flags change. |
+| `requirements.txt` | Python deps (fastapi, uvicorn, boto3, pydantic). No SDK — we call the CLI directly. | Adding/upgrading a Python library. |
+| `__init__.py` | Empty marker. | Don't. |
+| `README.md` | **Operator** docs (deploy, env vars, request shape, troubleshooting). | Behavior visible to callers / operators changes. |
+| `AGENTS.md` | This file. **Contributor** docs. | Conventions for code changes change. |
 
-# Testing
-make test                 # Run all tests
-make test-unit            # Run unit tests only
-make test-cov             # Run tests with coverage
+### Outside this folder (deployment + infra)
 
-# Run locally (agents)
-make dev agentic_chat              # Run an agent locally
-make dev agentic_rag PORT=8004     # Run with custom port
+The deployment stack is **CDK**, not Terraform. Older revisions referenced `infrastructure/stacks/agentcore-runtime/coding_agent.tfvars`; that path no longer exists.
 
-# Run locally (MCP servers)
-make dev:mcp bedrock_kb_mcp_server # Run an MCP server locally
+| Path | Purpose | Edit when… |
+|------|---------|------------|
+| [`/cdk/bin/coding-agent.ts`](../../../../cdk/bin/coding-agent.ts) | CDK app entrypoint. Registers cdk-nag and instantiates `CodingAgentStack`. | Adding env-level branching, registering more stacks. |
+| [`/cdk/lib/stacks/coding-agent-stack.ts`](../../../../cdk/lib/stacks/coding-agent-stack.ts) | Stack glue. Composes `AgentCoreRuntime` + `ApiKeyFrontDoor` and exposes the CFN outputs. | Adding new stack-level outputs or props. |
+| [`/cdk/lib/constructs/agentcore-runtime.ts`](../../../../cdk/lib/constructs/agentcore-runtime.ts) | ECR repo (imported), GitHub PAT secret, the AgentCore Runtime, log groups, Bedrock IAM. | The runtime needs new env vars / IAM / log destinations. |
+| [`/cdk/lib/constructs/api-key-frontdoor.ts`](../../../../cdk/lib/constructs/api-key-frontdoor.ts) | API Gateway, the Lambda proxy that calls `InvokeAgentRuntime`, API key, usage plan. | The HTTP front door changes (new method, different auth, throttle limits). |
+| [`/cdk/lambda/invoke/index.ts`](../../../../cdk/lambda/invoke/index.ts) | Lambda handler — bundled by `NodejsFunction`. Pass-through to AgentCore. | The Lambda needs to do more than pass-through (it shouldn't). |
+| [`/deploy/build-container.sh`](../../../../deploy/build-container.sh) | Builds & pushes the multi-arch image to ECR (creates the repo if missing). | Build-time changes (tag strategy, scan settings). |
 
-# Run locally (services)
-make service memory_gateway        # Run a service locally
+When you add a new env var to `server.py`, add it to **all three** places:
 
-# Build & Deploy (agents)
-make build agentic-chat              # Build container
-make deploy-eks agentic-chat         # Build + deploy to EKS
-make deploy-ac agentic_chat          # Build + deploy to AgentCore
+1. `os.environ.get(...)` in `server.py`
+2. `environmentVariables: {...}` in [`/cdk/lib/constructs/agentcore-runtime.ts`](../../../../cdk/lib/constructs/agentcore-runtime.ts)
+3. The "Environment variables" section of [`README.md`](README.md)
 
-# Build & Deploy (MCP servers)
-make build:mcp bedrock-kb-mcp-server       # Build MCP container
-make deploy-eks:mcp bedrock-kb-mcp-server  # Build + deploy MCP to EKS
+## Contracts that must not drift
 
-# Code quality
-make lint                 # Run linter
-make security             # Run gitleaks
-```
+These are the load-bearing contracts other systems depend on. Don't change them without coordinating.
 
----
-
-# Agent Development Guide
-
-This guide explains the agent architecture, folder structure, and how to build new agents in the platform.
-
-## Table of Contents
-
-- [Architecture Overview](#architecture-overview)
-- [Folder Structure](#folder-structure)
-- [Agent Patterns](#agent-patterns)
-- [Building a New Agent](#building-a-new-agent)
-- [Core Components](#core-components)
-- [Deployment](#deployment)
-- [Testing](#testing)
-
-## Architecture Overview
-
-The platform uses a microservice architecture where each agent runs as an independent FastAPI server. Agents share a common core package that provides:
-
-- **Standardized API models** (`AgenticRequest`, `AgenticResponse`)
-- **Gateway clients** (LLM, Memory, Retrieval)
-- **Middleware** (Authentication, Telemetry, Request Context)
-- **Observability** (OpenTelemetry integration)
-- **Converters** (Framework-specific adapters)
-
-### Key Principles
-
-1. **Separation of Concerns**: Server → Controller → Agent logic
-2. **Framework Agnostic**: Support multiple agent frameworks (LangGraph, PydanticAI, Strands, DIY)
-3. **Secure by Design**: JWT authentication, no direct IAM roles on agents
-4. **Observable**: Built-in telemetry and tracing
-5. **Containerized**: Each agent is independently deployable
-
-## Folder Structure
-
-```
-src/agentic_platform/
-├── agent/                          # Agent implementations
-│   ├── agentic_chat/               # Strands-based chat agent
-│   │   ├── server.py               # FastAPI server (thin layer)
-│   │   ├── controller/             # Business logic
-│   │   │   └── agentic_chat_controller.py
-│   │   ├── agent/                  # Agent implementation
-│   │   │   └── agentic_chat_agent.py
-│   │   ├── prompt/                 # Prompt templates
-│   │   │   └── agentic_chat_prompt.py
-│   │   ├── streaming/              # Streaming utilities
-│   │   │   └── strands_converter.py
-│   │   ├── Dockerfile              # Container definition
-│   │   ├── requirements.txt        # Dependencies
-│   │   └── .env                    # Local config
-│   │
-│   ├── agentic_rag/                # RAG agent with Bedrock KB
-│   │   ├── server.py
-│   │   ├── controller/
-│   │   ├── agent/
-│   │   ├── tool/                   # Agent-specific tools
-│   │   ├── prompt/
-│   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   └── .env
-│   │
-│   ├── langgraph_chat/             # LangGraph-based agent
-│   │   ├── server.py
-│   │   ├── chat_controller.py
-│   │   ├── chat_workflow.py        # LangGraph workflow
-│   │   ├── chat_prompt.py
-│   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   └── .env
-│   │
-│   ├── jira_agent/                 # Jira integration agent
-│   │   ├── server.py
-│   │   ├── jira_controller.py
-│   │   ├── jira_agent.py
-│   │   ├── jira_prompt.py
-│   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   └── .env
-│   │
-│   └── strands_glue_athena/        # AWS Glue/Athena agent
-│       ├── server.py
-│       ├── agent_controller.py
-│       ├── agent_service.py
-│       ├── tools/                  # AWS-specific tools
-│       │   ├── athena_tools.py
-│       │   └── glue_tools.py
-│       ├── Dockerfile
-│       ├── requirements.txt
-│       └── README.md
-│
-├── core/                           # Shared core functionality
-│   ├── client/                     # Gateway clients
-│   │   ├── llm_gateway/
-│   │   ├── memory_gateway/
-│   │   └── retrieval_gateway/
-│   ├── models/                     # Shared data models
-│   │   ├── api_models.py           # AgenticRequest/Response
+1. **HTTP shape.** `POST /invocations` accepts an arbitrary JSON object. `GET /ping` returns `{"status": "healthy"}` with HTTP 200. Both live on port 8080. AgentCore's container contract requires both.
+2. **Recognized payload fields.** `task_description`, `repo_url`, `max_budget_usd`, `cwd`. Everything else passes through as Jira-style context inside the prompt. Adding a new recognized field is fine; renaming an existing one is breaking and needs a corresponding change in the Jira integration.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aws-samples/sample-agentic-platform](https://github.com/aws-samples/sample-agentic-platform) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
