@@ -1,50 +1,150 @@
 ---
 trigger: always_on
-description: - `lib/` contains public `ClaudeAgentSDK` modules and internal runtime adapters.
+description: This guide covers how to define and use custom agents (personas) in the Claude Agent SDK for Elixir.
 ---
 
-# Repository Guidelines
+# Agents Guide
 
-## Project Structure
-- `lib/` contains public `ClaudeAgentSDK` modules and internal runtime adapters.
-- `test/` contains ExUnit coverage; `test/support/` is test-only and may contain lower-runtime fixtures.
-- `guides/`, `docs/`, `examples/`, `README.md`, and `CHANGELOG.md` must stay aligned with runtime and dependency behavior.
-- `doc/` is generated output and should not be edited.
+This guide covers how to define and use custom agents (personas) in the Claude Agent SDK for Elixir.
 
-## Execution Plane Stack
-- This SDK sits above `cli_subprocess_core`; do not expose raw `ExecutionPlane.*` internals in public APIs or docs.
-- Use `CliSubprocessCore` facades for execution surfaces, transport errors, transport info, process exits, sessions, commands, and provider model policy.
-- Dependency source selection is handled by `build_support/dependency_sources.exs`
-  and `build_support/dependency_sources.config.exs`; local overrides use
-  `.dependency_sources.local.exs`.
-- Keep `cli_subprocess_core` dependency resolution publish-aware: local path
-  deps for sibling development, GitHub fallback for clean clones, and Hex
-  constraints for release builds.
-- Dependency source selection must not use environment variables.
-- This repo is not a Weld consumer in this pass and must not receive a blind
-  Weld dependency. Weld verification is limited to discovered Weld consumers.
-- Runtime application code under `lib/**` must not call direct OS env APIs such
-  as `System.get_env`, `System.fetch_env`, `System.put_env`, or
-  `System.delete_env`.
-- Runtime and deployment env reads belong in `config/runtime.exs` or an
-  explicit `Config.Provider`; runtime modules read materialized values through
-  `ClaudeAgentSDK.Env` or explicit caller options.
+## Table of Contents
 
-## ASM Boundary
-- Claude-native controls such as hooks, MCP, permissions, permission callbacks, allowed/disallowed tools, settings, agents, control-client flows, and native system prompt channels belong in this SDK.
-- ASM may derive only common placement/session data unless a caller passes explicit Claude-native overrides through a provider extension or calls this SDK directly.
-- Do not generalize Claude control behavior into ASM without all-four proof across Claude, Codex, Gemini, and Amp.
-- Before asserting a Claude-native feature exists, add or update `guides/provider_behavior_manifest.md` with source, fixture, or live-smoke evidence.
-- SDK-direct promotion examples in `examples/promotion_path/` must not import or alias ASM.
+1. [What are Agents](#what-are-agents)
+2. [Agent.new/1 and the Agent Struct](#agentnew1-and-the-agent-struct)
+3. [Agent Configuration](#agent-configuration)
+4. [Using Agents in Options](#using-agents-in-options)
+5. [Switching Agents at Runtime](#switching-agents-at-runtime)
+6. [Multi-Agent Workflows](#multi-agent-workflows)
+7. [Filesystem Agents](#filesystem-agents)
+8. [Agent Validation](#agent-validation)
+9. [Best Practices](#best-practices)
 
-## Gates
-- Run `mix format`.
-- Run `mix compile --warnings-as-errors`.
-- Run `mix test`.
-- Run `mix credo --strict`.
-- Run `mix dialyzer`.
-- Run `mix docs --warnings-as-errors`.
+---
+
+## What are Agents
+
+Agents are custom personas or roles that you can define for Claude. Each agent has its own:
+
+- **Description**: A human-readable description of what the agent does
+- **Prompt**: A system prompt that defines the agent's behavior and expertise
+- **Allowed Tools**: An optional list of tools the agent can use
+- **Disallowed Tools**: An optional list of tools the agent cannot use
+- **Model**: An optional model specification (e.g., "haiku", "sonnet", "opus")
+- **Skills**: An optional list of skill names the agent has access to
+- **MCP Servers**: An optional list of MCP server names or configurations
+- **Max Turns**: An optional turn limit for the agent
+
+Agents enable you to:
+
+- Create specialized AI assistants for different tasks
+- Switch between different Claude behaviors at runtime
+- Maintain conversation context across agent switches
+- Build multi-agent workflows where different agents handle different parts of a task
+
+### Use Cases
+
+- **Code Review Agent**: Analyzes code for bugs, security issues, and best practices
+- **Documentation Agent**: Writes clear, comprehensive documentation
+- **Testing Agent**: Creates test cases and validates implementations
+- **Research Agent**: Gathers information and provides analysis
+- **Refactoring Agent**: Improves code structure and performance
+
+---
+
+## Agent.new/1 and the Agent Struct
+
+The `ClaudeAgentSDK.Agent` module provides the `Agent` struct and functions for creating and managing agents.
+
+### The Agent Struct
+
+```elixir
+%ClaudeAgentSDK.Agent{
+  name: atom() | nil,                      # Optional identifier
+  description: String.t(),                  # Required: What the agent does
+  prompt: String.t(),                       # Required: System prompt
+  allowed_tools: [String.t()] | nil,        # Optional: List of allowed tool names
+  disallowed_tools: [String.t()] | nil,     # Optional: List of disallowed tool names
+  model: String.t() | nil,                  # Optional: Model to use
+  skills: [String.t()] | nil,               # Optional: Skill names
+  mcp_servers: [String.t() | map()] | nil,  # Optional: MCP server names/configs
+  max_turns: pos_integer() | nil            # Optional: Turn limit
+}
+```
+
+### Creating Agents with Agent.new/1
+
+The `ClaudeAgentSDK.Agent.new/1` function creates a new agent struct from a keyword list:
+
+```elixir
+alias ClaudeAgentSDK.Agent
+
+# Minimal agent (only required fields)
+simple_agent = Agent.new(
+  description: "A helpful assistant",
+  prompt: "You are a helpful assistant that provides clear, concise answers."
+)
+
+# Complete agent with all fields
+code_reviewer = Agent.new(
+  name: :code_reviewer,
+  description: "Expert code reviewer",
+  prompt: """
+  You are an expert code reviewer. When reviewing code:
+  - Check for bugs and logic errors
+  - Identify security vulnerabilities
+  - Suggest performance improvements
+  - Enforce coding standards and best practices
+  Provide concise, actionable feedback.
+  """,
+  allowed_tools: ["Read", "Grep", "Glob"],
+  model: "sonnet"
+)
+```
+
+### Required Fields
+
+- `:description` - A non-empty string describing the agent's purpose
+- `:prompt` - A non-empty string defining the agent's behavior
+
+### Optional Fields
+
+- `:name` - An atom identifier for the agent (useful for referencing in multi-agent setups)
+- `:allowed_tools` - A list of tool name strings the agent can use
+- `:disallowed_tools` - A list of tool name strings the agent cannot use
+- `:model` - A string specifying which model to use (e.g., `"haiku"`, `"sonnet"`, `"opus"`) -- see [Model Configuration](model-configuration.md)
+- `:skills` - A list of skill name strings (e.g., `["code-review", "testing"]`)
+- `:mcp_servers` - A list of MCP server names or configuration maps
+- `:max_turns` - Maximum number of conversation turns for this agent
+
+Tip: MCP tool names are always strings (`mcp__<server>__<tool>`). Avoid atom tool names in agent configs to prevent atom leaks.
+
+---
+
+## Agent Configuration
+
+### Description
+
+The description should clearly explain what the agent does. It helps users understand the agent's purpose and is used by the CLI for agent discovery.
+
+```elixir
+# Good descriptions
+description: "Python coding expert that writes clean, type-hinted code"
+description: "Security analyst that identifies vulnerabilities in code"
+description: "Technical writer that creates clear API documentation"
+
+# Avoid vague descriptions
+description: "A helper"  # Too vague
+description: "Agent"     # Not descriptive
+```
+
+### Prompt
+
+The prompt is the system instruction that shapes the agent's behavior. Write detailed prompts that:
+
+- Define the agent's expertise and role
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nshkrdotcom/claude_agent_sdk](https://github.com/nshkrdotcom/claude_agent_sdk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-13 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
