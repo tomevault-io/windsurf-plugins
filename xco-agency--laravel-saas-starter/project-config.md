@@ -109,4 +109,4 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ---
 > Source: [XCO-Agency/Laravel-SAAS-Starter](https://github.com/XCO-Agency/Laravel-SAAS-Starter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
