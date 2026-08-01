@@ -1,119 +1,123 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: `tansu-sans-io` is the Kafka wire protocol implementation at the heart of Tansu. As its name implies, it performs **no I/O** — it operates purely on bytes, converting between raw Kafka protocol frames and typed Rust structures. This makes it suitable for embedding in any async runtime or network stack (Tansu uses `rama`).
 ---
 
-# CLAUDE.md
+# Research: tansu-sans-io Crate
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Overview
 
-## Project Overview
+`tansu-sans-io` is the Kafka wire protocol implementation at the heart of Tansu. As its name implies, it performs **no I/O** — it operates purely on bytes, converting between raw Kafka protocol frames and typed Rust structures. This makes it suitable for embedding in any async runtime or network stack (Tansu uses `rama`).
 
-Tansu is a stateless, Apache Kafka-compatible broker written in Rust. It is a drop-in replacement for Apache Kafka with pluggable storage backends: PostgreSQL, libSQL (SQLite), S3/object store, and memory. Schema-backed topics (Avro, JSON Schema, Protocol Buffers) can be written as Apache Iceberg or Delta Lake tables.
+The crate's description from `Cargo.toml`: *"A Kafka protocol implementation using serde"*.
 
-- Rust edition 2024, toolchain pinned to 1.93 (`rust-toolchain.toml`)
-- License: Apache-2.0
-- `unsafe_code` is forbidden workspace-wide
+The key insight of the design is that the entire Kafka binary protocol — serialization, deserialization, versioning, tagged fields — is expressed through serde's data model. A build-time code generator reads Apache Kafka's official JSON message descriptors and produces Rust types that `#[derive(Serialize, Deserialize)]`. Custom serde `Serializer` (`Encoder`) and `Deserializer` (`Decoder`) implementations then map between serde's abstract data model and Kafka's binary wire format.
 
-## Build & Test Commands
+## Source Layout
 
-The project uses `just` as a task runner (loads `.env` automatically).
-
-```shell
-just                 # default: fmt, build, test, clippy
-just build           # build with all features (dev profile)
-just test            # nextest + doc tests
-just test-workspace  # cargo nextest run --workspace --all-targets --all-features
-just test-doc        # cargo test --workspace --doc --all-features
-just clippy          # cargo clippy --workspace --all-features --all-targets -- -D warnings
-just fmt             # cargo fmt --all --check
-just check           # cargo check --workspace --all-features --all-targets
+```
+tansu-sans-io/
+├── build.rs                 # Code generator (1,276 lines)
+├── Cargo.toml
+├── message/                 # 185 official Kafka JSON descriptors
+│   ├── ProduceRequest.json
+│   ├── ProduceResponse.json
+│   ├── FetchRequest.json
+│   └── ... (185 files total)
+├── src/
+│   ├── lib.rs               # Frame, Header, Body, Error, traits (2,128 lines)
+│   ├── ser.rs               # Encoder: serde Serializer → Kafka bytes (820 lines)
+│   ├── de.rs                # Decoder: Kafka bytes → serde Deserializer (1,448 lines)
+│   ├── primitive.rs         # ByteSize trait
+│   ├── primitive/
+│   │   ├── varint.rs        # VarInt, LongVarInt, UnsignedVarInt (zigzag encoding)
+│   │   ├── tagged.rs        # TagBuffer, TagField (flexible version support)
+│   │   ├── tagged/ser.rs    # Tagged field serializer
+│   │   ├── tagged/de.rs     # Tagged field deserializer
+│   │   └── uuid.rs          # UUID (128-bit) type
+│   ├── record.rs            # Record module facade + Record struct + Builder
+│   └── record/
+│       ├── codec.rs         # Octets, Sequence, VarIntSequence codecs
+│       ├── header.rs        # Record Header (key/value byte pairs)
+│       ├── deflated.rs      # Compressed record batches (wire format)
+│       └── inflated.rs      # Decompressed record batches (in-memory)
+├── tests/                   # 18 test files
+│   ├── encode.rs            # Encoding tests
+│   ├── decode.rs            # Decoding tests
+│   ├── codec.rs             # Round-trip tests
+│   ├── api.rs               # API-level tests
+│   ├── snappy.rs            # Snappy compression tests
+│   └── ...
+└── benches/                 # Criterion benchmarks
 ```
 
-Run a single test with nextest:
-```shell
-cargo nextest run --workspace --all-features -E 'test(test_name_here)'
+## Build-Time Code Generation (`build.rs`)
+
+### Input: Kafka JSON Message Descriptors
+
+The `message/` directory contains 185 JSON files taken directly from the Apache Kafka source tree. Each file describes one API message (request or response). Example structure (`CreateTopicsRequest.json`):
+
+```json
+{
+  "apiKey": 19,
+  "type": "request",
+  "listeners": ["zkBroker", "broker", "controller"],
+  "name": "CreateTopicsRequest",
+  "validVersions": "0-7",
+  "deprecatedVersions": "0-1",
+  "flexibleVersions": "5+",
+  "fields": [
+    {
+      "name": "Topics",
+      "type": "[]CreatableTopic",
+      "versions": "0+",
+      "about": "The topics to create.",
+      "fields": [
+        { "name": "Name", "type": "string", "versions": "0+", ... },
+        { "name": "NumPartitions", "type": "int32", "versions": "0+", ... },
+        ...
+      ]
+    },
+    { "name": "TimeoutMs", "type": "int32", "versions": "0+", ... },
+    { "name": "ValidateOnly", "type": "bool", "versions": "1+", ... }
+  ]
+}
 ```
 
-### Local Development Environment
+Key descriptor properties:
+- **`apiKey`**: 16-bit integer identifying the API (e.g., 0=Produce, 1=Fetch, 19=CreateTopics)
+- **`type`**: `"request"` or `"response"`
+- **`listeners`**: Which broker types handle this message (the generator filters for `"broker"`)
+- **`validVersions`**: Range of supported protocol versions (e.g., `"0-7"`)
+- **`flexibleVersions`**: Versions that support tagged fields (e.g., `"5+"`)
+- **`fields`**: Array of field definitions, each with its own version range, type, and optional sub-fields
 
-```shell
-cp example.env .env    # then edit .env as needed (AWS_ENDPOINT for local minio, etc.)
-just ci                # starts minio, postgres, lakehouse via docker compose
-just broker            # build + start broker with full infrastructure
-just broker-postgres   # broker with postgres backend only
-just broker-sqlite     # broker with sqlite backend only
-just broker-memory     # broker with in-memory backend only
-just broker-s3         # broker with S3/minio backend only
+### Generation Pipeline
+
+The `build.rs` (1,276 lines) uses `proc_macro2`, `quote`, and `syn` to generate Rust source at compile time:
+
+1. **Read**: `read_value()` strips `//` comments from JSON files and parses them via `serde_json`
+2. **Parse**: Converts JSON values into `tansu_model::Message` structs (which model version ranges, field metadata, nested structures)
+3. **Filter**: Only processes messages where `listeners` includes `"broker"` and an `apiKey` is defined
+4. **Generate**: For each message, produces:
+
+#### Generated Artifacts
+
+**A. The `Body` enum** — A single enum with one variant per message type:
+```rust
+#[non_exhaustive]
+pub enum Body {
+    ProduceRequest(ProduceRequest),
+    ProduceResponse(ProduceResponse),
+    FetchRequest(FetchRequest),
+    // ... ~90 variants
+}
 ```
-
-Note: when running tansu directly (not via docker compose), set `AWS_ENDPOINT="http://localhost:9000"` in `.env`.
-
-## Architecture
-
-Cargo workspace with 15 member crates, producing a single binary (`tansu`) with subcommands: `broker` (default), `cat`, `topic`, `generator`, `perf`, `proxy`.
-
-### Key Crates
-
-| Crate | Role |
-|-------|------|
-| `tansu` | Binary entry point, subcommand dispatch |
-| `tansu-broker` | Kafka API broker: `Broker<G, S>` generic over Coordinator + Storage |
-| `tansu-sans-io` | **Code-generated** Kafka wire protocol (pure serde, no I/O) |
-| `tansu-service` | Network service layers built on `rama` (Layer/Service composition) |
-| `tansu-storage` | Storage abstraction: `StorageContainer` enum over backends |
-| `tansu-schema` | Schema registry + Iceberg/Delta/Parquet lake integration |
-| `tansu-client` | Async Kafka protocol client (rama service layers) |
-| `tansu-model` | Kafka JSON protocol definitions (used in build.rs) |
-| `tansu-cat` | CLI: produce/consume Avro, JSON, Protobuf messages |
-| `tansu-cli` | Clap-based CLI argument parsing |
-
-### Sans-I/O Code Generation (`tansu-sans-io`)
-
-`tansu-sans-io/build.rs` reads ~185 official Kafka JSON message descriptors from `tansu-sans-io/message/*.json` and generates typed Rust structs for every request/response pair. **Do not manually edit generated files.** The message JSON files are from upstream Apache Kafka.
-
-### Service Layer Pattern (`tansu-service`)
-
-Uses `rama` crate for Layer/Service composition:
-- `TcpBytesLayer` (TCP) -> `BytesFrameLayer` (bytes -> Kafka Frame) -> `FrameRouteService` (route to typed handlers) -> `FrameBytesLayer` -> `BytesTcpService`
-- Same layering pattern used for broker, proxy, and CLI clients
-
-### Storage Backends (`tansu-storage`)
-
-Selected at compile time via feature flags, dispatched at runtime through `StorageContainer` enum:
-- `memory://` - in-memory (feature: `dynostore`)
-- `s3://` - S3/MinIO (feature: `dynostore`)
-- `postgres://` - PostgreSQL (feature: `postgres`)
-- `sqlite://` - libSQL/SQLite (feature: `libsql`)
-- `slatedb://` - SlateDB KV store (feature: `slatedb`)
-
-### Broker Specifics
-
-- Node ID is always **111** (single-node, stateless design - this is intentional)
-- Group coordination in `tansu-broker/src/coordinator/group/`
-- `EnvVarExp<T>` wrapper allows CLI args with `${VAR}` references expanded at parse time
-- All `Error` types implement `Clone` (non-Clone errors wrapped in `Arc`)
-
-## Feature Flags
-
-Default: `dynostore`, `postgres`, `libsql`, `slatedb`. Full build: `delta,dynostore,iceberg,libsql,parquet,postgres,slatedb`.
-
-Lake features: `parquet`, `iceberg`, `delta` - enable writing schema-backed topics to data lake tables.
-
-## Testing Notes
-
-- Tests use `cargo-nextest` (not `cargo test` for workspace tests)
-- Test logs go to `logs/<crate-name>/` (one file per test thread, dirs must exist)
-- Integration tests require external services started via `just ci`
-- Tests load `.env` via `dotenv().ok()`
-- Tests in `tansu-broker` run against multiple backends: InMemory, Lite (libSQL), Postgres, SlateDb
-- Tests with specific feature requirements use `required-features` in their `Cargo.toml`
-
-## CI Pipeline
+Plus `From<MessageType> for Body` and `TryFrom<Body> for MessageType` impls for each variant.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tansu-io/tansu](https://github.com/tansu-io/tansu) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
