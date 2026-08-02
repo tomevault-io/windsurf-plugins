@@ -1,148 +1,60 @@
 ---
 trigger: always_on
-description: This is an MCP server (81 tools) that connects AI coding agents to Autodesk Fusion 360 for CAD automation. It consists of two pieces:
+description: An MCP server that bridges Claude Code to Autodesk Fusion 360 for CAD automation. Two components:
 ---
 
-# AGENTS.md
+# Fusion360 MCP Server
 
-## Overview
+## What this is
 
-This is an MCP server (81 tools) that connects AI coding agents to Autodesk Fusion 360 for CAD automation. It consists of two pieces:
+An MCP server that bridges Claude Code to Autodesk Fusion 360 for CAD automation. Two components:
 
-1. **MCP Server** (this repo) — speaks MCP protocol over stdio, forwards commands to Fusion via TCP
-2. **Fusion 360 Add-in** — runs inside Fusion, executes commands on the main thread via CustomEvent bridge
+1. **This repo** — Python MCP server (stdio transport, 81 tools). Claude talks to this.
+2. **Fusion360MCP add-in** — installed in Fusion's AddIns folder. Listens on `localhost:9876`.
 
-## How the system works
+The MCP server receives tool calls from Claude, forwards them as JSON over TCP to the add-in, and returns results.
+
+## Architecture
 
 ```
-Claude Code ──stdio──> MCP Server ──TCP :9876──> Fusion Add-in ──CustomEvent──> Main Thread
-                                   <──JSON──                    <──result──
+Claude Code ←(stdio MCP)→ This Server ←(TCP :9876)→ Fusion360MCP Add-in ←(CustomEvent)→ Fusion Main Thread
 ```
 
-The add-in uses a CustomEvent + work queue pattern to safely dispatch all Fusion API calls to the main thread. Socket threads submit work items and block on a per-item `threading.Event` until the main thread completes execution.
+## Development
 
-## Available tools (80)
+```bash
+uv sync --dev      # install deps
+uv run pytest -v   # run tests (275 tests)
+uv run ruff check  # lint
+```
 
-### Scene & Query
-| Tool | Description |
-|------|-------------|
-| `ping` | Health check (no Fusion API, instant) |
-| `get_scene_info` | Design name, bodies, sketches, features, camera |
-| `get_object_info` | Detailed info about a named body or sketch |
-| `list_components` | List all components in the design |
+## Key files
 
-### Sketching
-| Tool | Description |
-|------|-------------|
-| `create_sketch` | New sketch on xy/yz/xz, optional offset |
-| `draw_rectangle` | Rectangle in most recent sketch |
-| `draw_circle` | Circle in most recent sketch |
-| `draw_line` | Line in most recent sketch |
-| `draw_arc` | Arc (center + start + sweep angle) |
-| `draw_spline` | Fit-point or control-point spline |
-| `create_polygon` | Regular polygon (3–64 sides) |
-| `add_constraint` | Geometric constraint (coincident, parallel, tangent, etc.) |
-| `add_dimension` | Driving dimension (distance, angle, radial, diameter) |
-| `offset_curve` | Offset connected sketch curves |
-| `trim_curve` | Trim at intersections |
-| `extend_curve` | Extend to nearest intersection |
-| `project_geometry` | Project edges/bodies onto sketch plane |
+- `src/fusion360_mcp/server.py` — MCP server entry point (click CLI), resources, prompts
+- `src/fusion360_mcp/connection.py` — TCP client to Fusion add-in
+- `src/fusion360_mcp/tools.py` — 81 tool definitions with annotations
+- `src/fusion360_mcp/hints.py` — error-classification table (mirror of `addon/server/hints.py`)
+- `src/fusion360_mcp/mock.py` — mock responses for `--mode mock` testing
+- `tests/` — 275 tests covering tools, mock handlers, server routing, connection, annotations
 
-### Features
-| Tool | Description |
-|------|-------------|
-| `extrude` | Extrude a sketch profile |
-| `revolve` | Revolve a profile around an axis |
-| `sweep` | Sweep a profile along a path |
-| `loft` | Loft between two or more profiles |
-| `fillet` | Round edges (all/top/bottom/vertical) |
-| `chamfer` | Chamfer edges |
-| `shell` | Hollow out a body |
-| `mirror` | Mirror a body across a plane |
-| `create_hole` | Hole feature on a body face |
-| `rectangular_pattern` | Pattern in rows and columns |
-| `circular_pattern` | Pattern around an axis |
-| `create_thread` | Threads (cosmetic or modeled) |
-| `draft_faces` | Draft/taper for mold release |
-| `split_body` | Split a body using a plane |
-| `split_face` | Split faces of a body |
-| `offset_faces` | Push/pull faces by a distance |
-| `scale_body` | Scale uniformly or non-uniformly |
-| `suppress_feature` | Suppress a timeline feature |
-| `unsuppress_feature` | Re-enable a suppressed feature |
+## Adding a new command
 
-### Body Operations
-| Tool | Description |
-|------|-------------|
-| `move_body` | Translate a body by (x, y, z) |
-| `boolean_operation` | Join/cut/intersect two bodies |
-| `delete_all` | Clear the design |
-| `undo` | Undo last operation |
+1. Add the handler method in the **add-in's** `command_handler.py`
+2. Add a tool definition dict in `src/fusion360_mcp/tools.py`
+3. Add a mock handler in `src/fusion360_mcp/mock.py` + dispatch entry
+4. Add tool name to the annotation sets if read-only/destructive/idempotent
+5. Update `tests/test_tools.py` expected set and add mock test in `tests/test_mock.py`
+6. The MCP server forwards tool calls 1:1 — no mapping code needed
 
-### Direct Primitives
-| Tool | Description |
-|------|-------------|
-| `create_box` | Box (via TemporaryBRepManager) |
-| `create_cylinder` | Cylinder |
-| `create_sphere` | Sphere |
-| `create_torus` | Torus |
+## Conventions
 
-### Surface Operations
-| Tool | Description |
-|------|-------------|
-| `patch_surface` | Patch surface from boundary edges |
-| `stitch_surfaces` | Stitch surface bodies into one |
-| `thicken_surface` | Thicken a surface into a solid |
-| `ruled_surface` | Ruled surface from an edge |
-| `trim_surface` | Trim a surface with another body |
-
-### Sheet Metal
-| Tool | Description |
-|------|-------------|
-| `create_flange` | Create a flange on an edge |
-| `create_bend` | Add a bend |
-| `flat_pattern` | Create flat pattern |
-| `unfold` | Unfold specific bends |
-
-### Construction Geometry
-| Tool | Description |
-|------|-------------|
-| `create_construction_plane` | Offset, angle, midplane, 3-point, tangent |
-| `create_construction_axis` | Two-point, intersection, edge, perpendicular |
-
-### Assembly
-| Tool | Description |
-|------|-------------|
-| `create_component` | Create a sub-assembly component |
-| `add_joint` | Joint between two components |
-| `create_as_built_joint` | Joint from current positions |
-| `create_rigid_group` | Lock components together |
-
-### Inspection & Analysis
-| Tool | Description |
-|------|-------------|
-| `measure_distance` | Minimum distance between entities |
-| `measure_angle` | Angle between entities |
-| `get_physical_properties` | Mass, volume, area, center of mass |
-| `create_section_analysis` | Section plane through model |
-| `check_interference` | Detect collisions between components |
-
-### Appearance & Parameters
-| Tool | Description |
-|------|-------------|
-| `set_appearance` | Assign material appearance from library |
-| `get_parameters` | List all user parameters |
-| `create_parameter` | Create a new parameter |
-| `set_parameter` | Update a parameter value |
-| `delete_parameter` | Remove a parameter |
-
-### Export
-| Tool | Description |
-|------|-------------|
-| `export_stl` | Export body as STL |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Tool names use snake_case and must match the add-in's command names exactly
+- All Fusion API units are in **centimeters** (Fusion's internal unit)
+- The add-in uses newline-delimited JSON over TCP
+- `ping` is the health check — it never touches the Fusion API
+- Every tool has annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`)
+- Every tool has a mock handler so `--mode mock` works without Fusion running
 
 ---
 > Source: [faust-machines/fusion360-mcp-server](https://github.com/faust-machines/fusion360-mcp-server) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
