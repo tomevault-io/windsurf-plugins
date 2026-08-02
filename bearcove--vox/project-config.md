@@ -38,4 +38,4 @@ MultiEdit(file_path: "D:\repos\project\file.tsx", ...)
 
 ---
 > Source: [bearcove/vox](https://github.com/bearcove/vox) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
