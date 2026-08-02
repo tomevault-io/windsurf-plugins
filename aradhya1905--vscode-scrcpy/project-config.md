@@ -1,168 +1,187 @@
 ---
 trigger: always_on
-description: - **Type**: VS Code Extension with React Webview UI
+description: **Technology**: React 18, TypeScript, Vite 6, WebCodecs API
 ---
 
-# VS Code Scrcpy
+# VS Code Scrcpy - Webview UI
 
-## Overview
-
-- **Type**: VS Code Extension with React Webview UI
-- **Stack**: TypeScript 5.3, React 18, Vite 6, ESBuild, VS Code Extension API
-- **Purpose**: Mirror Android device screens directly in VS Code with touch controls, file management, and ADB tools
-- **Architecture**: Extension (Node.js) + Webview UI (React/browser)
-
-This CLAUDE.md is the authoritative source for development guidelines.
-Subdirectory CLAUDE.md files extend these rules with specific context.
+**Technology**: React 18, TypeScript, Vite 6, WebCodecs API
+**Entry Point**: [src/main.tsx](src/main.tsx)
+**Parent Context**: This extends [../CLAUDE.md](../CLAUDE.md)
 
 ---
 
-## Universal Development Rules
+## Development Commands
 
-### Code Quality (MUST)
-
-- **MUST** write TypeScript in strict mode (enabled in both tsconfigs)
-- **MUST** use 4-space indentation (Prettier config)
-- **MUST** use single quotes for strings
-- **MUST** include trailing commas (ES5 style)
-- **MUST** run `npm run typecheck` before committing
-- **MUST** run `npm run format` to ensure consistent formatting
-- **MUST NOT** commit secrets, API keys, or device-specific data
-
-### Best Practices (SHOULD)
-
-- **SHOULD** use functional React components with hooks (no class components)
-- **SHOULD** use `memo()` for components receiving callback props
-- **SHOULD** co-locate related code (component + hook + styles)
-- **SHOULD** use descriptive variable names (no single letters except loops/lambdas)
-- **SHOULD** keep functions under 50 lines when possible
-- **SHOULD** extract complex logic into service classes or hooks
-
-### Anti-Patterns (MUST NOT)
-
-- **MUST NOT** use `any` type without explicit justification in comments
-- **MUST NOT** bypass TypeScript errors with `@ts-ignore` or `@ts-expect-error`
-- **MUST NOT** use `console.log` in production code (use VS Code output channels)
-- **MUST NOT** hardcode device IDs or ADB paths
-- **MUST NOT** block the main thread with synchronous file operations in extension
-
----
-
-## Core Commands
-
-### Development
+### From This Directory
 
 ```bash
-# Install all dependencies (root + webview-ui)
-npm run install:all
+# Start Vite dev server (hot reload)
+npm run dev
 
-# Compile everything (extension + webview)
-npm run compile
-
-# Watch mode for extension development
-npm run watch
-
-# Watch mode for webview UI development
-npm run watch:webview
-
-# Type checking
-npm run typecheck
-
-# Lint code
-npm run lint
-
-# Format code
-npm run format
-
-# Check formatting without changes
-npm run format:check
-```
-
-### Building & Packaging
-
-```bash
-# Full production build (clean + typecheck + bundle + webview + VSIX)
+# Production build
 npm run build
 
-# Bundle extension only (minified)
-npm run bundle -- --minify
-
-# Compile webview only
-npm run compile:webview
-
-# Package VSIX for distribution
-npm run package:vsix
+# Preview production build
+npm run preview
 ```
 
-### Quality Gates (run before PR)
+### From Root Directory
 
 ```bash
-npm run typecheck && npm run lint && npm run format:check
+# Build webview
+npm run compile:webview
+
+# Watch webview (hot reload)
+npm run watch:webview
 ```
 
 ---
 
-## Project Structure
+## Architecture
 
-### Extension Source (`src/`)
+### Directory Structure
 
-- **[extension.ts](src/extension.ts)** - Main entry point, command registration
-- **[services/](src/services/)** - Core business logic
-  - `ScrcpyService.ts` - Screen mirroring via @yume-chan/scrcpy
-  - `DeviceManager.ts` - ADB device discovery and selection
-  - `AdbShellService.ts` - Shell command execution
-  - `DeviceInfoService.ts` - Device metadata (battery, storage, etc.)
-  - `AppManager.ts` - Installed apps, launch apps
-  - `DeviceFileService.ts` - File operations on device
-  - `ApkInstaller.ts` - APK installation
-  - `AdbLogcatService.ts` - Logcat streaming
-  - `AdbPathResolver.ts` - Cross-platform ADB path detection
-- **[panels/](src/panels/)** - Webview panel definitions
-  - `ScrcpyPanel.ts` - Floating mirror panel
-  - `FileManagerPanel.ts` - Device file browser
-  - `ShellLogsPanel.ts` - ADB shell interface
-  - `LogcatPanel.ts` - Logcat viewer
-- **[views/](src/views/)** - Sidebar view providers
-  - `ScrcpySidebarView.ts` - Main sidebar with mirror + controls
+```
+src/
+├── main.tsx                 # React entry point
+├── App.tsx                  # Root component (routing by viewMode)
+├── vscode.ts                # VS Code webview API bridge
+├── constants.ts             # App-wide constants
+├── apps/                    # Full-page applications
+│   ├── MirrorApp.tsx        # Screen mirroring view
+│   ├── FileManagerApp.tsx   # File browser view
+│   ├── LogcatApp.tsx        # Logcat viewer
+│   └── ShellLogsApp.tsx     # Shell output viewer
+├── components/              # Reusable UI components
+│   ├── index.ts             # Component exports
+│   ├── VideoCanvas.tsx      # WebGL video rendering (430 lines)
+│   ├── Toolbar.tsx          # Control buttons
+│   ├── DeviceSelector.tsx   # Device picker dropdown
+│   ├── SettingsPanel.tsx    # Quality/FPS settings
+│   ├── AppLauncher.tsx      # App list/launcher
+│   ├── DebugPanel.tsx       # Debug info overlay
+│   ├── DeviceStatus.tsx     # Connection status
+│   ├── MorePanel.tsx        # Additional options
+│   ├── Placeholder.tsx      # Empty state placeholder
+│   ├── RecentApps.tsx       # Recent apps list
+│   ├── Tooltip.tsx          # Hover tooltips
+│   ├── DeviceFrames/        # Phone skin overlays
+│   │   ├── PhoneFrame.tsx
+│   │   ├── SamsungS20Frame.tsx
+│   │   └── SamsungNote20UltraFrame.tsx
+│   └── logs/                # Log display components
+│       ├── LogsPanel.tsx
+│       ├── LogEntryRow.tsx
+│       ├── EnhancedLogsPanel.tsx
+│       └── EnhancedLogEntryRow.tsx
+├── hooks/                   # Custom React hooks
+│   ├── index.ts             # Hook exports
+│   ├── useVideoDecoder.ts   # H.264 WebCodecs decoding (350 lines)
+│   ├── useVSCodeMessages.ts # Extension messaging
+│   ├── useKeyboard.ts       # Keyboard event mapping
+│   └── useSettingsStorage.ts # Persistent settings
+├── styles/                  # CSS stylesheets (15 files)
+│   ├── index.css            # Main stylesheet imports
+│   ├── base.css             # Base styles
+│   ├── buttons.css          # Button styles
+│   └── ...                  # Component-specific styles
+├── types/                   # TypeScript type definitions
+│   ├── index.ts             # Type exports
+│   └── index.d.ts           # Declaration file
+└── utils/                   # Utility functions
+    └── colorUtils.ts        # Color manipulation
+```
 
-See [src/CLAUDE.md](src/CLAUDE.md) for detailed extension patterns.
+---
 
-### Webview UI (`webview-ui/`)
+## Code Organization Patterns
 
-- **[src/apps/](webview-ui/src/apps/)** - Full-page applications
-  - `MirrorApp.tsx` - Screen mirroring view
-  - `FileManagerApp.tsx` - File browser view
-  - `LogcatApp.tsx` - Logcat viewer
-  - `ShellLogsApp.tsx` - Shell output viewer
-- **[src/components/](webview-ui/src/components/)** - Reusable UI components
-  - `VideoCanvas.tsx` - WebGL video rendering + touch handling
-  - `Toolbar.tsx` - Control buttons
-  - `DeviceSelector.tsx` - Device picker dropdown
-  - `SettingsPanel.tsx` - Quality/FPS settings
-- **[src/hooks/](webview-ui/src/hooks/)** - Custom React hooks
-  - `useVideoDecoder.ts` - H.264 WebCodecs decoding
-  - `useVSCodeMessages.ts` - Extension ↔ webview messaging
-  - `useKeyboard.ts` - Keyboard event handling
-  - `useSettingsStorage.ts` - Persistent settings
-- **[src/styles/](webview-ui/src/styles/)** - CSS stylesheets (15 files)
+### Component Pattern
 
-See [webview-ui/CLAUDE.md](webview-ui/CLAUDE.md) for detailed React patterns.
+Use functional components with `memo()` for optimization.
 
-### Build & Configuration
+```typescript
+// ✅ DO: Memoized functional component with typed props
+interface VideoCanvasProps {
+    isConnected: boolean;
+    canvasRef: (canvas: HTMLCanvasElement | null) => void;
+    onTouchEvent: (action: 'down' | 'move' | 'up', x: number, y: number, ...) => void;
+    onKeyEvent: (action: 'down' | 'up', keyCode: number, metaState: number) => void;
+}
 
-- **[esbuild.js](esbuild.js)** - Extension bundler configuration
-- **[scripts/build.js](scripts/build.js)** - Full build orchestration
-- **[webview-ui/vite.config.ts](webview-ui/vite.config.ts)** - Webview bundler
-- **[tsconfig.json](tsconfig.json)** - Extension TypeScript config (CommonJS, Node)
-- **[webview-ui/tsconfig.json](webview-ui/tsconfig.json)** - Webview TypeScript config (ESNext, React)
+export const VideoCanvas = memo(function VideoCanvas({
+    isConnected,
+    canvasRef,
+    onTouchEvent,
+    onKeyEvent,
+}: VideoCanvasProps) {
+    // Implementation
+    return <canvas ref={internalCanvasRef} className="video-canvas" />;
+});
+```
 
-### Assets
+Example: [src/components/VideoCanvas.tsx:33-43](src/components/VideoCanvas.tsx#L33-L43)
 
-- **[assets/scrcpy-server](assets/scrcpy-server)** - Scrcpy server binary (pushed to device)
-- **[media/](media/)** - Compiled webview output + static HTML
+```typescript
+// ❌ DON'T: Class components
+class VideoCanvas extends React.Component<Props> {
+    // Avoid class components in this codebase
+}
+
+// ❌ DON'T: Inline component definitions
+const App = () => {
+    // Missing memo for component with callback props
+    const Child = ({ onClick }) => <button onClick={onClick} />;
+    return <Child onClick={() => {}} />;
+};
+```
+
+### Hook Pattern
+
+Custom hooks encapsulate stateful logic.
+
+```typescript
+// ✅ DO: Custom hook with clear return type
+interface UseVideoDecoderOptions {
+    onLog: (message: string, level?: 'info' | 'warn' | 'error') => void;
+}
+
+export function useVideoDecoder({ onLog }: UseVideoDecoderOptions) {
+    const decoderRef = useRef<VideoDecoder | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    const setCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
+        canvasRef.current = canvas;
+    }, []);
+
+    const processVideoPacket = useCallback((data: string) => {
+        // Base64 decode and process H.264 NAL units
+    }, []);
+
+    const reset = useCallback(() => {
+        // Clean up decoder state
+    }, []);
+
+    return { setCanvas, processVideoPacket, reset, getVideoSize };
+}
+```
+
+Example: [src/hooks/useVideoDecoder.ts:88-351](src/hooks/useVideoDecoder.ts#L88-L351)
+
+### VS Code Message Pattern
+
+Communication with the extension via `postMessage`.
+
+```typescript
+// ✅ DO: Type-safe message sending
+const vscode = acquireVsCodeApi();
+
+// Send command to extension
+vscode.postMessage({ command: 'start' });
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Aradhya1905/vscode-scrcpy](https://github.com/Aradhya1905/vscode-scrcpy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
