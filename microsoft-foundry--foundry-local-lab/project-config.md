@@ -1,17 +1,17 @@
 ---
 trigger: always_on
-description: This file provides context for AI coding agents (GitHub Copilot, Copilot Workspace, Codex, etc.) working in this repository.
+description: Este arquivo fornece contexto para agentes de codificação de IA (GitHub Copilot, Copilot Workspace, Codex, etc.) que trabalham neste repositório.
 ---
 
-# Coding Agent Instructions
+# Instruções para Agentes de Codificação
 
-This file provides context for AI coding agents (GitHub Copilot, Copilot Workspace, Codex, etc.) working in this repository.
+Este arquivo fornece contexto para agentes de codificação de IA (GitHub Copilot, Copilot Workspace, Codex, etc.) que trabalham neste repositório.
 
-## Project Overview
+## Visão Geral do Projeto
 
-This is a **hands-on workshop** for building AI applications with [Foundry Local](https://foundrylocal.ai) — a lightweight runtime that downloads, manages, and serves language models entirely on-device via an OpenAI-compatible API. The workshop includes step-by-step lab guides and runnable code samples in Python, JavaScript, and C#.
+Este é um **workshop prático** para construir aplicações de IA com o [Foundry Local](https://foundrylocal.ai) — um runtime leve que faz download, gerencia e serve modelos de linguagem inteiramente no dispositivo via uma API compatível com OpenAI. O workshop inclui guias de laboratório passo a passo e exemplos de código executáveis em Python, JavaScript e C#.
 
-## Repository Structure
+## Estrutura do Repositório
 
 ```
 ├── labs/                              # Markdown lab guides (Parts 1–13)
@@ -33,65 +33,62 @@ This is a **hands-on workshop** for building AI applications with [Foundry Local
 └── AGENTS.md                          # This file
 ```
 
-## Language & Framework Details
+## Detalhes de Linguagem e Framework
 
 ### Python
-- **Location:** `python/`, `zava-creative-writer-local/src/api/`
-- **Dependencies:** `python/requirements.txt`, `zava-creative-writer-local/src/api/requirements.txt`
-- **Key packages:** `foundry-local-sdk`, `openai`, `agent-framework-foundry-local`, `fastapi`, `uvicorn`
-- **Min version:** Python 3.9+
-- **Run:** `cd python && pip install -r requirements.txt && python foundry-local.py`
+- **Localização:** `python/`, `zava-creative-writer-local/src/api/`
+- **Dependências:** `python/requirements.txt`, `zava-creative-writer-local/src/api/requirements.txt`
+- **Principais pacotes:** `foundry-local-sdk`, `openai`, `agent-framework-foundry-local`, `fastapi`, `uvicorn`
+- **Versão mínima:** Python 3.9+
+- **Execução:** `cd python && pip install -r requirements.txt && python foundry-local.py`
 
 ### JavaScript
-- **Location:** `javascript/`, `zava-creative-writer-local/src/javascript/`
-- **Dependencies:** `javascript/package.json`, `zava-creative-writer-local/src/javascript/package.json`
-- **Key packages:** `foundry-local-sdk`, `openai`
-- **Module system:** ES modules (`.mjs` files, `"type": "module"`)
-- **Min version:** Node.js 18+
-- **Run:** `cd javascript && npm install && node foundry-local.mjs`
+- **Localização:** `javascript/`, `zava-creative-writer-local/src/javascript/`
+- **Dependências:** `javascript/package.json`, `zava-creative-writer-local/src/javascript/package.json`
+- **Principais pacotes:** `foundry-local-sdk`, `openai`
+- **Sistema de módulos:** Módulos ES (`.mjs` arquivos, `"type": "module"`)
+- **Versão mínima:** Node.js 18+
+- **Execução:** `cd javascript && npm install && node foundry-local.mjs`
 
 ### C#
-- **Location:** `csharp/`, `zava-creative-writer-local/src/csharp/`
-- **Project files:** `csharp/csharp.csproj`, `zava-creative-writer-local/src/csharp/ZavaCreativeWriter.csproj`
-- **Key packages:** `Microsoft.AI.Foundry.Local` (non-Windows), `Microsoft.AI.Foundry.Local.WinML` (Windows — superset with QNN EP), `OpenAI`, `Microsoft.Agents.AI.OpenAI`
-- **Target:** .NET 9.0 (conditional TFM: `net9.0-windows10.0.26100` on Windows, `net9.0` elsewhere)
-- **Run:** `cd csharp && dotnet run [chat|rag|agent|multi]`
+- **Localização:** `csharp/`, `zava-creative-writer-local/src/csharp/`
+- **Arquivos do projeto:** `csharp/csharp.csproj`, `zava-creative-writer-local/src/csharp/ZavaCreativeWriter.csproj`
+- **Principais pacotes:** `Microsoft.AI.Foundry.Local` (não Windows), `Microsoft.AI.Foundry.Local.WinML` (Windows — superconjunto com QNN EP), `OpenAI`, `Microsoft.Agents.AI.OpenAI`
+- **Alvo:** .NET 9.0 (TFM condicional: `net9.0-windows10.0.26100` no Windows, `net9.0` em outros)
+- **Execução:** `cd csharp && dotnet run [chat|rag|agent|multi]`
 
-## Coding Conventions
+## Convenções de Codificação
 
-### General
-- All code samples are **self-contained single-file examples** — no shared utility libraries or abstractions.
-- Each sample runs independently after installing its own dependencies.
-- API keys are always set to `"foundry-local"` — Foundry Local uses this as a placeholder.
-- Base URLs use `http://localhost:<port>/v1` — the port is dynamic and discovered at runtime via the SDK (`manager.urls[0]` in JS, `manager.endpoint` in Python).
-- The Foundry Local SDK handles service startup and endpoint discovery; prefer SDK patterns over hard-coded ports.
+### Geral
+- Todos os exemplos de código são **exemplos autossuficientes em arquivo único** — sem bibliotecas utilitárias compartilhadas ou abstrações.
+- Cada exemplo roda independentemente após instalar suas próprias dependências.
+- As chaves de API são sempre configuradas para `"foundry-local"` — Foundry Local usa isso como placeholder.
+- URLs base usam `http://localhost:<port>/v1` — a porta é dinâmica e descoberta em tempo de execução via SDK (`manager.urls[0]` no JS, `manager.endpoint` no Python).
+- O Foundry Local SDK gerencia a inicialização do serviço e descoberta do endpoint; prefira padrões do SDK ao invés de portas fixas.
 
 ### Python
-- Use `openai` SDK with `OpenAI(base_url=..., api_key="not-required")`.
-- Use `FoundryLocalManager()` from `foundry_local` for SDK-managed service lifecycle.
-- Streaming: iterate over `stream` object with `for chunk in stream:`.
-- No type annotations in sample files (keep samples concise for workshop learners).
+- Use o SDK `openai` com `OpenAI(base_url=..., api_key="not-required")`.
+- Use `FoundryLocalManager()` de `foundry_local` para ciclo de vida gerenciado pelo SDK.
+- Streaming: itere sobre o objeto `stream` com `for chunk in stream:`.
+- Sem anotações de tipo nos arquivos de exemplo (mantenha os exemplos concisos para aprendizes do workshop).
 
 ### JavaScript
-- ES module syntax: `import ... from "..."`.
-- Use `OpenAI` from `"openai"` and `FoundryLocalManager` from `"foundry-local-sdk"`.
-- SDK init pattern: `FoundryLocalManager.create({ appName })` → `FoundryLocalManager.instance` → `manager.startWebService()` → `await catalog.getModel(alias)`.
+- Sintaxe de módulo ES: `import ... from "..."`.
+- Use `OpenAI` de `"openai"` e `FoundryLocalManager` de `"foundry-local-sdk"`.
+- Padrão de inicialização do SDK: `FoundryLocalManager.create({ appName })` → `FoundryLocalManager.instance` → `manager.startWebService()` → `await catalog.getModel(alias)`.
 - Streaming: `for await (const chunk of stream)`.
-- Top-level `await` is used throughout.
+- `await` de topo é usado amplamente.
 
 ### C#
-- Nullable enabled, implicit usings, .NET 9.
-- Use `FoundryLocalManager.StartServiceAsync()` for SDK-managed lifecycle.
-- Streaming: `CompleteChatStreaming()` with `foreach (var update in completionUpdates)`.
-- The main `csharp/Program.cs` is a CLI router dispatching to static `RunAsync()` methods.
+- Nullable ativado, usings implícitos, .NET 9.
+- Use `FoundryLocalManager.StartServiceAsync()` para ciclo de vida gerenciado pelo SDK.
+- Streaming: `CompleteChatStreaming()` com `foreach (var update in completionUpdates)`.
+- O arquivo principal `csharp/Program.cs` é um roteador CLI que despacha para métodos estáticos `RunAsync()`.
 
-### Tool Calling
-- Only certain models support tool calling: **Qwen 2.5** family (`qwen2.5-*`) and **Phi-4-mini** (`phi-4-mini`).
-- Tool schemas follow the OpenAI function-calling JSON format (`type: "function"`, `function.name`, `function.description`, `function.parameters`).
-- The conversation uses a multi-turn pattern: user → assistant (tool_calls) → tool (results) → assistant (final answer).
+### Chamada de Ferramentas
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft-foundry/Foundry-Local-Lab](https://github.com/microsoft-foundry/Foundry-Local-Lab) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
