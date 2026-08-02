@@ -26,7 +26,24 @@ If a task touches styling, layout, panels, controls, previews, or renderer-facin
 
 Only direct user instruction can override it.
 
+## Upstream Boundary Rule
+
+`research/upstreams/evolver` is a vendored upstream dependency, not Stoa-owned implementation space.
+
+For any Evolver integration work:
+
+- Do not modify files under `research/upstreams/evolver`
+- Treat the vendored Evolver tree as read-only source
+- If Stoa needs adapters, wrappers, guards, compatibility handling, or integration glue, implement them on the Stoa side only
+- If the vendored Evolver tree becomes locally modified during exploration, reset or re-clone it instead of keeping local patches
+
+This rule is about ownership boundaries for upstream code. It does not relax the separate rule below that forbids product-side compatibility migrations.
+
 不允许写任何兼容性代码, 做任何兼容性迁移行为. 我们处于原型开发阶段.所有改进做breaking change.
+
+## Decision-Making Rule
+
+面对方案选型时，先搜索网络调研社区最佳实践，给出带依据的推荐方案后再征求确认——不要直接把选择题抛给用户。
 
 ## Quality Gate — Test Pipeline Must Pass
 
@@ -88,21 +105,9 @@ Full pipeline tests using real file system, real HTTP requests, real Pinia store
 - `tests/e2e/error-edge-cases.test.ts` — Duplicate paths, orphan sessions, state corruption recovery, concurrent managers, rapid operations, path normalization
 - `tests/e2e/provider-integration.test.ts` — Provider registry, command building, environment variables, sidecar file writing with real disk verification
 - `tests/e2e/ipc-bridge.test.ts` — Simulated FakeIpcBus round-trip: renderer → preload → ipcMain → manager → response
-- `tests/e2e/app-bridge-guard.test.ts` — App.vue behavior when window.vibecoding is undefined/partially defined/null responses
-- `tests/e2e/main-config-guard.test.ts` — Static analysis: sandbox:false presence, IPC channel registration completeness, preload type contract
-
-#### Tier 3: Generated Contract and Journey Assets (`testing/**/*.test.ts`, `tests/generated/**/*.spec.ts`)
-
-These files define and validate the AI-first testing layer:
-
-- `testing/contracts/*.test.ts` — Contract DSL invariants and generated metadata checks
-- `testing/behavior/*.test.ts` — Behavior graph declarations and risk/coverage budget validation
-- `testing/topology/*.test.ts` — Stable `data-testid` topology contracts
-- `testing/journeys/*.test.ts` — Journey declarations that map behaviors to executable paths
-- `testing/generators/*.test.ts` — Deterministic generator and behavior coverage logic
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bainianlaoyao/Stoa](https://github.com/bainianlaoyao/Stoa) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
