@@ -1,89 +1,138 @@
 ---
 trigger: always_on
-description: You are a **senior staff engineer** reviewing a pull request on the **PipesHub** codebase. Be direct and specific. Flag real issues; skip praise and restating the diff. Every comment must cite a file and line. If the PR is clean, say so in one line.
+description: PipesHub is an AI-powered knowledge management dashboard on **Next.js** (App Router, client-rendered React).
 ---
 
-# CLAUDE.md — Code Review Guide
+# CLAUDE.md - PipesHub Dashboard UI
 
-You are a **senior staff engineer** reviewing a pull request on the **PipesHub** codebase. Be direct and specific. Flag real issues; skip praise and restating the diff. Every comment must cite a file and line. If the PR is clean, say so in one line.
+## Project Overview
 
----
+PipesHub is an AI-powered knowledge management dashboard on **Next.js** (App Router, client-rendered React).
 
-## About PipesHub
+**Tech Stack:**
+- Next.js 14+ (App Router, CSR-only with `'use client'`)
+- TypeScript (strict mode)
+- Zustand (state management)
+- Radix UI Themes v3.2.1 (styling & components) - **No Tailwind CSS**
+- Google Fonts (Manrope) + Google Material Icons
+- React Hook Form + Zod (complex forms) / Native (simple forms)
+- SSE (chat streaming) + WebSocket (notifications)
+- i18n: German, English, Spanish, Hindi
 
-PipesHub is a workplace AI platform for enterprise search and workflow automation. It integrates with 30+ enterprise connectors (Google Workspace, Microsoft 365, Slack, Jira, Confluence, etc.) and provides natural language search, knowledge graphs, and AI agent capabilities on top of that data.
+## Naming: Collections vs Knowledge Base
 
-### Architecture
+**Important:** The feature formerly called "Knowledge Base" is now called **"Collections"** in the UI.
 
-The platform is a polyglot system: **4 independent Python FastAPI microservices**, **1 Node.js Express API**, and **1 Nextjs frontend**, backed by a fleet of stateful services.
+| Context | Name Used |
+|---------|-----------|
+| UI labels & text | "Collections" or "All Records" |
+| Route path | `/knowledge-base` |
+| API endpoints | `/api/v1/knowledgeBase` |
+| Code (types, stores, variables) | `KnowledgeBase`, `kb`, `kbId` |
+| Component files | `sidebar.tsx`, `header.tsx`, `filter-bar.tsx`, `kb-data-table.tsx` |
+
+**Collections mode sidebar sections:**
+- WORKSPACE (user's own collections)
+- SHARED (collections shared by others)
+- PRIVATE (private collections)
+
+**All Records mode sidebar sections:**
+- All Records (shows all records across sources)
+- Collections (flat list of collections - clicking filters records)
+- Connectors (Slack, Google Drive, Jira, etc.)
+
+## Folder Structure
 
 ```
-/pipeshub-ai
-├── frontend/              # React + Nextjs + TypeScript
-├── backend/
-│   ├── nodejs/apps/       # Node.js Express API
-│   └── python/            # Python FastAPI microservices
-└── deployment/            # Docker Compose configs
+src/
+├── app/                    # Next.js App Router
+│   ├── (auth)/             # Auth route group
+│   │   ├── sign-in/        # Each page has: page.tsx, api.ts, store.ts, types.ts, components/
+│   │   ├── sign-up/
+│   │   └── reset-password/
+│   ├── (dashboard)/        # Main app (uses query params, not dynamic routes)
+│   │   ├── knowledge-base/ # Collections page - Uses ?kbId=xxx&folderId=xxx
+│   │   │   ├── page.tsx
+│   │   │   ├── api.ts      # Page-specific API calls
+│   │   │   ├── store.ts    # Page-specific Zustand store
+│   │   │   ├── types.ts    # Page-specific types
+│   │   │   └── components/ # Page-specific components
+│   │   ├── agents/         # Uses ?agentId=xxx
+│   │   ├── chat/           # Uses ?conversationId=xxx
+│   │   ├── connectors/
+│   │   ├── account/
+│   │   ├── users/
+│   │   ├── groups/
+│   │   └── notifications/
+│   ├── layout.tsx          # Root layout (providers)
+│   └── page.tsx            # Redirect to dashboard or auth
+│
+├── components/             # Shared UI components (stateless)
+│   ├── ui/                 # Radix Themes components (MaterialIcon, Select, etc.)
+│   ├── form/               # React Hook Form wrappers
+│   ├── layout/             # Sidebar, header, breadcrumbs
+│   ├── data-display/       # DataTable, empty/error/loading states
+│   ├── feedback/           # Toast, confirmation dialogs
+│   └── icons/              # Google Material Icons wrapper
+│
+├── lib/                    # Core utilities
+│   ├── api/                # API layer
+│   │   ├── axios-instance.ts  # Axios client with interceptors
+│   │   ├── api-error.ts       # ErrorType & ProcessedError
+│   │   ├── swr-fetcher.ts     # SWR fetcher
+│   │   ├── streaming.ts       # SSE streaming (native fetch)
+│   │   └── index.ts           # Barrel export
+│   ├── store/              # Global Zustand stores
+│   │   └── auth-store.ts      # Auth state (tokens, user)
+│   ├── hooks/              # Global utility hooks
+│   ├── utils/              # formatters, validators
+│   ├── constants/          # Routes, storage keys, API endpoints
+│   └── i18n/               # i18next config and locales
+│
+├── styles/                 # Global CSS and fonts
+├── types/                  # Shared TypeScript types
+├── config/                 # Site config and env variables
+└── middleware.ts           # Auth redirect middleware
 ```
 
-**Stateful backends:** Qdrant (vectors), ArangoDB (graph + documents), MongoDB (sessions/metadata), Redis (cache/rate-limit), Kafka (event stream), etcd (distributed config).
+## Naming Conventions
 
-### Services
+### Files & Folders
+| Type | Convention | Example |
+|------|------------|---------|
+| Folders | kebab-case | `knowledge-base/`, `data-display/` |
+| Components | kebab-case.tsx | `kb-card.tsx`, `message-bubble.tsx` |
+| Hooks | use-*.ts | `use-auth.ts`, `use-debounce.ts` |
+| Stores | store.ts | Page-level store (`app/(dashboard)/chat/store.ts`) |
+| APIs | api.ts | Page-level API (`app/(dashboard)/chat/api.ts`) |
+| Types | types.ts | Page-specific types |
+| Utils | kebab-case.ts | `format-date.ts`, `cn.ts` |
 
-- **Node.js API** (`backend/nodejs/apps`, port 3001) — User/org management, authentication (JWT, OAuth2, SAML), knowledge base management, object storage (S3/Azure Blob), API gateway, Kafka producers for async work.
-- **Connectors** (`backend/python`, port 8088) — `app.connectors_main`. OAuth flows, token refresh, and 30+ data-source integrations (Google, Microsoft, Slack, Jira, Confluence, etc.). Uses a `ConnectorFactory` pattern; new sources live under `app/connectors/sources/`.
-- **Indexing** (`backend/python`, port 8091) — `app.indexing_main`. Document parsing, chunking, and embedding generation. Writes vectors to Qdrant and graph nodes to ArangoDB.
-- **Query** (`backend/python`, port 8000) — `app.query_main`. Retrieval-augmented generation, semantic search, and LLM orchestration via LiteLLM. Hosts the RAG pipeline and agent/workflow runtime.
-- **Docling** (`backend/python`, port 8001) — `app.docling_main`. Advanced document parsing and OCR for complex formats (PDFs, scans, tables).
+### Code Style
+| Type | Convention | Example |
+|------|------------|---------|
+| Components | PascalCase | `KbCard`, `MessageBubble` |
+| Hooks | camelCase with `use` | `useAuth`, `useDebounce` |
+| Functions | camelCase | `formatDate`, `handleSubmit` |
+| Constants | SCREAMING_SNAKE | `STORAGE_KEYS.JWT_TOKEN` |
+| Types/Interfaces | PascalCase | `KnowledgeBase`, `User` |
 
-### Cross-cutting patterns
+## Key Architecture Patterns
 
-- **DI:** `inversify` (Node.js), `dependency-injector` (Python). Prefer injected services over direct instantiation.
-- **Factories & abstractions:** `ConnectorFactory`, `MessagingFactory`, `GraphDataStore`, vector-store wrappers. New integrations should extend these, not sidestep them.
-- **Async work:** Kafka for cross-service events; Celery for background tasks.
-- **Repository pattern** for database access.
+### Component Types
+- **Stateless** (`/components/ui/`): Pure presentational, no internal state, uses TypeScript union types for variants
+- **Stateful** (`/app/(dashboard)/*/components/`): Page-specific with hooks, state, business logic
 
----
-
-## How to Review
-
-Read the diff, then the surrounding code the diff touches. A change is not safe just because it compiles — follow the call graph one hop out and confirm callers and callees still hold. Skip trivial style nits; focus on substance.
-
-Comment in **priority order** below. Stop early if earlier categories already surface blocking issues — do not pad with lower-priority nits.
-
-### 1. Correctness & functionality  *(highest priority)*
-
-Does the code do what the PR claims? Trace the happy path and the failure paths. Look for:
-
-- Off-by-one, wrong operator, swapped arguments, inverted conditions.
-- Race conditions, missing `await`, unawaited promises, fire-and-forget errors.
-- Silent `except` / `catch` blocks that swallow failures.
-- Transaction boundaries: partial writes across Mongo / Arango / Qdrant / Kafka. A failure after step 2 of 4 should leave the system recoverable.
-- Idempotency for Kafka consumers and retry-able handlers.
-- Auth/permission checks on every new route or tool — never trust client-supplied org/user IDs.
-
-### 2. Scalability
-
-- N+1 queries, unbounded loops over external data, per-request calls to LLMs or embeddings that should be batched.
-- Memory: loading entire collections/files into memory instead of streaming or paginating.
-- Blocking I/O on async event loops (sync `requests`, sync file reads inside FastAPI handlers).
-- If a new query pattern looks like it needs a Mongo/Arango index, ask the author to confirm one exists — do not assert a missing index from the diff alone.
-- Rate limits and backoff on outbound connector calls (Google, Microsoft, Slack APIs).
-- Cache invalidation: does the Redis key strategy survive multi-tenant and multi-instance deployment?
-
-### 3. Null pointer / undefined safety
-
-- Python: `dict.get()` returning `None` then dereferenced; optional Pydantic fields accessed without a guard; `await some_call()` returning `None` on not-found.
-- TypeScript: non-null assertions (`!`) on values that can legitimately be nullish; optional chaining missing where the type is `T | undefined`.
-- External responses (LLM, connector APIs, DB) must be validated before field access — do not trust shape.
-
-### 4. DRY & reuse existing methods
-
-- Before approving a new helper, search for an existing one. Common homes:
-  - Node.js: `backend/nodejs/apps/src/libs/` (middleware, encryption, http clients).
+### Page-Level Co-location
+Each page folder contains its own resources:
+```
+app/(dashboard)/[page]/
+├── page.tsx        # Main page component (reads query params)
+├── api.ts          # Page-specific API calls
+├── store.ts        # Page-specific Zustand store
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pipeshub-ai/pipeshub-ai](https://github.com/pipeshub-ai/pipeshub-ai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
