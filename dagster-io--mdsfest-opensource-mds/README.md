@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dagster-io/mdsfest-opensource-mds](https://github.com/dagster-io/mdsfest-opensource-mds).
+Original source: `CLAUDE.md` in [dagster-io/mdsfest-opensource-mds](https://github.com/dagster-io/mdsfest-opensource-mds).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
