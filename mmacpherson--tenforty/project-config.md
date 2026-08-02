@@ -1,0 +1,118 @@
+---
+trigger: always_on
+description: Guidance for anyone working in this repo, human or AI coding agent. This is the
+---
+
+# tenforty — Contributor & Agent Guide
+
+Guidance for anyone working in this repo, human or AI coding agent. This is the
+canonical guide; `CLAUDE.md` is a symlink to this file so tool-specific loaders
+pick up the same content. It follows the [AGENTS.md](https://agents.md) convention.
+
+## Working in this repo
+
+- **`main` is protected** — changes land through a pull request, not direct pushes.
+- **Branch for each change**, and keep PRs focused.
+- **Never force-push** `main` or any branch with an open PR.
+- Run the relevant quality gates before requesting review.
+
+## Vendored OpenTaxSolver is not ours to edit
+
+We **vendor** OpenTaxSolver, we do not fork it. Never change what OTS computes —
+not the release tarballs, not the generated `ots_amalgamation.cpp`, and not
+through a patch function in `ots/amalgamate.py`. This holds even when the defect
+is proven and the fix is one character.
+
+When you find a defect in OTS's tax logic:
+
+1. Report it upstream. Stage the report in `docs/upstream-ots-reports.md`.
+2. Record it locally as a **strict-xfail** test plus a known-defect signature in
+   `tests/taxcalc/taxcalc_policy.py`. The xfail is the durable record and flips on
+   its own once a release carries the correction.
+
+Patching the vendored source instead would fork it invisibly: our tree would
+silently diverge from the upstream we claim to wrap, with nothing in the OTS
+release to show for it.
+
+**The narrow exception is portability and memory safety** — making the source
+compile and not read out of bounds, without changing any computed figure. The
+existing patch functions are of this kind: C99→C++ shims, and
+`patch_az_widow_std_deduction` for an out-of-bounds array read. Anything in this
+category still gets reported upstream, and the patch function carries a docstring
+saying why it qualifies.
+
+Before deciding a finding is upstream's, check whether it is actually **ours**:
+the mapping layer (`models.py` input maps, `core.py` activation and
+orchestration) is our code and gets fixed here.
+
+Two traps worth knowing:
+
+- `ots_amalgamation.cpp` is the only `.cpp` the generator emits and the only one
+  compiled — every `.pxd` points at it. The 114 per-year `ots_YYYY_*.cpp` files
+  are stale and carry unpatched sources; don't read them as live.
+- Editing a generated file without a matching patch function means the next
+  regeneration silently reverts you. Change `ots/amalgamate.py`, then regenerate.
+
+## Overview
+
+Python library for US federal and state tax computation. Two backends:
+
+- **OTS backend**: Cython bindings to Open Tax Solver C++ code
+- **Graph backend**: Haskell DSL → JSON graph specs → Rust runtime → Python API (via PyO3)
+
+## Tech Stack
+
+- **Language**: Python 3.10+ with Cython extensions, Rust (graph runtime), Haskell (tax spec DSL)
+- **Build**: setuptools + Cython (OTS), cargo (Rust), cabal (Haskell)
+- **Testing**: pytest + hypothesis (Python), proptest (Rust), QuickCheck (Haskell)
+- **Quality**: ruff (linting), pre-commit hooks
+
+## Dependency & toolchain versions
+
+All three toolchains follow one rule: track newest-compatible versions, pin them
+in a lockfile, bump deliberately, on the latest stable compiler. The lockfile is
+the source of truth for reproducibility, and `main` always builds against it.
+
+- **Python (uv)**: loose `pyproject.toml` constraints → exact `uv.lock`; bump with
+  `uv lock --upgrade`.
+- **Rust (cargo)**: semver `Cargo.toml` → exact `Cargo.lock`; bump with `cargo update`.
+- **Haskell (cabal)**: lower-bounds-only `.cabal` (no PVP upper bounds —
+  `tenforty-spec` is unpublished) → exact `tenforty-spec/cabal.project.freeze` at a
+  pinned `index-state`, compiler pinned via `with-compiler`; bump with
+  `cabal update` → bump `index-state` → `cabal freeze`. GHC: the latest stable the
+  pinned deps **and the dev toolchain** build against — hlint/ormolu track GHC via
+  `ghc-lib-parser` and lag it, so the linter sets the practical ceiling (currently
+  9.12.x). This keeps one compiler for the project and all dev tools.
+
+If a newest combination breaks the build or tests, pin that one package back in the
+freeze rather than rolling the whole tree back.
+
+## Development Commands
+
+- `pip install -e ".[dev]"` — Install in dev mode
+- `pytest` — Run tests (uses dev profile by default)
+- `pytest --hypothesis-profile=ci` — Run with CI profile (500 examples)
+- `make test-deep` — Deep property sweep (10,000 examples, all cores; ad hoc, ~5 min)
+- `make test-soak` — Soak (100,000 examples, all cores; ad hoc, ~50 min)
+- `python ots/amalgamate.py ots/ots-releases/*.tgz` — Regenerate OTS bindings
+- `make graph-build` — Build graph library (interpreter only)
+- `make spec-graphs` — Generate JSON graphs from Haskell specs
+- `make forms-sync` — Sync generated JSON graphs into `src/tenforty/forms/`
+- `cd crates/tenforty-graph && cargo test` — Run Rust graph backend tests
+
+## Quality Gates
+
+Prefer `make` targets over running underlying commands directly. The full graph-backend
+QA sequence (Claude Code exposes it as the `/graph-qa` slash command):
+
+1. `make spec-fmt` — Format Haskell code
+2. `make spec-lint-strict` — Lint Haskell code
+3. `make spec-graphs` — Generate JSON graphs
+4. `make forms-sync` — Sync graphs to Python
+5. `make env-full` — Rebuild Rust extension
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [mmacpherson/tenforty](https://github.com/mmacpherson/tenforty) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
