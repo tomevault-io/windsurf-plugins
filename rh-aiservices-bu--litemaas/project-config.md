@@ -1,84 +1,134 @@
 ---
 trigger: always_on
-description: > **Note for AI Assistants**: This is the root context file providing project overview. For detailed implementation context:
+description: > **Note for AI Assistants**: This is a frontend-specific context file for the LiteMaaS React application. For project overview, see root CLAUDE.md. For backend context, see backend/CLAUDE.md.
 ---
 
-# CLAUDE.md - LiteMaaS AI Context File
+# CLAUDE.md - LiteMaaS Frontend Context
 
-> **Note for AI Assistants**: This is the root context file providing project overview. For detailed implementation context:
->
-> - **Backend Context**: [`backend/CLAUDE.md`](backend/CLAUDE.md) - Fastify API implementation details
-> - **Frontend Context**: [`frontend/CLAUDE.md`](frontend/CLAUDE.md) - React/PatternFly 6 implementation details
-> - **Project Structure**: [`docs/architecture/project-structure.md`](docs/architecture/project-structure.md) - Complete directory structure
-> - **Changelog**: [`CHANGELOG.md`](CHANGELOG.md) - All notable changes per release (Keep a Changelog format)
-> - **Documentation**: See `docs/` for comprehensive guides
+> **Note for AI Assistants**: This is a frontend-specific context file for the LiteMaaS React application. For project overview, see root CLAUDE.md. For backend context, see backend/CLAUDE.md.
 
-## 🚀 Project Overview
+## 🎯 Frontend Overview
 
-**LiteMaaS** is a model subscription and management platform that bridges users and AI model services through LiteLLM integration.
+**@litemaas/frontend** - React 18 application with TypeScript, Vite, and PatternFly 6 component library.
 
-**Monorepo** with two packages:
+**Development Server**: Running on port 3000 with Vite HMR (Hot Module Replacement) and auto-refresh
 
-- **Backend** (`@litemaas/backend`): Fastify API server with PostgreSQL, OAuth2/OIDC/JWT, RBAC
-- **Frontend** (`@litemaas/frontend`): React + PatternFly 6 UI with 9-language i18n support
+## 🚨 CRITICAL FOR AI ASSISTANTS - Server and Logging
 
-**Tech Stack**: Fastify, React, TypeScript, PostgreSQL, PatternFly 6, LiteLLM integration
+**⚠️ The frontend dev server is already running!** Do not start new processes.
 
-## 📁 Project Structure
+### Checking Frontend Status and Logs
 
-See [`docs/architecture/project-structure.md`](docs/architecture/project-structure.md) for complete directory structure and file organization.
+```bash
+# DO NOT run npm run dev - server is already running!
 
-## 🔧 Key Features
+# Check recent frontend logs (last 100 lines):
+tail -n 100 ../logs/frontend.log
 
-**Role-Based Access Control (RBAC)**: Three-tier hierarchy `admin > adminReadonly > user` with OpenShift integration.
+# Watch frontend logs in real-time:
+tail -f ../logs/frontend.log
 
-**Model Capability Management**: Multi-type model support beyond chat-only models:
+# Check for compilation errors:
+grep -i "error\|failed" ../logs/frontend.log | tail -n 20
 
-- **Model Types**: Chat (default), Embeddings, Document Conversion — selected via radio group in admin model form
-- **Tokenize Capability**: Optional per-model toggle for tokenization support
-- **Document Conversion**: Docling provider integration with `/health` endpoint testing, hidden irrelevant fields (backend model name, TPM, costs, max tokens)
-- **Capability Labels**: Color-coded flair labels on model cards (Chat=blue, Embeddings=green, Tokenize=orangered, Document Conversion=orange)
-- **Type-Specific Curl Examples**: View Key modal shows contextual curl commands based on model type
-- **Chat Playground Filtering**: Only chat-capable models shown in playground
-- **Redis Cache Flush**: Optional Redis integration (`REDIS_HOST`/`REDIS_PORT`) to flush LiteLLM's cache after model CRUD, ensuring all proxy pods pick up changes immediately
-- **Deployment**: Redis deployment included in Helm (`redis.enabled: true`) and Kustomize charts
+# Check for warnings (React, deprecations):
+grep -i "warning" ../logs/frontend.log | tail -n 20
 
-**Restricted Model Subscription Approval** (Major feature - 2025 Q4): Admin-controlled access to sensitive/costly models with comprehensive approval workflow:
+# Check Vite HMR updates:
+grep "hmr" ../logs/frontend.log | tail -n 20
 
-- **Restricted Model Flagging**: Administrators mark models requiring approval
-- **Three-state workflow**: Pending → Active/Denied with request review capability
-- **Bulk Operations**: Approve/deny multiple requests with detailed result tracking
-- **Full Audit Trail**: Complete history in `subscription_status_history` table
-- **Granular RBAC**: Read/write/delete permissions (admin vs adminReadonly)
-- **Automatic Cascade**: Access revocation when models become restricted
-- **LiteLLM-first security**: API key updates prioritize access revocation
+# Verify server is responding:
+curl http://localhost:3000
+```
 
-**Admin Usage Analytics** (Major feature - 2025 Q3): Enterprise-grade analytics with comprehensive system-wide visibility:
+### Server Information
 
-- **Day-by-day incremental caching** with intelligent TTL (permanent historical, 5-min current day)
-- **Multi-dimensional filtering**: users, models, providers, API keys with cascading filter dependencies
-- **Trend analysis** with automatic comparison period calculations
-- **Rich visualizations**: usage trends, model distribution, weekly heatmap (component ready, integration pending)
-- **Data export**: CSV/JSON with filter preservation
-- **Configurable cache TTL** via ConfigContext integration with React Query
+- **Dev Server URL**: `http://localhost:3000`
+- **HMR**: Enabled - changes to components instantly reflect in browser
+- **Auto-refresh**: Browser automatically updates on file save
+- **Log Location**: `../logs/frontend.log` (relative to frontend directory)
+- **Build Output**: Check logs for TypeScript/ESLint errors
 
-**Admin User Management** (Major feature - 2025 Q4): Consolidated admin interface for managing users through a modal-based workflow with tabbed views:
+### Debugging Workflow
 
-- **Unified Management Modal**: Profile, Budget & Limits, API Keys, and Subscriptions tabs
-- **Role Management**: Admin/adminReadonly/user role toggles with conflict detection
-- **Budget & Rate Limits**: Max budget, budget duration, TPM, and RPM with real-time spend from LiteLLM, spend reset, and color-coded utilization progress bars
-- **API Key Lifecycle**: Create, view, edit quotas (including per-model limits and expiration), soft revoke, permanent delete, and spend reset
-- **Subscription Management**: Add/remove model subscriptions directly from user modal with automatic LiteLLM key sync
-- **Full Audit Trail**: All admin actions logged with metadata
-- **RBAC**: `users:read` (admin, adminReadonly) for viewing, `users:write` (admin only) for modifications
+1. **Make component changes** - Save the file
+2. **Check logs for compilation** - `tail -n 50 ../logs/frontend.log`
+3. **If TypeScript errors** - Fix types and save, Vite will recompile
+4. **If ESLint warnings** - Fix or add disable comment if intentional
+5. **Check browser** - HMR should auto-update, check browser console for runtime errors
+6. **If HMR fails** - Browser will show error overlay with details
 
-**Admin Audit Log**: Full audit log viewer at `/admin/audit` with category/action filtering, human-readable labels, API access toggle, search, and date range filters. Requires `admin:audit` permission (admin + adminReadonly).
+### Common Frontend Log Patterns
 
-**API Key Quota Management**: Comprehensive budget and rate limit management for API keys across user self-service and admin interfaces:
+```bash
+# Check for failed API calls:
+grep -i "axios\|fetch\|401\|403\|404\|500" ../logs/frontend.log | tail -n 20
 
+# Check for React errors:
+grep -i "react\|hook\|render\|component" ../logs/frontend.log | tail -n 20
+
+# Check for PatternFly issues:
+grep -i "patternfly\|pf-v6" ../logs/frontend.log | tail -n 20
+
+# Check for build/bundle issues:
+grep -i "vite\|rollup\|bundle\|chunk" ../logs/frontend.log | tail -n 20
+```
+
+## 📁 Frontend Structure
+
+See [`docs/architecture/project-structure.md`](../docs/architecture/project-structure.md) for complete frontend directory structure.
+
+## 🎨 PatternFly 6 Critical Requirements
+
+⚠️ **MANDATORY**: Follow the [PatternFly 6 Development Guide](../docs/development/pf6-guide/README.md) as the **AUTHORITATIVE SOURCE** for all UI development.
+
+### Essential Rules
+
+1. **Class Prefix**: ALL PatternFly classes MUST use `pf-v6-` prefix
+2. **Design Tokens**: Use semantic tokens only, never hardcode colors
+3. **Component Import**: Import from `@patternfly/react-core` v6 and other @patternfly libraries
+4. **Theme Testing**: Test in both light and dark themes
+5. **Table Patterns**: Follow guide's table implementation (current code may be outdated)
+
+### Common Mistakes and Token Usage
+
+**Critical rules** - See [`docs/development/pf6-guide/guidelines/styling-standards.md`](../docs/development/pf6-guide/guidelines/styling-standards.md) for complete guide:
+
+- ✅ ALWAYS use `pf-v6-` prefix for component classes
+- ✅ ALWAYS use `--pf-t--` prefix for design tokens (semantic tokens with `-t-`)
+- ✅ Choose tokens by meaning (e.g., `--pf-t--global--color--brand--default`), not appearance
+- ❌ NEVER hardcode colors or measurements
+- ❌ NEVER use legacy `--pf-v6-global--` tokens or numbered base tokens
+
+## 🗃️ State Management
+
+**React Context**:
+
+- **AuthContext** - Authentication state (user, roles, isAuthenticated)
+- **NotificationContext** - App-wide notification system
+- **BrandingContext** - Branding settings from `/api/v1/branding` endpoint (5-min stale time, fallback to defaults)
+- **ConfigContext** - Application configuration from `/api/v1/config` endpoint
+  - **Base Config**: `usageCacheTtlMinutes`, `version`, `environment`
+  - **Admin Analytics Config**: All UI-relevant admin analytics settings (pagination, limits, thresholds)
+  - Integrates with React Query `staleTime`: `config.usageCacheTtlMinutes * 60 * 1000`
+  - Pattern: Dynamic cache TTL eliminates hardcoded values in query hooks
+
+**React Query**: Server state management with dynamic stale time from ConfigContext, 10min cache time, 3 retries
+
+### Admin Analytics Configuration
+
+**Hook**: `useAdminAnalyticsConfig()` provides pagination limits, date range limits, trend thresholds, and export limits from backend.
+
+**Integration**: Dynamic configuration eliminates hardcoded values, integrates with React Query `staleTime` via ConfigContext.
+
+**Admin Component Structure**:
+
+- `components/admin/` - Admin-specific UI components
+  - `MetricsOverview.tsx` - Shared usage analytics dashboard with trend indicators and auth-aware admin sections
+  - `TopUsersTable.tsx` - Admin-only user usage breakdown table rendered by `MetricsOverview`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rh-aiservices-bu/litemaas](https://github.com/rh-aiservices-bu/litemaas) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
