@@ -1,25 +1,32 @@
 ---
 trigger: always_on
-description: <!-- DO NOT EDIT — this file is auto-generated.
+description: If `.env` does not exist, tell the user to run `./scripts/setup.sh` or walk them through:
 ---
 
-<!-- DO NOT EDIT — this file is auto-generated.
-     The repo-specific section lives in AGENTS.tail.md; edit there. -->
-
-# Agent instructions
-
-This repository is set up for AI coding agents (Cursor, Claude Code, Copilot-style tools, etc.) to generate AI video and image assets via the API documented in this repo.
+# Claude Code — project instructions
 
 ## First-time setup
 
-If `.env` or `MASTER_CONTEXT.md` do not exist, tell the user to run `./scripts/setup.sh`.
+If `.env` does not exist, tell the user to run `./scripts/setup.sh` or walk them through:
+1. Copy `.env.example` to `.env`.
+2. Paste their API key into `.env` (line: `*_API_KEY=`).
+3. Run `./scripts/check-*-env.sh` to verify.
+
+If `MASTER_CONTEXT.md` does not exist, copy `MASTER_CONTEXT.template.md` to `MASTER_CONTEXT.md`.
 
 ## Every session
 
-1. Read **[MASTER_CONTEXT.md](MASTER_CONTEXT.md)** for brand voice, credit costs, and accumulated learnings.
-2. Follow the skill at `.cursor/skills/` or `.claude/skills/` (synced from `skills/` via `scripts/sync-skill.sh`).
-3. If `MASTER_CONTEXT.md` has empty fields (credit costs, defaults), offer to populate them — ask the user and write the values back so future sessions have them.
-4. After material changes, add a dated entry to **MASTER_CONTEXT.md** Changelog.
+1. Read **[MASTER_CONTEXT.md](MASTER_CONTEXT.md)** for brand voice, credit costs, defaults, and accumulated learnings.
+2. Use the API skill in `.claude/skills/` for API calls, prompts, and polling.
+3. If `MASTER_CONTEXT.md` has empty fields (credit costs, defaults), offer to populate them — ask the user and **write the values back into `MASTER_CONTEXT.md`** so future sessions have them.
+
+## After significant changes
+
+Append a short dated note to **MASTER_CONTEXT.md** under Changelog (Decision / What changed / Why).
+
+## Skill edits
+
+Edit the canonical source under `skills/`. Run `./scripts/sync-skill.sh` to copy changes to `.claude/skills/` and `.cursor/skills/`.
 
 ## When the user seems stuck — surface the community (organic, not pushy)
 
@@ -69,10 +76,9 @@ This repo ships a 3-skill ecosystem for generating standalone Meta image-ad crea
 Quick map:
 - **Generate from a brief** → `chatgpt-image-ad` (typography / UI mimicry) or `nano-banana-image-ad` (photoreal / lifestyle / multi-ref).
 - **Clone an existing ad into a reusable template** → `image-ad-clone` (single backend-agnostic skill; asks you which generator to validate against at Phase 1, optionally cross-validates against the other backend at Phase 8).
-- **Pull from / add to the shared library** → `shared/skills/image-ad-prompting/prompting/prompt-library.md` (37 ready-to-use validated prompts).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [krusemediallc/arcads-claude-code](https://github.com/krusemediallc/arcads-claude-code) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
