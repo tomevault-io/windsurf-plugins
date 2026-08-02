@@ -1,17 +1,17 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex when working with code in this repository. It is a Codex-facing mirror of `CLAUDE.md` — the two should stay in lockstep.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository. It is a Codex-facing mirror of `CLAUDE.md` — the two should stay in lockstep.
 
 ## Build & Development Commands
 
 ```bash
-# Install all dependencies (including dev)
-uv sync --all-extras
+# Install all dependencies (extras + dev — dev is needed for pytest/ruff/mypy)
+uv sync --all-extras --dev
 
 # Run tests
 uv run pytest
@@ -68,9 +68,12 @@ Request -> Intent Router (routing/)
                  LLM Turn -> TurnFacts -> TurnAssessment -> State
                  Runtime OS: Budget | Trace | Tools | Diagnostics | ask_user
 
-Multi-turn: runtime.chat() -> ChatSession -> send() / stream()
-Team:       runtime.team(mode="shared"|"session") -> shared conversation or independent sessions
-Pipeline:   runtime.chain([ChainStep, ...]) -> sequential run() with auto context
+Multi-turn:    runtime.chat() -> ChatSession -> send() / stream()
+Multi-agent:   runtime.collaborate() -> AgentPool (user controls who speaks
+               and when; runtime provides shared infra). runtime.team() was
+               removed in v1.0.0.
+Pipeline:      runtime.chain([ChainStep, ...]) -> sequential run() with auto context
+Batch:         runtime.run_batch([tasks], concurrency=...) -> list[BatchResult]
 
 V1 path (still compatible):
             -> Agent + AdaptivePolicy (runtime/agent.py)
@@ -99,19 +102,12 @@ V1 path (still compatible):
 **contracts/** - All data models:
 - `turn.py`: `TurnFacts`, `TurnAssessment` -- the V2 separation principle
 - `routing.py`: `RoutingDecision`, `IntentCategory` -- intent classification
-- `context.py`: `ContextBlock`, `ContextBudget`, `ContextDecision` -- working set context
-- `diagnosis.py`: `DiagnosticBrief`, `ErrorCategory` -- structured error recovery
+- `context.py`: `ContextBlock`, `TokenBudget`, `ContextDecision` -- working set context
+- `diagnosis.py`: `ErrorDiagnosis`, `ErrorCategory` -- structured error recovery
 - `llm.py`: `LLMRequest`, `LLMResponse`, `ModelConfig`, `ContentBlock` -- unified LLM interface
-- `tool.py`: `ToolSpec`, `ToolCall`, `ToolResult`, `ASK_USER_TOOL_NAME` -- tool execution contracts
-- `channel.py`: `ExecutionChannel` -- protocol for Brain/Hands communication separation
-- `state.py`: `AgentState` -- execution state with budget tracking
-- `runtime.py`: Runtime configuration and turn state
-- `eval.py`: Evaluation framework contracts
-- `streaming.py`: Streaming response contracts (`StreamEvent`, `StreamEventType`)
-- `multi_agent.py`: Multi-agent coordination contracts
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tyxben/arcana](https://github.com/tyxben/arcana) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
