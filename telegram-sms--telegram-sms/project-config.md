@@ -1,156 +1,78 @@
 ---
 trigger: always_on
-description: This is the **Telegram SMS** Android application project. Please refer to the comprehensive project documentation at `docs/docs/instructions/project.instructions.md` for detailed information about:
+description: This file provides guidance to AI coding agents (Claude Code, Cursor, Codex, Copilot, Gemini, etc.) when working with code in this repository. Contributions developed with any AI tool are welcome — keep this file tool-neutral.
 ---
 
-# GitHub Copilot Instructions for Telegram SMS
+# AGENTS.md
 
-## Project Context
+This file provides guidance to AI coding agents (Claude Code, Cursor, Codex, Copilot, Gemini, etc.) when working with code in this repository. Contributions developed with any AI tool are welcome — keep this file tool-neutral.
 
-This is the **Telegram SMS** Android application project. Please refer to the comprehensive project documentation at `docs/docs/instructions/project.instructions.md` for detailed information about:
+## Project
 
-- Project architecture and structure
-- Technology stack and dependencies
-- Key components and services
-- Data storage with MMKV
-- Security features
-- Build configuration and CI/CD
-- Development guidelines
+Android app that forwards SMS / missed calls / battery events to a Telegram bot and accepts remote commands back. Single Gradle module `:app`, all Kotlin, target package `com.qwe7002.telegram_sms`.
 
-## Key Guidelines
+- compileSdk / targetSdk: 36, minSdk: 23, JDK 21, Android Gradle Plugin 9.0.0
+- No native code despite NDK abiFilters (`armeabi-v7a`, `arm64-v8a`) — those exist for transitive `.so` packaging (libsodium, conscrypt, MMKV)
 
-### 1. Language and Code Style
-- **Primary commit language**: English
-- **Kotlin coding conventions**: Follow standard Kotlin style guide
-- **Documentation language**: English for developer docs (`docs/`)
+## Build & test commands
 
-### 2. String Resources
-- String resources are organized into category-based XML files
-- See `docs/docs/STRING_RESOURCES.md` for detailed guidelines
-- Always consider internationalization (i18n) when adding UI strings
-- Use appropriate category files:
-  - `strings_battery.xml` - Battery monitoring
-  - `strings_telegram.xml` - Telegram API
-  - `strings_sms.xml` - SMS forwarding
-  - `strings_call.xml` - Phone calls
-  - `strings_cc.xml` - Carbon Copy services
-  - etc.
+The Gradle wrapper is at the repo root. On Windows use `gradlew.bat`; on POSIX runners use `./gradlew`.
 
-### 3. Data Storage
-- Use **MMKV** for configuration persistence (not SharedPreferences)
-- Update `DataMigrationManager` when modifying data storage
-- See `MMKV/DataMigrationManager.kt` for migration examples
-
-### 4. Architecture Considerations
-- **No native code**: Project has no C/C++ despite NDK filters
-- **Background services**: Handle Android 8+ background execution limits
-- **Dual SIM support**: Code must account for multiple SIM slots
-- **Permission handling**: Update AndroidManifest.xml and runtime permissions
-- **Telegram API**: All bot interactions via `TelegramApi.kt` wrapper
-
-### 5. Dependencies
-- **Networking**: OkHttp 5.x with DNS-over-HTTPS
-- **Security**: Conscrypt, Lazysodium (libsodium)
-- **Storage**: MMKV 2.x (Tencent)
-- **JSON**: Gson 2.x
-- **QR Code**: code-scanner, AwesomeQRCode (custom)
-
-### 6. Build and Versioning
-- **compileSdk**: 36, **minSdk**: 23, **targetSdk**: 36
-- **JDK**: 21
-- **Kotlin**: 2.2.21
-- **Version naming**: Ubuntu-style `YY.MM` (e.g., `26.01`)
-- **Build variants**: debug, release, nightly
-
-### 7. Testing and Quality
-- Manual testing required for SMS/Call functionality
-- QR code configuration for easy setup
-- Log viewing within app for debugging
-- Always validate changes with `get_errors` after editing
-
-### 8. Documentation
-When making significant changes, update documentation in `docs/docs/`:
-- New features → Create feature documentation
-- API changes → Update `DATA_STRUCTURE_VERSION.md`
-- New integrations → Update `CarbonCopyProvider.md`
-- Security changes → Update `CRYPTO_DOC.md`
-
-**VitePress Documentation Sites**:
-- Both `docs/` and `document/` are deployed using **VitePress**
-- When adding new documentation pages, update the corresponding `config.mts` file:
-  - `docs/.vitepress/config.mts` - Developer documentation config
-  - `document/.vitepress/config.mts` - User documentation config
-- Add navigation items, sidebar entries, and routing as needed
-
-**Note**: Focus on developer docs in `docs/`. User documentation in `document/` requires multi-language support.
-
-### 9. Git Submodules
-The project uses git submodules:
-- `language_pack/` - Translations (9 languages)
-  - Located at: `app/language_pack/`
-  - Contains language-specific string resources in `values-*` directories
-  - Each language corresponds to Android resource qualifiers (e.g., `values-zh-rCN`, `values-ja-rJP`)
-  - When adding new strings, update the corresponding language files in language_pack
-- `AwesomeQrRenderer/` - QR code rendering
-- `CodeauxLibPortable/` - Portable library
-
-**Language Pack Structure**:
-- `values-zh-rCN/` - Simplified Chinese
-- `values-zh-rTW/` - Traditional Chinese
-- `values-zh-rHK/` - Hong Kong Chinese
-- `values-yue-rCN/` - Cantonese (China)
-- `values-yue-rHK/` - Cantonese (Hong Kong)
-- `values-ja-rJP/` - Japanese
-- `values-es-rES/` - Spanish
-- `values-ru/` - Russian
-- `values-vi/` - Vietnamese
-
-Handle submodules carefully when making changes.
-
-### 10. Important Notes
-- **Multi-language support**: 9 languages via language_pack system
-- **Carbon Copy system**: Extensible notification forwarding
-- **Remote commands**: Users control device via Telegram
-- **Security**: End-to-end encryption with libsodium
-- **CI/CD**: GitLab CI and GitHub Actions configured
-
-## Quick Reference
-
-### File Locations
-- Main code: `app/src/main/java/com/qwe7002/telegram_sms/`
-- Resources: `app/src/main/res/`
-- Translations: `app/language_pack/`
-- Developer docs: `docs/docs/`
-- User docs: `document/docs/`
-
-### Key Classes
-- `MainActivity.kt` - Main UI entry
-- `ChatService.kt` - Telegram polling
-- `TelegramApi.kt` - API wrapper
-- `DataMigrationManager.kt` - MMKV migrations
-- `ChatCommand.kt` - Command parser
-
-### Build Commands
 ```bash
-# Copy language pack
-./gradlew copy_language_pack
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Build release APK
-./gradlew assembleRelease
-
-# Clean build
+./gradlew assembleDebug              # debug APK -> app/build/outputs/apk/debug/
+./gradlew assembleRelease            # release APK (requires app/keys.jks + KEYSTORE_PASS/ALIAS_NAME/ALIAS_PASS env or -P props)
+./gradlew test                       # JUnit unit tests
+./gradlew :app:testDebugUnitTest --tests "com.qwe7002.telegram_sms.static_class.PhoneTest"
 ./gradlew clean
 ```
 
-## Additional Resources
+Version is **not** in `build.gradle.kts` — `versionCode` and `versionName` come from `VERSION_CODE` / `VERSION_NAME` env vars (set by GitLab CI, default `1` / `"Debug"` locally). Release tag scheme is Ubuntu-style `YY.MM[.N]` on `master`, timestamp on `nightly`. See [.reallsys/.gitlab-ci.yml](.reallsys/.gitlab-ci.yml).
 
-- **Project overview**: `docs/docs/instructions/project.instructions.md`
+Branch-based variant flavoring (also from `build.gradle.kts`):
+- `nightly` branch → release variant gets `applicationIdSuffix=".nightly"` (parallel-installable)
+- debug always gets `applicationIdSuffix=".debug"`
+
+## Language pack (CRITICAL before any string-resource work)
+
+`app/language_pack/` is a **git submodule** (`https://github.com/telegram-sms/language_pack.git`). It contains all `values-<locale>/` directories for non-English locales. The release CI runs `./gradlew app:copy_language_pack` which copies the submodule into `app/src/main/res/` before `assembleRelease`.
+
+When working locally:
+
+```bash
+git submodule update --init --recursive    # first checkout
+./gradlew app:copy_language_pack           # stage translations into res/
+./gradlew app:clean_language_pack          # remove the staged values-* dirs again
+```
+
+Add new UI strings to `app/src/main/res/values/strings_*.xml` (category files — `strings_sms.xml`, `strings_telegram.xml`, `strings_battery.xml`, `strings_call.xml`, `strings_cc.xml`, `strings_chat.xml`, `strings_network.xml`, `strings_notification.xml`, `strings_privacy_about.xml`, `strings_scanner.xml`, `strings_sms_manage.xml`, `strings_update.xml`, `strings_ussd.xml`). Translations of those keys go into the **language_pack submodule**, not into `app/src/main/res/values-*` directly (those staged copies are gitignored / get clobbered by `copy_language_pack`).
+
+**Auto-align translations after any string change.** Whenever you add, modify, or remove a UI string key in `app/src/main/res/values/strings_*.xml`, immediately bring every locale in the `language_pack` submodule into sync in the same change: add the new key to each `values-<locale>/` file (translated), update the text where the meaning changed, and delete keys you removed. Don't leave the source `values/` strings and the translations out of step. Edit the translations inside the `language_pack` submodule, never the staged `values-*` copies in `res/` (those get clobbered by `copy_language_pack`).
+
+Two other submodules exist and are vendored into the main source tree (no copy step):
+- `app/src/main/java/com/github/sumimakito/awesomeqrcode` — AwesomeQrRenderer
+- `app/src/main/java/com/github/sumimakito/codeauxlib` — CodeauxLibPortable
+
+## Architecture
+
+### Process model
+
+`MainApplication.onCreate()` only does `MMKV.initialize(this)`. The app is mostly **receivers + foreground services**, not Activity-driven:
+
+- **Receivers**: `SMSReceiver`, `WAPReceiver` (MMS WAP push), `CallReceiver`, `BootReceiver`, `SMSSendResultReceiver`, `USSDCallBack`.
+- **Foreground services** (`foregroundServiceType="specialUse"`):
+  - `ChatService` — long-poll `getUpdates` against Telegram Bot API; routes commands to handlers in [static_class/ChatCommand.kt](app/src/main/java/com/qwe7002/telegram_sms/static_class/ChatCommand.kt). Holds a `WakeLock` and `WifiLock`.
+  - `BatteryService` — battery + respond-via-message handler.
+  - `NotificationService` — `NotificationListenerService` for app-notification → Telegram forwarding (Carbon Copy source).
+- **JobServices**: `ReSendJob` (retry failed SMS sends), `CcSendJob` (Carbon Copy delivery), `KeepAliveJob`.
+- **Activities** are config UI (`MainActivity`, `CcActivity`, `TemplateActivity`, `SpamActivity`, `ScannerActivity`, `TransferConfigActivity`, `LogActivity`, `NotifyActivity`).
+
+`ChatService` is the brain — it owns the Telegram polling loop and dispatches inbound commands; outbound notifications come from receivers / `BatteryService` / `NotificationService` calling into `static_class.TelegramApi`.
+
+### Package layout
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [telegram-sms/telegram-sms](https://github.com/telegram-sms/telegram-sms) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
