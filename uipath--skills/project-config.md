@@ -1,46 +1,105 @@
 ---
 trigger: always_on
-description: This repository contains self-contained AI agent skills for UiPath automation development. Skills are installed as a Claude Code plugin and teach AI agents how to build, run, test, and deploy UiPath automations.
+description: > Requires `@uipath/uipath-typescript` **≥ 1.4.1**. Scopes: `Insights Insights.RealTimeData`.
 ---
 
-# UiPath Agent Skills — Project Rules
+# Agents & Agent Memory (Insights RTM) Reference
 
-This repository contains self-contained AI agent skills for UiPath automation development. Skills are installed as a Claude Code plugin and teach AI agents how to build, run, test, and deploy UiPath automations.
+> Requires `@uipath/uipath-typescript` **≥ 1.4.1**. Scopes: `Insights Insights.RealTimeData`.
 
-## Architecture
+Two services, **two different calling conventions** — do not mix them up:
 
-- **Skills are fully independent.** Each skill under `skills/` is self-contained. Skills cannot reference, import, or depend on other skills.
-- **SKILL.md is the contract.** Every skill folder must have a `SKILL.md` with valid YAML frontmatter. This is the only file the plugin system reads to discover and activate skills.
-- **No build system.** This repo contains only markdown documentation and shell scripts. There is no compilation or packaging step.
+| Service | Subpath | Convention |
+|---------|---------|------------|
+| `Agents` | `@uipath/uipath-typescript/agents` | **Positional `Date` args**: `getAll(startTime, endTime, options?)` |
+| `AgentMemory` | `@uipath/uipath-typescript/agent-memory` | **Options object**: `getTimeline({ startTime?, endTime?, ... })` — dates inside the object |
 
-## Contribution Rules
+## Agents Service
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. Key rules:
+```typescript
+import { Agents, AgentListSortColumn } from '@uipath/uipath-typescript/agents';
+const agents = new Agents(sdk)
+```
 
-1. **Skill folder naming:** `uipath-<kebab-case>` under `skills/`
-2. **SKILL.md frontmatter is required:** must include `name` (matching folder name) and `description` (with TRIGGER/DO NOT TRIGGER conditions)
-3. **References use kebab-case filenames** with `-guide.md` and `-template.md` suffixes
-4. **Update CODEOWNERS** when adding or modifying skill ownership
-5. **No cross-skill references** — each skill must work in isolation
-6. **No secrets or personal paths** in committed files
-7. **CLI commands must use `--output json`** when output is parsed programmatically
+### getAll(startTime: Date, endTime: Date, options?: AgentListOptions)
 
-## File Conventions
+The agent list with consumption + health metadata aggregated over the window. Returns `NonPaginatedResponse<AgentListItem>` (or `PaginatedResponse` with pagination options). **Rows are on `.items`.**
 
-| File | Convention |
-|------|-----------|
-| `SKILL.md` | Required. Uppercase. YAML frontmatter + markdown body. |
-| `references/*.md` | Kebab-case. Guides end with `-guide.md`. |
-| `assets/templates/*` | Templates end with `-template.md` or `-template.<ext>`. |
-| `hooks/*.sh` | Must be cross-platform (Windows/macOS/Linux). |
+`AgentListOptions`: `folderKeys?: string[]`, `agentNames?: string[]`, `projectKeys?: string[]`, `agentId?: string`, `processVersion?: string`, `orderBy?: { column: AgentListSortColumn, desc?: boolean }` + pagination (`pageSize`, `cursor`, `jumpToPage`).
 
-## When Reviewing or Editing Skills
+`AgentListSortColumn`: `AgentName`, `ParentProcess`, `LastRun`, `HealthScore`, `LastIncident`, `FolderName`, `QuantityAGU`, `QuantityPLTU`, `FolderPath`.
 
-- Read the existing SKILL.md before making changes
-- Preserve the Critical Rules section — these prevent expensive agent mistakes
-- Validate YAML frontmatter — broken frontmatter breaks skill discovery
-- Ensure `description` field has both TRIGGER and DO NOT TRIGGER conditions
+`AgentListItem` fields: `agentId`, `agentName`, `parentProcess`, `folderKey`, `folderName`, `folderPath`, `lastRun`, `processKey`, `processVersion`, `healthScore` (0–100), `lastIncidentType`, `unitsQuantity`, `unitsName`, `quantityAGU`, `quantityPLTU`. Nullable: `parentProcess`, `folderKey/Name/Path`, `processKey`, `processVersion`, `lastIncidentType`, `unitsName` (may be `null` or `""`).
+
+**Example response** (`.items` — field names exact, values illustrative):
+
+```json
+{
+  "items": [
+    {
+      "agentId": "ag-0001", "agentName": "InvoiceTriageAgent",
+      "parentProcess": "InvoiceFlow", "folderKey": "f-1001", "folderName": "Finance",
+      "folderPath": "Finance", "lastRun": "2026-06-10T18:22:00Z",
+      "processKey": "p-0088", "processVersion": "1.2.0",
+      "healthScore": 92, "lastIncidentType": null,
+      "unitsQuantity": 340, "unitsName": "AGU", "quantityAGU": 340, "quantityPLTU": 0
+    },
+    {
+      "agentId": "ag-0002", "agentName": "ContractReviewAgent",
+      "parentProcess": null, "folderKey": "f-1001", "folderName": "Finance",
+      "folderPath": "Finance", "lastRun": "2026-06-10T16:05:00Z",
+      "processKey": null, "processVersion": null,
+      "healthScore": 58, "lastIncidentType": "Error",
+      "unitsQuantity": 1210, "unitsName": "AGU", "quantityAGU": 1210, "quantityPLTU": 12
+    }
+  ],
+  "count": 2
+}
+```
+
+> **Semantics:** `getAll` returns per-agent totals (`quantityAGU`, `healthScore`, `lastIncidentType`) — good for KPIs and ranked tables. For *time-series* (error / latency / consumption trends) use the dedicated timeline methods below — all added in SDK 1.4.1. There is still **no invocation-count timeline** and **no per-percentile method other than `getLatencyTimeline`**.
+
+### getErrors(startTime: Date, endTime: Date, options?: AgentGetErrorsOptions)
+
+Agent error classes (incidents) observed in the window, ranked. Returns `NonPaginatedResponse<AgentError>` (or `PaginatedResponse` with pagination options). **Rows are on `.items`.**
+
+`AgentGetErrorsOptions`: filters (`folderKeys`, `agentNames`, `projectKeys`, `agentId`, `processVersion`) + `orderBy?: { column: AgentErrorSortColumn, desc?: boolean }` + pagination. `AgentErrorSortColumn`: `ExecutionCount`, `ErrorTitle`, `Type`, … (import from `@uipath/uipath-typescript/agents`).
+
+`AgentError` fields: `type`, `description`, `agentId`, `agentName`, `jobKey`, `parentProcess`, `firstSeen`, `folderKey`, `folderName`, `folderPath`, `count`, `firstSeenJob`, `lastSeenJob`.
+
+```json
+{ "items": [
+  { "type": "ToolError", "description": "Tool 'search' timed out", "agentId": "ag-0002", "agentName": "ContractReviewAgent", "count": 14, "firstSeen": "2026-06-02T09:11:00Z", "folderName": "Finance" }
+], "count": 1 }
+```
+
+### getErrorsTimeline(startTime: Date, endTime: Date, options?)
+
+Time-series of error counts grouped by agent. Returns a **bare array** `[{ name, value, date }]` — `name` is the agent name, `value` the error count, `date` the bucket. Options: filters + `limit?` (top-N agents, default 10).
+
+```json
+[ { "name": "ContractReviewAgent", "value": 6, "date": "2026-06-02" },
+  { "name": "InvoiceTriageAgent", "value": 1, "date": "2026-06-02" } ]
+```
+
+### getConsumptionTimeline(startTime: Date, endTime: Date, options?)
+
+Time-series of AGU consumption. Returns a **bare array** `[{ timeSlice, aguConsumption }]` — native chart shape. Options: filters.
+
+```json
+[ { "timeSlice": "2026-06-01T00:00:00Z", "aguConsumption": 120 },
+  { "timeSlice": "2026-06-02T00:00:00Z", "aguConsumption": 340 } ]
+```
+
+### getLatencyTimeline(startTime: Date, endTime: Date, options?)
+
+Time-series of agent latency per percentile. Returns a **bare array** `[{ name, value, date }]` — `name` is the percentile (`"P50"` / `"P95"`), `value` is **milliseconds**, `date` the bucket. Options: filters.
+
+```json
+[ { "name": "P50", "value": 820, "date": "2026-06-02" },
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [UiPath/skills](https://github.com/UiPath/skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
