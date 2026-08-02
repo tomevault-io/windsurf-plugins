@@ -1,87 +1,97 @@
 ---
 trigger: always_on
-description: This is the single source of truth for all AI coding agents (Claude, Gemini, others) working on ModelAudit, a security scanner for AI/ML model files. Follow it exactly and keep instructions concise through progressive disclosure—share only the minimum needed context and iterate.
+description: Scoped agent guide for work inside `packages/modelaudit-picklescan/`. The root [`../../AGENTS.md`](../../AGENTS.md) still applies; this file covers what's different about this subpackage.
 ---
 
-# AGENTS.md — ModelAudit (Canonical Agent Guide)
+# AGENTS.md — modelaudit-picklescan
 
-This is the single source of truth for all AI coding agents (Claude, Gemini, others) working on ModelAudit, a security scanner for AI/ML model files. Follow it exactly and keep instructions concise through progressive disclosure—share only the minimum needed context and iterate.
+Scoped agent guide for work inside `packages/modelaudit-picklescan/`. The root [`../../AGENTS.md`](../../AGENTS.md) still applies; this file covers what's different about this subpackage.
 
-## Stateless Onboarding
+## What this package is
 
-- Agents start with zero context; use this file to bootstrap each session with the essentials: what (stack/project map), why (security-focused scanner), and how (workflow + validation below).
-- Prefer pointers over payloads: read the specific docs in `docs/agents/` when needed instead of inlining here.
-- Keep instructions universal and minimal; lean on deterministic tools (ruff, mypy, pytest, prettier) rather than embedding style rules.
-- When unsure, ask or fetch targeted context instead of expanding instructions.
+`modelaudit-picklescan` is the Rust-backed pickle scanner that ships as an independent PyPI package. The root `modelaudit` wheel depends on it at runtime via a hard `modelaudit-picklescan>=0.1.9,<0.2.0` pin in the root `pyproject.toml`.
 
-### Monorepo at a glance
+- **Public API** — exported from `src/modelaudit_picklescan/__init__.py`: `PickleScanner`, `ScanOptions`, `scan_file`, `scan_bytes`, `scan_stream`, `shared_source_sensitive_caches`, `PickleReport`, `Finding`, `Notice`, `ScanError`, `Severity`, `ScanStatus`, `SafetyVerdict`, `CoverageSummary`. Treat these names as a stable surface.
+- **Rust engine** — `rust/src/` compiled to `modelaudit_picklescan._rust` via maturin + PyO3. Rust 1.83+, edition 2021.
+- **Zero Python runtime deps** — the wheel is intentionally self-contained.
+- **Typed** — ships `py.typed`. Public models are frozen dataclasses with `to_dict()`.
 
-This repo publishes **two PyPI packages with independent versions**:
+See [`../../docs/agents/picklescan-package-split.md`](../../docs/agents/picklescan-package-split.md) for the detailed boundary between this package and `modelaudit`.
 
-| PyPI name               | Path                              | Version file                    | CHANGELOG                                     |
-| ----------------------- | --------------------------------- | ------------------------------- | --------------------------------------------- |
-| `modelaudit`            | `./` (root)                       | `pyproject.toml` + `uv.lock`    | `CHANGELOG.md`                                |
-| `modelaudit-picklescan` | `packages/modelaudit-picklescan/` | `pyproject.toml` + `Cargo.toml` | `packages/modelaudit-picklescan/CHANGELOG.md` |
+## Layout
 
-Root `modelaudit` hard-requires `modelaudit-picklescan>=0.1.0,<0.2.0` — when the sibling crosses `0.2.0`, bump the constraint in the same PR or the next `modelaudit` release is uninstallable. Both packages are driven by a single `release-please` workflow (`.github/workflows/release-please.yml`) with components defined in `release-please-config.json` and current versions in `.release-please-manifest.json`. Full publishing details — trusted publishing, manual `workflow_dispatch` recovery (`root_version` / `picklescan_version`), and yank procedure — are in [`docs/agents/release-process.md`](docs/agents/release-process.md). For work inside the picklescan package, start from [`packages/modelaudit-picklescan/AGENTS.md`](packages/modelaudit-picklescan/AGENTS.md).
-
-## Mission & Principles
-
-- **Security first:** Never weaken detections or bypass safeguards.
-- **Match the codebase:** Follow existing patterns, architecture, and naming; never add dependencies without approval.
-- **Progressive disclosure:** Be concise, reveal details as needed, and prefer short, scoped messages.
-- **Iterative refinement:** Share a plan for non-trivial work, execute incrementally, and verify after each change.
-- **Ask when unclear:** Confirm scope before risky or ambiguous actions.
-- **Proactive completion:** Provide tests and follow-up steps without waiting to be asked.
-
-## Quick Start Commands
-
-```bash
-# Setup
-uv sync --extra all-ci
-
-# Pre-commit workflow (MUST run before every commit)
-uv run ruff format modelaudit/ packages/modelaudit-picklescan/src packages/modelaudit-picklescan/tests tests/
-uv run ruff check --fix modelaudit/ packages/modelaudit-picklescan/src packages/modelaudit-picklescan/tests tests/
-uv run mypy modelaudit/ packages/modelaudit-picklescan/src packages/modelaudit-picklescan/tests tests/
-PROMPTFOO_DISABLE_TELEMETRY=1 uv run pytest -n auto -m "not slow and not integration" --maxfail=1
+```
+packages/modelaudit-picklescan/
+├── pyproject.toml          # maturin build backend, version "X.Y.Z" # x-release-please-version
+├── Cargo.toml              # Rust crate version (bumped in lockstep by release-please)
+├── Cargo.lock
+├── uv.lock
+├── CHANGELOG.md            # separate from root CHANGELOG
+├── README.md               # separate — published to https://pypi.org/project/modelaudit-picklescan/
+├── src/modelaudit_picklescan/
+│   ├── __init__.py         # public API surface
+│   ├── api.py              # PickleScanner, scan_* entry points, container handling
+│   ├── options.py          # ScanOptions + validation + defaults
+│   ├── report.py           # PickleReport / Finding / Notice / ScanError / enums
+│   ├── py.typed            # PEP 561 marker
+│   └── _rust.*             # generated by maturin; NOT committed
+├── rust/src/               # Rust scanner implementation
+└── tests/                  # pytest suite (parity corpus, adversarial oracle, etc.)
 ```
 
-## Standard Workflow
+## Local validation
 
-1. **Understand:** Read nearby code, tests, and docs (`docs/agents/*.md`) before editing.
-2. **Plan:** For anything non-trivial, present a short multi-step plan; refine iteratively.
-3. **Implement:** Preserve security focus, follow `BaseScanner` patterns (see `docs/agents/architecture.md`), handle missing deps gracefully, and update `SCANNER_REGISTRY` when adding scanners.
-4. **Verify:** Run the validation commands above. Format/linters must be clean. Use targeted `pytest` when appropriate, and type-check modified tests as part of the normal `mypy modelaudit/ packages/modelaudit-picklescan/src packages/modelaudit-picklescan/tests tests/` pass.
-5. **Report:** Summarize changes with file references and note residual risks or follow-ups.
-
-## Branch & Git Hygiene
-
-**NEVER commit or push directly to `main`.** All changes must go through pull requests.
+Run from `packages/modelaudit-picklescan/`:
 
 ```bash
-# Start clean
-git fetch origin main
-git checkout main
-git merge --no-edit origin/main
+uv lock --check
+uv run --with ruff ruff check src tests
+uv run --with ruff ruff format --check src tests
+uv run --with mypy mypy src tests
+uv run --with pytest --with pytest-xdist pytest -n auto tests --tb=short
 
-# Work on a branch (REQUIRED - never commit to main)
-git checkout -b feat/your-feature-name  # or fix/, chore/, test/
-
-# Commit (conventional)
-git commit -m "feat: add scanner for XYZ format
-
-Description here."
-
-# PR (after validation) - ALL changes go through PRs
-git push -u origin feat/your-feature-name
-gh pr create --title "feat: descriptive title" --body "Brief description"
+cargo fmt --manifest-path Cargo.toml -- --check
+cargo check --manifest-path Cargo.toml
+cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path Cargo.toml
 ```
 
-- Use non-interactive flags (`--no-edit`, `-m`). One command per invocation; avoid long `&&` chains.
+Wheel build + twine check:
+
+```bash
+uv build --out-dir /tmp/modelaudit-picklescan-dist
+uvx twine check /tmp/modelaudit-picklescan-dist/*
+```
+
+Dev with hot-reload (rebuilds the Rust extension into your current venv), from this directory:
+
+```bash
+maturin develop --release
+```
+
+Root-level validation (`uv run ruff check modelaudit/ packages/modelaudit-picklescan/src packages/modelaudit-picklescan/tests tests/`) must also pass for any PR.
+
+## Versioning
+
+- `pyproject.toml` and `Cargo.toml` carry the same `version`, both tagged with `# x-release-please-version` so release-please updates them atomically.
+- `.release-please-manifest.json` at the repo root tracks the current released version: `"packages/modelaudit-picklescan": "X.Y.Z"`.
+- The CHANGELOG lives next to the package (`CHANGELOG.md`), _not_ at the repo root.
+- Release tag format: `modelaudit-picklescan-v{X.Y.Z}`.
+- Bumps are driven by Conventional Commits that **touch files inside `packages/modelaudit-picklescan/`**. Commits that only touch `modelaudit/` or the repo root do not bump this package.
+
+When this package reaches `0.2.0`, the root `pyproject.toml` `modelaudit-picklescan>=0.1.9,<0.2.0` constraint must be widened in the same PR, or the next `modelaudit` release will be uninstallable.
+
+## Publishing
+
+Driven from the shared `.github/workflows/release-please.yml`. The release PR merge triggers `build-picklescan-package` (5-arch matrix) and `publish-picklescan-pypi` via OIDC. The project has an **active trusted publisher** on PyPI; see [`../../docs/agents/release-process.md`](../../docs/agents/release-process.md) for the full flow, the manual `workflow_dispatch` recovery path (`-f picklescan_version=X.Y.Z`), and what to do when a publish job fails.
+
+## Safety invariants
+
+- **No imports from `modelaudit`** — this package is deliberately standalone. Adding such an import breaks the distribution boundary and will fail CI.
+- **Detection parity** — any detector moved from the root scanners into this package keeps the same malicious-positive / benign-negative coverage. See `tests/parity_corpus.py` and `tests/test_adversarial_pickle_oracle.py`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [promptfoo/modelaudit](https://github.com/promptfoo/modelaudit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
