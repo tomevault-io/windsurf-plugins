@@ -1,209 +1,186 @@
 ---
 trigger: always_on
-description: - `/agentjido/` is kept out of version control via the `.gitignore` entry at `/agentjido/`, but it is available locally for experimentation.
+description: - Consume `review.request` signals.
 ---
 
-# Agents Reference
+# Stage 1 Agents
 
-## Local Agent Workspace
+## CoordinatorAgent
 
-- `/agentjido/` is kept out of version control via the `.gitignore` entry at `/agentjido/`, but it is available locally for experimentation.
-- The directory contains three sibling libraries that power our agent work: `agentjido/jido`, `agentjido/jido_signal`, and `agentjido/jido_action`.
-- The Jido guides live under `agentjido/jido/guides` (explore that folder for detailed walkthroughs).
+### Responsibility
 
-● **Agents vs Pipelines: The Architecture of World Domination 🌍**
+- Consume `review.request` signals.
+- Determine review path (`:fast_path` vs `:deep_review`).
+- Ensure specialist agents are alive.
+- Enqueue specialist instructions via directives.
+- Collect `review.result` signals, store interim state.
+- Emit consolidated `review.summary`.
 
-You're asking the right question. Let me break down the fundamental differences and show you how to actually build toward multi-agent dominance.
-
----
-
-**Core Concepts**
-
-**Pipelines (Runners)**
-
-What: Static, deterministic data transformations  
-Decision-making: Zero - always follows the same path  
-Tools: No - just pure functions chained together
+### Schema
 
 ```elixir
-# Pipeline: Always does A -> B -> C
-input
-|> validate()
-|> transform()
-|> format()
-|> output()
+use Jido.Agent,
+  name: "coordinator",
+  description: "Routes review work to specialists and synthesizes results",
+  actions: [
+    Synapse.Actions.Review.ClassifyChange,
+    Synapse.Actions.Review.GenerateSummary
+  ],
+  schema: [
+    review_count: [type: :integer, default: 0],
+    active_reviews: [
+      type: {:map, :map},
+      default: %{},
+      doc: "ReviewID => %{status: atom(), results: [result()]}"
+    ]
+  ]
 ```
 
-When to use:
-- You know the exact steps beforehand
-- No decisions needed
-- Same path every time
-- Performance critical
+### Signals & Directives
 
-**Agents**
+| Trigger | Response |
+| --- | --- |
+| `review.request` | `Directive.Spawn` specialists (idempotent). |
+| `review.request` | `Directive.Enqueue` instructions for each specialist. |
+| `review.result` | Update `active_reviews`, check completion, possibly emit `review.summary`. |
+| `review.summary` (self-emitted) | Increment `review_count`, cleanup `active_reviews`. |
 
-What: Autonomous entities with state, goals, and decision-making  
-Decision-making: High - chooses actions based on context  
-Tools: Yes - can select and use different tools
-
-```elixir
-# Agent: Decides what to do based on input
-agent
-|> observe(situation)
-|> reason() # "Is this simple? Complex? Urgent?"
-|> decide_action() # Pick: quick_review OR deep_analysis OR escalate
-|> use_tool(selected_action)
-|> learn_from_result()
-```
-
-When to use:
-- Need decision-making
-- Adapt to different scenarios
-- Learn from experience
-- Coordinate with other agents
-
----
-
-**The Fundamental Difference**
-
-Pipeline: "Do these steps"
+### Decision Logic
 
 ```elixir
-# Always the same, no choices
-def pipeline(input) do
-  input
-  |> step1()
-  |> step2()
-  |> step3()
-end
-```
-
-Agent: "Achieve this goal"
-
-```elixir
-# Different paths based on reasoning
-def agent_decide(input, agent_state) do
-  case analyze_situation(input) do
-    :simple ->
-      agent |> use_tool(QuickReview)
-
-    :complex ->
-      agent
-      |> use_tool(DeepAnalysis)
-      |> maybe(use_tool(SecurityCheck))
-      |> maybe(use_tool(PerformanceCheck))
-
-    :urgent ->
-      agent
-      |> use_tool(FastTrack)
-      |> signal_other_agent(:escalate)
+def classify(review) do
+  cond do
+    review.files_changed > 50 -> :deep_review
+    Enum.any?(review.labels, &(&1 in ["security", "performance"])) -> :deep_review
+    review.intent == "hotfix" -> :fast_path
+    true -> :fast_path
   end
 end
 ```
 
+### State Updates
+
+- `active_reviews[review_id]` holds `%{status, pending_agents, results}`.
+- After summary emission, entry is removed.
+- `review_count` increments for metrics.
+
 ---
 
-**Your Current State (Honest Assessment)**
+## SecurityAgent
 
-What You Have Now
+### Responsibility
+
+- Run security-focused checks for a single review.
+- Track patterns of recurring issues.
+- Record scar tissue for failed mitigations.
+- Emit structured findings via `review.result`.
+
+### Schema
 
 ```elixir
-# This is a PIPELINE dressed as agents
-def evaluate(input) do
-  input
-  |> SimpleExecutor.cmd(Echo)        # Always echo
-  |> CriticAgent.cmd(CriticReview)   # Always review
-  |> GenerateCritique.run()          # Always LLM
-end
+use Jido.Agent,
+  name: "security_specialist",
+  description: "Finds security risks in code diffs",
+  actions: [
+    Synapse.Actions.Security.CheckSQLInjection,
+    Synapse.Actions.Security.CheckXSS,
+    Synapse.Actions.Security.CheckAuthIssues
+  ],
+  schema: [
+    review_history: [type: {:list, :map}, default: []],
+    learned_patterns: [type: {:list, :map}, default: []],
+    scar_tissue: [type: {:list, :map}, default: []]
+  ]
 ```
 
-Reality: This is a static pipeline using agent infrastructure. The current Synapse runtime already ships with a declarative
-orchestrator (`priv/orchestrator_agents.exs`) that decides which specialists run for each review. Instead of hand-written
-GenServers like `CoordinatorAgentServer` or `SecurityAgentServer`, every agent is now described as configuration.
+### Directive Handling
+
+- Receives `Directive.Enqueue` with payload `%{review_id, files, metadata}`.
+- Runs each listed action in order (using `Jido.Exec.run/3`).
+- Calls `record_history/2`, `learn_from_correction/2` as needed.
+
+### Result Structure
 
 ```elixir
-# priv/orchestrator_agents.exs (excerpt)
 %{
-  id: :coordinator,
-  type: :orchestrator,
-  actions: [Synapse.Actions.Review.ClassifyChange],
-  orchestration: %{
-    classify_fn: &Synapse.Orchestrator.Config.Classifier.fast_or_deep/1,
-    spawn_specialists: [:security_specialist, :performance_specialist],
-    aggregation_fn: &Synapse.Orchestrator.Config.Aggregation.combine/2
-  },
-  signals: %{subscribes: [:review_request, :review_result], emits: [:review_summary]}
+  review_id: String.t(),
+  agent: "security_specialist",
+  confidence: float(),
+  findings: [
+    %{type: :sql_injection, file: "lib/foo.ex", severity: :high, summary: "..."}
+  ],
+  should_escalate: boolean(),
+  metadata: %{runtime_ms: non_neg_integer()}
 }
 ```
 
-That declarative Config is what the runtime executes today; the rest of this document explains how to evolve it into
-multi-agent dominance (specialist negotiation, learning, etc.).
+---
 
-What You Should Have (Multi-Agent)
+## PerformanceAgent
+
+### Responsibility
+
+- Detect performance regressions and hotspots.
+- Track patterns (e.g., repeated N+1 queries).
+- Emit results consistent with security agent for easy synthesis.
+
+### Schema
 
 ```elixir
-# Real multi-agent: the declarative runtime decides everything
-defmodule Synapse.Orchestrator.Config do
-  def coordinator_spec do
-    %{
-      id: :coordinator,
-      type: :orchestrator,
-      actions: [Synapse.Actions.Review.ClassifyChange],
-      orchestration: %{
-        classify_fn: &Strategies.classify/1,
-        spawn_specialists: &Strategies.choose_team/2,
-        fast_path_fn: &Strategies.fast_path/2,
-        aggregation_fn: &Strategies.aggregate/2,
-        negotiate_fn: &Strategies.resolve_conflicts/2
-      },
-      signals: %{subscribes: [:review_request, :review_result], emits: [:review_summary]}
-    }
-  end
-end
+use Jido.Agent,
+  name: "performance_specialist",
+  description: "Evaluates performance implications of changes",
+  actions: [
+    Synapse.Actions.Performance.CheckComplexity,
+    Synapse.Actions.Performance.CheckMemoryUsage,
+    Synapse.Actions.Performance.ProfileHotPath
+  ],
+  schema: [
+    review_history: [type: {:list, :map}, default: []],
+    learned_patterns: [type: {:list, :map}, default: []],
+    scar_tissue: [type: {:list, :map}, default: []]
+  ]
 ```
 
+### Result Structure
+
 ```elixir
-# Runtime consumes that config – no GenServers required
-{:ok, _runtime} =
-  Synapse.Orchestrator.Runtime.start_link(
-    config_source: {:priv, "orchestrator_agents.exs"},
-    include_types: :all,
-    router: :synapse_router,
-    registry: :synapse_registry
-  )
-
-# Sending a review request is just a signal publish
-Synapse.SignalRouter.publish(
-  :synapse_router,
-  :review_request,
-  %{review_id: "123", diff: diff, labels: ["security"]}
-)
-
-# RunConfig + Workflow.Engine classify, spawn specialists, and emit review.summary
+%{
+  review_id: String.t(),
+  agent: "performance_specialist",
+  confidence: float(),
+  findings: [
+    %{type: :cpu_hotspot, file: "lib/bar.ex", severity: :medium, summary: "..."}
+  ],
+  should_escalate: boolean(),
+  metadata: %{runtime_ms: non_neg_integer()}
+}
 ```
 
 ---
 
-**Tools: The Agent's Superpowers**
+## Shared Behaviors
 
-What Are Tools?
+- Both specialists expose helper functions:
+  - `record_history(agent, review_metadata)` (keep last 100 entries).
+  - `learn_from_correction(agent, pattern_payload)` (update or create pattern).
+  - `record_failure(agent, failure_payload)` (append to scar tissue with timestamp).
+- All agents log at `:debug` when receiving directives/signals; `:info` when emitting results/summaries.
+- All agents must survive being spawned multiple times (`start_link/1` idempotent via `Registry`).
 
-In agent systems: Tools are capabilities an agent can choose to use.
+---
 
-```elixir
-# Agent has a toolbox
-defmodule CriticAgent do
-  use Jido.Agent,
-    actions: [
-      # These are TOOLS the agent can use
-      StaticAnalysis,
-      SecurityScan,
-      PerformanceBenchmark,
-      LLMReview,
-      GitBlame,
+## Non-Goals (Stage 1)
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- No marketplace enrollment.
+- No multi-level agent hierarchy.
+- No negotiation signals (`review.conflict`) yet.
+- No persistent storage beyond in-memory state (future phases may sync to DB).
+
+---
+
+Keep this file updated alongside code. Any drift (e.g., new actions, schema changes) must be reflected here before merging.***
 
 ---
 > Source: [nshkrdotcom/synapse](https://github.com/nshkrdotcom/synapse) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
