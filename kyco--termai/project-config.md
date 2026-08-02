@@ -1,0 +1,143 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+TermAI is a terminal-based AI assistant built in Rust that supports both OpenAI and Claude APIs. It provides privacy-focused chat capabilities with local context awareness, session management, and redaction features.
+
+## Development Commands
+
+### Build and Testing
+- `cargo build --release` - Build the project in release mode
+- `cargo test` - Run the test suite
+- `cargo run --release -- [args]` - Run the application with arguments
+- `just build` - Alternative build command using justfile
+- `just test` - Run tests via justfile
+- `just run [args]` - Run with arguments via justfile
+
+### Code Quality
+- `cargo fmt` - Format code
+- `cargo clippy -- -D warnings` - Run clippy linter with warnings as errors
+- `just fmt` - Format code via justfile  
+- `just clippy` - Run clippy via justfile
+
+### Dependencies
+- `cargo update` - Update dependencies
+- `just update-deps` - Update dependencies via justfile
+- `just outdated` - Check for outdated dependencies
+
+### Documentation
+- `cargo doc --open` - Generate and open documentation
+- `just doc` - Generate documentation via justfile
+
+## User Commands
+
+TermAI uses an intuitive subcommand structure for better discoverability and organization:
+
+### Setup and Configuration
+- `termai setup` - Interactive setup wizard (recommended for first-time setup)
+- `termai config show` - Display current configuration with visual status
+- `termai config set-claude <KEY>` - Set Claude API key
+- `termai config set-openai <KEY>` - Set OpenAI API key  
+- `termai config set-provider claude` - Set default provider (claude or openai)
+- `termai config reset` - Clear all configuration (with confirmation)
+
+### One-Shot Questions
+- `termai ask "your question"` - Quick question without starting interactive session
+- `termai ask "question" src/` - Ask with specific directory context
+- `termai ask -d src/ -d docs/ "question"` - Multiple directories as context
+- `termai ask --session mywork "question"` - Save question to named session
+- `termai ask --smart-context "question"` - Use smart context discovery
+- `termai ask --preview-context "question" src/` - Preview context before sending
+
+### Interactive Chat
+- `termai chat` - Start interactive chat session
+- `termai chat --session mywork` - Continue specific session
+- `termai chat src/` - Start chat with directory context
+- `termai chat --smart-context` - Enable smart context discovery
+- `termai chat -d src/ -d tests/` - Multiple directories as context
+
+### Session Management
+- `termai session list` - List all saved sessions with details
+- `termai session show <name>` - View session details and message history
+- `termai session delete <name>` - Delete session (with confirmation)
+
+### Privacy and Redaction
+- `termai redact add "pattern"` - Add pattern to be redacted (e.g., email, name)
+- `termai redact remove "pattern"` - Remove redaction pattern
+- `termai redact list` - List all active redaction patterns with usage info
+
+### Shell Completion
+- `termai completion bash` - Generate Bash completion script
+- `termai completion zsh` - Generate Zsh completion script  
+- `termai completion fish` - Generate Fish completion script
+- `termai completion powershell` - Generate PowerShell completion script
+
+### Quick Examples
+```bash
+# First time setup
+termai setup
+
+# Quick questions
+termai ask "What is Rust?"
+termai ask "Explain this code" src/main.rs
+
+# Interactive sessions
+termai chat
+termai chat --session debugging
+
+# With context
+termai ask "Review this function" -d src/commands/
+termai chat --session review src/
+
+# Privacy protection  
+termai redact add "mycompany@example.com"
+termai ask "analyze logs" --preview-context logs/
+```
+
+## Architecture
+
+TermAI follows a layered architecture with clear separation of concerns:
+
+### Core Layers
+- **main.rs**: Entry point, argument parsing, and orchestration
+- **Repository Layer**: Data access abstraction using SQLite (repository/db.rs)
+- **Service Layer**: Business logic for config, sessions, and LLM interactions
+- **Adapter Layer**: API integrations for OpenAI and Claude
+
+### Key Modules
+
+#### LLM Integration (`src/llm/`)
+- **claude/**: Claude API adapter, models, and chat service
+- **openai/**: OpenAI API adapter, models, and chat service  
+- **common/**: Shared models and constants for both providers
+
+#### Configuration Management (`src/config/`)
+- **service/**: Provider configuration, API keys, redaction settings
+- **repository/**: Config data access layer
+- **entity/**: Config data models
+
+#### Session Management (`src/session/`)
+- **service/**: Session and message management
+- **repository/**: Session persistence layer
+- **entity/**: Session and message entities
+
+#### Command Structure (`src/commands/`)
+- **mod.rs**: Command dispatcher with enhanced error handling and routing
+- **ask.rs**: One-shot question handler with full LLM integration
+- **chat.rs**: Interactive chat session handler
+- **config.rs**: Configuration and redaction management with enhanced UX
+- **session.rs**: Session management (list, show, delete) with confirmations
+- **setup.rs**: Setup wizard delegation to existing implementation
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [kyco/termai](https://github.com/kyco/termai) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
