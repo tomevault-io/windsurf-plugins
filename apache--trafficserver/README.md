@@ -1,15 +1,14 @@
 # trafficserver
 
-> Source: [apache/trafficserver](https://github.com/apache/trafficserver). Graded, signed and kept in sync across platforms by [TomeVault](https://tomevault.io)
+> Source: [apache/trafficserver](https://github.com/apache/trafficserver). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [apache/trafficserver](https://github.com/apache/trafficserver).
+Original source: `CLAUDE.md` in [apache/trafficserver](https://github.com/apache/trafficserver).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
