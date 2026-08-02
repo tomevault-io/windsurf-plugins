@@ -1,136 +1,152 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This document contains project-specific anti-patterns and style guidelines for working on pathfinding.cloud.
 ---
 
-# CLAUDE.md
+# Claude Code Guidelines for pathfinding.cloud
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This document contains project-specific anti-patterns and style guidelines for working on pathfinding.cloud.
 
-## When to Use Each File
+**For field definitions and validation rules**, see [SCHEMA.md](../SCHEMA.md).
+**For workflow and commands**, see [CLAUDE.md](../CLAUDE.md).
 
-- **CLAUDE.md** (this file): Workflow guidance, commands, development tasks, and quick references
-- **SCHEMA.md**: Authoritative field definitions, validation rules, and format specifications
-- **.claude/CLAUDE.md**: Anti-patterns, style guide, and contribution-specific guidance
+## Anti-Patterns to Avoid
 
-**Rule of thumb**: Check SCHEMA.md for "what does field X mean?", check this file for "how do I do task Y?"
+### 1. Inconsistent Terminology for Parent/Variant Relationships
 
-## Project Overview
+**WRONG:** Mixing terminology inconsistently
+- Using "child" in UI text
+- Using "primary" in YAML field names
+- Using "parent" in user-facing documentation
 
-**pathfinding.cloud** is a comprehensive, community-maintained library documenting AWS IAM privilege escalation paths. The project consists of:
+**CORRECT:** Use terminology appropriate to context
+- **In YAML/code**: Always use `parent` field name
+- **In UI/user-facing text**: Always use "Primary Technique" and "Variants"
+- **In comments**: Use "primary" and "variant" for clarity
 
-1. **Data Layer**: Structured YAML files documenting each privilege escalation path
-2. **Validation Layer**: Python scripts to validate YAML against schema
-3. **Website Layer**: Static HTML/CSS/JS site for browsing paths
-4. **CI/CD Layer**: GitHub Actions for validation and deployment
+**Rationale**: We maintain this hybrid approach for semantic clarity:
+- `parent` is concise and conventional in code (`parent.id`, `parent.modification`)
+- "Primary Technique" conveys foundational/original technique to users
+- "Variant" explains what the path IS (expanded applicability) not just hierarchy
 
-## Terminology: Parent/Child vs Primary/Variant
+See [Terminology section in CLAUDE.md](../CLAUDE.md#terminology-parentchild-vs-primaryvariant) for complete guidance.
 
-We use **different terminology in different contexts** for clarity and semantic meaning:
+### 2. Path Name Formatting
 
-### In YAML Files and Code
-- **`parent` field**: Points to the parent path (e.g., `parent.id: iam-002`)
-- **Why**: Concise, follows common data structure conventions, natural for hierarchical references
+**WRONG:** `iam:PassRole+sagemaker:CreateTrainingJob`
 
-### In UI and Documentation
-- **"Primary Technique"**: The foundational/original technique (what YAML calls the "parent")
-- **"Variant"**: A modification that expands applicability by removing prerequisites (what YAML calls the "child")
-- **Why**: Semantic clarity - "variant" explains WHAT it is, not just that there's a hierarchy
+**CORRECT:** `iam:PassRole + sagemaker:CreateTrainingJob`
 
-### Key Concepts
-- **Primary techniques** have no `parent` field - they are the foundational attacks
-- **Variant techniques** have a `parent` field with `id` and `modification`
-- **Variants add required permissions** that remove prerequisites from the primary technique
-- **Example**: IAM-002 (primary) requires < 2 keys. IAM-003 (variant) adds DeleteAccessKey to work even with 2 keys.
+Always include spaces before and after the `+` sign when combining multiple permissions in the `name` field.
 
-### When Contributing
-- In YAML: Use `parent` field for variants
-- In documentation/comments: Refer to "primary techniques" and "variants"
-- In UI text: Display "Primary Technique" and "Variants (N)"
+### 3. PowerUserAccess is NOT Administrative Access
 
-See [SCHEMA.md](SCHEMA.md#parent-object-optional) for detailed parent/child relationship criteria.
+**WRONG:** `The role must have administrative permissions (e.g., AdministratorAccess or PowerUserAccess)`
 
-## Quick Start Commands
+**CORRECT:** `The role must have administrative permissions (e.g., AdministratorAccess or an equivalent custom policy)`
 
-### Essential Commands
+PowerUserAccess does NOT provide administrative permissions (it specifically excludes IAM actions). When describing administrative access requirements in prerequisites, use "AdministratorAccess or an equivalent custom policy" instead.
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+### 4. Description Field Line Breaks
 
-# Validate a single file
-python scripts/validate-schema.py data/paths/{service}/{service}-###.yaml
-
-# Validate all files
-python scripts/validate-schema.py data/paths/
-
-# Generate JSON for website
-python scripts/generate-json.py
-
-# Test website locally (with SPA routing support)
-cd docs && python3 dev-server.py
-# Then visit http://localhost:8888
+**WRONG:**
+```yaml
+description: A principal with `iam:PassRole` and `ec2:RunInstances` can create
+  an EC2 instance with a privileged IAM role attached.
 ```
 
-### GitHub Token for Better Contributor Info
-
-```bash
-# Set GitHub token (optional but recommended)
-export GITHUB_TOKEN=your_github_pat_here
-python scripts/generate-json.py
-
-# Token scopes:
-# - Private repos: 'repo' scope
-# - Public repos: 'public_repo' scope
-# Create at: https://github.com/settings/tokens/new
+**CORRECT:**
+```yaml
+description: A principal with `iam:PassRole` and `ec2:RunInstances` can create an EC2 instance with a privileged IAM role attached. The instance automatically assumes the passed role, and the attacker can access the instance to retrieve temporary credentials.
 ```
 
-## Architecture
+Descriptions should be single-line in YAML (no artificial line breaks at ~80 characters). They will flow naturally in the UI based on container width.
 
-### Data Structure
+### 5. Missing Backticks for IAM Permissions
 
-All privilege escalation paths are stored as individual YAML files in `data/paths/{service}/`:
-- Files follow naming convention: `{service}-{number}.yaml` (e.g., `iam-001.yaml`)
-- Each file adheres to the schema defined in [SCHEMA.md](SCHEMA.md)
-- Files are organized by primary service (iam, ec2, lambda, ssm, cloudformation, etc.)
+**WRONG:** `A principal with iam:PassRole and ec2:RunInstances...`
 
-### ID Numbering Convention
+**CORRECT:** ``A principal with `iam:PassRole` and `ec2:RunInstances`...``
 
-- **IAM-focused paths**: `iam-001`, `iam-002`, etc.
-- **PassRole combinations**: Use the service of the resource being created/manipulated
-  - `iam:PassRole+ec2:RunInstances` → `ec2-001` (not iam-###)
-  - `iam:PassRole+lambda:CreateFunction` → `lambda-001`
-- **Other services**: `ssm-001`, `ec2-002`, etc.
-- **Sequential numbering**: IDs are assigned sequentially within each service
+All IAM permissions in descriptions, recommendations, and text should be formatted with backticks for code styling. This applies everywhere EXCEPT in the `name` field (which should be plain text).
 
-### Website Architecture (SPA with Client-Side Routing)
+### 6. Using Legacy Permission Format
 
-The website is a Single Page Application (SPA) with client-side routing:
-- **List view**: `/` - Shows all paths with search/filter functionality
-- **Detail view**: `/paths/{id}` - Shows individual path details (e.g., `/paths/iam-001`)
-- **Routing**: Uses History API (`pushState`/`popState`) for proper URLs
-- **No page reloads**: Navigation is instant, only content changes
-- **SEO ready**: Dynamic meta tags per page, Open Graph support
-- **Analytics ready**: Real pageviews on route changes
-- **Backward compatible**: Old hash URLs (`#iam-001`) redirect to new format
+**WRONG (deprecated format):**
+```yaml
+requiredPermissions:
+  - permission: iam:PassRole
+```
 
-**Directory Structure:**
-- All website files are in the `docs/` directory (GitHub Pages compatible)
-- Source data (YAML files) remain at `data/paths/` in repository root
-- Generated files (`paths.json`, `metadata.json`) are created in `docs/`
+**CORRECT (current format):**
+```yaml
+permissions:
+  required:
+    - permission: iam:PassRole
+      resourceConstraints: Target role ARN must be in the Resource section
+  additional:
+    - permission: iam:ListRoles
+      resourceConstraints: Helpful for discovering available roles to pass
+```
 
-**Development:**
-- Use `docs/dev-server.py` for local testing (handles SPA routing)
-- Run from project root: `cd docs && python3 dev-server.py`
-- Direct file opening won't support routing features
+The `permissions` field separates required permissions (minimum needed) from additional helpful permissions (get/list type permissions).
 
-**Production (GitHub Pages):**
-- GitHub Pages deploys only the `docs/` directory
-- `404.html` implements the SPA routing pattern for GitHub Pages
-- When users access direct URLs (e.g., `/paths/iam-001`), GitHub Pages serves `404.html`
+## YAML Formatting Standards
+
+### Description Fields
+
+- **Single-line**: Descriptions should be single-line in YAML (no artificial line breaks)
+- **Natural flow**: Text will wrap naturally in the UI based on container width
+- **Backticks**: Use backticks for inline code formatting (e.g., `` `iam:PassRole` ``)
+
+### Multi-line Fields
+
+Use the `|` pipe syntax for multi-line fields:
+- `recommendation`
+- `command` (in exploitation steps)
+- `limitations`
+- Long prerequisite descriptions
+
+Example:
+```yaml
+recommendation: |
+  Restrict the `iam:PassRole` permission using the principle of least privilege.
+
+  Use IAM policy conditions to restrict which roles can be passed:
+
+  ```json
+  {
+    "Effect": "Allow",
+    "Action": "iam:PassRole",
+    "Resource": "arn:aws:iam::ACCOUNT:role/SpecificRole"
+  }
+  ```
+```
+
+### YAML Indentation
+
+- Use **2-space indentation** (not tabs)
+- List items use `-` prefix
+- Strings with special characters should be quoted
+
+### Complete Example
+
+```yaml
+id: example-001
+name: iam:PassRole + ec2:RunInstances  # Note: spaces around +
+category: new-passrole
+services:
+  - iam
+  - ec2
+description: A principal with `iam:PassRole` and `ec2:RunInstances` can create an EC2 instance with a privileged IAM role attached. The instance automatically assumes the passed role, and the attacker can access the instance to retrieve temporary credentials.
+prerequisites:
+  admin:
+    - A role must exist that trusts ec2.amazonaws.com to assume it
+    - The role must have administrative permissions (e.g., AdministratorAccess or an equivalent custom policy)  # Note: NOT PowerUserAccess
+  lateral:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [DataDog/pathfinding.cloud](https://github.com/DataDog/pathfinding.cloud) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
