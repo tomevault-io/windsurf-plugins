@@ -1,100 +1,113 @@
 ---
 trigger: always_on
-description: after every change always run tsc inside cli to validate your changes. try to never use as any
+description: <!-- Purpose: Immutable bridge-specific engineering rules for discord-slack-bridge. -->
 ---
 
-after every change always run tsc inside cli to validate your changes. try to never use as any
+<!-- Purpose: Immutable bridge-specific engineering rules for discord-slack-bridge. -->
 
-do not use spawnSync. use our util execAsync. which uses spawn under the hood
+# discord-slack-bridge
 
-the important package in this repo is cli. it contains the discord bot code.
+## Package purpose
 
-after making important changes to queueing or message handling always run the full test suite inside cli to make sure our changes did not break anything. also run with -u and see snapshots updates in git diff if needed. `pnpm test -u --run`
+This package exists to let Kimaki (from the `cli` package) run on Slack in
+the future with minimal behavior differences. The adapter translates Discord
+Gateway and REST semantics to Slack APIs so Kimaki can keep the same runtime
+model:
 
-# repo architecture
+- Discord `guild` maps to Slack `team` (workspace).
+- Discord channels map to Slack channels.
+- Discord threads map to Slack threads (similar reply-thread model).
 
-kimaki is a monorepo with three main packages that communicate via a shared Postgres database hosted on PlanetScale.
+The goal is feature parity where Kimaki behaves in Slack as close as possible
+to how it behaves in Discord, with this bridge handling protocol translation.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  User's machine                                             │
-│  cli/ (TypeScript CLI + Discord bot)                        │
-│  ├── src/cli.ts        main CLI, onboarding wizard          │
-│  ├── src/discord-bot.ts  event loop, session routing        │
-│  └── SQLite (~/.kimaki/discord-sessions.db)                 │
-│         local state: bot tokens, channels, threads, models  │
-└────────┬──────────────────────────┬─────────────────────────┘
-         │ REST + WebSocket         │ polls /api/onboarding/status
-         │ (clientId:secret)        │ during first-time setup
-         ▼                          ▼
-┌─────────────────────┐   ┌──────────────────────────────────┐
-│  gateway-proxy/      │   │  website/                        │
-│  (Rust, fly.io)      │   │  (Cloudflare Worker, Hono)       │
-│                      │   │  https://kimaki.dev           │
-│  Sits between the    │   │                                  │
-│  CLI and Discord.    │   │  GET /oauth/callback              │
-│  One shared bot for  │   │    → upserts gateway_clients row │
-│  all users — users   │   │    → website/src/routes/          │
-│  don't create their  │   │      oauth-callback.tsx           │
-│  own Discord bot.    │   │                                  │
-│                      │   │  GET /api/onboarding/status       │
-│  Multi-tenant:       │   │    → CLI polls every 2s           │
-│  filters events per  │   │    → website/src/routes/          │
-│  client_id + guild   │   │      onboarding-status.ts         │
-│                      │   │                                  │
-│  wss://kimaki-       │   └──────────┬───────────────────────┘
-│  gateway-production  │              │
-│  .fly.dev            │              │
-└──────────┬───────────┘              │
-           │                          │
-           ▼                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Shared Postgres (PlanetScale)                               │
-│  db/schema.prisma                                            │
-│                                                              │
-│  gateway_clients table:                                      │
-│    client_id  TEXT   ── identifies the kimaki user            │
-│    secret     TEXT   ── authenticates gateway connections     │
-│    guild_id   TEXT   ── guild the user installed the bot in   │
-│    @@id([client_id, guild_id])                               │
-│                                                              │
-│  Written by: website (on OAuth callback)                     │
-│  Read by: gateway-proxy (polls every 1s via db_config.rs)    │
-│  Read by: website (onboarding status check)                  │
-└──────────────────────────────────────────────────────────────┘
-```
+## Canonical references
 
-## gateway-proxy (Rust)
+- Bridge behavior spec: `slop/discord-slack-bridge-spec.md`
+- Bridge implementation:
+  - `discord-slack-bridge/src/server.ts`
+  - `discord-slack-bridge/src/event-translator.ts`
+  - `discord-slack-bridge/src/rest-translator.ts`
+  - `discord-slack-bridge/src/file-upload.ts`
+  - `discord-slack-bridge/src/component-converter.ts`
+  - `discord-slack-bridge/src/gateway.ts`
+  - `discord-slack-bridge/src/types.ts`
+- Slack SDK request type references:
+  - `opensrc/repos/github.com/slackapi/node-slack-sdk/packages/web-api/src/types/request/chat.ts`
+  - `opensrc/repos/github.com/slackapi/node-slack-sdk/packages/web-api/src/types/request/conversations.ts`
+  - `opensrc/repos/github.com/slackapi/node-slack-sdk/packages/web-api/src/types/request/reactions.ts`
+  - `opensrc/repos/github.com/slackapi/node-slack-sdk/packages/web-api/src/types/request/files.ts`
+  - `opensrc/repos/github.com/slackapi/node-slack-sdk/packages/web-api/src/types/request/views.ts`
 
-`gateway-proxy/` is a Rust service that proxies both Discord Gateway (WebSocket) and REST traffic. it lets multiple users share a single Discord bot instead of each user creating their own.
+## Echo bot integration smoke checks
 
-key files:
+- Use `discord-slack-bridge/scripts/echo-bot.ts` to verify end-to-end Slack + gateway behavior.
+- For deployed gateway testing, run `pnpm echo-bot --gateway` from `discord-slack-bridge/`.
+- This validates Discord REST + Gateway routing through `slack-gateway.kimaki.dev` and Slack webhook/interactivity handling at `/slack/events`.
+- Important: this requires real user interaction in Slack. The script only starts the bridge client and registers commands; someone must send messages, run slash commands, and click interactive components in Slack to exercise Events + Interactivity webhooks end-to-end.
 
-- `src/main.rs` — entry point, shard setup, HTTP server, DB polling
-- `src/auth.rs` — authenticates `client_id:secret` tokens
-- `src/db_config.rs` — polls Postgres `gateway_clients` table every 1s, atomically swaps the in-memory client map. stale protection: rejects auth if DB unreachable >30s
-- `src/server.rs` — HTTP+WS server. REST proxy at `/api/v10/*`, WebSocket upgrade for gateway
-- `src/dispatch.rs` — per-shard event fanout, filters events by `authorized_guilds`
-- `src/cache.rs` — builds synthetic READY payloads filtered to authorized guilds
-- `src/rest_proxy.rs` — forwards REST calls, rewrites Authorization header to real bot token, scopes guild/channel routes
+## Non-negotiable typing rules
 
-auth flow: client sends IDENTIFY with token `client_id:client_secret` → proxy validates against the CLIENTS map (from DB) → returns `SessionPrincipal::Client(id)` + `authorized_guilds` → only forwards events for those guilds.
+- Do not use `as` assertions/casts in bridge source code.
+- Do not duplicate Slack payload types when official SDK/types are available.
+- Prefer `@slack/web-api` concrete request argument types for API calls
+  (e.g. `satisfies ChatPostMessageArguments`).
+- **Slack API response types**: use the SDK response types for all Slack API
+  call results. The WebClient methods return typed responses
+  (`ChatPostMessageResponse`, `ConversationsInfoResponse`, etc.) — access
+  fields directly on the result (e.g. `result.ts`, `result.channel?.name`)
+  instead of passing them through `Record<string, unknown>` + `readString`
+  helpers. This ensures misspelled field names are caught at compile time.
+- **Extracting nested Slack types**: the SDK does not re-export nested types
+  like `Channel`, `User`, `MessageElement` from the main entry because they
+  collide across response modules. Use indexed access on the response type:
+  ```ts
+  import type { ConversationsInfoResponse } from '@slack/web-api'
+  type SlackChannel = NonNullable<ConversationsInfoResponse['channel']>
+  ```
+  See `rest-translator.ts` imports for the full set of extracted types.
+- Prefer importing Slack types from the official Slack SDK instead of defining
+  bridge-local copies. This keeps bridge code aligned with Slack's source of
+  truth and automatically in sync when Slack updates type definitions.
+- Keep inbound payload boundary normalization in `server.ts`:
+  - parse as `unknown`
+  - validate/narrow at runtime
+  - pass normalized typed objects downstream
+- The `Record<string, unknown>` + `readString`/`readRecord` pattern is ONLY
+  acceptable for inbound webhook payloads from Slack Events API (raw JSON that
+  needs runtime validation). Never use it for Slack SDK WebClient responses.
 
-gateway REST rule for cli package code: when running with `client_id:secret`
-through gateway-proxy, Discord REST calls must be guild-scoped or explicitly
-allowlisted by the proxy (`/gateway/bot`, `/users/@me`, etc). avoid global
-application routes like `/applications/{app_id}/commands`; use
-`/applications/{app_id}/guilds/{guild_id}/commands` instead so auth can resolve
-scope and allow the request.
+## Protocol/constants rules
 
-multi-tenant REST safety invariant:
+- Avoid magic numbers and string literals for Discord protocol values.
+- Prefer enums and protocol types from `discord-api-types/v10`.
+- Follow payload-shaping patterns used by `discord-digital-twin`.
 
-- never allow client-authenticated requests to hit unscoped bot-token routes.
-- only tokenized interaction/webhook routes are allowed without auth
-  (`/interactions/{id}/{token}/...`, `/webhooks/{id}/{token}/...`).
+## ID mapping between Discord and Slack
+
+discord.js parses certain IDs as BigInt snowflakes internally (for
+`createdTimestamp`, sorting, caching). Any ID that discord.js treats as a
+snowflake **must** be a valid BigInt string — non-numeric IDs like
+`MSG_C04_17000...` cause `Cannot convert to BigInt` crashes at runtime.
+
+### Which IDs must be snowflake-compatible
+
+**Message IDs** — always parsed as BigInt by discord.js (`Snowflake.timestampFrom`
+in `Message._patch`). Must be pure numeric.
+
+**Thread channel IDs** — also parsed as snowflakes because discord.js treats
+threads as channels and accesses `createdTimestamp` on them. Must be pure
+numeric.
+
+**Guild/channel/user IDs** — discord.js does NOT parse these as snowflakes in
+tested code paths (only `createdTimestamp` getter would break, which typical
+bot code doesn't call). These keep their Slack format as-is (`T04ABC123`,
+`C04ABC123`, `U04ABC123`).
+
+### Encoding scheme
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [remorses/kimaki](https://github.com/remorses/kimaki) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
