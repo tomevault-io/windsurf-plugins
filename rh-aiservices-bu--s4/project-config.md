@@ -1,165 +1,127 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Manages modal open/close state with consistent API.
 ---
 
-# CLAUDE.md
+# CLAUDE.md - S4 Frontend Context
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Note for AI Assistants**: This file contains AI-specific development context for the S4 React frontend. For user-facing architecture documentation, see [docs/architecture/frontend.md](../docs/architecture/frontend.md) and [docs/development/frontend.md](../docs/development/frontend.md). For project overview, see root [CLAUDE.md](../CLAUDE.md). For backend context, see [backend/CLAUDE.md](../backend/CLAUDE.md).
 
-> **Note**: This file contains AI-specific development context. For user-facing documentation, see the [docs/](docs/) folder.
+## Frontend Overview
 
-## Project Overview
+**s4-frontend** - React 18 application with TypeScript, Webpack, and PatternFly 6 component library.
 
-**S4 (Super Simple Storage Service)** is a lightweight, self-contained S3-compatible storage solution combining:
+**Technology Stack**: React 18, PatternFly 6, React Router v7, TypeScript, Webpack
+**Development**: Port 9000 with Webpack HMR (Hot Module Replacement)
+**Production**: Built and served statically by Fastify backend on port 5000 (container)
 
-- **Ceph RGW with SQLite backend** - Lightweight S3 server (based on zgw)
-- **Node.js/React Web UI** - Storage management interface
+**For detailed architecture**, see [docs/architecture/frontend.md](../docs/architecture/frontend.md).
 
-Licensed under Apache 2.0.
+## 🎨 PatternFly 6 Critical Requirements
 
-## Development Commands
+⚠️ **MANDATORY**: Follow the [PatternFly 6 Development Guide](../docs/development/pf6-guide/README.md) as the **AUTHORITATIVE SOURCE** for all UI development.
 
-```bash
-# Install dependencies
-npm install
+### Context7 Warning
 
-# Start development servers (backend + frontend)
-npm run dev
+**DO NOT use Context7 for PatternFly components.** Context7 may contain outdated PatternFly versions (v5 or earlier) that conflict with this project's PatternFly 6 requirements.
 
-# Build for production
-npm run build
+**Instead use:**
 
-# Run tests
-npm run test
+- **Local guide**: [`docs/development/pf6-guide/`](../docs/development/pf6-guide/README.md) (authoritative, project-specific)
+- **Official docs**: [PatternFly.org](https://www.patternfly.org/) (always up-to-date)
 
-# Build container image
-make build
+Context7 is fine for non-PatternFly libraries: React, Axios, React Router, Jest, i18next, and other dependencies.
 
-# Run container locally
-make run
+### Essential Rules
 
-# Deploy to Kubernetes (Helm)
-make deploy NAMESPACE=s4
+1. **Class Prefix**: ALL PatternFly classes MUST use `pf-v6-` prefix
+2. **Design Tokens**: Use semantic tokens only, never hardcode colors
+3. **Component Import**: Import from `@patternfly/react-core` v6 and other @patternfly libraries
+4. **Theme Testing**: Test in both light and dark themes
+5. **Table Patterns**: Follow guide's table implementation (current code may be outdated)
 
-# Deploy to Kubernetes (raw manifests)
-make deploy-raw NAMESPACE=s4
+### Common Mistakes and Token Usage
 
-# Lint Helm chart
-make helm-lint
+**Critical rules** - See [`docs/development/pf6-guide/guidelines/styling-standards.md`](../docs/development/pf6-guide/guidelines/styling-standards.md) for complete guide:
+
+- ✅ **ALWAYS** use `pf-v6-` prefix for component classes
+- ✅ **ALWAYS** use `--pf-t--` prefix for design tokens (semantic tokens with `-t-`)
+- ✅ Choose tokens by **meaning** (e.g., `--pf-t--global--color--brand--default`), not appearance
+- ❌ **NEVER** hardcode colors or measurements
+- ❌ **NEVER** use legacy `--pf-v6-global--` tokens or numbered base tokens
+
+### Component Import Pattern
+
+```tsx
+import { Button, Card, Page, PageSection } from '@patternfly/react-core';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
+import { TrashIcon, UploadIcon } from '@patternfly/react-icons';
 ```
 
-## Architecture
+**Version**: PatternFly 6.2.x (NOT PatternFly 5)
 
-### Container Architecture
+## 🗃️ State Management Philosophy
 
-S4 runs as a single container with two processes managed by supervisord:
+- **Local State First**: Use `useState` for component-specific state
+- **Context for Global**: AuthContext for authentication state
+- **EventEmitter for Cross-Component**: Use emitter for decoupled communication (upload progress, notifications)
+- **Reusable Hooks**: Use custom hooks (`useModal`, `useStorageLocations`) for common patterns
+- **No React Query**: Direct API calls with axios and local loading/error states
 
-- **Ceph RGW** (port 7480) - S3-compatible API using SQLite for persistence
-- **Node.js backend** (port 5000) - Fastify server serving React frontend and API
+## 🎯 Component Development Checklist
 
-### Directory Structure
+### Before Creating ANY Component
 
-```
-s4/
-├── backend/               # Fastify API server (TypeScript)
-│   └── src/
-│       ├── routes/api/    # API endpoints (buckets, objects, notifications, settings, etc.)
-│       ├── plugins/       # Auto-loaded Fastify plugins (auth)
-│       ├── config/        # CORS configuration
-│       ├── schemas/       # Request validation schemas
-│       ├── types.ts       # TypeScript type definitions
-│       ├── utils/         # Configuration, helpers, notifications
-│       ├── __tests__/     # Jest tests
-│       ├── app.ts         # Fastify app initialization
-│       └── server.ts      # Entry point
-├── frontend/              # React application (TypeScript)
-│   └── src/
-│       ├── app/
-│       │   ├── components/  # UI components (StorageBrowser, Buckets, Settings)
-│       │   ├── hooks/       # Custom hooks (useModal, useStorageLocations, useIsMobile)
-│       │   ├── services/    # API service layer (storageService)
-│       │   ├── utils/       # Utilities (apiClient, notifications, validation)
-│       │   └── routes.tsx   # Route definitions
-│       └── i18n/            # Internationalization
-├── docker/                # Container configuration
-│   ├── Dockerfile         # Multi-stage build
-│   ├── ceph.conf          # RGW configuration
-│   ├── entrypoint.sh      # Startup script
-│   └── supervisord.conf   # Process management
-├── charts/s4/             # Helm chart (recommended for K8s deployment)
-│   ├── Chart.yaml         # Chart metadata
-│   ├── values.yaml        # Default configuration values
-│   └── templates/         # Kubernetes resource templates
-└── kubernetes/            # Raw K8s manifests (legacy)
-```
+1. **Search for similar components first** - Use `find_symbol` and `search_for_pattern`
+2. **Follow PatternFly 6 requirements** - ALWAYS use `pf-v6-` prefix, semantic tokens, v6 imports
+3. **Use established patterns** - Check existing components (StorageBrowser, Buckets, Settings)
 
-### Key Files
+### Critical Rules for ALL Components
 
-- `backend/src/app.ts` - Fastify app initialization, global auth hook
-- `backend/src/utils/config.ts` - S3 client configuration (defaults to localhost:7480)
-- `frontend/src/app/routes.tsx` - Frontend route definitions
-- `docker/Dockerfile` - Container build (RGW base + Node.js)
-- `docker/entrypoint.sh` - Creates RGW user on first run
+1. **Error Handling**: MUST use `Emitter.emit('notification', { variant, title, description })` for user-facing errors
 
-## Version Management
+   - Use `.catch()` with axios calls
+   - Log errors with `console.error()` for debugging
+   - Display user-friendly notifications via EventEmitter
 
-The application version is defined in `package.json` (source of truth). To bump:
+2. **Data Fetching**: Use direct axios calls with local state
 
-1. Update `version` in `package.json`
-2. Run `npm run version:sync` — this syncs `appVersion` in `charts/s4/Chart.yaml`
+   - Set loading state before call
+   - Handle errors in `.catch()`
+   - Update component state on success
 
-Other consumers read from `package.json` automatically at build time:
+3. **Internationalization**: MUST use `t()` function - never hardcode user-facing text
 
-- `Makefile` — uses it for the container image tag
-- `frontend/webpack.common.js` — injects it as `process.env.APP_VERSION`
+   - Import from `react-i18next`
+   - Wrap all strings in `t('key')`
 
-The `backend/package.json` and `frontend/package.json` versions are set to `0.0.0-see-root` and should not be changed.
+4. **Accessibility**: MUST include ARIA labels and keyboard navigation
 
-## Default Configuration
+   - Add `aria-label` to interactive elements
+   - Ensure keyboard navigation works
+   - Test with screen readers when possible
 
-### S3 Storage
+5. **PatternFly 6**: MUST use `pf-v6-` prefix and semantic design tokens
+   - Never hardcode colors or spacing
+   - Use `--pf-t--` tokens for styling
+   - Test in both light and dark themes
 
-S4 defaults to using its internal S3 engine:
+### Component Utilities
 
-- **Endpoint**: `http://localhost:7480`
-- **Access Key**: `s4admin`
-- **Secret Key**: `s4secret`
+6. **Hooks**: MUST use reusable hooks for common patterns
 
-Override via environment variables for external S3 connections.
+   - Use `useModal()` for modal state management instead of inline useState
+   - Use `useStorageLocations()` for loading storage locations
 
-### Authentication
+7. **Notifications**: MUST use notification utilities for user feedback
 
-S4 supports optional JWT-based authentication:
-
-- **Disabled (default)**: No `UI_USERNAME`/`UI_PASSWORD` set
-- **Enabled**: Both `UI_USERNAME` and `UI_PASSWORD` set
-
-For implementation details (JWT flow, SSE ticket system, CORS, rate limiting), see [backend/CLAUDE.md](backend/CLAUDE.md). For user-facing docs, see [docs/security/authentication.md](docs/security/authentication.md) and [docs/deployment/configuration.md](docs/deployment/configuration.md).
-
-## Technology Stack
-
-- **Backend**: Fastify 5, Node.js 20+, AWS SDK v3, TypeScript
-- **Frontend**: React 18, PatternFly 6, React Router 7, TypeScript
-- **S3 Engine**: Ceph RGW with DBStore (SQLite) backend
-- **Container**: Based on `quay.io/rh-aiservices-bu/radosgw-posix` (Ceph RGW)
-
-## Detailed Documentation
-
-### For AI Assistants
-
-Component-specific AI development context:
-
-- **[Backend CLAUDE.md](backend/CLAUDE.md)** - Fastify API patterns, route development, testing, error handling
-- **[Frontend CLAUDE.md](frontend/CLAUDE.md)** - React/PatternFly 6 components, styling, state management
-
-### For Users and Developers
-
-Complete user-facing documentation:
+   - Import from `@app/utils/notifications`
+   - Use `notifySuccess()`, `notifyError()`, `notifyWarning()`, `notifyInfo()`
+   - Use `notifyApiError()` for consistent API error handling
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rh-aiservices-bu/s4](https://github.com/rh-aiservices-bu/s4) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
