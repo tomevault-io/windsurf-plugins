@@ -1,174 +1,74 @@
 ---
 trigger: always_on
-description: Validates answers for correctness and structures them into memory objects with metadata.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Agent Types in OrKa
+# CLAUDE.md
 
-> **Last Updated:** 03 January 2026  
-> **Status:** 🟢 Current  
-> **Related:** [Advanced Agents](agents-advanced.md) | [Extending Agents](extending-agents.md) | [Agent Index](AGENT_NODE_TOOL_INDEX.md) | [INDEX](index.md)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-In OrKa, **agents** are modular processing units that receive input and return structured output — all orchestrated via a declarative YAML configuration.
+## Project status
 
-Agents can represent different cognitive functions: classification, decision-making, web search, conditional routing, memory management, and more.
+OrKa is an unmaintained personal research playground (see the maintainer note in `README.md`). It is **not** production software, but it values stability: changes should preserve backward compatibility, keep agent-level logging/tracing intact, and come with a test or log trace. PRs that are "random LLM wrappers" or "black-box logic with no traceable reasoning" are explicitly out of scope.
 
-The OrKa framework uses a unified agent base implementation that supports both modern asynchronous patterns and legacy synchronous patterns for backward compatibility.
+## What OrKa is
 
----
+A local-first, YAML-driven engine for composing AI agent workflows. You declare an `orchestrator` (strategy + ordered agent ids) and a list of `agents`/nodes in YAML, then run it with `orka run workflow.yml "input"`. Execution is async, traced, and backed by a RedisStack memory store with HNSW vector search and time-based decay.
 
-## 🧱 Core Agent Types
+## Common commands
 
-### � `brain`
+```bash
+# Install for development
+pip install -e ".[dev]"          # or ".[all]" for prod+ml+docs extras
 
-Procedural skill memory — learns abstract, transferable skills from LLM reasoning traces and re-applies them across domains.
+# Run a workflow
+orka run workflow.yml "input text" [--verbose]
+orka system status               # check services
+orka memory watch                # TUI memory dashboard
+orka-start                       # boot RedisStack + backend API (8000) + UI (8080)
 
-**Use case:** Cross-domain knowledge transfer, continuous learning, skill accumulation.
+# Tests (config in pytest.ini / pyproject.toml — coverage gate is 80%)
+pytest                           # full unit+integration suite with coverage
+pytest tests/unit/path/to/test_x.py::test_name   # single test
+pytest -m "not slow"             # skip slow tests
+pytest -m unit                   # markers: unit, integration, slow, performance, redis, llm, asyncio
 
-**Operations:**
-- `learn` — Extract a transferable skill from an execution trace
-- `recall` — Find applicable skills for a new context
-- `feedback` — Record whether a transferred skill succeeded
-
-**Example config:**
-```yaml
-- id: brain_learn
-  type: brain
-  operation: learn
-  prompt: "{{ previous_outputs.llm_reasoner }}"
-
-- id: brain_recall
-  type: brain
-  operation: recall
-  prompt: "{{ previous_outputs.new_context }}"
-
-- id: brain_feedback
-  type: brain
-  operation: feedback
-  prompt: "{{ previous_outputs.brain_recall }}"
+# Lint / typecheck (must pass CI)
+flake8 orka --count --select=E9,F63,F7,F82 --show-source --statistics   # critical errors (CI gate)
+flake8 orka                      # full lint (max-line-length 120, max-complexity 10, google docstrings)
+mypy orka                        # config in mypy.ini (permissive; many modules excluded)
+black .                          # line-length 120, py311
 ```
 
-**📖 [Complete Brain Documentation](./BRAIN_SYSTEM_GUIDE.md)**
+Requires Python >= 3.11. Integration tests need real services (Redis/LLM) and run locally only; unit tests mock externals with `fakeredis`.
 
-### �🧭 `graph-scout`
+## Architecture
 
-Intelligent workflow graph inspection and optimal multi-agent path execution. GraphScout automatically discovers, evaluates, and executes the best sequence of agents for any given input.
+### Orchestrator (composed via multiple inheritance)
+`orka/orchestrator.py` defines the public `Orchestrator(config_path)` class, but it is **only a composition of mixins** from `orka/orchestrator/` — understanding the system means reading the mixins, not the thin top-level file:
+- `base.OrchestratorBase` — config loading, memory backend setup
+- `agent_factory.AgentFactory` — the `AGENT_TYPES` registry (string type name → class) and `_init_agents()`
+- `execution_engine.ExecutionEngine` — the main async run loop and agent coordination (provides `run()`)
+- `simplified_prompt_rendering.SimplifiedPromptRenderer` — Jinja2 prompt rendering
+- `error_handling.ErrorHandler`, `metrics.MetricsCollector`
 
-**Use case:** Dynamic routing, intelligent workflow orchestration, adaptive agent selection.
+MRO matters: `Orchestrator(ExecutionEngine, OrchestratorBase, AgentFactory, ErrorHandler, MetricsCollector)`. Each mixin's `__init__` is called explicitly in `Orchestrator.__init__`.
 
-**Key Features:**
-- **Intelligent Path Discovery**: Automatically finds optimal agent sequences
-- **Memory-Aware Routing**: Positions memory agents optimally (readers first, writers last)
-- **Multi-Agent Execution**: Executes ALL agents in shortlist sequentially
-- **LLM-Powered Evaluation**: Advanced reasoning for path selection
-- **Budget & Safety Control**: Respects token/latency budgets and safety thresholds
+### Agents vs Nodes
+The distinction blurs in the registry but conceptually: **agents** (`orka/agents/`) produce reasoning output (LLM answer builders, binary/classification, validation, RAG, local LLM via direct HTTP to Ollama/LM Studio/OpenAI-compatible endpoints). **Nodes** (`orka/nodes/`) are control-flow primitives: `router` (conditional branching), `fork`/`join` (parallel execution + sync via `fork_group_manager.py`), `loop` (iterative refinement, see the `loop/` subpackage), `failover`, `memory_reader`/`memory_writer`, and `graph_scout_agent` (beta dynamic path discovery).
 
-**Example config:**
-```yaml
-- id: smart_router
-  type: graph-scout
-  k_beam: 5                # Top-k candidate paths
-  max_depth: 3             # Maximum path depth
-  commit_margin: 0.15      # Confidence threshold
-  cost_budget_tokens: 1000 # Token budget limit
-  latency_budget_ms: 2000  # Latency budget limit
-  safety_threshold: 0.2    # Lower is safer (0.0-1.0)
-  prompt: "Find the best path for: {{ input }}"
-```
+Both register through `AGENT_TYPES` in `agent_factory.py`. The string `"special_handler"` marks types instantiated specially in `_init_agents` (e.g. `memory`, `brain`, `path_executor` — the last is lazy-loaded to avoid circular imports). Note: `pyproject.toml` declares `orka.agents` / `orka.nodes` entry points, but no code loads them — third-party registration through entry points does not currently work; the hardcoded `AGENT_TYPES` dict is the only registry.
 
-**Decision Types:**
-- `commit_next`: High confidence single path → Execute immediately
-- `shortlist`: Multiple good options → Execute all sequentially  
-- `no_path`: No suitable path → Fallback to response builder
+### Prompts and the template layer
+Agent `prompt:` fields are Jinja2 templates rendered against workflow context. Custom helpers live in `orka/orchestrator/template_helpers.py` and are the canonical way to read prior state from a prompt: `get_input()`, `get_agent_response('agent_id')`, `safe_get_response(...)`, `previous_outputs.<agent_id>`. Prefer these helpers over raw dict access — they fail safe.
 
-**📖 [Complete GraphScout Documentation](./GRAPH_SCOUT_AGENT.md)**
+### Memory system
+`memory_logger.py` / `create_memory_logger("redisstack"|"redis")` is the factory. The RedisStack backend (`orka/memory/redisstack_logger.py`) does HNSW vector search + hybrid metadata filtering with namespace isolation. Memory config is driven by **presets** (`orka/memory/presets.py`) — 6 Minsky-inspired cognitive types (`sensory`, `working`, `episodic`, `semantic`, `procedural`, `meta`) that bundle decay/TTL/importance/vector settings. In YAML, `memory_preset: "semantic"` replaces what used to be ~15 lines of decay config. The unified `type: memory` agent with `config.operation: read|write` handles both directions.
 
-### 🔘 `binary`
-
-Returns a boolean (`"true"` or `"false"` as strings) based on a question or statement.
-
-**Use case:** Fact checking, condition validation, flag triggering.
-
-**Example config:**
-```yaml
-- id: is_fact
-  type: binary
-  prompt: >
-    Is the following statement factually accurate? Return TRUE or FALSE.
-  queue: orka:binary_check
-```
-
-### 🧾 `classification`
-
-**⚠️ Deprecated** - kept only for backward compatibility.
-
-This agent no longer performs classification and returns `"deprecated"`.
-
-**Use case:** Basic topic detection (legacy support only).
-
-### 🤖 `openai-binary`
-
-Uses OpenAI's LLM to perform binary classification with sophisticated reasoning.
-
-**Use case:** Complex true/false decisions requiring natural language understanding.
-
-**Example config:**
-```yaml
-- id: content_appropriate
-  type: openai-binary
-  prompt: >
-    Is this content appropriate for a professional environment?
-    Content: {{ input }}
-  queue: orka:moderation
-```
-
-### 🎯 `openai-classification`
-
-Uses OpenAI's LLM to classify input into multiple predefined categories.
-
-**Use case:** Advanced topic classification, sentiment analysis, content categorization.
-
-**Example config:**
-```yaml
-- id: domain_classifier
-  type: openai-classification
-  prompt: >
-    Classify this question into one of the following domains:
-  options: [science, geography, history, technology, general]
-  queue: orka:classify
-```
-
-### 📝 `openai-answer`
-
-Builds comprehensive answers using OpenAI's LLM, typically enriched with context from previous agents.
-
-**Use case:** Question answering, content generation, summarization.
-
-**Example config:**
-```yaml
-- id: answer_builder
-  type: openai-answer
-  prompt: |
-    Based on the search results: {{ previous_outputs.web_search }}
-    And classification: {{ previous_outputs.classifier }}
-    Provide a comprehensive answer to: {{ input }}
-  queue: orka:answer
-```
-
-### 🏠 `local_llm`
-
-Interfaces with locally running large language models (Ollama, LM Studio, etc.) for privacy-preserving AI processing.
-
-**Use case:** Offline processing, privacy-sensitive applications, custom model deployment.
-
-**Supported Providers:**
-- `ollama`: Native Ollama API
-- `lm_studio`: LM Studio OpenAI-compatible endpoint
-- `openai_compatible`: Any OpenAI-compatible API
-
+### Brain (learning/transfer engine)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [marcosomma/orka-reasoning](https://github.com/marcosomma/orka-reasoning) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
