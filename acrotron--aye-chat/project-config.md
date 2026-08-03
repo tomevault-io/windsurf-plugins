@@ -1,182 +1,65 @@
 ---
 trigger: always_on
-description: Provides undo/restore functionality for AI changes.
+description: Generate an implementation plan for adding AGENTS.md support to Aye Chat.
 ---
 
-# AGENTS.md - Aye Chat Project Guidelines
+Generate an implementation plan for adding AGENTS.md support to Aye Chat.
 
-This file provides context for AI coding assistants working on the Aye Chat codebase.
+Context:
 
-## Project Overview
+Aye Chat is a terminal-based AI coding tool (this codebase)
 
-**Aye Chat** is an AI-powered terminal workspace that brings AI directly into command-line workflows. It allows developers to edit files, run commands, and chat with their codebase without leaving the terminal.
+It does NOT support tool calling or command execution by the LLM.
 
-### Core Philosophy
+AGENTS.md is treated as static instruction text that augments the system prompt.
 
-- **Optimistic workflow**: Files are written directly (LLM assumed correct), with instant `restore` to undo
-- **Zero config**: Auto-detects project files, respects `.gitignore` and `.ayeignore`
-- **Real shell**: Execute any command without leaving chat
-- **Local-first**: All backups stored locally in `.aye/` directory
+Requirements:
 
-## Architecture
+Discovery logic:
 
-```
-src/aye/
-├── __main__.py          # CLI entry point (Typer app)
-├── controller/          # Business logic, command handling
-│   ├── repl.py          # Main chat REPL loop
-│   ├── commands.py      # Command implementations
-│   ├── command_handlers.py  # Individual command handlers
-│   ├── llm_invoker.py   # LLM API invocation
-│   ├── llm_handler.py   # LLM response processing
-│   └── plugin_manager.py    # Plugin discovery and management
-├── model/               # Data models, business logic
-│   ├── api.py           # HTTP API client
-│   ├── auth.py          # Token management (~/.ayecfg)
-│   ├── config.py        # Constants, system prompt, models
-│   ├── snapshot/        # File versioning (backup/restore)
-│   ├── source_collector.py  # File collection with ignore patterns
-│   ├── file_processor.py    # Path normalization, filtering
-│   └── index_manager.py     # RAG vector database
-├── presenter/           # UI output (Rich-based)
-│   ├── repl_ui.py       # Chat UI components
-│   ├── cli_ui.py        # CLI output formatting
-│   ├── streaming_ui.py  # Streaming response display
-│   └── diff_presenter.py    # Diff visualization
-└── plugins/             # Plugin implementations
-    ├── plugin_base.py   # Abstract base class
-    ├── at_file_completer.py  # @file reference completion
-    ├── completer.py     # Command/path completion
-    └── shell_executor.py    # Shell command execution
-```
+First, check for .aye/AGENTS.md in the current working directory.
 
-## Coding Conventions
+If not found, search upward through parent directories for AGENTS.md.
 
-### Python Style
+Stop searching when the filesystem root or repository root is reached.
 
-- **Python 3.10+** - Use modern syntax (type hints, `|` union, walrus operator where clear)
-- **Type hints** - Required for function signatures, optional for locals
-- **Docstrings** - Google style, required for public functions
-- **Line length** - 100 characters soft limit
-- **Imports** - Standard library, third-party, then local; alphabetized within groups
+At most one AGENTS.md should be applied (no merging).
 
-```python
-# Good
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+Precedence:
 
-import httpx
-from rich import print as rprint
+.aye/AGENTS.md has higher priority than root-level AGENTS.md.
 
-from aye.model.auth import get_user_config
-from aye.presenter.repl_ui import print_error
+If both exist, only .aye/AGENTS.md is used.
+
+Prompt integration:
+
+The contents of AGENTS.md should be appended to the system prompt.
+
+Clearly delimit the injected content - like the following:
+
+--- SYSTEM CONTEXT - AGENTS.md (repo instructions)
+
+<contents>
+
+--- END AGENTS.md
 
 
-def process_files(
-    files: List[Dict[str, str]],
-    root: Path,
-    *,
-    verbose: bool = False,
-) -> Optional[str]:
-    """Process files and return batch ID.
-    
-    Args:
-        files: List of file dicts with 'file_name' and 'file_content'
-        root: Project root path
-        verbose: Enable verbose output
-        
-    Returns:
-        Batch ID if successful, None otherwise
-    """
-```
+Do not modify or reinterpret the contents.
 
-### Error Handling
+No special handling for commands or tool instructions — treat all text as guidance only.
 
-- Use specific exceptions, not bare `except:`
-- Log errors with context using Rich formatting
-- Graceful degradation - don't crash on non-critical errors
+Scope:
 
-```python
-# Good
-try:
-    content = file_path.read_text(encoding='utf-8')
-except UnicodeDecodeError:
-    # Skip binary files gracefully
-    if verbose:
-        rprint(f"[yellow]Skipping binary file: {file_path}[/]")
-    return None
-except PermissionError as e:
-    rprint(f"[red]Permission denied:[/] {file_path}")
-    raise
-```
+This is per-project configuration, not global user configuration.
 
-### Path Handling
+Behavior should be deterministic and transparent.
 
-- Always use `pathlib.Path`, never string manipulation for paths
-- Use `.as_posix()` for cross-platform path strings in output
-- Resolve paths against project root, not CWD
+Deliverables:
 
-```python
-# Good
-from pathlib import Path
+Implementation plan, written into agents_implementation.md file
 
-def resolve_file(file_name: str, root: Path) -> Path:
-    p = Path(file_name)
-    if p.is_absolute():
-        return p
-    return (root / p).resolve()
-```
-
-### Configuration
-
-- User config stored in `~/.ayecfg` (flat INI-style file)
-- Use `get_user_config()` / `set_user_config()` from `aye.model.auth`
-- Environment variables override file config (prefix: `AYE_`)
-
-```python
-from aye.model.auth import get_user_config, set_user_config
-
-# Reading config with default
-verbose = get_user_config("verbose", "off").lower() == "on"
-
-# Writing config
-set_user_config("selected_model", "gpt-4")
-```
-
-## Testing
-
-### Test Organization
-
-```
-tests/
-├── test_*.py            # Unit tests (pytest)
-├── ua/                  # User acceptance test specs (markdown)
-└── e2e/                 # End-to-end tests
-```
-
-### Test Patterns
-
-- Use `pytest` with fixtures
-- Mock external dependencies (API calls, file system where needed)
-- Use `tmp_path` fixture for file system tests
-- Test both success and error paths
-
-```python
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-from aye.model.file_processor import make_paths_relative
-
-
-class TestMakePathsRelative:
-    def test_absolute_path_under_root(self, tmp_path):
-        """Test converting absolute paths under root to relative."""
-        root = tmp_path
-        files = [{"file_name": str(root / "src" / "main.py")}]
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Do not propose additional features beyond the above.
 
 ---
 > Source: [acrotron/aye-chat](https://github.com/acrotron/aye-chat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
