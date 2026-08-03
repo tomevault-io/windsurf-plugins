@@ -1,0 +1,106 @@
+---
+trigger: always_on
+description: This file is the entry point for an AI agent picking up work in this repo. It is
+---
+
+# AGENTS.md — orientation for AI coding agents (Codex et al.)
+
+This file is the entry point for an AI agent picking up work in this repo. It is
+checked into git, so it travels with the repo across machines. Read it first,
+then the docs it points to.
+
+> A parallel `CLAUDE.md` exists with the same project facts. This file adds the
+> cross-machine handoff and a condensed set of working notes that otherwise live
+> only in a per-user memory store (which does **not** travel between machines).
+
+## What this project is
+
+ttkbootstrap is a **theming extension for tkinter/ttk** — it generates modern,
+flat, Bootstrap-inspired themes on demand and adds a `bootstyle=` keyword API to
+ttk widgets. Pure Python; the only runtime dependency is **Pillow** (image-based
+widget assets). Public entry point: `src/ttkbootstrap/__init__.py`, imported as
+`import ttkbootstrap as ttk`. src layout, `requires-python >= 3.10`.
+
+ttkbootstrap stays a **styling extension for vanilla tkinter** — NOT a widget
+library. The forward-looking widget framework is a **separate** project,
+**bootstack** (www.bootstack.org). Several 2.0 mechanisms are *ported from*
+bootstack (the asset render pipeline, the icon renderer) — port the mechanism,
+not bootstack's API.
+
+## The active initiative: the 2.0 cleanup
+
+**2.0 is a cleanup/consolidation release — no new features.** Goals: remove
+cruft, normalize the API (breaking is OK when meaningful, with a migration
+path), fix memory leaks + theme-switch perf, make user-defined custom styles
+easy, overhaul docs. Target: **end of July 2026**.
+
+Read these, in order, before any 2.0 work:
+
+1. **`development/2_0_handoff.md`** — the living session handoff. Current state,
+   what's merged, what's next. **Start here.**
+2. **`development/2_0_plan.md`** — the durable worklist (locked decisions +
+   workstreams A–I).
+3. The per-workstream design docs, as relevant:
+   - `development/2_0_engine_design.md` — repaint engine + image cache (Workstream A).
+   - `development/2_0_style_split_design.md` — the `style/` package split (G).
+   - `development/2_0_toolkit_design.md` — the public style-construction toolkit (I).
+   - `development/2_0_icons_design.md` — the Bootstrap-Icons glyph renderer (I).
+   - `development/2_0_recolor_assets_design.md` — **recolorable raster widget
+     assets** (merged in #1081).
+   - `development/2_0_builder_split_design.md` — modular `StyleBuilderTTK`
+     recipe registry (approved, implemented, visually approved, and merged as
+     #1082).
+   - `development/2_0_scaling_design.md` — scaling and asset-geometry
+     normalization (approved, implemented, visually approved, and merged as
+     #1083).
+   - `development/2_0_color_helpers_design.md` — focused private color ramps
+     and `StyleBuilderTTK` state-color helpers (implemented; automated gates
+     pass and human visual approval is pending).
+
+### Where things stand (snapshot — confirm against the handoff, it's authoritative)
+
+Integration branch is **`2.0`** (cut all 2.0 PRs against it, NOT `master`).
+Merged into `2.0`: engine repaint + content-addressed image cache (PRs 1–2),
+mixin API replacing the import-time monkey-patch (PR 3), the `style/` package
+split (PR 4), the public asset/layout toolkit (PR 5), the icon engine (PR 6a),
+the glyph-builder migration (PR 6b), recolorable raster widget assets (#1081),
+the `StyleBuilderTTK` modularization (#1082), and scaling/asset normalization
+(#1083). The expected suite on `2.0` is **177 passed**; the color-helper branch
+raises it to **189 passed**. Scaling's human 100/125/150/200% light↔dark gate
+passed. The focused Workstream E color helpers are implemented and awaiting
+their six-theme visual gate. Canonical bootstyle grammar (D) remains later and
+needs its own design pass.
+
+## Current task this handoff: run the color-helper visual gate
+
+Branch: **`refactor/2.0-color-helpers`**, cut from `2.0` after scaling merged as
+**#1083** (`c1f9ed73`). The approved design is
+**`development/2_0_color_helpers_design.md`**. Run
+`python examples/color_states_preview.py`, exercise normal/hover/pressed/
+selected/disabled/focus states, and switch through flatly, minty, morph,
+darkly, solar, and vapor. Automated results: full suite **189 passed**,
+on the original implementation run. The corrected builder audit reports **188
+passed / 1 known local Tcl `nl.msg` failure**; excluding localization gives
+**183 passed**. Warning-free import, Python 3.10 grammar for 91 files, and the
+annotation sweep are clean. Public semantic ramps, built-in theme conversion,
+canonical bootstyle grammar, and legacy-tk parity remain deferred.
+
+## How to work here
+
+### Build / test / run
+- Headless test suite: `python -m pytest -q` (config in `pyproject.toml`,
+  `testpaths = ["tests"]`). This is the CI-runnable gate; keep it green.
+- A virtualenv with an editable install lives at `.venv/`. The package is also
+  importable with `PYTHONPATH=src`.
+- `tests/` is **headless pytest only**. Interactive `mainloop()` demos live in
+  `examples/` and are NOT collected by pytest. Put any visual/manual check there.
+- Docs: `mkdocs serve` (deps in `requirements.txt`). Docs are **MkDocs, not
+  Sphinx** — write docstrings in **plain Markdown**; do NOT use reST roles or
+  directives (`:func:`, `:param:`, `.. note::` …).
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [israel-dryer/ttkbootstrap](https://github.com/israel-dryer/ttkbootstrap) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
