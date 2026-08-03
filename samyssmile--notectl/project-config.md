@@ -1,116 +1,65 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
 
-**notectl** is a rich text editor shipped as a Web Component. It is State of the  Art in terms of architecture and code quality, with a strict layered architecture, immutable data structures, a powerful plugin system, and comprehensive test coverage. The codebase is designed for maintainability, extensibility, and performance.
-Beside of being a text editor, notectl bring all capabilites to be a IDE. So syntax highlighting, code formating are all in scope.
+## TypeScript Best Practices
 
-## Commands
+- Use strict type checking
+- Prefer type inference when the type is obvious
+- Avoid the `any` type; use `unknown` when type is uncertain
 
-```bash
-# Build (all packages via turbo)
-pnpm build
+## Angular Best Practices
 
-# Unit tests (vitest + happy-dom)
-pnpm test                          # all tests
-pnpm --filter @notectl/core test -- Document.test.ts   # single file
-pnpm --filter @notectl/core test:watch                 # watch mode
+- Always use standalone components over NgModules
+- Must NOT set `standalone: true` inside Angular decorators. It's the default in Angular v20+.
+- Use signals for state management
+- Implement lazy loading for feature routes
+- Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
+- Use `NgOptimizedImage` for all static images.
+  - `NgOptimizedImage` does not work for inline base64 images.
 
-# E2E tests (playwright, needs build first)
-pnpm test:e2e                      # all e2e
-pnpm test:e2e -- basic-editing     # single spec
+## Accessibility Requirements
 
-# Lint & format (biome)
-pnpm lint                          # check
-pnpm lint:fix                      # auto-fix
-pnpm format                        # format
+- It MUST pass all AXE checks.
+- It MUST follow all WCAG AA minimums, including focus management, color contrast, and ARIA attributes.
 
-# Type checking
-pnpm typecheck
-```
+### Components
 
-## Architecture
+- Keep components small and focused on a single responsibility
+- Use `input()` and `output()` functions instead of decorators
+- Use `computed()` for derived state
+- Set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorator
+- Prefer inline templates for small components
+- Prefer Reactive forms instead of Template-driven ones
+- Do NOT use `ngClass`, use `class` bindings instead
+- Do NOT use `ngStyle`, use `style` bindings instead
+- When using external templates/styles, use paths relative to the component TS file.
 
-See `ARCHITECTURE.md` for the full architecture guide (layer model, dependency matrix, plugin system, data flow, bundle rules, i18n, CSP). All code changes must conform to it.
+## State Management
 
-**notectl** is a rich text editor shipped as a Web Component (`<notectl-editor>`). Single package at `packages/core`.
+- Use signals for local component state
+- Use `computed()` for derived state
+- Keep state transformations pure and predictable
+- Do NOT use `mutate` on signals, use `update` or `set` instead
 
-### Data Flow
+## Templates
 
-```
-Input Event → InputHandler/KeyboardHandler
-  → TransactionBuilder creates Transaction with Steps
-  → PluginManager.dispatchWithMiddleware() (priority-ordered middleware chain)
-  → EditorState.apply(tr) → new immutable EditorState
-  → Reconciler patches DOM (block-level diffing)
-  → SelectionSync updates cursor
-  → Plugins notified via onStateChange()
-```
+- Keep templates simple and avoid complex logic
+- Use native control flow (`@if`, `@for`, `@switch`) instead of `*ngIf`, `*ngFor`, `*ngSwitch`
+- Use the async pipe to handle observables
+- Do not assume globals like (`new Date()`) are available.
+- Do not write arrow functions in templates (they are not supported).
 
-### Layer Separation
+## Services
 
-- **`model/`** — Immutable data types (`Document`, `BlockNode`, `TextNode`, `Mark`, `Selection`, `Schema`). All deeply `readonly`. Mutations always create new instances.
-- **`state/`** — `EditorState` (immutable container), `Transaction` (atomic step-based changes), `StepApplication` (pure functions), `History` (undo/redo grouping via transaction inversion).
-- **`view/`** — `EditorView` (orchestrates dispatch, reconciliation, input), `Reconciler` (block-level DOM diffing), `SelectionSync`, `NodeView` interface.
-- **`input/`** — `InputHandler` (beforeinput → commands), `KeyboardHandler` (keymap dispatch), `PasteHandler`, `InputRule` (pattern-based transforms like `# ` → heading).
-- **`commands/`** — High-level commands (`toggleMark`, `insertText`, `splitBlock`, `deleteBackward`).
-- **`plugins/`** — Plugin system + all feature plugins. Each plugin folder: implementation + co-located tests.
-- **`editor/`** — `NotectlEditor` Web Component (public API, DOM setup).
-
-### Plugin System
-
-All editor features are plugins. Plugins register capabilities during `init(context: PluginContext)`:
-- `registerNodeSpec()` / `registerMarkSpec()` — schema extensions
-- `registerCommand()` / `registerKeymap()` — commands and shortcuts
-- `registerInputRule()` — pattern-based text transforms
-- `registerToolbarItem()` — toolbar UI
-- `registerMiddleware()` — transaction middleware
-- `registerService()` — typed services via `ServiceKey<T>`
-
-Plugins never access core internals directly — everything goes through `PluginContext`.
-
-### Transaction System
-
-Changes are expressed as **Steps** (`InsertTextStep`, `DeleteTextStep`, `SplitBlockStep`, `MergeBlocksStep`, `AddMarkStep`, `RemoveMarkStep`, `SetBlockTypeStep`, etc.). Every step stores enough data to be inverted for undo. Built via `state.transaction('input').insertText(...).build()`.
-
-## Code Style
-
-Enforced via `biome.json` and `code-style-requirements.md`:
-
-- **TypeScript strict mode** — no `any` (biome error), no `console.log` (biome error), `readonly` everywhere
-- **Tabs**, single quotes, semicolons, max 100 chars/line
-- **Explicit types** on all variables, parameters, return values, properties
-- **`import type`** for type-only imports
-- **Files max ~500 lines**, small single-responsibility functions, early returns over nesting
-- **Naming**: files=PascalCase, interfaces=PascalCase (no `I` prefix), functions=camelCase, constants=UPPER_SNAKE_CASE, plugin folders=kebab-case
-- **Tests** co-located (`Foo.ts` + `Foo.test.ts`), Arrange-Act-Assert, test public API not internals
-- **Commits**: conventional (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`)
-
-## Clean Code Principles
-The Code follows always follow clean code principles, such as:
-- SOLID
-- DRY
-- TESTABILITY
-- SEPARATION OF CONCERNS
-- Always avoid big classes/files. If something is getting too big or complex, it's a sign that it should be refactored into smaller, more focused modules or functions.
-
-## Accessibility
-- All interactive elements must be keyboard accessible (tab order, ARIA roles/labels)
-- All new Plugins/Features must be accessible by default, with no extra configuration needed
-- 
-## Key Constraints
-
-- DOM manipulation only in `view/` — model and state are DOM-free
-- Business logic belongs in `state/` or `model/`, not in plugins
-- No circular imports between layers
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Design services around a single responsibility
+- Use the `providedIn: 'root'` option for singleton services
+- Use the `inject()` function instead of constructor injection
 
 ---
 > Source: [Samyssmile/notectl](https://github.com/Samyssmile/notectl) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
