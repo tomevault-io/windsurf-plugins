@@ -1,216 +1,78 @@
 ---
 trigger: always_on
-description: Azure Storage Explorer is a web-based application for managing Azure Storage resources including blobs, tables, queues, and file shares. The application provides an intuitive interface for developers to interact with Azure Storage without installing local clients.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Azure Storage Explorer - Agent Guide
+# CLAUDE.md
 
-## Project Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Azure Storage Explorer is a web-based application for managing Azure Storage resources including blobs, tables, queues, and file shares. The application provides an intuitive interface for developers to interact with Azure Storage without installing local clients.
+## Build & Run Commands
 
-**Live Demo:** https://azurestorage.azurewebsites.net  
-**Docker Hub:** https://hub.docker.com/r/sebagomez/azurestorageexplorer/
-
-### Technology Stack
-
-- **Framework:** .NET 10.0 with Blazor Server
-- **Previous Versions:** Originally built with ASP.NET WebForms, migrated through .NET Core 2.1, 2.2, 3.1, 5.0, 6, 7, 8, and Angular (later moved to Blazor to avoid npm dependency issues)
-- **Build Tool:** [just](https://github.com/casey/just) with justfile for build automation
-- **Container:** Docker images available and automatically built via GitHub Actions
-- **Deployment:** Supports Docker, Docker Compose, Kubernetes, and Helm
-
-### Key Features
-
-1. **Blob Storage Management**
-   - Create public or private containers
-   - Upload BlockBlobs (other blob types not yet supported)
-   - Download and delete blobs
-
-2. **Queue Management**
-   - Create queues
-   - Create and manage messages
-
-3. **File Share Support**
-   - Navigate file shares
-   - Browse directory structures
-
-4. **Table Storage**
-   - Create tables and entities
-   - Query entities with OData-style operators
-   - Support for typed properties with EDM data types
-
-5. **Multi-Cloud Support (Beta)**
-   - Azure Storage (primary)
-   - AWS S3 buckets
-   - Google Cloud Platform (GCP) buckets
-   - Local Azurite emulator support
-
-## Project Structure
-
-```
-azurestorageexplorer/
-├── justfile                 # Build automation commands
-├── docker-compose.yml       # Docker Compose manifest for Azurite + Explorer
-├── k8s/                     # Kubernetes manifests
-│   ├── deployment.yaml
-│   └── service.yaml
-└── src/                     # .NET 10.0 Blazor Server application
-```
-
-## Authentication & Configuration
-
-### Connection Methods
-
-The application supports multiple authentication methods:
-
-1. **Account Name + Key**
-2. **Shared Access Signature (SAS)**
-3. **Connection String** (recommended)
-
-### Environment Variables
-
-**Azure Storage:**
-- `AZURE_STORAGE_CONNECTIONSTRING` - Full connection string (takes precedence)
-- `AZURE_STORAGE_ACCOUNT` - Account name
-- `AZURE_STORAGE_KEY` - Access key
-- `AZURE_STORAGE_ENDPOINT` - Custom endpoint
-- `AZURITE` - Set to `true` for Azurite emulator
-
-**AWS S3:**
-- `CLOUD_PROVIDER=AWS`
-- `AWS_ACCESS_KEY`
-- `AWS_SECRET_KEY`
-- `AWS_REGION`
-
-**Google Cloud Platform:**
-- `CLOUD_PROVIDER=GCP`
-- `GCP_CREDENTIALS_FILE` - Full path to service account credentials file
-
-**Note:** If `AZURE_STORAGE_CONNECTIONSTRING` is set, other Azure variables are ignored. Otherwise, all three (account, key, endpoint) must be present.
-
-## Building and Running
-
-### Prerequisites
-- .NET 10.0 SDK: https://dotnet.microsoft.com/en-us/download
-- just (optional): https://github.com/casey/just
-
-### Local Development
+Requires [.NET 10.0 SDK](https://dotnet.microsoft.com/en-us/download) and optionally [just](https://github.com/casey/just).
 
 ```bash
-# Build the project
-just build
-
-# Publish to bin folder
-just publish
-
-# Application will start with Kestrel, typically on http://localhost:5000
+just build        # build src/web/web.csproj
+just publish      # release build to ./bin, then runs via Kestrel on http://localhost:5000
+just test         # run tests/StorageLibTests/StorageLibTests.csproj
+just dbuild       # build Docker image as azurestorageexplorer:local
+just drun         # run local Docker image at http://localhost:8080
+just compose      # docker-compose with Azurite + explorer (pre-authenticated)
 ```
 
-### Docker
-
+Run a specific test class:
 ```bash
-# Run latest version
-docker run --rm -it -p 8000:8080 sebagomez/azurestorageexplorer
-
-# Access at http://localhost:8000
+dotnet test ./tests/StorageLibTests/StorageLibTests.csproj --filter "ClassName=StorageLibTests.ContainersTests"
 ```
 
-### Docker Compose (with Azurite)
+## Architecture
 
-```bash
-# Start Azurite + Storage Explorer
-just compose
+The solution has two projects and one test project:
 
-# Access at http://localhost:8080 (auto-logged into Azurite)
-```
+- **`src/StorageLibrary/`** — cloud-agnostic storage abstraction library
+- **`src/web/`** — Blazor Server app that references StorageLibrary
+- **`tests/StorageLibTests/`** — MSTest unit tests for StorageLibrary (uses `azure.data` file for credentials, not environment variables)
 
-### Kubernetes
+### StorageLibrary
 
-```bash
-# Apply manifests
-kubectl apply -f ./k8s
+The core abstraction is `StorageFactory`, which creates provider-specific implementations based on `StorageFactoryConfig`. Four interfaces define the contract:
 
-# Port forward
-kubectl port-forward svc/azurestorageexplorer 8080:8080
+| Interface | Azure impl | AWS impl | GCP impl |
+|-----------|-----------|----------|----------|
+| `IContainer` | `AzureContainer` | `AWSBucket` | `GCPBucket` |
+| `IQueue` | `AzureQueue` | — | — |
+| `ITable` | `AzureTable` | — | — |
+| `IFile` | `AzureFile` | — | — |
 
-# Access at http://localhost:8080
-```
+Mock implementations live in `Mocks/` and are used when `MOCK=true` env var is set or when `StorageFactory()` is called with no arguments. `Common/` contains provider-neutral wrapper types (`BlobItemWrapper`, `QueueWrapper`, `TableEntityWrapper`, etc.) used as return values across the interface layer.
 
-### Helm Chart (v2.7.1+)
+### Blazor Web App
 
-```bash
-# Add repository
-helm repo add sebagomez https://sebagomez.github.io/azurestorageexplorer
+`BaseComponent` is the base class for all storage pages. On init it loads `Credentials` from `ProtectedSessionStorage`, redirects to `/login` if missing, and builds a `StorageFactory` via `Util.GetStorageFactory()`.
 
-# Install chart
-helm install azurestorageexplorer sebagomez/azurestorageexplorer
+`Login.razor.cs` checks environment variables on init and auto-authenticates if they are present, bypassing the login form.
 
-# Port forward
-kubectl port-forward service/azurestorageexplorer 8080:8080
-```
+Credentials are stored in browser session storage (encrypted by ASP.NET's Data Protection) under `wasm_*` keys.
 
-## Working with Table Storage
+A `BASEPATH` environment variable can set a path prefix for reverse proxy deployments.
 
-### Creating Entities
+Prometheus metrics are exposed via `prometheus-net.AspNetCore` and counters are incremented via `BaseComponent.Increment()`.
 
-Entities are created using property-value pairs, one per line in the format:
-```
-<PropertyName>='<PropertyValue>'
-```
+## Environment Variables
 
-**Example: Creating a movie entity**
-```
-PartitionKey=Action
-RowKey=1
-Title=Die Hard
-```
-
-**Default Values:**
-- `PartitionKey`: "1" (if not specified)
-- `RowKey`: Current timestamp (if not specified)
-
-### Typed Properties
-
-Set data types using EDM notation:
-```
-Year=1978
-[Year@odata.type]=Edm.Int32
-```
-
-**Supported EDM Types:**
-- `Edm.Int64`
-- `Edm.Int32`
-- `Edm.Boolean`
-- `Edm.DateTime`
-- `Edm.Double`
-- `Edm.Guid`
-- Default: String (for any other type)
-
-### Querying Entities
-
-Query syntax: `<PropertyName> [operator] <PropertyValue>`
-
-**Supported Operators:**
-- `eq` - equals
-- `gt` - greater than
-- `ge` - greater or equal
-- `lt` - less than
-- `le` - less or equal
-- `ne` - not equal
-
-**Important:** Operators must have spaces before and after them.
-
-**Example:**
-```
-PartitionKey eq 'Action'
-```
-
-**Note:** Empty query retrieves all entities from the table.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| Variable | Purpose |
+|----------|---------|
+| `AZURE_STORAGE_CONNECTIONSTRING` | Azure connection string (takes precedence over account/key/endpoint) |
+| `AZURE_STORAGE_ACCOUNT` | Azure account name |
+| `AZURE_STORAGE_KEY` | Azure access key |
+| `AZURE_STORAGE_ENDPOINT` | Custom endpoint (default: `core.windows.net`) |
+| `AZURITE` | Set to `true` when connecting to Azurite emulator |
+| `CLOUD_PROVIDER` | `AWS` or `GCP` to switch providers |
+| `AWS_ACCESS_KEY` / `AWS_SECRET_KEY` / `AWS_REGION` | AWS credentials |
+| `GCP_CREDENTIALS_FILE` | Path to GCP service account JSON file |
+| `MOCK` | Set to `true` to use in-memory mock implementations |
+| `BASEPATH` | URL path prefix for reverse proxy (e.g. `/explorer`) |
 
 ---
 > Source: [sebagomez/azurestorageexplorer](https://github.com/sebagomez/azurestorageexplorer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
