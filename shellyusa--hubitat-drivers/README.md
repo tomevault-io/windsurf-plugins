@@ -5,11 +5,10 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [ShellyUSA/Hubitat-Drivers](https://github.com/ShellyUSA/Hubitat-Drivers).
+Original source: `CLAUDE.md` in [ShellyUSA/Hubitat-Drivers](https://github.com/ShellyUSA/Hubitat-Drivers).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
