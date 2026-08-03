@@ -219,4 +219,4 @@ let mut dog = use_resource(move || async move {
 
 ---
 > Source: [albertsgarde/rustorio](https://github.com/albertsgarde/rustorio) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
