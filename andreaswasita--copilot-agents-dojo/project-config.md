@@ -1,103 +1,110 @@
 ---
 trigger: always_on
-description: Customize this section for your stack. Examples for common fighting styles:
+description: Authoritative reference for humans (and AI assistants) **modifying** the dojo itself. If you're just *using* the dojo in your own repo, start with [`README.md`](README.md). If you're inside an agent session running on the dojo, the runtime prompt is [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 ---
 
-# Copilot Instructions
+# Copilot Agents Dojo — Contributor Guide
 
-## Code Standards
+Authoritative reference for humans (and AI assistants) **modifying** the dojo itself. If you're just *using* the dojo in your own repo, start with [`README.md`](README.md). If you're inside an agent session running on the dojo, the runtime prompt is [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
-Customize this section for your stack. Examples for common fighting styles:
+This file is load-bearing. Reviewers may reject PRs that violate the rules below.
 
-### TypeScript (Default Example)
-- Always use TypeScript with `strict: true`
-- Naming: camelCase for variables/functions, PascalCase for components/types
-- Styling: Tailwind CSS + shadcn/ui components
-- Testing: Write Vitest tests for every new component/logic
-- Architecture: Next.js App Router, Server Actions, React Server Components when possible
-- Security: Never commit secrets, use environment variables
+---
 
-### Python
-- Type hints on all function signatures
-- Formatting: Black (line length 88)
-- Testing: pytest with fixtures, aim for >80% coverage
-- Linting: ruff or flake8
-- Architecture: FastAPI or Django conventions as applicable
-- Dependency management: pyproject.toml / requirements.txt pinned
+## Project Structure
 
-### Java
-- Follow Google Java Style Guide
-- Testing: JUnit 5 + Mockito for unit tests
-- Build: Maven or Gradle (match existing project)
-- Architecture: Spring Boot patterns, constructor injection
-- Security: OWASP dependency check in CI
-
-### Go
-- Follow standard library conventions and `go fmt`
-- Testing: table-driven tests with `testing` package
-- Error handling: explicit, no panic in library code
-- Architecture: clean package boundaries, interfaces for testability
-
-### .NET
-- Nullable reference types enabled
-- Testing: xUnit + FluentAssertions
-- Architecture: clean architecture, MediatR for CQRS if applicable
-- Security: never log PII, use IOptions pattern for config
-
-> **Pick your style.** Delete the others or keep them as reference.
-
-## Superpowers Activated
-
-At session start: load all skills from `skills/`. Follow the mandatory workflow. Never improvise.
-
-See [skills.md](../skills.md) for the full skills index. Each skill is a self-contained folder under `skills/` with a `SKILL.md` file. Load the relevant skill when its trigger conditions are met.
-
-### Mandatory Workflow Pipeline
-
-Every non-trivial task follows this sequence:
+File counts shift constantly — don't treat the tree below as exhaustive. The canonical source is the filesystem.
 
 ```
-BRAINSTORM → WORKTREE → PLAN → EXECUTE → TEST → REVIEW → FINISH → LEARN
+copilot-agents-dojo/
+├── AGENTS.md                          # this file — contributor reference
+├── README.md                          # user-facing onboarding
+├── SOUL.md                            # agent identity charter (who / how / limits)
+├── skills.md                          # GENERATED — skills index grouped by tier
+├── spec/
+│   └── copilot-skills-spec.md         # the HARDLINE skill spec (v1)
+├── template/
+│   └── SKILL.md                       # canonical starter for new skills
+├── skills/                            # core + practical skills (always discoverable)
+│   ├── plan-before-code/SKILL.md      # tier: core
+│   ├── code-review/SKILL.md           # tier: practical
+│   └── …
+├── optional-skills/                   # heavy / niche skills (installed explicitly)
+├── scripts/
+│   ├── init.sh                        # scaffold tasks/{todo,lessons}.md
+│   ├── verify.sh                      # the lint/test/invariant gate
+│   ├── run-checks.ps1                 # Windows parity for verify.sh
+│   ├── regen-skills-index.sh          # rebuilds skills.md from frontmatter
+│   ├── lesson-updater.sh              # cache-aware skill amendments
+│   └── curator.sh                     # skill lifecycle (pin/archive/restore)
+├── tasks/
+│   ├── todo.md                        # current plan (rollup of tasks/board/)
+│   ├── lessons.md                     # postmortem log
+│   └── board/                         # durable per-task markdown files
+├── agents/                            # persona briefs (architect, TPM, etc.)
+├── mcp/
+│   ├── registry.yaml                  # MCP server catalog
+│   ├── servers/                       # per-server JSON manifests
+│   └── scripts/                       # mcp-subprocess wrappers
+├── cli/
+│   └── dojo_cli/                      # optional Python CLI (marketplace + scanner)
+├── .github/
+│   ├── copilot-instructions.md        # runtime prompt for sessions in this repo
+│   ├── known-pitfalls.md              # imperative DO NOT register
+│   └── workflows/dojo-enforce.yml     # PR enforcement
+└── .dojo/                             # per-clone state (telemetry, profiles); gitignored
+    └── skill-usage.json               # curator telemetry sidecar
 ```
 
-1. **[Brainstorming](../skills/brainstorming/SKILL.md)** → Socratic design refinement, get approval
-2. **[Using git worktrees](../skills/using-git-worktrees/SKILL.md)** → Isolated workspace on feature branch
-3. **[Plan before code](../skills/plan-before-code/SKILL.md)** → Break into tasks in `tasks/todo.md`
-4. **[Executing plans](../skills/executing-plans/SKILL.md)** → One task at a time, verify each
-5. **[Test writing](../skills/test-writing/SKILL.md)** → RED-GREEN-REFACTOR for every change
-6. **[Requesting code review](../skills/requesting-code-review/SKILL.md)** → Self-review against plan
-7. **[Finishing a development branch](../skills/finishing-a-development-branch/SKILL.md)** → Verify, merge decision, cleanup
-8. **[Self-improvement](../skills/self-improvement/SKILL.md)** → Log lessons, update metrics
+---
 
-### Core Kata — 基本型 (always active)
-- **[Plan before code](../skills/plan-before-code/SKILL.md)**: Enter plan mode for any non-trivial task (3+ steps). Write plan to `tasks/todo.md`.
-- **[Verify before done](../skills/verify-before-done/SKILL.md)**: Run tests, check logs, diff against main. Never mark complete without proof.
-- **[Subagent strategy](../skills/subagent-strategy/SKILL.md)**: Offload research and parallel analysis to subagents. Keep context clean.
-- **[Self-improvement](../skills/self-improvement/SKILL.md)**: Capture lessons in `tasks/lessons.md` after any correction. Review at session start.
-- **[Demand elegance](../skills/demand-elegance/SKILL.md)**: Challenge shortcuts on non-trivial changes. Skip for simple fixes — don't over-engineer.
-- **[Autonomous bug fix](../skills/autonomous-bug-fix/SKILL.md)**: Reproduce → diagnose → fix → verify. Zero hand-holding. No context switching from the user.
+## Adding a Skill
 
-### Flow Waza — 流れ技 (activate in sequence)
-- **[Brainstorming](../skills/brainstorming/SKILL.md)**: Refine ideas via Socratic questioning before code
-- **[Using git worktrees](../skills/using-git-worktrees/SKILL.md)**: Isolated workspace for every session
-- **[Executing plans](../skills/executing-plans/SKILL.md)**: Dispatch and execute tasks from todo.md
-- **[Requesting code review](../skills/requesting-code-review/SKILL.md)**: Self-review against plan between tasks
-- **[Receiving code review](../skills/receiving-code-review/SKILL.md)**: Process feedback and iterate
-- **[Finishing a development branch](../skills/finishing-a-development-branch/SKILL.md)**: Final verification + merge + cleanup
-- **[Dispatching parallel agents](../skills/dispatching-parallel-agents/SKILL.md)**: Concurrent sub-agent work when beneficial
+1. Copy `template/SKILL.md` to `skills/<name>/SKILL.md` (or `optional-skills/<name>/` for heavyweight skills).
+2. Fill in **all required frontmatter** — see [`spec/copilot-skills-spec.md`](spec/copilot-skills-spec.md) §1.
+3. Write the body in the **required section order** — spec §2.
+4. Reference real Copilot tools in backticks (`view`, `edit`, `grep`, `glob`, `powershell`, `web_fetch`, `task`). NOT bare shell utilities — spec §3.
+5. If the skill needs deterministic logic, add `scripts/` (ship `.sh` + `.ps1` for cross-platform) and `tests/`.
+6. Run `scripts/verify.sh` locally. It must pass.
+7. Open the PR. Reviewer checks against `.github/known-pitfalls.md` + the spec.
 
-### Practical Kumite — 実践組手 (load on demand)
-- **[Code review](../skills/code-review/SKILL.md)**: For reviewing PRs or diffs
-- **[Refactoring](../skills/refactoring/SKILL.md)**: For restructuring code safely
-- **[Test writing](../skills/test-writing/SKILL.md)**: For writing meaningful tests
-- **[PR workflow](../skills/pr-workflow/SKILL.md)**: For preparing merge-ready PRs
-- **[Debugging](../skills/debugging/SKILL.md)**: For systematic complex debugging
-- **[Codebase onboarding](../skills/codebase-onboarding/SKILL.md)**: For understanding unfamiliar repos
+The full reviewer checklist lives in `.github/known-pitfalls.md`.
 
-### Meta Dō — 道
+---
+
+## Adding a CLI Command
+
+The optional Python CLI lives in `cli/dojo_cli/`. Commands are centralized in `cli/dojo_cli/registry.py` (see Phase 5 of the roadmap) — adding a command is one entry in `COMMAND_REGISTRY`. `app.py`, `--help`, `marketplace.py`, and shell completion all derive from it.
+
+Until that registry exists, follow the per-file pattern in `app.py` but keep new commands tiny and dependency-free — the CLI is a convenience, never a hard dependency.
+
+---
+
+## Testing
+
+**Always use `scripts/verify.sh`** (or `scripts/run-checks.ps1` on Windows). The wrapper enforces hermetic env parity with CI:
+
+| | Without wrapper | With wrapper |
+|---|---|---|
+| Credentials | Whatever is in your env | All `*_TOKEN` / `*_API_KEY` unset |
+| Timezone | Local | UTC |
+| Locale | Local | C.UTF-8 |
+| `DOJO_ROOT` | Inherited | Temp dir per skill test |
+
+Direct `pytest` calls on a developer machine diverge from CI in ways that have caused "works locally, fails in CI" incidents in other projects.
+
+```bash
+scripts/verify.sh                       # full gate
+scripts/verify.sh tests                 # only the pytest suite
+scripts/verify.sh spec                  # only the spec/frontmatter invariants
+scripts/verify.sh --check               # CI mode: fail on any drift
+```
+
+### Test Discipline — No Change-Detector Tests
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [andreaswasita/copilot-agents-dojo](https://github.com/andreaswasita/copilot-agents-dojo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
