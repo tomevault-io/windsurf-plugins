@@ -1,198 +1,81 @@
 ---
 trigger: always_on
-description: > **For AI coding assistants** (OpenCode, Cursor, Copilot, etc.): This file is the
+description: `request_id::ensure_request_id` opens the `request{request_id=…}` span that puts a
 ---
 
-# AGENTS.md
+# aisix-proxy
 
-> **For AI coding assistants** (OpenCode, Cursor, Copilot, etc.): This file is the
-> primary context source for AI assistants working on this codebase. Use it to
-> understand project structure, coding conventions, and build commands.
+## Response-body streams and spawned tasks must re-attach the request span
 
-> **For human contributors**: See [CONTRIBUTING.md](CONTRIBUTING.md) for the
-> contribution guide.
+`request_id::ensure_request_id` opens the `request{request_id=…}` span that puts a
+`request_id` on every log line a request emits — that field is what joins a deep
+diagnostic (e.g. the Aliyun guardrail's `aliyun_request_id`) back to the
+`x-aisix-request-id` the caller was handed.
 
-## Project Overview
+Two places fall outside it, and neither errors when missed — the logs are just
+silently uncorrelated, which reads exactly like working code:
 
-Rust-based AI gateway proxy supporting OpenAI, Anthropic, Gemini, and DeepSeek APIs. Built with Axum for HTTP, Tokio for async runtime, and etcd for configuration storage.
+- **Streamed response bodies.** Hyper polls the generator after the middleware has
+  returned. Wrap it in `request_id::in_request_span(…)` **from the handler's
+  stack** (it captures `Span::current()`, so calling it elsewhere attaches a no-op
+  span). Every `async_stream::stream!` returned as a body needs this.
+- **Detached tasks.** Anything reached via `tokio::spawn` or axum's
+  `WebSocketUpgrade::on_upgrade` inherits nothing; attach the span to the future
+  with `.instrument()` (see `realtime::realtime`).
 
-Includes a React-based admin UI (in `ui/`) for managing models, API keys, and a playground for testing chat completions.
+Do not hold a span guard across an await to work around this — it leaks the span
+onto whatever the executor runs next on that thread.
 
-## Build, Lint, and Test Commands
+A `text/event-stream` body needs a second wrapper for the same reason — nothing
+errors when it is missed. Pass it through `sse_keepalive::with_heartbeat(…,
+sse_keepalive::interval())` (or, on an axum `Sse`, `keep_alive` with that
+interval) so a model that is slow to its first token doesn't look like an
+abandoned connection to a proxy in front. Only for SSE: the same wrapper on an
+opaque binary passthrough (audio, images) corrupts it.
 
-### Build
-```bash
-cargo build           # Debug build
-cargo build --release # Release build
-```
+## A per-model gate must say whether it binds the requested entry or each target
 
-### Run
-```bash
-RUST_LOG=info cargo run
-```
+`resolve_attempt_models` expands a routing model into targets, so `model_entry` /
+`virtual_entry` is the **group**, which carries none of a member's config. A gate
+written against it silently never runs for group traffic, and nothing errors —
+requests keep succeeding on a target that should have been excluded.
 
-### UI Development
-```bash
-cd ui
-pnpm install --frozen-lockfile    # Install dependencies
-pnpm dev        # Start dev server
-pnpm build      # Build for production
-pnpm lint       # Run ESLint
-pnpm format     # Format with Prettier
-pnpm typecheck  # Type check without emit
-pnpm preview    # Preview production build
-```
+**The default is that a per-model gate binds each target.** Anything an operator
+configures ON a model — rate limits, `allowed_cidrs`, cooldown, health, timeouts —
+is a statement about that model, and reaching it through a group must not strip it.
+The only deliberately entry-scoped gate is the group's own copy of any of the
+above. Anything else that only checks `model_entry` / `virtual_entry` is a bug.
 
-### Lint
-```bash
-cargo clippy --all-targets --all-features --locked -- -D warnings
-```
-Clippy warnings are treated as errors. Fix all warnings before committing.
+Guardrail attachment is the **known open exception, not a settled design**: the
+chain resolves from `RequestContext.model_id` before dispatch, so a guardrail
+scoped to a member never runs for group traffic (measured: direct 422, via group
+200). It is unfixed because the semantics are undecided, not because entry scope
+is correct — input guardrails run before a target is picked, and under failover
+there is no single "winning member" to resolve against. Tracked in
+AISIX-Cloud#1090; do not cite it as precedent for scoping a new gate to the entry.
 
-### Test
-```bash
-cargo test                             # Run all tests
-cargo test --verbose                   # Run tests with verbose output
-cargo test --test api                  # Run specific test file (tests/api.rs)
-cargo test test_crud                   # Run specific test by name
-cargo test --test admin::models_api    # Run tests in specific module
-cargo test -- --nocapture              # Show test output
-```
+Two shapes, both already implemented — copy the nearest one:
 
-### E2E Test
-```bash
-pnpm -C tests install --frozen-lockfile  # Install e2e dependencies
-pnpm -C tests test                       # Run all e2e tests
-```
+- **Filter the candidate set** (static per-caller predicates like `allowed_cidrs`):
+  drop ineligible targets in `routing::resolve_attempt_models` *before* the strategy
+  picks, so `max_fallbacks` budgets attempts across reachable targets and a
+  metric-based strategy ranks only those. Empty result → the gate's own error.
+  Do NOT fold these into `filter_attempt_models`: its
+  `when_all_unavailable: try_anyway` policy hands back the unfiltered list, which
+  would defeat an allowlist. See `routing::targets_allowed_for_ip`.
+- **Check per attempt** (dynamic/stateful gates like a rate-limit reservation):
+  resolve from the attempt model *inside* the dispatch loop, in all four
+  group-capable endpoints (chat, messages, count_tokens, responses) and in both the
+  streaming and non-streaming branches; skip the target and continue rather than
+  failing the whole request. See `quota::reserve_routing_target`, which also shows
+  the non-double-charge rule: it returns `None` for non-routing dispatch, whose
+  model layers the pre-dispatch `quota::enforce*` already reserved.
 
-### Format
-```bash
-cargo fmt          # Format all code
-cargo fmt -- --check  # Check formatting without changes
-```
-
-## Code Style Guidelines
-
-### Imports
-
-Imports are auto-organized by `rustfmt` with these rules (see `rustfmt.toml`):
-- `reorder_imports = true` — Sort imports alphabetically
-- `imports_granularity = "Crate"` — Merge imports from same crate
-- `group_imports = "StdExternalCrate"` — Group: std → external crates → local
-
-```rust
-// Standard library first
-use std::sync::Arc;
-
-// External crates (alphabetical)
-use anyhow::Result;
-use axum::{Json, extract::State};
-use serde::{Deserialize, Serialize};
-use tokio::select;
-
-// Local modules last
-use crate::config::entities::Model;
-```
-
-### Naming Conventions
-
-- **Types/Structs/Enums**: `PascalCase` (e.g., `ProviderConfig`, `ChatCompletionError`)
-- **Functions/Methods**: `snake_case` (e.g., `chat_completions`, `create_provider`)
-- **Constants/Statics**: `SCREAMING_SNAKE_CASE` (e.g., `MODELS_PATTERN`, `SCHEMA_VALIDATOR`)
-- **Modules**: `snake_case` (e.g., `chat_completions`, `rate_limit`)
-- **Local variables**: `snake_case`
-
-### Error Handling
-
-Use `thiserror` for library/domain errors, `anyhow` for application errors:
-
-```rust
-// Domain errors with thiserror
-#[derive(Debug, Error)]
-pub enum ProviderError {
-    #[error("Not implemented")]
-    NotYetImplemented,
-    #[error("API error {0}: {1}")]
-    ServiceError(http::StatusCode, String),
-    #[error("Request error: {0}")]
-    RequestError(#[from] reqwest::Error),
-}
-
-// Application code uses anyhow::Result
-pub async fn create_provider(config: &ProviderConfig) -> Result<Box<dyn Provider>> {
-    // ...
-}
-```
-
-Error types should implement `IntoResponse` for Axum handlers:
-
-```rust
-impl IntoResponse for AuthError {
-    fn into_response(self) -> Response {
-        match self {
-            AuthError::MissingApiKey => (
-                http::StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": { "message": "Missing API key" } })),
-            ).into_response(),
-        }
-    }
-}
-```
-
-### Async Patterns
-
-- Use `tokio` as the async runtime
-- Async functions: `async fn`
-- Async tests: `#[tokio::test]`
-- Traits with async methods: `#[async_trait]`
-
-```rust
-#[async_trait]
-pub trait Provider: Send + Sync {
-    async fn chat_completion(&self, request: ChatCompletionRequest) 
-        -> Result<ChatCompletionResponse, ProviderError>;
-    async fn chat_completion_stream(&self, request: ChatCompletionRequest) 
-        -> Result<BoxStream<'static, Result<ChatCompletionChunk, ProviderError>>, ProviderError>;
-    async fn embedding(&self, request: EmbeddingRequest) 
-        -> Result<EmbeddingResponse, ProviderError>;
-}
-```
-
-### Tracing
-
-Use `fastrace` for distributed tracing:
-
-```rust
-#[fastrace::trace]
-pub async fn chat_completions(...) -> Result<Response, ChatCompletionError> {
-    // Function is automatically traced
-}
-
-#[fastrace::trace(short_name = true)]
-pub fn create_provider(config: &ProviderConfig) -> Box<dyn Provider> {
-    // Short name in trace spans
-}
-```
-
-### Documentation
-
-Use `///` for doc comments on public items:
-
-```rust
-/// Creates a new provider instance based on the configuration.
-pub fn create_provider(config: &ProviderConfig) -> Box<dyn Provider> {
-    // ...
-}
-```
-
-## Testing Patterns
-
-### Test Organization
-
-- Integration tests in `tests/` directory
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Whichever shape, the group's own gate stays enforced pre-dispatch — the two tiers
+are additive, not either/or — and a caller-visible rejection must keep the
+direct-model envelope (`ModelIpRestricted` names no model and no CIDR), so a group
+never becomes a probe for which members exist.
 
 ---
 > Source: [api7/aisix](https://github.com/api7/aisix) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
