@@ -1,126 +1,65 @@
 ---
 trigger: always_on
-description: This is a TypeScript library that provides OpenTelemetry integration for NestJS applications, enabling observability through metrics, tracing, and logging. The library follows NestJS module patterns and provides decorators and services for seamless OpenTelemetry integration.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# NestJS OpenTelemetry (nestjs-otel) - AI Coding Agent Instructions
+# CLAUDE.md
 
-## Project Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This is a TypeScript library that provides OpenTelemetry integration for NestJS applications, enabling observability through metrics, tracing, and logging. The library follows NestJS module patterns and provides decorators and services for seamless OpenTelemetry integration.
+## What this is
 
-## Architecture & Key Components
+`nestjs-otel` — NestJS module wrapping OpenTelemetry (`@opentelemetry/api`). Published library (`main: lib/index.js`). Provides tracing, metrics, and wide-events to NestJS apps. Node >= 22. NestJS 11 peer dep.
 
-### Module Structure
-- **Entry point**: `src/index.ts` - exports all public APIs
-- **Core module**: `src/opentelemetry-core.module.ts` - handles OpenTelemetry SDK integration and DI setup
-- **Public module**: `src/opentelemetry.module.ts` - provides `forRoot()` and `forRootAsync()` methods
-- **Services**: `TraceService` and `MetricService` - injectable services for manual instrumentation
-- **Decorators**: `@Span`, `@OtelCounter`, `@OtelMethodCounter`, etc. - declarative instrumentation
+The library does **not** start the OTEL SDK. Consumers create their own `NodeSDK` (`tracing.ts`) and call `otelSDK.start()` before `NestFactory.create`. This module reads the global tracer/meter providers the SDK registers (`trace.getTracer`, `metrics.getMeterProvider`).
 
-### Configuration Pattern
-```typescript
-// Synchronous configuration
-OpenTelemetryModule.forRoot({
-  metrics: {
-    hostMetrics: true,
-  }
-})
+## Commands
 
-// Asynchronous configuration with factory
-OpenTelemetryModule.forRootAsync({
-  useFactory: () => ({ metrics: { hostMetrics: true } }),
-  inject: [ConfigService]
-})
-```
-
-### Decorator Patterns
-- **Span decorator**: Auto-wraps methods in OpenTelemetry spans, supports both sync/async functions. Now supports `onResult` callback for capturing return values.
-- **Traceable decorator**: Class-level decorator (`@Traceable`) that automatically applies `@Span` to all methods in a class.
-- **Context decorators**: `@CurrentSpan` and `@Baggage` for accessing OpenTelemetry context (active span, baggage items) in NestJS controllers/resolvers.
-- **Metric decorators**: Parameter injection decorators (`@OtelCounter`) and method/class decorators (`@OtelMethodCounter`, `@OtelInstanceCounter`)
-- **Naming convention**: Auto-generated metric names follow `app.ClassName.methodName.calls.total` pattern
-
-## Development Workflow
-
-### Build & Test Commands
 ```bash
-npm run build          # TypeScript compilation to /lib
-npm run test          # Runs unit + e2e tests
-npm run test:unit     # Jest unit tests
-npm run test:e2e      # E2E tests with test applications
-npm run test:coverage # Coverage report
-npm run lint          # Prettier formatting check
-npm run format        # Auto-format code
+npm run build         # tsc → lib/ (prebuild rimraf's lib first)
+npm run lint          # ultracite check (biome wrapper)
+npm run format        # ultracite fix (auto-fix lint)
+npm test              # unit + e2e
+npm run test:unit     # jest, *.spec.ts under src/
+npm run test:e2e      # jest tests/jest-e2e.json, --runInBand
+npm run test:coverage
+npm run test:watch
 ```
 
-### File Structure Conventions
-- **Source**: `src/` contains TypeScript source files
-- **Compiled**: `lib/` contains compiled JavaScript (git-ignored, npm-published)
-- **Tests**: Unit tests alongside source files (`.spec.ts`), E2E tests in `tests/e2e/`
-- **Fixture app**: `tests/fixture-app/` provides test NestJS application for E2E testing
+Run a single test: `npx jest src/wide-events/wide-event.service.spec.ts` (or `-t "<test name>"`). E2E single: `npx jest --config ./tests/jest-e2e.json tests/e2e/<file>.e2e-spec.ts`.
 
-## Critical Implementation Patterns
+Unit specs live next to source under `src/`. E2E specs in `tests/e2e/` run against `tests/fixture-app/` (a real NestJS app). Commits use Conventional Commits (commitlint + husky). `lint-staged` runs `ultracite fix` on staged files.
 
-### Decorator Implementation
-When creating new decorators, follow the proxy pattern used in `@Span`:
-```typescript
-// Preserve function metadata and parameters for OpenAPI/reflection
-propertyDescriptor.value = new Proxy(originalFunction, {
-  apply: (_, thisArg, args) => wrappedFunction.apply(thisArg, args)
-});
-copyMetadataFromFunctionToFunction(originalFunction, propertyDescriptor.value);
-```
+## Architecture
 
-### Metric Management
-- Metrics are singleton instances managed by `metric-data.ts` using `getOrCreate*` functions
-- Use the `OTEL_METER_NAME` constant for consistent meter naming
-- Metrics support optional prefixes and default attributes from configuration
+`OpenTelemetryModule.forRoot(options)` / `forRootAsync(options)` (`src/opentelemetry.module.ts`) are thin shells delegating to `OpenTelemetryCoreModule` (`src/opentelemetry-core.module.ts`). The core module is `@Global`, registers + exports `TraceService`, `MetricService`, `WideEventService`, `WideEventInterceptor`, and the `OPENTELEMETRY_MODULE_OPTIONS` token. `onApplicationBootstrap` is the only runtime side effect — it starts `HostMetrics` when `options.metrics.hostMetrics` is true. `forRootAsync` supports `useFactory` / `useClass` / `useExisting` via `OpenTelemetryOptionsFactory`.
 
-### Error Handling in Spans
-Always record exceptions and set error status:
-```typescript
-span.recordException(error);
-span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-```
+Three feature areas, each exported through `src/index.ts`:
 
-### HTTP Adapter Detection
-The library supports both Express and Fastify through `feature-detection.utils.ts`. When adding HTTP-related features, use `detectHttpAdapterType()` for adapter-specific logic.
+- **tracing** (`src/tracing/`): `TraceService` is a thin accessor over the global tracer. The real work is in decorators (`src/tracing/decorators/`): `@Span(name?, options?)` wraps a method in `startActiveSpan`, handles sync + Promise returns, records exceptions, supports an `onResult` callback to set attributes from the return value. `@Traceable` applies `@Span` to every method of a class. `@Baggage` / `@CurrentSpan` are param decorators. Decorators preserve the original function name/metadata via a `Proxy` + `copyMetadataFromFunctionToFunction` (`src/opentelemetry.utils.ts`) — critical so OpenAPI/Nest reflection still works.
 
-## Dependencies & Integration Points
+- **metrics** (`src/metrics/`): `MetricService` exposes `getCounter`/`getHistogram`/`getGauge`/observable variants, all delegating to `getOrCreate*` in `src/metrics/metric-data.ts`, which caches instruments by name in a module-level map (idempotent re-fetch). `@InjectMetric(name)` (`src/metrics/injector.ts`) injects a named instrument via a DI token from `getToken`. Class/method decorators in `src/metrics/decorators/` (`OtelInstanceCounter`, `OtelMethodCounter`, etc.) auto-instrument.
 
-### Peer Dependencies
-- `@opentelemetry/sdk-node` (required)
-- `@opentelemetry/exporter-prometheus` (optional, for metrics)
-- NestJS core packages for DI and decorators
+- **wide-events** (`src/wide-events/`): one structured event (a wide span) per request. `WideEventInterceptor` opens a `WideEventBag` (a `Map`) stored on the active OTEL context under `WIDE_EVENT_CONTEXT_KEY`, then on `finalize` flushes all accumulated attributes onto the span that was active when the request entered. `WideEventService` (`set`/`setMany`/`increment`/`startTimer`) and the `@WideEventField` decorator mutate that bag via `getWideEventBag()` — all **no-ops outside an intercepted request**. The interceptor seeds `code.function.name` plus an optional `options.wideEvents.seed(executionContext)`, and records `error.type`/`error.message` on failure. Register globally with `APP_INTERCEPTOR` or per-controller with `@UseInterceptors`.
 
-### External Integrations
-- **Prometheus**: Metrics exported via PrometheusExporter on port 8081
-- **Jaeger/Tempo**: Tracing via BatchSpanProcessor
-- **Pino Logging**: Structured logging with trace context injection
+Options/interfaces in `src/interfaces/`. Constants (token, tracer name `OTEL_TRACER_NAME`) in `src/opentelemetry.constants.ts`.
 
-## Testing Strategy
+## Conventions
 
-### Unit Tests
-- Test decorators with mock functions and verify OpenTelemetry API calls
-- Test services in isolation with mocked OpenTelemetry providers
-- Use `jest.mock()` for OpenTelemetry SDK components
+- Lint is `ultracite` (extends biome). Config in `biome.jsonc` already disables `noExplicitAny`, `useAwait`, barrel-file warnings — `any` is used freely in decorator code by design. Run `npm run format` before committing.
+- Public API symbols are tagged `@publicApi`; internal ones `@internal`. Keep new exports wired through `src/index.ts`.
+- Decorators must not break function identity — when adding/altering a method decorator, preserve name + metadata as the existing ones do.
 
-### E2E Tests
-- Create test NestJS applications in `tests/fixture-app/`
-- Test module registration with both `forRoot()` and `forRootAsync()`
-- Verify metrics/spans are created during actual HTTP requests
-- Test adapter-specific behavior (Express vs Fastify)
+## graphify
 
-## Common Patterns to Follow
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
-1. **Export everything from index.ts** - All public APIs must be re-exported
-2. **Use injection tokens** - Define constants in `opentelemetry.constants.ts`
-3. **Global module pattern** - Core module is `@Global()` to avoid re-imports
-4. **Async/sync support** - All decorators must handle both sync and async functions
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pragmaticivan/nestjs-otel](https://github.com/pragmaticivan/nestjs-otel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
