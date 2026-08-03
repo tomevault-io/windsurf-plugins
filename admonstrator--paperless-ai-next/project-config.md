@@ -1,119 +1,107 @@
 ---
 trigger: always_on
-description: Community fork of [clusterzx/paperless-ai](https://github.com/clusterzx/paperless-ai) - an AI-powered document processing extension for Paperless-ngx. This fork focuses on integration testing, performance optimizations, and Docker improvements. Core development credit belongs to the upstream project.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Copilot Instructions for Paperless-AI next
+# CLAUDE.md
 
-## Project Context
-Community fork of [clusterzx/paperless-ai](https://github.com/clusterzx/paperless-ai) - an AI-powered document processing extension for Paperless-ngx. This fork focuses on integration testing, performance optimizations, and Docker improvements. Core development credit belongs to the upstream project.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+Paperless-AI **next** — a community fork of clusterzx/paperless-ai. A Node.js/Express app that uses
+LLMs (OpenAI, Ollama, Azure, or any OpenAI-compatible "custom" endpoint) plus optional OCR to auto-tag,
+title, classify, and extract metadata for documents in a Paperless-ngx instance. Server-rendered EJS UI,
+no frontend framework. Single SQLite database (better-sqlite3, WAL mode).
+
+## Commands
+
+> ⚠️ **`npm test` / `npm run test` does NOT run tests** — it starts the dev server via nodemon
+> (`nodemon server.js`). This is a deliberate quirk of `package.json`.
+
+```bash
+# Run the dev server (auto-reload)
+npm run test                       # = nodemon server.js
+node server.js                     # plain run
+
+# Tests (custom runner — plain node scripts, no jest/mocha)
+npm run test:all                   # all tests          (node scripts/run-tests.js --all)
+npm run test:list                  # list areas + tests
+npm run test:area:security         # run an area (auth|ocr|observability|processing|prompts|security)
+node scripts/run-tests.js --test ssrf-url-validation   # single test by name
+
+# Lint / format
+npx eslint .                       # flat config: eslint.config.mjs
+npx prettier --check .             # .prettierrc.json + .prettierignore
+
+# Production (what Docker runs)
+pm2-runtime ecosystem.config.js    # via start-services.sh
+
+# Maintenance
+npm run mfa:reset                  # reset MFA for a user
+node scripts/regen-openapi.js      # regenerate OPENAPI/openapi.json from @swagger JSDoc
+```
+
+**Test gotcha:** several tests self-skip unless a server is reachable at `BASE_URL`
+(default `http://localhost:3000`) and certain env vars are set — e.g. `rate-limiting`,
+`thumbnail-auth-guard`, `scan-stop-flow` (needs `JWT_TOKEN` or `API_KEY`), `login-mfa-flow`
+(needs `LOGIN_TEST_USERNAME`/`LOGIN_TEST_PASSWORD`). A "SKIPPED" result is not a failure. To run
+the full server-dependent suite, start the server first, then run the tests against it.
 
 ## Architecture
 
-### Dual Runtime System
-- **Node.js (Express)**: Main API server, document processing, UI (`server.js`)
-- **Python (FastAPI)**: Optional RAG service for semantic search (`main.py`)
-- **Startup**: `start-services.sh` launches both with PM2 + uvicorn
-- **Database**: better-sqlite3 with WAL mode (`models/document.js`)
+**Entry point:** `server.js` (~1200 lines) — Express app, all middleware/routes/CSRF/rate-limiting,
+the cron-driven `scanDocuments()` processing loop, and SSE progress streams. Most logic lives here plus
+the `services/` singletons.
 
-### Service Layer Pattern
-All services follow singleton pattern: `class ServiceName { ... }; module.exports = new ServiceName();`
+**Service layer** (`services/`): every service is a singleton —
+`class Foo { ... }; module.exports = new Foo();`. Import and call directly; do not `new` them.
 
-**AI Provider Factory** (`services/aiServiceFactory.js`):
-- Returns appropriate service based on `config.aiProvider` (openai|ollama|custom|azure)
-- All AI services must implement: `analyzeDocument(content, doc, existingTags, correspondents)`
-- Use `RestrictionPromptService.processRestrictionsInPrompt()` for placeholder replacement (`%RESTRICTED_TAGS%`, `%RESTRICTED_CORRESPONDENTS%`)
+**AI provider abstraction:** `services/aiServiceFactory.js` returns the right service based on
+`config.aiProvider` (`openai` | `ollama` | `custom` | `azure`). Every provider service implements
+`analyzeDocument(content, doc, existingTags, correspondents)`. To add a provider: add a service singleton,
+wire it into the factory switch, and add its config block in `config/config.js`.
 
-**Token Management** (`services/serviceUtils.js`):
-- `calculateTokens(text, model)` - Uses tiktoken for OpenAI models, character estimation (÷4) for others
-- `truncateToTokenLimit(text, maxTokens, model)` - Smart truncation with safety buffer
+**Token handling:** `services/serviceUtils.js` — `calculateTokens()` (tiktoken for OpenAI, ÷4 char
+estimate otherwise) and `truncateToTokenLimit()`. Also holds AI-error → OCR-fallback classification
+helpers used by the scan loop.
 
-### Configuration System
-All config loads from `data/.env` via `config/config.js`. Key patterns:
-- Boolean parsing: `parseEnvBoolean(value, defaultValue)` - handles 'yes'/'no', 'true'/'false', '1'/'0'
-- Feature toggles: `activateTagging`, `activateCorrespondents`, etc.
-- AI restrictions: `restrictToExistingTags`, `restrictToExistingCorrespondents`
+**Prompt restrictions:** `services/restrictionPromptService.js` replaces placeholders like
+`%RESTRICTED_TAGS%`, `%RESTRICTED_CORRESPONDENTS%`, `%CUSTOMFIELDS%` in prompts. The base prompts live
+in `config/config.js` (`specialPromptPreDefinedTags`, `mustHavePrompt`).
 
-### Database Schema
-5 key tables in `data/documents.db` (see `models/document.js`):
-- `processed_documents` - Tracks processed docs (document_id, title)
-- `history_documents` - UI history with pagination support
-- `openai_metrics` - Token usage tracking
-- `original_documents` - Pre-AI metadata snapshot
-- `users` - Authentication (bcryptjs passwords)
+**OCR:** `services/mistralOcrService.js` — provider can be `mistral`, `ollama` (native `/api/chat`
+vision), or OpenAI-compatible `/v1`. OCR is a fallback path when AI analysis fails on low-text docs.
 
-**Performance Pattern**: Use prepared statements for all queries. History pagination uses SQL `LIMIT/OFFSET`, not in-memory filtering.
+**Database:** `models/document.js` — better-sqlite3 at `data/documents.db`, WAL mode, prepared
+statements throughout. Key tables: `processed_documents`, `history_documents` (server-side paginated
+via SQL `LIMIT/OFFSET`, not in-memory), `openai_metrics`, `original_documents`, `users`.
+Schema migrations run at startup via `services/startupMigrations.js`.
 
-## Critical Workflows
+**Paperless-ngx I/O:** `services/paperlessService.js` fetches documents and posts results back
+(`updateDocument()`). Tags are cached with a TTL (`TAG_CACHE_TTL_SECONDS`, default 300s) to cut API calls.
 
-### Document Processing Flow
-1. `node-cron` triggers scan based on `config.scanInterval` (cron format)
-2. `scanDocuments()` fetches from Paperless-ngx API
-3. Retry tracking: `retryTracker` Map prevents infinite loops (max 3 attempts)
-4. Content validation: Documents need ≥ `MIN_CONTENT_LENGTH` chars (default: 10)
-5. **Tag filtering**: If `PROCESS_PREDEFINED_DOCUMENTS=yes`, only process docs with tags matching `TAGS` env var
-6. AI service processes via factory pattern
-7. Results posted back to Paperless-ngx via `paperlessService.updateDocument()`
+**Reconciliation:** `services/reconciliationService.js` — cron job (`RECONCILIATION_INTERVAL`) that
+cleans up records for documents deleted in Paperless-ngx.
 
-**Key Files**: `server.js` lines 150-400, `services/paperlessService.js`
+**Routes:** `routes/auth.js` (JWT-in-cookie + `x-api-key` auth, `isAuthenticated` middleware) and
+`routes/setup.js` (setup wizard + history/api endpoints). `schemas.js` holds shared swagger schemas.
 
-### RAG Service Integration
-- Python service runs on port 8000 (configurable via `RAG_SERVICE_URL`)
-- Node.js proxies requests through `services/ragService.js`
-- Embeddings: sentence-transformers with ChromaDB vector store
-- Hybrid search: BM25 (keyword) + semantic embeddings, weighted 30/70
-- **Important**: RAG endpoints check `RAG_SERVICE_ENABLED` before proxying
+### Document processing flow (the core loop in server.js)
 
-### Authentication & Security
-- JWT stored in cookies (`jwt` cookie name)
-- API key support via `x-api-key` header
-- Middleware: `isAuthenticated` checks both JWT and API key
-- Protected routes use `protectApiRoute` middleware
-- **Pattern**: All `/api/*` routes require authentication, including `/api-docs`
+1. `node-cron` fires on `config.scanInterval` (cron syntax, default `*/30 * * * *`).
+2. `scanDocuments()` pulls candidates from Paperless-ngx.
+3. A `retryTracker` Map caps attempts (max 3) to prevent infinite loops.
+4. Docs below `MIN_CONTENT_LENGTH` (default 10) are skipped or routed to OCR.
+5. If `PROCESS_PREDEFINED_DOCUMENTS=yes`, only docs whose tags match the `TAGS` env var are processed.
+6. The factory's AI service analyzes; results are written back via `paperlessService.updateDocument()`.
+   A global `__paperlessAiScanControl` object supports stop-requests mid-scan.
 
-### Server-Side Pagination (PERF-001)
-History table uses SQL-based pagination instead of loading all records:
-```javascript
-// In routes/setup.js - /api/history endpoint
-const { start, length, search, order } = req.query; // DataTables params
-// Use getPaginatedHistoryDocuments() with LIMIT/OFFSET
-```
-Tag caching with 5-minute TTL reduces Paperless-ngx API calls by ~95%.
+## Configuration system (important)
 
-## Development Commands
-
-```bash
-# Local development (auto-reload)
-npm run test  # Uses nodemon
-
-# Python RAG service
-source venv/bin/activate
-python main.py --host 127.0.0.1 --port 8000
-
-# Production (Docker uses this)
-pm2 start ecosystem.config.js
-
-# Database inspection
-sqlite3 data/documents.db "SELECT * FROM processed_documents LIMIT 5;"
-```
-
-## Code Conventions
-
-### Language Requirement (MANDATORY)
-- English only across the project.
-- All source code comments, commit messages, pull requests, issue templates, documentation, UI labels, and user-facing text must be written in English.
-- Do not introduce German or mixed-language content in any repository file.
-
-### Error Handling
-- Always log to both `htmlLogger` and `txtLogger` for user-facing operations
-- Use try-catch in all async routes
-- Return meaningful HTTP status codes (400 for validation, 500 for server errors)
-
-### Frontend Integration
-- EJS templates in `views/` (no framework)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [admonstrator/paperless-ai-next](https://github.com/admonstrator/paperless-ai-next) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
