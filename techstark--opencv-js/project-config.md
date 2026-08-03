@@ -1,147 +1,110 @@
 ---
 trigger: always_on
-description: Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+description: TypeScript NPM package wrapping the pre-built OpenCV.js (WASM) binary with type definitions. Supports Node.js and browser environments.
 ---
 
-# OpenCV-JS Package Development Instructions
+# opencv-js — Claude Development Guide
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+## Project Overview
 
-## About This Project
+TypeScript NPM package wrapping the pre-built OpenCV.js (WASM) binary with type definitions. Supports Node.js and browser environments.
 
-OpenCV-JS is a TypeScript NPM package that provides OpenCV.js (JavaScript/WebAssembly version of OpenCV) for both Node.js and browser environments. The package wraps a pre-built 11MB OpenCV.js WASM binary with TypeScript type definitions.
+- **Package:** `@techstark/opencv-js`
+- **Version:** `5.0.0-release.1`
+- **OpenCV Version:** 5.0.0 (WASM binary in `dist/opencv.js`)
+- **Binary source:** Built via GitHub Actions (`build-opencv-js.yml`) — official `docs.opencv.org` does not yet publish 5.x
 
-**Repository:** https://github.com/TechStark/opencv-js  
-**NPM Package:** [@techstark/opencv-js](https://www.npmjs.com/package/@techstark/opencv-js)  
-**Version:** 5.0.0-release.1
+## Essential Commands
 
-## Technology Stack
-
-- **Language:** TypeScript
-- **Runtime:** Node.js 20.x (also supports browser environments)
-- **Build Tool:** TypeScript Compiler (tsc)
-- **Testing:** Jest with ts-jest
-- **Package Manager:** npm
-- **OpenCV Version:** 5.0.0 (WebAssembly/JavaScript build)
-- **Key Dependencies:** Jimp (for image loading in tests)
-
-## Table of Contents
-
-- [Working Effectively](#working-effectively)
-- [Package Usage Patterns](#package-usage-patterns)
-- [Testing and Validation](#testing-and-validation)
-- [File Structure and Navigation](#file-structure-and-navigation)
-- [CI/CD and Publishing](#cicd-and-publishing)
-- [Common Development Tasks](#common-development-tasks)
-- [Browser vs Node.js Differences](#browser-vs-nodejs-differences)
-- [Performance and Timing Expectations](#performance-and-timing-expectations)
-- [Troubleshooting](#troubleshooting)
-- [Security Considerations](#security-considerations)
-- [External Documentation](#external-documentation)
-- [Contributing Guidelines](#contributing-guidelines)
-
-## Working Effectively
-
-### Initial Setup and Build
-- Install dependencies: `npm install` -- takes ~15 seconds
-- Build TypeScript: `npm run build` -- takes ~2 seconds. NEVER CANCEL. Set timeout to 60+ seconds.
-- Run tests: `npm test` -- takes ~8 seconds. NEVER CANCEL. Set timeout to 300+ seconds.
-- Format code: `npm run format` -- takes ~1 second
-
-### Build Process Validation
-- ALWAYS run the complete build process: `npm install && npm run build && npm test`
-- Test package creation: `npm pack` -- creates .tgz file for distribution testing
-- ALWAYS run `npm audit fix` to address security vulnerabilities before committing
-
-### Manual Testing and Validation
-- ALWAYS test OpenCV functionality after making changes using this pattern:
-```javascript
-const cv = await require('./dist/opencv.js');
-global.cv = cv;
-const mat = new cv.Mat(3, 3, cv.CV_8UC1);
-console.log(`Mat: ${mat.rows}x${mat.cols}, channels: ${mat.channels()}`);
-mat.delete(); // CRITICAL: Always call delete() for memory management
+```bash
+npm install        # ~15s — regenerates package-lock.json
+npm run build      # ~2s  — TypeScript compile (tsc)
+npm test           # ~8s  — Jest test suite (38 tests)
+npm run format     # ~1s  — Prettier
 ```
 
-### Memory Management Requirements
-- ALWAYS call `.delete()` on OpenCV objects (Mat, Size, etc.) to prevent memory leaks
-- NEVER forget memory cleanup in tests and examples
-- Use try/catch with proper cleanup in finally blocks when appropriate
+NEVER cancel builds or tests. Always run the full sequence after any change:
+```bash
+npm install && npm run build && npm test
+```
 
-## Package Usage Patterns
+## File Structure
 
-### v4.11+ API (Current)
-```javascript
+```
+dist/opencv.js          — pre-built WASM binary (~10MB), never edit
+src/index.ts            — re-exports from types/
+src/types/opencv/       — 100+ TypeScript definition files
+test/                   — Jest tests (Mat, Tracker, rect, cvKeys, QRCode, etc.)
+doc/cvKeys.json         — runtime API surface snapshot (buildInformation + keys)
+.github/workflows/
+  build-opencv-js.yml   — builds opencv.js from source via Emscripten
+  npm-publish.yml       — publishes to NPM on release
+  unit-test.yml         — CI tests on PR/push
+```
+
+## Memory Management (Critical)
+
+Always call `.delete()` on OpenCV objects — WASM memory does not GC:
+
+```typescript
+const mat = new cv.Mat(3, 3, cv.CV_8UC1);
+try {
+  // use mat
+} finally {
+  mat.delete();
+}
+```
+
+## Import Patterns
+
+**Current API (v4.11+):**
+```typescript
 import cvReadyPromise from "@techstark/opencv-js";
 const cv = await cvReadyPromise;
-// Use cv here
 ```
 
-### v4.10- API (Legacy)
-```javascript
+**Legacy API (v4.10-):**
+```typescript
 import cv from "@techstark/opencv-js";
-cv.onRuntimeInitialized = () => {
-  // Use cv here
-};
+cv.onRuntimeInitialized = () => { /* use cv */ };
 ```
 
-### Browser Configuration
-- ALWAYS include webpack polyfills for browser usage:
+## Browser webpack polyfills
+
 ```javascript
-module.exports = {
-  resolve: {
-    fallback: {
-      fs: false,
-      path: false,
-      crypto: false
-    }
-  }
-};
+resolve: { fallback: { fs: false, path: false, crypto: false } }
 ```
 
-## Testing and Validation
+## Updating the OpenCV Version
 
-### Running Tests
-- Unit tests use Jest with TypeScript preset
-- Tests validate: Mat operations, image processing, color conversions, tracking
-- Test files include: `Mat.test.ts`, `Tracker.test.ts`, `rect.test.ts`, `cvKeys.test.ts`
-- ALWAYS wait for async OpenCV initialization in tests using `setupOpenCv()` helper
+See `doc/updating-opencv-version.md` for the full checklist.
 
-### Key Validation Scenarios
-After making changes, ALWAYS test these scenarios:
-1. Basic Mat creation and property access
-2. Color space conversion (RGBA2GRAY)
-3. Image filtering operations (GaussianBlur, threshold)
-4. Contour detection and processing
-5. Memory cleanup with .delete() calls
+**Quick summary:**
+1. Build new `dist/opencv.js` via GitHub Actions (`build-opencv-js.yml`)
+2. Replace `dist/opencv.js` with the artifact
+3. Update version strings: `package.json`, `README.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `build-opencv-js.yml`
+4. Run `npm install && npm run build && npm test`
+5. Regenerate `doc/cvKeys.json` (run `npm test` — the cvKeys test validates the binary)
 
-### Testing with Real Images
-- Use `test/Lenna.png` for image processing tests
-- Use Jimp library for loading images in Node.js environment
-- Pattern: `const jimpSrc = await Jimp.read(path); const img = cv.matFromImageData(jimpSrc.bitmap);`
+**Build parameters for 5.0.0:**
+- Emscripten: `4.0.20`
+- CMake option: `-DCMAKE_CXX_STANDARD=17` (required for Emscripten 4.0.20+)
+- Build flags: default (no custom flags needed)
 
-## File Structure and Navigation
+## Common Issues
 
-### Key Directories
-- `src/` - TypeScript source (mainly type definitions)
-  - `src/index.ts` - Main export (32 bytes, exports from types/opencv)
-  - `src/types/` - Comprehensive OpenCV type definitions
-- `test/` - Jest test files with OpenCV functionality validation
-- `dist/` - Build output including the 11MB opencv.js binary
-- `.github/workflows/` - CI/CD configuration
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `cv.Mat is not a constructor` | OpenCV not initialized | use `await cvReadyPromise` |
+| Memory leak / browser crash | Missing `.delete()` | add `.delete()` in finally |
+| webpack `fs` not found | Missing polyfills | add fallback config |
+| Test failures on `setupOpenCv()` | Async init not awaited | check test helper |
 
-### Important Files
-- `dist/opencv.js` - Pre-built OpenCV.js WASM binary (11MB, core functionality)
-- `package.json` - NPM configuration with build/test scripts
-- `tsconfig.json` - TypeScript compilation settings
-- `jest.config.js` - Jest testing configuration
-- `doc/cvKeys.json` - Runtime OpenCV methods and properties reference
+## Security
 
-### Type Definitions Structure
-- Over 100 TypeScript definition files in `src/types/opencv/`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `dist/opencv.js` comes from our own CI build (OpenCV source + Emscripten) — verify origin before accepting external files
+- Run `npm audit fix` before committing
 
 ---
 > Source: [TechStark/opencv-js](https://github.com/TechStark/opencv-js) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
