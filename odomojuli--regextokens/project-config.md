@@ -1,0 +1,56 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A sourced, tested token-scanning suite: a catalog of regex patterns for OAuth/API tokens and secrets (`109` patterns / `64` providers), plus an installable engine that scans files and scores each hit with **offline proof**. The core principle is that every pattern is **sourced** (primary provider docs), **tested** (positive + negative samples), and **proven** (RE2-compatible, ReDoS-checked). The engine extends "proven" to individual findings: a GitHub/npm CRC32 checksum can confirm or *reject* a match with certainty, no network.
+
+## Commands
+
+```
+pip install -e .            # install package + `regextokens` console script
+pip install pytest          # test dependency
+pytest                      # full suite (patterns + engine)
+pytest -k aws               # tests for patterns whose id contains "aws"
+pytest "tests/test_patterns.py::test_positive_samples_match[github-pat-classic]"   # one check for one pattern
+python3 build_patterns.py   # validate DATA, then regenerate patterns.json + README.md + bundled copy
+regextokens scan PATH... -m verified   # scan; show only offline-proven findings
+regextokens scan . --write-baseline .regextokens-baseline.json   # snapshot accepted findings
+regextokens scan . --baseline .regextokens-baseline.json         # subtract them
+```
+
+## Architecture
+
+Single source of truth is the `DATA` list in `build_patterns.py`. Everything else is generated or derived:
+
+- `build_patterns.py` — `DATA` (all pattern entries with samples) + `validate()` + `write_json()` + `write_readme()`. Running it validates every pattern against its samples, then writes `patterns.json`, `README.md`, and a synced copy at `regextokens/data/patterns.json`.
+- `patterns.json` — generated machine-readable catalog. **Never edit by hand; never add samples to it** (see invariant below).
+- `README.md` — generated human reference. Never edit by hand.
+- `regextokens/` — installable package that **consumes** the generated `patterns.json` (never a second definition of patterns): `catalog.py` (load/compile), `scanner.py` (walk files/text, yield `Finding`s), `verify.py` (offline proof → `Confidence` tier), `baseline.py` (fingerprints, baseline file, allowlist), `report.py` (human/JSON/SARIF), `cli.py` (`scan`/`list`/`version`). Bundles a synced copy of `patterns.json` as package data.
+- `tests/test_patterns.py` — loads `build_patterns.py` via importlib (repo root is not a package) and parametrizes over every pattern id.
+- `tests/test_engine.py` — scanner/verify/report/CLI tests, plus bundled-catalog sync and no-samples checks. Constructs checksum-valid tokens at runtime (never commits token literals).
+- `tests/test_baseline.py` — baseline/allowlist semantics, repo-baseline honesty, distribution artifact checks, version sync.
+- Distribution: `.pre-commit-hooks.yaml` (hook, default `-m probable`), `action.yml` (composite GitHub Action, SARIF out), `.github/workflows/ci.yml` (pytest matrix + self-scan dogfood) and `release.yml` (tag-triggered PyPI trusted publishing; guards tag == `__version__`). Version lives in **both** `regextokens/__init__.py` and `pyproject.toml`; `test_version_in_sync_with_pyproject` enforces sync.
+
+### Baseline (accepted findings)
+
+Findings carry a `fingerprint` (sha256 of pattern id + hashed secret body — line- and path-independent; never contains the secret). Suppression requires fingerprint **and** path, so the same token in a new file re-flags; line moves don't. The `allow` section of the baseline file is hand-edited policy (fnmatch path globs, pattern ids) — `--write-baseline` preserves and applies it. Tree walks skip `.regextokens-baseline.json` (explicit file targets still scan it). **The repo commits its own baseline** for the six probable-tier synthetic samples in `build_patterns.py`; `test_repo_baseline_matches_current_tree` requires it to cover the tree *exactly* — if a DATA edit adds a sample that scores `probable`, regenerate it: `regextokens scan . -m probable --write-baseline .regextokens-baseline.json`.
+
+### Offline proof (the differentiator)
+
+`verify.py` scores a shape match without any network call. The strongest check is the GitHub/npm CRC32: modern `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`/`npm_` tokens are `prefix` + 30 base62 random + 6-char base62-encoded CRC32 of those 30 chars. `verify.github_npm_checksum_ok` recomputes it — **empirically validated against 20 real (revoked) GitHub tokens; all pass, any single-char tamper fails.** A bad checksum yields `Confidence.REJECTED` and the finding is dropped. Tiers: `verified-offline` (checksum/decoder), `probable` (structure + entropy), `low` (shape only), `rejected` (provably not a token). Never claim a key is *live* — that needs the issuer's API. When adding a checksummed provider, prove the algorithm against real revoked tokens before shipping a `REJECTED` path.
+
+### Critical invariant: no sample tokens in committed catalog output
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [odomojuli/regextokens](https://github.com/odomojuli/regextokens) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
