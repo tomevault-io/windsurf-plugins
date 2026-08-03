@@ -53,6 +53,22 @@ description: - **Check**: To check for all linting/formatting issues, run `pnpm 
 - Use UI components from the `zudoku/ui` module. (based on shadcn/ui)
 - Use icons from the `zudoku/icons` module (based on Lucide icons)
 
+## Config Schema (Zod)
+
+- The loader parses the user config via `validateConfig()`, so schema `.default()`/`.transform()`
+  values apply to everything downstream. Don't re-parse config sections in consumers.
+- Order is always transform-then-parse: plugin `transformConfig` hooks run on the RAW authored
+  config (same shape they see in the client bundle), then the result is schema-parsed. Hook
+  additions must conform to the schema; unknown keys are stripped on the server side.
+- Zod only applies nested `.default()`s when the parent object is present in the input. A parent
+  that is `.optional()` short-circuits to `undefined` and inner defaults never run. Sub-schemas
+  whose defaults should apply when omitted must use `.prefault({})` on the schema itself (see
+  `DocsConfigSchema`). `.default({})` does NOT work for this: it returns the literal `{}` without
+  running the inner schema.
+- Exceptions that read the raw (unparsed) config: the client bundle via `virtual:zudoku-config`, and
+  `buildManifest` when called from the SSR entry. The prerender worker parses the built bundle's
+  config itself via `validateConfig()`.
+
 ## OpenAPI Schema Processing Pipeline
 
 There are two distinct pipelines depending on how schemas are loaded:
@@ -81,38 +97,9 @@ There are two distinct pipelines depending on how schemas are loaded:
 Schemas are exposed via a Pothos GraphQL API (`oas/graphql/index.ts`). The `schema` field on
 responses/request bodies is passed as `JSONSchemaScalar`, which serializes the raw schema object
 through `handleCircularRefs()`. Media-type level `example`/`examples` are resolved into
-`ExampleItem` arrays by the GraphQL resolvers before reaching the client.
-
-## Polyfills
-
-`polyfills.ts` is a side-effect module imported in `main.tsx` and listed in `package.json`
-`sideEffects`. All browser polyfills must go in this file or be added as a separate entry in the
-`sideEffects` array, otherwise they will be tree-shaken in production builds.
-
-## Bundle Size
-
-Heavy modules must never be statically imported from entry-path code (modules reachable from
-`entry.client` without a lazy boundary). Static imports from route-split code (e.g. openapi plugin
-pages) are fine since those are already in separate chunks.
-
-Modules that must be lazy-loaded (`React.lazy` or dynamic `import()`) in entry-path code:
-
-- `SyntaxHighlight` / `HighlightedCode` (pulls in shiki)
-- `CodeTabs` (imports SyntaxHighlight)
-- `Mermaid`
-- `Markdown`
-- `PlaygroundDialog`
-
-When adding new components that depend on these, either lazy-load them or place them in route-split
-plugin code. A static import chain from `MdxComponents.tsx` or similar always-loaded modules will
-pull the heavy dependency into `entry.client`.
-
-## Plugin Architecture
-
-- Plugins live in packages/zudoku/lib/plugins/
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zuplo/zudoku](https://github.com/zuplo/zudoku) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
