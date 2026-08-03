@@ -1,254 +1,146 @@
 ---
 trigger: always_on
-description: Before implementing any task spec, read:
+description: Before changing code, read:
 ---
 
-# CLAUDE.md — Futureboard Studio Agent Rules
+# Futureboard Studio Agent Rules
 
-Before implementing any task spec, read:
+Before changing code, read:
 
-1. `tasks/SKILL.md`
-2. `DESIGN.md` if the task touches UI, layout, styling, windows, dialogs, panels, or component structure
-3. The smallest relevant task file/section only
+1. `SKILL.md` for repository workflow and engineering constraints.
+2. `DESIGN.md` when the task touches UI, layout, interaction, windows, panels, dialogs, or plugin editors.
+3. Only the smallest relevant implementation area after that.
 
-This file is a quick operating contract for Claude Code inside the Futureboard Studio repository.  
-`tasks/SKILL.md` is the deeper source of truth.
+`AGENTS.md` delegates here so every coding agent follows the same contract.
 
----
+## Product scope
 
-## Prime Directive
+Futureboard Studio is the native Rust/GPUI application:
+
+- app: `apps/native/studio`
+- binary: `FutureboardNative`
+- package: `futureboard_native`
+- native UI: `crates/SphereUIComponents`
+- audio engine: `crates/SphereDirectAudioEngine`
+- plugin host and scanner: `crates/SpherePluginHost`
+- built-in plugins: `crates/BuiltinAudioPlugins`
+
+Electron and the general-purpose Web UI are retired. Do not implement, repair,
+port from, validate, or use them as product/design authority unless the user
+explicitly asks for legacy removal or archaeology.
+
+The only active Web UI scope is a built-in plugin's embedded editor. Those
+editors live under `crates/BuiltinAudioPlugins/crates/*/editor` or `editorui`,
+are compiled to static assets, embedded by `builtin_ui_embed`, and hosted by
+the native app through `SphereWebView`/CEF. They are plugin views, not a second
+Futureboard application.
+
+## Operating contract
 
 Work in the smallest safe scope.
 
-Do not rewrite the repository.  
-Do not implement an entire roadmap unless explicitly requested.  
-Do not "improve" unrelated code while fixing a specific bug.
-
-Every patch must be:
-
-- scoped
-- buildable
-- reversible
-- validated
-- honest about what was and was not tested
-
 Before editing:
 
-```txt
-1. Restate the exact requested scope.
-2. Inspect the relevant files.
-3. Identify the current behavior.
-4. Identify the smallest safe patch.
-5. List likely files to change.
-6. Implement only that patch.
-7. Run the smallest relevant validation.
-8. Report changed files, validation, and remaining TODOs.
+1. Inspect `git status` and preserve unrelated work.
+2. Trace the real call path and current state ownership.
+3. Classify the changed code: realtime, audio control, plugin producer, UI,
+   scanner/offline, build-time, or test-only.
+4. Identify the smallest complete patch and its validation target.
+5. Reuse current abstractions and visual language.
+
+While editing:
+
+- Do not rewrite adjacent systems or complete an unrequested roadmap.
+- Do not add fake production behavior, disconnected controls, or mock runtime
+  data.
+- Do not add dependencies without a concrete need.
+- Keep edition behavior behind the existing verified edition/license provider.
+- Preserve project compatibility and opaque plugin state.
+- Keep native and embedded-plugin-Web-UI boundaries explicit.
+
+When finishing:
+
+- Run the smallest relevant check first.
+- Separate compile/test evidence from manual/runtime/visual evidence.
+- Report changed files, commands run, failures, and remaining validation.
+- Never claim a check or gesture was tested when it was not.
+
+## Realtime and bridge rules
+
+Realtime and producer-hot paths must not perform steady-state heap allocation,
+filesystem I/O, JSON/string-map lookup, logging, sleeps, blocking locks,
+unbounded queue operations, UI work, or panics across FFI.
+
+Use preallocated buffers, compact resolved identifiers, immutable snapshots,
+atomics, bounded SPSC/lock-free queues, event-driven wakeups, and diagnostics
+rings drained off the hot path.
+
+For bridged plugins:
+
+- Route MIDI, parameters, state, and responses by the exact plugin instance.
+- Keep freshness/sequence guards; never hide stale output by removing them.
+- Persist component and controller state as opaque data where available.
+- Supply transport-derived process context; do not hardcode tempo, position,
+  playing state, or time signature outside explicit tests.
+- Carry automation from UI/project state through the engine and bridge into the
+  target plugin.
+- Include bridged latency in graph delay compensation.
+
+## Native UI rules
+
+- GPUI owns the application shell, commands, focus, state, and native windows.
+- Reuse shared components and semantic theme tokens.
+- Keep one layout owner, one scroll owner, and one clip owner for each region.
+- Use the same coordinate transform for ruler, grid, clips, notes, automation,
+  playhead, hit-testing, and overlays.
+- Keep per-frame visuals isolated from broad entity rerenders.
+- Defer parent mutations when a child callback would create nested GPUI entity
+  updates.
+- Treat external plugin editors as plugin-owned native child views with exact
+  client bounds, DPI handling, focus forwarding, resize, and teardown.
+
+For visual direction and interaction details, follow `DESIGN.md`.
+
+## Built-in plugin editor Web UI
+
+Web technologies are allowed only inside a built-in plugin editor bundle.
+
+- Keep DSP, parameter schema, defaults, normalization, and persistence in Rust.
+- Keep the editor a thin view over the real parameter bridge.
+- Use stable parameter IDs shared with the Rust core.
+- Build to deterministic static assets; do not depend on a dev server or remote
+  network content at runtime.
+- Keep the custom scheme/asset lookup and CEF lifecycle native-owned.
+- Do not import plugin editor React/Tailwind conventions into GPUI app chrome.
+- Do not turn the embedded editor exception into a general Web UI platform.
+
+## Validation
+
+Choose only commands relevant to the touched scope:
+
+```bash
+cargo fmt --all -- --check
+cargo check -p futureboard_native
+cargo check -p sphere_ui_components
+cargo check -p sphere-plugin-host
+cargo test -p sphere-plugin-host
+cargo check -p BuiltinAudioPlugins
+cargo check --workspace
 ```
 
-Never claim validation passed if it was not run.
+For an embedded plugin editor, run its own package scripts, for example:
 
----
-
-## Project Map
-
-Futureboard surfaces:
-
-- **Futureboard Express** — WebUI
-- **Futureboard Lite** — Electron
-- **Futureboard Studio** — Native Rust / GPUI
-- **SphereDirectAudioEngine / DAUx** — native realtime audio engine
-- **SpherePluginHost** — plugin scanning, loading, processing, and editor hosting
-- **SphereWebAudioCore** — WASM/WebAudio fallback engine
-- **SphereUIComponents** — shared native UI components
-
-Common paths, but always inspect the repo because paths may differ:
-
-```txt
-apps/
-  web/
-  electron/
-  native/
-  experimental/native/
-
-crates/
-  SphereUIComponents/
-  SphereDirectAudioEngine/
-  SphereWebAudioCore/
-  SpherePluginHost/
-
-external/
-  vst3sdk/
-  clap/
-  ARA_SDK/
-  zed/
-
-tasks/
-  native/
-  audio/
-  plugin/
+```bash
+bun run --cwd crates/BuiltinAudioPlugins/crates/rodharerist/editorui build
 ```
 
-For WebUI WASM DSP work, inspect:
+A runnable native debug build also needs the helper binaries next to the app:
 
-```txt
-crates/SphereWebAudioCore
-```
-
----
-
-# PluginHost
-
-If editing or creating PluginHostWrapper / plugin host integration, inspect:
-
-```txt
-crates/SpherePluginHost
-external/vst3sdk
-external/clap
-```
-
-Planned/target support includes:
-
-- VST3
-- CLAP
-- AU
-- LV2
-- Linux/macOS platform paths
-
-Native Studio should use the pure host core without requiring N-API.
-
-Do not force JUCE into the project unless explicitly requested.
-
----
-
-# Audio / Plugin Bridge Rules — Do Not Break Realtime
-
-Futureboard audio work must be realtime-aware.
-
-## Realtime hot paths must not contain
-
-- heap allocation in steady-state processing
-- `println!`, `eprintln!`, tracing/logging directly from audio callback
-- filesystem I/O
-- plugin scanning
-- JSON parsing
-- `serde_json::Value` lookup
-- `HashMap<String, ...>` lookup per block
-- blocking locks
-- sleeps
-- waits on UI thread
-- Node/Electron calls
-- unbounded queues
-- panics across FFI
-
-Use instead:
-
-- preallocated buffers
-- immutable runtime snapshots
-- compact enums/indices resolved before playback
-- atomics
-- bounded lock-free/SPSC queues
-- diagnostics rings drained by non-realtime threads
-
-## Classify touched code before editing
-
-When touching audio/plugin code, classify every changed function as one of:
-
-```txt
-Realtime callback / hot path
-Audio control thread
-Plugin host producer thread
-UI/control path
-Scanner/offline path
-Test-only path
-```
-
-If it is realtime or producer-hot, apply realtime rules.
-
-## Bridge producer rules
-
-The plugin host producer must not rely on `sleep(250µs)` polling as the main wake mechanism.
-
-Preferred architecture:
-
-```txt
-Engine/audio callback publishes request_seq
-Engine signals named event / SetEvent
-Host producer WaitForSingleObject
-Host producer processes exact target instance
-Host publishes response_seq
-Engine freshness guard verifies response
-```
-
-Windows bridge threads should use appropriate scheduling hardening where relevant:
-
-- `timeBeginPeriod(1)` while bridge is active
-- MMCSS `"Pro Audio"` for producer thread
-- suitable thread priority
-- cleanup on shutdown
-
-Do not remove freshness guards to hide dropouts.  
-If the guard says stale, fix producer timing or bridge sequencing.
-
-## Instance routing rules
-
-Never broadcast MIDI or parameter events to all loaded plugin voices unless the feature explicitly says "broadcast".
-
-Route by:
-
-- `instance_id`
-- region identity
-- insert id
-- track/insert mapping
-
-Required behavior:
-
-```txt
-MIDI for insert A reaches only insert A.
-Param event for insert A reaches only insert A.
-Plugin state for insert A restores only insert A.
-```
-
-## Plugin state is P0
-
-DAW project save/load is not usable unless plugin state is persisted.
-
-VST3 state work must support:
-
-- component state
-- controller state when available
-- opaque binary blobs
-- project snapshot persistence
-- restore after plugin instantiation and before playback/editor open
-- clear error reporting if restore fails
-
-Do not silently discard plugin state.
-
-## VST3 ProcessContext must be real
-
-Do not hardcode:
-
-```txt
-tempo = 120
-time signature = 4/4
-playing = true
-projectTimeSamples = 0
-```
-
-ProcessContext should come from actual engine transport and timeline state:
-
-- sample rate
-- block frames
-- playing/stopped
-- recording if available
-- project time samples
-- tempo map
-- time signature map
-- PPQ/bar position when available
-- loop/cycle state when available
-
+```bash
+cargo build -p futureboard_native
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [futureboard/Futureboard](https://github.com/futureboard/Futureboard) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-07 -->
+> Source: [futureboard/futureboard](https://github.com/futureboard/futureboard) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
