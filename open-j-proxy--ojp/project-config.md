@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance for GitHub Copilot working inside this repository. Read it before making any changes.
+description: Manages regular (non-XA) connection pools. Built-in implementations: HikariCP (default, priority 100), DBCP2 (priority 10). To replace the pool, place a JAR implementing this interface in `ojp-libs/` — no recompile needed.
 ---
 
-# Copilot Instructions for Open J Proxy (OJP)
+# Agents.md — AI Agent Guide for Open J Proxy (OJP)
 
-This file provides guidance for GitHub Copilot working inside this repository. Read it before making any changes.
+This file provides guidance for AI coding agents (GitHub Copilot, etc.) working inside this repository. Read it before making any changes.
 
 ---
 
@@ -20,20 +20,6 @@ This file provides guidance for GitHub Copilot working inside this repository. R
 
 ---
 
-## Java Runtime Requirement
-
-**This project uses Java 21. Use the Java 21 runtime for all build and test tasks.**
-
-| Context | Minimum Java |
-|---|---|
-| ojp-jdbc-driver (runtime) | Java 11 |
-| ojp-server (runtime) | Java 21 |
-| Development / CI build | Java 21 (required) |
-
-The root `pom.xml` compiles with `source/target = 11` but the server module overrides this to 21. **Do not lower these targets.** Never suggest Java 8 or Java 17 as the build/test runtime; always use Java 21.
-
----
-
 ## What OJP Is
 
 OJP is the **world's first open-source JDBC Type 3 driver**. It consists of two main deployable artefacts:
@@ -41,11 +27,14 @@ OJP is the **world's first open-source JDBC Type 3 driver**. It consists of two 
 1. **ojp-server** – a standalone gRPC server that owns and controls the real database connection pools (HikariCP). Applications never connect directly to the database.
 2. **ojp-jdbc-driver** – a JDBC 4.2-compliant driver that clients drop in. Instead of opening real connections, it makes gRPC calls to ojp-server.
 
+The value proposition is back-pressure / connection-storm prevention: many application instances can scale elastically without ever overwhelming the database, because the proxy enforces a global connection limit.
+
 ```
 [Java App] --JDBC--> [ojp-jdbc-driver] --gRPC/HTTP2--> [ojp-server] --JDBC--> [Database]
 ```
 
-Supported databases: PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, DB2, H2.
+Supported databases (tested): PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, DB2, H2.  
+In principle any database that ships a JDBC driver should work.
 
 ---
 
@@ -55,27 +44,36 @@ This is a **multi-module Maven project**. All modules share the parent `pom.xml`
 
 | Module | Purpose |
 |---|---|
-| `ojp-grpc-commons` | Shared Protobuf/gRPC contracts (`.proto` files) |
-| `ojp-jdbc-driver` | JDBC driver implementation |
-| `ojp-server` | gRPC server, HikariCP pool management, session/transaction tracking |
+| `ojp-grpc-commons` | Shared Protobuf/gRPC contracts (`.proto` files). Both driver and server depend on this. |
+| `ojp-jdbc-driver` | JDBC driver implementation (`OjpDriver`, `OjpConnection`, `OjpStatement`, `OjpResultSet`, …) |
+| `ojp-server` | gRPC server, HikariCP pool management, session/transaction tracking, slow-query segregation |
 | `ojp-datasource-api` | SPI interface: `ConnectionPoolProvider` |
-| `ojp-datasource-hikari` | Built-in HikariCP implementation (priority 100) |
-| `ojp-datasource-dbcp` | Built-in DBCP2 implementation (priority 10) |
-| `ojp-xa-pool-commons` | XA-capable pool provider and `XAConnectionPoolProvider` SPI |
-| `ojp-testcontainers` | OJP-specific Testcontainers support for integration tests |
+| `ojp-datasource-hikari` | Built-in HikariCP implementation of `ConnectionPoolProvider` (priority 100) |
+| `ojp-datasource-dbcp` | Built-in DBCP2 implementation of `ConnectionPoolProvider` (priority 10) |
+| `ojp-xa-pool-commons` | XA-capable pool provider (`CommonsPool2XAProvider`) and `XAConnectionPoolProvider` SPI |
+| `ojp-testcontainers` | OJP-specific Testcontainers support for reproducible integration tests |
 | `spring-boot-starter-ojp` | Spring Boot auto-configuration / starter |
+
+Documentation lives under `documents/`. ADRs are in `documents/ADRs/`. The `ROADMAP.md` at the root describes the release plan (1.0.0 targets September/October 2026).
+
+---
+
+## Java Version Requirements
+
+| Context | Minimum Java |
+|---|---|
+| ojp-jdbc-driver (runtime) | Java 11 |
+| ojp-server (runtime) | Java 25 |
+| Development / CI build | Java 25 (recommended) |
+
+The root `pom.xml` compiles with `source/target = 11` but the server module overrides this to 25. **Do not lower these targets.** CI tests against Java 11, 17, 21, and 25 for the driver.
 
 ---
 
 ## Build Commands
 
-Always use Java 21 when running these commands.
-
 ```bash
-# Run lint only (fast, no compilation needed)
-mvn checkstyle:check
-
-# Build everything, skip tests
+# Build everything, skip tests (required before running any tests)
 mvn clean install -DskipTests -Dgpg.skip=true
 
 # Build a single module and its dependencies
@@ -85,42 +83,40 @@ mvn clean install -pl ojp-server -am -DskipTests -Dgpg.skip=true
 mvn clean compile
 ```
 
----
-
-## Pre-commit Requirements
-
-- All code must compile successfully before committing.
-- All Checkstyle (SonarLint) rules must pass — **never commit code that fails `mvn checkstyle:check`**.
-- Run `mvn clean compile` to verify both lint and compilation — **never commit code that fails**.
-- Ensure you are using Java 21 as the active runtime before building or testing.
+**Never commit code that fails `mvn clean compile`.**
 
 ---
 
 ## Testing
 
-Most tests in `ojp-jdbc-driver` are **integration tests** that require a running OJP server. H2 tests are the fast, embedded option.
+### Architecture of tests
+
+Most tests in `ojp-jdbc-driver` are **integration tests**: they require a running OJP server and, for non-H2 databases, a running database container. This design choice means the tests verify the real end-to-end flow, which is appropriate for a proxy that sits between a driver and a database.
 
 ### Running tests locally
 
-**Step 1 – Download JDBC drivers:**
+**Step 1 – Download JDBC drivers** (needed since 0.4.0-beta; drivers are no longer bundled):
+
 ```bash
 cd ojp-server
-bash download-drivers.sh
+bash download-drivers.sh        # downloads H2, PostgreSQL, MySQL, MariaDB to ojp-server/ojp-libs/
 cd ..
 ```
 
-**Step 2 – Start the OJP server (leave running):**
+**Step 2 – Start the OJP server** (leave this terminal open):
+
 ```bash
 mvn verify -pl ojp-server -Prun-ojp-server
 ```
 
-**Step 3 – Run tests:**
+**Step 3 – Run tests** (in another terminal):
+
 ```bash
 cd ojp-jdbc-driver
-mvn test -DenableH2Tests=true
+mvn test -DenableH2Tests=true   # H2 is embedded; no external DB needed
 ```
 
-All database test flags are disabled by default:
+All database test flags are disabled by default. Enable only what you need:
 
 | Flag | Database |
 |---|---|
@@ -132,26 +128,9 @@ All database test flags are disabled by default:
 | `-DenableOracleTests=true` | Oracle |
 | `-DenableSqlServerTests=true` | SQL Server |
 
-For IDE runs, always add `-Dfile.encoding=UTF-8 -Duser.timezone=UTC` as JVM arguments.
-
-- Use JUnit 5. Follow the `shouldReturnXxxWhenYyy` naming convention.
-- Prefer `ojp-testcontainers` for new tests over manually managed Docker databases.
-
----
-
-## Code Style
-
-- **Java conventions**: camelCase for variables/methods, PascalCase for classes.
-- **Lombok**: Used throughout (`@Getter`, `@Setter`, `@Builder`, `@Slf4j`, etc.). Do not write getters/setters by hand.
-- **Indentation**: 4 spaces.
-- **Comments**: Only when necessary to explain non-obvious logic. Code should be self-documenting.
-- **New dependencies**: Check license compatibility (Apache 2.0 or compatible required). Minimize additions.
-- **No secrets or credentials** in committed code — use environment variables or Testcontainers.
-
----
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Open-J-Proxy/ojp](https://github.com/Open-J-Proxy/ojp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
