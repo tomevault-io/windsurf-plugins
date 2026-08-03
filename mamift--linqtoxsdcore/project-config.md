@@ -1,49 +1,86 @@
 ---
 trigger: always_on
-description: An agent designed to assist with software development tasks for .NET projects and code in the LinqToXsdCore repo.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-You are an expert C#/.NET developer, whose primary purpose is fixing bugs in the LinqToXsdCore code base. You help with .NET programming tasks by writing clean, well-designed, error-free, efficient, secure, readable, and maintainable code that follows project and .NET conventions. You also give insights, best practices, general software design tips, and testing best practices.
+# CLAUDE.md
 
-General guidelines to follow:
-- Understand the user's .NET task and context.
-- Use UK or Australian English when writing code documentation, comments or prose accompanying a pull request.
-- Write clean, organised solutions that follow .NET conventions.
-- Do not arbitrarily re-write existing code.
-- Write tests using the NUnit API. At a minimum write tests that models or capture the correct output or result, and that the result reflects the user's feature or bug fix request.
-  - Some tests themselves contain bugs; please note in the git commit message if you've fixed a bug in a test.
-- Use the K&R style for braces (braces on the same line), except for method definitions, which should always be on a new line.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# Specific LinqToXsdCore project guidance
+## What this project does
 
-LinqToXsdCore's primary function is to read W3C XML Schema definition (XSD) file(s), map the schema types (element definitions, complex types, groups etc.) inside the schema to .NET CLR-compatible types and generate C# code. The primary output of LinqToXsdCore is C# code that is used by the user (always another programmer) to ease the burden of programming with XML data. LinqToXsdCore is a modern port of the older 'LinqToXsd' tool from 2008, and runs on both .NET Framework, and  .NET 6. However it's generated code is .NET Standard 2.1 compliant.
+LinqToXsdCore is a .NET CLI tool that reads W3C XSD schema files and generates strongly-typed C# wrapper classes. The generated code uses `System.Xml.Linq` (XDocument/XElement) under the hood and inherits from `XTypedElement` in the companion `XObjectsCore` runtime library. It is a .NET Core port of Microsoft's original LinqToXsd project from CodePlex.
 
-The primary maintenance burden with LinqToXsdCore are the many bugs exist in the parts of the C# code base that handle XSD type mapping and code generation as it uses the older CodeDOM API for generating C# code, mixed with hand-written written logic to emit C# code strings when there are gaps in the CodeDOM API. And there are lots of gaps. CodeDOM as an API, emits C# 6-compatible code, so be conservative with modifying code-generation logic so as to not accidentally introduce C# language syntax or APIs that might break .NET Standard 2.1 compatibility, in the generated output code.
+## Commands
 
-The LinqToXsdCore projects use Polysharp, which allows using modern C# syntax and features in the code base itself. However, we assume the user of the tool is not using that in their own projects, so the generated code should use .NET Standard 2.1 compatible APIs and C# 7.3 language features. 
+```bash
+# Build the entire solution
+dotnet build LinqToXsdCore.sln
 
-This project was ported specifically with the intention to retain .NET Framework compatibility with the generated code, and the generator tool, so C# 7.3 in the generated code is for .NET Framework compatibility.
+# Run all tests
+dotnet test XObjectsTests/XObjectsTests.csproj
 
-## Solution layout
+# Run a single test class
+dotnet test XObjectsTests/XObjectsTests.csproj --filter "ClassName=CommandLineInterfaceTests"
 
-Important folders:
-* `LinqToXsd/` folder (one project)
-  - LinqToXsdCore is a nuget-published command line tool ('LinqToXsd.csproj') that exposes code generation facilities, that is both .NET 6+ and .NET Framework compatible. This CLI tool should remain .NET 6+ and .NET Framework 4.8 compatible. It depends on `XObjectsCode`.
-* `XObjectsCode/` folder
-  - Contains the code generation project that enables most of the functionality of the LinqToXsd CLI tool. While a separate project, it is tightly linked to `XObjectsCore` as the generated code needs to call into the XObjectsCore API surface. This is an internal library and not meant to be referenced by users of the tool.
-* `XObjectsCore/` folder
-  - This contains the runtime project that is published publicly on nuget.org and is required to be referenced in projects where generated code produced by the CLI tool is used. Because this project is publicly published, the public API surface should remain unchanged unless you've been instructed that your changes are part of a major release (new v4 or v5 for example). Assume you're working on a minor release (v3.5, v3.6 etc.) unless told otherwise.
-* `XObjectsTests/` folder
-  - Contains all the test cases written in NUnit. Write all your tests here. Depends on LinqToXsd, XObjectsCode, XObjectsCore projects directly. Also depends on LinqToXsd.Schemas, which in turn, transitively brings all the sample projects in the `GeneratedSchemaLibraries/` folder. If there are any bugs in code gen, and the code generator emits buggy code in any of the `GeneratedSchemaLibraries/` projects, then this project may not build successfully. Always write tests for the code you write; whether you modify existing code or add new code.
+# Run the CLI tool (after building)
+dotnet run --project LinqToXsd -- gen path/to/schema.xsd -c path/to/schema.xsd.config
+dotnet run --project LinqToXsd -- config -e path/to/schema.xsd
+```
 
-Not important folders:
+## Architecture
 
-* `GeneratedSchemaLibraries/` folder (multiple projects)
-  - Contains code generated by the LinqToXsd CLI tool and their original schemas purely for testing the code gen and runtime API. Contains many XSD files so can be ignored as it is not part of the shipping CLI tool or public nuget library. This folder is included in git, so its source history can be used to track when or if any bugs have emerged in the code gen.
-* `LinqToXsd.Schemas/` folder (one project, references projects under `GeneratedSchemaLibraries/`)
+Code generation flows through four layers:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```
+User XSD files
+  → LinqToXsd/ (CLI: parses verbs, routes to dispatchers)
+  → XObjectsCode/ (code generation: XSD → CLR type model → CodeDOM → C# text)
+  → *.xsd-g.cs (generated C# files, committed to source control)
+  → XObjectsCore/ (runtime library: base classes used by generated code)
+```
+
+**`LinqToXsd/`** — the CLI tool (published to NuGet as `LinqToXsdCore`). `Program.cs` routes the `gen` and `config` verbs. `Program.GenerateCodeDispatcher.cs` handles writing output: if the `-o` path ends in `.cs` all generated code is merged into one file; otherwise each XSD produces a separate `*.xsd-g.cs` file alongside (or in) the target directory.
+
+**`XObjectsCode/`** — internal code generation library (not published). Key types:
+- `XObjectsCoreGenerator` — entry point; reads XSD via `XmlSchemaSet`, drives the whole pipeline
+- `ClrTypeInfo` / `ClrPropertyInfo` — intermediate representation of types mapped from XSD
+- `TypeBuilder` — converts the CLR type model into CodeDOM `CodeTypeDeclaration` trees
+- `CodeDomHelper` — utilities for building CodeDOM fragments
+
+**`XObjectsCore/`** — public runtime NuGet library. Must maintain backwards compatibility. Key types: `XTypedElement` (base class for all generated elements), `FSM` (finite-state machine for content model validation), `FacetChecker` / `SimpleTypeValidator` (XSD facet enforcement). Default new members to `internal`.
+
+**`XObjectsTests/`** — NUnit integration tests. The test project depends on `LinqToXsd.Schemas`, which in turn references all `GeneratedSchemaLibraries` projects. If code generation emits invalid C#, the entire test project will fail to build — the generated libraries act as a compile-time gate.
+
+**`LinqToXsd.Schemas/`** — aggregates `GeneratedSchemaLibraries/` projects into one test support library. Not published.
+
+**`GeneratedSchemaLibraries/`** — sample XSD schemas with their pre-generated `*.xsd-g.cs` output committed alongside. Regenerate with the CLI tool when changing code generation logic.
+
+## Important constraints
+
+**Generated code language level:** CodeDOM only emits C# 6 syntax. Hand-written string emission is used for newer constructs, but generated code must remain compatible with C# 7.3 / .NET Standard 2.0 for .NET Framework consumers. Do not use newer language features in generated output.
+
+**No assembly generation:** The original LinqToXsd supported emitting `.dll` files directly; this port does not. Only source files are produced.
+
+**No dependency injection:** The codebase does not use DI. Do not introduce it.
+
+**Do not edit `*.xsd-g.cs` files directly** — they are regenerated by the tool. Changes belong in the code generation logic in `XObjectsCode/`.
+
+**PolySharp** is used in the tool and library projects to allow modern C# syntax in the *source*, but this does not apply to what the tool *emits*.
+
+## Code style
+
+- K&R style braces for control structures; method opening brace on its own line
+- 4-space indentation in C# files
+- Use UK/Australian English in documentation and comments
+- Comments explain *why*, not what — avoid restating what the code does
+- Reuse existing extension methods before adding new ones
+- Add XML doc comments for public API members in `XObjectsCore`
+
+## Testing conventions
+
+Tests are integration-focused, not unit tests. Naming: `WhenCatMeowsThenCatDoorOpens` style. One behavior per test, AAA pattern. Test classes are public instance classes mirroring the class under test (`CatDoor` → `CatDoorTests`). Avoid static fields. Minimize disk I/O; when disk access is needed, use random/temp paths and clean up in teardown.
 
 ---
 > Source: [mamift/LinqToXsdCore](https://github.com/mamift/LinqToXsdCore) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
