@@ -1,0 +1,137 @@
+---
+trigger: always_on
+description: Validates the Rust runtime against ANTLR's upstream conformance descriptors.
+---
+
+# Development notes
+
+## Codegen boundaries
+
+Generic runtime and codegen paths must stay grammar-agnostic. Do not add
+language-specific rule names, grammar names, file extensions, or semantic
+workarounds to `src/bin/antlr4-rust-gen.rs` or runtime modules; model the
+behavior from ANTLR metadata/ATN structure instead, and keep language-specific
+guidance in docs or tests for that language.
+
+## Kotlin parser parity perf benchmark
+
+Reproduces the timings against the Kotlin grammar from `antlr/grammars-v4`.
+
+### One-time setup (fresh checkout)
+
+```bash
+# 1. ANTLR jar (any path; pin v4.13.2)
+mkdir -p /tmp/antlr-cleanroom/tools
+curl -fLo /tmp/antlr-cleanroom/tools/antlr-4.13.2-complete.jar \
+    https://www.antlr.org/download/antlr-4.13.2-complete.jar
+
+# 2. grammars-v4 checkout (sparse, just the kotlin grammar)
+mkdir -p /tmp/antlr-cleanroom/grammars-v4
+git -C /tmp/antlr-cleanroom/grammars-v4 init -q
+git -C /tmp/antlr-cleanroom/grammars-v4 remote add origin https://github.com/antlr/grammars-v4.git
+git -C /tmp/antlr-cleanroom/grammars-v4 sparse-checkout init --cone
+git -C /tmp/antlr-cleanroom/grammars-v4 sparse-checkout set kotlin/kotlin
+git -C /tmp/antlr-cleanroom/grammars-v4 fetch --depth 1 origin 284602b3f23ca54dc30778204ab7ae9e969145e9
+git -C /tmp/antlr-cleanroom/grammars-v4 checkout FETCH_HEAD
+```
+
+### Run the parity smoke + dumper build
+
+```bash
+tests/kotlin-parity/run.sh \
+    --antlr-jar /tmp/antlr-cleanroom/tools/antlr-4.13.2-complete.jar \
+    --grammars-v4 /tmp/antlr-cleanroom/grammars-v4
+```
+
+That generates the Rust recognizers directly from the Kotlin `.g4` source,
+builds `tests/kotlin-parity/dumper`, and asserts the parse trees match
+`antlr4-python3-runtime` byte-for-byte. The ANTLR jar is used only for the
+Python oracle.
+
+### Measure parse-only timings
+
+The dumper has a built-in parse-only stopwatch so process startup (~10 ms) is excluded:
+
+```bash
+DUMPER=tests/kotlin-parity/dumper/target/release/kotlin-parity-dumper
+for snippet in tests/kotlin-parity/snippets/*.kt; do
+    echo "=== $(basename "$snippet") ==="
+    "$DUMPER" --input "$snippet" --output /tmp/dump.txt --iters 5 --time
+done
+```
+
+`--iters N` repeats parse N times within one process; `--time` prints `min`/`avg` to stderr.
+
+## ANTLR runtime testsuite
+
+Validates the Rust runtime against ANTLR's upstream conformance descriptors.
+
+### One-time setup
+
+```bash
+git clone --depth 1 https://github.com/antlr/antlr4 /tmp/antlr-cleanroom/antlr4-upstream
+```
+
+The harness reads `antlr4-upstream/runtime-testsuite` and the same ANTLR jar fetched above.
+
+### Run the full sweep
+
+```bash
+cargo run --release --quiet --bin antlr4-runtime-testsuite
+```
+
+Defaults to `ANTLR4_JAR=/tmp/antlr-cleanroom/tools/antlr-4.13.2-complete.jar` and `ANTLR4_RUNTIME_TESTSUITE=/tmp/antlr-cleanroom/antlr4-upstream/runtime-testsuite`. Override with `--antlr-jar`/`--descriptors` or env vars. Cases run on `--jobs` parallel workers (default `min(cores, 8)`), each with its own cargo target-dir stripe; the render driver and `antlr4-rust-gen` are prebuilt once per sweep. Wall-clock ≈ 2 minutes on Apple Silicon.
+
+### The rendered (embedded-actions) pipeline
+
+The harness runs descriptors the way every official ANTLR target does:
+each descriptor grammar is rendered through
+`.conformance-review/Rust.test.stg` with the real StringTemplate engine
+(`tools/stg-render/RenderGrammar.java`, executed via the ANTLR jar and the
+Java single-file source launcher), so its actions/predicates become real
+Rust code. The rendered grammar feeds `antlr4-rust-gen --actions embedded`
+directly, which splices the bodies verbatim
+after `$`-attribute translation (`src/bin_support/embedded.rs`) and
+generates typed context views, per-rule attrs structs, members
+fields/methods, listener traits, and recognizer facades. `--stg PATH`
+overrides the template group. (An earlier template-recognition pipeline,
+which simulated action output instead of executing it, was replaced by
+this one before ever shipping.)
+
+### Run a subset while iterating
+
+```bash
+# One descriptor:
+cargo run --release --quiet --bin antlr4-runtime-testsuite -- --case LexerExec/KeywordID
+
+# One group (e.g. while debugging left-recursion):
+cargo run --release --quiet --bin antlr4-runtime-testsuite -- --group LeftRecursion --limit 20
+
+# Keep the per-case temp crates for inspection:
+cargo run --release --quiet --bin antlr4-runtime-testsuite -- --case ParserErrors/SingleSetInsertion --keep
+```
+
+Per-case scratch crates land under `target/antlr-runtime-testsuite/<case>/`. Stale dirs from a killed run can fail a re-run with `Os { code: 66, ... DirectoryNotEmpty }` — `rm -rf target/antlr-runtime-testsuite/*` to recover.
+
+## Code coverage
+
+CI collects LLVM source-based coverage (`cargo-llvm-cov`) and uploads it to
+Codecov as two merged flags — `unittests` (from `ci.yml`) and `conformance`
+(from `antlr-runtime-testsuite.yml`). One-time local install (it is a crates.io
+cargo subcommand, *not* a rustup component, so it cannot live in
+`rust-toolchain.toml` — only its `llvm-tools` dependency does, and that is
+already pinned there):
+
+```bash
+cargo install cargo-llvm-cov   # or: cargo binstall cargo-llvm-cov (prebuilt)
+```
+
+Then reproduce CI locally:
+
+```bash
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ophi-dev/antlr-rust-runtime](https://github.com/ophi-dev/antlr-rust-runtime) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
