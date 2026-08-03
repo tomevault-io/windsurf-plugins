@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [cube-js/cube-ui-kit](https://github.com/cube-js/cube-ui-kit).
+Original source: `AGENTS.md` in [cube-js/cube-ui-kit](https://github.com/cube-js/cube-ui-kit).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
