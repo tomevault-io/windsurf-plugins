@@ -1,54 +1,54 @@
 ---
 trigger: always_on
-description: > **Developer Guide for Contributing to EdgeAI for Beginners**
+description: > **Guia do Desenvolvedor para Contribuir com EdgeAI para Iniciantes**
 ---
 
 # AGENTS.md
 
-> **Developer Guide for Contributing to EdgeAI for Beginners**
+> **Guia do Desenvolvedor para Contribuir com EdgeAI para Iniciantes**
 > 
-> This document provides comprehensive information for developers, AI agents, and contributors working with this repository. It covers setup, development workflows, testing, and best practices.
+> Este documento fornece informações detalhadas para desenvolvedores, agentes de IA e colaboradores que trabalham com este repositório. Ele abrange configuração, fluxos de trabalho de desenvolvimento, testes e melhores práticas.
 > 
-> **Last Updated**: October 30, 2025 | **Document Version**: 3.0
+> **Última Atualização**: 30 de outubro de 2025 | **Versão do Documento**: 3.0
 
-## Table of Contents
+## Índice
 
-- [Project Overview](#project-overview)
-- [Repository Structure](#repository-structure)
-- [Prerequisites](#prerequisites)
-- [Setup Commands](#setup-commands)
-- [Development Workflow](#development-workflow)
-- [Testing Instructions](#testing-instructions)
-- [Code Style Guidelines](#code-style-guidelines)
-- [Pull Request Guidelines](#pull-request-guidelines)
-- [Translation System](#translation-system)
-- [Foundry Local Integration](#foundry-local-integration)
-- [Build and Deployment](#build-and-deployment)
-- [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
-- [Additional Resources](#additional-resources)
-- [Project-Specific Notes](#project-specific-notes)
-- [Getting Help](#getting-help)
+- [Visão Geral do Projeto](../..)
+- [Estrutura do Repositório](../..)
+- [Pré-requisitos](../..)
+- [Comandos de Configuração](../..)
+- [Fluxo de Trabalho de Desenvolvimento](../..)
+- [Instruções de Teste](../..)
+- [Diretrizes de Estilo de Código](../..)
+- [Diretrizes para Pull Requests](../..)
+- [Sistema de Tradução](../..)
+- [Integração Local do Foundry](../..)
+- [Build e Implantação](../..)
+- [Problemas Comuns e Solução de Problemas](../..)
+- [Recursos Adicionais](../..)
+- [Notas Específicas do Projeto](../..)
+- [Obtendo Ajuda](../..)
 
-## Project Overview
+## Visão Geral do Projeto
 
-EdgeAI for Beginners is a comprehensive educational repository teaching Edge AI development with Small Language Models (SLMs). The course covers EdgeAI fundamentals, model deployment, optimization techniques, and production-ready implementations using Microsoft Foundry Local and various AI frameworks.
+EdgeAI para Iniciantes é um repositório educacional abrangente que ensina desenvolvimento de Edge AI com Modelos de Linguagem Pequenos (SLMs). O curso aborda fundamentos de EdgeAI, implantação de modelos, técnicas de otimização e implementações prontas para produção usando Microsoft Foundry Local e vários frameworks de IA.
 
-**Key Technologies:**
-- Python 3.8+ (primary language for AI/ML samples)
-- .NET C# (AI/ML Samples)
-- JavaScript/Node.js with Electron (for desktop applications)
+**Principais Tecnologias:**
+- Python 3.8+ (linguagem principal para exemplos de IA/ML)
+- .NET C# (exemplos de IA/ML)
+- JavaScript/Node.js com Electron (para aplicações desktop)
 - Microsoft Foundry Local SDK
 - Microsoft Windows ML 
 - VSCode AI Toolkit
 - OpenAI SDK
-- AI Frameworks: LangChain, Semantic Kernel, Chainlit
-- Model Optimization: Llama.cpp, Microsoft Olive, OpenVINO, Apple MLX
+- Frameworks de IA: LangChain, Semantic Kernel, Chainlit
+- Otimização de Modelos: Llama.cpp, Microsoft Olive, OpenVINO, Apple MLX
 
-**Repository Type:** Educational content repository with 8 modules and 10 comprehensive sample applications
+**Tipo de Repositório:** Repositório de conteúdo educacional com 8 módulos e 10 aplicações de exemplo abrangentes
 
-**Architecture:** Multi-module learning path with practical samples demonstrating edge AI deployment patterns
+**Arquitetura:** Caminho de aprendizado multi-módulo com exemplos práticos demonstrando padrões de implantação de Edge AI
 
-## Repository Structure
+## Estrutura do Repositório
 
 ```
 edgeai-for-beginners/
@@ -71,38 +71,38 @@ edgeai-for-beginners/
 └── imgs/                  # Course images and assets
 ```
 
-## Prerequisites
+## Pré-requisitos
 
-### Required Tools
+### Ferramentas Necessárias
 
-- **Python 3.8+** - For AI/ML samples and notebooks
-- **Node.js 16+** - For Electron sample application
-- **Git** - For version control
-- **Microsoft Foundry Local** - For running AI models locally
+- **Python 3.8+** - Para exemplos e notebooks de IA/ML
+- **Node.js 16+** - Para aplicação de exemplo com Electron
+- **Git** - Para controle de versão
+- **Microsoft Foundry Local** - Para executar modelos de IA localmente
 
-### Recommended Tools
+### Ferramentas Recomendadas
 
-- **Visual Studio Code** - With Python, Jupyter, and Pylance extensions
-- **Windows Terminal** - For better command-line experience (Windows users)
-- **Docker** - For containerized development (optional)
+- **Visual Studio Code** - Com extensões Python, Jupyter e Pylance
+- **Windows Terminal** - Para uma melhor experiência de linha de comando (usuários Windows)
+- **Docker** - Para desenvolvimento em contêineres (opcional)
 
-### System Requirements
+### Requisitos de Sistema
 
-- **RAM**: 8GB minimum, 16GB+ recommended for multi-model scenarios
-- **Storage**: 10GB+ free space for models and dependencies
-- **OS**: Windows 10/11, macOS 11+, or Linux (Ubuntu 20.04+)
-- **Hardware**: CPU with AVX2 support; GPU (CUDA, Qualcomm NPU) optional but recommended
+- **RAM**: Mínimo de 8GB, recomendado 16GB+ para cenários com múltiplos modelos
+- **Armazenamento**: 10GB+ de espaço livre para modelos e dependências
+- **SO**: Windows 10/11, macOS 11+, ou Linux (Ubuntu 20.04+)
+- **Hardware**: CPU com suporte AVX2; GPU (CUDA, Qualcomm NPU) opcional, mas recomendada
 
-### Knowledge Prerequisites
+### Conhecimentos Necessários
 
-- Basic understanding of Python programming
-- Familiarity with command-line interfaces
-- Understanding of AI/ML concepts (for sample development)
-- Git workflows and pull request processes
+- Compreensão básica de programação em Python
+- Familiaridade com interfaces de linha de comando
+- Entendimento de conceitos de IA/ML (para desenvolvimento de exemplos)
+- Fluxos de trabalho com Git e processos de pull request
 
-## Setup Commands
+## Comandos de Configuração
 
-### Repository Setup
+### Configuração do Repositório
 
 ```bash
 # Clone the repository
@@ -112,7 +112,7 @@ cd edgeai-for-beginners
 # No build step required - this is primarily an educational content repository
 ```
 
-### Python Sample Setup (Module08 and Workshop samples)
+### Configuração de Exemplos em Python (Módulo08 e exemplos de Workshop)
 
 ```bash
 # Create and activate virtual environment
@@ -134,7 +134,7 @@ cd ../Workshop
 pip install -r requirements.txt
 ```
 
-### Node.js Sample Setup (Sample 08 - Windows Chat App)
+### Configuração de Exemplos em Node.js (Exemplo 08 - Aplicação de Chat para Windows)
 
 ```bash
 cd Module08/samples/08
@@ -150,16 +150,14 @@ npm run build
 npm run dist
 ```
 
-### Foundry Local Setup
+### Configuração do Foundry Local
 
-Foundry Local is required to run the samples. Download and install from the official repository:
+Foundry Local é necessário para executar os exemplos. Baixe e instale a partir do repositório oficial:
 
-**Installation:**
-- **Windows**: `winget install Microsoft.FoundryLocal`
-- **macOS**: `brew tap microsoft/foundrylocal && brew install foundrylocal`
+**Instalação:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/edgeai-for-beginners](https://github.com/microsoft/edgeai-for-beginners) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
