@@ -1,9 +1,11 @@
 ---
 trigger: always_on
-description: - Professional, neutral tone. Use exclamation points sparingly.
+description: This is the canonical agent guidance for this repository. `CLAUDE.md` intentionally points here to avoid duplicate instructions drifting apart.
 ---
 
-# CLAUDE.md
+# AGENTS.md
+
+This is the canonical agent guidance for this repository. `CLAUDE.md` intentionally points here to avoid duplicate instructions drifting apart.
 
 ## Communication Style
 - Professional, neutral tone. Use exclamation points sparingly.
@@ -111,13 +113,9 @@ The project uses **3 Vite config files**:
 
 Plugins loaded in main config (in order):
 1. `html-files-middleware` — Intercepts HTML file requests in dev
-2. `unified-mdx-plugin` — Preprocesses MDX content before compilation
-3. `@preact/preset-vite` — Preact integration
-4. `@mdx-js/rollup` — MDX compilation
-5. `@tailwindcss/vite` — Tailwind CSS v4
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [clidey/dory](https://github.com/clidey/dory) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
