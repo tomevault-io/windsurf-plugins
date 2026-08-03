@@ -1,116 +1,157 @@
 ---
 trigger: always_on
-description: You are an expert .NET engineer working on Foundatio.Mediator, a production-grade mediator library powered by source generators and interceptors. Your primary goal is to help maintain and enhance this codebase while preserving backward compatibility, performance, and reliability.
+description: **You are an expert AI assistant working on the Foundatio.Mediator source generator. This document defines the exact rules and patterns you must follow when modifying code generation logic.**
 ---
 
-# Agent Guidelines for Foundatio.Mediator
+# AI Instructions: Foundatio.Mediator Source Generator
 
-## Identity and Purpose
+**You are an expert AI assistant working on the Foundatio.Mediator source generator. This document defines the exact rules and patterns you must follow when modifying code generation logic.**
 
-You are an expert .NET engineer working on Foundatio.Mediator, a production-grade mediator library powered by source generators and interceptors. Your primary goal is to help maintain and enhance this codebase while preserving backward compatibility, performance, and reliability.
+## Critical Principles
 
-**Core Values:**
+1. **Never break existing semantics** - Generated code must maintain backward compatibility
+2. **Follow the patterns exactly** - Handler/middleware instantiation follows strict rules based on lifetime
+3. **Performance is critical** - Avoid allocations, use aggressive inlining, cache where safe
+4. **Test thoroughly** - All changes require running `dotnet build` then `dotnet test`
+5. **Static caching rules**:
+   - Only cache when handler/middleware has NO constructor dependencies AND lifetime is None/Default
+   - NEVER cache when handler/middleware has constructor dependencies (use `ActivatorUtilities.CreateInstance` each invocation - deps may be scoped)
+   - NEVER cache when lifetime is Scoped/Transient (always resolve from DI)
+   - NEVER cache when lifetime is Singleton (always resolve from DI - let DI container manage singleton caching)
 
-- **Correctness over speed** - Take time to understand before acting
-- **Surgical changes** - Modify only what's necessary
-- **Evidence-based decisions** - Search and read code before assuming
-- **Verify thoroughly** - Build and test before marking complete
+## Handler Instantiation Rules (CRITICAL)
 
-## Repository Overview
+The `GenerateGetOrCreateHandler` and `EmitHandlerInvocation` methods MUST follow these exact patterns:
 
-Foundatio.Mediator is a high-performance mediator library for .NET that achieves near-direct call performance through compile-time code generation:
+### 1. Static Handlers
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| **Runtime Library** | `src/Foundatio.Mediator.Abstractions/` | Core abstractions: `IMediator`, `Result<T>`, middleware, attributes |
-| **Source Generators** | `src/Foundatio.Mediator/` | Analyzers and generators that emit handler wrappers and interceptors |
-| **Tests** | `tests/Foundatio.Mediator.Tests/` | Unit tests, generator snapshot tests, integration tests |
-| **Samples** | `samples/` | ConsoleSample, CleanArchitectureSample (modular monolith) |
-| **Benchmarks** | `benchmarks/` | Performance benchmarks |
-| **Documentation** | `docs/` | VitePress documentation site |
+**No caching needed** - call directly:
 
-**Key Features:**
-
-- **Convention-based discovery** - Handlers discovered by naming (`*Handler`, `*Consumer`) or explicit attributes
-- **Zero runtime reflection** - All dispatch resolved at compile time via source generators
-- **Middleware pipeline** - Before/After/Finally/Execute hooks with state passing
-- **Result pattern** - Rich status handling without exceptions via `Result<T>`
-- **Cascading messages** - Tuple returns for event-driven patterns
-- **Endpoint generation** - Auto-generate minimal API endpoints from handlers
-
-## Quick Reference
-
-```bash
-# Essential commands
-dotnet build Foundatio.Mediator.slnx          # Build (triggers generators)
-dotnet test Foundatio.Mediator.slnx           # Run all tests
-dotnet clean Foundatio.Mediator.slnx          # Clean (recommended before generator changes)
-
-# Run samples
-cd samples/ConsoleSample && dotnet run
-cd samples/CleanArchitectureSample/src/Api && dotnet run
-
-# Benchmarks
-cd benchmarks/Foundatio.Mediator.Benchmarks && dotnet run -c Release -- foundatio
+```csharp
+// In EmitHandlerInvocation:
+string accessor = handler.FullName;
+source.AppendLine($"{asyncModifier}{accessor}.{handler.MethodName}({parameters});");
 ```
 
-**Required workflow:** After any code changes, ALWAYS run `dotnet build` then `dotnet test` before considering work complete.
+### 2. Scoped/Transient Lifetime
 
-## Project Structure
+**Always resolve from DI - NO caching, NO generated method**:
 
-```text
-src/
-├── Foundatio.Mediator/                    # Source generators (compile-time)
-│   ├── MediatorGenerator.cs               # Main orchestrator
-│   ├── HandlerAnalyzer.cs                 # Discovers handler classes/methods
-│   ├── HandlerGenerator.cs                # Emits handler wrapper classes
-│   ├── MiddlewareAnalyzer.cs              # Discovers middleware classes
-│   ├── CallSiteAnalyzer.cs                # Finds mediator.InvokeAsync() call sites
-│   ├── InterceptsLocationGenerator.cs     # Emits [InterceptsLocation] attributes
-│   ├── EndpointGenerator.cs               # Generates minimal API endpoints
-│   ├── CrossAssemblyHandlerScanner.cs     # Scans referenced assemblies
-│   └── Models/                            # Data structures for analysis
-│
-└── Foundatio.Mediator.Abstractions/       # Runtime library
-    ├── IMediator.cs                       # Core mediator interface
-    ├── Mediator.cs                        # Default implementation
-    ├── Result.cs, Result.Generic.cs       # Result pattern types
-    ├── HandlerRegistration.cs             # DI lookup metadata
-    ├── HandlerResult.cs                   # Middleware flow control
-    ├── HandlerExecutionInfo.cs            # Execution context for middleware
-    ├── MediatorExtensions.cs              # DI registration helpers
-    └── Attributes/                        # Handler, Middleware, etc.
-
-tests/Foundatio.Mediator.Tests/
-├── GeneratorTestBase.cs                   # Base class for generator tests
-├── BasicHandlerGenerationTests.cs         # Generator snapshot tests
-└── Integration/                           # E2E and integration tests
-
-samples/
-├── ConsoleSample/                         # Simple console example
-└── CleanArchitectureSample/               # Modular monolith with multiple bounded contexts
-    └── src/
-        ├── Common.Module/                 # Shared events, middleware, handlers
-        ├── Orders.Module/                 # Order bounded context
-        ├── Products.Module/               # Product bounded context
-        ├── Reports.Module/                # Cross-module reporting
-        ├── Api/                           # ASP.NET Core backend (composition root)
-        └── Web/                           # SvelteKit SPA frontend
+```csharp
+// Check in EmitHandlerInvocation:
+if (handler.RequiresDIResolutionPerInvocation)
+{
+    source.AppendLine($"var handlerInstance = serviceProvider.GetRequiredService<{handler.FullName}>();");
+    accessor = "handlerInstance";
+}
 ```
 
-## Before Making Changes
+**Important**: `RequiresDIResolutionPerInvocation` returns true when:
 
-### 1. Understand the Context
+- `handler.Lifetime` is `"Scoped"`, OR
+- `handler.Lifetime` is `"Transient"`, OR
+- Assembly-level `MediatorConfiguration.HandlerLifetime` is `Scoped` or `Transient` AND `handler.Lifetime` is `None`
 
-```bash
-# Search for related code
-# Use Grep tool for content search
-# Use Glob tool for file patterns
+### 3. Explicit Singleton Lifetime
 
-# Check existing tests
+**Always resolve from DI - NO static caching**:
+
+```csharp
+// Check in EmitHandlerInvocation:
+if (string.Equals(handler.Lifetime, "Singleton", StringComparison.OrdinalIgnoreCase))
+{
+    source.AppendLine($"var handlerInstance = serviceProvider.GetRequiredService<{handler.FullName}>();");
+    accessor = "handlerInstance";
+}
+```
+
+**Why no static caching for Singleton?**
+
+- User explicitly wants DI to manage the instance
+- Let the DI container handle singleton caching (it's optimized for this)
+- Avoids potential issues with multiple ServiceProvider instances (e.g., in tests)
+
+### 4. No Constructor Dependencies, Lifetime is None/Default
+
+**Static cached instance with lazy initialization**:
+
+```csharp
+// In GenerateGetOrCreateHandler:
+private static {handler.FullName}? _cachedHandler;
+
+[DebuggerStepThrough]
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+private static {handler.FullName} GetOrCreateHandler(IServiceProvider serviceProvider)
+{
+    return _cachedHandler ??= new {handler.FullName}();
+}
+
+// In EmitHandlerInvocation:
+source.AppendLine("var handlerInstance = GetOrCreateHandler(serviceProvider);");
+accessor = "handlerInstance";
+```
+
+### 5. Has Constructor Dependencies, Lifetime is None/Default
+
+**Use `ActivatorUtilities.CreateInstance` - NO caching**:
+
+```csharp
+// In EmitHandlerInvocation:
+source.AppendLine($"var handlerInstance = ActivatorUtilities.CreateInstance<{handler.FullName}>(serviceProvider);");
+accessor = "handlerInstance";
+```
+
+**Important**: When a handler has constructor dependencies AND lifetime is None/Default, a fresh instance is created via `ActivatorUtilities.CreateInstance` on every invocation. We do NOT cache these handlers because their constructor dependencies may be scoped (e.g., `DbContext`, `IMediator`) and would become stale or invalid after the scope ends.
+
+## Middleware Instantiation Rules (CRITICAL)
+
+The `GenerateMiddlewareInstantiation` and `EmitMiddlewareInstances` methods MUST follow these exact patterns:
+
+### 1. Static Middleware
+
+**No instantiation needed** - call directly:
+
+```csharp
+// In middleware invocation code:
+string accessor = middleware.FullName;
+```
+
+### 2. Scoped/Transient Lifetime
+
+**Always resolve from DI - NO caching, NO generated method**:
+
+```csharp
+// In EmitMiddlewareInstances:
+if (m.RequiresDIResolutionPerInvocation)
+{
+    source.AppendLine($"var {varName} = serviceProvider.GetRequiredService<{m.FullName}>();");
+}
+```
+
+### 3. Explicit Singleton Lifetime
+
+**Always resolve from DI - NO static caching**:
+
+```csharp
+// In EmitMiddlewareInstances:
+if (string.Equals(m.Lifetime, "Singleton", StringComparison.OrdinalIgnoreCase))
+{
+    source.AppendLine($"var {varName} = serviceProvider.GetRequiredService<{m.FullName}>();");
+}
+```
+
+### 4. No Constructor Dependencies, Lifetime is None/Default
+
+**Static cached instance with lazy initialization**:
+
+```csharp
+// In GenerateMiddlewareInstantiation:
+private static {m.FullName}? _cached{m.Identifier};
+
+[DebuggerStepThrough]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [FoundatioFx/Foundatio.Mediator](https://github.com/FoundatioFx/Foundatio.Mediator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
