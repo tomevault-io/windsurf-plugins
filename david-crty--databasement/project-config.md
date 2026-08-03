@@ -1,122 +1,53 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: GitHub Pages site at `https://david-crty.github.io/databasement/`, deployed by `.github/workflows/docs.yml` on every `v*` tag push (never from `main` merges).
 ---
 
-# CLAUDE.md
+# Documentation (Docusaurus 3)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+GitHub Pages site at `https://david-crty.github.io/databasement/`, deployed by `.github/workflows/docs.yml` on every `v*` tag push (never from `main` merges).
 
-## Project Overview
-
-This is a Laravel application for managing database server backups. It uses Livewire for reactive components and Mary UI (robsontenorio/mary, built on daisyUI and Tailwind CSS). The application allows users to register database servers (MySQL, PostgreSQL, MariaDB, SQLite, Redis/Valkey), test connections, and manage backup configurations. See Boost's Foundational Context below for exact package versions.
-
-## Development Commands
-
-**IMPORTANT**: All PHP commands MUST be run through Docker. Never run `php`, `composer`, or `vendor/bin/*` commands directly on the host. Use the Makefile targets or `docker compose exec --user application -T app <command>` instead. Always include `--user application` to ensure correct file permissions.
-
-### Setup and Installation
-```bash
-make setup              # Full project setup: install deps, env setup, generate key, migrate, build assets
-make install            # Install composer and npm dependencies only
-docker compose exec --user application -T app composer require <package>  # Install a composer package
-docker compose exec --user application -T app composer remove <package>   # Remove a composer package
-```
-
-### Running the Application
-```bash
-make start              # Start all Docker services: php (FrankenPHP), queue worker, mysql, postgres, redis
-docker compose up -d    # Alternative: direct docker compose command
-docker compose logs -f  # View logs from all services
-docker compose logs -f queue  # View queue worker logs only
-```
-
-### Testing
-
-**IMPORTANT**: ALWAYS use `make test` commands for running tests. NEVER use `docker compose exec ... php artisan test` directly - it runs tests sequentially and is much slower.
+## Commands
 
 ```bash
-make test                           # Run all tests in parallel (fast iteration) - ALWAYS USE THIS
-make test-sequential                # Run tests sequentially (for debugging only)
-make test-filter FILTER=DatabaseServer  # Run specific test class/method
-make test-coverage                  # Run tests with coverage report
+npm run start          # Dev server (single version, working-tree docs)
+npm run build          # Production build — throws on any broken link
+./scripts/prepare-versions.sh   # Regenerate versioned snapshots from git tags (optional, for testing versioning)
 ```
 
-Tests run in parallel by default using Pest's parallel testing feature. This significantly speeds up the test suite (~12-18s for 350+ tests). Use `make test-sequential` if you need to debug test order issues.
+Run `npm run build` after editing docs — it is the broken-link check.
 
-### Test Strategy
-- Focus on testing business logic and behaviors
-- Do not test framework internals or trust that Laravel/Livewire works correctly
-- Keep tests minimal and focused - one test per behavior when possible
+## Versioning (important)
 
-#### What NOT to Test
-- **Form validation rules** - Laravel validation works, don't test `required`, `max:255`, etc.
-- **Eloquent relationships** - Don't test that `hasMany`/`belongsTo` work
-- **Eloquent cascades** - Don't test `onDelete('cascade')` behavior
-- **Session flash messages** - Don't test that `session('status')` contains a message
-- **Redirect responses** - Testing redirect URL once per flow is enough
-- **Multiple variations of the same thing** - e.g., don't test weekly AND daily recurrence separately
+Docs versions are **ephemeral**: `scripts/prepare-versions.sh` rebuilds one snapshot per 1.x minor from the latest patch tag of that minor, at build time. `versioned_docs/`, `versioned_sidebars/`, and `versions.json` are gitignored — **never commit them, never edit files inside them** (fix the source in `docs/` or the rewrite rules in the script instead).
 
-#### What TO Test
-- **Authorization** - Who can access what (guests, users, admins)
-- **Business logic** - Core application behavior (backup works, restore works, cleanup deletes correct snapshots)
-- **Integration points** - External services, commands, scheduled tasks
-- **Edge cases in YOUR code** - Not edge cases in the framework
+The working tree `docs/` is the *next* version; it goes live when the next tag is cut. To change an already-published version, the fix must land before the next patch tag of that minor, or be handled by a rewrite in `prepare-versions.sh` (see the `../static/` and absolute-link rewrites there).
 
-#### Mocking Strategy
+## Links & assets
 
-**DO Mock:**
-- External API services
-- Third-party libraries (AWS SDK, S3 client, etc.)
+- Internal links: **relative `.md` file paths** — `./backups.md`, `../self-hosting/configuration/backup.md#anchor`. Never absolute URL paths like `/user-guide/backups`: they escape the version and always point to latest.
+- Images/static files: absolute `/img/...` (served from `static/`). Never `../static/...` — it breaks inside versioned snapshots.
+- External-file links (llms.txt etc.): `pathname:///llms.txt`.
 
-**DON'T Mock:**
-- Model/ORM methods
-- Simple utility functions
+## Structure & style
 
-### Code Quality
-```bash
-make lint-fix           # Auto-fix code style with Laravel Pint (recommended)
-make lint-check         # Check code style without fixing
+- Three sections, each an autogenerated sidebar (`sidebars.ts`): `self-hosting/`, `user-guide/`, `contributing/`. Order pages with `sidebar_position` frontmatter; that is the only frontmatter used.
+- One `# H1` per page matching the topic; task-oriented `## sections`; short paragraphs.
+- UI element names in **bold** (`**Configuration > Organizations**`), env vars and values in `` `code` ``, env/shell examples in fenced ```bash blocks with the language tag.
+- Admonitions (`:::note`, `:::tip`, `:::info`, `:::warning`) sparingly — one per section at most, `:::warning` only for data-loss/lockout risks.
+- Keep the technical terms **Backup**, **Restore**, **Snapshot** as-is (project-wide convention).
 
-make phpstan            # Run PHPStan static analysis
-make analyse            # Alias for phpstan
-```
+## When adding a page
 
-### Database Operations
-```bash
-make migrate                # Run pending migrations
-make migrate-fresh          # Drop all tables and re-migrate
-make migrate-fresh-seed     # Fresh migration with seeders
-make db-seed                # Run database seeders
-```
+1. Create the `.md` under the right section with `sidebar_position`.
+2. Add it to the `includeOrder` list in `docusaurus.config.ts` (llms.txt plugin) in reading order.
+3. Link it from related pages (relative `.md` links) and run `npm run build`.
 
-### Asset Building
-```bash
-npm run build           # Build production assets with Vite
-npm run dev             # Start Vite dev server for hot module replacement
-make build              # Alternative: build via Makefile
-```
+## Deployment notes
 
-### Docker Services
-```bash
-make start                      # Start all services (php, queue worker, mysql, postgres, redis)
-docker compose up -d            # Alternative: direct docker compose command
-docker compose down             # Stop all services
-docker compose down -v          # Stop and remove volumes
-docker compose logs -f queue    # View queue worker logs
-docker compose restart queue    # Restart queue worker (after code changes)
-```
-
-The Docker setup provides:
-- **php**: FrankenPHP server on port 2226 (http://localhost:2226)
-- **queue**: Queue worker processing backup/restore jobs
-- **mysql**: MySQL 8.0 on port 3306 (user: admin, password: admin, db: testdb)
-- **postgres**: PostgreSQL 16 on port 5432 (user: admin, password: admin, db: testdb)
-- **redis**: Redis 7 on port 6379
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `gh-pages` also hosts the Helm repo: `charts/`, `index.yaml`, `artifacthub-repo.yml` must survive deploys (handled via `clean-exclude` in the workflow — keep it).
+- The workflow runs from the tagged commit, so workflow/script changes only take effect for tags cut after they land on `main`.
 
 ---
 > Source: [David-Crty/databasement](https://github.com/David-Crty/databasement) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
