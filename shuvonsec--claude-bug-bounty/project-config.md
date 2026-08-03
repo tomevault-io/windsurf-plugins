@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This repo is a Claude Code plugin for professional bug bounty hunting across HackerOne, Bugcrowd, Intigriti, and Immunefi.
+description: This repo is an agent-portable bug bounty plugin for professional hunting across HackerOne, Bugcrowd, Intigriti, and Immunefi. It supports Claude Code, OpenCode, Pi Agent, Codex-style Agent Skills, and shared `.agents/skills` harnesses.
 ---
 
-# Claude Bug Bounty — Plugin Guide
+# Bug Bounty Agent Toolkit — Plugin Guide
 
-This repo is a Claude Code plugin for professional bug bounty hunting across HackerOne, Bugcrowd, Intigriti, and Immunefi.
+This repo is an agent-portable bug bounty plugin for professional hunting across HackerOne, Bugcrowd, Intigriti, and Immunefi. It supports Claude Code, OpenCode, Pi Agent, Codex-style Agent Skills, and shared `.agents/skills` harnesses.
 
 ## What's Here
 
@@ -23,10 +23,10 @@ This repo is a Claude Code plugin for professional bug bounty hunting across Hac
 | `skills/report-writing/` | H1/Bugcrowd/Intigriti/Immunefi report templates, CVSS 3.1, human tone |
 | `skills/triage-validation/` | 7-Question Gate, 4 gates, never-submit list, conditionally valid table |
 
-### Commands (14 slash commands)
+### Commands (21 slash commands)
 
-> **Note:** All commands are prefixed to avoid conflicts with Claude Code's built-in commands.
-> `/resume` is a reserved Claude Code command — use `/pickup` to continue a previous hunt.
+> **Note:** All commands are prefixed to avoid conflicts with Codex's built-in commands.
+> `/resume` is a reserved Codex command — use `/pickup` to continue a previous hunt.
 
 | Command | Usage |
 |---|---|
@@ -36,6 +36,7 @@ This repo is a Claude Code plugin for professional bug bounty hunting across Hac
 | `/report` | `/report` — write submission-ready report |
 | `/chain` | `/chain` — build A→B→C exploit chain |
 | `/scope` | `/scope <asset>` — verify asset is in scope |
+| `/scope-aggregate` | `/scope-aggregate <program>` — pull every in-scope asset across H1/Bugcrowd/Intigriti/YWH/Immunefi |
 | `/triage` | `/triage` — quick 7-Question Gate |
 | `/web3-audit` | `/web3-audit <contract.sol>` — smart contract audit |
 | `/autopilot` | `/autopilot target.com --normal` — autonomous hunt loop |
@@ -44,6 +45,14 @@ This repo is a Claude Code plugin for professional bug bounty hunting across Hac
 | `/remember` | `/remember` — log finding to hunt memory |
 | `/intel` | `/intel target.com` — fetch CVE + disclosure intel |
 | `/token-scan` | `/token-scan <contract>` — meme coin/token rug pull scanner |
+| `/memory-gc` | `/memory-gc [--rotate|--purge-backups]` — inspect/rotate hunt-memory JSONL files (10MB cap, 3 backups) |
+| `/secrets-hunt` | `/secrets-hunt --js-bundle <recon-dir>` — leaked-credential scan (trufflehog/noseyparker/gitleaks) |
+| `/takeover` | `/takeover --recon <recon-dir>` — subdomain takeover candidates (dnsReaper/subjack) |
+| `/cloud-recon` | `/cloud-recon --keyword <name>` — public S3/Azure/GCP + CloudFlare-bypass origin IPs |
+| `/param-discover` | `/param-discover <url>` — find hidden HTTP parameters (Arjun/x8) |
+| `/bypass-403` | `/bypass-403 <url>` — try header/method/encoding tricks against a 403/401 |
+| `/arsenal` | `/arsenal [tool]` — list installed external tools or get an install hint |
+| `/scan-cves` | `/scan-cves <host>` — focused nuclei CVE sweep (high/critical) + optional log4j-scan |
 
 ### Agents (8 specialized agents)
 
@@ -64,49 +73,22 @@ This repo is a Claude Code plugin for professional bug bounty hunting across Hac
 ### Tools (Python/shell — in `tools/`)
 
 - `tools/hunt.py` — master orchestrator
-- `tools/recon_engine.sh` — subdomain + URL discovery
+- `tools/recon_engine.sh` — subdomain + URL discovery (now with optional `nuclei` phase)
+- `tools/vuln_scanner.sh` — XSS/SQLi/SSTI/MFA/SAML probe pipeline
 - `tools/validate.py` — 4-gate finding validator
 - `tools/learn.py` — CVE + disclosure intel
 - `tools/intel_engine.py` — on-demand intel with memory context
 - `tools/scope_checker.py` — deterministic scope safety checker
-- `tools/cicd_scanner.sh` — GitHub Actions workflow scanner (sisakulint wrapper, remote scan)
-- `tools/token_scanner.py` — automated token red flag scanner (EVM + Solana)
+- `tools/scope_aggregator.sh` — multi-platform scope pull (bbscope + bounty-targets-data)
+- `tools/secrets_hunter.sh` — trufflehog/noseyparker/gitleaks wrapper for FS/git/JS/GH-org
+- `tools/takeover_scanner.sh` — dnsReaper/subjack subdomain-takeover scanner
+- `tools/cloud_recon.sh` — S3Scanner + cloud_enum + CloudFail wrapper
+- `tools/param_discovery.sh` — Arjun/x8 hidden-parameter discovery
+- `tools/bypass_403.sh` — byp4xx + built-in 403/401 bypass matrix
+- `tools/cve_scan.sh` — focused nuclei CVE-tag sweep + optional log4j-scan
 
-### MCP Integrations (in `mcp/`)
-
-- `mcp/burp-mcp-client/` — Burp Suite proxy integration
-- `mcp/hackerone-mcp/` — HackerOne public API (Hacktivity, program stats, policy)
-
-### Hunt Memory (in `memory/`)
-
-- `memory/pattern_db.py` — cross-target pattern learning
-- `memory/audit_log.py` — request audit log, rate limiter, circuit breaker
-- `memory/schemas.py` — schema validation for all data
-
-## Start Here
-
-```bash
-claude
-# /recon target.com
-# /hunt target.com
-# /validate   (after finding something)
-# /report     (after validation passes)
-```
-
-## Install Skills
-
-```bash
-chmod +x install.sh && ./install.sh
-```
-
-## Critical Rules (Always Active)
-
-1. READ FULL SCOPE before touching any asset
-2. NEVER hunt theoretical bugs — "Can attacker do this RIGHT NOW?"
-3. Run 7-Question Gate BEFORE writing any report
-4. KILL weak findings fast — N/A hurts your validity ratio
-5. 5-minute rule — nothing after 5 min = move on
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
