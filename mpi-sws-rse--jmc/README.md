@@ -5,17 +5,17 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [mpi-sws-rse/jmc](https://github.com/mpi-sws-rse/jmc).
+Original source: `AGENTS.md` in [mpi-sws-rse/jmc](https://github.com/mpi-sws-rse/jmc).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [mpi-sws-rse/jmc](https://github.com/mpi-sws-rse/jmc) — a repo with 67+ stars on GitHub.
+From [mpi-sws-rse/jmc](https://github.com/mpi-sws-rse/jmc) — a repo with 65+ stars on GitHub.
 
 ---
 
