@@ -1,152 +1,120 @@
 ---
 trigger: always_on
-description: See [`guides/agentic_coding.md`](guides/agentic_coding.md) for a full guide on the
+description: You're in the **mob** repo, the runtime library for the Mob mobile framework.
 ---
 
-# Mob — Agent Instructions
+# AGENTS.md — orientation for AI agents working on Mob
 
-See [`guides/agentic_coding.md`](guides/agentic_coding.md) for a full guide on the
-agent round-trip workflow: how to connect to the running Erlang node, when to use
-`Mob.Test` vs MCP platform tools, and how to avoid the instinct to reach for
-`xcrun simctl` screenshots.
+You're in the **mob** repo, the runtime library for the Mob mobile framework.
+Read this in full before making changes — it's the 5-minute orientation that
+will keep you from re-deriving things the rest of the team has already learned
+(or learned the hard way).
 
-## Standard debugging workflow
+## What Mob is, in one paragraph
 
-The preferred tool is `mix mob.connect` (from `mob_dev` package):
+Mob lets you write iOS and Android apps in Elixir, with the BEAM running
+on-device. The phone hosts an Erlang node — a real one, distribution-capable,
+introspectable, hot-code-loadable. Two modes: a SwiftUI/Compose UI driven by
+Elixir GenServers (Mob UI apps), or a sidecar BEAM embedded in a normal native
+app to give agents and tests live access (Mob as test harness). The sidecar
+mode is the long-term bet. Both modes produce a real Erlang node you can `Node.connect/1` to.
+
+For the *why* (the BEAM-on-mobile pitch), see `guides/why_beam.md`.
+
+## Repo topology
+
+Mob is three coordinated repos. **Know which one to edit before you change anything.**
+
+| Repo | Path | What lives here | Edit when |
+|---|---|---|---|
+| **mob** | `~/code/mob` | Runtime library: `Mob.Screen`, `Mob.App`, `Mob.Renderer`, `Mob.Dist`, `Mob.Test`, the iOS Swift / Android Kotlin native bridges, the NIF | UI behavior, on-device runtime, native bridge changes |
+| **mob_dev** | `~/code/mob_dev` | Mix tasks: `mob.deploy`, `mob.connect`, `mob.devices`, `mob.emulators`, `mob.provision`, `mob.doctor`, `mob.battery_bench_*`. Igniter installers (`mob.add_nif`, `mob.enable`, `mob.adopt`). Device discovery (`MobDev.Discovery.{Android,IOS}`). Native build orchestration (`MobDev.NativeBuild`). OTP tarball download/cache (`MobDev.OtpDownloader`). | Build/deploy mechanics, device handling, dev tooling, **Igniter tasks that mutate an existing project** |
+| **mob_new** | `~/code/mob_new` | Project generator. Hex archive (`mix archive.install hex mob_new`). Templates in `priv/templates/mob.new/`. Generates both native Mob UI projects and Phoenix LiveView wrappers. | Greenfield generator output. **Must stay self-contained** (`ArchiveSelfContainedTest`) — no hex-dep modules reachable from archive code, so Igniter-based tasks live in mob_dev, not here |
+
+Cross-repo changes are common — fixing one user-visible behavior often needs
+the runtime patched in `mob`, the build retooled in `mob_dev`, **and** the
+generator template updated in `mob_new` so newly-generated projects pick up
+the fix without manual edits.
+
+The OTP runtime tarballs (Android arm64/arm32, iOS sim, iOS device) are built
+separately and uploaded to GitHub Releases — see `mob_dev/build_release.md`
+and `mob_dev/scripts/release/`. Patches we apply to OTP source live at
+`mob_dev/scripts/release/patches/`.
+
+## Driving apps from your session
+
+The default instinct — screenshots — is wrong. Mob apps run a real Erlang node
+you can talk to directly. Read the BEAM, drive it, then verify visually only
+when state isn't enough.
+
+### Connect
 
 ```bash
-cd ~/code/mob_demo
-mix mob.connect          # discover all devices, tunnel, restart, connect IEx
-mix mob.connect --no-iex # same but print node names instead of starting IEx
-mix mob.devices          # list connected devices and their status
+mix mob.devices                 # list everything connected (sims, emulators, physical)
+mix mob.emulators --list        # list virtual devices (running and stopped)
+mix mob.connect                 # set up tunnels, start IEx attached to all running nodes
+mix mob.connect --no-iex        # just print node names + tunnels (for scripting)
 ```
 
 Node names are platform-specific:
-- iOS simulator:    `mob_demo_ios@127.0.0.1`
-- Android emulator: `mob_demo_android@127.0.0.1`
-
-### EPMD tunneling
-
-iOS simulator shares the Mac's network stack — the iOS BEAM registers directly in
-the Mac's EPMD on port 4369. No forwarding needed.
-
-Android is a separate network namespace. `mob_dev` sets up adb tunnels automatically:
 
 ```
-adb reverse tcp:4369 tcp:4369   # EPMD: device → Mac (Android BEAM registers in Mac EPMD)
-adb forward tcp:9100 tcp:9100   # dist:  Mac → device
+mob_demo_ios@127.0.0.1                     # iOS simulator
+mob_demo_android_<serial-suffix>@127.0.0.1  # Android (suffix from ro.serialno)
 ```
 
-### Port assignment (handled by mob_dev)
+For iOS simulator, the sim shares the Mac's network stack — distribution Just
+Works. For Android (and iOS device), `mix mob.connect` sets up `adb reverse` /
+similar tunnels.
 
-Devices are assigned dist ports by index to avoid conflicts:
-- Device 0 (Android): port 9100
-- Device 1 (iOS sim): port 9101
-
-iOS dist port is passed via `SIMCTL_CHILD_MOB_DIST_PORT` env var; `mob_beam.m` reads
-`MOB_DIST_PORT` at startup. Android dist port is passed as an intent extra (`mob_dist_port`);
-**`MainActivity.java` does NOT yet read this — multi-Android support is pending.**
-
-Both iOS and Android end up registered in the same Mac EPMD. `mix mob.connect` sets
-up all tunnels automatically.
-
-## Day-to-day development loop
-
-```bash
-# Edit Elixir code, then:
-mix mob.deploy          # compile + push BEAMs + restart apps
-mix mob.connect         # tunnel + wait for nodes + drop into IEx
-
-# In IEx (after mob.connect):
-mix compile && nl(MobDemo.CounterScreen)   # hot-push one module without restart
-Node.list()                                # verify both devices connected
-:rpc.call(:"mob_demo_android@127.0.0.1", MobDemo.CounterScreen, :some_fn, [])
-```
-
-### Reading live screen state
-
-```elixir
-# Screen pid is logged at app start: "[mob] step 5 => {ok,<0.92.0>}"
-pid = :rpc.call(:"mob_demo_android@127.0.0.1", :erlang, :list_to_pid, [~c"<0.92.0>"])
-socket = :rpc.call(:"mob_demo_android@127.0.0.1", Mob.Screen, :get_socket, [pid])
-socket.assigns   # live assigns
-```
-
-### Hot code push
-
-```bash
-# After editing a screen (from the terminal):
-mix mob.push          # compile + push all changed modules to all connected devices
-mix mob.push --all    # force-push every module
-
-# Or from inside IEx (after mob.connect), one module at a time:
-nl(MobDemo.CounterScreen)
-# Returns: {:ok, [{:"mob_demo@127.0.0.1", :loaded, MobDemo.CounterScreen}]}
-```
-
-### Android distribution
-
-Android cannot start distribution at BEAM launch (races with hwui thread pool, causes
-SIGABRT via FORTIFY `pthread_mutex_lock on destroyed mutex`). Instead, `Mob.Dist.ensure_started/1`
-defers `Node.start/2` by 3 seconds after app startup. This is handled in the mob library —
-app code just calls `Mob.Dist.ensure_started(node: :"my_app_android@127.0.0.1", cookie: :my_secret)`.
-
-ERTS helper binaries (`erl_child_setup`, `inet_gethost`, `epmd`) cannot be exec'd from the
-app data directory (SELinux `app_data_file` blocks `execute_no_trans`). They are packaged in
-the APK as `lib*.so` in `jniLibs/arm64-v8a/` (gets `apk_data_file` label, which allows exec).
-`mob_beam.c` symlinks `BINDIR/<name>` → `<nativeLibraryDir>/lib<name>.so` before `erl_start`.
-
-## Agent round-trip workflow
-
-The standard loop for AI-assisted feature development or debugging. Use all three
-layers in order — BEAM state first, then visual verification only when needed.
-
-### 1. Edit and deploy
-
-```bash
-mix mob.push            # compile + push changed BEAMs to all connected nodes
-# or for a native rebuild (e.g. after NIF or Swift/Kotlin change):
-mix mob.deploy --native
-```
-
-### 2. Inspect BEAM state via IEx or Mob.Test
-
-Connect (or use an already-open IEx session from `mix mob.connect`):
-
-```bash
-mix mob.connect --no-iex   # sets up tunnels, prints node names, exits
-```
-
-Then from a separate IEx session or script:
+### Inspect (`Mob.Test`, BEAM-state, fast, exact — prefer this)
 
 ```elixir
 node = :"mob_demo_ios@127.0.0.1"
-Mob.Test.screen(node)    # which screen is showing?
-Mob.Test.assigns(node)   # live assigns — count, selected items, etc.
-Mob.Test.tap(node, :some_button)   # drive a tap programmatically
-Mob.Test.find(node, "Submit")      # locate a widget by visible text
+
+Mob.Test.screen(node)            # which screen is showing?  → ModuleName
+Mob.Test.assigns(node)           # live socket assigns        → %{...}
+Mob.Test.find(node, "Submit")    # locate widget by visible text
+Mob.Test.inspect(node)           # full snapshot: screen, assigns, nav stack, widget tree
 ```
 
-This is the fastest path. BEAM state is exact and doesn't require image decoding.
+This is faster, exact (not pixel-inferred), and works without taking a
+screenshot. Use it as the default.
 
-### 3. Visual verification via MCP tools
+### Drive
 
-When you need to confirm rendering, layout, or animations — use the platform MCP
-servers. These are available as tools in the agent environment.
+```elixir
+Mob.Test.tap(node, :open_text)              # tap by tag atom (the on_tap: {self(), :tag})
+Mob.Test.send_message(node, {:custom, :msg}) # arbitrary handle_info
+```
 
-**iOS Simulator** (`mcp__ios-simulator__*`):
+After a tap, call `Mob.Test.screen(node)` again to confirm navigation
+happened. Call `Mob.Test.assigns(node)` to confirm state changed.
 
-| Tool | When to use |
-|------|-------------|
-| `screenshot` | Capture the current simulator frame |
-| `ui_tap` | Tap at x,y coordinates |
-| `ui_type` | Type text into focused input |
-| `ui_swipe` | Swipe gesture |
-| `ui_view` | Inspect the accessibility tree |
-| `ui_describe_point` | What element is at this coordinate? |
+### Visual verify (MCP, slower, image-based — only when needed)
+
+When layout/animation/rendering matters, fall back to MCP platform tools:
+
+| iOS simulator | Android |
+|---|---|
+| `mcp__ios-simulator__screenshot` | `mcp__adb__dump_image` |
+| `mcp__ios-simulator__ui_view` | `mcp__adb__inspect_ui` |
+| `mcp__ios-simulator__ui_tap {x, y}` | `adb shell input tap` |
+| `mcp__ios-simulator__ui_swipe` | `adb shell input swipe` |
+| `mcp__ios-simulator__record_video` | `adb shell screenrecord` |
+
+Use these to confirm a layout looks right, spot animation glitches, or
+debug rendering. **Don't use them for state queries** — `Mob.Test.assigns/1`
+is always better.
+
+### Round-trip workflow
+
+```
+1. Edit Elixir/Swift/Kotlin code
+2. mix mob.push                  # fast: BEAM-only push, no native rebuild
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GenericJam/mob](https://github.com/GenericJam/mob) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
