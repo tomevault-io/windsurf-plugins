@@ -1,137 +1,104 @@
 ---
 trigger: always_on
-description: Create, analyze, proofread, and modify Office and PDF documents (.docx, .xlsx, .pptx, .pdf) using the officecli CLI tool. Use when the user wants to create, inspect, check formatting, find issues, add charts, or modify Office or PDF documents.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
+# AGENTS.md
 
-# officecli
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-AI-friendly CLI for .docx, .xlsx, .pptx, .pdf. Single binary (pure Rust), no dependencies, no Office installation needed.
+## Project Overview
 
-## Install
+OfficeCLI is a single-binary, pure-Rust CLI for creating, reading, modifying, and rendering Office documents (.docx, .xlsx, .pptx) and PDFs. No Office installation needed. It also includes an MCP server for AI agent integration and a watch server for live HTML previews.
 
-If `officecli` is not installed:
+## Build & Development Commands
 
 ```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/RainLib/OfficeCli-rust/main/install.sh | bash
-
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/RainLib/OfficeCli-rust/main/install.ps1 | iex
+cargo build                     # Debug build
+cargo build --release           # Release build
+cargo check                     # Fast compile check (no binary)
+cargo test                      # Run all tests (inline unit tests only, no integration test dirs)
+cargo clippy --all-targets -- -D warnings  # Lint
+cargo fmt -- --check            # Check formatting
+cargo fmt                       # Auto-fix formatting
+cargo run -- <ARGS>             # Run with CLI args
+make smoke                      # Smoke test: create + view a doc, verify binary works
+make lint                       # fmt + clippy combined
 ```
 
-Verify with `officecli --version`. If still not found after install, open a new terminal.
+Tests are inline (`#[test]` within source files), not in separate `tests/` directories. No integration tests exist.
 
----
+## Workspace Structure
 
-## Strategy
+Cargo workspace with 7 crates under `crates/`:
 
-**L1 (read) → L2 (DOM edit) → L3 (raw XML)**. Always prefer higher layers. Add `--json` for structured output.
+| Crate | Purpose |
+|-------|---------|
+| `officecli` | CLI binary (entry point) |
+| `handler-common` | `DocumentHandler` trait + shared types (`DocumentNode`, `HandlerError`, `PathSegment`, `TextOffsetMap`, etc.) |
+| `oxml` | OOXML ZIP package abstraction (`OxmlPackage` — open, read/write parts, content types, relationships) |
+| `docx-handler` | `WordHandler` — Word DOM (`WordDom`/`WordNode`) over `OxmlPackage` |
+| `xlsx-handler` | `ExcelHandler` — workbook model (`WorkbookModel`/`Cell`) over `OxmlPackage` |
+| `pptx-handler` | `PptxHandler` — presentation/slide XML over `OxmlPackage` |
+| `pdf-handler` | `PdfHandler` — separate backend (lopdf, custom content stream parser, font embedder, modifier) |
 
-**Before doc work, check Specialized Skills** (bottom of this file). Fundraising decks, academic papers, financial models, dashboards, and Morph animations need their own skill loaded first — `load_skill` once, then proceed.
+Dependency graph: `handler-common` is the root trait crate. `oxml` depends on `handler-common`. OOXML handlers depend on `oxml`. `pdf-handler` depends only on `handler-common`. `officecli` depends on all handlers.
 
----
+## Three-Layer Architecture
 
-## Help System (IMPORTANT)
+All handlers implement the same `DocumentHandler` trait with three layers:
 
-**When unsure about property names, value formats, or command syntax, ALWAYS run help instead of guessing.** One help query beats guess-fail-retry loops.
+- **L1 (Semantic/Read)**: `view` modes (text, annotated, outline, stats, issues, html, svg)
+- **L2 (DOM/Query)**: `get`, `query`, `set`, `add`, `remove`, `move` — path-based element operations
+- **L3 (Raw)**: `raw`, `raw-set`, `validate` — direct XML/XPath access
 
-`officecli help` ≡ `officecli --help`, and `officecli <cmd> --help` ≡ `officecli help <cmd>` — same content.
+Always prefer higher layers. L2 handles structured edits; L3 is for cases L2 can't express.
 
-```bash
-officecli help                                  # All commands + global options + schema entry points
-officecli help docx                             # List all docx elements
-officecli help docx paragraph                   # Full schema: properties, aliases, examples, readbacks
-officecli help docx set paragraph               # Verb-filtered: only props usable with `set`
-officecli help docx paragraph --json            # Structured schema (machine-readable)
-```
+## Key Architectural Patterns
 
-Format aliases: `word`→`docx`, `excel`→`xlsx`, `ppt`/`powerpoint`→`pptx`. Verbs: `add`, `set`, `get`, `query`, `remove`. MCP exposes the same schema via `{"command":"help","format":"docx","type":"paragraph"}`.
+- **Interior mutability**: All handlers use `RefCell` (`RefCell<OxmlPackage>` or `RefCell<PdfReader>`) because `DocumentHandler` trait methods take `&self`.
+- **Parse-modify-serialize**: OOXML handlers parse XML into a custom DOM tree, mutate it, serialize back to XML string, then write back to the ZIP package.
+- **Path-based addressing**: XPath-like paths with 1-based indexing (e.g., `/body/p[3]`, `/slide[1]/shape[@id=550950021]`). Alias resolution built in (e.g., "paragraph" → "p").
+- **TextOffsetMap**: Every format emits full text + character-offset-to-path-ID mapping for AI agents to precisely locate and modify text.
+- **Inline templates**: Blank document creation uses hardcoded XML strings, no external template files.
+- **Platform conditional**: Resident mode (Unix Domain Socket IPC) is Unix-only; stubbed with error on other platforms.
 
----
+## Handler Module Structure
 
-## Performance: Resident Mode
+Each handler crate follows a consistent module pattern:
 
-**Every command auto-starts a resident on first access** (60s idle timeout) — file-lock conflicts are automatically avoided. Explicit `open`/`close` is still recommended for longer sessions (12min idle):
-```bash
-officecli open report.docx       # explicitly keep in memory
-officecli set report.docx ...    # no file I/O overhead
-officecli close report.docx      # save and release
-```
+- `handler.rs` — `DocumentHandler` trait impl + XML parse/serialize
+- `dom_types.rs` — Format-specific DOM types and element enums
+- `navigation.rs` — Path parsing and DOM tree navigation
+- `mutations.rs` — `set`, `move`, `remove` operations
+- `add.rs` — `add` element operations
+- `view.rs` — View mode implementations
+- `query.rs` — CSS-like selector query
+- `raw.rs` — Raw XML read/write
+- `html_preview.rs` — HTML rendering for watch/preview
+- `text_offset.rs` — `extract_text_with_offsets`
 
-Opt out of auto-start: `OFFICECLI_NO_AUTO_RESIDENT=1`.
+Format-specific extras: docx has `para_id.rs`, `helpers.rs`; xlsx has `formula_eval.rs`; pptx has `svg_preview.rs`; pdf has `content_stream.rs` (~108KB parser/modifier), `font_embedder.rs`, `modifier.rs`, `reader.rs`, `render.rs`, `text_extract.rs`.
 
----
+## CLI Entry Point
 
-## Quick Start
+`crates/officecli/src/main.rs` — clap-based CLI. `open_handler()` routes by file extension (.docx → WordHandler, .xlsx → ExcelHandler, .pptx → PptxHandler, .pdf → PdfHandler). Commands are defined in `crates/officecli/src/commands/mod.rs`.
 
-**PPT:**
-```bash
-officecli create slides.pptx
-officecli add slides.pptx / --type slide --prop title="Q4 Report" --prop background=1A1A2E
-officecli add slides.pptx '/slide[1]' --type shape --prop text="Revenue grew 25%" --prop x=2cm --prop y=5cm --prop font=Arial --prop size=24 --prop color=FFFFFF
-```
+Additional modes:
+- **Resident mode**: Background IPC server via Unix Domain Socket (auto-starts on first access, 60s idle)
+- **Watch mode**: Axum HTTP server for live HTML preview (default port 26315)
+- **MCP server**: Stdio-based JSON-RPC 2.0 server exposing 13 tools
 
-**Word:**
-```bash
-officecli create report.docx
-officecli add report.docx /body --type paragraph --prop text="Executive Summary" --prop style=Heading1
-officecli add report.docx /body --type paragraph --prop text="Revenue increased by 25% year-over-year."
-```
+## Contribution Rules
 
-**Excel:**
-```bash
-officecli create data.xlsx
-officecli set data.xlsx /Sheet1/A1 --prop value="Name" --prop bold=true
-officecli set data.xlsx /Sheet1/A2 --prop value="Alice"
-```
+From CONTRIBUTING.md — two hard rules:
 
-**PDF:**
-```bash
-officecli view report.pdf --mode text
-officecli view report.pdf --mode outline
-officecli get report.pdf '/page[1]' --json
-officecli extract-text report.pdf --with-offsets --json
-```
+1. **One PR = one atomic change**. Cannot be further decomposed. If a diff can be split into multiple independent PRs, submit each separately.
+2. **Every PR must include a verifiable validation method**. Bug fixes: officecli command sequence showing before/after. Features: screenshot + command sequence.
 
----
-
-## L1: Create, Read & Inspect
-
-```bash
-officecli create <file>               # Create blank .docx/.xlsx/.pptx (type from extension)
-officecli view <file> <mode>          # outline | stats | issues | text | annotated | html | svg
-officecli get <file> <path> --depth N # Get a node and its children [--json]
-officecli extract-text <file> --with-offsets --json  # Text + offset→path mapping (all formats)
-officecli query <file> <selector>     # CSS-like query
-officecli validate <file>             # Validate against OpenXML schema
-```
-
-### view modes
-
-| Mode | Description | Useful flags |
-|------|-------------|-------------|
-| `outline` | Document structure | |
-| `stats` | Statistics (pages, words, shapes) | |
-| `issues` | Formatting/content/structure problems | `--type format\|content\|structure`, `--limit N` |
-| `text` | Plain text extraction | `--start N --end N`, `--max-lines N` |
-| `annotated` | Text with formatting annotations | |
-| `html` | Static HTML snapshot — same renderer as `watch`, no server needed | `--browser`, `--page N` (pdf/docx), `--start N --end N` (pptx) |
-| `screenshot` / `svg` / `pdf` / `forms` | PNG via headless browser / SVG (pptx/pdf) / PDF via exporter plugin / form-fields JSON via format-handler plugin | `-o`, `--screenshot-width/-height`, pptx `--grid N` |
-
-Use `view html` for one-shot snapshots (CI artifacts, archival, diffing); use `watch` when you need live refresh or browser-side click-to-select.
-
-### PDF Support
-
-PDF is a first-class format — read, view, modify (text replace, page delete), and extract text with offsets.
-
-```bash
-officecli view report.pdf --mode text          # Extract text
-officecli view report.pdf --mode outline        # Page listing + metadata
-officecli view report.pdf --mode stats          # Pages, chars, lines
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [RainLib/OfficeCli-rust](https://github.com/RainLib/OfficeCli-rust) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+> Source: [RainLib/OfficeCLI-rust](https://github.com/RainLib/OfficeCLI-rust) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-29 -->
