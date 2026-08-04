@@ -1,175 +1,74 @@
 ---
 trigger: always_on
-description: **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+description: The news around AI terms can be pretty overwhelming and sound more like a buzzword than something useful. Before we dive
 ---
 
-# Railtracks Development Instructions
+# What is an Agent?
 
-**Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+The news around AI terms can be pretty overwhelming and sound more like a buzzword than something useful. Before we dive
+deep into how you can build agents in **Railtracks**, let's first understand what an agent is.
 
-## Repository Overview
+An agent is a self-contained unit that can perform a specific task or set of tasks autonomously. It has the ability to
+make decisions, take actions, and act within its environment to achieve its goals.
 
-Railtracks is a Python framework for building agentic systems. This is a monorepo with two packages:
-- `packages/railtracks/` - Core SDK with optional LLM, MCP, and integration features
-- `packages/railtracks-cli/` - Command-line visualization and development tools
+The key abilities of the agent include:
 
-## Railtracks Framework Concepts
+* **Autonomy**: Agents can operate independently within the boundaries you define
+* **Adaptability**: Agents can adjust their behavior based on the environment and the tasks at hand
+* **Goal-Oriented**: Agents are designed to achieve specific objectives or complete tasks
+* **Interaction**: Agents can communicate with other agents or systems to gather information or perform actions
+* **Stateful**: Agents maintain context and history and use it to inform their decisions
 
-### How Railtracks Works
-- **Tools** are plain Python functions decorated with `@rt.function_node`. Type hints become the parameter schema; the docstring becomes the description.
-- **Agents** are created with `rt.agent_node()`. The type is auto-selected based on whether tools and/or a structured output schema are provided.
-- **Flows** wrap an agent or async function as the entry point and handle execution, config, and context.
-- **`rt.call()`** is used inside async workflows to call agents or nodes directly.
+# LLMs as Agents
 
-### Agent Type Selection
-| Has `tool_nodes`? | Has `output_schema`? | Agent type |
-|---|---|---|
-| No | No | `TerminalLLM` — plain chat |
-| No | Yes | `StructuredLLM` — structured output, no tools |
-| Yes | No | `ToolCallLLM` — tools, text output |
-| Yes | Yes | `StructuredToolCallLLM` — tools + structured output |
+Reinforcement Learning and other AI techniques have trained specific agents to operate in their environments
+for a while now, but LLMs have changed the game and made it much easier to use their generalized intelligence to
+accomplish complex tasks and goals. This ability makes them uniquely suited to operate as the **brain** for your agentic
+system.
 
-### LLM Providers
-```python
-rt.llm.AnthropicLLM("claude-sonnet-4-6")
-rt.llm.OpenAILLM("gpt-5")
-rt.llm.GeminiLLM("gemini-3-flash-preview")
-rt.llm.OpenAICompatibleProvider(base_url="...", model="...")
+```mermaid
+graph TB
+    User[User]
+    Agent[Agent]
+    Tools[Tools]
+    Env[Environment]
+    
+    User -->|Query| Agent
+    Agent -->|Response| User
+    Agent -->|Select & invoke| Tools
+    Tools -->|Results| Agent
+    Tools -->|Actions| Env
+    Env -->|State updates| Tools
+    
+    classDef userClass fill:#60A5FA,fill-opacity:0.3
+    classDef agentClass fill:#FBBF24,fill-opacity:0.3
+    classDef toolClass fill:#FECACA,fill-opacity:0.3
+    classDef envClass fill:#34D399,fill-opacity:0.3
+    
+    class User userClass;
+    class Agent agentClass;
+    class Tools toolClass;
+    class Env envClass;
 ```
 
-### Agent Patterns
+# Real World Applications
 
-#### Simple Agent with Tools
-```python
-import railtracks as rt
+Agents are already being used in real world applications such as:
 
-@rt.function_node
-def my_tool(param: str) -> str:
-    """One-line description.
-    Args:
-        param: What this parameter is.
-    Returns:
-        What this returns.
-    """
-    return f"result for {param}"
+1. Vibe Coding Tools ([Cursor](https://cursor.so/), [Windsurf](https://windsurf.com/), etc.)
+2. NPC Interactions in Games ([AI Village](https://arxiv.org/pdf/2304.03442))
+3. Technical Documentation Writing ([ParagraphAI](https://www.paragraphai.com/product))
+4. Deep Research Tools ([GPT Deep Research](https://openai.com/index/introducing-deep-research/))
 
-llm = rt.llm.AnthropicLLM("claude-sonnet-4-6")
-# agent_node returns a class (type), not an instance — use PascalCase
-MyAgent = rt.agent_node(
-    "Agent Name",
-    tool_nodes=[my_tool],
-    llm=llm,
-    system_message="You are a helpful assistant that ...",
-)
-flow = rt.Flow(name="My Flow", entry_point=MyAgent)
-if __name__ == "__main__":
-    result = flow.invoke("user query here")
-    print(result)
-```
+## Related Topics
 
-#### Structured Output
-```python
-from pydantic import BaseModel
+* [Tools](tools.md)
 
-class Output(BaseModel):
-    field1: str
-    field2: int
+## Build Your Own
 
-StructuredAgent = rt.agent_node(
-    "Structured Agent",
-    output_schema=Output,
-    tool_nodes=[my_tool],
-    llm=llm,
-)
-```
-
-#### Multi-Agent Workflow
-```python
-@rt.function_node
-async def pipeline(query: str):
-    step1 = await rt.call(AgentA, query)
-    step2 = await rt.call(AgentB, step1)
-    return step2
-
-flow = rt.Flow(name="Pipeline", entry_point=pipeline)
-```
-
-#### Agent as a Tool (Multi-Agent Orchestration)
-```python
-from railtracks.llm import Parameter
-
-SubAgent = rt.agent_node(
-    "Sub Agent",
-    tool_nodes=[tool_a],
-    llm=llm,
-    manifest=rt.ToolManifest(
-        description="Does X given a topic. Call this when you need X.",
-        parameters=[
-            Parameter(name="topic", description="The topic to process", param_type="string"),
-        ],
-    ),
-)
-Orchestrator = rt.agent_node(
-    "Orchestrator",
-    tool_nodes=[SubAgent],  # SubAgent is now a tool the orchestrator can call
-    llm=llm,
-    system_message="You are an orchestrator. Delegate to sub-agents as needed.",
-)
-```
-
-`Parameter.param_type` may be a JSON schema type string (e.g. `"string"`) or a Python builtin (`str`, `int`, …) mapped to the same schema types.
-
-#### MCP Tools
-```python
-server = rt.connect_mcp(rt.MCPStdioParams(command="python", args=["-m", "my_mcp_server"]))
-agent = rt.agent_node("MCP Agent", tool_nodes=server.tools, llm=llm)
-```
-
-### Things to Avoid
-- Don't use vague docstrings — the docstring is the tool description the LLM sees.
-- Don't skip type hints — they define the tool's parameter schema.
-- Don't create a `Flow` and a manual `await rt.call()` for the same agent at the top level — pick one entry point.
-- Don't add unnecessary tools. Only give the agent what it needs.
-
----
-
-## Working Effectively
-
-### Prerequisites and Setup
-- Python 3.10+ required (tested with 3.12.3)
-
-### Development Environment Setup
-
-**Option 1: Standard Installation** (recommended when network is reliable)
-```bash
-pip install -r requirements-dev.txt
-```
-
-**Option 2: Manual Installation** (for environments with network limitations)
-```bash
-# Install core development tools first
-pip install ruff pytest pytest-asyncio pytest-cov pytest-timeout
-
-# Install core dependencies manually (due to flit build system requirements)
-pip install colorama pydantic python-dotenv litellm fastapi uvicorn watchdog mcp tomlkit
-
-# Install documentation tools
-pip install mkdocs mkdocs-material mkdocs-material-extensions mkdocs-mermaid2-plugin
-
-# Set Python path for development (use in every session)
-export PYTHONPATH=/home/runner/work/railtracks/railtracks/packages/railtracks/src:/home/runner/work/railtracks/railtracks/packages/railtracks-cli/src:$PYTHONPATH
-```
-
-
-
-### Build and Test Commands
-
-#### Linting (FAST - runs in <1 second)
-```bash
-# Check code style - runs instantly
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+We have build **Railtracks** with developers in mind; with just a simple prompt and a bit of Python, you’re
+already well on your way to building your first agent. Get started [Building with Railtracks](../walkthroughs/byfa.md)
 
 ---
 > Source: [RailtownAI/railtracks](https://github.com/RailtownAI/railtracks) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
