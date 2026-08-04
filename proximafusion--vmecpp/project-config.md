@@ -1,176 +1,84 @@
 ---
 trigger: always_on
-description: This file provides guidance to AI agents (Claude Code, GitHub Copilot, etc.) when working with code in this repository.
+description: This directory contains the top-level solver driver (`vmec.cc` / `vmec.h`) and the flow
 ---
 
-# AGENTS.md
+# VMEC Solver Control Flow (`vmec/vmec/`)
 
-This file provides guidance to AI agents (Claude Code, GitHub Copilot, etc.) when working with code in this repository.
+This directory contains the top-level solver driver (`vmec.cc` / `vmec.h`) and the flow
+control state (`flow_control.h`). It orchestrates the iterative equilibrium solve; the actual
+physics (forces, geometry, transforms) lives in `../ideal_mhd_model/`.
 
-## Development Commands
+## Control flow
 
-### Building and Installation
-```bash
-# Build C++ core with CMake
-cmake -B build
-cmake --build build --parallel
+The solver is driven by `Vmec::run()` (`vmec.cc`), structured as nested loops around a
+fixed-point force-balance solve:
 
-# Install as editable Python package (rebuilds C++ automatically on changes)
-pip install -e .
+- **Multigrid (outer loop)**: VMEC++ solves on a sequence of progressively finer radial grids
+  from `indata_.ns_array` (with matching `ftol_array`, `niter_array`). For each grid step
+  `igrid`, `run()` sets the resolution `fc_.nsval`, interpolates the converged coarse-grid
+  solution onto the finer grid via `InterpolateToNextMultigridStep()` (linear radial
+  interpolation of the spectral R/Z/lambda coefficients; odd-`m` modes extrapolated to the
+  axis), then calls `SolveEquilibrium()`. An outer retry over `jacob_off_` reruns the whole
+  sequence if the initial Jacobian is bad. This is multigrid only in the sense of
+  grid-sequencing (a good coarse-grid guess seeds the fine grid) -- it is **not** a V-cycle
+  multigrid solver.
 
-# Install from source
-pip install git+https://github.com/proximafusion/vmecpp
-```
+- **Inner solve**: `SolveEquilibrium()` -> `SolveEquilibriumLoop()` repeatedly calls
+  `Vmec::Evolve()` until convergence or `niterv` is exceeded.
 
-### Testing
-```bash
-# Run Python tests
-pytest
+## Descent algorithm
 
-# Run specific test file
-pytest tests/test_simsopt_compat.py
+The inner solve is **not** Newton -- it is an accelerated (damped) first-order pseudo-time
+descent: conjugate-gradient-without-line-search / second-order Richardson scheme (Garabedian).
+Each step (`Evolve()` -> `PerformTimeStep()`/`performTimeStep()`) integrates a damped equation
+of motion for the spectral coefficients `x` with velocity `v`:
 
-# Run C++ tests (requires separate repo)
-# See: https://github.com/proximafusion/vmecpp_large_cpp_tests
-```
+- `v_new = fac * (b1 * v_old + delt * f)`, then `x += delt * v_new`
+- `f` is the (preconditioned) MHD force, `delt` is the pseudo-time step (`delt0r`).
+- Damping is adapted each step from the residual history: `b1 = 1 - dtau`,
+  `fac = 1 / (1 + dtau)`, with `dtau` from a running average (`kNDamp = 10`) of `invTau_`.
+- The `b1`-weighted momentum term is the acceleration; with no damping this reduces to plain
+  steepest descent.
 
-### Code Quality
-```bash
-# Lint and format code
-ruff check
-ruff format
+## Convergence
 
-# Type checking
-pyright
+Reached when all three force residuals fall below the current stage tolerance:
+`fsqr <= ftolv && fsqz <= ftolv && fsql <= ftolv` (radial, vertical, lambda forces), or when
+the iteration count exceeds `niterv`. Residuals live in `FlowControl` (`flow_control.h`);
+`fsq*1` are the preconditioned variants used for the damping average.
 
-# Pre-commit checks (runs automatically on commit)
-pre-commit run --all-files
-```
+## Restart logic
 
-### C++ Development (Bazel)
-```bash
-# Build C++ core with Bazel (from src/vmecpp/cpp/)
-bazel build //...
+`Vmec::RestartIteration()` (enum `RestartReason` in `flow_control.h`). When the iteration
+misbehaves, the velocity `decomposed_v_` is zeroed and the state is rolled back to
+`physical_x_backup_`, with the pseudo-time step reduced:
 
-# Run C++ tests
-bazel test //vmecpp/...
+- `BAD_JACOBIAN` (overlapping flux surfaces): `delt0r *= 0.9`, increment `fc_.ijacob`.
+- `BAD_PROGRESS` (residuals not decaying): `delt0r /= 1.03`.
+- `NO_RESTART` (good path): back up the current state into `physical_x_backup_`.
 
-# Build specific target
-bazel build //vmecpp/vmec/vmec:vmec
-```
+At a multigrid stage transition, the initial backup is taken **after**
+`InterpolateToNextMultigridStep()`, so the stage's first rollback target is the
+interpolated coarse-grid solution. This follows PARVMEC/VMEC2000 (change
+"SPH 012417" in `initialize_radial.f`), deliberately deviating from VMEC 8.52,
+which backed up the pre-interpolation cold initial guess.
 
-### Running VMEC++
-```bash
-# Command line usage
-python -m vmecpp examples/data/input.w7x
-python -m vmecpp examples/data/w7x.json
+Separately, **hot restart** seeds `run()` from a previously converged `HotRestartState`
+(`wout` + `indata`) via `FourierGeometry::InitFromState()`, used for parameter scans.
+The first element of `ns_array` must match the last `ns` of the restart state; subsequent
+multigrid steps proceed normally via `InterpolateToNextMultigridStep()`.
 
-# Run C++ standalone executable
-./build/vmec_standalone examples/data/solovev.json
-```
+## State variables (`Vmec`)
 
-## High-Level Architecture
+- `decomposed_x_` / `decomposed_v_` / `decomposed_f_`: spectral position / velocity /
+  (preconditioned) force.
+- `physical_x_backup_`: rollback snapshot for restarts.
+- `iter1_` / `iter2_`: branch-point and total-evaluation iteration markers.
 
-VMEC++ is a modern C++ reimplementation of the VMEC magnetohydrodynamic equilibrium solver with a Python interface.
-
-### Core Components
-
-**C++ Computational Engine** (`src/vmecpp/cpp/vmecpp/`):
-- **VMEC Solver** (`vmec/vmec/`): Main iterative equilibrium solver using multigrid methods
-- **Ideal MHD Model** (`vmec/ideal_mhd_model/`): Physics equations and force calculations
-- **Fourier Transforms** (`common/fourier_basis_fast_*`): Fast transforms for spectral decomposition
-- **Free Boundary Solver** (`free_boundary/`): NESTOR/BIEST methods for plasma-vacuum interface
-- **Geometry Engine** (`vmec/fourier_geometry/`): Flux surface geometry and coordinate transformations
-
-**Python Interface Layer** (`src/vmecpp/`):
-- **VmecInput**: Pydantic model for input validation (profiles, boundary, parameters)
-- **VmecOutput/VmecWOut**: Output data structures with equilibrium results
-- **run()**: Primary entry point for computations
-- **Free Boundary Support**: External magnetic field handling
-
-**Python-C++ Bridge** (`src/vmecpp/cpp/vmecpp/vmec/pybind11/`):
-- Automatic NumPy ↔ Eigen conversion
-- Exception translation from C++ to Python
-- Memory-efficient data sharing
-
-**SIMSOPT Compatibility** (`src/vmecpp/simsopt_compat.py`):
-- Drop-in replacement for SIMSOPT's Vmec class
-- Optimization workflow integration
-- Hot restart support for parameter scans
-
-### Data Flow
-
-1. **Input**: JSON (VMEC++) or INDATA (Fortran) formats → VmecInput validation → C++ VmecINDATA
-2. **Computation**: Multigrid setup → Fourier decomposition → Force balance iteration → Convergence
-3. **Output**: C++ results → Python data structures → Multiple formats (HDF5, NetCDF, JSON)
-
-### Key Features
-
-- **Zero-crash policy**: All errors reported as Python exceptions
-- **Hot restart**: Initialize from previous converged state for efficient parameter scans
-- **OpenMP parallelization**: Multi-threaded force calculations
-- **Dual input formats**: Classic INDATA and modern JSON
-- **SIMSOPT integration**: Seamless optimization workflow support
-
-## Coding Standards and Guidelines
-
-### C++ Code (Google Style with Physics Domain Adaptations)
-
-**Naming Conventions**:
-- **Namespaces**: `snake_case` (e.g., `vmec_algorithm_constants`)
-- **Classes**: `CamelCase` (e.g., `IdealMhdModel`)
-- **Functions**: `CamelCase` (e.g., `ComputeGeometry()`)
-- **Constants**: `kCamelCase` (e.g., `kSignOfJacobian`)
-- **Member variables**: `snake_case_` with trailing underscore
-- **Physics variables**: Preserve traditional names (e.g., `bsupu_`, `iotaf_`, `presf_`)
-
-**Function Parameters**:
-- Use `m_` prefix for parameters that **will be modified** by the function
-- Example: `void UpdateForces(const RadialProfiles& profiles, FourierGeometry& m_geometry)`
-
-**Modern C++ Practices**:
-- Use `std::array<>` instead of C-style arrays
-- Include `<array>` header when using `std::array<>`
-- Follow clang-format Google style
-
-**Pre-commit Validation**:
-- All C++ code must pass `clang-format` (Google style)
-- Must pass `readability-identifier-naming` checks
-- Must pass `modernize-avoid-c-arrays` checks
-- Files must end with newline (`end-of-file-fixer`)
-
-### Python Code
-
-- **Style**: Follows `ruff` linting and formatting with line length 88
-- **Type Checking**: Must pass `pyright` type validation
-- **Documentation**: Use `docformatter` for consistent docstring formatting
-
-### Development Workflow
-
-1. **Before making C++ changes**:
-   ```bash
-   cd src/vmecpp/cpp
-   bazel build //...  # Ensure current code builds
-   ```
-
-2. **After making changes**:
-   ```bash
-   # Run pre-commit checks
-   pre-commit run --files path/to/modified/files
-
-   # Build and test
-   bazel build //...
-   bazel test //vmecpp/...
-   ```
-
-3. **Incremental development**: Make small, focused changes that can be validated independently
-
-## File Structure Guidelines
-
-- **C++ core**: `src/vmecpp/cpp/vmecpp/` - Physics computations, numerical algorithms
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Output quantities are computed **after** convergence as a post-processing step, not during the
+loop -- see `../output_quantities/` and `../ideal_mhd_model/AGENTS.md`.
 
 ---
 > Source: [proximafusion/vmecpp](https://github.com/proximafusion/vmecpp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-31 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
