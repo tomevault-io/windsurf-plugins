@@ -55,4 +55,4 @@ Key routing rules:
 
 ---
 > Source: [HexSleeves/tailscale-mcp](https://github.com/HexSleeves/tailscale-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
