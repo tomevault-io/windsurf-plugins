@@ -1,106 +1,108 @@
 ---
 trigger: always_on
-description: Overall guidelines about the project.
+description: This file tells AI coding assistants (Codex CLI, GitHub Copilot, Cursor, etc.) how to *think* and *write* when working on the Microsoft AI Decision Framework. If you skip this, you will produce output that doesn't match the project's voice — and that matters more here than in most repos.
 ---
 
-# Microsoft AI Decision Tree - Copilot Instructions
 
-## Project Overview
+# AGENTS.md — Codex Persistent Guidance
 
-This is a **comprehensive decision framework and reference guide** for navigating Microsoft's AI technology portfolio. The project helps users systematically evaluate and select the right Microsoft AI technology (M365 Copilot, Copilot Studio, Microsoft Foundry, Agent Service, SDKs, etc.) for their specific business requirements.
-
-**Primary Goal:** Enable evidence-based technology selection through a structured learning journey that progresses from foundational concepts to technical mastery.
-
-**Target Audience:** Technical decision-makers, architects, developers, and business stakeholders evaluating Microsoft AI technologies for enterprise use cases.
+This file tells AI coding assistants (Codex CLI, GitHub Copilot, Cursor, etc.) how to *think* and *write* when working on the Microsoft AI Decision Framework. If you skip this, you will produce output that doesn't match the project's voice — and that matters more here than in most repos.
 
 ---
 
-## Technology Stack
+## Project Context
 
-- **Static Site Generator:** Jekyll 4.4+ (GitHub Pages)
-- **Documentation Format:** Markdown (.md files)
-- **Diagrams:** Mermaid 11.12.1 flowcharts (embedded in Markdown, dark theme configured)
-- **Navigation:** Jekyll front matter with `nav_order` property (1-12)
-- **Theme:** Just the Docs (remote_theme via GitHub Pages)
-- **Custom Styling:** SCSS in `_sass/custom/custom.scss` (no Mermaid overrides; palette is owned inline in diagrams)
-- **Ruby Gems:** jekyll-seo-tag, jekyll-github-metadata, jekyll-include-cache, webrick
-- **Deployment:** GitHub Pages at https://chrismckee1.github.io/microsoft-ai-decision-tree/
+**What this project does:**
+Teaches a **way of thinking** about Microsoft's AI portfolio — not just a technology catalog. It uses mental models, analogies, and narrative arcs to help architects and builders make evidence-based decisions that survive product renames.
 
----
+**Why it exists:**
+Microsoft ships new AI features weekly. Memorizing the product list is futile. This framework teaches the *logic* of how to choose: Outcomes → Behaviors → Platforms. It prevents "Shiny Object Syndrome" by forcing structured reasoning before any technology gets picked.
 
-## Project Structure & Architecture
-
-### Documentation Organization (12 Core Files)
-
-The documentation follows a **progressive learning flow** designed to build knowledge systematically:
-
-1. **README.md** (nav_order: 1) - Landing page with learning paths
-2. **docs/capability-model.md** (nav_order: 2) - **Foundation** - Five capability groupings
-3. **docs/decision-framework.md** (nav_order: 3) - **Methodology** - Storybook flow & 9 questions
-4. **docs/scenarios.md** (nav_order: 4) - **Context** - Real-world use cases
-5. **docs/evaluation-criteria.md** (nav_order: 5) - **Assessment** - Complexity, skills, budget, governance
-6. **docs/implementation-patterns.md** (nav_order: 6) - **Execution** - Architecture patterns
-7. **docs/technologies.md** (nav_order: 7) - **Deep Dive** - Technical specifications
-8. **docs/feature-comparison.md** (nav_order: 8) - **Mastery** - Side-by-side matrices
-9. **docs/visual-framework.md** (nav_order: 9) - **Application** - 8 Mermaid decision tree diagrams
-10. **docs/quick-reference.md** (nav_order: 10) - **Reference** - Fast lookup tables
-11. **docs/resources.md** (nav_order: 11) - **Reference** - External links
-12. **docs/glossary.md** (nav_order: 12) - **Reference** - Terminology
-
-### Learning Flow Rationale
-
-**Why this order matters:**
-- **Quick Reference at position 10**: Prevents "cheating" - users must learn framework before accessing cheat sheet
-- **Scenarios at position 4** (not 9): Provides early context to ground abstract concepts
-- **Visual Framework at position 9**: Reinforces methodology after content mastery, preventing it from becoming a shortcut
-- **Technologies at position 7** (not 2): Delays deep technical details until after framework understanding
-
-**Navigation links** at the bottom of each document guide users through this optimal progression.
-
-### File Naming & Location Conventions
-
-- Main documentation: `docs/*.md`
-- Configuration: `_config.yml`, `Gemfile`
-- Custom includes: `_includes/*.html`, `_includes/*.js`
-- Custom styles: `_sass/custom/custom.scss`
-- Images: `images/*.png`, `images/*.svg`
-- GitHub metadata: `.github/copilot-instructions.md` (this file)
-- Codex guidance: `AGENTS.md` (root level)
+**Target audience:**
+Enterprise architects, technical leads, developers, and business stakeholders evaluating Microsoft AI technologies for production use cases.
 
 ---
 
-## Core Methodology & Validation Rules
+## The Voice (READ THIS FIRST)
 
-### The Constitution (Governing Philosophy)
+This project's differentiation is *how* it teaches, not *what* it lists. Every AI assistant working in this repo is a **co-author and storyteller**, not a transcriptionist. Your output must match the voice of the best docs in the project.
 
-This repository is governed by a set of immutable principles defined in **[`CONSTITUTION.md`](../CONSTITUTION.md)**. This document serves as the "Supreme Law" for the project.
+### Style Exemplars — Read Before Editing
 
-**Agent Instruction:** You MUST review and adhere to `CONSTITUTION.md` when making decisions.
+* **`docs/capability-model.md`** — "The Coin," "The 5 Dimensions," "The AI Podcast Problem."
+* **`docs/decision-framework.md`** — "Stop Shiny Object Syndrome before it starts," "The Kitchen" analogy.
+* **`docs/evaluation-criteria.md`** — "The Furnished Condo vs. The Skyscraper," trade-off openers.
 
-### Article I: Fact vs. Framework Distinction
+If your output reads like a product spec sheet or a compliance document, rewrite it.
+
+### The Teaching Triad (Non-Negotiable)
+
+Every major concept needs three legs: **Concept → Analogy → Product.**
+
+* *Bad:* "Use Copilot Studio for triggers."
+* *Good:* "Think of an Invisible Agent like a thermostat (Analogy). It waits for a change to trigger an action (Concept). In Microsoft's stack, Copilot Studio handles these triggers (Product)."
+
+### Named Mental Models
+
+Give ideas memorable handles — "The Coin," "The Kitchen," "The AI Podcast Problem." These sticky names survive product renames and make the framework memorable months later. Invent new ones when they serve the reader.
+
+### Conversational Authority
+
+Write like a senior architect mentoring a colleague over coffee — direct, confident, occasionally irreverent, always grounded. Open sections with bold trade-off statements or provocative questions, not dry definitions.
+
+---
+
+## Core Principles (ALWAYS FOLLOW)
+
+### 1. Fact vs. Framework (Constitution Article I)
+
 **"Cite the Specs, Own the Story."**
-- **Technical Truths:** Claims about features, limits, pricing, or availability MUST be validated against official Microsoft documentation. Verify accuracy — include links where they genuinely help the reader, but exhaustive inline citation is not required.
-- **Conceptual Truths:** Thought leadership, analogies, and mental models (e.g., "The Coin," "The Podcast") DO NOT require citations. They are the lens we use to teach.
 
-### Source Validation Principle (For Technical Specs)
+* **Technical Truths:** Claims about what a product *is*, limits, pricing, or status (GA/Preview) MUST be verified against official Microsoft documentation. Include links where they genuinely help the reader — not for every statement.
+* **Conceptual Truths:** Mental models and analogies DO NOT require citations. They are the teaching lens. Fearlessly invent narratives to explain the features — but never invent features to fit a narrative.
 
-All technology capabilities, features, and status annotations (GA/Preview/Experimental) MUST be verified against official Microsoft documentation sources.
+### 2. Prevent "Shoeboxing" (Constitution Article II)
 
-**Always:**
-- Verify against Microsoft Learn documentation first
-- If Microsoft Learn does not host the relevant product documentation, use the official product documentation site (VS Code, GitHub Docs, Aspire.dev)
-- Include source links where they genuinely help the reader navigate further — not for every statement
-- Mark Preview/Experimental/GA status explicitly
+**Shoeboxing** = Claiming a technology can do something it cannot.
 
-### Guardrails for Core Files (Constitutional Mandate)
+**Real shoeboxing examples we caught:**
+- ❌ Fabric Data Agents in "Autonomous" path → ✅ Actually conversational Q&A, not autonomous
+- ❌ M365 SDK "has built-in Agent Framework" → ✅ Actually "bring your own orchestrator" model
+- ❌ Logic Apps for "multi-agent orchestration" → ✅ Actually triggers SINGLE agents via events
 
-**CRITICAL:** The following files have **Immutable Intent** defined in `CONSTITUTION.md`.
+**How to avoid:**
+- Verify capabilities against official Microsoft docs before making claims
+- Don't infer features from product naming
+- Explicitly state what a technology *cannot* do
 
-1.  **`docs/capability-model.md` (The "What")**
-    * **Purpose:** Defines abstract capabilities and mental models.
+### 3. Status Transparency (Constitution Article III)
+
+Rigorously distinguish **GA**, **Public Preview**, and **Experimental**. Flag non-GA features in every diagram, table, and recommendation.
+
+### 4. No Product Supremacy (Constitution Article VIII)
+
+Frame technologies as **roles in a cast** — teammates, not rivals. "Copilot Studio plays the Orchestrator; Foundry plays the Engine." Never say one is "better" than another.
+
+### 5. Keep Agent Names Product-Specific
+
+* **Declarative Agent** refers to Microsoft 365 Copilot and Copilot Studio agents built from instructions, knowledge, and actions with platform-managed orchestration.
+* **Prompt Agent** refers to the configuration-defined agent type in Microsoft Foundry Agent Service.
+* Never normalize one term into the other. Name the platform when context could be ambiguous.
+
+### 6. Mermaid Diagram Conventions
+
+Every diagram in `docs/visual-framework.md` must have:
+1. Dark theme (default Mermaid config)
+2. Color-coded nodes set **inline** per diagram (keep white text): Blue #004578, Purple #4b2070, Green #0b6a0b, Orange #8c5e00, Red #a52617
+3. Status annotations: `<i>Preview</i>` for preview features
+4. Validation summary with sources
+
+---
+
+## File Structure & Conventions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/Microsoft-AI-Decision-Framework](https://github.com/microsoft/Microsoft-AI-Decision-Framework) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
