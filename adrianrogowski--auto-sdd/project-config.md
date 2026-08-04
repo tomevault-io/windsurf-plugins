@@ -1,92 +1,128 @@
 ---
 trigger: always_on
-description: When to use subagents (Task tool) for parallel work in SDD commands
+description: This project uses a spec-driven development workflow. Follow these rules in all interactions.
 ---
 
+# Spec-Driven Development (SDD)
 
-# Subagent Patterns for SDD
+This project uses a spec-driven development workflow. Follow these rules in all interactions.
 
-When executing SDD commands, use subagents (the Task tool) to parallelize independent work. This applies to both interactive commands and the build loop.
+> **Command files**: `.cursor/commands/` is the canonical source for all slash commands. `.claude/commands/` is generated from it by `./scripts/sync-commands.sh` (real copies, not symlinks — Claude Code's command discovery doesn't reliably follow symlinks). To change a command, edit it in `.cursor/commands/` and run the sync script. Never edit `.claude/commands/` directly.
 
-## When to Fan Out
+## Core Principle
 
-### During /spec-first
-- **Parallel reads**: Load strategy, constitution, personas, design tokens, learnings index, and search for existing spec simultaneously (up to 6 parallel explore subagents)
-- **Component stub creation**: If mockup references 3+ new components, create stubs in parallel
-
-### During /tdd
-- **Post-GREEN validation**: Run build check, lint check, and test check simultaneously (3 parallel shell subagents)
-- **Drift check + compound**: After refactor, drift check and compound can start reading files in parallel (drift checks code, compound reads learnings index)
-
-### During /build-next
-- **Context loading**: Read strategy, vision, personas, constitution, design tokens, related specs, and learnings index in parallel (7 parallel reads)
-- **Post-build phases**: If drift check and code review are both enabled, they read independent file sets — run simultaneously
-
-### During /check-coverage
-- **Parallel analysis**: Check spec coverage, test coverage, and mapping consistency as 3 independent subagents
-
-### During /catch-drift
-- **Multi-spec drift scan**: When scanning multiple specs, batch 3-5 specs per subagent instead of one at a time
-
-### During /guide
-- **Parallel gathering**: Read all feature specs, codebase files, and learnings in parallel batches
-
-### During /ralph-run
-- **Pre-flight checks**: Validate CLI, check ports, read roadmap simultaneously
-
-## When NOT to Fan Out
-
-- **Sequential dependencies**: Spec must complete before tests, tests before implementation
-- **Git operations**: Only one agent should touch git at a time (commits, branches, merges)
-- **Roadmap updates**: Single writer to avoid race conditions on roadmap.md
-- **Small tasks**: If the total work is < 10 seconds, the subagent overhead isn't worth it
-
-## How to Fan Out
-
-Use the Task tool with appropriate subagent types:
+**Spec before code.** Define behavior before implementing it.
 
 ```
-# For file reading / exploration
-subagent_type: "explore" with model: "fast"
+Project setup (once):
+  /strategy → /vision → /personas → /constitution → /design-tokens
 
-# For shell commands (build, test, lint)
-subagent_type: "shell" with model: "fast"
+GTM pipeline (from strategy):
+  /strategy (Phase 5: GTM sketch) → /gtm (full playbook) → /find-early-users (prospect list)
 
-# For complex analysis (drift check, code review)
-subagent_type: "generalPurpose"
+Finding product-market fit (iterate before building):
+  /strategy → /gtm → /find-early-users → talk to people → /strategy (update) → repeat
+      ↓ (once stable)
+  /vision → /personas → /roadmap → /build-next
+
+Per feature (Red-Green-Refactor TDD):
+  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+  │    SPEC      │ ──▶ │  RED (test)  │ ──▶ │ GREEN (impl) │ ──▶ │  REFACTOR    │
+  │ (Gherkin +   │     │  (failing)   │     │ (until tests │     │ (clean up,   │
+  │  mockup +    │     │              │     │  pass)       │     │  tests must  │
+  │  persona     │     │              │     │              │     │  still pass) │
+  │  revision)   │     │              │     │              │     │              │
+  └──────┬───────┘     └──────────────┘     └──────┬───────┘     └──────┬───────┘
+         │                                         │                     │
+      [PAUSE]                                      ▼                     ▼
+    user approves                           ┌──────────────┐     ┌──────────────┐
+    then /tdd                               │ DRIFT CHECK  │     │ DRIFT CHECK  │
+                                            │ (layer 1)    │     │ (layer 1b)   │
+                                            └──────────────┘     └──────┬───────┘
+                                                                        │
+                                                                        ▼
+                                                                 ┌──────────────┐
+                                                                 │  COMPOUND    │
+                                                                 │ (learnings)  │
+                                                                 └──────────────┘
 ```
 
-### Pattern: Parallel Reads Then Sequential Write
+---
 
-```
-1. Fan out: explore subagents read strategy, constitution, personas, tokens, learnings, existing specs
-2. Collect results
-3. Sequential: Write the spec using all gathered context
-```
+## Command Triggers
 
-### Pattern: Parallel Validation
+When the user says any of these phrases, **automatically invoke `/spec-first`**:
 
-```
-1. Agent completes implementation
-2. Fan out: shell subagent runs tests, shell subagent runs build, shell subagent runs lint
-3. Collect results
-4. If all pass → continue
-5. If any fail → fix sequentially (failures may be related)
-```
+| User says | Action |
+|-----------|--------|
+| "spec first" | Run `/spec-first {feature}` |
+| "spec-first" | Run `/spec-first {feature}` |
+| "write a spec for" | Run `/spec-first {feature}` |
+| "create a spec" | Run `/spec-first {feature}` |
+| "spec this out" | Run `/spec-first {feature}` |
+| "spec out" | Run `/spec-first {feature}` |
+| "plan this feature" | Run `/spec-first {feature}` |
+| "write the spec" | Run `/spec-first {feature}` |
+| "create spec" | Run `/spec-first {feature}` |
+| "update the spec for" | Run `/spec-first {feature}` (update mode) |
+| "update spec" | Run `/spec-first {feature}` (update mode) |
 
-### Pattern: Batch Processing
+When the user says any of these after a spec is shown, **invoke `/tdd`**:
 
-For commands that process multiple items (drift-scan, doc-loop, check-coverage):
-```
-1. Gather list of items to process
-2. Chunk into batches of PARALLEL_FEATURES (default: 3)
-3. Fan out: one subagent per chunk
-4. Collect and merge results
-```
+| User says | Action |
+|-----------|--------|
+| "tdd" | Run `/tdd {feature}` |
+| "go ahead" | Run `/tdd` with current spec |
+| "build it" | Run `/tdd` with current spec |
+| "implement it" | Run `/tdd` with current spec |
+| "ship it" | Run `/tdd` with current spec |
 
-## Build Loop Integration
+Extract the feature description from the rest of their message.
 
-The `BRANCH_STRATEGY=parallel` mode in `build-loop-local.sh` already handles script-level parallelism (multiple agent processes in separate worktrees). Within each agent process, use the patterns above for command-level parallelism.
+When the user says any of these, **invoke the corresponding ralph/utility command**:
+
+| User says | Action |
+|-----------|--------|
+| "ralph setup", "set up ralph", "configure ralph" | Run `/ralph-setup` |
+| "ralph run", "run ralph", "start the loop", "run the loop" | Run `/ralph-run` |
+| "clean slate", "kill everything", "restart everything", "nuke localhost" | Run `/clean-slate` |
+| "generate guide", "update guide", "how to use guide" | Run `/guide` |
+
+When the user says any of these, **invoke `/strategy`**:
+
+| User says | Action |
+|-----------|--------|
+| "strategy" | Run `/strategy` |
+| "product strategy" | Run `/strategy` |
+| "business strategy" | Run `/strategy` |
+| "shape this" | Run `/strategy` |
+| "who are we selling to" | Run `/strategy` |
+| "business model" | Run `/strategy` |
+
+When the user says any of these, **invoke `/gtm`**:
+
+| User says | Action |
+|-----------|--------|
+| "gtm playbook" | Run `/gtm` |
+| "marketing plan" | Run `/gtm` |
+| "how do we get users" | Run `/gtm` |
+| "distribution plan" | Run `/gtm` |
+| "growth plan" | Run `/gtm` |
+| "channel strategy" | Run `/gtm` |
+| "launch plan" | Run `/gtm` |
+| "outreach plan" | Run `/gtm` |
+
+When the user says any of these, **invoke `/find-early-users`**:
+
+| User says | Action |
+|-----------|--------|
+| "find early users" | Run `/find-early-users` |
+| "find users" | Run `/find-early-users` |
+| "find prospects" | Run `/find-early-users` |
+| "find people" | Run `/find-early-users` |
+| "who should I talk to" | Run `/find-early-users` |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [AdrianRogowski/auto-sdd](https://github.com/AdrianRogowski/auto-sdd) — distributed by [TomeVault](https://tomevault.io).
