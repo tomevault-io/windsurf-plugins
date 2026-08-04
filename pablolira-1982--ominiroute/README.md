@@ -5,12 +5,12 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [pablolira-1982/OminiRoute](https://github.com/pablolira-1982/OminiRoute).
+Original source: `CLAUDE.md` in [pablolira-1982/OminiRoute](https://github.com/pablolira-1982/OminiRoute).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
