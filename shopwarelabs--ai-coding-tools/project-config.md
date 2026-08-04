@@ -1,138 +1,112 @@
 ---
 trigger: always_on
-description: **Skills are executable code, not documentation.** Markdown files in `skills/[skill-name]/` directories (SKILL.md, references/*.md) are instruction files that Claude Code reads and executes. Modifying these files changes the skill's behavior directly - treat them as you would Python or JavaScript code.
+description: ├── README.md                           # Developer quick reference
 ---
 
 @README.md
 
-# Shopware AI Coding Tools Marketplace - Technical Reference
+## Directory & File Structure
 
-## Understanding Skills
-
-**Skills are executable code, not documentation.** Markdown files in `skills/[skill-name]/` directories (SKILL.md, references/*.md) are instruction files that Claude Code reads and executes. Modifying these files changes the skill's behavior directly - treat them as you would Python or JavaScript code.
-
-## Understanding Slash Commands
-
-**Slash commands are executable code, not documentation.** Markdown files in `commands/` directories are instruction files that Claude Code reads and executes when users invoke the command. Modifying these files changes what happens when users run the slash command.
-
-## Understanding Developer Documentation
-
-**AGENTS.md, README.md, and CHANGELOG.md inside plugins are developer documentation, not runtime code.** These files are read by humans maintaining this repository. Claude Code does not load or execute them when the plugin is installed. Changes to these files affect documentation only, not plugin behavior.
-
-Runtime files (executed by Claude Code):
-- `skills/*/SKILL.md` and `skills/*/references/*.md`
-- `agents/*.md`
-- `commands/*.md`
-- `hooks/` (hooks.json and scripts)
-- `.mcp.json`
-
-When modifying runtime behavior (e.g. MCP tool references, workflow instructions), edit only runtime files. When updating architectural descriptions or usage guides, edit the developer documentation.
-
-## Marketplace Architecture
-
-This marketplace uses a **distributed metadata pattern** where plugin metadata is stored in individual `plugin.json` files rather than centralized in `marketplace.json`.
-
-### Structure
 ```
-.claude-plugin/marketplace.json       # Minimal registry (name + source only)
-plugins/
-  [category]/
-    [plugin-name]/
-      .claude-plugin/plugin.json      # Full plugin metadata
-      ...                             # Plugin components
+.github/scripts/
+├── README.md                           # Developer quick reference
+├── AGENTS.md                          # This file - LLM navigation guide
+├── lib/
+│   ├── common.sh                      # Shared utilities (logging, validation, env)
+│   ├── yaml-operations.sh             # YAML extraction and update functions
+│   └── version-operations.sh          # Version extraction and sync functions
+├── discover-components.sh             # Component discovery library (plugins/commands/skills/agents)
+├── validate-issue-templates.sh        # Read-only template validation (CI/CD ready)
+├── update-issue-templates.sh          # Write-only template updates
+├── validate-versions.sh               # Read-only version validation (CI/CD ready)
+├── update-versions.sh                 # Write-only version synchronization
+└── setup-bats.sh                      # BATS testing framework installer
 ```
 
-### marketplace.json Schema (Minimal Registry)
+## Component Overview
 
-The marketplace configuration acts as a lightweight registry pointing to plugins. Each plugin entry only needs `name` and `source`.
+This directory provides scripts for maintaining the AI Coding Tools repository:
 
-**Required fields:**
-- `name` - Marketplace identifier in kebab-case
-- `owner` - Object with at least `name` property (optionally `email`, `url`)
-- `plugins` - Array of plugin definitions
+**Issue Template Management:**
+- **Validation Script** (`validate-issue-templates.sh`) - CI/CD validation with GitHub Actions integration
+- **Update Script** (`update-issue-templates.sh`) - Simple maintenance updates
 
-**Plugin entry structure (minimal):**
-- `name` (required) - Plugin identifier in kebab-case
-- `source` (required) - Relative path starting with `./`
+**Version Management:**
+- **Validation Script** (`validate-versions.sh`) - CI/CD validation of version consistency
+- **Update Script** (`update-versions.sh`) - Synchronize versions from plugin.json (authoritative source)
 
-**Optional marketplace-level metadata:**
-- `metadata.description` - Marketplace description
-- `metadata.version` - Marketplace version
-- `metadata.pluginRoot` - Root directory for plugins
+**Libraries:**
+- `lib/common.sh` - Shared utilities (logging, validation, env)
+- `lib/yaml-operations.sh` - YAML extraction and update functions
+- `lib/version-operations.sh` - Version extraction and sync functions
+- `discover-components.sh` - Component discovery library
 
-### plugin.json Schema (Per-Plugin Metadata)
+**Testing:**
+- `setup-bats.sh` - BATS testing framework installer (tests in `plugin-tests/`)
 
-Each plugin has its own `.claude-plugin/plugin.json` containing full metadata:
+## Architecture
 
-```json
-{
-  "name": "plugin-name",
-  "version": "1.0.0",
-  "description": "Plugin description",
-  "author": { "name": "Author Name", "email": "email@example.com" },
-  "license": "MIT",
-  "keywords": ["tag1", "tag2"],
-  "homepage": "https://github.com/...",
-  "repository": "https://github.com/..."
-}
-```
+**Two-script design split by responsibility (validate vs update):**
 
-**Fields:**
-- `name` (required) - Plugin identifier in kebab-case
-- `version` (required) - Semantic version string
-- `description` - Full description of functionality
-- `author` - Object with `name`, optionally `email` and `url`
-- `license` - SPDX license identifier (e.g., "MIT", "Apache-2.0")
-- `keywords` - Array of tags for discovery
-- `homepage` - Documentation URL
-- `repository` - Source code repository URL
+### Issue Template Scripts
 
-## Plugin Component Types
+- **`validate-issue-templates.sh`** - Read-only validation for CI/CD
+  - Compares current template dropdowns against discovered components
+  - Never modifies files
+  - Integrates with GitHub Actions (annotations, job summaries, outputs)
 
-Claude Code plugins can include any combination of these components:
+- **`update-issue-templates.sh`** - Write-only updates for local maintenance
+  - Updates template YAML files with discovered components
+  - Creates `.bak` backups before modifications
+  - Simple operation, no CI features
 
-- **Commands** - Custom slash commands (markdown files in `commands/`)
-- **Agents** - Specialized subagents (markdown files in `agents/`)
-- **Skills** - Model-invoked capabilities (`skills/[skill-name]/SKILL.md`)
-- **Hooks** - Event handlers (configured via `hooks/hooks.json`)
-- **MCP Servers** - External tool integration (`.mcp.json` configuration)
+### Version Management Scripts
 
-### MCP Server Cross-Plugin Dependencies
+- **`validate-versions.sh`** - Read-only validation for CI/CD
+  - Compares versions across plugin.json, SKILL.md, and CHANGELOG.md
+  - Each plugin's `.claude-plugin/plugin.json` is the authoritative source
+  - Integrates with GitHub Actions (annotations, job summaries, outputs)
 
-When an MCP config plugin needs to reference server code from another plugin, **do not use relative paths** like `${CLAUDE_PLUGIN_ROOT}/../other-plugin/`. This fails because the plugin cache uses versioned subdirectories (`plugin-name/1.0.0/`).
+- **`update-versions.sh`** - Write-only synchronization
+  - Propagates versions from plugin.json to all other locations
+  - Creates `.bak` backups before modifications
+  - Supports `--dry-run` and `--plugin <name>` options
 
-**Solution**: Use a wrapper script that dynamically discovers the dependency:
+**Shared libraries** (sourced by scripts):
+- `lib/common.sh` - Logging, validation, dependency checks
+- `lib/yaml-operations.sh` - YAML parsing and manipulation with AWK
+- `lib/version-operations.sh` - Version extraction and update functions
+- `discover-components.sh` - Component discovery from marketplace structure
 
-```bash
-#!/bin/bash
-# run-server.sh
-CACHE_ROOT="$(dirname "$(dirname "$(cd "$(dirname "$0")" && pwd)")")"
-SERVER=$(find "$CACHE_ROOT/dependency-plugin" -name "server.sh" -path "*/mcp-server/*" 2>/dev/null | sort -V | tail -1)
-[ -z "$SERVER" ] && echo '{"jsonrpc":"2.0","error":{"code":-32603,"message":"dependency-plugin not found"}}' >&2 && exit 1
-exec "$SERVER" "$@"
-```
+## Key Navigation Points
 
-Reference in `.mcp.json`: `"command": "${CLAUDE_PLUGIN_ROOT}/run-server.sh"`
+| Task | Primary File | Secondary File | Key Concepts |
+|------|--------------|----------------|--------------|
+| Add GitHub Actions feature | `validate-*.sh` scripts | `lib/common.sh` | Annotations, job summaries, output vars |
+| Add logging function | `lib/common.sh` | - | log_info, log_success, log_warning, log_error |
+| Add YAML operation | `lib/yaml-operations.sh` | - | AWK-based parsing, extraction, updates |
+| Add version operation | `lib/version-operations.sh` | - | jq/awk/sed parsing, extraction, updates |
+| Add component discovery | `discover-components.sh` | - | find commands, jq parsing |
+| Modify template validation | `validate-issue-templates.sh` | `lib/yaml-operations.sh` | validate_dropdown(), array comparison |
+| Modify template update | `update-issue-templates.sh` | `lib/yaml-operations.sh` | update_dropdown(), backup creation |
+| Modify version validation | `validate-versions.sh` | `lib/version-operations.sh` | validate_*_version(), per-plugin checks |
+| Modify version update | `update-versions.sh` | `lib/version-operations.sh` | update_*_version(), backup creation |
+| Add template type | template scripts + ISSUE_TEMPLATE | `discover-components.sh` | Discovery + validation + update functions |
+| Add version location | version scripts | `lib/version-operations.sh` | Extract + update functions |
 
-See `plugins/dev-tooling/` for implementation.
+## When to Modify What
 
-### Skills Directory Structure
+**Adding GitHub Actions feature** (annotations, summaries, outputs) → Edit `validate-*.sh` scripts with `GITHUB_ACTIONS_MODE` checks + update `lib/common.sh` for logging if needed
 
-Skills follow this pattern:
-```
-plugin-root/
-└── skills/
-    └── skill-name/
-        └── SKILL.md
-```
+**Adding new logging level** → Edit `lib/common.sh` log functions + add both normal and GitHub Actions mode outputs
 
-Example: `plugins/adr-writing/skills/adr-creating/SKILL.md`
+**Adding YAML operation** → Edit `lib/yaml-operations.sh` + add new function with AWK-based parsing pattern
 
-## Commit Messages
+**Adding version operation** → Edit `lib/version-operations.sh` + add extract_*_version() and update_*_version() functions
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shopwareLabs/ai-coding-tools](https://github.com/shopwareLabs/ai-coding-tools) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
