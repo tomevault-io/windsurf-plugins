@@ -1,37 +1,88 @@
 ---
 trigger: always_on
-description: - `backend/` — Go backend (Fiber HTTP, GORM, MCP server)
+description: This document outlines the coding style and naming conventions for the AgentRQ backend workspace. Coding agents should adhere to these guidelines when generating or modifying code.
 ---
 
-# AgentRQ Codebase Notes
+# AgentRQ Backend Coding Style and Naming Conventions
 
-## Project layout
-- `backend/` — Go backend (Fiber HTTP, GORM, MCP server)
-- `frontend/` — React frontend
+This document outlines the coding style and naming conventions for the AgentRQ backend workspace. Coding agents should adhere to these guidelines when generating or modifying code.
 
-## Running tests
-```
-cd backend && go test ./internal/...
-```
+## 1. Workspace Structure
 
-Mock packages are **generated** (gitignored). Run `make mocks` before testing if they are missing. `mockgen` lives at `~/go/bin/mockgen`.
+The workspace follows a standard Go layered architecture:
 
-## MCP server (`backend/internal/controller/mcp/`)
-- `server.go` — all tool handlers (`handleCreateTask`, `handleReply`, etc.) and the `WorkspaceServer` struct
-- Cron validation: `validateCronGranularity` enforces hourly-minimum granularity. Minute field must be a single fixed integer (0-59); wildcards/steps/ranges/comma-lists are rejected.
-- Creating a task with `cron_schedule` sets `status="cron"` on the model.
+- `internal/handler/{transport}`: Transport layer handlers (e.g., Fiber HTTP handlers in `api`).
+- `internal/controller/{domain}`: Business logic implementation (e.g., CRUD actions or domain-specific modules).
+- `internal/data/model`: Database models (GORM) and table definitions.
+- `internal/data/entity`: Domain entities passed between layers.
+- `internal/data/view`: External representations (e.g., JSON request/response bodies).
+- `internal/mapper`: Functions to map between models, entities, and views.
+- `internal/repository`: Data access layer.
 
-## CRUD task controller (`backend/internal/controller/crud/task.go`)
-- Cron validation also lives here for the REST API path (same rules).
-- `isValidTaskStatus` — valid statuses: `notstarted`, `ongoing`, `completed`, `rejected`, `cron`, `blocked`.
+## 2. Naming Conventions
 
-## Commit convention
-Include `Task: <taskID>` in the commit body for traceability.
+### Handlers (`internal/handler/{transport}/`)
 
-## Coding Standards
-- **API Naming**: All JSON fields in API requests and responses MUST use `camelCase` (e.g., `workspaceId`, `createdAt`). Never use `snake_case` in the API surface.
-- **Backend Layers**: Follow view-entity-model separation; only `view` structs define the API schema.
+Handlers process incoming HTTP requests and format responses.
+
+- **Naming**: File names should match the entity being handled (e.g., `provider_tool.go`).
+- **Structs**: The handler struct is typically named after the entity, e.g., `type ProviderTool struct { controller _crud.ProviderToolController }`.
+- **Methods**: Use standard CRUD terminology: `Create`, `Get`, `List`, `Update`, `Delete`. They should match the `fiber.Handler` signature `func (c *fiber.Ctx) error`.
+- **Flow**:
+  1. Use a mapper to parse the request into an entity (e.g., `reqEntity := api.FromHTTPRequestTo<Action><Entity>RequestEntity(c)`).
+  2. Return `fiber.ErrBadRequest` if the mapper returns `nil` (meaning parsing failed or a required param was missing).
+  3. Call the corresponding `controller` method with `c.Context()` and the parsed request entity.
+  4. Handle domain errors gracefully (e.g., checking for specific error types and returning appropriate HTTP status codes).
+  5. Use a mapper to format the controller's response entity into a JSON payload byte array.
+  6. Set `fiber.HeaderContentType` to `fiber.MIMEApplicationJSON` before returning `c.Send(payload)`.
+
+### Controllers (`internal/controller/{domain}/`)
+
+Controllers contain the core business logic.
+
+- **Naming**: File names match the entity or domain logic (e.g., `provider_tool.go`).
+- **Interface**: Define a `Controller` interface at the top of the file grouping the supported operations.
+- **Implementation**: The struct implementing the interface should handle repository interactions, business rules, and validation.
+- **Methods**: Methods typically accept a `context.Context` and a specific request entity (e.g., `*entity.CreateProviderToolRequest`), and return a specific response entity (e.g., `*entity.CreateProviderToolResponse`, `error`).
+
+### Services (`internal/service/{domain}/`)
+
+Services provide low-level utility or integration logic (e.g., SMTP, Image processing, Auth).
+
+- **Methods**: Every service method MUST accept `ctx context.Context` as its FIRST parameter. This ensures consistent trace propagation and situational timeout management across the infrastructure.
+- **Interface**: Define a `Service` interface to allow for situational mocking and dependency injection.
+
+### Mappers (`internal/mapper/{transport}/`, `internal/mapper/model/`)
+
+Mappers transform data between the different layers (View <-> Entity <-> Model). Focus on explicitly naming the source and target formats. Mappers must not return error. It can return `nil` if the conversion is not possible. The validation should be done in the controller/service layers.
+
+- **Naming Constraints**:
+  - Mapping mapped HTTP requests to Entities start with `FromHTTPRequestTo` and end with `RequestEntity`.
+    - Example: `func FromHTTPRequestToCreateProviderToolRequestEntity(c *fiber.Ctx) *entity.CreateProviderToolRequest`
+  - Mapping Entities to HTTP responses start with `From` and end with `ResponseEntityToHTTPResponse` (returning `[]byte`).
+    - Example: `func FromCreateProviderToolResponseEntityToHTTPResponse(rs *entity.CreateProviderToolResponse) []byte`
+  - Mapping internal structures start with `From` and explicitly state the source and target formats.
+    - Example: `func FromProviderToolViewToProviderToolEntity(e view.ProviderTool) entity.ProviderTool`
+    - Example: `func FromProviderToolEntitiesToProviderToolViews(es []entity.ProviderTool) []view.ProviderTool`
+    - Example: `func FromProviderToolModelToProviderToolEntity(m model.ProviderTool) entity.ProviderTool`
+
+### Entities (`internal/data/entity/`)
+
+Entities are standard Go structs that specify the data passing between the controller layer and the handler/repository layers. Usually there's a `<Action><Entity>Request` and `<Action><Entity>Response` definition.
+
+### Views (`internal/data/view/`)
+
+Views define the external structures, like JSON inputs/outputs.
+
+- Structs use `json:"fieldName"` struct tags with **camelCase** naming (e.g., `workspaceId`, `createdAt`).
+- **CRITICAL**: No `snake_case` is allowed in the JSON API surface.
+- Do not contain behavior/business logic or persistence details here.
+
+## 3. General Best Practices
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [agentrq/agentrq](https://github.com/agentrq/agentrq) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
