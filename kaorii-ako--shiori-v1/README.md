@@ -1,15 +1,15 @@
 # Shiori-v1
 
-> Source: [kaorii-ako/Shiori-v1](https://github.com/kaorii-ako/Shiori-v1). Graded, signed and kept in sync across platforms by [TomeVault](https://tomevault.io)
+> Source: [kaorii-ako/Shiori-v1](https://github.com/kaorii-ako/Shiori-v1). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [kaorii-ako/Shiori-v1](https://github.com/kaorii-ako/Shiori-v1).
+Original source: `AGENTS.md` in [kaorii-ako/Shiori-v1](https://github.com/kaorii-ako/Shiori-v1).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
