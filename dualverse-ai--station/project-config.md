@@ -1,104 +1,95 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file gives Claude Code and other coding agents the current operating guidance for this repository.
 ---
 
-# CLAUDE.md
+# AGENT.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file gives Claude Code and other coding agents the current operating guidance for this repository.
 
-## Important Rules
+## First Principles
 
-**CRITICAL**: Before starting any work, follow these essential guidelines:
+1. **Read the relevant docs before touching a subsystem.** The `example/doc/` folder contains subsystem notes. Use these as maintenance references, but verify against code when they disagree.
+2. **Check runtime overrides.** Defaults live in `station/constants.py`, but `station_data/constant_config.yaml` overrides them at import time. Always inspect both when behavior depends on configuration.
+3. **Verify names and signatures before calling or editing.** Use `rg` to find definitions and call sites. Do not infer parameter names, constants, action names, or YAML fields from memory.
+4. **Treat `station_data/` as live station state.** Reading is allowed for debugging. Ask the user before modifying real station data unless the request explicitly asks for that modification.
+5. **Keep disposable local probes in `/tmp`.** Use `tests/test_*.py`, `tests/debug_*.py`, or `tests/analysis_*.py` only for files that should be visible to git. Use `/tmp` directly for generated API/debug snapshots, Sage/CAS probes, and other throwaway local test output.
+6. **Use repository file helpers for persistent station data.** Use `station/file_io_utils.py` for atomic YAML/text writes and safe directory creation.
 
-1. **Always read relevant documentation**: When user requests involve specific systems, automatically read the corresponding `.md` files in the `example/doc` folder:
-   
-   - **example/doc/REVIEWER.md**: Archive evaluation system with two-prompt architecture, auto-pruning, and custom scoring fields
-   - **example/doc/RESEARCH_TASK.md**: Complete guide for creating research tasks with function/command modes and evaluation systems  
-   - **example/doc/CLAUDE_CODE.md**: Claude Code debugger integration with isolated workspaces and auto-fix capabilities
-   - **example/doc/ASCENSION.md**: Agent ascension flow and lineage evolution system with fitness-based selection
-   - **example/doc/EVALUATION_VERSIONS.md**: Simplified evaluation management with clean ID/version separation and queue processing
-   
-2. **Check constant overrides**: All constants are defined in `station/constants.py` but will be overridden by `station_data/constant_config.yaml`. Always read the override config before starting work to understand the current configuration.
+## Coding Agent Checklist
 
-3. **Verify function signatures**: Always verify function signatures before calling them. Never assume or make up parameters.
-   - Use `grep` to find the actual function definition
-   - Check parameter names, order, and types
-   - Verify optional vs required parameters
-   - Example: `grep -A5 "def function_name" file.py`
-   - Common mistakes to avoid:
-     - Assuming `tags_filter` when it's actually `tag_filter`
-     - Passing positional arguments when keyword arguments are expected
-     - Adding parameters that don't exist (like `include_abstracts` to `list_capsules`)
+Before making code changes:
 
-4. **Handle station_data carefully**: The `station_data/` directory contains real station data from active research sessions.
-   - You can read files under `station_data/` for analysis and understanding
-   - **Always ask user permission before modifying any file under `station_data/`** - these are live research environments
+1. Run `git status --short` and identify unrelated user changes.
+2. Read this file, then read the subsystem doc listed in the Documentation Map.
+3. Inspect `station_data/constant_config.yaml` when configuration affects the issue.
+4. Use `rg` to find the live implementation, constants, tests, and call sites.
+5. Decide which files are code, docs, tests, or live station state before editing.
 
-5. **Use tests/ folder for all scripts**: All temporary files, analysis scripts, debug scripts, and test files must be created in the `tests/` folder.
-   - This folder is excluded from git tracking and safe for temporary work
-   - Create scripts as `tests/test_*.py`, `tests/debug_*.py`, `tests/analysis_*.py` for consistency
-   - Use absolute imports: `sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))`
-   - **Remove scripts when finished** - these are for temporary development only
-   - Example structure:
-     ```python
-     #!/usr/bin/env python3
-     import os
-     import sys
-     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-     from station import constants
-     # ... script code ...
-     ```
+While changing code:
 
-6. **Use web search when uncertain**: If you're unsure about external library signatures, default behaviors, or API usage, perform a web search first.
-   - Especially important for library function signatures, parameter defaults, and expected behaviors
-   - Search before making assumptions about how external libraries work
-   - Verify current documentation for libraries like numpy, pandas, flask, etc.
+1. Prefer small, localized edits that preserve existing YAML schema compatibility.
+2. Use `file_io_utils` for station persistence and keep in-memory indexes synchronized.
+3. Update help text when changing agent-facing actions, YAML fields, or room behavior.
+4. Add or adjust tests for behavior, restart/recovery paths, and notifications when relevant.
+5. Do not change `.env`, API keys, production logs, backups, or live `station_data/` unless explicitly requested.
 
-## Project Overview
+Before finishing:
 
-The Station is a multi-agent environment for LLMs. It uses a room-based architecture where agents navigate between specialized spaces to conduct research, take tests, and interact with other agents. The system distinguishes between "Guest Agents" (limited capabilities) and "Recursive Agents" (full access after passing tests).
+1. Run the most relevant tests from the Verification Matrix below.
+2. Re-run `git status --short`.
+3. Report changed files, tests run, and any untested risk.
 
-## Key Architecture Concepts
+## Current Project Snapshot
 
-### Room-Based System
-- **Station** (`station.py`): Central orchestrator managing rooms and agents
-- **Rooms** (inherit from `base_room.py`): Each room provides specific functionality
-- **Agents** (`agent.py`): Navigate rooms, create capsules, maintain state
-- **Capsules** (`capsule.py`): Persistent memory units with threaded messages
+- Package/version: `station` version `1.5.0` in `setup.py`, `station/__init__.py`, `README.md`, and `CITATION.cff`.
+- Main app: `python -m web_interface.app`.
+- Default data root: `./station_data`.
+- Default research task layout: `station_data/rooms/research/`.
+- Test style: the existing tests are mostly `unittest` files under `tests/`; run specific files with `python -m unittest tests.test_name`.
+- Core supported LLM connectors: Gemini, Claude, OpenAI, and Grok via `station/llm_connectors/`.
+- Current model presets are in `station/llm_connectors/model_presets.yaml`.
 
-### Data Flow
-1. Web interface (`web_interface/app.py`) → Station → Room → Agent
-2. Agent actions parsed by `action_parser.py` → Room processes → Station updates
-3. All persistence through YAML files with atomic writes (`file_io_utils.py`)
+## Setup And Run
 
-## Development Commands
-
-### Setup and Run
 ```bash
-# Install
+conda create -y -n station python=3.11
+conda activate station
 pip install -e .
-
-# Run web interface
 python -m web_interface.app
 ```
 
-### Test Chamber
-The station requires agents to pass certain tests to become a recursive agent. Tests are defined in `station_data/rooms/test/test_definitions.yaml` and can be evaluated either:
-- **Manually**: Through the web interface test evaluation page (outdated)
-- **Automatically**: By LLM evaluator (when `AUTO_EVAL_TEST = True`)
+Useful optional setup:
 
-### Testing Auto Evaluation
-1. Ensure `AUTO_EVAL_TEST = True` in `constants.py`
-2. Have an agent submit a test response
-3. Orchestrator enters waiting state ("Waiting: Pending test evaluations")
-4. Auto evaluator processes the test in background (check logs for violet-colored events)
-5. Orchestrator automatically resumes when evaluation completes
-6. Review evaluation logs in `station_data/rooms/test/evaluations/`
+```bash
+sudo apt install ripgrep
+bash scripts/setup_theory.sh
+```
 
+Use the Theory setup only when working with `THEORY_ROOM_ENABLED` or Lean verification.
+
+## Secrets And Local State
+
+Sensitive or machine-local files can exist in this repo checkout. Treat these as read-only unless the user explicitly asks otherwise:
+
+- `.env`
+- `station_data/`
+- `backup/`
+- `deployment/`
+- `worker_monitor.log`
+- `example_private/`
+
+API keys are read from environment variables such as `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `XAI_API_KEY`. Research coder backends can also use `CODEX_BIN_PATH`, `CLAUDE_BIN_PATH`, `CODEX_API_KEY`, and `CLAUDE_CODE_API_KEY`. Do not print, copy, or rewrite secrets.
+
+For live-station debugging, `deployment/error.log` is often useful, but it accumulates across station restarts. Do not run a blind global search across the whole file. First locate the most recent `Station initialized.` line, then inspect or search from that point onward.
+
+## Documentation Map
+
+- `example/doc/SYNC_MODES.md`: Sequential and parallel orchestrator sync modes, parallel tick state, staged LLM history, internal actions, Research Center fast-lane submit, recovery semantics, dashboard status, and tests. Read this before changing `SYNC_MODE`, `station_runner.py` tick execution, `station/sync/`, connector history persistence, or parallel Research submit behavior.
+- `example/doc/API_BACKUP.md`: Provider-level API backup fallback configuration and runtime behavior. Read this before changing `station/runtime_api_config.py`, provider connector runtime endpoint handling, or dashboard API backup settings.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/dualverse-ai) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [dualverse-ai/station](https://github.com/dualverse-ai/station) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
