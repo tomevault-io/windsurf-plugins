@@ -1,167 +1,37 @@
 ---
 trigger: always_on
-description: You are an expert in Svelte 5, SvelteKit, TypeScript, and modern web development.
+description: Svelte Diff Match Patch — a Svelte component library for visual string diffing using the diff-match-patch algorithm. Supports character-level diffing, expected pattern-matching with named capture groups, and flexible rendering.
 ---
 
+# CLAUDE.md
 
-You are an expert in Svelte 5, SvelteKit, TypeScript, and modern web development.
+## Project Overview
 
-Key Principles
-- Write concise, technical code with accurate Svelte 5 and SvelteKit examples.
-- Leverage SvelteKit's server-side rendering (SSR) and static site generation (SSG) capabilities.
-- Prioritize performance optimization and minimal JavaScript for optimal user experience.
-- Use descriptive variable names and follow Svelte and SvelteKit conventions.
-- Organize files using SvelteKit's file-based routing system.
+Svelte Diff Match Patch — a Svelte component library for visual string diffing using the diff-match-patch algorithm. Supports character-level diffing, expected pattern-matching with named capture groups, and flexible rendering.
 
-Code Style and Structure
-- Write concise, technical TypeScript or JavaScript code with accurate examples.
-- Use functional and declarative programming patterns; avoid unnecessary classes except for state machines.
-- Prefer iteration and modularization over code duplication.
-- Structure files: component logic, markup, styles, helpers, types.
-- Follow Svelte's official documentation for setup and configuration: https://svelte.dev/docs
+## Coding Style Requirements
 
-Naming Conventions
-- Use lowercase with hyphens for component files (e.g., `components/auth-form.svelte`).
-- Use PascalCase for component names in imports and usage.
-- Use camelCase for variables, functions, and props.
+- All TypeScript functions must be **arrow functions** (no `function` keyword declarations)
+- All exported TypeScript functions must have **Google-style JSDoc** comments
+- Use `trunk fmt` and `trunk check` to ensure code formatting and linting compliance before committing
 
-TypeScript Usage
-- Use TypeScript for all code; prefer interfaces over types.
-- Avoid enums; use const objects instead.
-- Use functional components with TypeScript interfaces for props.
-- Enable strict mode in TypeScript for better type safety.
+## Build & Test Commands
 
-Svelte Runes
-- `$state`: Declare reactive state
-  ```typescript
-  let count = $state(0);
-  ```
-- `$derived`: Compute derived values
-  ```typescript
-  let doubled = $derived(count * 2);
-  ```
-- `$effect`: Manage side effects and lifecycle
-  ```typescript
-  $effect(() => {
-    console.log(`Count is now ${count}`);
-  });
-  ```
-- `$props`: Declare component props
-  ```typescript
-  let { optionalProp = 42, requiredProp } = $props();
-  ```
-- `$bindable`: Create two-way bindable props
-  ```typescript
-  let { bindableProp = $bindable() } = $props();
-  ```
-- `$inspect`: Debug reactive state (development only)
-  ```typescript
-  $inspect(count);
-  ```
+- `pnpm run build` — Build the project (vite build + svelte-package + publint)
+- `pnpm vitest run src/lib/` — Run unit tests
+- `pnpm playwright test` — Run E2E tests
+- `trunk fmt` — Format files
+- `trunk check` — Lint/check files
 
-UI and Styling
-- Use Tailwind CSS for utility-first styling approach.
-- Leverage Shadcn components for pre-built, customizable UI elements.
-- Import Shadcn components from `$lib/components/ui`.
-- Organize Tailwind classes using the `cn()` utility from `$lib/utils`.
-- Use Svelte's built-in transition and animation features.
+## Project Structure
 
-Shadcn Color Conventions
-- Use `background` and `foreground` convention for colors.
-- Define CSS variables without color space function:
-  ```css
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  ```
-- Usage example:
-  ```svelte
-  <div class="bg-primary text-primary-foreground">Hello</div>
-  ```
-- Key color variables:
-  - `--background`, `--foreground`: Default body colors
-  - `--muted`, `--muted-foreground`: Muted backgrounds
-  - `--card`, `--card-foreground`: Card backgrounds
-  - `--popover`, `--popover-foreground`: Popover backgrounds
-  - `--border`: Default border color
-  - `--input`: Input border color
-  - `--primary`, `--primary-foreground`: Primary button colors
-  - `--secondary`, `--secondary-foreground`: Secondary button colors
-  - `--accent`, `--accent-foreground`: Accent colors
-  - `--destructive`, `--destructive-foreground`: Destructive action colors
-  - `--ring`: Focus ring color
-  - `--radius`: Border radius for components
-
-SvelteKit Project Structure
-- Use the recommended SvelteKit project structure:
-  ```
-  - src/
-    - lib/
-    - routes/
-    - app.html
-  - static/
-  - svelte.config.js
-  - vite.config.js
-  ```
-
-Component Development
-- Create .svelte files for Svelte components.
-- Use .svelte.ts files for component logic and state machines.
-- Implement proper component composition and reusability.
-- Use Svelte's props for data passing.
-- Leverage Svelte's reactive declarations for local state management.
-
-State Management
-- Use classes for complex state management (state machines):
-  ```typescript
-  // counter.svelte.ts
-  class Counter {
-    count = $state(0);
-    incrementor = $state(1);
-
-    increment() {
-      this.count += this.incrementor;
-    }
-
-    resetCount() {
-      this.count = 0;
-    }
-
-    resetIncrementor() {
-      this.incrementor = 1;
-    }
-  }
-
-  export const counter = new Counter();
-  ```
-- Use in components:
-  ```svelte
-  <script lang="ts">
-  import { counter } from './counter.svelte.ts';
-  </script>
-
-  <button on:click={() => counter.increment()}>
-    Count: {counter.count}
-  </button>
-  ```
-
-Routing and Pages
-- Utilize SvelteKit's file-based routing system in the src/routes/ directory.
-- Implement dynamic routes using [slug] syntax.
-- Use load functions for server-side data fetching and pre-rendering.
-- Implement proper error handling with +error.svelte pages.
-
-Server-Side Rendering (SSR) and Static Site Generation (SSG)
-- Leverage SvelteKit's SSR capabilities for dynamic content.
-- Implement SSG for static pages using prerender option.
-- Use the adapter-auto for automatic deployment configuration.
-
-Performance Optimization
-- Leverage Svelte's compile-time optimizations.
-- Use `{#key}` blocks to force re-rendering of components when needed.
-- Implement code splitting using dynamic imports for large applications.
-- Profile and monitor performance using browser developer tools.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `src/lib/` — Core library source
+    - `SvelteDiffMatchPatch.svelte` — Main component
+    - `expectedPatterns.ts` — Expected pattern-matching algorithm
+    - `index.ts` — Public exports and types
+- `src/routes/` — Demo/test pages (SvelteKit routes)
+- `docs/` — Documentation website
+- `tests/` — E2E tests (Playwright)
 
 ---
 > Source: [humanspeak/svelte-diff](https://github.com/humanspeak/svelte-diff) — distributed by [TomeVault](https://tomevault.io).
