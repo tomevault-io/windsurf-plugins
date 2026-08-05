@@ -3,7 +3,7 @@ trigger: always_on
 description: This repository is a template with sensible defaults for building Tauri React apps.
 ---
 
-# Claude Instructions
+# AI Agents
 
 ## Current Status
 
@@ -37,7 +37,7 @@ If you need to check some codex app-server related things, use "codex app-server
 5. **Match Code Style**: Follow existing formatting and patterns
 6. **Test Coverage**: Write comprehensive tests for business logic
 7. **Quality Gates**: Run `bun run check:all` after significant changes
-8. **No Dev Server**: Ask user to run and report back
+8. **Dev Server**: You may start the dev server (`bun run tauri dev`) when needed
 9. **No Unsolicited Commits**: Only when explicitly requested
 10. **Documentation**: Update relevant `docs/developer/` files for new patterns
 11. **Removing files**: Always use `rm -f`
@@ -125,10 +125,9 @@ Session-specific UI state (e.g., answered questions, fixed review findings) must
 
 **CRITICAL:** Never subscribe to a getter function and call it directly in JSX. This creates NO subscription to the underlying data.
 
-```typescript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [coollabsio/jean](https://github.com/coollabsio/jean) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
