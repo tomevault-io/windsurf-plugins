@@ -1,6 +1,6 @@
 # frameworks
 
-> Source: [open-policy-agent/frameworks](https://github.com/open-policy-agent/frameworks). Graded, signed and kept in sync across platforms by [TomeVault](https://tomevault.io)
+> Source: [open-policy-agent/frameworks](https://github.com/open-policy-agent/frameworks). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
