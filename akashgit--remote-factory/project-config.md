@@ -1,11 +1,12 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: <!-- Keep in sync with CLAUDE.md -->
 ---
 
-# CLAUDE.md
+<!-- Keep in sync with CLAUDE.md -->
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex CLI and other AGENTS.md-compatible tools when working with this repository.
 
 ## Build & Run
 
@@ -23,7 +24,7 @@ pytest -k "test_detect" -v       # By name pattern
 pytest --cov                     # With coverage
 ```
 
-Tests use `pytest-asyncio` with `asyncio_mode = "auto"` — async test functions run without `@pytest.mark.asyncio`. Shared fixtures (`tmp_project`, `sample_config`, `python_project`, `obsidian_vault`) live in `tests/conftest.py`.
+Tests use `pytest-asyncio` with `asyncio_mode = "auto"`.
 
 ## Lint & Type Check
 
@@ -35,66 +36,48 @@ mypy factory/                    # Type check
 
 ## Style
 
-- Python 3.11+ — use `X | Y` unions, not `Union[X, Y]`
+- Python 3.11+, use `X | Y` unions, not `Union[X, Y]`
 - Snake_case everywhere
 - 100 char line length (enforced by ruff)
-- All Pydantic models use `ConfigDict(strict=True, extra="forbid")`
-- Async/await by default — library functions in `store.py` and `eval/runner.py` are async, the CLI wraps them with `asyncio.run()`
-- Structured logging via `structlog` — use `log = structlog.get_logger()` at module level
+- Pydantic models use `ConfigDict(strict=True, extra="forbid")`
+- Async/await by default
+- Structured logging via `structlog`
 
-## Architecture (v2 — CEO Agent)
+## Architecture
 
-The factory is a **three-layer system** with a dedicated CEO agent as the orchestrator:
+The factory is a three-layer system:
 
-### Layer 1: Python CLI (`factory/`)
+1. **Python CLI** (`factory/cli/`): Pure tools that don't make decisions. Entry point is `factory/cli/_main.py`.
+2. **CEO Agent** (`factory/agents/prompts/ceo.md`): Orchestrates the full workflow. Spawned via `factory ceo /path`.
+3. **Specialist Agents** (`factory/agents/`): Eight subprocesses spawned by the CEO via `factory agent <role>`.
 
-Pure tools that don't make decisions. Entry point is `factory/cli.py` → `factory.cli:main` (registered as `factory` script in pyproject.toml). Each subcommand is a `cmd_*` function dispatched via a handler dict.
+Agent roles: Researcher, Strategist, Builder, Reviewer, Evaluator, Archivist, Distiller, Failure Analyst, CEO.
 
-### Layer 2: CEO Agent (`factory/agents/prompts/ceo.md`)
+Key modules: `factory/adversarial.py` (GAN-style adversarial eval loops — phase transitions with hysteresis, convergence detection, state at `.factory/adversarial_state.json`).
 
-A dedicated Claude Code agent that owns the full factory workflow. Spawned via `factory ceo /path` or `factory run /path`. The CEO detects project state, routes to modes (Build/Discover/Review/Improve/Interactive/Meta), spawns specialist agents, makes keep/revert decisions, and ensures mandatory archival. SKILL.md is a thin launcher shim that spawns the CEO.
+## MCP Server
 
-### Layer 3: Specialist Agents (`factory/agents/`)
+The factory exposes tools via MCP (Model Context Protocol):
 
-Eight specialist Claude Code subprocesses spawned by the CEO via `factory agent <role>`. Agent prompts are resolved via `factory/agents/runner.py` with a two-tier lookup: project-specific override (`.factory/agents/<role>.md`) then factory default (`factory/agents/prompts/<role>.md`). Evolved playbooks from `~/.factory/playbooks/<role>.md` (user-local, ACE-generated) are auto-injected, falling back to factory defaults in `factory/agents/playbooks/<role>.md`.
-
-**Roles:** Researcher (observe), Strategist (hypothesize), Builder (implement), Reviewer (guard), Evaluator (measure), Archivist (record), Distiller (refine ideas), CEO (orchestrate).
-
-### Key data flow
-
-1. **State detection** (`factory/state.py`): Checks git, `.factory/config.json`, and `eval_profile.json` to determine one of 5 `ProjectState` enum values
-2. **Discovery** (`factory/discovery/`): `introspect.py` → `profile.py` → `generate.py` — detects project language/framework, builds an `EvalProfile` of dimensions, generates `eval/score.py`
-3. **Eval** (`factory/eval/`): `runner.py` executes the eval command as a subprocess, expects JSON stdout `{"results": [...]}`. Growth dimensions (`growth.py`) are computed locally and merged at 50/50 with project hygiene dimensions. `scorer.py` computes the weighted composite
-4. **Strategy** (`factory/strategy.py`): FEEC priority heuristic (Fix > Exploit > Explore > Combine) classifies hypotheses by keyword matching, with stuck detection after 3+ consecutive same-category reverts
-5. **Store** (`factory/store.py`): `ExperimentStore` manages the `.factory/` directory — config, TSV history, per-experiment dirs with hypothesis/eval/diff/verdict artifacts
-6. **Checkpoint** (`factory/checkpoint.py`): Saves and loads CEO state for crash-resilient resume
-7. **Analysis** (`factory/analysis.py`): Experiment comparison (`diff`) and FEEC analysis (`explain`)
-
-### Target project's `.factory/` layout
-
-```
-.factory/
-├── config.json           # Parsed from factory.md (FactoryConfig model)
-├── eval_profile.json     # Discovered eval dimensions (EvalProfile model)
-├── results.tsv           # Append-only experiment history
-├── experiments/
-│   └── 001/              # Per-experiment: hypothesis.md, eval_before.json, eval_after.json, changes.diff, verdict.json
-├── strategy/             # observations.md, current.md, backlog.md, insights.md, research.md
-├── reviews/              # Agent output capture + CEO review verdicts
-│   ├── <role>-latest.md  # Auto-saved stdout from each agent invocation
-│   └── ceo-verdict-<role>.md  # CEO's review verdict (PROCEED/REDIRECT/ABORT)
-└── agents/               # Per-project agent prompt overrides
+```bash
+factory serve-mcp
 ```
 
-### Models
+Or configure in `~/.codex/config.toml`:
 
-All domain models live in `factory/models.py` as strict Pydantic v2 models. Key types: `ProjectState` (enum), `FactoryConfig`, `EvalProfile` / `EvalDimension`, `CompositeScore` / `EvalResult`, `ExperimentRecord`, `CrossProjectInsights`. The `Notifier` protocol defines the async notification interface.
+```toml
+[mcp_servers.factory]
+command = "factory"
+args = ["serve-mcp"]
+```
 
-## Environment
+## Installing Agents
 
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```bash
+factory install --runner codex    # Install TOML agents to ~/.codex/agents/
+factory install --runner claude   # Install Markdown agents to ~/.claude/agents/
+```
 
 ---
 > Source: [akashgit/remote-factory](https://github.com/akashgit/remote-factory) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
