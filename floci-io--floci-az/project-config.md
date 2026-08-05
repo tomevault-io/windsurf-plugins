@@ -1,160 +1,136 @@
 ---
 trigger: always_on
-description: Review pull requests in the Floci-Az repository with Azure compatibility as the primary concern.
+description: Guidance for AI coding agents working in the floci-az repository.
 ---
 
-# Copilot Instructions for Pull Request Review
+Guidance for AI coding agents working in the floci-az repository.
 
-Review pull requests in the Floci-Az repository with Azure compatibility as the primary concern.
+This file defines repository-specific operating rules for autonomous or semi-autonomous coding agents. Follow these instructions unless a maintainer explicitly tells you otherwise.
 
-Floci-Az is a Java-based local Azure emulator built on Quarkus. Its goal is to match Azure SDK and Azure CLI behavior through real Azure wire protocols, not convenience APIs or custom abstractions.
+---
 
-## Review Priorities
+## Project Overview
 
-Evaluate changes in this order:
+floci-az is a Java-based local Azure emulator built on Quarkus.
+
+Its goal is full Azure SDK and Azure CLI compatibility through real Azure wire protocols, not convenience APIs or simplified abstractions.
+
+floci-az is the Azure counterpart of Floci (the AWS emulator) and floci-gcp. They share design patterns and Docker infrastructure, but are independent repositories.
+
+- Port: **4577** (all HTTP services share this single port)
+- AMQP port: **5672** (Event Hubs, managed by Artemis sidecar)
+- Kafka port: **9093** (Event Hubs Kafka, managed by Redpanda sidecar, opt-in)
+- Stack:
+  - Java 25
+  - Quarkus 3.x
+  - JUnit 5 + RestAssured
+  - Jackson
+  - docker-java for sidecar container management
+
+---
+
+## First Principles
+
+When making changes, follow these priorities:
 
 1. Preserve Azure protocol compatibility
-2. Match Azure SDK and Azure CLI behavior
-3. Reuse existing Floci-Az patterns
+2. Match Azure SDK and CLI behavior
+3. Reuse existing floci-az patterns
 4. Prefer correctness over convenience
-5. Keep changes focused and testable
+5. Keep changes narrow and testable
 
-## What to Flag
+Critical rules:
 
-Raise concerns when a PR introduces any of the following without strong justification:
+- Do not introduce custom endpoint shapes
+- Do not change request or response formats for convenience
+- Do not perform broad refactors unless the task explicitly requires them
+- Keep behavior aligned with Azure SDK expectations and existing floci-az conventions
 
-- Non-Azure endpoint shapes or routing patterns
-- Request or response format changes made for convenience
-- Broad refactors unrelated to the PR goal
-- New service patterns where an existing Floci-Az pattern should be reused
-- Direct storage implementation usage instead of `StorageFactory`
-- Auth bypasses that do not respect the configured `auth.mode`
+---
 
-## Architecture Expectations
+## Architecture
 
-Floci-Az follows a layered design:
+floci-az follows a layered design:
 
-- `AzureRoutingFilter` dispatches incoming requests to the correct service handler
-- `AzureServiceHandler` implementations parse Azure protocol input and produce Azure-compatible responses
-- Services contain business logic and should produce `AzureErrorResponse` on failure
-- Models hold domain data
+- **AzureRoutingFilter** — pre-matching JAX-RS filter; extracts account name and service type from the request path; dispatches to the correct `AzureServiceHandler`
+- **AzureServiceHandler** — interface implemented by each service (`getServiceType()`, `canHandle()`, `handle()`)
+- **AzureServiceRegistry** — CDI registry of all handlers; checks `isEnabled()` per service
+- **Service Handler** — parses Azure protocol input, contains business logic, produces Azure-compatible responses
+- **StorageBackend** — pluggable persistence (memory / persistent / hybrid / wal)
 
-Core infrastructure commonly relevant in reviews:
+### Core Infrastructure
 
-- `EmulatorConfig`
-- `AzureServiceRegistry`
-- `StorageFactory`
-- `AzureServiceHandler`
-- `AzureRoutingFilter`
-- `AzureErrorResponse`
-- `AuthPipeline` / `AuthVerifier`
+- `EmulatorConfig` — SmallRye `@ConfigMapping`; prefix `floci-az`
+- `AzureRoutingFilter` — path-based routing (suffix detection: `-queue`, `-table`, `-functions`, `-appconfig`, `-keyvault`, `-eventhub`)
+- `AzureServiceRegistry` — handler discovery + `isEnabled()` per service type
+- `BannerLogger` — startup banner listing all enabled services
+- `StorageBackend` + `StorageFactory` — pluggable storage
+- `XmlBuilder` — fluent XML builder with attribute support (`startAttr`, `selfClose`)
+- `XmlParser` — StAX-based XML parser (no extra dependencies)
+- `XmlUtils` — Jackson-based XML serialisation for structured models
 
-Check that handlers stay thin, business logic remains in service classes, and new changes fit existing repository patterns.
+### Sidecar Container Infrastructure (`core/docker/`)
 
-## Service Routing
+Used by services that delegate to a managed Docker container:
 
-Each service is routed by account-suffix on a single port (default `4577`):
+- `ContainerSpec` — immutable container descriptor (record)
+- `ContainerBuilder` — fluent `ContainerSpec` builder (network, ports, mounts, log rotation, DNS)
+- `ContainerLifecycleManager` — create/start/stop/remove containers; volume management; endpoint resolution
+- `ImageCacheService` — pull-once-per-image with registry credential support
+- `PortAllocator` — thread-safe free TCP port allocation
+- `ContainerDetector` — detects whether floci-az is running inside Docker
+- `CurrentContainerNetworkResolver` — resolves which Docker network floci-az is on
+- `DockerHostResolver` — resolves the correct host for child containers to reach floci-az
+- `DockerClientProducer` — CDI producer for `DockerClient`
 
-| Service | Path prefix | Notes |
-|---|---|---|
-| Blob Storage | `/{account}/` | Container and blob operations |
-| Queue Storage | `/{account}-queue/` | Queue and message operations |
-| Table Storage | `/{account}-table/` | Table and entity operations |
-| Azure Functions | `/{account}-functions/` | Deploy and invoke HTTP-triggered functions |
+---
 
-Flag PRs that change routing prefixes or introduce non-Azure path conventions.
+## Package Layout
 
-## Protocol Review Rules
+```
+io.floci.az.config           — EmulatorConfig
+io.floci.az.core             — routing, registry, banner, XML utils, auth, DNS
+io.floci.az.core.auth        — auth pipeline, verifiers
+io.floci.az.core.docker      — container infrastructure
+io.floci.az.core.storage     — storage backends
+io.floci.az.services.<svc>   — per-service handlers
+```
 
-Floci-Az implements real Azure wire protocols. Review protocol-affecting changes carefully.
+Typical service structure:
 
-- Blob Storage uses REST XML for list operations and raw binary for blob data
-- Queue Storage uses REST XML for messages and queue metadata
-- Table Storage uses OData JSON (application/json;odata=minimalmetadata) for entity operations
-- Azure Functions management uses REST JSON; function invocation proxies directly to the container
+```
+services/<svc>/
+  *Handler.java       — implements AzureServiceHandler
+  *Models.java        — domain objects (optional)
+```
 
-Pay extra attention to these cases:
+Sidecar-based services additionally have:
 
-- Error responses must follow Azure's error envelope: `{ "error": { "code": "...", "message": "..." } }`
-- Blob and Queue operations use shared-key HMAC-SHA256 signatures — auth must not be silently skipped in `strict` mode
-- SAS token parsing must respect expiry, permissions, and resource fields
-- Azure Functions must use Docker-in-Docker; do not introduce direct process execution
+```
+services/<svc>/
+  *ContainerManager.java   — @ApplicationScoped, @PostConstruct/@PreDestroy lifecycle
+  *Manager.java            — manages one sidecar (pull, start, health-wait, stop)
+  *ConfigGenerator.java    — generates sidecar config file from EmulatorConfig
+```
 
-## Auth Review
+Rule: copy an existing service pattern before introducing a new one.
 
-Floci-Az supports two auth modes configured via `floci-az.auth.mode`:
+---
 
-- `dev` — accept any credentials without signature validation (default)
-- `strict` — validate HMAC-SHA256 signatures via `SharedKeyAuthVerifier`
+## Azure Protocol Rules
 
-Also supports Bearer tokens (`BearerTokenVerifier`) and SAS tokens (`SasTokenParser`).
-
-Flag PRs that:
-
-- Hardcode auth behavior instead of reading from `EmulatorConfig`
-- Break `strict` mode by skipping `AuthPipeline`
-- Accept malformed or expired SAS tokens
-
-## XML and JSON Rules
-
-Flag PRs that:
-
-- Return error responses that do not follow Azure error structures
-- Change OData metadata levels without justification
-- Use non-standard XML namespaces for Storage responses
-- Change controller return types in ways that may break reflection or native-image compatibility
-
-## Config and Storage Review
-
-When a PR changes configuration or persistence behavior, verify the change is wired consistently.
-
-Check for updates to:
-
-- `EmulatorConfig`
-- main `application.yml`
-- test `application.yml`
-- `StorageFactory`
-
-Supported storage modes include:
-
-- `memory`
-- `persistent`
-- `hybrid`
-- `wal`
-
-Treat repository YAML as the source of truth for runtime behavior unless the PR explicitly changes configuration semantics.
-
-## Testing Expectations
-
-Expect automated coverage for changes that affect:
-
-- request parsing
-- response shape
-- error handling
-- persistence semantics
-- URL and endpoint generation
-- service enablement
-- auth validation
-
-Prefer:
-
-- Azure SDK-based validation (Java, Node, Python SDKs) over raw HTTP-only testing
-- Integration tests for compatibility-sensitive behavior
-- Existing naming conventions such as `*ServiceTest.java` and `*IntegrationTest.java`
-
-If behavior changes without automated coverage, call that out explicitly.
-
-## Review Checklist
-
-When analyzing a PR, check:
-
-- Is the change focused?
-- Does it preserve Azure-compatible wire behavior?
-- Does it reuse an existing Floci-Az pattern?
-- Are handlers thin and service classes responsible for domain logic?
+| Service | Protocol | Path Suffix | Notes |
+|---|---|---|---|
+| Blob Storage | Azure Storage REST | `/{account}/` | XML responses, Shared Key auth |
+| Queue Storage | Azure Storage REST | `/{account}-queue/` | XML responses |
+| Table Storage | Azure Storage REST | `/{account}-table/` | JSON / OData |
+| Azure Functions | HTTP REST | `/{account}-functions/` | ZIP deploy, HTTP trigger invoke |
+| App Configuration | Azure App Config REST | `/{account}-appconfig/` | JSON, ETags, labels |
+| Key Vault | Azure Key Vault REST | `/{account}-keyvault/` | JSON, Bearer auth challenge |
+| Event Hubs | AMQP 1.0 (Artemis) | port 5672 | Direct sidecar, not proxied through 4577 |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [floci-io/floci-az](https://github.com/floci-io/floci-az) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
