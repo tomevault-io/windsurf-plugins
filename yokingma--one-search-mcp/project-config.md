@@ -1,11 +1,25 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to coding agents such as Codex when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents such as Codex when working with code in this repository.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs for this repo live as local markdown under `.scratch/`; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default canonical triage labels unchanged: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo is configured as single-context: look for `CONTEXT.md` at the repo root and ADRs under `docs/adr/`. See `docs/agents/domain.md`.
 
 ## Project Overview
 
@@ -116,21 +130,9 @@ Environment variables control behavior:
 - `processScrape()`: Scrapes a single URL with configurable formats (markdown, HTML, links, screenshots)
 - `processMapUrl()`: Discovers URLs from a starting page with filtering options
 - `processExtract()`: Extracts content from multiple URLs with optional LLM prompts and schemas
-- All operations use the AgentBrowser wrapper for consistent behavior
-
-### Error Handling
-- All tool handlers wrapped in try-catch with logging
-- Errors returned as MCP responses with success: false
-- Server logs all requests, errors, and timing information
-
-## Important Notes
-
-- All four MCP tools (`one_search`, `one_scrape`, `one_map`, `one_extract`) are fully implemented
-- Local search and scraping require a local Chromium installation (Chrome, Chromium, Edge, etc.)
-- The project uses ESM modules exclusively - all imports must include `.js` extensions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yokingma/one-search-mcp](https://github.com/yokingma/one-search-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
