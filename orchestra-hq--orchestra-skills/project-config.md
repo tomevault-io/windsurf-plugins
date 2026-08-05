@@ -1,0 +1,80 @@
+---
+trigger: always_on
+description: This repository is documentation and workflow instructions for AI agents, not an application runtime. It is distributed as a plugin marketplace: the single `orchestra` plugin bundles every skill, and both Claude Code and Cursor install it from the manifests at the repo root (`.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json`). Skills live under `skills/orchestra/skills/` (single source of truth — no generated copies). Shared Orchestra material lives under `skills/orchestra/refe
+---
+
+# Agent guide — orchestra-skills
+
+This repository is documentation and workflow instructions for AI agents, not an application runtime. It is distributed as a plugin marketplace: the single `orchestra` plugin bundles every skill, and both Claude Code and Cursor install it from the manifests at the repo root (`.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json`). Skills live under `skills/orchestra/skills/` (single source of truth — no generated copies). Shared Orchestra material lives under `skills/orchestra/references/orchestra/`, inside the plugin bundle so a marketplace install carries it along.
+
+## Choose a skill first
+
+| User intent | Skill | Path |
+|-------------|-------|------|
+| Author a new pipeline YAML | `create-orchestra-pipeline` | `skills/orchestra/skills/create-orchestra-pipeline/SKILL.md` |
+| **Fix anything in a pipeline (entry point)** — identify the failing task and cause, then route | `identify-pipeline-error` | `skills/orchestra/skills/identify-pipeline-error/SKILL.md` |
+| Fix a dbt task already identified as a dbt code/config issue | `fix-pipeline-dbt-task` | `skills/orchestra/skills/fix-pipeline-dbt-task/SKILL.md` |
+| Fix a Python task already identified as a code/dependency/schema issue | `fix-pipeline-python-task` | `skills/orchestra/skills/fix-pipeline-python-task/SKILL.md` |
+| Fix an Orchestra-platform/config issue (or repo code fix with no dedicated skill); retry/explain a failure without a merge gate | `fix-orchestra-pipeline` | `skills/orchestra/skills/fix-orchestra-pipeline/SKILL.md` |
+| Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/orchestra/skills/triage-orchestra-pipeline/SKILL.md` |
+| Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same |
+| Set up dbt Slim CI in Orchestra on an existing production pipeline | `orchestra-dbt-slim-ci-setup` | `skills/orchestra/skills/orchestra-dbt-slim-ci-setup/SKILL.md` |
+
+Read the full `SKILL.md` for the matching skill before changing pipelines, opening pull requests, or calling external APIs.
+
+## Reference index
+
+Skill `SKILL.md` files reference shared docs with paths relative to the skill folder (`../../references/orchestra/...`, which resolves to the plugin's `references/orchestra/`). From the repository root, use `skills/orchestra/references/orchestra/`.
+
+| Topic | File |
+|-------|------|
+| Index | `skills/orchestra/references/orchestra/README.md` |
+| YAML authoring schema & validation | `pipeline/yaml-authoring.md` |
+| Pipeline pattern examples | `pipeline/examples.md` |
+| Failure classification | `pipeline/diagnosis-patterns.md` |
+| Remediation actions | `pipeline/remediation-playbooks.md` |
+| Past fixes and failure profile | `pipeline/knowledge-store.md` |
+| MCP tool names and arguments | `mcp/tools-quick-ref.md` |
+
+## Operating rules
+
+1. **MCP** — Use Orchestra MCP for all operations: listing runs, task runs, logs, artifacts, operations, retries, and reading a pipeline's full definition (`get_pipeline`). The Orchestra MCP server is assumed connected.
+2. **Parse input early** — Orchestra UI URLs, bare UUIDs, pipeline aliases, pasted errors, and alert text are all valid entry points; the fix skill documents extraction rules.
+3. **Evidence before theory** — Prefer `list_task_run_logs`, `download_task_run_log`, artifacts, and `list_operations` over guessing from status fields alone.
+4. **Learning is optional** — Recording fixes is deferred to the calling client's persistent memory; never commit workspace-specific fix history. Add only generic, reusable patterns to `pipeline/diagnosis-patterns.md`.
+5. **Triage gate** — The triage skill must not merge to the default branch without explicit user approval (`merge`, `yes`, `approve`, and similar).
+
+## Repository layout
+
+```text
+.claude-plugin/
+  marketplace.json          # Claude Code marketplace → lists the orchestra plugin
+.cursor-plugin/
+  marketplace.json          # Cursor marketplace → same
+skills/
+  orchestra/                # the single plugin bundle
+    .claude-plugin/plugin.json
+    .cursor-plugin/plugin.json
+    skills/
+      identify-pipeline-error/          # diagnose & fix
+      fix-pipeline-dbt-task/
+      fix-pipeline-python-task/
+      fix-orchestra-pipeline/
+      triage-orchestra-pipeline/
+      create-orchestra-pipeline/        # author & maintain
+      merge-duplicate-pipelines/
+      account-health-check/             # account health & governance
+      orchestra-dbt-slim-ci-setup/      # dbt state-aware orchestration
+      configure-dbt-source-freshness/
+      configure-dbt-build-after/
+      write-snowflake-dq-tests/         # data-quality testing
+      write-bigquery-dq-tests/
+      write-clickhouse-dq-tests/
+      write-databricks-dq-tests/
+    references/
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [orchestra-hq/orchestra-skills](https://github.com/orchestra-hq/orchestra-skills) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
