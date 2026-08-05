@@ -3,7 +3,7 @@ trigger: always_on
 description: > Concise project reference for AI-assisted development. Check `CHANGELOG.md` for latest version and recent work.
 ---
 
-# Supervertaler – Claude Code Reference
+# Supervertaler – Codex Reference
 
 > Concise project reference for AI-assisted development. Check `CHANGELOG.md` for latest version and recent work.
 
@@ -67,4 +67,4 @@ Manual smoke test: import DOCX → translate → export, save/load `.svproj`, TM
 
 ---
 > Source: [Supervertaler/Supervertaler-Workbench](https://github.com/Supervertaler/Supervertaler-Workbench) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
