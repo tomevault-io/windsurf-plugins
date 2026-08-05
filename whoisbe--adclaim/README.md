@@ -7,11 +7,11 @@ Grounded FTC advertising-compliance Q&A with a CrewAI faithfulness verifier, eva
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [whoisbe/AdClaim](https://github.com/whoisbe/AdClaim).
+Original source: `AGENTS.md` in [whoisbe/AdClaim](https://github.com/whoisbe/AdClaim).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
