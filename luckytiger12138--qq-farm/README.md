@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [LuckyTiger12138/QQ_Farm](https://github.com/LuckyTiger12138/QQ_Farm).
+Original source: `AGENTS.md` in [LuckyTiger12138/QQ_Farm](https://github.com/LuckyTiger12138/QQ_Farm).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
