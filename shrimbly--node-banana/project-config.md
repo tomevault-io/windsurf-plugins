@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Build & Development Commands
 
@@ -21,7 +21,7 @@ npm run test:run # Run all tests once (CI mode)
 ## Environment Setup
 
 Create `.env.local` in the root directory:
-```
+```bash
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key  # Optional, for OpenAI LLM provider
 KIE_API_KEY=your_kie_api_key        # Optional, for Kie.ai models (Sora, Veo, Kling, etc.)
@@ -145,9 +145,10 @@ Returns `{ images: string[], text: string | null }`.
 
 1. Define the data interface in `src/types/index.ts`
 2. Add to `NodeType` union in `src/types/index.ts`
+3. Create default data in `createDefaultNodeData()` in `workflowStore.ts`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shrimbly/node-banana](https://github.com/shrimbly/node-banana) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
