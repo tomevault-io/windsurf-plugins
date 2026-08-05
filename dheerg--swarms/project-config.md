@@ -3,56 +3,64 @@ trigger: always_on
 description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Anti-ratchet constraint on launch.md
+## Anti-ratchet constraint on the briefing templates
 
-launch.md Step 8 briefing templates are FIXED. Do not add sections to member briefs. Do not prescribe investigation steps. Do not introduce "first action" items or acknowledgment rituals. If a team run reveals a member needs more context, the fix is to improve the noun-phrase identity in suggest-members, NOT to add sections to the briefing template. This constraint exists because the briefing templates are an observed regression vector — commit f7db555 sprayed "quality-oriented" framing into every brief and created FM-3.1 (premature termination) + FM-1.3 (step repetition) failure modes users observed.
-
-**Carve-out: harness protocol mechanics are permitted.** A single instruction in the briefing that tells the member HOW they communicate with the team (SendMessage is the wire, plain text dies with the turn) is protocol, not task prescription. It does not describe what to investigate, when to act, or what "done" looks like — it only describes the transport layer. Protocol mechanics are allowed. **Task framing, lifecycle framing, phase framing, acknowledgment rituals, and "first action" directives remain forbidden.**
+- **The briefing templates are FIXED** (canonical in skills/workflow-rules/SKILL.md). No added sections, no prescribed investigation steps, no "first action" items, no acknowledgment rituals. If a member needs more context, improve the noun-phrase identity in suggest-members — never the template. (Observed regression vector: f7db555 sprayed framing into every brief → premature-termination and step-repetition failures.)
+- **Carve-out: harness protocol mechanics are permitted.** One instruction on HOW members communicate (SendMessage is the wire; plain text dies with the turn) is transport, not task prescription. Task framing, lifecycle framing, phase framing, and rituals remain forbidden.
 
 ## What This Is
 
-Swarm is a Claude Code plugin for launching agent teams. Eight commands — `/swarm:launch` (catch-all), `/swarm:code`, `/swarm:write`, `/swarm:general` (mode shortcuts), `/swarm:refine` (refine the current branch and PR), `/swarm:workflow` (custom mode entry point), `/swarm:create-workflow` (scaffolding), `/swarm:update-workflow` (refresh generated workflows) — drive an interactive setup that creates a coordinated team of agents with defined roles and rules. Users can extend swarm by creating custom mode skills in their own codebases — either as **full custom modes** or as **thin wrappers** that extend a built-in mode.
+Swarm is a Claude Code plugin for launching agent teams. Eight commands drive an interactive setup that creates a coordinated team with defined roles and rules; users extend it with custom mode skills — full modes or thin wrappers over a built-in mode.
 
 ## Architecture
 
-**Everything is a prompt.** No runtime composition, no imports, no framework. Commands and skills are self-contained markdown files consumed by the model in one pass.
+**Everything is a prompt.** No runtime composition, no imports, no framework — self-contained markdown consumed in one pass.
 
 ```
 commands/launch.md          # Catch-all command — interactive team setup (Steps 0–8)
 commands/code.md            # Mode shortcut — pre-selects Code, delegates to launch.md
+commands/triage.md          # Mode shortcut — pre-selects Triage, delegates to launch.md
 commands/write.md           # Mode shortcut — pre-selects Writing, delegates to launch.md
-commands/general.md         # Mode shortcut — pre-selects General, delegates to launch.md
 commands/refine.md          # Standalone — runs Review/Refine/Deliver against the current branch + PR
 commands/workflow.md         # Custom mode entry point — takes a mode skill name, delegates to launch.md
 commands/create-workflow.md  # Scaffolding — interviews user, generates mode skill + shortcut command (wrapper or full)
 commands/update-workflow.md  # Refresh — regenerates the plugin-owned wiring of an existing shortcut command
 skills/code-mode/           # Code mode: lead identity, facilitator title, rules, phase arc
+skills/triage-mode/         # Triage mode: diagnose an issue (cause + blast radius), no code change; phase arc has no Refine
 skills/writing-mode/        # Writing mode: lead identity, facilitator title, ownership boundaries, editorial baseline, phase arc
-skills/general-mode/        # General mode: lead identity, facilitator title, lightweight default
-skills/workflow-rules/      # Governance spec for custom workflows — hard rules, briefing templates, launch mechanics
-skills/refine-outcomes/     # Converts implementation descriptions into outcome statements
+skills/general-mode/        # General mode: silent fallback + wrapper base — no shortcut command
+skills/workflow-rules/      # CANONICAL governance spec — hard rules, briefing templates, gate presentation contract, launch mechanics, pulse
+skills/gate-presentation/   # Frozen per-gate constants (question/options/digest/preview) — invoked fresh at each gate
 skills/suggest-members/     # Recommends team composition based on outcomes and mode
 skills/writing-style/       # Structural pattern analysis (trope detection) for writing-mode review
 skills/resolve-dispute/     # Resolves stuck review findings via put-up-or-concede exchange
 skills/define-rubric/       # Available skill for teams that genuinely need formal validation criteria
+skills/independent-review-loop/  # Independent pre-delivery review loop — Codex or swarm-native fallback
+agents/swarm-member.md      # Read-only team-member agent definition — every spawned teammate
+agents/swarm-reviewer.md    # Ephemeral read-only reviewer for the independent-review-loop fallback — never a teammate
 .claude-plugin/plugin.json  # Plugin manifest
 .claude-plugin/marketplace.json  # Marketplace registry entry
 .claude/swarm-ship.md       # Per-project ship definition (created at first launch, user-owned)
 ```
 
-**Commands** are entry points that can spawn teams (TeamCreate + Agent). Shortcut commands (`/swarm:code`, `/swarm:write`, `/swarm:general`) use `${CLAUDE_PLUGIN_ROOT}` to read launch.md and execute it with mode pre-set. `/swarm:workflow` is the generic entry point for custom modes — it takes a mode skill name as argument. `/swarm:create-workflow` scaffolds a custom mode skill + shortcut command in the user's project. **Skills** are helpers invoked via the Skill tool — they cannot launch teams. **Mode skills** (`swarm:code-mode`, `swarm:writing-mode`, `swarm:general-mode`, and user-defined custom modes) are invoked by the team lead at Step 8b; they return the phase arc and mode-specific rules for that run. `swarm:workflow-rules` returns the universal governance spec (hard rules, briefing templates, launch mechanics) for use by user-authored shortcut commands that cannot access `${CLAUDE_PLUGIN_ROOT}`.
+- **Commands** spawn teams (Agent tool; teams form implicitly at first spawn; requires Claude Code ≥ v2.1.178). Shortcuts read launch.md via `${CLAUDE_PLUGIN_ROOT}` and run it with mode pre-set; `/swarm:workflow` takes a custom mode name as argument.
+- **Skills** are Skill-tool helpers — they cannot launch teams. Mode skills are invoked by the lead at Step 8b and return the phase arc + mode rules. `swarm:workflow-rules` is the canonical governance spec (hard rules, briefing templates, gate presentation contract, launch mechanics, pulse) — invoked by launch.md Step 1 and by project-local commands that cannot read `${CLAUDE_PLUGIN_ROOT}`. `swarm:gate-presentation` holds the frozen per-gate constants, invoked fresh at each gate.
 
-### How launch.md Works
+### How launch.md works
 
-Step 0 (pre-flight) → Step 1 (universal hard rules) → Step 2 (outcomes + defaults/configure fork) → Step 3 (mode selection) → Step 4 (team members, mode-aware) → Step 5 (team shape) → Step 6 (lead research toggle) → Step 7 (confirmation) → Step 8 (spawn and execute).
+- **Flow:** Step 0 pre-flight → Step 1 governance → Step 2 (outcomes → explicit tier pick → silent mode inference + suggest-members → team approval) → Step 7 confirmation → Step 8 spawn. Steps 3–6 are definitions serving Step 2 and "I have changes," not a walked sequence.
+- **Three gates stand between outcomes and spawn — tier, team, launch.** Inline `$ARGUMENTS` outcomes exempt none of them (that skip caused a real regression). `$ARGUMENTS` is substituted before the model sees the prompt; when present, only the outcomes question is skipped.
+- **Step 7 and Step 8 labels are load-bearing cross-references** throughout the plugin — keep the names.
+
+### Phase arc
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [DheerG/swarms](https://github.com/DheerG/swarms) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
