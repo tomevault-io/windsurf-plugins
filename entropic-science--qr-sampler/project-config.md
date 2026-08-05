@@ -1,102 +1,120 @@
 ---
 trigger: always_on
-description: `qr-sampler` is an engine-agnostic framework that replaces standard LLM token sampling with external-entropy-driven selection. It fetches random bytes from any entropy source (QRNGs via gRPC, OS randomness, CPU timing jitter, OpenEntropy), amplifies the signal into a uniform float via z-score or ECDF statistics, and uses that float to select a token from a probability-ordered CDF.
+description: Companion to `LEARNINGS.md` (non-obvious lessons + a labelled history
 ---
 
-# CLAUDE.md -- Codebase Guide for Coding Agents
+# AGENTS.md — Codebase Guide for Coding Agents
+
+Companion to `LEARNINGS.md` (non-obvious lessons + a labelled history
+section) and `README.md` (end-user documentation).
 
 ## What this project is
 
-`qr-sampler` is an engine-agnostic framework that replaces standard LLM token sampling with external-entropy-driven selection. It fetches random bytes from any entropy source (QRNGs via gRPC, OS randomness, CPU timing jitter, OpenEntropy), amplifies the signal into a uniform float via z-score or ECDF statistics, and uses that float to select a token from a probability-ordered CDF.
+`qr-sampler` is an engine-agnostic framework that replaces standard LLM token
+sampling with external-entropy-driven selection. It fetches random bytes from
+any entropy source (QRNGs via gRPC, OS randomness, CPU timing jitter,
+OpenEntropy), amplifies the signal into a uniform float via z-score or ECDF
+statistics, and uses that float to select a token from a probability-ordered
+CDF. The primary use case is weak-signal integration research: studying
+whether small statistical biases in physical entropy sources are detectable
+in LLM token selection. In server-draw mode the integration happens
+server-side (Qbert0G's `qr_purity.PurityService`) and each draw arrives with
+purity/coherence metadata; the research narrative lives in Qbert0G's README.
 
-The core sampling pipeline (`qr_sampler.core`) has **zero inference-engine dependencies** -- it operates on numpy arrays and knows nothing about torch, vLLM, or any specific engine. Engine-specific integration is handled by thin adapter classes (`qr_sampler.engines`). A vLLM V1 adapter ships out of the box; other engines (e.g., vLLM-Metal for Apple Silicon) are supported via the `EngineAdapter` plugin system and declarative YAML profiles.
+Two independent consumers sit on top of the library:
 
-The primary use case is consciousness-research: studying whether conscious intent can influence quantum-random processes in LLM token selection.
+1. **vLLM** loads `VLLMAdapter` as a V1 logits processor via the
+   `vllm.logits_processors` entry point (no vLLM source changes).
+2. **`qr-llm-qthought`** (sibling checkout at
+   `../Entropic-Science/qr-llm-qthought`, relative to this repo) imports the
+   `QthoughtRoller` entropy stack — no vLLM, no GPU — through
+   `qr_sampler.contract` (see below).
 
-## Commands
+## Verification — one command
 
 ```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test modules
-pytest tests/test_config.py -v
-pytest tests/test_amplification/ -v
-pytest tests/test_temperature/ -v
-pytest tests/test_selection/ -v
-pytest tests/test_logging/ -v
-pytest tests/test_entropy/ -v
-pytest tests/test_processor.py -v
-pytest tests/test_statistical_properties.py -v
-pytest tests/test_core/ -v
-pytest tests/test_engines/ -v
-pytest tests/test_profiles/ -v
-pytest tests/test_cli/ -v
-
-# Run with coverage
-pytest tests/ -v --cov=src/qr_sampler --cov-report=term-missing
-
-# Install in editable mode
-pip install -e .
-
-# Install with dev dependencies
-pip install -e ".[dev]"
-
-# Install with CLI (click + jinja2)
-pip install -e ".[cli]"
-
-# Lint and format
-ruff check src/ tests/
-ruff format --check src/ tests/
-
-# Type check
-mypy --strict src/
-
-# CLI commands (requires [cli] extra)
-qr-sampler list engines              # List available engine profiles
-qr-sampler list models --engine vllm # List known-working models for an engine
-qr-sampler list entropy-sources      # List entropy source profiles
-qr-sampler list amplifiers           # List amplifier profiles
-qr-sampler list samplers             # List adaptive sampler profiles
-qr-sampler info engine vllm          # Detailed info for a component
-qr-sampler validate --engine vllm --model Qwen/Qwen2.5-1.5B-Instruct  # Check compatibility
-qr-sampler build --engine vllm --entropy quantum_grpc --output ./deploy # Generate Docker Compose
+python scripts/check.py            # every oracle: lint, format, types, security, tests
+python scripts/check.py --only lint,types
 ```
+
+The oracle rows (CI and pre-commit invoke this same script):
+
+| Check | Command |
+|---|---|
+| lint | `ruff check .` |
+| format | `ruff format --check .` |
+| types | `mypy --strict src/` |
+| security | `bandit -c pyproject.toml -r src/ -q` |
+| tests | `pytest tests/ -v --cov=src/qr_sampler` (coverage `fail_under=90`) |
+
+A change is NOT done until every row passes. Use these as ground truth — do
+not act as a linter yourself.
+
+## Layering (imports only point down)
+
+```
+L0 foundation   exceptions.py, config/  (model + presets + resolve)
+L1 core         core/, entropy/, amplification/, temperature/, selection/,
+                logging/, telemetry/, proto/
+L2 roller       qthought.py
+L3 adapters     engines/
+L4 periphery    cli/, profiles/, templates/, __main__.py, contract.py
+```
+
+Rules:
+
+- Nothing in L0–L3 may import from `cli/`, `profiles/`, or `templates/` —
+  the periphery is CLI/documentation tooling, never runtime sampling.
+- `core/` has **zero engine dependencies**: numpy only, no torch/vLLM.
+  Engine-specific code lives exclusively under `engines/`.
+- `contract.py` is a pure re-export module (may import from anywhere; nothing
+  internal imports it).
+- Import side effects are forbidden. `import qr_sampler` and
+  `import qr_sampler.engines.vllm` are 100% side-effect-free — no sockets, no
+  monkey-patches, no file writes. Pinned by
+  `tests/test_engines/test_import_time_socket_guard.py`.
+
+## The cross-repo contract (`contract.py`)
+
+`src/qr_sampler/contract.py` is **the only surface downstream consumers may
+import**; `qr-llm-qthought` is the live consumer. It re-exports (grouped):
+
+- roller + provenance: `QthoughtRoller`, `ChoiceProvenance`, `BindSpec`, `IntRange`
+- config + presets: `QRSamplerConfig`, `resolve_config`, `resolve_preset`,
+  `BUILTIN_PRESETS`, `PRESET_QTHOUGHT`, `PRESET_QTHOUGHT_THINK`, `PRESET_QTHOUGHT_VOICE`
+- entropy primitives: `EntropySource`, `MockUniformSource`, `FallbackEntropySource`
+- exceptions: `EntropyUnavailableError`, `ConfigValidationError`
+- `CONTRACT_VERSION` — bump on ANY breaking change to this surface; qthought
+  asserts it at import and fails loudly on mismatch.
+
+Internal module boundaries are free to move as long as `contract.__all__`
+keeps re-exporting the same names. `tests/test_contract.py` pins `__all__`,
+the three qthought preset dicts (scientific lineage — do not touch their
+values), and `inspect.signature` snapshots of the roller surface. Its
+counterpart `tests/test_sampler_contract.py` lives in the qthought repo.
+Breaking-seam changes must land atomically with the qthought consumer update
+(both repos green in the same increment).
 
 ## File map
 
 ```
 src/qr_sampler/
-+-- __init__.py                    # Package version (setuptools-scm), re-exports
-+-- __main__.py                    # CLI entry: `python -m qr_sampler` -> cli/main.py
-+-- config.py                      # QRSamplerConfig (pydantic BaseSettings), resolve_config(), validate_extra_args()
-+-- exceptions.py                  # QRSamplerError -> {EntropyUnavailableError, ConfigValidationError, SignalAmplificationError, TokenSelectionError}
-+-- processor.py                   # Re-export: VLLMAdapter as QRSamplerLogitsProcessor (backward compat)
-+-- py.typed                       # PEP 561 marker
-+-- core/                          # Engine-agnostic sampling pipeline (NO torch/vLLM imports)
-|   +-- __init__.py                # Re-exports SamplingPipeline, SamplingResult, build_pipeline, etc.
-|   +-- pipeline.py                # SamplingPipeline class + factory functions (build_pipeline, build_entropy_source, config_hash, accepts_config)
-|   +-- types.py                   # SamplingResult frozen dataclass (token_id, one_hot, record)
-+-- engines/                       # Engine adapter layer
-|   +-- __init__.py                # Re-exports EngineAdapter, EngineAdapterRegistry
-|   +-- base.py                    # EngineAdapter ABC (get_pipeline, close)
-|   +-- registry.py                # EngineAdapterRegistry (decorator + qr_sampler.engine_adapters entry-point discovery)
-|   +-- vllm.py                    # VLLMAdapter: vLLM V1 LogitsProcessor, delegates sampling to SamplingPipeline
-+-- profiles/                      # Declarative YAML profile system (read-only metadata for CLI)
-|   +-- __init__.py                # Re-exports ProfileLoader, CompatibilityChecker, CompatibilityReport
-|   +-- schema.py                  # Pydantic models: EngineProfile, EntropySourceProfile, AmplifierProfile, SamplerProfile, etc.
-|   +-- loader.py                  # ProfileLoader: discovers built-in + user override profiles, lazy loading with cache
-|   +-- compatibility.py           # CompatibilityChecker: tri-state logic (known_working/untested/known_incompatible)
-|   +-- engines/
-|   |   +-- vllm.yaml              # vLLM NVIDIA GPU profile
-|   |   +-- vllm_metal.yaml        # vLLM Apple Silicon / Metal profile
-|   +-- entropy/
-|   |   +-- system.yaml            # os.urandom() entropy
-|   |   +-- quantum_grpc.yaml      # gRPC quantum entropy
-|   |   +-- timing_noise.yaml      # CPU timing jitter
++-- __init__.py                # Version + top-level re-exports (side-effect-free)
++-- __main__.py                # `python -m qr_sampler` -> cli/main.py
++-- exceptions.py              # QRSamplerError -> {EntropyUnavailable, ConfigValidation, SignalAmplification, TokenSelection}Error
++-- contract.py                # Cross-repo seam (see above)
++-- qthought.py                # QthoughtRoller: typed random-choice family over the entropy stack (choose/coin/bind_int/draw_u/draw_index + ChoiceProvenance)
++-- py.typed
++-- config/
+|   +-- model.py               # QRSamplerConfig (pydantic BaseSettings); PER_REQUEST_FIELDS derived from Field(json_schema_extra={"per_request": True})
+|   +-- presets.py             # BUILTIN_PRESETS, PRESET_* name constants, resolve_preset(), expand_extra_args()
+|   +-- resolve.py             # resolve_config(), validate_extra_args() — the single validation point
++-- core/
+|   +-- pipeline.py            # SamplingPipeline + factories (build_pipeline, build_entropy_source, config_hash, derive_commit_nonce)
+|   +-- types.py               # SamplingResult (frozen)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Entropic-Science/qr-sampler](https://github.com/Entropic-Science/qr-sampler) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
