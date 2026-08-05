@@ -1,150 +1,179 @@
 ---
 trigger: always_on
-description: Review pull requests in the floci-gcp repository with GCP compatibility as the primary concern.
+description: Guidance for AI coding agents working in the floci-gcp repository.
 ---
 
-# Copilot Instructions for Pull Request Review
+Guidance for AI coding agents working in the floci-gcp repository.
 
-Review pull requests in the floci-gcp repository with GCP compatibility as the primary concern.
+This file defines repository-specific operating rules for autonomous or semi-autonomous coding agents. Follow these instructions unless a maintainer explicitly tells you otherwise.
 
-floci-gcp is a Java-based local GCP emulator built on Quarkus. Its goal is to match GCP SDK and gcloud CLI behavior through real GCP wire protocols (gRPC and REST), not convenience APIs or custom abstractions.
+---
 
-## Review Priorities
+## Project Overview
 
-Evaluate changes in this order:
+floci-gcp is a Java-based local GCP emulator built on Quarkus.
+
+Its goal is full GCP SDK and gcloud CLI compatibility through real GCP wire protocols, not convenience APIs or simplified abstractions.
+
+floci-gcp acts as an open-source alternative to the GCP-provided emulators, unified under a single port.
+
+- Port: 4588
+- Stack:
+  - Java 25
+  - Quarkus 3.34.6
+  - JUnit 5
+  - RestAssured
+  - Jackson
+  - quarkus-grpc (gRPC + HTTP/2 via ALPN on the same port)
+
+---
+
+## First Principles
+
+When making changes, follow these priorities:
 
 1. Preserve GCP protocol compatibility
 2. Match GCP SDK and gcloud CLI behavior
 3. Reuse existing floci-gcp patterns
 4. Prefer correctness over convenience
-5. Keep changes focused and testable
+5. Keep changes narrow and testable
 
-## What to Flag
+Critical rules:
 
-Raise concerns when a PR introduces any of the following without strong justification:
+- Do not introduce custom endpoint shapes
+- Do not change request or response formats for convenience
+- Do not perform broad refactors unless the task explicitly requires them
+- Keep behavior aligned with GCP expectations and existing floci-gcp conventions
 
-- Non-GCP endpoint shapes or resource name formats
-- Request or response format changes made for convenience
-- Broad refactors unrelated to the PR goal
-- New service patterns where an existing floci-gcp pattern should be reused
-- Direct storage implementation usage instead of `StorageFactory`
-- Use of `@ConfigMapping` (this project uses `@ApplicationScoped` + `@ConfigProperty`)
+---
 
-## Architecture Expectations
+## Architecture
 
 floci-gcp follows a layered design:
 
-- Controllers / handlers parse GCP protocol input (gRPC or REST) and produce GCP-compatible responses
-- Services contain business logic and should throw `GcpException`
-- Models hold domain data
+- **Controller / Handler**
+  - Parses GCP protocol input (gRPC or REST)
+  - Produces GCP-compatible responses
 
-Core infrastructure commonly relevant in reviews:
+- **Service**
+  - Contains business logic
+  - Throws `GcpException`
 
-- `EmulatorConfig` — `@ApplicationScoped` with `@ConfigProperty`, prefix `floci-gcp.*`
+- **Model**
+  - Domain objects
+
+### Core Infrastructure
+
+- `EmulatorConfig` — `@ConfigMapping(prefix = "floci-gcp")` SmallRye Config interface
 - `ServiceRegistry`
-- `StorageFactory`
+- `StorageBackend` + `StorageFactory`
 - `GcpException` + `GcpExceptionMapper`
 - `GcpGrpcController` — base class for gRPC service implementations
-- `ProjectContextFilter` — extracts GCP project ID from request path/headers
+- `ProjectContextFilter` — extracts GCP project ID from request path or headers
 - `RequestContext` — `@RequestScoped` holder for the current project ID
-- `GcpResourceNames` — resource name parsing and construction utilities
+- `GcpResourceNames` — utilities for parsing and building GCP resource name strings
 - `EmulatorLifecycle`
+- `XmlBuilder` + `XmlParser` — used by GCS (REST XML)
 
-Check that controllers stay thin, business logic remains in services, and new changes fit existing repository patterns.
+---
 
-## Protocol Review Rules
+## Package Layout
 
-floci-gcp implements real GCP wire protocols. Review protocol-affecting changes carefully.
+- `io.floci.gcp.config`
+- `io.floci.gcp.core.common`
+- `io.floci.gcp.core.common.dns`
+- `io.floci.gcp.core.common.docker`
+- `io.floci.gcp.core.storage`
+- `io.floci.gcp.lifecycle`
+- `io.floci.gcp.lifecycle.inithook`
+- `io.floci.gcp.services.<service>`
 
-- gRPC services (Pub/Sub, Firestore, Datastore, Secret Manager) must use proto3 wire format via pre-compiled `grpc-google-cloud-*-java` stubs
-- REST XML services (GCS object operations) must use `XmlBuilder` and match GCS XML response shapes
-- REST JSON services (GCS management, IAM) must return GCP-style JSON
-- Both gRPC and REST are served on the same port (4578) via ALPN — do not split them onto separate ports
+Typical service structure:
 
-Pay extra attention to these cases:
+- `services/<svc>/`
+  - `*Controller.java`
+  - `*Service.java`
+  - `model/`
 
-- GCS has both REST XML (object API) and REST JSON (bucket management) — keep both aligned
-- Project ID extraction must follow the `projects/{project}/...` resource naming convention
-- Auth bypass via `*_EMULATOR_HOST` env vars means floci-gcp must not validate credentials
-- Management APIs should be validated with GCP SDK clients, not only handcrafted HTTP
+Rule:
+Copy an existing service pattern before introducing a new one.
 
-## XML and JSON Rules
+---
 
-Flag PRs that:
+## GCP Protocol Rules
 
-- Return JSON errors that do not follow GCP error structure: `{"error": {"code": N, "message": "...", "status": "..."}}`
-- Return gRPC errors that do not map to the correct `io.grpc.Status` code via `GcpException`
-- Change controller return types in ways that may break reflection or native-image compatibility
+floci-gcp must implement real GCP wire protocols.
 
-## Config and Storage Review
+| Protocol | Services | Transport | Implementation |
+|----------|----------|-----------|----------------|
+| gRPC | Pub/Sub, Firestore, Datastore, Secret Manager | HTTP/2 + proto3 | `GcpGrpcController` subclass |
+| REST JSON | GCS (management), IAM, Secret Manager (REST) | HTTP/1.1 or HTTP/2 | JAX-RS |
+| REST XML | GCS (object operations) | HTTP/1.1 or HTTP/2 | JAX-RS + `XmlBuilder` |
 
-When a PR changes configuration or persistence behavior, verify the change is wired consistently.
+### Single-port design
 
-Check for updates to:
+Both gRPC and REST are served on port **4588** via ALPN negotiation:
+- `quarkus.http.http2=true`
+- `quarkus.grpc.server.use-separate-server=false`
 
-- `EmulatorConfig` (new `@ConfigProperty` field + accessor method)
-- main `application.yml`
-- test `application.yml`
-- `StorageFactory`
-- lifecycle hooks when relevant
+### Auth bypass
 
-Supported storage modes include:
+GCP SDKs skip credential checks when `*_EMULATOR_HOST` environment variables are set. floci-gcp does not validate credentials; it accepts all requests unconditionally.
+
+### Project ID as multi-tenancy key
+
+GCP resource names follow `projects/{project}/...`. The project ID is the multi-tenancy boundary. All storage keys are namespaced by project ID via `ProjectAwareStorageBackend`.
+
+Resolution order in `ProjectContextFilter`:
+1. URL path segment `projects/{project}/...`
+2. `x-goog-request-params` header (`project=...`)
+3. `EmulatorConfig.defaultProjectId()` fallback
+
+### Important exceptions
+
+- GCS uses REST XML for object operations and REST JSON for bucket management; keep them aligned
+- gRPC services use pre-compiled stubs from `grpc-google-cloud-*-java` artifacts — do not introduce raw `.proto` codegen
+- Management APIs should be validated with GCP SDK clients, not only handcrafted HTTP requests
+
+---
+
+## XML / JSON Rules
+
+- Use `XmlBuilder` for XML responses (GCS object API)
+- Use `XmlParser` for XML parsing; do not use regex
+- JSON errors must follow GCP error structures: `{"error": {"code": 404, "message": "...", "status": "NOT_FOUND"}}`
+- gRPC errors must map to `io.grpc.Status` codes via `GcpException.grpcCode()`
+- Types returned directly from controllers must remain compatible with native-image reflection requirements
+
+---
+
+## Storage Rules
+
+Supported storage modes:
 
 - `memory`
 - `persistent`
 - `hybrid`
 - `wal`
 
-Storage keys are namespaced by GCP project ID via `ProjectAwareStorageBackend`. Treat repository YAML as the source of truth for runtime behavior unless the PR explicitly changes configuration semantics.
+Rules:
 
-## Testing Expectations
+- Always use `StorageFactory`
+- Do not instantiate storage implementations directly inside services
+- Respect lifecycle hooks for load and flush behavior
+- Storage keys are namespaced by GCP project ID via `ProjectAwareStorageBackend`
 
-Expect automated coverage for changes that affect:
+Important nuance:
 
-- request parsing
-- response shape
-- error handling
-- persistence semantics
-- resource name generation
-- service enablement
+`EmulatorConfig` declares `@WithDefault` values, but `application.yml` defines effective runtime behavior. Treat repository YAML as the source of truth unless a task explicitly changes configuration semantics.
 
-Prefer:
+When adding storage-related behavior:
 
-- GCP SDK-based validation over raw HTTP-only testing
-- integration tests for compatibility-sensitive behavior
-- existing naming conventions such as `*ServiceTest.java` and `*IntegrationTest.java`
-
-If behavior changes without automated coverage, call that out explicitly.
-
-## Review Checklist
-
-When analyzing a PR, check:
-
-- Is the change focused?
-- Does it preserve GCP-compatible wire behavior?
-- Does it reuse an existing floci-gcp pattern?
-- Are controllers thin and services responsible for domain logic?
-- Are `GcpException` and existing error-mapping patterns used correctly?
-- Are config and YAML updates complete?
-- Are storage changes wired through `StorageFactory`?
-- Are tests added or updated where compatibility is affected?
-- Are docs updated when user-facing behavior changes?
-
-## How to Write Feedback
-
-Write review comments that are:
-
-- specific
-- repository-aware
-- grounded in GCP compatibility risk
-
-Use severity when helpful:
-
-- `high`: likely breaks GCP SDK / CLI compatibility or protocol behavior
-- `medium`: inconsistent with floci-gcp architecture, wiring, or testing expectations
+1. Update `EmulatorConfig`
+2. Update main `application.yml`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [floci-io/floci-gcp](https://github.com/floci-io/floci-gcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
