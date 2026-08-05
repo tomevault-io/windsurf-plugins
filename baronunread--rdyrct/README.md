@@ -7,11 +7,11 @@ Open-source URL shortener for teams: branded short links, QR codes, and custom d
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [baronunread/rdyrct](https://github.com/baronunread/rdyrct).
+Original source: `AGENTS.md` in [baronunread/rdyrct](https://github.com/baronunread/rdyrct).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
