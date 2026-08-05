@@ -1,0 +1,116 @@
+---
+trigger: always_on
+description: Repo-wide agent instructions for `sixb`.
+---
+
+# AGENTS.md
+
+Repo-wide agent instructions for `sixb`.
+
+## Scope
+
+- This file applies to the whole repository unless a nearer `AGENTS.md` is added later.
+- Keep one root `AGENTS.md` for now. Add nested files only when a package genuinely needs different instructions.
+
+## Repo Map
+
+- `packages/core`: runtime, ontology builders, providers, and validation
+- `packages/server`: Elysia HTTP/WebSocket API and OpenAPI generation
+- `packages/atlas`: built-in React UI (the Atlas app); pages live in `src/pages/`
+- `packages/ui`: shared React component library used by Atlas
+- `packages/client`: generated typed client artifacts
+- `packages/cli`: CLI entrypoint for `sixb`
+- `packages/create-sixb`: zero-dependency project scaffolder and template
+- `packages/app`: custom app integration
+- `connectors/`, `storage/`, `broker/`: integrations and infrastructure providers
+- `examples/`: runnable sample projects
+
+## Toolchain
+
+- Bun only for package management, scripts, and runtime. Do not use `npm`, `pnpm`, `yarn`, or Vite CLI commands.
+- TypeScript is `strict`, targets ES2022, uses ESNext modules, and `moduleResolution: "bundler"`.
+- Formatting and linting are enforced with Biome.
+- Prefer `rg` and `rg --files` for search.
+
+## Core Commands
+
+Repo-wide:
+
+```bash
+bun install
+bun run build
+bun run typecheck
+bun run test
+bun run test:e2e
+bun run test:all
+bun run check
+bun run check:fix
+bun run generate:client
+bun sixb dev
+bun create-sixb my-app
+```
+
+Targeted:
+
+```bash
+bun --filter @sixb/core build
+bun --filter @sixb/core typecheck
+bun test packages/core/tests/create-sixb.test.ts
+bun test packages/server/tests/
+```
+
+CI runs these as independent parallel jobs (each does `bun install --frozen-lockfile` first):
+
+- `typecheck`: `bun run typecheck`
+- `build`: `bun run build`, then `bun run test:publish`
+- `client`: `bun run generate:client`, then `git diff --exit-code`
+- `test`: `bun run test:ci`
+- `lint`: `bun run check`
+- `e2e`: package-scoped matrix jobs for packages with `test:e2e`
+
+`test:ci` is `bun test` wrapped in `scripts/ci-guard.ts`, which fails the run at the first 60-second
+silence and prints the last test file, the process tree, and each thread's kernel wait state. The
+job's `timeout-minutes` is only a backstop: a job that dies at its own wall clock reports
+"cancelled" with the log ending mid-stream, which is indistinguishable from every other cause. The
+guard exists because a `Bun.build()` deadlock once cost five 15-minute runs before anyone found the
+one named failure buried in the log.
+
+`typecheck` uses the TypeScript project-reference graph: `bun run build:types` (`tsc -b
+tsconfig.build.json`) checks every package's `src` exactly once, `tsconfig.tests.json` checks
+test files against the emitted `.d.ts`, and the example/docs apps keep their own
+`typegen && tsc` typecheck (`typecheck:examples`). The old per-package `tsc --noEmit` re-checked
+shared source (notably `@sixb/core`) once per dependent, which made the step the CI bottleneck.
+
+The root config maps `@sixb/*` to `packages/*/src`, which is right for workspace development and
+wrong for consumer typechecks: it pulls the whole framework into each example's program. Examples
+keep that config as their default because Bun reads it while bundling dev apps. Their typecheck
+scripts alone pass `--paths null`, which clears the inherited mapping and lets `tsc` resolve each
+package's `exports.types`. This is why the steps are chained with `&&`: a consumer type-checked
+without a prior `build:types` fails on unresolved `@sixb/*` imports.
+
+That ordering is also the limit of where the override applies. `apps/docs` stays entirely on the
+root config because Vercel deploys it with `prepare:docs && next build` and never emits declarations
+— pointing it at `dist` broke the deployment once already. Anything built or run outside this
+repo's `typecheck` chain reads source.
+
+## Architecture
+
+- Define ontology types with `defineObjectType`, `prop`, `link`, `action`, and `defineValueType`.
+- Most runtimes start with `createSixb()`.
+- `createSixb()` auto-discovers `ontology/`, `actions/`, `datasets/`, `syncs/`, `schedules/`, `pipelines/`, `projections/`, `connectors/`, `rules/`, `workflows/`, `agents/`, and `security/{groups,roles,policies}/`. The `app/` directory is served separately and is not part of `createSixb()` discovery.
+- `sixb.objects(MyType)` is the typed API for object CRUD, telemetry, links, and actions.
+- Important domain events include `object.created`, `object.updated`, `object.deleted`, `link.created`, `link.updated`, `link.deleted`, `telemetry.appended`, and `action.requested`.
+- Convention-based discovery is the normal registration model.
+- Generated client files live in `packages/client/src/generated/`.
+- If routes, schemas, or public contracts change, run `bun run generate:client`.
+
+## Export Surfaces
+
+- Exports are curated — never re-export something from a barrel just because it exists. If nothing imports it, it does not belong on a public surface; a selector or helper that can only return nothing is dead API.
+- A package root (`.`) is for app authors: `@sixb/core` exports the authoring API (`define*`, `createSixb`, config types, and the `InMemory*` providers that fill a `createSixb` slot); other packages export only what consumers call (workers export just their `*Worker` class).
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [sixb-ai/sixb](https://github.com/sixb-ai/sixb) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-04 -->
