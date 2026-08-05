@@ -1,0 +1,21 @@
+---
+trigger: always_on
+description: This public repository is the frontend and product home for Eddie's Wallet. Keep client behavior aligned with the product requirements in `docs/product-requirements.md`, especially split-audience money language, parent/child permissions, and offline states. The root `README.md` is the public landing page; keep its status, setup, and limitation claims truthful for an unfinished, unreleased MVP.
+---
+
+# Project agent memory
+
+This public repository is the frontend and product home for Eddie's Wallet. Keep client behavior aligned with the product requirements in `docs/product-requirements.md`, especially split-audience money language, parent/child permissions, and offline states. The root `README.md` is the public landing page; keep its status, setup, and limitation claims truthful for an unfinished, unreleased MVP.
+
+The app's service implementation and operations are maintained separately. Keep this repository frontend-only: do not add backend source, migrations, credentials, deployment assets, or infrastructure configuration here.
+
+Brand and interface guidance lives in the project skill at `.agents/skills/eddies-wallet-design/SKILL.md`; load it before changing visuals, copy, or assets. `.claude/skills` is a tracked relative symlink to `.agents/skills`, so keep skill directory names matching their `name:` frontmatter and keep file names exact-cased for case-sensitive checkouts.
+
+Releases ship through release-please and a captain-merged release PR that uploads to TestFlight; `docs/release.md` is authoritative for the pipeline, including the pull-request Release compile regression, version lineage, trust boundaries, and Apple-side setup. `docs/app-store-configuration.md` is authoritative for the live App Store Connect state of the optional Cloud subscription - products, prices, plan type, grace period, notification URLs, and what is deliberately still unproven. Apple account-level setup is shared across several apps and already satisfied; never request an agreement, tax/banking, upload API key, or distribution certificate again, and keep `EddysWallet/Configuration/EddysWallet.storekit` in step with that record. Merging a release PR is the release trigger and belongs to the captain alone. `test/release-checks.sh` guards the workflow invariants, state-aware release-please lineage (pre-first `0.0.0` seed + `initial-version: 0.1.0`, and post-first advanced seed matching available CHANGELOG/tag lineage), and version derivation; run it (plus the normal test suite) after touching anything under `.github/`, `ExportOptions.plist`, `release-please-config.json`, `test/fixtures/release-lineage/`, or the version files release-please owns (`version.txt`, `.release-please-manifest.json`, `CHANGELOG.md` - never hand-edit those three).
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [kunchenguid/eddies-wallet](https://github.com/kunchenguid/eddies-wallet) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-04 -->
