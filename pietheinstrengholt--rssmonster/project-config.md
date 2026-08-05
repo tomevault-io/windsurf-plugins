@@ -1,195 +1,85 @@
 ---
 trigger: always_on
-description: RSSMonster is an intelligent RSS reader and aggregation engine built with a **Vue.js 3 frontend** and **Express backend using ESM modules**. The application provides advanced features including semantic article clustering, quality scoring, importance-based ranking, and AI-powered capabilities
+description: Article search is the system that turns a user's reading intent into a precise, ordered set of articles from that user's library. It exists to make a large feed archive feel navigable: users should be able to ask for text, state, quality, recency, tags, sources, events, and ranking in one expression, and receive results that match the meaning of that expression.
 ---
 
+# Article Search Architecture
 
-# RSSMonster - Copilot Agent Instructions
+Article search is the system that turns a user's reading intent into a precise, ordered set of articles from that user's library. It exists to make a large feed archive feel navigable: users should be able to ask for text, state, quality, recency, tags, sources, events, and ranking in one expression, and receive results that match the meaning of that expression.
 
-## Repository Overview
+This document describes what search is supposed to do. It is an architectural specification, not an implementation guide.
 
-RSSMonster is an intelligent RSS reader and aggregation engine built with a **Vue.js 3 frontend** and **Express backend using ESM modules**. The application provides advanced features including semantic article clustering, quality scoring, importance-based ranking, and AI-powered capabilities
+## Architectural Objective
 
-**Tech Stack:**
-- **Backend:** Node.js 20+, Express 5.x (ESM only), Sequelize ORM, MySQL
-- **Frontend:** Vue.js 3, Vite, Bootstrap 5, Pinia (state management)
-- **Build Tools:** Vite for client, no build step for server (ESM)
-- **Database:** MySQL 5.7+ with Sequelize migrations
-- **Deployment:** Docker
+Search must provide a predictable retrieval contract for articles.
 
-**Repository Size:** Small-to-medium monorepo with clear client/server separation.
+A search request represents:
 
-### Backend Patterns
+- The user whose library is being searched.
+- The scope of the library being considered.
+- The article states and metadata that constrain eligibility.
+- The text intent that narrows relevance.
+- The ordering model that decides what should appear first.
+- The desired response shape: matching article identifiers or a matching count.
 
-1. **ESM Only:** All server code uses ES modules (`import`/`export`). Do NOT use `require()`.
-2. **Sequelize Models:** Factory-style models exported from `models/index.js`. Example:
-   ```javascript
-   import db from './models/index.js';
-   const { Article, Feed, Category } = db;
-   ```
-3. **Routes:** Express routers imported in `app.js` and mounted at `/api/*` paths.
-4. **Authentication:** JWT tokens managed by `auth.js` controller, verified by middleware.
-5. **Database:** Migrations are sequential (timestamped). Never modify existing migrations.
+The search system is responsible for combining those dimensions into one coherent answer.
 
-### Frontend Patterns
+## Core Principles
 
-1. **Vue 3 Composition API:** Most components use `<script setup>`.
-2. **Bootstrap 5:** UI framework. Use existing Bootstrap classes, no custom CSS frameworks.
-3. **Pinia Stores:** State management in `src/store/`.
-4. **Axios Services:** API calls centralized in `src/services/`.
-5. **PWA:** Configured via `vite-plugin-pwa`. Service worker auto-generated.
+Search is user-scoped. A result may only come from the requesting user's article library unless a behavior is explicitly defined as a cross-feed or global-user view. User ownership is the first boundary of every search.
 
-## Code Style & Conventions
+Search is restrictive by composition. Each explicit filter narrows the eligible article set. Text, tags, dates, reading state, source scope, scores, event state, and language must work together rather than replacing one another, except where precedence is part of the query language.
 
-- **Backend:** ESM modules, single-expression assignments preferred, preserve existing comments
-- **Frontend:** Vue 3 Composition API, Bootstrap 5 classes only, Bootstrap Icons standard. Single-expression assignments. Design must look sleek and stand out.
-- **Naming:** camelCase for variables/functions, PascalCase for components/models
-- **Comments:** Minimal comments unless required for complex logic (match existing style)
+Search is intent-preserving. A compact query string is not just text; it may contain structured intent. The system must distinguish between human text to search for and fielded constraints that describe how articles should be selected or ranked.
 
-# Core Concepts
+Search is stable enough to reason about. Equivalent requests should produce equivalent result sets and ordering, assuming the article library has not changed.
 
-## Feed
+Search is optimized around article identity. The primary answer is the ordered set of matching article IDs. Full article rendering, enrichment, and presentation are responsibilities outside the search contract.
 
-A Feed represents an external RSS or Atom source.
+## Search Scope
 
-Examples:
-- Hacker News
-- TechCrunch
-- CNN
-- Reddit RSS feeds
+Every search operates inside a library scope. The broadest normal scope is all feeds belonging to the user. Narrower scopes may select one feed, one category, or a derived subset such as tagged articles or grouped representatives.
 
-Purpose:
-- Source of incoming articles
-- Maintains crawl metadata and source identity
+Scope controls where results may come from. It does not decide relevance by itself. Relevance is determined after scope is established by applying text intent, state filters, metadata filters, quality thresholds, and ordering.
 
-Relationships:
-- A Feed has many Articles
+Some views intentionally loosen normal feed/category scope when the concept being requested is not source-local. For example, a hot-article view is about the article's global attention state inside the user's library, not about one selected feed.
 
-## Article
+## Query Intent
 
-An Article is the atomic content unit ingested from a feed.
+The search expression has two meanings at once:
 
-Examples:
-- A news post
-- Blog article
-- Podcast update
-- Research publication
+- Free text expresses article content the user wants to find.
+- Fielded tokens express constraints or ranking preferences.
 
-Purpose:
-- Consumable content for users
-- Stores embeddings and metadata
-- Connected to Events
+Quoted text represents phrase intent. Unquoted text represents term intent. Fielded tokens represent structured intent and should not accidentally become normal text search terms.
 
-Important characteristics:
-- Articles are ephemeral
-- Articles should not be used as long-term semantic anchors
-- Each article has a vector embedding
+When a structured token and an external request parameter describe the same concept, the search expression is the more specific user intent and takes precedence. This allows saved views and UI defaults to be refined from the search box without changing the surrounding view.
 
-Relationships:
-- Belongs to a Feed
-- Belongs to an Event
-- Can receive user interactions
-- Can contribute to Interest Islands indirectly
+Legacy vocabulary remains part of the architecture when it represents the same user concept. For example, "starred" and "favorite" are one conceptual state even if older clients use older language.
 
-## Event
+## Article Eligibility
 
-An Event is a temporary cluster of semantically similar Articles.
+An article is eligible only when it satisfies the active constraints.
 
-Examples:
-- "OpenAI releases GPT-6"
-- "Apple announces new iPhone"
-- "Databricks acquires company X"
+The fundamental eligibility dimensions are:
 
-Purpose:
-- Deduplicate similar news coverage
-- Group multiple articles discussing the same real-world event
-- Reduce noise in recommendations
+- Ownership: the article belongs to the requesting user.
+- Source scope: the article is in the selected feed/category scope unless the requested concept overrides source locality.
+- Canonical visibility: duplicate or non-canonical articles are excluded according to the product's canonical article rules.
+- Reading state: unread, read, favorite, clicked, seen, hot, or all.
+- Text relevance: title and article text match the requested term or phrase intent.
+- Metadata: tag, title, author, language, date, first-seen age, event state, event size, interest-island applicability, or grouping concept.
+- Quality gates: advertisement, sentiment, and quality thresholds are all satisfied.
 
-Important characteristics:
-- Events are ephemeral and time-sensitive
-- Events may merge or expire
-- Events are generated through vector similarity clustering
+Eligibility is binary. Ranking must not resurrect articles that failed eligibility.
 
-Relationships:
-- Contains many Articles
-- Belongs to one or more Topics
+## Time Concepts
 
-## Topic
-
-A Topic is a stable semantic category that groups related Events.
-
-Examples:
-- Generative AI
-- Cloud Computing
-- Cybersecurity
-- European Politics
-- Formula 1
-
-Purpose:
-- Central semantic layer of the recommendation system
-- Long-lived representation of user interests
-- Stable recommendation anchor
-
-Important characteristics:
-- Topics are durable and stable
-- Topics outlive Events
-- Topics may be curated, ML-generated, or hybrid
-- Topics have embeddings
-
-Relationships:
-- Contains many Events
-- Connected to Interest Islands
-- Used for recommendation candidate generation
-
-## Interest Island
-
-An Interest Island is a coherent cluster of user interests.
-
-An individual user can have multiple Interest Islands.
-
-Examples:
-- AI + Databricks + LLMs
-- Geopolitics + China + Taiwan
-- Formula 1 + Ferrari + Racing
-
-Purpose:
-- Represent multiple dimensions of user interests
-- Avoid reducing a user to a single embedding
-- Drive personalized recommendations
-
-Important characteristics:
-- Interest Islands are dynamic
-- Generated from user behavior
-- Have embeddings
-- Connected primarily to Topics, not directly to Articles
-
-Relationships:
-- Belongs to a User
-- Connected to Topics
-- May temporarily connect to Events
-- Built from interaction signals
-
-# Recommendation Philosophy
-
-The system is topic-centric, not article-centric.
-
-The recommendation flow should be:
-
-Interest Island
-    ↓
-Nearest Topics
-    ↓
-Active Events
-    ↓
-Best Articles
-
-## User Interaction Signals
-
-Interest Islands are built from behavioral signals.
+Search supports human time intent. Users may ask for concrete dates, relative periods, recent days, or named days. These expressions describe publication-time ranges unless another product concept explicitly says otherwise.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pietheinstrengholt/rssmonster](https://github.com/pietheinstrengholt/rssmonster) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
