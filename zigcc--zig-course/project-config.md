@@ -1,303 +1,159 @@
 ---
 trigger: always_on
-description: 本文档帮助 AI 助手理解 Zig 语言圣经项目的结构和开发规范。
+description: > 本文件面向后续维护本目录的 **AI Agent / LLM** 与 **人类开发者**。
 ---
 
-# AGENTS.md
+# AGENTS.md — zig-course PDF 导出器
 
-本文档帮助 AI 助手理解 Zig 语言圣经项目的结构和开发规范。
+> 本文件面向后续维护本目录的 **AI Agent / LLM** 与 **人类开发者**。
+> 阅读后应能：理解整体设计、在不破坏既有特性的前提下扩展功能、把工具集成进
+> zig-course（VitePress）项目，并避开已知的若干隐蔽陷阱。
+>
+> 适用范围：`scripts/pdf/` 目录下的全部代码。修改本目录代码时请优先遵循本文件的约定。
 
-## 项目概述
+---
 
-**Zig 语言圣经** 是一个全面的开源 Zig 编程语言中文教程。项目旨在为中文开发者提供高质量的 Zig 学习资源。
+## 1. 这是什么
 
-- **官方网站**: https://course.ziglang.cc/
-- **GitHub Pages**: https://zigcc.github.io/zig-course/
-- **代码仓库**: https://github.com/zigcc/zig-course
-- **开源协议**: MIT
-- **主要语言**: 简体中文
-- **文档语言**: 中文为主，技术术语保留英文
+一个**不依赖无头浏览器**的离线 PDF 生成器，把整套 zig-course 课程渲染为带书签、
+可点击站内/外链的单一 PDF（`books/zig_course.pdf`）。它替代了旧的
+`vitepress-export-pdf`（基于 Puppeteer）方案。
 
-## 核心目标
+核心实现思路：直接复用项目的 `course/.vitepress/sidebar.ts` 作为目录与顺序的**唯一数据源**，
+逐篇读取 Markdown → 预处理与分词（`marked`）→ 用 [`jsPDF`](https://github.com/parallax/jsPDF)
+矢量绘制 → 收集并绑定跳转链接 → 写入 PDF outline（书签）→ 输出文件。代码高亮使用
+VitePress 同款的 [Shiki](https://shiki.style/) 引擎。
 
-1. 提供全面的 Zig 编程语言中文文档
-2. 支持多个 Zig 版本（0.11 至 0.16）
-3. 维护可运行的代码示例
-4. 记录版本升级指南和破坏性变更
-5. 构建高质量的中文 Zig 社区学习资源
-
-## 项目结构
-
-```
-zig-course/
-├── build.zig                    # 主构建编排器
-├── build/                       # 版本特定的构建脚本
-│   ├── 0.11.zig                # Zig 0.11 构建逻辑
-│   ├── 0.12.zig                # Zig 0.12 构建逻辑
-│   ├── 0.13.zig                # Zig 0.13 构建逻辑
-│   ├── 0.14.zig                # Zig 0.14 构建逻辑
-│   ├── 0.15.zig                # Zig 0.15 构建逻辑（当前重点）
-│   └── 0.16.zig                # Zig 0.16 构建逻辑
-│
-├── course/                      # 主要文档内容
-│   ├── .vitepress/             # VitePress 配置
-│   │   ├── config.mts          # 站点主配置
-│   │   ├── sidebar.ts          # 侧边栏导航结构
-│   │   ├── nav.ts              # 顶部导航
-│   │   └── theme/              # 自定义主题组件
-│   │
-│   ├── environment/            # 环境搭建指南
-│   ├── basic/                  # Zig 基础概念
-│   ├── advanced/               # 进阶主题
-│   ├── engineering/            # 软件工程实践
-│   ├── examples/               # 实战示例
-│   ├── update/                 # 版本升级指南
-│   ├── appendix/               # 参考资料
-│   │
-│   ├── code/                   # 可运行的代码示例
-│   │   ├── 11/                 # Zig 0.11 示例
-│   │   ├── 12/                 # Zig 0.12 示例
-│   │   ├── 13/ → ./12          # 符号链接（与 0.12 兼容）
-│   │   ├── 14/                 # Zig 0.14 示例
-│   │   ├── 15/                 # Zig 0.15 示例（当前活跃版本）
-│   │   └── release/ → ./15     # 符号链接到最新稳定版
-│   │
-│   ├── picture/                # 图片资源
-│   └── public/                 # 静态网站资源
-│
-├── .github/
-│   └── workflows/              # CI/CD 流水线
-│       ├── build.yml           # 多平台、多版本构建
-│       ├── deploy.yml          # GitHub Pages 部署
-│       ├── check.yml           # 代码格式检查
-│       ├── autocorrect.yml     # 中文文本格式检查
-│       └── pdf.yml             # PDF 导出流程
-│
-├── package.json                # Node.js 依赖（Bun）
-├── bun.lock                    # Bun 锁文件
-└── flake.nix                   # Nix 开发环境
-```
-
-## 开发工作流
-
-### 构建和测试
-
-项目使用多版本构建系统确保跨 Zig 版本兼容性：
+### 运行方式
 
 ```bash
-# 使用当前 Zig 版本构建所有示例
-zig build
-
-# 主 build.zig 会根据检测到的 Zig 编译器版本
-# 自动分发到 build/ 目录下对应的版本特定脚本
+bun pdf          # 全量构建 -> books/zig_course.pdf
+bun pdf:sample   # 仅渲染几篇代表页 -> books/zig_course_sample.pdf（快速验证，秒级）
 ```
 
-### 文档开发
-
-文档站点使用 VitePress 构建：
+两个脚本都通过 [Bun](https://bun.sh) **直接执行 TypeScript**（`bun run scripts/pdf/main.ts`），
+无需预编译或 tsx。类型检查（不产出文件）：
 
 ```bash
-# 启动带热重载的开发服务器
-bun dev
-
-# 构建生产站点
-bun build
-
-# 预览构建后的站点
-bun preview
-
-# 导出 PDF 版本
-bun export-pdf
+node_modules/.bin/tsc --noEmit -p scripts/pdf/tsconfig.json
 ```
 
-### 代码格式化
+---
 
-```bash
-# 格式化所有代码（Markdown、Zig、中文文本）
-bun format
+## 2. 目录与模块职责
 
-# 检查格式但不修改文件
-bun check
+| 文件            | 职责                                                                                         |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| `main.ts`       | 入口：`import sidebar`，扁平化为有序节点，逐页渲染，创建 PDF 书签（outline），写出文件       |
+| `parse.ts`      | Markdown **预处理 + 分词**：展开代码引用、转换 GitHub alert、解析 VitePress 容器，产出 token |
+| `renderer.ts`   | **核心布局引擎**：标题/段落/列表/表格/代码块/图片/提示框/引用块绘制，链接坐标收集与最终绑定  |
+| `highlight.ts`  | 用 Shiki 把代码着色为 `{content, color}` 片段（只取 token 颜色，不生成 HTML）                |
+| `utils.ts`      | sidebar 扁平化、站内链接归一化、`slugify`、图片路径解析、代码引用 `<<<@/...` 解析 + dedent   |
+| `tsconfig.json` | 仅供本目录 `tsc --noEmit` 类型检查与编辑器使用，**不参与** VitePress 构建                    |
+| `README.md`     | 面向使用者的简明说明                                                                         |
+| `AGENTS.md`     | 本文件，面向维护者/Agent 的深入说明                                                          |
+
+> 模块依赖方向（无环）：`main → {parse, renderer, highlight, utils}`；
+> `parse → utils`；`renderer → {utils, highlight, parse(类型)}`。
+
+---
+
+## 3. 数据流（端到端）
+
+```
+sidebar.ts
+   │  flattenSidebar()               (utils.ts)
+   ▼
+FlatNode[]  ──filter EXCLUDE/SAMPLE──►  有序页面/分组节点          (main.ts)
+   │  对每个页面节点 route:
+   │    readFile(route.md)
+   ▼
+parseMarkdown(content, courseDir)                                  (parse.ts)
+   │  预处理 step A→D（见 §4）后 marked.lexer，再把 [[ADMONITION]] 收拢为自定义 token
+   ▼
+PdfToken[]
+   │  renderer.renderPage(route, title, tokens)                    (renderer.ts)
+   │    renderTokens() 按 token.type 分发到各 drawXxx；
+   │    标题登记 anchors，页面登记 routeStart，链接坐标入 pendingLinks
+   ▼
+（全部页面渲染完）
+   │  renderer.finalize()   用 anchors/routeStart 把 pendingLinks 绑定为 doc.link 跳转
+   │  main.ts 同步用 outline.add() 写书签
+   ▼
+renderer.output()  ->  books/zig_course.pdf
 ```
 
-这会运行：
+---
 
-- Prettier 处理 Markdown/TypeScript/JavaScript
-- `zig fmt` 处理 Zig 源文件
-- AutoCorrect 处理中文文本格式
+## 4. Markdown 预处理管线（`parse.ts` 的 `preprocess`）
 
-## 版本兼容性维护
+按**固定顺序**执行，顺序不可随意调换：
 
-### 多版本构建系统架构
+1. **step A — 去除 front matter**：删除文件开头 `--- ... ---` 区块。
+2. **step B — 展开代码引用**：把 `<<<@/code/xxx.zig#anchor` 行替换为对应代码 fence。
+   实际抽取在 `utils.resolveCodeImport`（见 §6）。
+3. **step B2 — GitHub alert**：把 `> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION|DETAILS]`
+   多行 blockquote 转成统一的 `[[ADMONITION:type:title]] ... [[/ADMONITION]]` 标记块。
+4. **step C — VitePress 容器**：用**栈**跟踪 `::: info/tip/warning/danger/details`、
+   `code-group/raw/v-pre`（支持 `:::` 数量 ≥3 的嵌套）。提示类容器转成 `[[ADMONITION]]` 标记块；
+   `code-group` 等仅去除围栏标记、保留内部内容。
+5. **step D — 剔除属性指令**：去掉图片/链接尾部的 `{data-zoomable}`、`{.class}` 等 VitePress 属性。
 
-项目采用版本分发架构来支持多个 Zig 版本：
+之后 `parseMarkdown` 调用 `marked.lexer`，再用递归的 `collapse()` 把文本里的
+`[[ADMONITION:...]] / [[/ADMONITION]]` 标记**收拢为嵌套的 `admonition` 自定义 token**。
 
-1. **主构建入口** (`build.zig`): 检测当前 Zig 编译器版本，自动分发到对应的版本特定构建脚本
-2. **版本构建脚本** (`build/0.XX.zig`): 每个版本有独立的构建逻辑
-3. **代码示例目录** (`course/code/XX/`): 每个版本维护独立的示例代码
+> **设计动机**：把"容器/alert"在文本层先归一成统一标记，避免在 `marked` token 树里
+> 处理 VitePress 私有语法；渲染器只需认识一种 `admonition` token。
 
-### 修复不同版本编译问题的工作流程
+---
 
-当需要修复特定 Zig 版本的编译问题时，需要处理以下目录：
+## 5. 渲染引擎要点（`renderer.ts`）
 
-#### 1. 更新构建脚本
+### 5.1 坐标系与单位
 
-**路径**: `build/0.XX.zig`
+- 单位为 **mm**（`new jsPDF({ unit: "mm", format: "a4" })`）。A4 = 210×297mm，页边距见 `MARGIN`。
+- **字号是 pt**，坐标是 mm。两者换算 `1pt ≈ 0.3528mm`。涉及"按字号计算垂直偏移"时
+  **必须显式换算**（如列表圆点的 `dotCy`），不要把 pt 当 mm 直接相加——这是历史 bug 来源。
 
-当 Zig 编译器 API 发生变更时需要更新：
+### 5.2 三字体与正文/代码分流
 
-- 构建系统 API 变更（如 `std.Build` 接口改变）
-- 模块系统变更（如 `root_module` 相关 API）
-- 目标平台和优化选项变更
+构造时加载三套 glyf 型 TrueType 字体：
 
-**示例场景**:
+- `CJK`（思源宋体）→ 中文与 CJK 标点；
+- `Sans`（Inter）→ **正文英文/数字**（无衬线比例字体）；
+- `Mono`（JetBrains Mono）→ **代码块与行内代码**（等宽）。
 
-- Zig 0.12 引入模块系统，需要从 `addExecutable` 迁移到 `addModule`
-- Zig 0.14 更改了目标解析方式，需要更新 `resolved_target` 相关代码
+分流规则（`isCjk(ch)` 逐字符判定 + 是否代码上下文）：CJK 字符走 `CJK`；代码（fence 代码块、
+`codespan` 行内代码）走 `Mono`；其余正文拉丁走 `Sans`。字体子集**不含 emoji**，因此提示框
+标题会先经 `cleanAdmonitionTitle` 去除 emoji，否则会出现缺字形并把文字推偏。
 
-#### 2. 更新代码示例
+> 字体由 `build-fonts.ts`（纯 Bun/JS，`subset-font`/harfbuzz）从 Google Fonts 的 glyf 型
+> **可变字体**「子集 + 钉轴（wght=400 等）」生成静态 TTF。**jsPDF 只能内嵌 glyf 型 TrueType**，
+> 三个源（Noto Serif SC / Inter / JetBrains Mono）都是 glyf，无需任何 CFF→glyf 转换。
+> 换字体务必选 glyf 型来源（CFF/OTF 会被 jsPDF 静默拒绝、渲染空白）。
 
-**路径**: `course/code/XX/`
+### 5.3 两遍链接绑定（核心机制）
 
-此目录包含两类文件需要维护：
+jsPDF 顺序绘制、无法回溯修改链接。因此采用"**先收集坐标，最后统一绑定**"：
 
-##### a) 单文件示例（直接的 .zig 文件）
+- 渲染时：标题登记到 `anchors`（key = `` `${route}#${slug}` ``），页面登记到 `routeStart`，
+  每个站内链接的矩形热区入 `pendingLinks`（含其所在页 `page`）。
+- `finalize()`：对每个 `pendingLink` 查 `anchors[route#anchor]` → 退化到 `anchors[route#]`（页首）
+  → 再退化到 `routeStart[route]`，命中后 `doc.setPage(link.page)` 并 `doc.link(...)` 绑定跳转。
 
-这些文件会被构建脚本直接编译为可执行文件和测试：
+### 5.4 页号的真实来源：`curPage()`（务必理解）
 
-- `hello_world.zig`
-- `array.zig`
-- `comptime.zig`
-- 等等...
+存在两个"页号"：
 
-**修复重点**:
+- `this.page`：**内部计数器**，`newPage()` 时自增，用于跨页测高的增量判断；
+- `doc.getCurrentPageInfo().pageNumber`：jsPDF **文档真实页号**。
 
-- 标准库 API 变更（如 `std.debug.print`、`std.mem.Allocator`）
-- 语法变更（如错误处理、可选类型语法）
-- 类型系统变更
-
-##### b) 项目类型示例（子目录包含 build.zig）
-
-这些是完整的 Zig 项目，有自己的构建系统：
-
-- `build_system/` - 构建系统示例
-- `import_dependency_build/` - 依赖管理示例
-- `import_vcpkg/` - C 库集成示例
-
-**修复重点**:
-
-- 项目自己的 `build.zig` 需要同步更新
-- 依赖声明方式的变更（如 `build.zig.zon`）
-- 模块导入和导出方式的变更
-
-#### 3. 版本符号链接维护
-
-**当前符号链接**:
-
-- `course/code/13/` → `./12` (Zig 0.13 与 0.12 兼容)
-- `course/code/release/` → `./15` (指向最新稳定版)
-
-**维护规则**:
-
-- 如果新版本完全兼容旧版本，可以创建符号链接而不是复制代码
-- 当有破坏性变更时，必须创建独立目录并更新所有示例
-
-#### 4. 验证流程
-
-在根目录运行 `zig build` 验证修复：
-
-```bash
-# 主 build.zig 会自动选择对应版本的构建脚本
-zig build
-
-# 构建过程会：
-# 1. 编译 course/code/XX/ 下的所有单文件示例
-# 2. 运行所有测试
-# 3. 递归构建子目录中的项目示例
-```
-
-#### 5. 常见破坏性变更类型
-
-**标准库变更**:
-
-- 分配器 API (`std.heap.GeneralPurposeAllocator`)
-- 文件系统 API (`std.fs`)
-- 网络 API (`std.net`)
-
-**语言特性变更**:
-
-- 错误处理语法
-- 可选类型语法
-- 编译时特性
-
-**构建系统变更**:
-
-- `std.Build` API
-- 模块系统
-- 依赖管理（`build.zig.zon`）
-
-#### 6. 实用技巧
-
-**批量测试多个版本**:
-项目的 CI 系统（`.github/workflows/build.yml`）会在多个平台和 Zig 版本上运行构建，可以参考 CI 配置来本地测试多版本兼容性。
-
-**创建新版本支持**:
-
-1. 复制最近版本的 `build/0.XX.zig` 到新版本
-2. 复制或链接 `course/code/XX/` 目录
-3. 在主 `build.zig` 中添加新版本的 case 分支
-4. 运行构建并修复所有编译错误
-5. 更新 `course/code/release/` 符号链接（如果是最新稳定版）
-
-**检查依赖项目**:
-不要忘记检查子目录项目的构建：
-
-```bash
-cd course/code/15/build_system
-zig build
-```
-
-## 文档编写规范
-
-### 文档与代码分离原则
-
-本项目要求**代码示例必须与 Markdown 文档分离**，不允许将代码内联到 Markdown 中。这样做的目的是：
-
-1. **可测试性**：所有代码示例都能通过 `zig build` 进行编译验证
-2. **版本兼容性**：不同 Zig 版本可以维护各自的代码实现
-3. **代码质量**：通过单元测试确保示例代码的正确性
-
-### 添加新文档章节的完整流程
-
-以添加一个新的教程章节为例，完整流程如下：
-
-#### 步骤 1：创建代码示例文件
-
-**路径**: `course/code/15/<topic>.zig`（15 为当前活跃版本）
-
-代码文件结构规范：
-
-```zig
-const std = @import("std");
-
-// 主入口函数，用于运行所有示例
-pub fn main() !void {
-    Example1.main();
-    Example2.main();
-    try Example3.main();
-}
-
-// 使用结构体封装每个代码片段
-const Example1 = struct {
-    // #region example1_anchor
-    // 这里是将在文档中显示的代码
-    const SomeType = struct {
-        field: u32,
-    };
-
+两者可能因两遍渲染产生 1 页漂移。**所有"用于记录跳转目标 / 链接热区"的页号必须用
+`curPage()`**（real 阶段返回真实页号，dry 阶段返回内部计数）。历史上曾因为用 `this.page`
+记录锚点导致**全书站内跳转整体错一页**，已通过 `curPage()` 修复。新增任何"登记 anchor /
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zigcc/zig-course](https://github.com/zigcc/zig-course) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
