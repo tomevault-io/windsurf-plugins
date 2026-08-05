@@ -1,66 +1,155 @@
 ---
 trigger: always_on
-description: This document serves as the primary rule file for AI Agents working on this project.
+description: manages:
 ---
 
-# AI Agent Guidelines
+# tmux-worktree-tui
 
-This document serves as the primary rule file for AI Agents working on this project.
-**ALWAYS** update this file when you discover new patterns or finish significant tasks.
+**공식 명칭**: `tmux-worktree-tui`  
+**실행 명령어**: `tmux-worktree-tui`
 
-## Instruction
-- After every task and changes, install the compiled extension to `code`, `code-insiders`, `antigravity`. DO NOT INCREASE version. (It will be automatically increased when publish, and we don't want to increase it for testing)
+This project is a Go CLI that provides two entry points for the same
+multiplexer (tmux / zellij) sessions the `vscode-tmux-worktree` extension
+manages:
 
-## Tested VS Code
-- `code` (VS Code)
-- `antigravity` (Google Antigraity)
-- `cursor` (Cursor)
+- `tmux-worktree-tui` (no args) — Bubble Tea TUI for browsing existing
+  sessions and worktrees across configured search paths.
+- `tmux-worktree-tui open` — attach to (or create) the session the
+  extension would use for the current directory.
 
-## 1. Codebase Understanding
+It **MUST** follow the same naming and env-handling rules as the extension
+so a session created from one tool can be attached from the other without
+any drift.
 
-### Project Structure
-```
-.
-├── src/                    # VS Code Extension Source (TypeScript)
-│   ├── extension.ts        # Extension Entry Point
-│   ├── commands/           # Command Implementations
-│   ├── providers/          # Tree Data Providers (Sidebar)
-│   └── utils/              # Utilities (tmux, git, execution)
-├── cli/                    # CLI Tool Source (Go)
-│   ├── main.go             # CLI Entry Point
-│   ├── internal/ui/        # TUI Implementation (Bubble Tea)
-│   └── pkg/                # Shared Packages
-├── out/                    # Compiled Extension Output
-├── .vscode/                # Editor Configuration
-└── resources/              # Icons and Assets
+## 📦 Installation
+
+```bash
+cd cli && go install ./...
+# Binary: ~/go/bin/tmux-worktree-tui
 ```
 
-### Key Components
-- **VS Code Extension**: Manages the "TMUX Worktrees" view in the Activity Bar. It interacts with the `tmux` CLI and `git worktree` commands.
-- **CLI (`twt`)**: A terminal user interface (TUI) for managing sessions/worktrees outside of VS Code, built with Bubble Tea.
+## 📏 Naming Conventions (STRICT)
 
-## 2. Coding Patterns & Best Practices
+These rules come from `src/utils/git.ts` and
+`src/utils/{tmux,zellij}Backend.ts` in the extension. Keep them in sync.
 
-- **Polymorphism**: Commands must handle `TmuxItem` base class and variants (`TmuxSessionItem`, `InactiveWorktreeItem`, etc.).
-- **Path Handling**: Use `getWorktreePath(item)` helper.
-- **Canonical Path Matching**: For path equality/deduplication/current-workspace checks, normalize to absolute paths with `~` expansion before comparison (do not collapse symlink aliases via `realpath`).
-- **Managed Worktree Location**: Create extension-managed worktrees under `~/.tmux-worktrees/<repo-name-hash>/` by default. Reuse shared helpers for path checks and orphan cleanup instead of hardcoding repo-local `.worktrees` path fragments.
-- **Session Namespace**: Build tmux session prefixes from repo-root identity (basename + short path hash), not display repo name alone, to avoid collisions across same-name repositories in different directories.
-- **Legacy Session Compatibility Isolation**: Keep legacy session-prefix compatibility logic centralized in `src/utils/sessionCompatibility.ts`; call helpers from commands/providers instead of duplicating fallback checks.
-- **Root Detection**: Determine the primary worktree by comparing worktree path to the primary worktree path derived from `git rev-parse --git-common-dir`, not by branch naming, folder basename, or the current workspace folder.
-- **Current Workspace Indicator**: Highlight the active VS Code workspace by comparing worktree/session paths against the current workspace folder (not the primary worktree path). Current items should sort to the top and display a `👆` marker in the label.
-- **External Worktrees**: If the worktree folder name matches the repo name, derive a unique slug/label from the parent directory.
-- **Slug Collision Handling**: Worktree session slugs must be unique by sanitized tmux name. Start with basename-based slug, then disambiguate with parent directory, and finally append a short path hash when collisions remain.
-- **Free-Form Task Branches**: `TMUX: New Task` accepts arbitrary valid git branch names, including `/`. Sanitize `/` to `-` for tmux/worktree slugs, and never infer main-vs-task state from a `task/` prefix.
-- **Unpublished Task Branches**: When creating a new task branch, do not preconfigure `branch.<name>.remote` / `branch.<name>.merge` before the first push. VS Code SCM treats that as an upstream and may try to sync against a remote branch that does not exist yet. Store only `branch.<name>.vscode-merge-base` with the chosen base branch so SCM diffs stay anchored while **Publish Branch** remains available.
-- **Primary `main` Slug Reservation**: Reserve `main` for the primary worktree. If a non-primary worktree or branch would sanitize to `main`, suffix it during slug collision resolution instead of reusing the primary session name.
-- **Tree Context Menu**: Use a single TreeItem `contextValue` (`tmuxItem`) for levels 2/3/4 so the same context menu always appears.
-- **Error Handling**: Use `try-catch` in TS and check `err != nil` in Go. Fail gracefully and notify the user.
-- **Async/Await**: Use `async/await` for all I/O operations in TypeScript.
-- **Terminal Creation**: Use `/bin/sh -c 'exec tmux attach ...'` instead of `shellPath: 'tmux'`. Direct `shellPath: 'tmux'` causes VS Code to treat it as a non-standard shell, breaking mouse drag events (pane resize). The `exec` replaces sh with tmux (no extra process), and `-c` avoids sendText race conditions with other extensions.
+### 1. Identity Root
+
+- Always derive identity from the **primary worktree** path, not the
+  current (possibly linked) worktree.
+- Find it with `git rev-parse --git-common-dir`; the parent of that dir is
+  the primary worktree root.
+- For non-git folders, the identity root is the folder itself.
+
+### 2. Session Namespace
+
+- Format: `{sanitized-basename}-{sha1[:8]}`
+- The hash is taken from the **absolute identity-root path** (no
+  `realpath`, no symlink resolution).
+- This is the part that prevents same-named repos in different folders
+  from colliding on a shared multiplexer server.
+
+### 3. Slug
+
+- Primary worktree → `main`.
+- Managed storage (`~/.tmux-worktrees/<ns>/<slug>` or repo-local
+  `.worktrees/<slug>`) → basename of the worktree path.
+- External worktree whose basename equals the repo name → suffix with the
+  parent dir (`repo` + `-` + parent).
+- Otherwise → basename of the worktree path.
+
+### 4. Session Name
+
+- Format: `{namespace}_{slug}`
+- Both halves run through the sanitizer that replaces `/ \ . : <space>`
+  with `-`.
+- Examples:
+  - `my-project-7b66cd9f_main`
+  - `my-project-7b66cd9f_feature-login`
+
+### 5. Slug Collision
+
+- Primary `main` slug is reserved for the primary worktree. If another
+  worktree would sanitize to `main`, suffix it (CLI behavior should match
+  the extension's auto-disambiguation; today only the extension creates
+  new worktrees so this rule mainly applies to the TUI's `new task`
+  flow).
+
+## ⚙️ VS Code Settings Integration
+
+`open` reads two VS Code settings so the CLI matches what the extension
+is configured to do for the same folder:
+
+- `tmuxWorktree.multiplexer` (`tmux` | `zellij`, default `tmux`)
+- `tmuxWorktree.socketDir` (default `/var/tmp`)
+
+Resolution order (first hit wins):
+
+1. Workspace settings: `<repoRoot>/.vscode/settings.json`
+2. User settings (in this order, when present):
+   - `~/Library/Application Support/Code/User/settings.json`
+   - `~/Library/Application Support/Code - Insiders/User/settings.json`
+   - `~/Library/Application Support/Cursor/User/settings.json`
+   - `~/Library/Application Support/Antigravity/User/settings.json`
+   - Linux equivalents under `~/.config/<variant>/User/settings.json`
+3. Built-in defaults.
+
+JSONC quirks (line/block comments, trailing commas) are stripped before
+JSON parsing; a malformed settings file is silently skipped so the CLI
+keeps working when one editor variant has a broken file.
+
+## 🧼 Env Scrub on Attach
+
+Both backends strip `VSCODE_*`, `ELECTRON_RUN_AS_NODE`, `TERM_PROGRAM`,
+`TERM_PROGRAM_VERSION`, `VSCODE_INJECTION`, `VSCODE_SHELL_INTEGRATION`
+from `os.Environ()` before invoking the multiplexer, and pin a clean
+`TERM=xterm-256color` / `COLORTERM=truecolor`. The tmux backend also
+clears any cached `VSCODE_*` keys from a running tmux server via
+`set-environment -gu` so previously-leaked vars don't poison fresh panes.
+
+## 🌀 Backend-Specific Quirks
+
+### Zellij
+
+- Session names starting with `-` (e.g. `.hermes-...`) are passed after
+  `--` so zellij does not parse them as flags.
+- `--simplified-ui` is **not** added by the CLI — the user's native
+  terminal is assumed to have Nerd Font glyphs. The extension still adds
+  it for the integrated VS Code terminal.
+- Attempting `open` from inside an existing zellij session (with
+  `ZELLIJ` env set) fails fast with a clear error; zellij has no
+  switch-client equivalent.
+- `ZELLIJ_SOCKET_DIR` is pinned to the configured socket dir + `/zellij`.
+
+### Tmux
+
+- Inside tmux (`TMUX` env set) the CLI uses `switch-client -t <name>`
+  and exits cleanly. The session is created in detached mode first if
+  it didn't already exist.
+- Outside tmux the CLI uses `syscall.Exec` with `tmux new-session -A`,
+  letting tmux take over the terminal directly.
+- `TMUX_TMPDIR` is pinned to the configured socket dir.
+
+## 🛠 Tech Stack
+
+- **Language**: Go
+- **TUI**: [Bubble Tea](https://github.com/charmbracelet/bubbletea)
+- **Git**: `os/exec` with `git worktree list --porcelain`
+- **Config**: JSON in `~/.config/tmux-worktree-tui/config.json` (TUI
+  search paths only); VS Code settings drive multiplexer/socketDir.
+
+## 🚀 Features
+
+1. **Project Discovery**: Scan user-defined directories for git repos
+   (TUI).
+2. **Worktree List**: Parse porcelain output, filter prunable (TUI).
+3. **`open` subcommand**: Resolve session identity for the current
+   directory and attach via the multiplexer the VS Code extension is
+   configured to use.
+4. **Multiplexer Integration**:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kargnas/vscode-ext-tmux-worktree](https://github.com/kargnas/vscode-ext-tmux-worktree) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
