@@ -1,102 +1,134 @@
 ---
 trigger: always_on
-description: > Single source of AI agent guidance for the Octocode monorepo. Covers the root and every package — there is **no** per-package `AGENTS.md`.
+description: Agent guide for `@octocodeai/skills`. Read this before any edit to this package.
 ---
 
-# AGENTS.md — Octocode Monorepo
+# AGENTS.md — `packages/octocode-skills`
 
-> Single source of AI agent guidance for the Octocode monorepo. Covers the root and every package — there is **no** per-package `AGENTS.md`.
-
-## Contents
-
-**Monorepo**
-- [Documentation Links Rule](#documentation-links-rule)
-- [Core Methodology](#core-methodology)
-- [Repository Structure](#repository-structure)
-- [Access Control](#access-control-monorepo-wide)
-- [Quick Commands](#quick-commands)
-- [Key References](#key-references)
-
-**Packages**
-- [`octocode-mcp`](#package-octocode-mcp) — MCP server (14 tools)
-- [`octocode-cli`](#package-octocode-cli) — CLI installer + tool runner
-- [`octocode-shared`](#package-octocode-shared) — Credentials, sessions, platform
-- [`octocode-vscode`](#package-octocode-vscode) — VS Code extension
-- [`octocode-security-utils`](#package-octocode-security-utils) — Security utilities
+Agent guide for `@octocodeai/skills`. Read this before any edit to this package.
+Root `AGENTS.md` applies everywhere; this file narrows scope to this package only.
 
 ---
 
-## Documentation Links Rule
+## What this package is
 
-All links in documentation files (`docs/`, package READMEs) **MUST** use absolute GitHub URLs — never relative paths.
+A zero-runtime-dep CLI + library that:
+1. **Bundles** all skills from `../../skills/` at build time into `skills/` (package root).
+2. **Lists** bundled skills with install status and env readiness.
+3. **Installs** skills to a canonical home (`~/.octocode/skills/<name>/`) then symlinks into platform dirs.
+4. **Checks** all installation locations and env param configuration.
+5. **Informs** — every command tells the user what is missing and how to fix it.
 
-**Base URL:** `https://github.com/bgauryy/octocode-mcp/blob/main/`
+**Hard invariants:**
+- Zero npm runtime dependencies — Node.js builtins only (`node:fs`, `node:path`, `node:os`, `node:url`).
+- `src/cli.ts` must NOT start with `#!/usr/bin/env node` — esbuild adds it via `banner`; a source shebang creates a double-shebang that crashes Node ESM.
+- All TypeScript is compiled with `exactOptionalPropertyTypes: true` — never assign `undefined` to an optional property; use conditional spread `...(x !== undefined ? { x } : {})`.
+- `out/` is always generated — never edit it by hand; always rebuild after changes.
 
-```
-❌ WRONG: Config -> ./CONFIGURATION_REFERENCE.md
-❌ WRONG: Auth -> ../docs/AUTHENTICATION_SETUP.md
-✅ RIGHT: [Config](https://github.com/bgauryy/octocode-mcp/blob/main/docs/configuration/CONFIGURATION_REFERENCE.md)
-✅ RIGHT: [Auth](https://github.com/bgauryy/octocode-mcp/blob/main/docs/configuration/providers/AUTHENTICATION_SETUP.md)
-```
+---
 
-## Core Methodology
-
-1. **Task Management**: Review → Plan (use `todo` tool) → Track progress
-2. **Research**: Prefer `octocode-local` MCP tools. LSP first, then local search, then GitHub
-3. **TDD**: Write failing test → Run (`yarn test`) → Fix → Verify coverage (90%)
-4. **ReAct Loop**: Reason → Act → Observe → Loop
-5. **Quality**: Clean Code, run `yarn lint` + `yarn test`, use `npx knip` for dead code
-6. **Efficiency**: Use Linux commands (`mv`, `cp`, `sed`) for file operations
-
-> **File Operations**: Use Linux commands for file changes and prefer batching changes.
-> For command examples and workflows, see: [Linux & File Operations](https://github.com/bgauryy/octocode-mcp/blob/main/docs/dev/DEVELOPMENT_GUIDE.md#linux--file-operations)
-
-## Repository Structure
+## Directory map
 
 ```
-octocode-mcp/
-├── packages/
-│   ├── octocode-mcp/             # MCP server: GitHub/GitLab/Bitbucket, local tools, LSP
-│   ├── octocode-cli/             # CLI installer, tool runner, skills marketplace
-│   ├── octocode-vscode/          # VS Code extension (OAuth, multi-editor MCP install)
-│   ├── octocode-shared/          # Shared utilities (credentials, platform, session)
-│   └── octocode-security-utils/  # Standalone security utilities (no AGENTS section)
-├── skills/                       # AI agent skills (research, plan, roast, etc.)
-├── docs/                         # ALL monorepo documentation (provider setup, references, workflows)
-└── package.json                  # Workspace root (yarn workspaces)
+packages/octocode-skills/
+├── src/
+│   ├── cli.ts              ← CLI entry point — arg parsing, command dispatch, help text
+│   ├── index.ts            ← Library exports (programmatic API)
+│   ├── registry.ts         ← Read bundled skills list; parse SKILL.md frontmatter
+│   ├── installer.ts        ← Copy/symlink a skill to home, platform dirs, workspace, custom path
+│   ├── checker.ts          ← Probe install locations: installed | linked | broken | missing
+│   ├── env-params.ts       ← Static env param registry per skill; runtime set/missing check
+│   ├── home.ts             ← getOctocodeHome(), getSkillsHome() — inlined, zero deps
+│   ├── platforms.ts        ← Platform → dir mapping; parsePlatforms()
+│   ├── commands/
+│   │   ├── list.ts         ← `octocode-skills list`    — skills + install + env status
+│   │   ├── install.ts      ← `octocode-skills install` — install with override/keep + env warning
+│   │   ├── check.ts        ← `octocode-skills check`   — verify install + env per skill
+│   │   └── info.ts         ← `octocode-skills info`    — SKILL.md + env params detail
+│   └── utils/
+│       ├── colors.ts       ← dim / bold / green / yellow / red / cyan — single-file, no dep
+│       └── spinner.ts      ← TTY spinner on stderr; silent when !isTTY or CI=true
+├── skills/                 ← GENERATED at build — copy of ../../skills/ (no scripts/ dirs)
+├── out/                    ← GENERATED — esbuild bundles (cli.js, index.js)
+├── build.mjs               ← Build script: clean → sync skills → esbuild CLI + index
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
 
-## Access Control (monorepo-wide)
+---
 
-| Path | Access |
-|------|--------|
-| `packages/*/src/`, `packages/*/tests/` | ✅ Auto |
-| `docs/` | ✅ Auto |
-| `*.json`, `*.config.*` | ⚠️ Ask |
-| `.env*`, `.octocode/`, `node_modules/`, `dist/`, `out/`, `coverage/` | ❌ Never |
+## Data flow
 
-## Quick Commands
+```
+../../skills/<name>/SKILL.md   ← source of truth for skill content
+        ↓  build.mjs (sync at build time, excludes scripts/)
+skills/<name>/SKILL.md         ← bundled copy inside this package
+        ↓  src/registry.ts
+listSkills() / getSkill()      ← SkillInfo { name, folder, description, dir }
+        ↓  src/env-params.ts
+getSkillEnvStatus()            ← SkillEnvStatus { readiness, params[] }
+        ↓  src/checker.ts
+checkSkill()                   ← SkillCheckResult { home, platforms[], workspace }
+        ↓  src/commands/*.ts
+list / install / check / info  ← human or JSON output to stdout
+```
 
-Canonical command list lives in the [Development Guide](https://github.com/bgauryy/octocode-mcp/blob/main/docs/dev/DEVELOPMENT_GUIDE.md) (Commands & Workflow section).
+All four commands read from these three modules. Changes to skill content flow through
+registry; changes to env requirements flow through env-params; installation state flows
+through checker.
 
-## Key References
+---
 
-### Core
-- **Docs Index**: [docs/README.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/README.md)
-- **Configuration Docs**: [docs/configuration/](https://github.com/bgauryy/octocode-mcp/tree/main/docs/configuration) — install, auth providers, MCP clients, env/config, troubleshooting
-- **Developer Docs**: [docs/dev/](https://github.com/bgauryy/octocode-mcp/tree/main/docs/dev) — tool/API references, workflows, architecture, contributing, skills
-- **Specs**: [docs/specs/](https://github.com/bgauryy/octocode-mcp/tree/main/docs/specs) — design specs and RFCs
-- **Development Guide**: [docs/dev/DEVELOPMENT_GUIDE.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/dev/DEVELOPMENT_GUIDE.md)
-- **Configuration**: [docs/configuration/CONFIGURATION_REFERENCE.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/configuration/CONFIGURATION_REFERENCE.md)
-- **Troubleshooting**: [docs/configuration/TROUBLESHOOTING.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/configuration/TROUBLESHOOTING.md)
+## Task: Adding a new skill
 
-### Octocode MCP
-- **GitHub/GitLab/Bitbucket Tools**: [docs/dev/reference/GITHUB_GITLAB_TOOLS_REFERENCE.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/dev/reference/GITHUB_GITLAB_TOOLS_REFERENCE.md)
-- **Local + LSP Tools**: [docs/dev/reference/LOCAL_TOOLS_REFERENCE.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/dev/reference/LOCAL_TOOLS_REFERENCE.md)
-- **Clone & Local Workflow**: [docs/dev/workflows/CLONE_AND_LOCAL_TOOLS_WORKFLOW.md](https://github.com/bgauryy/octocode-mcp/blob/main/docs/dev/workflows/CLONE_AND_LOCAL_TOOLS_WORKFLOW.md)
+**1. Create the skill folder** in `../../skills/<new-name>/` with at least a `SKILL.md`
+   that has YAML frontmatter:
+   ```yaml
+   ---
+   name: <new-name>
+   description: "One sentence — shown in list and info."
+   ---
+   ```
+
+**2. Register env params** in `src/env-params.ts` → `SKILL_ENV_PARAMS`:
+   ```ts
+   // If the skill needs no env params — do nothing. Skills absent from the map are treated as "ok".
+
+   // If it needs web search (like brainstorming):
+   'new-skill-name': WEB_SEARCH_PARAMS,
+
+   // If it needs GitHub token (like research):
+   'new-skill-name': GITHUB_TOKEN_PARAMS,
+
+   // If it needs something unique:
+   'new-skill-name': [
+     {
+       key: 'MY_KEY',
+       description: 'What it is for',
+       required: 'recommended',   // 'required' | 'recommended' | 'optional'
+       link: 'https://where-to-get.it/',
+       // group: 'my-group',  ← add only if AT LEAST ONE of multiple keys is enough
+     },
+   ],
+   ```
+
+**3. Rebuild and verify:**
+   ```bash
+   cd packages/octocode-skills
+   node build.mjs
+   node out/cli.js list
+   node out/cli.js info <new-name>
+   node out/cli.js list --json | python3 -c "import sys,json; s=json.load(sys.stdin)['skills']; [print(x['name'], x['env']['readiness']) for x in s]"
+   ```
+
+**4. Update README.md** — add a skill entry under `## Bundled skills` following the
+   existing pattern: name, one-liner, when-to-use, env params table.
+
+**No other files need to change.** `registry.ts` auto-discovers all SKILL.md folders;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bgauryy/octocode](https://github.com/bgauryy/octocode) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
