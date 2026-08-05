@@ -1,0 +1,109 @@
+---
+trigger: always_on
+description: This directory is the workdir of a cron job that sends an AI-paper digest to Slack every morning.
+---
+
+# Paper Digest Bot — Project Rules
+
+This directory is the workdir of a cron job that sends an AI-paper digest to Slack every morning.
+These rules are separate from SOUL.md (personality) and MUST be followed for this task.
+
+*한국어 버전: `AGENTS.ko.md` — 한국어로 운영하려면 `cp AGENTS.ko.md .hermes.md` (`.hermes.md`가 이 파일을 오버라이드합니다).*
+
+**Personal settings live in two files. Read them FIRST, before doing anything:**
+- `profile/config.md` — target channel ID, group→emoji mapping, output language, tone guide
+- `profile/interests.md` — interest groups with keywords, plus a low-interest list
+
+(If either is missing, tell the user to copy it from `profile/*.example.md` and stop.)
+
+## Mission
+
+1. Run `python3 scripts/collect_reactions.py` first to collect reactions on past messages.
+   - Based on the latest entries in `state/feedback.jsonl`, update `profile/interests.md`.
+   - Reaction interpretation (weights):
+     - ❤️ 🔥 🤩 💯 = strong interest (+2): more of this topic
+     - 👍 👏 🙌 ⭐ = interest (+1)
+     - 👀 🔖 = want to read (+1) — good candidate for a recap in the weekly digest
+     - 👎 😴 🥱 = not interested (-1)
+     - ❌ 🚫 = stop this topic (-2): move the topic toward the low-interest list
+   - When updating, append one line to the "feedback history" section at the bottom of the file.
+2. Gather today's paper candidates.
+   - Rankings on HF Daily Papers and alphaXiv are **UTC-based**. Always use the most
+     recently COMPLETED UTC day (= "yesterday" in KST terms) — never an in-progress ranking.
+   - alphaXiv trending/hot list (do not rely on keyword search alone)
+   - Hugging Face Daily Papers ranking for that completed day
+   - X/Twitter researcher posts as discovery signals only
+3. Exclude papers already sent, by checking against `state/sent-papers.jsonl`.
+4. Select papers in two tracks:
+   a. **Interest picks (3–5)** — match against `profile/interests.md`; the "low interest"
+      section MUST be reflected. Papers mentioned by the influence accounts listed in
+      `profile/config.md` get a ranking bonus — verify mentions via web search and cite
+      only confirmed ones in the buzz line. Influence-mentioned papers are eligible even
+      if they are NOT from that day's arXiv/ranking — recency is not required for them
+      (still dedup against sent-papers.jsonl).
+   b. **Exploration seeds (up to 3)** — papers ranked **top-3 on HF Daily or alphaXiv**
+      are ALWAYS shared even if they fall outside the user's interests (skip any already
+      chosen in 4a). Use the exploration emoji from `profile/config.md` and write the
+      interest line as `_Exploration: HF Daily #N_`. Positive reactions on these are a
+      signal to ADD a new topic to `interests.md` — they exist to expand the profile.
+5. For each paper, write the message using the template below, extract the concept figure
+   with `python3 scripts/extract_figure.py <arxiv_id>`, then send with
+   `python3 scripts/post_digest.py` (payload schema in the script's docstring).
+   - Channel: use the channel ID from `profile/config.md`
+   - One call sends the main message + the thread (figure, details).
+   - Never send via cron delivery. Sending happens ONLY through this script.
+6. Using the `ts` printed by post_digest.py, record each sent paper in
+   `state/sent-papers.jsonl` (one line = one paper, schema below). Never omit `ts` —
+   it is required for reaction tracking.
+
+## Weekly digest (Saturdays)
+
+On Saturdays, run only step 1 (reactions) as usual, then instead of the daily flow send
+**ONE message + thread**.
+- Channel: the **weekly channel** in `profile/config.md` (not the daily channel).
+- The main message is an overview only; ALL content goes into thread comments —
+  minimize reader fatigue.
+- Pick one of two types: Type 1 when a major conference just ended (or just announced
+  awards/orals/spotlights); Type 2 otherwise.
+
+### Common rules
+- Papers already shared in a daily digest MAY reappear — mark with 👀 + a short recap
+  (`sent-papers.jsonl` dedup does NOT apply to the weekly digest).
+- Never show which roundup/source a paper came from.
+- Paper titles are hyperlinks to arXiv (`<url|title>`).
+- Keyword/field names stay in English as-is — never awkwardly translated
+  (e.g. "Agentic Memory", "Long-Context Efficiency").
+- Do NOT record the weekly message in `sent-papers.jsonl` (it is not a per-paper send).
+- Send with ONE post_digest.py call (main + `thread` array). Figures optional.
+
+### Type 1: Conference highlights
+
+Main message:
+```
+🏛️ *{Conference} highlights* — weekly digest
+
+> *TL;DR*: X and Y dominated this {conference}.
+
+*Trends*
+- trend 1 (one line)
+- trend 2 (one line)
+
+*Notable papers*: N — one per thread comment
+```
+- Deriving trends: combine ① topic distribution of the official award/oral/spotlight
+  lists and ② social reception (X write-ups, conference specials in weekly roundups)
+  into 2–4 currents. No speculation — verified only.
+- Selecting the 5 notable papers: `interests.md` match + hype (social buzz, award/oral).
+- Thread: ① 1–2 sentence conference overview ② one comment per paper — `[oral]`/
+  `[best paper]` tag + why it matters in 1–2 sentences ③ last comment: related links.
+
+### Type 2: Weekly roundup
+
+- Selection: the **union** of DAIR.AI "Top AI Papers of the Week" and TuringPost's
+  weekly top N.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [yukyeongleee/paper-digest-bot](https://github.com/yukyeongleee/paper-digest-bot) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
