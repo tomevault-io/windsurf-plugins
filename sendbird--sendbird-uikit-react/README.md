@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [sendbird/sendbird-uikit-react](https://github.com/sendbird/sendbird-uikit-react).
+Original source: `AGENTS.md` in [sendbird/sendbird-uikit-react](https://github.com/sendbird/sendbird-uikit-react).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
