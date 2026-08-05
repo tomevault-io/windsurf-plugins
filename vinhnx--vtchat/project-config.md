@@ -1,13 +1,10 @@
 ---
 trigger: always_on
-description: <!-- Source: .ruler/AGENTS.md -->
+description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web app) and `packages/` (shared code: `common`, `shared`, `ai`, `ui`, etc.).
 ---
 
 
-
-<!-- Source: .ruler/AGENTS.md -->
-
-# AGENTS.md
+# AGENT.md - Development Guidelines
 
 ## Tech Stack & Project Overview
 
@@ -99,18 +96,16 @@ description: <!-- Source: .ruler/AGENTS.md -->
 
 ## Testing
 
-- use ChatMode.ChatMode.GEMINI_2_5_FLASH_LITE to test instead GEMINI_2_5_PRO because cost.
+- use ChatMode.ChatMode.GEMINI_3_FLASH_LITE to test instead GEMINI_3_PRO because cost.
 - Test files should be in `apps/web/app/tests/`. Example: `./test-vt-plus-only.js` should be moved to `apps/web/app/tests/test-vt-plus-only.js`
 - Every implemented feature should have a test case to maintain quality
 - Every unit test should cover critical paths and edge cases
 - Use `vitest` for testing, with `@testing-library/react` for React components.
 - Run tests regularly to ensure code quality
 - Use `@testing-library/jest-dom/vitest` for custom matchers
-- Use `@testing-library/user-event` for simulating user interactions
-- Use `@testing-library/react` for rendering components in tests
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [vinhnx/vtchat](https://github.com/vinhnx/vtchat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
