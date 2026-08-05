@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code when working with this repository.
+description: This file provides guidance to coding agents working with this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code when working with this repository.
+This file provides guidance to coding agents working with this repository.
 
 ## Project Overview
 
@@ -96,4 +96,4 @@ composer test:ci
 
 ---
 > Source: [WatheqAlshowaiter/filament-sticky-table-header](https://github.com/WatheqAlshowaiter/filament-sticky-table-header) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
