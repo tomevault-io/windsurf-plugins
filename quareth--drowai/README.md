@@ -7,11 +7,11 @@ Pre-v1 platform for task-isolated red teaming AI agent.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [quareth/drowAI](https://github.com/quareth/drowAI).
+Original source: `AGENTS.md` in [quareth/drowAI](https://github.com/quareth/drowAI).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
