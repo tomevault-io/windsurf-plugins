@@ -7,11 +7,11 @@ Apple Silicon-native molecular dynamics and DFT runtime built on MLX and Metal �
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [appautomaton/mlx-atomistic](https://github.com/appautomaton/mlx-atomistic).
+Original source: `AGENTS.md` in [appautomaton/mlx-atomistic](https://github.com/appautomaton/mlx-atomistic).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
