@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Overview
 
@@ -63,7 +63,6 @@ shark MyApp.xcodeproj ./Sources/MyApp/ --target MyAppTarget --framework swiftui 
 # Localization workflow
 shark lint MyApp.xcodeproj --target MyAppTarget --format github
 shark translate MyApp.xcodeproj --target MyAppTarget --to de,fr --dry-run
-shark translate MyApp.xcodeproj --target MyAppTarget --to de,fr --yes
 shark translate MyApp.xcodeproj --target MyAppTarget --to de,fr --backend claude-code --yes
 shark translate MyApp.xcodeproj --target MyAppTarget --to de,fr --backend codex --yes
 ```
@@ -96,4 +95,4 @@ The package is split into a library and a thin executable (see TRANSLATE_PLAN.md
 
 ---
 > Source: [kaandedeoglu/Shark](https://github.com/kaandedeoglu/Shark) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
