@@ -1,105 +1,64 @@
 ---
 trigger: always_on
-description: This file is for an LLM or agent that needs to understand Gradients.io's training product, its public API, and the G.O.D. subnet that powers training jobs and tournaments.
+description: This file applies to the entire repository. Use it as the operating manual for agentic coding in G.O.D.
 ---
 
-G.O.D SKILL FILE
+# AGENTS.md
 
-Purpose
-This file is for an LLM or agent that needs to understand Gradients.io's training product, its public API, and the G.O.D. subnet that powers training jobs and tournaments.
+This file applies to the entire repository. Use it as the operating manual for agentic coding in G.O.D.
 
-Short version
-Gradients.io is a training orchestration system built on Bittensor subnet 56 ("G.O.D", Gradients on Demand). Users create paid fine-tuning jobs through the public API. The API bills an account, forwards the job to a private validator, and the validator coordinates miners/trainers to produce a trained model. The same ecosystem also runs open tournaments where miners submit open-source training repos and compete on standardized tasks.
+## What This Repo Is
 
-Public URLs
-- Main product site: https://gradients.io
-- API base URL: https://api.gradients.io
-- Human-friendly API docs: https://api.gradients.io/docs
-- FastAPI swagger docs: https://api.gradients.io/swagger
-- Tournament results page: https://gradients.io/app/research/tournament/{TOURNAMENT_ID}
-- Tournament fees: GET https://api.gradients.io/tournament/fees
-- Tournament balance lookup: GET https://api.gradients.io/tournament/balance/{coldkey}
+G.O.D. is the Gradients on Demand subnet runtime: a Python system for Bittensor subnet training jobs and tournaments. It is not a frontend app. The main runtime boundaries are:
 
-Important framing
-- Use https://api.gradients.io for creating and monitoring jobs.
-- Use https://gradients.io for the product website and tournament/research pages.
-- This is primarily a training/fine-tuning platform, not a generic chat completion API.
-- The repo named G.O.D is not a website frontend. It is the subnet/validator/miner/trainer system that executes training jobs and tournaments.
+- `core/`: shared cross-runtime contracts, constants, dataset whitelist data, training templates, and small helpers.
+- `miner/`: public miner FastAPI service that returns training repositories for tournaments.
+- `trainer/`: trainer FastAPI service and Docker/GPU orchestration for miner training repositories.
+- `validator/`: validator API, task lifecycle, tournament orchestration, evaluation, scoring, persistence, transfers, and infrastructure clients.
+- `ops/`: Docker, compose, config generation, observability, manual probes, runbooks, and operational tools.
+- `docs/`: maintained human-facing docs. Keep it intentionally small.
+- `tests/`: focused unit/integration/e2e tests grouped by runtime/domain.
 
-What the system does
-1. Accepts training requests for text, chat, DPO, GRPO, image, and environment tasks.
-2. Prices jobs based on model size and hours requested.
-3. Charges the user's account balance.
-4. Sends the task to a private validator on subnet 56.
-5. The validator stores the task, schedules training/evaluation, and coordinates trainer infrastructure.
-6. Training artifacts and resulting models are tracked through the task record.
-7. The broader subnet also runs recurring tournaments where miners expose a repo endpoint and compete with open-source training code.
+The product-facing mental model is in `SKILL.md`; update it when public Gradients API behavior, pricing, account flow, task types, or tournament user expectations change.
 
-Main product capabilities
-- Fine-tune text instruction models.
-- Fine-tune chat models.
-- Fine-tune DPO preference models.
-- Fine-tune GRPO / reward-driven models.
-- Fine-tune image models such as SDXL and Flux variants.
-- Launch training from a Hugging Face dataset reference or from pre-prepared dataset URLs.
-- Check prices before creating jobs.
-- Poll task state and fetch result breakdowns.
-- View public network status and recent completed jobs.
-- Deploy LoRA adapters to Chutes for inference after training.
-- View tournament data, fees, balances, analytics, and performance projections.
+## Start By Reading
 
-Public API auth model
-- End-user automation should normally use an API key in the Authorization header.
-- The middleware accepts either "Authorization: Bearer <token>" or a raw token value, but Bearer is the safest choice.
-- Scheduler auth exists via X-Scheduler-Auth, but that is an internal service token and should not be assumed to be available to third-party agents.
+Before editing, read the smallest set that explains the domain you are changing:
 
-Account bootstrap flow
-If an agent needs to fully bootstrap a user account from scratch:
-1. POST /account-create with a username.
-2. Receive a fingerprint.
-3. POST /auth-with-fingerprint with that fingerprint to create a session token.
-4. Use the session token in Authorization.
-5. POST /api-key-create to mint a long-lived API key.
-6. Use the API key for training endpoints.
+- Repo overview and commands: `README.md`, `docs/developer.md`, `docs/README.md`.
+- Miner contract: `docs/miner.md`, `miner/endpoints/training_repo.py`, `core/models/payload_models.py`.
+- Shared contracts: `core/README.md`, `core/models/README.md`, `core/constants/README.md`.
+- Validator API/tasks: `validator/README.md`, `validator/endpoints/README.md`, `validator/tasks/README.md`.
+- DB changes: `validator/db/README.md`, `validator/db/migrations/README.md`, `validator/db/constants.py`, matching `validator/db/sql/*.py`.
+- Evaluation/scoring/tournaments: `validator/evaluation/README.md`, `validator/scoring/README.md`, `validator/tournament/README.md`.
+- Trainer runtime: `trainer/README.md`, `trainer/containers/README.md`, `trainer/entrypoints/README.md`, `trainer/model_prep/README.md`.
+- Ops/config/deploy tooling: `ops/README.md`, `ops/tools/README.md`, relevant subdirectory README.
+- Tests: `tests/README.md`, plus the relevant runtime README under `tests/`.
 
-Useful account endpoints
-- POST /account-create
-- POST /auth-with-fingerprint
-- POST /api-key-create
-- POST /account-get-info
-- POST /account-get-public-key
+## Design Rules
 
+- Put code in the domain that owns it. Do not create new catch-all modules such as `utils.py`, `shared.py`, or generic helper packages unless the surrounding package already owns that exact concern.
+- Keep `core/` only for contracts or helpers used by more than one runtime. Validator-only schemas belong in `validator/`; trainer-only behavior belongs in `trainer/`; miner behavior belongs in `miner/`.
+- Prefer the narrowest existing module over a new abstraction. Add abstraction only when it removes real duplication or clarifies a cross-module contract.
+- Keep constants near their owner. Use `core/constants/*` only for shared constants, `validator/*/constants.py` for validator-domain constants, and `trainer/constants.py` for trainer runtime constants.
+- Preserve public contracts deliberately. If a Pydantic model, endpoint path, task type, enum value, CLI argument, Docker path, env var, or DB column changes, update every caller, docs, tests, and operational references in the same change.
+- Use structured models and parsers instead of ad hoc string manipulation. Pydantic models should carry validation and examples for request/response data where useful.
+- Keep async boundaries clean. Existing FastAPI, asyncpg, Redis, httpx, and Docker orchestration patterns should be followed instead of introducing incompatible blocking flows.
+- Never log secrets, GitHub tokens, wallet secrets, API keys, Hugging Face tokens, signed URLs, or private dataset contents. Treat env files and task payloads as potentially sensitive.
+- Avoid unrelated refactors. This repo coordinates live services, tournaments, payments, training containers, and scoring; narrow changes are easier to verify and safer to deploy.
 
-Adding balance (funding an account)
-Users fund their Gradients account by sending TAO (Bittensor native token) to their account's deposit address.
+## Change Completeness Checklist
 
-Step-by-step flow for agents:
-1. Get the user's deposit address:
-   - Call POST /account-get-info (requires session token in Authorization header).
-   - The response includes bittensor_public_key — this is the SS58 deposit address.
-   - If bittensor_public_key is null, call POST /account-get-public-key to generate one on demand. This returns { "public_key": "<ss58_address>", "keypair_created_at": "...", "network": "finney" }.
+Use this checklist whenever the change touches more than a private helper:
 
-2. Send TAO to the deposit address:
-   - The user transfers TAO from their Bittensor wallet to the bittensor_public_key address.
-   - This is a standard Bittensor transfer, e.g.: btcli wallet transfer --dest <bittensor_public_key> --amount <amount>
-   - The system automatically detects incoming transfers and credits the account balance.
-
-3. Verify the balance was credited:
-   - Wait a few minutes for the transfer to be processed.
-   - Login to gradients.io with your fingerprint and confirm.
-
-Important notes on balance:
-- Balance is denominated in USD internally. TAO transfers are converted at the current rate.
-- Always check pricing (POST /v1/tasks/text/check_price or POST /v1/tasks/image/check_price) before creating tasks so the user knows the cost.
-- If a task creation fails due to insufficient balance, advise the user to send more TAO to their deposit address.
-
-Billing model
-- Text jobs are priced by model size bucket and hours requested.
-- Image jobs use a flat hourly rate.
-- Current code-level defaults:
+- Public API or task request changes: update `core/models/payload_models.py`, endpoint code under `validator/endpoints/`, client/service constants if relevant, `SKILL.md`, `docs/developer.md`, and tests.
+- Miner tournament contract changes: update `core/models/payload_models.py`, `core/models/utility_models.py`, `miner/endpoints/training_repo.py`, `docs/miner.md`, and any tournament validation tests.
+- Trainer container contract changes: update `trainer/runtime.py`, `trainer/training_paths.py`, trainer entrypoints, Docker/ops docs, `docs/miner.md`, and trainer tests.
+- DB schema changes: add a new timestamped migration in `validator/db/migrations/`; do not edit applied migrations. Update `validator/db/constants.py`, SQL access modules, task/model schemas, tests, and docs if operator-visible.
+- Tournament/scoring changes: update constants, models, state-machine code, reports/analytics endpoints if affected, simulations or probes when useful, and focused tests under `tests/validator/tournament` or `tests/validator/scoring`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [gradients-ai/G.O.D](https://github.com/gradients-ai/G.O.D) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
