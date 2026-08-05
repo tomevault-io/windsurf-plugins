@@ -1,165 +1,85 @@
 ---
 trigger: always_on
-description: - **Absolutely prohibit executing git reset, git revert, git rebase, git restore, and other rollback commands**
+description: @extends ../../AGENTS.md
 ---
 
-# Development Guidelines
+# i18n 架构变更规则
 
-## Strict Prohibited Operations
+@extends ../../AGENTS.md
 
-### Git Operation Restrictions
+## 核心原则
 
-- **Absolutely prohibit executing git reset, git revert, git rebase, git restore, and other rollback commands**
-- **Only allow safe operations like git logs, git status, git diff to compare files and restore content**
-- **Prohibit deleting or modifying the .git directory**
-- **Any git operation must get explicit user permission first**
+**无需任何向后兼容性** - 这是一个未发布的项目，所有变更都是破坏性的，直接应用新设计。
 
-### File System Operation Restrictions
+## 当前架构
 
-- **Absolutely prohibit executing rm -rf command**
-- **Prohibit deleting directories, especially project root or important directories**
-- **Must clearly inform user and get permission before deleting files**
+- **语言存储**: localStorage (`app-locale` 键)
+- **URL 结构**: 无语言前缀，如 `/charts` 而非 `/zh-CN/charts`
+- **路由**: 使用 `@/i18n/routing` 导出的钩子
+- **翻译**: 通过根布局的 `TranslationsProvider` 提供
 
-## Communication Language
+## 强制规则
 
-**Important**: Please use the same language with the user in your communication and responses. This includes:
+### 0. 禁止修改 shadcn UI 组件
 
-- All conversations and responses
-- Code comments (unless project specification requires English)
-- Documentation and explanations
-- Error messages and explanations
-- Task plans and summaries
+- ❌ **绝对禁止修改 `src/components/ui/` 目录下的任何组件**
+- 这些是 shadcn 原子组件，通过 CLI 维护，可能被自动更新/替换
+- 直接修改会在通过 CLI 更新 shadcn 组件时产生冲突
+- 重新生成组件时修改会丢失
 
-## Philosophy
+**自定义方式**:
 
-### Core Beliefs
+- ✅ 在业务页面/组件级别应用自定义样式（使用 `className`、`style` props 或包装组件）
+- ✅ 在 `src/components/`（非 `src/components/ui/`）创建扩展或组合 shadcn 组件的高阶组件
+- ✅ 在 `src/components/{module}/` 创建模块特定的包装组件
 
-- **Incremental progress over big bangs** - Small changes that compile and pass tests
-- **Learning from existing code** - Study and plan before implementing
-- **Pragmatic over dogmatic** - Adapt to project reality
-- **Clear intent over clever code** - Be boring and obvious
-- **No backward compatibility required** - This is a new project, all changes can be breaking changes
+### 1. 禁止使用旧模式
 
-### Simplicity Means
+- ❌ 禁止在 URL 中使用语言前缀
+- ❌ 禁止从 `params` 中读取 `locale`
+- ❌ 禁止使用 `getLocaleFromPathname()` 等旧函数
+- ❌ 禁止修改 `next.config.mjs` 添加 locale 重写
 
-- Single responsibility per function/class
-- Avoid premature abstractions
-- No clever tricks - choose the boring solution
-- If you need to explain it, it's too complex
+### 2. 必须使用新 API
 
-## Process
+- ✅ 客户端: `useLocale()`, `useSetLocale()`, `usePathname()`, `useRouter()` from `@/i18n/routing`
+- ✅ 服务器端: `getLocaleFromRequest()` from `@/i18n/server-utils`
+- ✅ 翻译: `useTranslations()` from `@/i18n/use-translations`
 
-### 1. Planning & Staging
+### 3. 页面结构
 
-Break complex work into 3-5 stages. Document in `IMPLEMENTATION_PLAN.md`:
+- 所有页面必须在根路径，如 `/charts/page.tsx`（不是 `/[locale]/charts/page.tsx`）
+- 根布局 (`/app/layout.tsx`) 负责所有语言处理
+- 页面组件不应关心语言，只负责渲染
 
-```markdown
-## Stage N: [Name]
+### 4. 语言切换
 
-**Goal**: [Specific deliverable]
-**Success Criteria**: [Testable outcomes]
-**Tests**: [Specific test cases]
-**Status**: [Not Started|In Progress|Complete]
-```
+- 使用 `useSetLocale()` 更新 localStorage
+- 自动刷新页面应用变更
+- 无需重定向，路径保持不变
 
-- Update status as you progress
-- Remove file when all stages are done
+### 5. 错误处理
 
-### 2. Implementation Flow
+- 如果 localStorage 不可用，回退到默认语言
+- 如果 cookie 不存在，使用 Accept-Language 或默认
+- 不要尝试兼容旧 URL，直接拒绝访问
 
-1. **Understand** - Study existing patterns in codebase
-2. **Test** - Write test first (red)
-3. **Implement** - Minimal code to pass (green)
-4. **Refactor** - Clean up with tests passing
-5. **Validate** - Ensure compilation and tests run
-6. **Update TODO** - Mark completed tasks and summarize achievements
-7. **Commit** - With clear message linking to plan
+## 文件清单
 
-**Key**: After code compiles successfully, always:
+- `/src/i18n/locale-storage.ts` - localStorage 管理
+- `/src/i18n/client-routing.tsx` - 客户端路由钩子
+- `/src/i18n/server-utils.ts` - 服务器端工具
+- `/src/i18n/routing.ts` - 公共 API
+- `/src/middleware.ts` - 语言切换和旧 URL 重定向
+- `/src/app/layout.tsx` - 根布局（获取语言，提供翻译）
 
-- Update TODO list to mark completed tasks
-- Add summary of completed content
-- Plan next steps (if applicable)
-- Never let TODO list become outdated or stagnant
+## 变更原则
 
-### 3. When Stuck (After 3 Attempts)
-
-**Critical**: Maximum 3 attempts per issue, then STOP.
-
-1. **Document what failed**:
-   - What you tried
-   - Specific error messages
-   - Why you think it failed
-
-2. **Research alternatives**:
-   - Find 2-3 similar implementations
-   - Note different approaches used
-
-3. **Question fundamentals**:
-   - Is this the right abstraction level?
-   - Can this be split into smaller problems?
-   - Is there a simpler approach entirely?
-
-4. **Try different angle**:
-   - Different library/framework feature?
-   - Different architectural pattern?
-   - Remove abstraction instead of adding?
-
-## Technical Standards
-
-### Architecture Principles
-
-- **Composition over inheritance** - Use dependency injection
-- **Interfaces over singletons** - Enable testing and flexibility
-- **Explicit over implicit** - Clear data flow and dependencies
-- **Test-driven when possible** - Never disable tests, fix them
-- **No backward compatibility** - This is a new, unreleased project. All refactoring can be breaking changes. Don't maintain deprecated code or compatibility layers unless absolutely necessary
-
-### Code Quality
-
-- **Every commit must**:
-  - Compile successfully
-  - Pass all existing tests
-  - Include tests for new functionality
-  - Follow project formatting/linting
-
-- **Before committing**:
-  - Run formatters/linters
-  - Self-review changes
-  - Ensure commit message explains "why"
-
-### Error Handling
-
-- Fail fast with descriptive messages
-- Include context for debugging
-- Handle errors at appropriate level
-- Never silently swallow exceptions
-
-### Refactoring Principles
-
-**No Backward Compatibility Required**: This is a new, unreleased project. When refactoring:
-
-- **Remove deprecated code directly** - Don't maintain compatibility layers or deprecated functions
-- **Break existing patterns if needed** - If a better pattern exists, migrate all code to it
-- **Don't keep old implementations** - Remove old code instead of keeping it "just in case"
-- **Update all usages immediately** - When changing an API or pattern, update all call sites
-- **No deprecation warnings needed** - Since this is a new project, just remove and replace
-
-**Exception**: Only maintain compatibility if explicitly required by external dependencies or critical business needs.
-
-### Compilation Error Handling
-
-**Fundamental Principle**: Never delete code to bypass compilation errors. Fix the root cause.
-
-When encountering compilation errors:
-
-1. **NEVER do this**:
-   - Delete problematic methods/code
-   - Comment out error lines
-   - Use placeholder implementations (TODO, throw NotImplemented)
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. **直接变更**: 不要保留旧代码
+2. **破坏性**: 不需要兼容旧版本
+3. **简洁**: 移除所有条件分支和兼容逻辑
+4. **明确**: 如果不支持，直接报错而不是回退
 
 ---
 > Source: [overtrue/sparkset](https://github.com/overtrue/sparkset) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
