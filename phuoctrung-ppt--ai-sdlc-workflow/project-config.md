@@ -1,70 +1,119 @@
 ---
 trigger: always_on
-description: Planner-Worker-Judge workflow discipline, handoff packets, evidence-based completion
+description: > **TEMPLATE — DOMAIN-NEUTRAL.** This repo ships the portable Planner-Worker-Judge workflow with **no** target domain.
 ---
 
+# AGENTS.md — <PROJECT_NAME>
 
-# Agentic Workflow Guardrails
+> **TEMPLATE — DOMAIN-NEUTRAL.** This repo ships the portable Planner-Worker-Judge workflow with **no** target domain.
+> Replace every `<PLACEHOLDER>` and every block tagged `> _EXAMPLE_` with your project's real values when you port this setup.
+> **Agents:** if a section below is still a `<PLACEHOLDER>`, treat that fact as *unknown* — gather it from the codebase or ask the orchestrator. **Never invent stack, structure, or compliance facts from an example block.**
 
-Canonical workflow: `AGENTS.md`. Project standards are configured in `.cursor/config/workflow-policy.json` and always include `AGENTS.md`.
+> **How to use this file:** This is the canonical domain-config hub for the agentic workflow.
+> Every agent reads this file at task start. Generic workflow rules, hooks, and skills live in `.cursor/` and do not need editing when you port this setup to a new repo.
+> Only this file and the config JSONs below need updating when adding new features:
+> - `.cursor/config/protected-paths.json` → `projectProtectedGlobs`
+> - `.cursor/config/worker-scopes.json` → `agents` section
+> - `.cursor/skills/skills-manifest.json` → add/remove domain skills
 
-## Execution Order
+---
 
-1. Classify the change mechanically with `.cursor/config/protected-paths.json`; do not rely on agent self-report.
-2. Plan with `architect-planner` for protected module-spanning/high-risk work.
-4. Implement with the narrowest matching worker agent.
-5. Verify locally with checks proportional to risk.
-6. For protected changes, persist `docs/reviews/*` via `judge-agent` or `/workflow-eval` before completion.
+**IMPORTANT** : Always follow the development rules during the coding phase. See `./docs/development-rules.md`.
 
+## 1. Project Overview
 
-## Protected Change Classifier
+| Field | Value |
+|---|---|
+| **Project Name** | `<name>` |
+| **Domain** | `<domain / industry>` |
+| **Description** | `<one-sentence description of what the product does>` |
+| **Monorepo** | `<yes (tool: nx / turbo / pnpm-workspaces) | no>` |
+| **Multi-Tenancy** | `<none | soft (tenant column) | hard (schema/RLS per tenant)>` |
 
-Protected status is shared by plans, judge review, stop hooks, and `/workflow-eval`:
+---
 
-- Path globs and keywords live in `.cursor/config/protected-paths.json`.
-- Multi-file threshold also lives in `.cursor/config/protected-paths.json`.
-- Fail closed only for protected changes. Fail open for standard changes to avoid team-wide lockouts from broken hooks.
-- `/workflow-eval` always writes a durable review artifact whenever it runs.
+## 2. Tech Stack (Locked — ADR required to change)
 
-## Hook Enforcement
+> Fill one row per layer your project uses; delete rows that don't apply. State a version only when it is actually pinned. Once filled, changing a locked choice requires an ADR in `docs/adr/`.
 
-- `preToolUse` enforces worker path scopes from `.cursor/config/worker-scopes.json`.
-- `afterFileEdit` records edited files for stop-hook classification.
-- `stop` blocks protected changes without current plan/review artifacts.
-- Stop blocking has a retry cap; after the cap, the hook writes a human escalation artifact instead of looping forever.
-- Manual review override must be explicit and logged with `.cursor/hooks/review-override.sh --skip-review "reason"`.
+| Layer | Technology | Notes |
+|---|---|---|
+| Language | `<e.g. TypeScript (strict)>` | |
+| Backend framework | `<...>` | |
+| Frontend framework | `<...>` | |
+| Shared contracts | `<schema/validation lib, e.g. Zod>` | source of truth for API types |
+| Database | `<...>` | |
+| ORM / Migrations | `<...>` | migrations only — no auto-sync |
+| Cache / Queue | `<...>` | |
+| AI / LLM | `<provider(s) | none>` | |
+| Object storage | `<...>` | |
+| Auth | `<...>` | |
+| Email / Notifications | `<...>` | |
+| Payments | `<... | none>` | |
+| Infra / Deploy | `<...>` | |
+| Testing | `<unit / integration / e2e frameworks>` | |
 
-If scope enforcement blocks a worker, request scope expansion from the orchestrator with the path, reason, and updated acceptance criteria.
+---
 
-## Handoff Packet Required
+## 3. Repository Structure
 
-Every worker task should start from a handoff packet containing:
+> Describe the actual layout of THIS repo. Keep it in sync with `.cursor/config/worker-scopes.json` (agent path scopes must match real folders).
 
-- Objective
-- In-scope paths
-- Out-of-scope paths
-- Required skills and selected reference files
-- Acceptance criteria
-- Required verification commands
-- Risks or constraints from `AGENTS.md`
+```
+<root>/
+├── <app-or-package-1>/        # <role>
+├── <app-or-package-2>/        # <role>
+├── docs/                      # plans, adr, reviews, architecture
+└── .cursor/                   # workflow: agents, skills, hooks, config
+```
 
-If any field is missing, infer only low-risk details from the codebase. Ask the orchestrator before expanding scope.
+> _EXAMPLE_ (delete when porting): a monorepo might use `apps/api`, `apps/web`, `apps/worker`, `packages/shared-types`. Whatever you choose, mirror it exactly in `worker-scopes.json`.
 
-## Completion Evidence
+---
 
-Do not claim completion from intent or a file edit alone. Completion requires evidence:
+## 4. Multi-Tenancy Rules
 
-- Modified files match the acceptance criteria.
-- Relevant lint/type/test/build commands were run, or skipped with a concrete reason.
-- Domain-specific checks such as security, privacy, data, AI, billing, infrastructure, or compliance were applied when relevant.
-- Docs/ADRs were updated when behavior, architecture, or workflow changed.
+> **Applies only if §1 Multi-Tenancy ≠ `none`.** If single-tenant, write "N/A — single-tenant" and skip the guard requirements below.
 
-## Context Control
+### Tenant Isolation Pattern
 
-- Read `SKILL.md` files only for selected skills.
-- Load reference files one at a time only when needed.
-- Do not bulk-read entire `references/` folders.
-- Write durable decisions to `docs/plans/`, `docs/adr/`, or `docs/reviews/`.
+Choose and document your tenant column name (e.g. `tenant_id`, `workspace_id`, `org_id`). Every table that belongs to a tenant **MUST** carry `<TENANT_COL> NOT NULL` with an FK to the tenant table.
+
+- **Tenant-scoped tables:** `<list here>`
+- **Global / non-tenant tables:** `<list here>`
+
+### Tenant Guard (mandatory on every tenant-scoped query)
+
+> _EXAMPLE_ pattern — adapt to your framework/ORM:
+
+```typescript
+// Every tenant-scoped read MUST filter by the tenant column and select explicit columns:
+async findRecords(tenantId: string): Promise<Record[]> {
+  return this.repo.find({
+    where: { tenantId },            // ALWAYS filter by tenant
+    select: ['id', 'name', 'status', 'createdAt'], // NEVER select *
+  });
+}
+```
+
+> ❗ **NEVER write a tenant-scoped query without a tenant filter — no exceptions, not even in admin convenience methods, unless an explicit, logged override flag is used.**
+
+---
+
+## 5. Agent Roster & Scopes
+
+> Roles below are the portable defaults shipped in `.cursor/agents/`. **Path scopes and skills are defined in `.cursor/config/worker-scopes.json` and `.cursor/skills/skills-manifest.json`** — keep those two files as the source of truth and update this table to match. Remove agents you don't use.
+
+| Agent | Role | Scope source | Skills source |
+|---|---|---|---|
+| `architect-planner` | Plan, ADR, task breakdown, scope definition | `worker-scopes.json` | `skills-manifest.json` |
+| `scaffold-agent` | Bootstrap new module/page shells; update §3 paths | `worker-scopes.json` | `skills-manifest.json` |
+| `designer-worker` | UI/UX design, component specs, design tokens | `worker-scopes.json` | `skills-manifest.json` |
+| `backend-worker` | API features, services, DTOs, guards | `worker-scopes.json` | `skills-manifest.json` |
+| `frontend-worker` | Pages, forms, data fetching, client state | `worker-scopes.json` | `skills-manifest.json` |
+| `database-worker` | Migrations, entities, query optimization | `worker-scopes.json` | `skills-manifest.json` |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [phuoctrung-ppt/ai-sdlc-workflow](https://github.com/phuoctrung-ppt/ai-sdlc-workflow) — distributed by [TomeVault](https://tomevault.io).
