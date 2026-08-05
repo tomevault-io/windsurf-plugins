@@ -1,85 +1,161 @@
 ---
 trigger: always_on
-description: OpenRefine is a Java-based power tool for loading, cleaning, reconciling, and augmenting data, accessed through a web browser. The backend is written in Java and the frontend uses JavaScript/jQuery. The project uses a multi-module Maven build.
+description: This file provides important information about the OpenRefine project and repository for AI agents and developers.
 ---
 
-# Copilot Instructions for OpenRefine
+# AGENTS.md - OpenRefine Project Information
+
+This file provides important information about the OpenRefine project and repository for AI agents and developers.
 
 ## Project Overview
 
-OpenRefine is a Java-based power tool for loading, cleaning, reconciling, and augmenting data, accessed through a web browser. The backend is written in Java and the frontend uses JavaScript/jQuery. The project uses a multi-module Maven build.
+**OpenRefine** is a Java-based power tool that allows you to load data, understand it, clean it up, reconcile it, and augment it with data coming from the web. All from a web browser and the comfort and privacy of your own computer.
 
-## Repository Structure
+- **License**: BSD-3-Clause
+- **Official Website**: https://openrefine.org
+- **Documentation**: https://openrefine.org/docs
+- **Community Forum**: https://forum.openrefine.org
+- **Version**: 3.10-SNAPSHOT (as of this writing)
 
-- **main/** – Core application: Java source (`src/main/java`), web application (`webapp/`), and tests (`src/test/java`, `tests/cypress/`)
-- **modules/grel/** – GREL expression language module
-- **modules/core/** – Core module (shared code)
-- **extensions/** – Optional extensions: `database`, `jython`, `pc-axis`, `wikibase`
-- **server/** – Embedded Jetty server infrastructure
-- **packaging/** – Build and distribution packaging scripts
-- **conf/** – Application configuration files
+## Technology Stack
 
-## Requirements
+### Backend
+- **Language**: Java
+- **Minimum Java Version**: JDK 21
+- **Maximum Java Version**: JDK 26
+- **Build Tool**: Apache Maven 
+- **Project Structure**: Multi-module Maven project
 
-- **JDK 11** or newer
-- **Apache Maven 3.8+**
-- **Node.js 18** or newer (for frontend dependencies)
+### Frontend
+- **JavaScript Libraries**: jQuery, jQuery UI, Select2, Underscore.js
+- **Internationalization**: @wikimedia/jquery.i18n
+- **Build/Package Management**: Node.js 24+ and npm 11.16.0+
+- **E2E Testing**: Cypress with Node.js 24
 
-## Build, Run, and Test
+### Project Modules
+- `modules/core` - Core OpenRefine functionality
+- `modules/grel` - GREL (General Refine Expression Language)
+- `main` - Main application and webapp
+- `server` - Server components
+- `extensions` - Extension modules (database, jython, pc-axis, wikibase)
+- `packaging` - Distribution packaging
+- `benchmark` - Performance benchmarks
+
+## Build System
+
+### Building OpenRefine
 
 ```bash
-# Run OpenRefine from source (Mac/Linux)
-./refine
-
-# Run OpenRefine from source (Windows)
-refine.bat
-
-# Run all Java unit tests
-./refine test
-
-# Run only server tests
-./refine server_test
-
-# Run only extension tests
-./refine extensions_test
-
-# Run end-to-end (Cypress) tests
-./refine e2e_tests
-
-# Reformat source code (run before submitting a PR)
-./refine lint
+./refine build
 ```
 
-## Code Style
+This command:
+- Compiles all Java code using Maven
+- Builds the webapp frontend
+- Prepares all modules and extensions
+- Creates necessary artifacts
 
-- Always run `./refine lint` before submitting a PR. CI will fail if linting is not applied.
-- Java code is formatted using the Maven Formatter plugin (`formatter:format`) and import ordering is enforced with `impsort:sort`.
-- Follow the existing patterns in the file you are editing.
+### Running OpenRefine
 
-## Pull Request Guidelines
+```bash
+# On Mac OS and Linux
+./refine
 
-- Branch names should include the issue number and a brief description (e.g., `1234-fix-csv-import`).
-- Keep changes focused: avoid unrelated modifications in a single PR.
-- Add unit tests and/or end-to-end tests for every bug fix or new feature.
-- Ensure all tests pass before submitting.
-- Java unit tests live under `main/src/test/java/` and `modules/*/src/test/java/`.
-- End-to-end tests are Cypress tests located in `main/tests/cypress/`.
+# On Windows
+refine.bat
+```
 
-## Key Architecture Notes
+**Configuration Options:**
+- `-c <path>` - Path to refine.ini file (default: ./refine.ini)
+- `-d <path>` - Path to the data directory
+- `-H <host>` - Expected host header value
+- `-i <interface>` - Network interface to bind (default: 127.0.0.1)
+- `-m <memory>` - JVM min and max memory heap size (default: 1400M)
+- `-p <port>` - Port to listen on (default: 3333)
+- `-v <level>` - Verbosity level [error,warn,info,debug,trace]
+- `-w <path>` - Path to the webapp (default: main/webapp)
+- `--debug` - Enable JVM debugging on port 8000
+- `--jmx` - Enable JMX monitoring
 
-- The backend exposes a REST/JSON API consumed by the single-page frontend in `main/webapp/`.
-- Extensions follow a plugin architecture; see `extensions/` for examples.
-- Reconciliation service integration is a core feature; be careful when modifying reconciliation-related code.
-- Internationalisation (i18n) strings for the UI live in `main/webapp/modules/core/langs/` and are also managed via [Weblate](https://hosted.weblate.org/engage/openrefine/).
+### Other Build Commands
 
-## Useful Links
+```bash
+./refine clean              # Clean compiled classes
+./refine test              # Run all tests
+./refine extensions_test   # Run extension tests
+./refine server_test       # Run server tests
+./refine e2e_tests         # Run end-to-end tests
+./refine lint              # Reformat source code according to conventions
+./refine mac_dist <ver>    # Make MacOS binary distribution
+./refine windows_dist <ver> # Make Windows binary distribution
+./refine linux_dist <ver>  # Make Linux binary distribution
+./refine dist <ver>        # Make all distributions
+```
 
-- [User Manual](https://openrefine.org/docs)
-- [Developer Guide & Architecture](https://github.com/OpenRefine/OpenRefine/wiki/Documentation-For-Developers)
-- [Contributing Guide](./CONTRIBUTING.md)
-- [Project Governance](./GOVERNANCE.md)
-- [Community Forum](https://forum.openrefine.org)
+## Testing Infrastructure
+
+### Unit Tests
+- **Framework**: TestNG (Java)
+- **Location**: Throughout the codebase in `src/test` directories
+- **Run**: `./refine test` or `./refine server_test` or `./refine extensions_test`
+
+### End-to-End Tests
+- **Framework**: Cypress
+- **Location**: `main/tests/cypress/`
+- **Setup**: 
+  ```bash
+  cd main/tests/cypress
+  npm i -g yarn
+  yarn install
+  ```
+- **Run**: `./refine e2e_tests`
+- **Browser**: Chrome (default in CI)
+- **Configuration**: Uses environment variables like `CYPRESS_BROWSER`, `CYPRESS_SPECS`, `CYPRESS_GROUP`
+
+### Testing in CI
+The project uses GitHub Actions for continuous integration:
+- **E2E Tests**: `.github/workflows/pull_request_e2e.yml` - Runs Cypress tests on pull requests
+- **Server Tests**: `.github/workflows/pull_request_server.yml` - Runs server-side tests
+- **CodeQL Analysis**: Security scanning for Java and JavaScript
+
+## Development Workflow
+
+### Code Contributions
+1. Fork the repository
+2. Create a branch named with the issue number and brief description
+3. Make changes (avoid unrelated modifications)
+4. Create unit and/or E2E tests for your changes
+5. Run `./refine lint` before submitting (CI will fail if lint fails)
+6. Ensure all tests pass
+7. Submit a pull request for review
+
+### Code Style and Formatting
+- **Linting**: Run `./refine lint` to reformat code according to OpenRefine conventions
+- **EditorConfig**: The repository includes `.editorconfig` for consistent formatting:
+  - Charset: UTF-8
+  - Line endings: LF
+  - Indent: 4 spaces (2 for YAML, JSON, LESS, shell scripts)
+  - Max line length: 120 characters
+  - Java imports organized with specific layout rules
+  - Insert final newline
+
+### Important Files
+- `pom.xml` - Root Maven project configuration
+- `refine` / `refine.bat` - Main launch scripts
+- `refine.ini` - Runtime configuration (can be created)
+- `.editorconfig` - Code formatting rules
+- `CONTRIBUTING.md` - Contribution guidelines
+- `GOVERNANCE.md` - Project governance model
+
+## Extension System
+
+OpenRefine supports a plugin architecture for extending functionality. Extensions are located in the `extensions/` directory:
+- **database** - Database import/export functionality
+- **jython** - Python scripting support via Jython
+- **pc-axis** - PC-Axis file format support
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [OpenRefine/OpenRefine](https://github.com/OpenRefine/OpenRefine) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
