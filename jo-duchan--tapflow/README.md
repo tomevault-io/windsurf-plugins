@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [jo-duchan/tapflow](https://github.com/jo-duchan/tapflow).
+Original source: `AGENTS.md` in [jo-duchan/tapflow](https://github.com/jo-duchan/tapflow).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
