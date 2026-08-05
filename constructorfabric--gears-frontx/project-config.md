@@ -1,10 +1,12 @@
 ---
 trigger: always_on
-description: Always use the ./.ai/GUIDELINES.md
+description: ALWAYS open and follow `{cypilot_path}/.core/skills/cypilot/SKILL.md`
 ---
 
+# Cypilot
 
-Always use the ./.ai/GUIDELINES.md
+
+ALWAYS open and follow `{cypilot_path}/.core/skills/cypilot/SKILL.md`
 
 ---
 > Source: [constructorfabric/gears-frontx](https://github.com/constructorfabric/gears-frontx) — distributed by [TomeVault](https://tomevault.io).
