@@ -1,39 +1,65 @@
 ---
 trigger: always_on
-description: **Last Updated:** 2026-06-29
+description: **Last Updated:** 2026-07-16
 ---
 
 # LLM Wiki Plugin Project Development Standards
 
-**Last Updated:** 2026-06-29
+**Last Updated:** 2026-07-16
 
 ---
 
-## Current Phase: v1.22.5 (released) → v1.23.0 (Graph Engine direction)
+## Current Phase: v1.25.0 PR3 + PR3 follow-up #2 SHIPPED (2026-07-16) — cache-only PDF; awaiting e2e + release; v1.24.1 PATCH RELEASED 2026-07-14
 
-### Completed (v1.22.5) — Hotfix: Responses API for #207 follow-up (2026-06-29)
+**v1.25.0 scope decision (2026-07-15, user-confirmed post-pivot):**
 
-Closed the second half of #207 — reasoning model family (gpt-5.1+ / gpt-5.5 / o1-o4) now uses OpenAI's Responses API, and the Test Connection Notice surfaces the provider's full error body (e.g. "insufficient_quota") instead of bare "status 429". #207 stays open for real-world user testing before final close.
+Cache-only architecture replaces the previously-planned sidecar (`<vault>/<basename>.pdf.md`) approach.
 
-- ✅ **#207 follow-up — Reasoning model family uses OpenAI Responses API.** v1.22.4's `max_tokens` ↔ `max_completion_tokens` probe was necessary but not sufficient — `gpt-5.1-chat-latest` / `gpt-5.5` / `o1` / `o3` / `o4-mini` still failed Test Connection with 400 because Chat Completions has compatibility issues for the reasoning family. Per OpenAI's official GPT-5.5 migration guide ("GPT-5.5 works best in the Responses API"), v1.22.5 routes the reasoning family to `/v1/responses` with `reasoning: { effort: 'low' }`. `gpt-5-chat-latest`, `gpt-4.1`, `gpt-3.5-turbo`, and all non-OpenAI baseUrls (Ollama, LM Studio, DeepSeek, etc.) continue on `/v1/chat/completions` unchanged. Detection is a pure-function `isResponsesApiModel(model, baseUrl)` export, gated to `https://api.openai.com/v1` only.
-- ✅ **Test Connection Notice now surfaces the provider's full error body.** Obsidian's `requestUrl` throws on 4xx WITHOUT populating the Error with the provider body, so v1.22.4's `extractProviderErrorMessage()` couldn't see the actual diagnostic. v1.22.5 wraps the failing request in a `window.fetch` re-fetch (5s timeout) and merges the provider body into `Error.message` — users now see e.g. `"status 429: You exceeded your current quota, please check your plan and billing details"`. Raw body also logged at `console.warn` for DevTools investigation. Non-OpenAI baseUrls get the same enrichment via the existing Chat Completions path.
-- ✅ **429/5xx now retry with exponential backoff on the Responses API path.** v1.22.4's `withRetry` (3 attempts, 1s/2s/4s + jitter) covered only the Chat Completions path. v1.22.5 wraps the new Responses API path in the same `withRetry` so transient 429 quota bumps no longer immediately fail Test Connection.
-- ✅ **Tests: 1104 passing.** +28 since v1.22.4 (new `llm-client-responses-api.test.ts` with 28 tests covering endpoint routing, body shape, error enrichment, withRetry integration, custom baseUrl compatibility, and reasoning-family model coverage). Existing dot-naming gpt-5.x regression test (v1.22.4) and `thinking.type='disabled'` Chat Completions tests refactored to use `gpt-5-mini`/`gpt-5-nano`/`gpt-4.1` (the Chat Completions path models).
+- ✅ **PR2 redo (1-1.5 days)** — delete `pdf-ingest-orchestrator.ts`; refactor `wiki-engine.ingestPdfSource` to feed `convertPdfToMarkdown` result into `analyzeSource` via `contentOverride`; extend `PdfConversionCache` with `purgeExpired/enforceSizeLimit` (100MB / 1000-entry / 10MB-single caps + LRU-by-mtime eviction); add `converterVersion` to cache key; delete 5 dead i18n keys across 10 locales. **`prepareBatchIngest` deferred to PR3 follow-up #2.**
+- ✅ **PR3 (1 day)** — settings: `writePdfMarkdownToVault` toggle in Wiki Configuration (always visible, not Advanced-bound); `forcePdfSupport` toggle in Advanced for non-NATIVE providers only (universal escape hatch — user opted in → LLM call attempted → endpoint rejection surfaces via localized Notice); CHANGELOG; ROADMAP sync.
+  - Settings types + DEFAULT_SETTINGS
+  - 4 i18n keys × 10 locales for both PDF toggles
+  - sidecar write via direct vault.create/modify (no createOrUpdateFile cascade)
+  - normalizePath for cross-platform sidecar paths
+  - 3 new tests: default no-sidecar, write creates sidecar, write updates existing
+  - Code-review findings applied: simplified `ingestPdfSource` comment; used `normalizePath`; avoided `createOrUpdateFile` for sidecar to prevent auto-watch cascades.
+- ✅ **PR3 follow-up (2026-07-16)** — universal escape hatch + UX moves
+  - `forcePdfSupport` toggle: any non-NATIVE provider allowed; toggle hidden for NATIVE providers; provider switch to NATIVE auto-resets value; `FORCE_PDF_PROVIDER_IDS` constant deleted
+  - `writePdfMarkdownToVault` moved to Wiki Configuration → Wiki Folder (semantic: vault storage policy, not LLM config); always visible
+  - `advancedSettingsMode` default no longer resets `forcePdfSupport`
+  - 3 new tests: ollama + forcePdfSupport=true attempts LLM; deepseek same; endpoint-rejects error propagates verbatim
+- ✅ **PR3 follow-up #2 (2026-07-16)** — third-party model audit fixes
+  - **P0 (cross-platform cache filename safety)**: physical filename = sha256(logicalKey).slice(0,16) (Git short-hash style); fixes Windows ERROR_INVALID_NAME + POSIX unintended subpath when model contains `:` or `/`
+  - **P1 (batch-start housekeeping)**: new PdfConversionCache.prepareBatchIngest() wired into runBatchIngest()
+  - **P1 (PDF-shaped LLM errors → localized Notice)**: isPdfRelatedLlmError(message) classifier routes obvious PDF-rejection errors to reportSkip('unsupported-pdf')
+  - **P1 (settings defaults test)**: new src/__tests__/types/settings.test.ts
+  - **P2 (i18n user-perspective rewrite)**: forcePdfSupportDesc + sourceRejectedPdfUnsupported rewritten in 10 locales — drop developer jargon, speak user outcome
+- ⏳ **PR4 (optional, by AkaSakana)** — Kimi Files API provider dispatch + error regex classifiers + transient-retry extension. If AkaSakana ships as follow-up PR after v1.25.0 lands, we merge after review. If schedule slips, we port ourselves (1-day).
+- ⏳ **Final** — `pnpm build:dev` + HARD STOP + user e2e + push decision.
 
-### Completed (v1.22.4) — Hotfix: GPT-5.x probe + provider error UX (2026-06-27)
+**AkaSakana PR #286 feedback adopted (2026-07-15):**
+- ✅ Cache key includes `converterVersion` so prompt upgrades invalidate stale entries.
+- ✅ `forcePdfSupport` is now a **universal escape hatch** (any non-NATIVE provider); default `false` (manual opt-in, NOT opt-out — many compatible endpoints don't reliably support PDF). (2026-07-16 user correction.)
+- ⏳ Kimi Files API (PR4, optional contribution): upload → extract → delete, error regex classifiers, transient-retry extension. AkaSakana owns the contribution; we transfer responsibility to TA via PR #286 reply.
 
-Closed two user-reported issues in v1.22.3 user testing — both PATCH scope (backward-compatible bug fixes):
+**Trust boundary (v1.25.0 PR3 follow-up, 2026-07-16):** the user is the authoritative source on what their endpoint supports. Pre-flight whitelist rejects violate user intent. The provider gate must attempt the call; LLM errors surface as localized Notices guiding the user to disable the toggle or check endpoint config.
 
-- ✅ **#207 — GPT-5.x models no longer fail Test Connection with 400.** v1.20.0's `params.model.startsWith('gpt-5-')` prefix-matching heuristic only matched the dash-suffixed OpenAI gpt-5 family (`gpt-5-mini`, `gpt-5-nano`, etc.) and silently broke for every new gpt-5.x release (`gpt-5.1`, `gpt-5.4-mini`, `gpt-5.5`). This was a regression of the same root-cause class as #143 in v1.20.0. Replaced with a runtime probe-then-cache mechanism: first request uses `max_tokens`, if the backend rejects with 400 we cache the alternate key (`max_completion_tokens` or vice versa) and retry. New `MaxTokenKey` type and `detectRejectedMaxTokenKey()` exported pure function. Stream path mirrors the same pattern in `createMessageStream`. Per-client isolation ensures baseUrl changes start a fresh cache.
-- ✅ **Test Connection UI now surfaces the provider's actual error message.** Previously, `requestUrl` errors were re-wrapped as `status 400: ${data.error.message}` (or just "status 400" when the response body was lost to requestUrl's 4xx-throw-without-body behavior), and the provider's actual diagnostic was never visible. New `extractProviderErrorMessage()` enriches the thrown error in both `createMessage` and `createMessageStream` so Test Connection Notice text reads `status 400: <provider message>` instead of a generic HTTP wrapper. Test Connection is now self-diagnostic without needing the console.
-- ✅ **Lint performance knobs centralised in `src/constants.ts`.** Yield cadences, candidate batch sizing, prep batch read, and source-analyzer batch sizing now live in one place. Previously these values were duplicated across `controller.ts`, `duplicate-detection.ts`, `preparation.ts`, and `batch-limits.ts` — including a literal `MAX_TOKENS=16000` copy of `MAX_TOKENS_BATCH`. Tuning lint performance is now a single-file change.
-- ✅ **Tests: 1076 passing.** +12 since v1.22.3.
+**v1.24.1 PATCH release composition (2026-07-13/14 merge window):**
+- ✅ Phase 1 (#271): Fix #1 #268 Tier C forceRecreate bypass
+- ✅ Phase 2 (#276): page-factory.ts 1297-LOC god-class split (10 modules + 99 tests)
+- ✅ Phase 3 (#277/280): Bedrock Stage 1 via bedrock-mantle (~+3 KB, zero new npm deps)
+- ✅ Phase 4 (#269): #272 LM Studio no-key ingest fix
+- ✅ Phase 5 (#281): 5-stage PPR seed-selection pipeline (lex → LLM keywords → local scan → LLM KB fallback → PPR) + post-e2e noise/correctness fixes. 1825 → 2060 tests.
+- ✅ Phase 5.5 (#282): parseJsonResponse empty-body quiet path (`silentOnEmpty` + `throwOnEmpty`). Closes #255 + #274. 2060 → 2073 tests (+13).
+- ✅ Phase 6 (#283): #258 entities-page redundant `## 基本信息` body block fix at the prompt + schema + lint layer. Closes #258. 2073 → 2080 tests (+7).
 
-### Completed (v1.22.3) — Hotfix hardening (2026-06-26)
-- ✅ **log header detection hardened to language-agnostic structural marker.** Switched from text-based detection (`view operation history` / `操作历史`) to embedded `<!-- llm-wiki-log-header-start -->` HTML-comment marker. v1.22.2 log files auto-upgrade on next startup.
+**Issues closed in v1.24.1:**
+- #255 — Lint console errors (CLOSED via #282)
+- #258 — entities-page `## 基本信息` drift (CLOSED via #283)
+- #274 — Ollama Qwen3.5:9b no-key empty body (CLOSED via #282)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [green-dalii/obsidian-llm-wiki](https://github.com/green-dalii/obsidian-llm-wiki) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
