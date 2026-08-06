@@ -1,0 +1,105 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+- Build: `swift build`
+- Run: `.build/debug/Starboard` (or `swift run`, but `swift run` attaches the
+  process's stdout/stderr to the terminal and blocks it — running the built
+  binary directly and backgrounding it is usually more convenient for a
+  persistent GUI app)
+- There are no tests, linters, or CI configured.
+
+## Architecture
+
+Plain Swift Package Manager executable target (`Starboard`), no Xcode
+project, no Info.plist. Three files in `Sources/Starboard/`:
+
+- `main.swift` — entry point. Creates `NSApplication.shared`, sets the
+  delegate, and calls `app.setActivationPolicy(.accessory)` *before*
+  `app.run()`. This is what gives the app no Dock icon and no Cmd+Tab entry
+  — there is no Info.plist / `LSUIElement` involved, since SPM executables
+  don't bundle one.
+- `KeyablePanel.swift` — an `NSPanel` subclass that overrides
+  `canBecomeKey` to return `true`. Needed because a borderless panel with
+  `.nonactivatingPanel` style won't accept keystrokes otherwise, and
+  `.nonactivatingPanel` is what lets the terminal view become key *without*
+  activating the app or stealing focus from whatever app the user is
+  currently in.
+- `AppDelegate.swift` — everything else: builds the panel, tracks the Dock
+  to size/position it, and wires up the terminal.
+  - The panel's `collectionBehavior` includes `.canJoinAllSpaces` and
+    `.fullScreenAuxiliary` so it stays visible across every Space, including
+    over full-screen apps. `effectView.layer?.masksToBounds = true` clips
+    the (edge-to-edge) terminal view to the panel's rounded corners —
+    without it, square corners get painted over the rounded blur.
+  - The terminal itself is a [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
+    `LocalProcessTerminalView`, started once via
+    `startProcess(executable: "/bin/zsh", args: ["-l"], ...)`. This is a
+    real PTY-backed shell process, not a `Process` spawned per command —
+    that's what makes `cd`, shell history, and arrow-key line editing work
+    across commands instead of resetting each time.
+  - `nativeBackgroundColor`/`layer?.backgroundColor` are set to `.clear` on
+    the terminal view so the panel's blur shows through behind the text;
+    SwiftTerm's Metal renderer is off by default (`useMetalRenderer` starts
+    `false`), which is what makes the transparent layer approach work — if
+    that ever gets toggled on, the transparency handling would need
+    revisiting.
+  - `setUpMainMenu()` builds a minimal `NSMenu` (Quit + Edit: Copy/Paste/
+    Select All) and sets it as `NSApp.mainMenu`. This menu is never
+    visibly shown — the nonactivating panel never makes Starboard the
+    frontmost app — but Cmd+C/Cmd+V/Cmd+A only resolve to a view's
+    `copy(_:)`/`paste(_:)`/`selectAll(_:)` via AppKit's menu-key-equivalent
+    system, so without *some* main menu those keystrokes go nowhere,
+    silently, regardless of whether it's ever drawn on screen.
+
+### Dock tracking
+
+The panel positions itself as a companion to the Dock — same height, left
+edge touching the Dock's right edge, same bottom margin as the Dock (so
+they share a baseline), and its own right edge flush against the screen's
+right edge, no margin there at all. A repeating `Timer`
+(`dockTrackingInterval`, 1s) recomputes this and
+calls `panel.setFrame` whenever it changes, so it follows the Dock live as
+it's resized or gains/loses icons — there's no notification to observe for
+this, so it's polled.
+
+The Dock's geometry comes from `dockIconTrayFrame()`, which reads the
+`AXList` element (the icon row) from the Dock process's accessibility tree
+via `AXUIElementCreateApplication` / `AXUIElementCopyAttributeValue`. This
+is deliberately **not** `CGWindowListCopyWindowInfo`: on modern macOS the
+Dock's own window frame spans the entire screen (the Dock process also
+hosts desktop wallpaper/icon interaction — see the sibling "Wallpaper"
+window owned by the same process), which is useless for positioning. The
+`AXList` box is close but not exact: its bottom edge sits above the Dock's
+real bottom margin, and its top edge overshoots above the Dock's real top
+edge by a smaller amount — Apple doesn't expose the actual painted chrome
+rectangle through Accessibility at all. `dockBottomCorrection` (5pt) and
+`dockTopCorrection` (5pt) are empirical fixes for that gap, tuned pixel by
+pixel against one real Dock; nudge them if the panel's edges visibly drift
+from the Dock's, e.g. at a very different tile size.
+
+Reading another process's accessibility tree requires the user to grant
+Starboard Accessibility permission (`AXIsProcessTrustedWithOptions` is
+called with the prompt option at launch to trigger the system dialog).
+Until granted — or if the Dock's AX tree is ever unreadable —
+`fallbackFrame(on:)` is used instead: a fixed-width panel in the
+bottom-right corner, with height read from the gap between
+`NSScreen.main.frame` and `.visibleFrame` (which doesn't need any special
+permission, but also can't reveal the Dock's *width*).
+
+No App Sandbox entitlements are set (SPM executables are unsandboxed by
+default), which is required for spawning a shell process at all.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [palamim/starboard](https://github.com/palamim/starboard) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
