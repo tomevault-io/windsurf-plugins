@@ -1,0 +1,60 @@
+---
+trigger: always_on
+description: <!-- Budget: ~2,000 tokens (~8 KB). This file loads at the start of every session, so every line here is a tax on every session. If an addition pushes past the budget, something else moves out to docs/ first. The project this grew from let its rules file double past its own declared budget; the budget line you're reading exists so that doesn't happen here. -->
+---
+
+<!-- Budget: ~2,000 tokens (~8 KB). This file loads at the start of every session, so every line here is a tax on every session. If an addition pushes past the budget, something else moves out to docs/ first. The project this grew from let its rules file double past its own declared budget; the budget line you're reading exists so that doesn't happen here. -->
+
+# Foundry: the working agreement
+
+This file is the shared ground rules for any agent working in a project that uses Foundry. Cursor and Codex read it natively. Claude Code reads it through the one-line import in CLAUDE.md. If your tool reads none of these, paste this file into the chat at the start of a session.
+
+Foundry is an agent process: named stages you run in order, each one a markdown command in this repo. The chain is start-up, construct-the-plan, frame-it, challenge-plan 1 through 5, build-it, test-it, security-scan, challenge-implementation 1 through 5, wrap-up, handoff, with quiz available at any point. You don't have to run all of it every time; see the light path in docs/light-path.md.
+
+## What the chain assumes
+
+An agent that can read and write files, run shell commands, and follow a multi-step instruction. That's the whole requirement. Plan modes, queued commands, blocking question dialogs, and subagents are comforts some tools have; every command marks the steps that need them as optional. Git and a GitHub-style remote are assumed by the full flow (build-it makes a branch, wrap-up opens a pull request), but every command that touches git also carries a no-git alternative: edit in place, keep the plan as a local file, write a summary instead of opening a pull request. Nothing in the chain depends on one vendor's model, pricing, or terms.
+
+## How the agent works here
+
+- **Understand before changing.** Trace how the code you're touching connects to the rest before you edit it. If you can't explain what your change affects, you haven't read enough.
+- **No shortcuts.** Never "good enough for now," never "simplified for testing." If the proper version is expensive, say so honestly instead of shipping the cheap one quietly.
+- **Verify your own work.** If you're about to write "worth a manual check," stop and build the check instead. A test, a script, a measurement. Hand the human results, not homework.
+- **Own the calls.** Engineering decisions are the agent's to make and defend. The human owns taste, money, credentials, and anything irreversible. Bring recommendations, not multiple-choice quizzes.
+- **Keep it clean.** Remove dead code when you see it. Commit and push when a task completes. Don't batch unrelated changes.
+
+## Plans
+
+Substantive work starts with a plan file at `docs/plans/<slug>.md`, written by the construct-the-plan command. Small frontmatter header: `id`, `status` (PROPOSED, IN_PROGRESS, SHIPPED), `created`. Two halves split by a horizontal rule: a narrative half for the human (what and why, in plain language), a working-memory half for the agent (files, steps, acceptance bars). Plans are scaffolding, not documentation; delete them when the work ships.
+
+## Memory
+
+Two standing folders, both fed by wrap-up and read by start-up. `docs/sessions/LOG.md` is chronology: one plain-English entry per session, rotated weekly into dated history files. `docs/wiki/` is distilled knowledge: one page per topic, every page listed in `docs/wiki/INDEX.md` (the check fails on orphans and dead links), seeded with the engineering, design, and motion reference shelves. Log entries say what happened; wiki pages say what we know. Consult the index when planning; distill durable lessons at wrap-up.
+
+## The challenge rounds
+
+Reviews only work when each round looks from a genuinely different angle. The angle list:
+
+1. implementation
+2. where data flows and what happens when something fails
+3. how this code talks to its neighbours
+4. how this code talks to outside services
+5. config-file syntax and quoting pitfalls
+6. what unusual or hostile inputs would break this?
+7. what happens when shell scripts fail mid-pipeline?
+8. will this code be discoverable when it feels unfamiliar?
+9. is the sequence of steps right?
+10. where else does the same root cause apply?
+11. check whether the earlier rounds' fixes broke anything new
+12. does this convention reach every place the mechanism reaches?
+
+Every round states its angle at the top and must differ from all prior rounds. When an angle repeats, you find nothing; when it's genuinely different, you find the next layer. Every round ends with its structured count lines, verbatim: plan rounds report `Re-verified N claims, demoted M to uncertainty.` and implementation rounds report that same line plus `Bugs found: K. Bugs fixed: K.` beneath it. The human scans for those lines; don't restyle them.
+
+## The flow guarantee
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [simoncorry/foundry](https://github.com/simoncorry/foundry) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
