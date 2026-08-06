@@ -7,11 +7,11 @@ Late-night voice chats with an AI who blushes when you flirt, laughs at your jok
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [vincenzo-afk/Lucie-AI](https://github.com/vincenzo-afk/Lucie-AI).
+Original source: `AGENTS.md` in [vincenzo-afk/Lucie-AI](https://github.com/vincenzo-afk/Lucie-AI).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
