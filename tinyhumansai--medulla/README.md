@@ -7,11 +7,11 @@ Manage up to 1,000 agents using Medulla.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [tinyhumansai/medulla](https://github.com/tinyhumansai/medulla).
+Original source: `AGENTS.md` in [tinyhumansai/medulla](https://github.com/tinyhumansai/medulla).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
