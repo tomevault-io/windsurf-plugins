@@ -7,11 +7,11 @@ Open-source reading-first firmware for the Xteink X3 and X4
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lauren-alexandra/duet-xteink](https://github.com/lauren-alexandra/duet-xteink).
+Original source: `AGENTS.md` in [lauren-alexandra/duet-xteink](https://github.com/lauren-alexandra/duet-xteink).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
