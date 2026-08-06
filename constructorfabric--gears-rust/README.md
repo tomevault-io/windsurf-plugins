@@ -7,11 +7,11 @@ All-in-one open-source framework & middleware for enterprise-grade multi-tenant 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [constructorfabric/gears-rust](https://github.com/constructorfabric/gears-rust).
+Original source: `AGENTS.md` in [constructorfabric/gears-rust](https://github.com/constructorfabric/gears-rust).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
