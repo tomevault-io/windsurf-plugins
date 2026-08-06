@@ -7,12 +7,12 @@ open source agent in vscodium
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [kurzcraft/DeepTask](https://github.com/kurzcraft/DeepTask).
+Original source: `AGENTS.md` in [kurzcraft/DeepTask](https://github.com/kurzcraft/DeepTask).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
