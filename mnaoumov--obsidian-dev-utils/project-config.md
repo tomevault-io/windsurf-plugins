@@ -3,7 +3,7 @@ trigger: always_on
 description: `obsidian-dev-utils` is a TypeScript utility library for Obsidian plugin development. It publishes as a dual-format (ESM + CJS) npm package.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 ## Project Overview
 
@@ -25,10 +25,13 @@ All npm scripts follow the `"foo:bar": "jiti scripts/foo-bar.ts"` pattern. Each 
 - `npm run build` — full build pipeline
 - `npm run build:clean` — clean build output
 - `npm run build:compile:typescript` — type-check with tsc
-- `npm run build:static` — copy static assets
+- `npm run build:templates` — copy consumer templates
 - `npm run spellcheck` — spell check with cspell
 - `npm run commit` — guided commit via Commitizen
 - `npm run version` — update version
+- `npm run docs:dev` — start the documentation site dev server (Astro)
+- `npm run docs:build` — build the documentation site to `docs/dist`, then validate its internal links, assets, and anchors offline plus its (deduplicated) external links for 404s (`scripts/docs-link-check.ts`)
+- `npm run docs:preview` — serve the built documentation site locally
 
 ## Architecture
 
@@ -45,76 +48,29 @@ All npm scripts follow the `"foo:bar": "jiti scripts/foo-bar.ts"` pattern. Each 
 - `src/script-utils/formatters/dprint.ts` — dprint formatting
 - `src/script-utils/test-runners/vitest.ts` — Vitest test runner
 - `scripts/` — npm script entry points (executed via `jiti`), each wraps its call in `wrapCliTask()` for error handling and exit codes
-- `static/scripts/` — consumer example scripts organized by module (bundlers, formatters, linters, test-runners, build, version)
+- `templates/` — consumer-facing templates copied verbatim into `dist/templates/` by `build:templates` (so they ship in the package, copyable from `node_modules/obsidian-dev-utils/dist/templates`). A trailing `.template` on a source file name is stripped during the copy (e.g. `templates/eslint.config.mts.template` → `dist/templates/eslint.config.mts`), so an active config template can live in the repo under a name the corresponding tool does not auto-discover (only `eslint.config.mts` currently needs this — ESLint treats any `eslint.config.*` as a flat config). Two kinds of file live here:
+  - Root config templates (`templates/commitlint.config.ts`, `templates/eslint.config.mts.template`, `templates/vitest.config.ts`, `templates/.markdownlint-cli2.mjs`, `templates/.nano-staged.mjs`, `templates/dprint.json`) — thin re-exports a consumer drops at their project root.
+  - `templates/scripts/` — the script entry points a consumer drops in their `scripts/` folder. This holds both the per-tool example scripts grouped by category (`bundlers/`, `formatters/`, `linters/`, `test-runners/`, `build/`, `version/`) and the flat `*-config.ts` logic files that the root config templates re-export (`commitlint-config.ts`, `eslint-config.ts`, `vitest-config.ts`, `markdownlint-cli2-config.ts`, `nano-staged-config.ts`).
+  - `templates/` is kept self-contained: every root config template resolves to a real `templates/scripts/*-config.ts`, so the imports never dangle. `commitlint-config`/`markdownlint-cli2-config`/`nano-staged-config` are pure re-exports (identical for every plugin); `eslint-config`/`vitest-config` are generic baselines a consumer customizes.
 - `src/script-utils/commitlint-config.ts` — shared commitlint configuration
 - `src/script-utils/nano-staged-config.ts` — shared nano-staged pre-commit configuration
 - `dist/` — compiled output (ESM `.mjs` + CJS `.cjs` + type declarations)
 
-### TypeScript
+### Documentation Site
 
-- Extends `@tsconfig/strictest` — very strict settings
-- Target: ES2024, Module: NodeNext
-- `allowImportingTsExtensions: true` — always use `.ts` extension in imports
+The API-reference + guides site is a self-contained **Astro + Starlight** project deployed to **GitHub
+Pages** at `https://mnaoumov.dev/obsidian-dev-utils/` (the `mnaoumov.dev` custom domain aliases
+`mnaoumov.github.io`). It is NOT a separate npm package — its dependencies live in the root
+`package.json` and it is driven by the root `docs:dev`/`docs:build`/`docs:preview` scripts.
 
-### Build
-
-- esbuild for bundling (ESM + CJS dual output)
-- `src/**/index.ts` files are auto-generated — do NOT edit them manually
-- `package.json` exports are auto-generated via `build:generate-exports`
-
-## Code Conventions
-
-### File Structure
-
-Every source file follows this pattern:
-
-```typescript
-/**
- * @file
- *
- * Brief description of module purpose.
- */
-
-import type { SomeType } from './some-module.ts';
-
-import { something } from './other-module.ts';
-
-export function myFunction(param: Type): ReturnType {
-  // ...
-}
-```
-
-### Naming
-
-- Directories: kebab-case (e.g., `script-utils/bundlers/esbuild-impl`, `test-runners`)
-- **Exception:** `src/test-helpers/mocks/` files use PascalCase to mirror Obsidian API export names (e.g., `App.ts`, `Vault.ts`, `TFile.ts`)
-- **Exception:** `constructors/` files use camelCase matching the exported function name (e.g., `getDomEventsHandlersConstructor.ts`), mirroring the `obsidian-typings` Constructors convention
-
-### Documentation
-
-- Every exported function/class requires JSDoc with `@param` and `@returns` tags
-- Every file requires a `@file` JSDoc comment at the top
-- Test files and mock files are exempt from documentation requirements
-
-### Imports
-
-- Sorted alphabetically (enforced by `eslint-plugin-perfectionist`)
-- Always include `.ts` extension in relative imports
-
-### Code Quality
-
-- Use `assertNonNullable()` from `src/type-guards.ts` in tests instead of `!`
-
-## Rules
-
-### L1. Overriding deprecated upstream methods
-
-- When this library overrides a method whose ancestor declaration carries a `@deprecated` JSDoc tag (e.g., Obsidian's `SettingTab.display()` is deprecated as of 1.13.0), the override semantically clears the deprecation but the `@typescript-eslint/no-deprecated` rule still fires on every call site. This is because the rule reads JSDoc tags via TypeScript's `getJsDocTags(checker)`, which walks the inheritance chain.
-- Resolution: add `// eslint-disable-next-line @typescript-eslint/no-deprecated -- <reason>` at the call site, or a file-level `/* eslint-disable @typescript-eslint/no-deprecated -- <reason> */` with a matching `/* eslint-enable ... -- <reason> */` when the same call appears throughout a file (paired enable + description are required by `@eslint-community/eslint-comments`).
-- Do not remove the `override` keyword or omit the override JSDoc to work around the rule. Keep the override explicit and disable the rule where the deprecated symbol is unavoidably referenced.
+- `astro.config.ts` (repo root) — the Astro config. `srcDir` is set to `./docs` so the site's content
+  tree never collides with the library's own `src/`; output goes to `docs/dist`. The Starlight
+  integration uses `starlight-github-alerts` to render GitHub-style Markdown alerts as native
+  Starlight asides.
+- `docs/content.config.ts` — Starlight content-collection config.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mnaoumov/obsidian-dev-utils](https://github.com/mnaoumov/obsidian-dev-utils) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
