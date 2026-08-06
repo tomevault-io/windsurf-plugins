@@ -96,4 +96,4 @@ Layered on top of the v2 institutional-readiness backbone (canonical
 
 ---
 > Source: [joejoe168168/impact-vision](https://github.com/joejoe168168/impact-vision) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
