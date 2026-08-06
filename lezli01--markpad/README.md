@@ -7,11 +7,11 @@ Markdown editor with live preview
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lezli01/markpad](https://github.com/lezli01/markpad).
+Original source: `AGENTS.md` in [lezli01/markpad](https://github.com/lezli01/markpad).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
