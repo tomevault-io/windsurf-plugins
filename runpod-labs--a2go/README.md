@@ -7,11 +7,11 @@ run your open source agent with open weight models
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [runpod-labs/a2go](https://github.com/runpod-labs/a2go).
+Original source: `AGENTS.md` in [runpod-labs/a2go](https://github.com/runpod-labs/a2go).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
