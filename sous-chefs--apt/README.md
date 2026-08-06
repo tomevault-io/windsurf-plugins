@@ -5,12 +5,12 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [sous-chefs/apt](https://github.com/sous-chefs/apt).
+Original source: `AGENTS.md` in [sous-chefs/apt](https://github.com/sous-chefs/apt).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
