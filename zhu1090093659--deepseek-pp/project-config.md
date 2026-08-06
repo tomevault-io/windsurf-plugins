@@ -56,4 +56,4 @@ When prose and executable behavior disagree, verify the code and tests, then upd
 
 ---
 > Source: [zhu1090093659/deepseek-pp](https://github.com/zhu1090093659/deepseek-pp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
