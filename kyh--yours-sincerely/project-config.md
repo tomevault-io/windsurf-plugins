@@ -1,122 +1,120 @@
 ---
 trigger: always_on
-description: Anonymous love letters app with disappearing ink. T3 Turbo stack + Supabase (as the
+description: **Yours Sincerely** is an anonymous love-letter app — letters written in disappearing ink.
 ---
 
-# Agent Instructions
+# AGENTS.md
 
-Anonymous love letters app with disappearing ink. T3 Turbo stack + Supabase (as the
-Postgres host — see "Architecture decisions" before assuming anything else about it).
+**Yours Sincerely** is an anonymous love-letter app — letters written in disappearing ink.
+One typed stack (tRPC · Drizzle · Postgres) behind a Next.js web app (`apps/web`) and an
+Expo native app (`apps/expo`). This is the tool-agnostic guide for coding agents: it is
+meant to be **run**, not just read. Claude also reads `CLAUDE.md` — that file holds the
+architecture decisions you must not reverse; this one holds the workflow.
 
-## Agent-driven development
+## Quickstart (headless)
 
-`AGENTS.md` is the tool-agnostic guide: provisioning that actually works from a fresh
-clone, how to verify a change end-to-end (`pnpm verify` plus a browser recipe against the
-real UI), and which surfaces an agent can check at runtime at all. **Read it before
-starting work**; it is meant to be run, not skimmed. This file stays the Claude-facing
-reference for conventions and for the architecture decisions below — the two do not
-duplicate each other.
-
-## Stack
-
-- **Monorepo**: pnpm + Turborepo
-- **Web**: Next.js (App Router, Turbopack), Tailwind v4, tRPC
-- **Mobile**: Expo / React Native (`apps/expo`) — the shipping native app
-- **Legacy mobile**: Capacitor (`apps/mobile`) — superseded WebView shell, plus the
-  `@capacitor/*` runtime inside `apps/web` (see "Architecture decisions"). Do not add
-  features; do not delete either without reading "Architecture decisions" first.
-- **DB**: Postgres (Supabase) + Drizzle ORM
-- **Auth**: hand-rolled signed-cookie sessions (`packages/api/src/auth/session.ts`).
-  **Not Supabase Auth.** Supabase is the Postgres host and local CLI only.
-  Read "Architecture decisions" before changing anything here.
-- **Notifications**: Knock
-- **Hosting**: Vercel
-
-## Structure
-
-```
-apps/
-  web/         # Next.js web app
-  expo/        # iOS/Android native app (Expo) — the one that ships
-  mobile/      # Legacy Capacitor shell — superseded, pending removal. Its Android
-               # applicationId still matches the live Play Store package, so it is
-               # the only source that can rebuild the legacy Android artifact.
-packages/
-  api/         # tRPC routers + auth/session
-  contracts/   # SHARED domain: zod schemas + pure rules used by BOTH web and expo.
-               # Shared domain logic belongs HERE, not duplicated per-platform.
-  db/          # Drizzle schema, Postgres client
-  ui/          # shadcn-ui components (web only)
+```sh
+pnpm install
+cp .env.example .env   # COOKIE_SECRET may stay empty in development (see below)
+pnpm db:start          # local Supabase — REQUIRES Docker
+pnpm db:push           # REQUIRED: `supabase start` brings up an EMPTY database
+pnpm dev:web           # → http://localhost:3000
 ```
 
-## Commands
+There is no bootstrap script; the five commands above are the whole provisioning story.
 
-```bash
-pnpm dev              # All packages (turbo watch)
-pnpm dev:web          # Web only
-pnpm dev:expo         # Expo only
-pnpm db:start         # Start local Supabase
-pnpm db:stop          # Stop Supabase
-pnpm db:reset         # Reset DB
-pnpm db:push          # Push schema to local
-pnpm db:push-remote   # Push schema to production
-pnpm db:seed          # Perf fixture — large, NOT idempotent, no signable accounts
-pnpm verify           # typecheck + lint + format + test — mirrors CI, run before commit
-pnpm lint             # oxlint (NOT ESLint), warnings are errors
-pnpm format           # oxfmt --check (use format:fix to write)
-pnpm typecheck        # TypeScript
-pnpm test             # node:test suites (turbo run test)
-pnpm build            # Build all
+`pnpm db:push` is not optional. There is no `packages/db/supabase/migrations` directory —
+the schema is declared, not migrated — so a fresh clone that skips it gets a database with
+no tables and a 500 on first page load. `db:push` runs `drizzle-kit push --force` (forced so
+it cannot hang on a TTY confirmation) and then applies every file in `packages/db/sql/`.
+
+Liveness: there is **no** `/api/health` route. Use the home page.
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/   # 200 when up
 ```
 
-## DB (packages/db)
+### When `pnpm db:start` misbehaves
 
-```bash
-pnpm -F db studio     # Drizzle Studio
-pnpm -F db seed       # Run seed script
-pnpm -F db apply-sql  # Re-apply sql/ only (push already does this)
+- `supabase start is already running` while the container is gone → `pnpm db:stop`, retry.
+- `Bind for 0.0.0.0:54322 failed: port is already allocated` → another local Supabase
+  project owns the port. Stop it (`supabase stop --project-id <other>`) or work without the
+  database; `pnpm verify` and `pnpm build` do not need it.
+
+## Fresh clone & remote sessions
+
+Everything is committed except `node_modules` and `.env`. `.codex/environments/environment.toml`
+describes the cloud runner (it runs `pnpm i` on clone and exposes a `dev:web` action) — note
+it is autogenerated, do not hand-edit it. A sandbox **without Docker** can still run
+`pnpm verify` and `pnpm build`; anything that reads or writes data cannot run there.
+
+`COOKIE_SECRET` signs the session cookie, and the session cookie **is** the user id. Under
+`NODE_ENV=development` or `test` an empty value falls back to a public dev constant, which is
+why local runs work out of the box. Every other environment fails to boot without it —
+that is deliberate (`packages/api/src/auth/session-core.ts`). Generate one with
+`openssl rand -base64 32` (32-character minimum).
+
+Every other key in `.env.example` may stay empty. A missing one disables its feature rather
+than crashing boot: no `KNOCK_*` means no notifications, no `RESEND_API_KEY` means
+`auth.requestPasswordReset` returns `PRECONDITION_FAILED` instead of sending mail.
+
+## Login
+
+**There is no seeded login.** `pnpm db:seed` runs `packages/db/src/seed/initial.ts`, which is a
+_performance_ fixture — 200 users, ~8k letters, 40k likes, shaped to make `EXPLAIN` honest. It
+sets no password hash, so none of those accounts can sign in, and it is **not idempotent**:
+running it twice duplicates the whole dataset. Reach for it when profiling, not when you need
+an account.
+
+You usually do not need one. Identity here is **anonymous-first**: writing a letter requires no
+account — the server mints a credential-less user on first write. Only Settings, Profile and
+the blocked-writers list need a real account, and you make one in three steps:
+
+```sh
+agent-browser open http://localhost:3000/auth/sign-up
+agent-browser fill '[data-test="email-input"]' dev@yourssincerely.local
+agent-browser fill '[data-test="password-input"]' password
+agent-browser find text 'Sign Up' click
 ```
 
-**The schema is declared, not migrated. There are no migrations.** It has two halves,
-and `pnpm db:push` applies both, in this order:
+The session comes back as a signed `Set-Cookie` and the browser keeps it. `/auth/sign-in`
+takes an optional `?next=<same-origin path>` to land somewhere other than `/`.
 
-1. `src/drizzle-schema.ts` — tables, columns, indexes. `drizzle-kit push` syncs these.
-2. `sql/*.sql` — functions, triggers, grants, **and views**. `src/apply-sql.ts` runs
-   every file, in filename order, in one transaction. Every file is idempotent; it
-   re-runs on every push. See `sql/README.md`.
+The HTTP API is tRPC with a **superjson-transformed** body at `/api/trpc/<router>.<procedure>`
+(e.g. `auth.signInWithPassword`) — there is no REST `/api/auth/*` endpoint, so a plain
+`curl -d '{"email":…}'` will not sign you in. Drive the UI instead.
 
-`pnpm db:push` is therefore the whole deploy, and `pnpm db:reset` is
-`supabase db reset && push && seed`. Nothing is replayed, so no migration history can
-drift from the schema.
+## Verify a change end-to-end
 
-The LOCAL `push` runs `drizzle-kit push --force` so a headless run cannot hang on the TTY
-confirmation prompt. `--force` accepts data-loss statements without asking, which is fine
-against a disposable local database and is why `push:remote` deliberately does **not** carry
-it — production stays interactive.
+Static gate — run before every commit. It is exactly what `.github/workflows/ci.yml` runs,
+in the same order:
 
-**`drizzle-kit push` does NOT diff a view's body.** This is the trap. It creates a view
-that is missing and drops one deleted from the schema file, but when the name already
-exists it emits _nothing_, however much the SELECT changed — exit 0, no warning.
-Verified against a production-shaped database. So: **any view is declared `.existing()`
-in `drizzle-schema.ts` (for column types only) and its DDL lives in `sql/090-views.sql`.**
-A view written with `.as(...)` will silently rot in production while push reports
-success. `main` shipped a `Feed` whose drizzle copy had already drifted from the
-deployed view (it was missing `AND p."parentId" IS NULL`, which would have put every
-comment in the feed); it never broke anything _only_ because push ignored it.
+```sh
+pnpm verify   # typecheck · lint · format · test
+```
 
-Corollary: **push cannot roll a view back either.** Reverting the schema file and
-pushing will leave the new view live. A rollback needs explicit SQL.
+`pnpm test` is `turbo run test`: the `*.test.ts` unit suites in `@repo/api`, `@repo/contracts`,
+`@repo/db` and `@repo/expo`. The `*.integration.ts` suites need a live local Supabase and are
+deliberately outside CI — run them yourself with `pnpm -F @repo/api test:db` when you touch a
+router, a query or the schema.
 
-The old `generate`/`migrate` scripts are gone, which retired the standing footgun that
-generate emitted `DROP TABLE "auth"."users" CASCADE` into every migration (an artifact
-of `schemaFilter: ["public"]` hiding Supabase's `auth` schema). `push` never had that
-bug — verified, it emits no `auth` DDL.
+Runtime — drive the real web UI with [agent-browser](https://github.com/vercel-labs/agent-browser).
+The core flow needs no login:
 
-## Testing
+```sh
+pnpm dev:web &
+agent-browser open http://localhost:3000
+agent-browser snapshot                       # accessibility tree with @eN refs
+agent-browser fill '#post-input' 'A letter from an agent'
+agent-browser find text 'Publish' click
+agent-browser get text                       # assert the letter is in the feed
+agent-browser screenshot /tmp/after.png
+```
 
+Stable hooks that already exist, so you do not have to add any: `#post-input` (the letter
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kyh/yours-sincerely](https://github.com/kyh/yours-sincerely) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
