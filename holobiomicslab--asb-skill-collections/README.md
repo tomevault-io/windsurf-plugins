@@ -7,11 +7,11 @@ Curated, evidence-grounded skill and software-tool collections for scientific AI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [HolobiomicsLab/asb-skill-collections](https://github.com/HolobiomicsLab/asb-skill-collections).
+Original source: `AGENTS.md` in [HolobiomicsLab/asb-skill-collections](https://github.com/HolobiomicsLab/asb-skill-collections).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
