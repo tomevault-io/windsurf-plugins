@@ -1,0 +1,88 @@
+---
+trigger: always_on
+description: The Makefile exposes explicit targets for each sync mode:
+---
+
+# QuranEngine
+
+## Make commands
+
+The Makefile exposes explicit targets for each sync mode:
+
+- no sync: `make build-no-sync`, `make test-no-sync`, `make build-example-no-sync`, `make run-example-no-sync`
+- sync enabled: `make build-sync`, `make test-sync`, `make build-example-sync`, `make run-example-sync`
+- SwiftFormat: `make format-lint`
+
+Package build targets honor `TARGET` as a scheme override, such as `make build-no-sync TARGET=NoorUI`. Package test targets always use the `QuranEngine-Package` scheme. Omit `TARGET` to run its full test plan, or set a production or test target to filter the run, such as `make test-sync TARGET=AyahMenuFeature` or `make test-sync TARGET=AyahMenuFeatureTests`. Keep every package test target in `QuranEngine-Package.xctestplan`. Ambient `QURAN_SYNC` may be set or unset through `launchctl`, so always use an explicit sync-mode target.
+
+Keeping these commands green locally should keep the CI workflow green as well.
+
+## Architecture
+
+- Respect target layers: `Core`/`Model` stay foundational, `Data` owns persistence/network implementations, `Domain` owns business services, `Features` own UI workflows, and `Example` wires concrete dependencies.
+- Avoid dependency direction reversals. Lower layers should not import feature/app targets.
+- Add new modules through the `Package.swift` target helpers and keep dependencies explicit.
+- Prefer extending existing services/builders over creating parallel abstractions.
+- Keep feature entry points in `*Builder` types; dependency wiring belongs in builders/container, not views.
+- Pass dependencies directly to view-model initializers; do not introduce nested `Deps` or dependency-bag types.
+
+## UI and features
+
+- `ViewModel`, builder, and UIKit/SwiftUI presentation code should be `@MainActor` when touching UI state.
+- Keep navigation through listener/navigator protocols already used by the feature.
+- Do not introduce new listener or delegate patterns unless extending an existing one; prefer closure-based callbacks for new interaction seams.
+- Views should stay mostly declarative; business logic belongs in view models/interactors/services.
+- Reuse NoorUI/UIx components before adding one-off controls.
+- Put new reusable UI components in NoorUI; avoid feature-local component duplicates.
+- Match established layouts in analogous features before introducing a new visual pattern.
+- Render Quran Arabic with NoorUI's Quran text APIs and Quran font; never use a system font.
+- Render sura names with NoorUI's locale-aware `MultipartText` sura interpolation: localized plus decorated Arabic outside Arabic locales, localized Arabic only in Arabic locales.
+- Prefer native `UINavigationItem` title, subtitle, and attributed-title APIs; use a custom `titleView` only when native APIs cannot meet the requirement. For pre-iOS 26 fallback, combine title and subtitle as `Title (Subtitle)`.
+- Inject concrete data services through builders and view models; do not wrap them in closure-based adapters.
+- Use `@ScaledMetric` for explicit UI dimensions that should scale with Dynamic Type; avoid fixed numeric layout metrics.
+- Prefer default `.padding()` spacing; specify edges or values only when the design requires custom spacing.
+- Always use `#Preview` for SwiftUI previews; do not use `PreviewProvider`.
+- Preserve localized strings; do not hardcode user-facing text unless existing nearby code does.
+
+## Concurrency
+
+- Prefer `Sendable` on models/services crossing concurrency boundaries.
+- Avoid detached tasks unless there is a clear lifecycle reason.
+- Prefer structured async flows; keep `Task {}` usage close to UI/event boundaries.
+- Be careful with shared mutable state; use existing `Locking`, actors, or `ManagedCriticalState` patterns.
+
+## Persistence and data
+
+- Use existing persistence boundaries (`CoreDataPersistence`, GRDB persistence targets, test support) instead of ad hoc file/database access.
+- Keep mapping between external SDK/data models and QuranEngine models in domain/data services, not features.
+- Treat migrations and sync mapping as user-data-sensitive; add narrow regression coverage when changing them.
+
+## Sync and build flags
+
+- Code behind `QURAN_SYNC` must compile both with and without the flag.
+- Any sync change should be checked with explicit sync and no-sync Make targets.
+- Do not rely on ambient shell/launchctl `QURAN_SYNC`.
+
+## Style
+
+- Follow local `// MARK:` organization and existing access-control style.
+- Prefer small files/types; split when a file grows into several responsibilities.
+- Keep public API minimal; default to internal/private.
+- Avoid drive-by cleanup in unrelated modules.
+- Use SwiftFormat; do not hand-format around it.
+
+## Dependencies
+
+- New third-party dependencies need a quick health check and should be added only when they remove meaningful complexity.
+- Prefer existing packages/utilities already in the repo.
+
+## Testing guidance
+
+- Keep tests in their owning module's `Tests` target. `AllTargetsTests` exists only to link otherwise-untested targets for coverage; do not add behavioral tests there without explicit confirmation.
+- Prefer real objects whenever practical. Use real model types, services, persistence stacks, parsers, mappers, builders, and value objects instead of test doubles.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [quran/quran-ios](https://github.com/quran/quran-ios) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
