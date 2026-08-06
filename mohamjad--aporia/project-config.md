@@ -1,0 +1,134 @@
+---
+trigger: always_on
+description: This repo is Aporia: a measurement contract compiler for reinforcement-learning
+---
+
+# AGENTS.md
+
+This repo is Aporia: a measurement contract compiler for reinforcement-learning
+evaluation.
+
+This file is the standing operating contract for coding agents. If chat context
+conflicts with this file and the governing docs, follow the docs unless the user
+explicitly changes the project direction.
+
+## Governing Docs
+
+Read these before major work:
+
+- `docs/SOURCE_OF_TRUTH.md`
+- `docs/DIFFERENTIATION_DOCTRINE.md`
+- `docs/APORIA_COMPILER_SPEC.md`
+- `docs/CONSISTENCY_REVIEW.md`
+- `docs/PROVENANCE_AND_REVIEW.md`
+- `docs/ARCHITECTURE_INTEGRITY_REVIEW.md`
+- `docs/PRE_C14_AUDIT.md`
+
+Use specific implementation docs when touching their surface:
+
+- Contract work: `docs/CONTRACT_SCHEMA.md`, `docs/VALIDATION_ERRORS.md`
+- Manifest work: `docs/MANIFEST_SCHEMA.md`
+- Trace/runtime work: `docs/OFFLINE_TRACE_SCHEMA.md`
+- Offline audit assembly: `docs/OFFLINE_AUDIT_RUNTIME.md`
+- Evidence manifests: `docs/EVIDENCE_MANIFEST_SCHEMA.md`
+- Invariant execution: `docs/INVARIANT_INTERFACE.md`
+- Witness reports: `docs/WITNESS_REPORT_SCHEMA.md`
+- Backend work: `docs/BACKEND_CAPABILITY_MATRIX.md`
+- Verdict work: `docs/VERDICT_PREDICATES.md`
+- Claim cards: `docs/CLAIM_CARD.md`
+- Gymnasium/MuJoCo backend spike: `docs/GYMNASIUM_MUJOCO_FRICTION_SPIKE.md`
+- Backend execution reports: `docs/BACKEND_EXECUTION_REPORT.md`
+- CLI work: `docs/CLI_ERRORS.md`
+
+## One-Sentence Purpose
+
+Aporia turns an RL evaluation's declared measurement claim into executable
+worlds, falsifiers, evidence requirements, witness searches, and verdict
+conditions for auditing whether the score is licensed to mean what it claims.
+
+## Non-Negotiable Framing
+
+Aporia is not:
+
+- A reward-hacking detector.
+- A robustness benchmark.
+- A Gym wrapper.
+- An offline trace summarizer.
+- A dashboard.
+- A generic eval toolkit.
+
+Those may be mechanics Aporia uses. They are not the product.
+
+The core chain is:
+
+```text
+measurement contract
+  -> compiler IR
+  -> generated worlds and falsifiers
+  -> executable audit manifest
+  -> evidence and witness search
+  -> licensed verdict
+```
+
+Every feature must support this chain or be cut.
+
+## Current Boundary
+
+The compiler currently can:
+
+- Parse and validate YAML measurement contracts.
+- Build ClaimGraph and SourceGraph IR.
+- Expand WorldSetPlan, FalsifierPlan, DriftPlan, and EvidencePlan.
+- Lower plans to backend jobs with capability honesty.
+- Assemble and validate audit manifests.
+- Emit deterministic artifacts and compile reports.
+- Compile the canonical HalfCheetah contract.
+- Run consistency audits.
+- Load compiled audit manifests and JSONL offline trace files.
+- Reconstruct offline trace episodes deterministically.
+- Validate trace world IDs, timestep continuity, terminal-step consistency, and
+  checkpoint requirements for policy-support drift.
+- Preserve run, policy, checkpoint, environment, seed, reward-component, and
+  per-step `info` context during episode reconstruction.
+- Aggregate episode rewards by world, policy, and checkpoint.
+- Aggregate reward components separately from total reward.
+- Parse invariant result objects.
+- Execute explicitly registered invariant callables over reconstructed episodes.
+- Summarize behavior traces: universally computable `episode_length` and
+  `episode_reward`, numeric fixed-action `action_smoothness`, and
+  discrete-action `action_entropy`.
+- Assemble an evidence manifest from reconstructed episodes, reward summaries,
+  reward-component summaries, behavior summaries, and externally supplied
+  invariant results while computing conservative construct scores from
+  invariants, supported construct-scored behavior evidence, and normalized
+  declared judge-family outputs plus explicit human-preference comparisons when
+  evidence exists.
+- Emit per-episode evidence units that align reward and construct evidence while
+  preserving raw invariant and behavior component values separately.
+- Rank high-reward, low-construct witness candidates using available invariant
+  and supported behavior construct evidence, then match them to same-world
+  trajectory, checkpoint, or policy references for witness contradiction
+  predicates.
+- Evaluate predicate results for rank-based metric/construct agreement over
+  complete paired evidence units, invariant violation rate, no-witness search
+  outcomes, and same-world candidate/reference witness contradictions.
+- Resolve conservative verdicts from evaluated predicate results and manifest
+  verdict policy.
+- Render Markdown claim cards that expose evidence gaps, unscored construct
+  sources, missing predicates, witness limitations, and the resolved verdict.
+- Run `aporia audit-offline` to assemble offline evidence, witness, predicate,
+  verdict, and claim-card artifacts from an emitted manifest and JSONL traces,
+  including compatible traces generated by concrete backends.
+- Route invariant execution through an explicit execution-mode boundary where
+  trusted in-process execution is supported and isolated subprocess execution
+  enforces timeout and payload-size limits without silently falling back to
+  trusted mode. OS-level sandboxing is not implemented.
+- Run a narrow Gymnasium/MuJoCo HalfCheetah friction-mutation backend path and
+  script that mutate `env.unwrapped.model.geom_friction` and emit offline trace
+  JSONL.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [mohamjad/aporia](https://github.com/mohamjad/aporia) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-29 -->
