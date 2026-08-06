@@ -7,11 +7,11 @@ Pure Elixir MQTT 3.1.1/5.0 library - high-performance codec, transport-agnostic 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [cignosystems/mqttx](https://github.com/cignosystems/mqttx).
+Original source: `AGENTS.md` in [cignosystems/mqttx](https://github.com/cignosystems/mqttx).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
