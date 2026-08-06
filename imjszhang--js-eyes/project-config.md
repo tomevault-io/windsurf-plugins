@@ -1,61 +1,121 @@
 ---
 trigger: always_on
-description: Install, configure, verify, and troubleshoot JS Eyes browser automation for OpenClaw.
+description: JS Eyes is a local-first browser capability and site-skill runtime for AI
 ---
 
+# Repository Guidance for Coding Agents
 
-# JS Eyes
+## Project purpose
 
-Use this skill to turn a ClawHub-installed `js-eyes` bundle into a working OpenClaw browser automation stack.
+JS Eyes is a local-first browser capability and site-skill runtime for AI
+agents. The browser extension, server, SDK, CLI, MCP facade, and optional host
+adapters are separate layers over the same protocol and policy model.
 
-Treat `{baseDir}` as the installed skill root. The plugin path that must be registered in OpenClaw is `{baseDir}/openclaw-plugin`, not `{baseDir}` itself.
+CLI, MCP, and OpenClaw are peer host surfaces. Do not make a host-specific
+adapter the owner of behavior that belongs in the host-neutral runtime.
 
-## Use This Skill When
+## Repository map
 
-- The user wants to install or configure JS Eyes from a ClawHub skill bundle.
-- `js_eyes_*` tools are missing after installation.
-- The browser extension is installed but still shows `Disconnected`.
-- The user wants to verify the built-in server, plugin config, or extension connection.
-- The user wants to discover or install JS Eyes extension skills after the base stack is working.
-- The user wants to mount a **custom / external** extension skill (a directory outside the bundle that contains a `skill.contract.js`) into a running OpenClaw, or to verify that such a skill is actually loaded.
-- The user wants to **author a new extension skill from scratch** — in that case, point them at the starter template and authoring guide (see `Authoring A New Extension Skill` below) rather than writing files from nothing.
+- `apps/cli` contains the public `js-eyes` command.
+- `apps/native-host` contains the browser Native Messaging host.
+- `packages/protocol` owns shared protocol constants, browser-operation
+  metadata/handlers, and browser-operation catalogs. Install helpers live in
+  `@js-eyes/skill-install` (not under `protocol`).
+- `packages/skill-install` owns skill discovery, install, trust, ZIP/npm, and
+  registry helpers (formerly under `protocol`).
+- `packages/policy` owns `PolicyContext` and related egress/taint/task-origin
+  policy primitives used by server-core and the client SDK.
+- `packages/client-sdk` owns the Node.js browser client (may re-export selected
+  policy symbols from its main entry; prefer `@js-eyes/policy` directly).
+- `packages/server-core` owns the local HTTP and WebSocket server.
+- `packages/mcp-server` is the native stdio MCP facade.
+- `packages/skill-contract` validates Skill metadata; `packages/skill-runtime`
+  owns host-neutral Skill Runtime V2, including isolated worker execution.
+- `openclaw-plugin` (`@js-eyes/openclaw-plugin`) is an optional OpenClaw
+  adapter workspace. Core packages must not import it.
+- `extensions/shared` is the canonical source for cross-browser extension
+  behavior. Chrome and Firefox copies are generated from it.
+- `skills/*` are independently versioned site skills.
+- `packages/devtools` owns builds, release staging, and generated artifacts.
+- `distribution` contains source templates for distributable artifacts.
+- `src` contains the public website source.
+- `dist` contains generated output and must not be edited by hand.
 
-## What Success Looks Like
+## Architecture boundaries
 
-A successful setup has all of the following:
+Preserve these dependency directions:
 
-1. `npm install` has been run in `{baseDir}` with Node.js 22 or newer.
-2. OpenClaw loads `{baseDir}/openclaw-plugin` via `plugins.load.paths`.
-3. `plugins.entries["js-eyes"].enabled` is `true`.
-4. `tools.alsoAllow` (preferred) or `tools.allow` includes `js-eyes`, so the plugin's optional tools are actually exposed to the model.
-5. The user can run `openclaw js-eyes status`.
-6. The browser extension is connected to `http://<serverHost>:<serverPort>`, the popup **Server Token** field is populated (2.2.0+), and `js-eyes` with `action: browser/get-tabs` returns real tabs.
-7. The bundled first-party extension skills under `{baseDir}/skills` are enabled by default in the JS Eyes host config, and the main plugin auto-loads enabled skills from `{baseDir}/skills` or the configured `skillsDir` (primary), plus any read-only directories listed in `extraSkillDirs` (extras). The user can later use `js-eyes` actions `skills/discover` and `skills/plan-install` to add more extension skills dynamically.
-8. `js-eyes doctor` reports an acceptable security posture for this skill's deployment (token present, `allowAnonymous=false`, **`allowRawEval=true` in `~/.js-eyes/config/config.json`**, host bound to loopback, skill integrity OK). `doctor` will still label raw eval as insecure — that is expected when following this skill.
+```text
+browser extension
+        |
+  server-core
+        |
+   client-sdk
+        |
+host-neutral runtime
+        |
+CLI / MCP / optional OpenClaw adapter
+```
 
-## Deployment Modes
+- Keep host discovery, trust, invocation, configuration, cancellation, and
+  disposal in the host-neutral Skill Runtime.
+- Keep OpenClaw configuration migration, registration, consent presentation,
+  and watcher integration inside `openclaw-plugin`.
+- Skill discovery must inspect static metadata only. Never execute a skill
+  entry module during discovery.
+- A V2 skill must declare its tools, schemas, risks, and capabilities in
+  `skill.manifest.json`.
+- Browser permissions granted to a skill must be intersected with the
+  capabilities declared by the invoked tool.
+- Prefer first-class protocol operations over implementing ordinary browser
+  actions through arbitrary JavaScript.
+- Avoid adding compatibility aliases silently. If compatibility is necessary,
+  document its lifetime and test it explicitly.
 
-Treat `{baseDir}` as the bundle or repository root that contains `openclaw-plugin/`, `skills/`, and the package manifests.
+## Browser extension changes
 
-There are two supported complete deployment modes:
+- Edit shared cross-browser behavior in `extensions/shared` first.
+- Do not independently patch injected Chrome and Firefox runtime copies.
+- After shared changes, prepare staging with `npm run sync:extension-shared`
+  (writes `dist/extensions-stage/{chrome,firefox}`); builders inject shared
+  the same way. Load unpacked extensions from the staged directories.
+- Keep Chrome MV3 and Firefox MV2 loading differences in their platform entry
+  modules.
+- Treat authentication, request validation, deduplication, rate limiting,
+  reconnection, uploads, screenshots, and sender validation as security- or
+  reliability-sensitive behavior.
 
-1. ClawHub / bundle deployment
-   - `{baseDir}` is the installed JS Eyes bundle root.
-   - Run `npm install` in `{baseDir}` so the plugin runtime can resolve its dependencies.
-   - Register `{baseDir}/openclaw-plugin` in OpenClaw.
+## Skill changes
 
-2. Source-repo / development deployment
-   - `{baseDir}` is the root of a local `js-eyes` git clone.
-   - Run `npm install` in the repo root, not inside `openclaw-plugin/`.
-   - Point OpenClaw `plugins.load.paths` at the repo-root `openclaw-plugin` directory.
-   - If you are debugging the browser side, load the extension from `extensions/chrome/` or `extensions/firefox/manifest.json` as appropriate.
-   - **Restart scope**: only changes to files **under `openclaw-plugin/` itself** (or any `packages/*` module the plugin imports directly) require restarting / refreshing OpenClaw so the plugin module is re-`require`d. Edits to individual skill files (`skills/<id>/skill.contract.js`, an `extraSkillDirs` entry's contract, etc.) are picked up hot by the `SkillRegistry` + chokidar watcher — no restart needed.
+- Each directory under `skills/` is an independent package with its own
+  version and compatibility range.
+- Keep `skill.manifest.json`, `skill.entry.js`, `skill.definition.js`,
+  `package.json`, and `SKILL.md` consistent for official V2 Skills. Treat
+  `skill.contract.js` is no longer activated by the runtime (V1 removed).
+- New tools must have a stable name, JSON Schema input, risk classification,
+  and the minimum capabilities required.
+- `read`, `interactive`, `destructive`, and `administrative` are meaningful
+  policy inputs; do not downgrade a risk to make a tool easier to expose.
+- Prefer structured, site-semantic operations over exposing low-level page
+  scripts to callers.
+- Document login requirements and unavailable or experimental commands
+  accurately.
+- Do not assume Worker execution is an operating-system sandbox. Direct
+  filesystem, process, and network access remain trust decisions.
 
-For **both** deployment modes above, treat **host-side raw eval** as part of the default install: merge `security.allowRawEval: true` into `~/.js-eyes/config/config.json` (Windows: `%USERPROFILE%/.js-eyes/config/config.json`) **during** deployment — not in `openclaw.json`. The js-eyes server reads this file; the browser extension syncs the value on WebSocket handshake (2.5.1+). Restart the server / OpenClaw after changing it so `execute_script` raw JavaScript is not blocked with `RAW_EVAL_DISABLED`.
+## Security invariants
 
+- Never print or persist authentication tokens, cookie values, script bodies,
+  CSS payloads, uploaded file contents, full HTML, or screenshot base64 in
+  ordinary logs or error summaries.
+- Keep the default MCP profile safe. Sensitive tools must remain absent from
+  discovery unless the operator explicitly selects a broader profile.
+- Preserve loopback binding, origin validation, token authentication, audit
+  logging, task-origin tracking, taint checks, and egress policy unless the
+  change explicitly targets one of those controls.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [imjszhang/js-eyes](https://github.com/imjszhang/js-eyes) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
