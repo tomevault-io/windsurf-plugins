@@ -1,62 +1,125 @@
 ---
 trigger: always_on
-description: Workflow orchestration guidelines for planning, subagent usage, task management, verification, and autonomous problem-solving. Apply when handling multi-step tasks, bug fixes, architectural decisions, or any non-trivial work.
+description: Cross-tool project guide for any coding agent. Domain workflows live in **on-demand
 ---
 
+# UnravelEngine - Agent Instructions
 
-## Workflow Orchestration
+Cross-tool project guide for any coding agent. Domain workflows live in **on-demand
+skills** under `.agents/skills/` - do not load them all at once.
 
-### 1. Plan Mode Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately – don't keep pushing
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
+## Layout
 
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One task per subagent for focused execution
+| Path | Role |
+|------|------|
+| `AGENTS.md` | Always-on project instructions (this file) |
+| `.agents/skills/` | Portable skills (`*/SKILL.md`) - source of truth |
+| `CLAUDE.md` | Optional one-line import of this file for Claude Code |
+| `.cursor/skills`, `.claude/skills` | Optional junctions to `.agents/skills` (see `.agents/README.md`) |
 
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
+## Precedence
 
-### 4. Verification Before Done
-- Never mark a task complete without proving it works
-- Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this?"
-- Run tests, check logs, demonstrate correctness
+1. Explicit user instructions in the current chat  
+2. This file (`AGENTS.md`)  
+3. On-demand skills under `.agents/skills/`  
 
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
-- Skip this for simple, obvious fixes – don't over-engineer
-- Challenge your own work before presenting it
+Skills add procedures and domain checklists. They do not override hard rules here
+unless the user says so.
 
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding
-- Point at logs, errors, failing tests – then resolve them
-- Zero context-switching required from the user
-- Go fix failing CI tests without being told how
+## Repository map
 
-## Task Management
+| Path | Role |
+|------|------|
+| `engine/` | Runtime library: ECS, rendering, assets, scripting, physics, audio |
+| `editor/` | Editor executable and ImGui hub (must not be required at game runtime) |
+| `game/` | Game / player runner |
+| `engine_data/`, `editor_data/` | Shipped data (shaders, scripts, UI); rebuild `engine_data` / `editor_data` when changed |
+| `deps/` | Third-party; use, almost never modify (`deps/3rdparty/` especially) |
+| `cmake/`, `CMakeLists.txt`, `CMakePresets.json` | Build system |
+| `.agents/skills/` | Domain and workflow skills |
+| `tasks/` | Optional agent notes (`todo.md`, `lessons.md`) |
 
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plans**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review section to `tasks/todo.md`
-6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+Bootstrap order and system list: see skill `unravel-triage`.
 
-## Core Principles
+## Agent behavior
 
-- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+- Act as a principal C++ / engine engineer with many years of experience.
+- Keep going until the user's query is completely resolved. Only stop when the
+  problem is solved.
+- If unsure about file content or codebase structure, use tools to read and gather
+  information. Do not guess or invent answers.
+- Plan extensively before each tool call, and reflect on outcomes before the next.
+  Do not solve the problem with tool calls alone - think between steps.
+- Prefer minimal diffs. Touch only what the task requires.
+- Never modify `deps/3rdparty/` unless there is no alternative.
+- After a user correction, capture the pattern in `tasks/lessons.md` (see skill
+  `unravel-lessons`).
+
+## Start here on non-trivial work
+
+Skip triage for trivial one-file edits with an obvious touch point.
+
+1. Read skill **`unravel-triage`** (`.agents/skills/unravel-triage/SKILL.md`).
+2. Classify domain, list files to read, then open the matching domain / workflow skill.
+3. For large or cross-cutting design, use **`unravel-architect`**.
+4. Before calling done, use **`unravel-build-verify`** when code or data targets changed.
+
+Skill catalog: `.agents/skills/README.md`.
+
+## Hard project rules
+
+- Match existing naming: `snake_case` for types, files, and functions in this codebase.
+- Engine vs editor: code under `editor/` must not be required at game runtime.
+- Play mode: respect `play_mode` phases; do not run edit-only mutations while playing.
+- Serialization / meta / prefabs / C# parity: check the triage skill's cross-cutting
+  list before adding components or reflected fields.
+- Prefer English in code and comments; ASCII only in source.
+- Do not create git commits, amend, push, or open PRs unless the user explicitly asks.
+- Never update git config; never force-push `main`/`master`; avoid destructive git
+  commands unless the user explicitly requests them.
+
+## Code quality
+
+- Verify information before presenting it. Do not assume or speculate without evidence.
+- Make changes file by file when that helps review.
+- Never use apologies.
+- Do not add "understanding" feedback in comments or documentation.
+- Do not suggest whitespace-only changes.
+- Do not invent changes beyond what was requested.
+- Do not ask for confirmation of information already in context.
+- Preserve unrelated code and existing structure.
+- Prefer a single coherent edit per file over multi-step rewrite instructions.
+- Do not ask the user to verify implementations that are already visible in context.
+- Do not suggest updates when no modification is needed.
+- Link to real project files, not placeholder docs.
+- Do not show or discuss the current implementation unless asked.
+- Prefer root-cause fixes over temporary hacks.
+- Keep changes simple and local; avoid drive-by refactors.
+
+## Clean code
+
+- Named constants over magic numbers; keep constants near the top of the file or
+  in a dedicated constants location.
+- Names reveal purpose; avoid unclear abbreviations.
+- Comments explain *why*, not *what*; document APIs, complex algorithms, and
+  non-obvious side effects.
+- Single responsibility; small focused functions.
+- DRY: extract repeated logic; keep a single source of truth.
+- Keep related code together; consistent file and folder naming.
+- Hide implementation details; expose clear interfaces.
+- Refactor continuously; leave touched code cleaner than you found it.
+- Write tests before fixing bugs when practical; cover edge cases.
+- Clear commit messages; small focused commits; meaningful branch names.
+
+## Workflow orchestration
+
+### Plan first
+
+- Enter a planning mindset for any non-trivial task (3+ steps or architectural decisions).
+- If something goes sideways, stop and re-plan - do not keep pushing a failing approach.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [unravel-dev/UnravelEngine](https://github.com/unravel-dev/UnravelEngine) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
