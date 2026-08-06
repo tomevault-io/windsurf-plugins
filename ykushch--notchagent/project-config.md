@@ -1,0 +1,98 @@
+---
+trigger: always_on
+description: A native macOS notch/menu-bar control surface for AI coding agents running under
+---
+
+# NotchAgent — build & architecture notes for Claude
+
+A native macOS notch/menu-bar control surface for AI coding agents running under
+[herdr](https://herdr.dev), viewed and driven from Ghostty. herdr is the state
+authority; this app is a **socket client + notch UI** that keeps transport and
+state reconciliation in `HerdrClient`, while the app
+remains a thin, user-driven control surface. herdr continues to own PTYs and
+agent lifecycle state; NotchAgent reads snapshots/events and sends explicit actions.
+
+## Build & test
+
+```bash
+swift build                      # build all targets
+swift build --target HerdrClient # build just the core library (fast lane)
+swift test                       # run the full swift-testing suite (needs ALL targets to compile)
+swift run notchctl list          # dogfood the core against live herdr
+swift run NotchApp               # launch the notch UI (accessory app; no dock icon)
+```
+
+- **Toolchain:** Swift 6.2, macOS 14+. No third-party dependencies (Foundation/AppKit/SwiftUI + POSIX sockets only).
+- `swift test` compiles *every* target first — a broken UI target blocks core tests. Use `swift build --target HerdrClient`/`--target HerdrClientTests` to verify the core in isolation.
+- Tests use the **swift-testing** framework (`import Testing`, `@Test`/`@Suite`/`#expect`), NOT XCTest. `xcrun xctest` will report "0 tests" — always use `swift test`.
+
+## Targets
+
+| Target | Kind | Contents |
+| --- | --- | --- |
+| `HerdrClient` | library | Socket client, Codable models, state store, prompt classifier, action layer. The whole M1 core. |
+| `notchctl` | executable | Headless CLI harness that dogfoods the core (`list`/`watch`/`read`/`resolve`/`reply`/`jump`). |
+| `NotchApp` | executable | The notch `NSPanel` UI (accessory app). Binds to `HerdrClient`. |
+
+## Architecture (data flow)
+
+```
+herdr server (owns PTYs + agent state)
+    │ newline-delimited JSON over Unix socket (~/.config/herdr/herdr.sock)
+    │
+HerdrClient.request()  → connect-per-call (herdr closes socket after one req/resp)
+HerdrClient.events()   → ONE long-lived connection, reconnects with backoff
+    │
+    ▼
+StateStore (@MainActor @Observable)  → hydrate(snapshot) then apply(event)
+    │
+    ├─→ InteractionCoordinator (pane-keyed cache, drafts, refresh + response phases)
+    │     ├─ ScreenInteractionProvider → ScreenAdapterRegistry
+    │     │     ├─ ClaudeScreenAdapter
+    │     │     ├─ CodexScreenAdapter
+    │     │     └─ GenericScreenAdapter (safe raw fallback)
+    │     └─ InteractionResponder (fresh-read safety boundary + pane-scoped settle)
+    ├─→ InteractionDisplayModel + InteractionResponsePlanner (pure; no transport)
+    ├─→ PromptClassifier  (temporary ClassifiedPrompt compatibility facade)
+    └─→ Actions           (approve/deny/answer/reply/jump → send_keys/send_text/focus + Ghostty raise)
+    │
+NotchApp UI (NSPanel + SwiftUI)  /  notchctl CLI
+```
+
+## Protocol facts that shaped the code (verified live against herdr 0.7.4 / protocol 16)
+
+- **One request per connection.** The server closes the socket after a single
+  request/response. `HerdrClient.request` connects per call. Only `events()`
+  keeps a connection open. Do NOT build a persistent multiplexed request channel.
+- **`pane.agent_status_changed` is per-pane** — its subscription requires a
+  `pane_id`. There is no global status firehose. `StateStore.currentSubscriptions()`
+  emits one entry per pane + the global `pane.agent_detected`/`created`/`exited`,
+  and is re-derived on every (re)connect. Do *not* add `pane.output_matched` to
+  that set — herdr requires it per-pane WITH a `source` field, and one bad entry
+  makes herdr reject the *entire* subscribe batch (`invalid_request`) so no events flow.
+- **Status is driven by POLLING, not events.** On the live build,
+  `pane_agent_status_changed` events are sparse/absent (a pane can sit `blocked`
+  and never emit one), but `session.snapshot` always has correct `agent_status`.
+  So `NotchViewModel` polls the snapshot every ~1.5s and calls
+  `StateStore.reconcile(_:)` (the primary status path); the event stream is only an
+  accelerator + new-pane detector. If you ever see the UI "frozen," suspect the
+  event assumption — verify with `notchctl list` (pure snapshot path).
+- **Interactions are pane-scoped.** `InteractionCoordinator` keeps blocked
+  interactions, drafts, errors, read revisions, and response/settle phases keyed
+  by pane ID. A busy pane never suppresses another pane's refresh. Selected panes
+  refresh promptly; non-selected panes use revision changes plus a fourth-poll
+  fallback when revision evidence is missing or explicitly untrusted.
+- **herdr replays `pane_created` for long-closed panes on every subscribe.** An
+  unfamiliar `pane_id` in an event does not mean a new pane exists — confirm against
+  a fresh snapshot before resubscribing, or it thrashes.
+- **`pane_created`/`pane_focused` nest the id at `data.pane.pane_id`**;
+  `pane_agent_status_changed` uses `data.pane_id`. `EventEnvelope.paneID` checks both.
+- **Envelopes are nested by result type:** `session.snapshot`→`result.snapshot...`,
+  `pane.read`→`result.read.text`, `pane.focus`/`pane.get`→`result.pane`. Events
+  arrive as `{event:"<snake_name>", data:{…}}`. Models decode the nested shapes.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ykushch/notchagent](https://github.com/ykushch/notchagent) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
