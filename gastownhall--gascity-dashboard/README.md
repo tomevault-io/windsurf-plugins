@@ -7,11 +7,11 @@ temporary workspace for developing the next Gas City dashboard
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [gastownhall/gascity-dashboard](https://github.com/gastownhall/gascity-dashboard).
+Original source: `AGENTS.md` in [gastownhall/gascity-dashboard](https://github.com/gastownhall/gascity-dashboard).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
