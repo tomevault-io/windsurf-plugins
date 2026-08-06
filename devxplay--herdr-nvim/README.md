@@ -7,11 +7,11 @@ Neovim integration for Herdr pane navigation
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [devxplay/herdr.nvim](https://github.com/devxplay/herdr.nvim).
+Original source: `AGENTS.md` in [devxplay/herdr.nvim](https://github.com/devxplay/herdr.nvim).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
