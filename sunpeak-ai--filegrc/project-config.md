@@ -1,26 +1,26 @@
 ---
 trigger: always_on
-description: This monorepo builds FileGRC, a Git-native GRC system for SOC 2 work. It has two Node.js packages:
+description: This monorepo builds filegrc, a Git-native GRC system for SOC 2 work. It has two Node.js packages:
 ---
 
-# FileGRC Repository Instructions
+# filegrc Repository Instructions
 
 ## Purpose
 
-This monorepo builds FileGRC, a Git-native GRC system for SOC 2 work. It has two Node.js packages:
+This monorepo builds filegrc, a Git-native GRC system for SOC 2 work. It has two Node.js packages:
 
-- `filegrc`: the zero-dependency FileGRC engine, which validates, searches, edits, and renders GRC data.
-- `create-filegrc`: the FileGRC scaffolder, which creates a standalone SOC 2 repository.
+- `filegrc`: the zero-dependency filegrc engine, which validates, searches, edits, and renders GRC data.
+- `create-filegrc`: the filegrc scaffolder, which creates a standalone SOC 2 repository.
 
 The generated repository is the product. Keep it understandable to an engineer who opens it without prior context.
 
 ## Agent-facing product surface
 
-Treat headless use as a first-class interface. An agent with no FileGRC context must be able to discover the right record type, inspect current relationship candidates, create or update JSON and Markdown through one validated payload, complete scheduled and event work, prepare an audit, and verify the result without opening the renderer.
+Treat headless use as a first-class interface. An agent with no filegrc context must be able to discover the right record type, inspect current relationship candidates, create or update JSON and Markdown through one validated payload, complete scheduled and event work, prepare an audit, and verify the result without opening the renderer.
 
 - Keep the generated root `AGENTS.md` as the program and Git guide.
 - Keep `data/AGENTS.md` as the universal record workflow. Add collection-level `AGENTS.md` files only where a wrong action has material compliance, privacy, or audit consequences.
-- Keep `filegrc guide`, `types`, `list`, `get`, `references`, `scaffold`, CRUD, `content`, obligations, events, audit readiness, and evidence packets model-driven.
+- Keep `filegrc guide`, `types`, `list`, `get`, `references`, `scaffold`, CRUD, `content`, obligations, events, program readiness, audit readiness, and evidence packets model-driven.
 - Scaffold files are prompts, not compliance facts. They must keep incomplete work in a non-final state and make missing required values obvious.
 - Browser and CLI mutations must use the same domain functions and the same `{ record, content }` shape.
 - Every resource type must pass automated guide and scaffold coverage. Test first-class multi-record workflows through the CLI as well as their domain functions.
@@ -65,14 +65,14 @@ Treat headless use as a first-class interface. An agent with no FileGRC context 
 
 ## Data rules
 
-The authoritative model registry is `packages/filegrc/model/v1.json`. FileGRC has not shipped, so update v1, the starter data, generated docs, and tests together. Do not add a second model or migration code until a published version creates a real compatibility boundary.
+The authoritative model registry is `packages/filegrc/model/v1.json`. Model v1 is published. Before changing it, decide whether existing v1 workspaces remain valid. Keep compatible v1 changes, starter data, generated docs, and tests in sync. Add a new model version and an explicit migration path when a change would make existing v1 workspaces invalid.
 
 - Use UTF-8 JSON for structured records and Markdown for long-form content.
-- Store canonical long-form Markdown beside its structured JSON record. FileGRC derives companion names from the JSON location and Markdown slot; do not store those paths in record data.
+- Store canonical long-form Markdown beside its structured JSON record. filegrc derives companion names from the JSON location and Markdown slot; do not store those paths in record data.
 - Structure fields only when the engine needs them for validation, filtering, relationships, lifecycle rules, due-date calculations, or audit-period completeness.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [Sunpeak-AI/FileGRC](https://github.com/Sunpeak-AI/FileGRC) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+> Source: [Sunpeak-AI/filegrc](https://github.com/Sunpeak-AI/filegrc) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-28 -->
