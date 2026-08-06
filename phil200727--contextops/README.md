@@ -7,11 +7,11 @@ A lightweight, file-based Kanban engine for orchestrating AI coding agents — p
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Phil200727/contextops](https://github.com/Phil200727/contextops).
+Original source: `AGENTS.md` in [Phil200727/contextops](https://github.com/Phil200727/contextops).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
