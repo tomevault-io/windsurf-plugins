@@ -7,11 +7,11 @@ Unified model-distillation harness for code abilities: pi / claude-code / codex 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [greghavens/moonshiner](https://github.com/greghavens/moonshiner).
+Original source: `AGENTS.md` in [greghavens/moonshiner](https://github.com/greghavens/moonshiner).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
