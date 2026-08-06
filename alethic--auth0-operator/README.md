@@ -7,12 +7,12 @@ Kubernetes Operator for Managing Auth0 Tenants, Clients, etc
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [alethic/auth0-operator](https://github.com/alethic/auth0-operator).
+Original source: `CLAUDE.md` in [alethic/auth0-operator](https://github.com/alethic/auth0-operator).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
