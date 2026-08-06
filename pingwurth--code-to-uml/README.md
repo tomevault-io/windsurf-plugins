@@ -7,11 +7,11 @@ Code-To-UML is a zero-dependency, browser-first PlantUML rendering tool for conv
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [pingwurth/code-to-uml](https://github.com/pingwurth/code-to-uml).
+Original source: `AGENTS.md` in [pingwurth/code-to-uml](https://github.com/pingwurth/code-to-uml).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
