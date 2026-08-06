@@ -1,0 +1,179 @@
+---
+trigger: always_on
+description: Intelligent arXiv literature crawler and analyzer for physics research. Features:
+---
+
+# ArXiv-Pulse Development Guide for AI Agents
+
+## Project Overview
+
+Intelligent arXiv literature crawler and analyzer for physics research. Features:
+- Automated paper fetching from arXiv API
+- AI-powered summarization and translation (DeepSeek/OpenAI)
+- FastAPI web interface with Vue 3 + Element Plus frontend
+- SQLite database with SQLAlchemy ORM
+- SSE (Server-Sent Events) for real-time progress streaming
+- Multilingual support (Chinese/English UI, translation to multiple languages)
+
+Target domains: condensed matter physics, DFT, machine learning, force fields, computational materials science.
+
+## Development Setup
+
+```bash
+git clone https://github.com/kYangLi/ArXiv-Pulse.git
+cd ArXiv-Pulse
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+## Build/Lint/Test Commands
+
+```bash
+# Build
+python -m build          # Build distribution
+pip install -e .         # Install locally
+
+# Lint (Black line-length 120, Ruff, mypy)
+black .                  # Format code
+black --check . && ruff check . && mypy arxiv_pulse/
+
+# Test
+pytest                              # Run all tests
+pytest tests/test_module.py         # Run single test file
+pytest tests/test_module.py::test_name  # Run single test
+pytest --cov=arxiv_pulse            # With coverage
+
+# Playwright browser tests (run from tests/ directory)
+cd tests && uv run python test_field_selector.py
+
+# Web server
+pulse serve .                        # Start web server (background)
+pulse serve . -f                     # Start web server (foreground)
+pulse status .                       # Check service status
+pulse stop .                         # Stop service
+pulse restart .                      # Restart service
+```
+
+Note: mypy may show SQLAlchemy Column type errors - these are known issues and don't affect runtime.
+
+## Code Style Guidelines
+
+### Import Organization
+Standard library → third-party → local imports:
+```python
+import asyncio
+import json
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from arxiv_pulse.config import Config
+from arxiv_pulse.core import Database
+from arxiv_pulse.models import Paper
+from arxiv_pulse.i18n import t, get_translation_prompt
+```
+
+### Naming Conventions
+- **Classes**: `PascalCase` (`ArXivCrawler`, `PaperSummarizer`)
+- **Variables/Functions**: `snake_case` (`search_arxiv`, `paper_ids`)
+- **Constants**: `UPPER_SNAKE_CASE` (`ARXIV_MAX_RESULTS`)
+- **Private**: `_private_method()`
+- **Database tables**: Plural `snake_case` (`papers`, `collections`)
+- **API routers**: `router = APIRouter()` at module level
+
+### Type Hints
+Use type hints for all function signatures:
+```python
+def enhance_paper_data(paper: Paper, session=None) -> dict[str, Any]:
+    """Enhance paper data with translations and metadata."""
+
+async def update_recent_papers(
+    days: int = Query(7, ge=1, le=30),
+    limit: int = Query(50, ge=1, le=200),
+) -> StreamingResponse:
+    """SSE endpoint for updating recent papers."""
+```
+
+### Error Handling
+Use try/except for operations that may fail. Use `HTTPException` in API routes:
+```python
+try:
+    result = crawler.sync_query(query=query, years_back=years_back)
+except Exception as e:
+    yield f"data: {json.dumps({'type': 'log', 'message': f'同步出错: {str(e)[:80]}'}, ensure_ascii=False)}\n\n"
+
+# In API endpoints:
+if not collection:
+    raise HTTPException(status_code=404, detail="Collection not found")
+```
+
+### Database Session Management
+Always use context manager for sessions:
+```python
+with get_db().get_session() as session:
+    papers = session.query(Paper).filter(Paper.id.in_(paper_ids)).all()
+```
+
+### SSE (Server-Sent Events) Pattern
+```python
+async def event_generator():
+    yield f"data: {json.dumps({'type': 'log', 'message': '开始处理...'}, ensure_ascii=False)}\n\n"
+    await asyncio.sleep(0.1)
+    yield f"data: {json.dumps({'type': 'done', 'total': len(papers)}, ensure_ascii=False)}\n\n"
+
+return StreamingResponse(
+    event_generator(),
+    media_type="text/event-stream",
+    headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+)
+```
+
+### Frontend (Vue 3 + Element Plus)
+Located at `arxiv_pulse/web/static/index.html` - single file application:
+- Use `v-for` with `:key` for lists
+- Use `ref()` for reactive state
+- i18n: Use `t('key.path')` for translations
+- All functions must be returned in the setup() return statement
+- Use `@click.stop` to prevent event propagation on nested clickable elements
+
+### Frontend i18n Pattern
+```javascript
+// Translation object structure
+const i18n = {
+    zh: {
+        collections: {
+            title: '论文集',
+            create: '新建论文集',
+        }
+    },
+    en: {
+        collections: {
+            title: 'Collections',
+            create: 'New Collection',
+        }
+    }
+};
+
+// Usage
+function t(key, params = {}) {
+    const keys = key.split('.');
+    let value = i18n[currentLang.value];
+    for (const k of keys) {
+        if (value && typeof value === 'object') value = value[k];
+        else return key;
+    }
+    if (typeof value !== 'string') return key;
+    return value.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
+}
+```
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [kYangLi/arXiv-Pulse](https://github.com/kYangLi/arXiv-Pulse) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-28 -->
