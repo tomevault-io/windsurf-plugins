@@ -7,11 +7,11 @@ New GitHub repository for the OVHcloud public documentation
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ovh/ovhcloud-docs](https://github.com/ovh/ovhcloud-docs).
+Original source: `AGENTS.md` in [ovh/ovhcloud-docs](https://github.com/ovh/ovhcloud-docs).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
