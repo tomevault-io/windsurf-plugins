@@ -1,246 +1,118 @@
 ---
 trigger: always_on
-description: Generates video titles in the style of Bilibili creator "黑鸦" (Heya) — long, emotionally charged, multi-event headlines. Use when the user asks for 黑鸦风格, heya style, or wants any content (news, tech, gaming, entertainment, etc.) transformed into sensational Chinese titles with emotional punch.
+description: Bilibili creator "黑鸦" title style generator — CLI pipeline + AI skill output.
 ---
 
+# AGENTS.md
 
-# 黑鸦 · 标题风格生成器
+Bilibili creator "黑鸦" title style generator — CLI pipeline + AI skill output.
 
-> "震撼官宣！DeepSeek 服务完成提速扩容，算力霸权神话破灭，闭源大模型的斩杀线来了！| AI日报0523"
+## Runtime
 
-## 使用前必读
+- **Bun only**. Every command uses `bun`. No npm/pnpm/yarn.
+- `bun run <script>` for package.json scripts, `bun test` for tests.
+- `#!/usr/bin/env bun` shebang on `src/index.ts`.
 
-**每次使用此 Skill 前，必须先更新数据：**
+## Commands
 
-根据你的包管理器选择命令：
-
-```bash
-npx skills update heya-title-style      # npm
-bunx skills update heya-title-style     # bun
-pnpm dlx skills update heya-title-style # pnpm
-yarn dlx skills update heya-title-style # yarn
+```sh
+bun install                    # install deps (bun.lock)
+bun run check                  # biome check . && tsc --noEmit
+bun run format                 # biome check --write .
+bun test                       # run all tests
+bun test -t <pattern>          # filter by test name regex
+bun run pipeline               # full pipeline: fetch → analyze → generate
+bun run pipeline --skip-fetch --skip-analyze --dry-run
+bun run docs                   # typedoc → docs/ (gitignored)
 ```
 
-> 超过 3 分钟未完成则终止，使用已有数据兜底。
+**Order matters**: `bun run check` before `bun test`. CI enforces this.
 
----
+## Pipeline
 
-## 角色规则
+3 phases: fetch (UApi Bilibili proxy) → analyze (HanLP REST + deterministic aggregation) → generate (template substitution).
 
-**此 Skill 激活后，你就是黑鸦的标题风格分析师。**
+Fetch uses `uapi-sdk-typescript` — no Bilibili cookie or WBI signing needed. HanLP REST required for analysis; skip with `--skip-analyze`.
 
-- ✅ 基于真实数据学习风格，不凭感觉
-- ✅ 每次生成 3-5 个候选标题
-- ✅ 标题要长（40-60字），要情绪饱满，要有冲击力
-- ✅ 参考下方真实标题示例，模仿其结构和用词
-- ✅ 生成前先读取 `references/research/` 下的分析数据，用完整数据做决策，不要只依赖上方内嵌摘要
-- ✅ 每个标题必须包含至少 1 个情绪词（从下方词汇库选取）
-- ✅ 感叹号是核心标点，平均每句用 2-3 个
-- ❌ 不要生成短标题（黑鸦不用短标题）
-- ❌ 不要平淡陈述（黑鸦的标题都很有情绪）
-- ❌ 不要用"发布"、"上线"、"更新"等平淡动词开头（要用情绪词开头）
+## SKILL.md generation
 
----
+- **Template**: `SKILL.template.md` — the canonical source. Edit this file.
+- **Output**: `skills/heya-title-style/SKILL.md` — auto-generated from template + analysis, committed. This is the deployed agent skill artifact.
+- **AUTO sections**: Content between `<!-- AUTO_START:xxx -->` / `<!-- AUTO_END:xxx -->` is replaced by pipeline for these 4 sections: `core-features`, `title-examples`, `vocab-library`, `structure-formulas`. The `core-guidance` section has template fallback text but is NOT replaced by pipeline. Never edit AUTO sections in the output file.
+- **Reference data**: `skills/heya-title-style/references/` is auto-generated.
+  - `00-llm-brief.md` — compact LLM-readable summary
+  - `01-titles.csv` — raw video titles
+  - `02-style-analysis.yaml` — structured analysis data
+  - `02-style-analysis.md` — human-readable analysis report
+  - `03-title-features.json` — per-title debug data; never load wholesale into LLM context
 
-## 黑鸦标题风格 DNA（基于真实标题）
+## Environment
 
-<!-- AUTO_START:core-features -->
-### 核心特征
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `UAPI_BASE_URL` | no | `https://uapis.cn` | UApi proxy base URL |
+| `UAPI_API_KEY` | no | — | UApi API key (free tier works without) |
+| `BILIBILI_MID` | no | `3706929260006322` | Target user ID (黑鸦) |
+| `BILIBILI_PAGE_SIZE` | no | `30` | Archive API page size |
+| `NLP_BACKEND` | no | `hanlp` | Only `hanlp` is supported |
+| `HANLP_URL` | yes (unless `--skip-analyze`) | `http://127.0.0.1:8765` | Local HanLP REST service |
+| `HANLP_TIMEOUT_MS` | no | `20000` | Per-request timeout (ms) |
+| `HANLP_BATCH_SIZE` | no | `32` | Titles per HanLP parse call |
 
-1. **超长标题**：平均 51.8 字，78.7% 超过 40 字
-2. **情绪炸弹**：大量使用感叹号（22%）和情绪词
-3. **多事件合并**：一个标题常包含 2-3 条新闻
-4. **AI 日报格式**：61.1% 的标题带 "| AI日报MMDD" 后缀
-5. **主导风格**：「悬念式」占比 43.5%
-6. **独特词汇**：大地震、引爆、重磅、杀疯了、雪崩、史诗级、吓出癫痫、头皮发麻、全面、海啸
-7. **多分句结构**：平均 4.6 个分句，信息密度极高
-8. **感叹号密度**：平均每标题 2.1 个感叹号
-9. **最常用公式**：`{事件们} | AI日报{日期}`（66次）
-10. **交叉风格**：「情感式」含交叉匹配 95 次（88.0%），标题常兼具多种风格
+Copy `.env.example` to `.env` (gitignored), and start a local HanLP REST service before running analysis. Pipeline performs `/health` check and fails clearly if HanLP unavailable.
 
-<!-- AUTO_END:core-features -->
+## Lint / format
 
-<!-- AUTO_START:title-examples -->
-### 真实标题示例（直接学习）
+- **Biome** (v2.5+), not ESLint/Prettier.
+- Excludes: `skills/` (see `biome.json`).
+- Double quotes, tab indent, organize imports on save (`assist.source.organizeImports: "on"`).
 
-**情感式（最常用，42.6%）**：
-```
-OpenAI彻底清算！低价区廉价Team正价自用无差别全封禁！AI圈血流成河！码农最黑暗一日！ | AI日报0605
-OpenAI突发服务崩溃疑似大赦天下，官方论坛惊现密集举报！DeepSeek再现融资疑云真假难辨！| AI日报0603
-MiniMax M3深夜引爆AI圈！Token Plan大地震，高价老用户的斩杀线来了！
-Anthropic底裤露出，Opus 4.8自称Qwen引发蒸馏争议！OpenAI 偷偷更新 GPT-5.5 模型，宣称 4.5 和 o3 将下架！| AI日报
-震撼官宣！DeepSeek 服务完成提速扩容，算力霸权神话破灭，闭源大模型的斩杀线来了！| AI日报0523
-```
+## TypeScript
 
-**悬念式（43.5%）**：
-```
-AI圈大地震！微信AI重磅泄露，ChatGPT已吓晕！MiniMax 涨价失败惹群嘲，Kimi又双叒融资！| AI日报0608
-OpenAI雪崩！芯片核心大将连夜叛逃Anthropic，奥特曼的棺材板快按不住了……| AI日报0607
-重磅炸弹！Claude Mythos 5 幽灵现身 API，OpenAI即将被招安？特朗普与奥特曼惊天密谋泄露！| AI日报0606
-```
+- `strict: true`, `noEmit: true`, `target: ES2023`, `moduleResolution: Bundler`.
+- Notable: `noUncheckedIndexedAccess: true`, `allowImportingTsExtensions: true`, `skipLibCheck: true`.
+- TypeScript 6.x with `bun-types` for Bun globals.
 
-**日报式（61.1%）**：
-```
-DeepSeek 网页前端现快速模式，代码暗藏专家模式 | AI日报0403
-阿里千问正式发布Qwen3.6-Plus；Gemma 4 即将发布 | AI日报0402
-DeepSeek 灰度测试多轮搜索功能；千问上线 Qwen3.5-Omini 系列模型 | AI日报3月30日
-```
+## Testing
 
-**对比式（1.9%）**：
-```
-巅峰血战！GPT-5.6 vs Gemini 3.2，这一次，硅谷天崩地裂！| AI日报0514
-OpenAI杀疯了！Codex超级App突降硅谷，决战！百Agent大战！OpenAI全线突围，全面围剿Claude！
-```
+- **`bun:test`** (Bun built-in). No Vitest/Jest config.
+- Integration tests use static fixture data — no network, no HanLP needed.
+- 4 test files: `nlp-adapter`, `pipeline.integration`, `skill-generation`, `video-titles`.
 
-**其他（11.1%）**：
-```
-DeepSeek 网页前端现快速模式，代码暗藏专家模式 | AI日报0403
-阿里千问正式发布Qwen3.6-Plus；Gemma 4 即将发布 | AI日报0402
-DeepSeek 灰度测试多轮搜索功能；千问上线 Qwen3.5-Omini 系列模型 | AI日报3月30日
-```
-
-**高频公式模板示例**：
-```
-{事件们} | AI日报{日期} （66次）
-{事件1}！{事件2}！{事件3}！ （39次）
-{陈述}？{追问} （19次）
-```
-
-<!-- AUTO_END:title-examples -->
-
-<!-- AUTO_START:vocab-library -->
-### 高频词汇库
-
-**情绪词（必用）**：
-大地震、引爆、重磅、杀疯了、雪崩、史诗级、吓出癫痫、头皮发麻、全面、海啸、炸裂、命运大转折、斩杀线、后背发凉、奇点
-
-**AI 领域词**：
-AI、DeepSeek、模型、OpenAI、Gemini、发布、GPT、泄露、Claude、Qwen、硅谷、上线、Kimi、Anthropic、MiniMax
-
-**高频词 Top 20**：
-AI日报(66)、模型(35)、DeepSeek(32)、AI(21)、OpenAI(19)、Gemini(17)、AI圈(12)、引爆(12)、泄露(11)、奥特曼(9)、Claude(9)、硅谷(9)、来袭(9)、AI圈大地震(8)、3.5(8)、深夜(8)、Kimi(7)、Anthropic(7)、彻底(7)、GPT(7)
-
-**描述词/形容词（情绪渲染）**：
-彻底(7)、史诗级(5)、直接(4)、后背发凉(4)、疯狂(4)、神秘(4)、偷偷(3)、血腥(3)、最强(3)、真相(2)
-
-**动作词/动词（事件描述）**：
-引爆(12)、泄露(11)、杀疯了(6)、全线突围(6)、吓出癫痫(5)、炸裂(5)、突发(4)、斩杀线来了(4)、震撼(4)、瘫坐(4)
-
-**名词/实体词（主题概念）**：
-AI日报(66)、模型(35)、AI圈(12)、奥特曼(9)、硅谷(9)、AI圈大地震(8)、深夜(8)、人类(7)、重磅炸弹(6)、大地震(6)
-
-**英文词（品牌/产品名）**：
-DeepSeek(32)、AI(21)、OpenAI(19)、Gemini(17)、Claude(9)、Kimi(7)、Anthropic(7)、GPT(7)、V4(7)、MiniMax(6)
-
-**公司/机构**：
-DeepSeek(31)、OpenAI(18)、Google(9)、Anthropic(7)、MiniMax(6)、腾讯(5)、智谱(4)、阶跃星辰(2)、字节跳动(1)、xAI(1)
-
-**产品/模型**：
-Gemini(16)、Claude(9)、Kimi(7)、GPT(7)、Qwen(6)、Mythos(5)、ChatGPT(4)、Grok(4)、Opus(4)、Codex(3)
-
-**高频二元短语**：
-深夜引爆(7)、命运大转折(4)、AI奇点(3)、模型来袭(3)、AI圈沸腾(3)、V4下周(3)、系列模型(3)、奇点已至(3)、风控大地震(2)、移交军事法庭(2)
-
-**高频三元短语**：
-AI奇点已至(2)、系列多款模型(2)、多款模型震撼(2)、模型震撼开源(2)、震撼开源史上(2)、开源史上最强(2)、史上最强模型(2)、最强模型系列(2)、模型系列来袭(2)、参与美军空袭(2)
-
-<!-- AUTO_END:vocab-library -->
-
-<!-- AUTO_START:structure-formulas -->
-**公式1：情绪词 + 主题 + 副标题（最常用，42.6%）**
-```
-{情绪词}！{主题}，{副标题}！
-```
-
-**公式2：多事件合并**
-```
-{事件1}！{事件2}！{事件3}！| AI日报{MMDD}
-```
-
-**公式3：悬念式（43.5%）**
-```
-{情绪词}！{主题}泄露/曝出/传出，{副标题}？
-```
-
-**公式4：日报式（61.1%）**
-```
-{主题} | AI日报{MMDD}
-```
-
-**语料中高频公式模板**：
-
-- `{事件们} | AI日报{日期}`: 66 次
-- `{事件1}！{事件2}！{事件3}！`: 39 次
-- `{陈述}？{追问}`: 19 次
-- `{情绪词}！{主题}，{后果}！`: 17 次
-- `{传闻}，{推测}`: 16 次
-
-### 分类占比
-
-| 类型 | 数量 | 占比 |
-|------|------|------|
-| 悬念式 | 47 | 43.5% |
-| 数字列表式 | 1 | 0.9% |
-| 对比式 | 2 | 1.9% |
-| 情感式 | 46 | 42.6% |
-| 故事式 | 0 | 0.0% |
-| 教程式 | 0 | 0.0% |
-| 其他 | 12 | 11.1% |
-
-### 多标签分类占比（含交叉匹配）
-
-| 类型 | 高置信匹配 | 含交叉匹配 | 占比 |
-|------|-----------|-----------|------|
-| 悬念式 | 4 | 47 | 43.5% |
-| 情感式 | 0 | 95 | 88.0% |
-| 数字列表式 | 0 | 2 | 1.9% |
-| 故事式 | 0 | 7 | 6.5% |
-| 对比式 | 0 | 5 | 4.6% |
-| 教程式 | 0 | 1 | 0.9% |
-| 其他 | 12 | 12 | 11.1% |
-
-<!-- AUTO_END:structure-formulas -->
-
-<!-- AUTO_START:emotion-guide -->
-### 情绪词使用指南
-
-**平均情绪强度**：6.6 分
-
-**强度分布**：
-- 极强: 28 个（26%）
-- 强烈: 17 个（16%）
-- 中等: 28 个（26%）
-- 轻微: 14 个（13%）
-- 无: 21 个（19%）
-
-**必用情绪词（按频次排序）**：
-
-| 情绪词 | 频次 | 强度 | 用法 |
-|--------|------|------|------|
-| 大地震 | 14 | 极强 | 开头，制造震撼 |
-| 引爆 | 12 | 强烈 | 搭配「深夜」，事件爆发 |
-| 重磅 | 7 | 中等 | 搭配「炸弹」 |
-| 杀疯了 | 6 | 强烈 | 搭配公司名，表示碾压 |
-| 雪崩 | 5 | 极强 | 搭配「全面」，表示崩溃 |
-| 史诗级 | 5 | 中等 | 通用 |
-| 吓出癫痫 | 5 | 中等 | 通用 |
-| 头皮发麻 | 5 | 强烈 | 悬念式开头 |
-| 全面 | 5 | 中等 | 通用 |
-| 海啸 | 5 | 极强 | 搭配「席卷」，表示冲击 |
-| 炸裂 | 5 | 中等 | 通用 |
-| 命运大转折 | 4 | 中等 | 通用 |
-
-**情绪词搭配公式**：
+## Architecture
 
 ```
-{情绪词}！{公司/产品}{动作}，{后果}！
-例：震撼官宣！DeepSeek 服务完成提速扩容，算力霸权神话破灭！
+src/index.ts                 CLI entry (bun shebang)
+src/shared/                  env, files (CSV/JSON/YAML), paths, sleep
+src/features/
+  video-titles/              UApi proxy pagination → VideoEntry[]
+  style-analysis/            HanLP adapter + style aggregation + report rendering
+  skill-generation/          Template → SKILL.md with AUTO section replacement
+  pipeline/                  Orchestration + CLI option parsing
+tests/                       4 test files (bun:test)
 ```
 
+- Fetch: `uapi-sdk-typescript` (`UapiClient`) proxies Bilibili API. No WBI signing needed.
+- NLP: local HanLP REST for segmentation, POS, and NER. Aggregation and style scoring remain deterministic.
+- File I/O: custom CSV/YAML/JSON helpers in `src/shared/files.ts` (auto-create parent dirs).
+
+## CI
+
+Scheduled daily (`30 12 * * *`) + manual dispatch via `.github/workflows/update-reference.yml`.
+Runs: install → check → test → HanLP health check → pipeline → commit if `skills/heya-title-style/references/` changed.
+Note: CI pushes reference data only; SKILL.md is regenerated but commits require manual review.
+
+## Commit conventions
+
+[Conventional Commits](https://www.conventionalcommits.org/).
+
+```
+<type>(<scope>): <description>
 ```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`.
+Scopes: `video-titles`, `style-analysis`, `skill-generation`, `pipeline`, `readme`.
 
 ---
 > Source: [ChouChiu/heya-skill](https://github.com/ChouChiu/heya-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
