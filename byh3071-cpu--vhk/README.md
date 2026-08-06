@@ -7,11 +7,11 @@ VHK — AI 코딩 세션을 목표·증거·기억·규칙으로 묶는 한국�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [byh3071-cpu/vhk](https://github.com/byh3071-cpu/vhk).
+Original source: `AGENTS.md` in [byh3071-cpu/vhk](https://github.com/byh3071-cpu/vhk).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
