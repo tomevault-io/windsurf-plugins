@@ -7,11 +7,11 @@ Reality gap analyzer — scrapes signals across 7 layers (finance, job postings,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [snowtone-ai/odim](https://github.com/snowtone-ai/odim).
+Original source: `AGENTS.md` in [snowtone-ai/odim](https://github.com/snowtone-ai/odim).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
