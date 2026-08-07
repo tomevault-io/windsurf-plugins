@@ -7,11 +7,11 @@ Base44 App: StkFlow Analytics
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [afbertuolsmart/stkflow-analytics](https://github.com/afbertuolsmart/stkflow-analytics).
+Original source: `AGENTS.md` in [afbertuolsmart/stkflow-analytics](https://github.com/afbertuolsmart/stkflow-analytics).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
