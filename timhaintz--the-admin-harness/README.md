@@ -7,11 +7,11 @@ Source-driven agentic harness for IT administrators
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [timhaintz/the-admin-harness](https://github.com/timhaintz/the-admin-harness).
+Original source: `AGENTS.md` in [timhaintz/the-admin-harness](https://github.com/timhaintz/the-admin-harness).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
