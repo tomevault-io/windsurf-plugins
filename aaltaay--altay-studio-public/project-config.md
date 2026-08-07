@@ -1,74 +1,90 @@
 ---
 trigger: always_on
-description: Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria.
+description: Altay Studio is an automated SaaS platform (the "Control Plane") that rapidly provisions, deploys, and manages isolated business websites. It acts as a website factory by creating an isolated schema in a master Supabase project, cloning a tailored GitHub repository (template), injecting environment variables (including VITE_DB_SCHEMA), and deploying to Vercel for every new client.
 ---
 
+# Altay Studio AI Context & Governance
 
-# Karpathy behavioral guidelines
-
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+## Project Overview
+Altay Studio is an automated SaaS platform (the "Control Plane") that rapidly provisions, deploys, and manages isolated business websites. It acts as a website factory by creating an isolated schema in a master Supabase project, cloning a tailored GitHub repository (template), injecting environment variables (including VITE_DB_SCHEMA), and deploying to Vercel for every new client.
 
 ---
 
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+## ⚠️ Critical: The Provisioning Flow (MUST READ)
+
+Every time a client submits the "Launch My Site" form, the `provision-client` edge function executes these steps **in order**. Getting the order wrong has caused bugs multiple times — do not change it without reading this.
+
+```
+User submits form
+      │
+      ▼
+1. AUTHENTICATE — verify the user's JWT via supabase.auth.getUser(token)
+      │
+      ▼
+2. DB RECORD (INIT) — insert into public.businesses with owner_id, slug, schema_name,
+                      provisioning_status = 'in_progress', provisioning_step = 'init'
+      │
+      ▼
+3. DB SCHEMA — create a new Postgres schema (e.g. schema_ahmiclinic) in the
+               master Supabase project and run the template's schema.sql into it
+               (Update DB record: provisioning_step = 'db_schema')
+      │
+      ▼
+4. GITHUB REPO — call POST /repos/{org}/{template-repo}/generate to clone the
+                 template into a brand-new repo named {slug}-site
+                 (e.g. aaltaay/template-barber → aaltaay/ahmiclinic-site)
+                 ⚠️ Wait ~3 seconds after creation before the next step.
+                 (Update DB record: github_repo, provisioning_step = 'github_repo')
+      │
+      ▼
+4b. INJECT CONFIG — GET then PUT tenant.config.json into the new repo via
+                    GitHub Contents API. Overwrites the template default with
+                    tenant-specific colors, fonts, feature flags, and pages.
+                    Non-fatal if it fails (env vars are the primary source).
+      │
+      ▼
+5. VERCEL PROJECT — call POST /v10/projects?teamId={VERCEL_TEAM_ID} to create
+                    a new Vercel project named {slug}, linking it to the NEW repo.
+                    Inject all VITE_ env vars at this step.
+                 (Update DB record: vercel_project_id, provisioning_step = 'vercel_deploy')
+      │
+      ▼
+6. CLOUDFLARE DNS — DNS is handled automatically via a global wildcard CNAME 
+                (*.altaystudio.com → cname.vercel-dns.com) on Cloudflare. 
+                No per-client API calls are required for DNS.
+                 (Update DB record: provisioning_step = 'done')
+      │
+      ▼
+7. UPDATE DB — write vercel_deployment_url back onto the business record, 
+               mark provisioning_status = "completed", provisioning_step = "done"
+```
+
+### Rollback Strategy
+- If **any step fails** → Catch error, update DB record with `provisioning_status = 'failed'` and `provisioning_error = err.message`. This allows the Admin Dashboard to see the failure.
+- External resources (like a partially created GitHub repo or Vercel project) should either be rolled back manually via the Admin Dashboard or via a robust retry mechanism. We currently keep the DB record as an error log.
+
+### Template → Repo Name Convention
+| Template repo      | Business type | New client repo name   |
+|--------------------|---------------|------------------------|
+| template-barber    | barber        | `{slug}-site`          |
+| template-clinic    | clinic        | `{slug}-site`          |
+
+Template is resolved from the `GITHUB_TEMPLATE_BARBER` / `GITHUB_TEMPLATE_CLINIC` secrets (NOT hardcoded). The `GITHUB_ORG` secret controls the GitHub org (default: `aaltaay`).
+
+## The Admin Control Plane & Diagnostics
+
+The platform includes an Admin Dashboard (`/admin`) for monitoring and debugging provisioning flows. It interfaces with two main Edge Functions:
+1. `provision-client`: Handles the initial creation.
+2. `admin-action`: A secure proxy function that takes an `action` and `business_id` to perform live diagnostics or cleanup.
+   - **`diagnose`**: Connects to the database to check if the schema exists, pings GitHub to verify the repo exists, and hits Vercel API to check the project.
+   - **`cleanup`**: Drops the schema (`DROP SCHEMA CASCADE`), deletes the GitHub repo, and deletes the Vercel project, allowing the admin to start over cleanly.
+
+---
+
+## Key Architectural Decisions & Gotchas
+*   **Archival Architecture:** Adopted a "Safe Archive" philosophy. When an admin deletes a business record, the system relies on archiving resources instead of fully destroying them to prevent accidental data loss. The Edge Function renames the Postgres schema and the GitHub repository by prefixing them with `archived_` and a timestamp. Vercel projects are permanently deleted to free up domains, and the local business record is removed to clear the dashboard.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aaltaay/altay-studio-public](https://github.com/aaltaay/altay-studio-public) — distributed by [TomeVault](https://tomevault.io).
