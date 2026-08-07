@@ -1,0 +1,23 @@
+---
+trigger: always_on
+description: Before changing or rebuilding the IronDeploy WinPE image, read and follow:
+---
+
+# Codex Workspace Instructions
+
+Before changing or rebuilding the IronDeploy WinPE image, read and follow:
+
+- `Core\Docs\WINPE.md`
+
+Important:
+
+- Never execute `Core\WinPE\Runtime\deploy.ps1` on this machine. It erases a
+  physical disk.
+- Do not start IronAPI unless the user explicitly asks.
+- Do not commit `.iso`, `.venv`, `.env`, Python caches, or other ignored files.
+- Treat `Core\WinPE\Runtime` as the source of truth for files copied into WinPE.
+- After modifying WinPE scripts, rebuild the ISO only when the user requests it.
+
+---
+> Source: [Syrinoxsis/IronDeploy](https://github.com/Syrinoxsis/IronDeploy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-07 -->
