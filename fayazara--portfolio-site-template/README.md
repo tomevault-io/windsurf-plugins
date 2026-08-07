@@ -7,11 +7,11 @@ A fun little personal portfolio site template
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [fayazara/portfolio-site-template](https://github.com/fayazara/portfolio-site-template).
+Original source: `AGENTS.md` in [fayazara/portfolio-site-template](https://github.com/fayazara/portfolio-site-template).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
