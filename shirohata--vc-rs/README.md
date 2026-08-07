@@ -7,11 +7,11 @@ Real-time RVC voice changer in Rust: standalone GUI, CLI, and VST3 plugin runnin
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [shirohata/vc-rs](https://github.com/shirohata/vc-rs).
+Original source: `AGENTS.md` in [shirohata/vc-rs](https://github.com/shirohata/vc-rs).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
