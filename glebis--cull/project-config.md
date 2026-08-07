@@ -1,0 +1,115 @@
+---
+trigger: always_on
+description: Cull is a Tauri 2 + SvelteKit 5 + Rust desktop image viewer focused on AI-generated art. Uses SQLite (rusqlite), CLIP embeddings (ONNX), and Svelte 5 runes.
+---
+
+# Agent Instructions
+
+## Project Overview
+
+Cull is a Tauri 2 + SvelteKit 5 + Rust desktop image viewer focused on AI-generated art. Uses SQLite (rusqlite), CLIP embeddings (ONNX), and Svelte 5 runes.
+
+Canonical modular release skills live in `~/ai_projects/claude-skills/` and are
+installed into `~/.agents/skills/`. Repository-local release policy and commands
+remain authoritative when a skill is unavailable.
+
+## Architecture
+
+- **Rust backend**: `src-tauri/src/db_core/` — models, DB, smart collections, NL parser, source detection
+- **Frontend**: `src/lib/` — Svelte 5 components, API layer, stores
+- **Commands**: `src-tauri/src/commands/` — Tauri IPC commands
+- **Tests**: `src-tauri/` (Rust unit tests), `tests/e2e/` (browser E2E)
+
+## Codebase Patterns
+
+### Rust
+- `Database` struct with `Mutex<Connection>`, accessed via `self.conn.lock().unwrap()`
+- `Database::open()` → `run_migrations()` — not `new()`
+- `ImageWithFile` is nested: `{ image: Image, path, thumbnail_path, selection: Option<Selection> }`
+- All queries LEFT JOIN selections with `s.project_id = '__global__'`
+- `rows.collect::<Result<Vec<_>>>()` — one generic param (rusqlite)
+- Tauri commands: `pub async fn`, `State<'_, AppState>`, `.map_err(|e| e.to_string())`
+
+### Svelte 5
+- Uses runes: `$state()`, `$props()`, `$derived()`
+- Event handlers: `onclick`, `onkeydown` (not `on:click`)
+- CSS classes: `.section`, `.section-header`, `.section-item`, `.count`, `.active`
+- Stores: `writable<T>` from `svelte/store`, accessed with `$storeName`
+
+### CSS Design System (app.css)
+```
+--bg: #08080c          --surface: #0c0c12      --border: #1a1a2e
+--text: #e0e0e0        --text-secondary: #7a7fa0
+--blue: #7aa2f7        --green: #9ece6a        --orange: #e0af68
+--purple: #bb9af7      --red: #f7768e
+--spacing: 8px         --radius: 4px
+--font: JetBrains Mono (monospace)
+```
+Tokyo Night dark theme. All components MUST use these tokens, never hardcode colors.
+
+### API Layer
+- `src/lib/api.ts` imports `invoke` directly from `@tauri-apps/api/core`
+- **NO MOCK LAYER.** Never add a mock/fallback invoke. The app is a Tauri desktop app — it always runs with the real Rust backend. A previous mock layer (`tauri-mock.ts`) caused persistent bugs where the UI showed fake test data instead of the real database. It was removed 2026-05-09.
+- `src/lib/tauri-mock.ts` exists for E2E browser testing ONLY — it must never be imported from `api.ts` or any component
+
+### Data Safety
+- **NEVER delete, trash, or reset `cull.db`** — it contains real user data (ratings, selections, collections) accumulated over many sessions
+- When the UI shows wrong data, the bug is in the code, not the database
+- The database path: `~/Library/Application Support/com.glebkalinin.cull/cull.db`
+
+### License And Open Source Release
+- Cull is true open source under Apache-2.0, not source-available. Do not
+  reintroduce BSL/BUSL/source-available positioning in active product docs, app
+  metadata, or UI.
+- Keep license metadata aligned across `LICENSE`, `NOTICE`, `package.json`,
+  `package-lock.json`, `src-tauri/Cargo.toml`, README, and the About dialog.
+- Run `npm run audit:licenses` before publishing, before changing
+  dependency/model download policy, and after adding dependencies.
+- AI-assisted code is allowed, but do not paste generated output that appears
+  copied from public code unless the upstream license is compatible and notices
+  are preserved. Keep `AUTHORSHIP.md`, `CONTRIBUTING.md`, and
+  `docs/OPEN_SOURCE_AUDIT.md` current when provenance assumptions change.
+
+### Model And Asset Licensing
+- Apache-2.0 covers Cull source code, not third-party model weights, fonts,
+  artwork, or example assets.
+- CLIP/DINOv2 embedding downloads must stay tied to compatible model licenses
+  recorded in `docs/OPEN_SOURCE_AUDIT.md`.
+- Do not add built-in downloads for YOLO, NudeNet, or other third-party ONNX
+  weights unless source, license, attribution, checksum, and commercial-use terms
+  are documented first.
+- User-supplied local ONNX files are allowed, but the app must not imply Cull
+  grants rights to those weights.
+
+## E2E Testing with agent-browser
+
+Tests run against `localhost:1420` in Chrome Beta via CDP. E2E tests use `tauri-mock.ts` directly (not via api.ts) for browser-only testing. The browser smoke suite is classified as a manual pre-push gate for covered UI/browser changes; see `docs/e2e-testing-policy.md` for the required file areas and non-CI status.
+
+### Prerequisites
+```bash
+# Chrome Beta with debug port
+"/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta" \
+  --remote-debugging-port=9222 --user-data-dir="$HOME/.chrome-beta-profile" &
+
+# Vite dev server
+npx vite dev --port 1420 &
+```
+
+### Running tests
+```bash
+bash tests/e2e/run-e2e.sh
+```
+
+### agent-browser + Svelte 5 patterns
+- Use `tab new` not `open` (prevents session switching)
+- **Input values**: Svelte's `bind:value` doesn't detect DOM-level `.value` changes. Use native setter + event dispatch:
+  ```bash
+  agent-browser eval "const el = document.querySelector('.command-input'); \
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; \
+    set.call(el, 'query text'); \
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [glebis/cull](https://github.com/glebis/cull) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-02 -->
