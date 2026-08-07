@@ -1,0 +1,67 @@
+---
+trigger: always_on
+description: > 本文件是 wx-kit 项目对所有 AI 编码 agent 的权威指南（CLAUDE.md 软链到此）。
+---
+
+# wx-kit — Agent 指南
+
+> 本文件是 wx-kit 项目对所有 AI 编码 agent 的权威指南（CLAUDE.md 软链到此）。
+> 它是稳定的「宪法」——只放决策、不变量、陷阱，**不放易变的进度状态**。
+> 新开会话续接项目时，先读这里；**当前进度/路线图看 `ROADMAP.md`**，实现细节看 `docs/`。
+
+## 是什么
+微信百宝箱桌面应用。第一阶段只做"文章下载器"：把微信公众号文章下载为多种格式并在应用内浏览，同时提供 CLI 供 AI agent 调用。单进程 Electron，双启动模式：GUI 与 CLI。
+
+后续是可扩展的"百宝箱"，但**当前不预造空模块**（YAGNI）。
+
+本项目脱胎于技术探索原型 `../trae/x-downloader`（PyQt→Electron 迁移的遗留物），产品化时做了几个**已定的不可回退决策**。
+
+---
+
+## 已定关键决策（勿回退，2026-06 安哥确认）
+- **弃用代理模式**：原型用 AnyProxy 做全局 HTTPS MITM 拦截 PC 微信流量，装根证书、改系统代理，脆弱且有还原风险。**不要重新引入代理抓取。**
+- **纯 Node/Electron，无 Python 边车**：原型的 FastAPI + Playwright + PyInstaller 是 PyQt 时代遗留。**不要重新引入 Python / 独立 chromium / 数据库**——单一语言、单进程、单二进制。
+- **双启动模式服务于 AI agent**：CLI 输出纯 JSON 就是为了让 agent 通过 skill 调用，这是产品定位的一部分。
+- **第一阶段不做授权/激活系统**：开箱即用，不加付费门槛。后续要商业化再单独议（`electron/main.ts` 当前无 license 校验）。
+
+---
+
+## 工作流约定（每个里程碑）
+1. 先 `docs/plans/YYYY-MM-DD-<里程碑>.md` 写实现计划（参照 M1/M2 的规格：bite-sized 步骤、TDD、确切代码）。
+2. 就地开 feature 分支实现（`feat/<里程碑>`），完成后合回 main、删分支。
+3. 纯逻辑 TDD；依赖网络/Electron 的部分注入依赖 + 端到端验证。
+4. 改完跑 `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`。
+5. **完成一个相对独立的功能即自动收尾，无需询问**：验证通过后，若开了 feature 分支，默认合回 main 并删分支；commit 一律自动执行（message 用英文、描述变更意图）。此为本项目长期授权，覆盖「commit 前先问」的默认。**唯 `git push` 仍手动，等安哥发话**（跨设备同步用）。
+6. **每完成一个里程碑，更新 `docs/devlog/wx-kit-vibe-coding.md`**：把该里程碑的流程/决策/踩坑/方法论增补进复盘，保持其为活文档。
+7. **CLI 命令/参数/输出结构变更时，同步刷新 `agent/wx-kit-skill/`**（SKILL.md 速查表 + references 的命令参考与范例）——skill 是 agent 消费的说明书，漂移即失效（类比「发版刷 README」）。
+
+### 发版规约（统一，勿再不一致）
+发版只走一条路：**feat 分支 → 合 main → 在 main 打 annotated tag `vX.Y.Z` → 建 GitHub Release**。
+- **不单开 `release/*` 分支**——版本的不可变快照由 **tag** 锁定（分支会漂移、tag 不会）。历史上的 `release/v0.2.0` 是早期不一致的遗留，已删。
+- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归「项目状态」与 ROADMAP 发布史（曾追加式维护堆出 7 版重复,2026-07-17 安哥指出后清理）；⑥ commit、合 main、打 tag。
+- **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
+- **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
+### 发版完成的定义（v0.6.0 起）
+
+**必做渠道 = GitHub Release + brew tap**，两者全部上线并逐一核实才算发版完成，缺一不得汇报「发版完成」。**npm 为可选渠道**：默认不发,仅当安哥明确说「发布到 npm」时执行(npm 官方仓库的版本落后于 GitHub/brew 是预期状态,不算异常)。
+
+| 渠道 | 必/选 | 上线动作（接上面步骤编号） | 核实动作 |
+|---|---|---|---|
+| GitHub Release | 必 | `gh release create` + 逐个 upload 三平台包 | `gh release view`（isDraft:false、标 Latest）+ 资产大小与本地逐字节比对 |
+| brew tap | 必 | ⑦ `scripts/update-brew-tap.sh <version>`（sha256 取自 **GitHub API 的资产 digest**，零下载） | ⑧ `scripts/verify-brew-tap.sh <version>` —— **零下载**核实：cask 语法/version、两个 dmg 的 sha256 与 url 逐一对上已发布资产、`brew info --cask` 报告的版本。约 7 秒 |
+| npm `@simiam/wx-kit` | **选**（安哥点名才发） | `node scripts/build-npm-pkg.mjs && cd dist-npm && npm publish`。**publish 须安哥终端执行**——需登录 + 浏览器二次认证，agent 的非交互 shell 做不了：agent 备好 dist-npm 后停下,把这条命令交给安哥 | `npm view @simiam/wx-kit version --registry=https://registry.npmjs.org`（view 会走镜像，核实要显式指官方源；可见延迟约 1–2 分钟），再从官方 registry 隔离 prefix 干净安装跑 `--version` |
+
+npm 包名与配置背景：无 scope 的 `wx-kit` 被 npm 相似度保护拒绝（与既有包 `wxkit` 太像），故用 `@simiam/wx-kit`，**bin 命令名不变仍是 `wx-kit`**；生成的 package.json 内置 `publishConfig`（官方 registry + access public）——publish 自动直发官方源，**不受也不用改 `~/.npmrc` 的国内镜像**，flag 都不用带。
+
+**brew tap 陷阱清单（v0.6.0 实录）**：① tap 是**本地 clone**——推送 tap 更新后，本机（和任何用户机）在 `brew update`（或对 tap clone `git pull`）前读到的仍是旧 cask，安哥曾据此装到旧版 + 旧 caveats。② Homebrew 5 已移除 `--no-quarantine`，且实测 quarantine 对未签名 app **连纯 CLI 都拦**（Gatekeeper 拦在 exec，进程挂起无输出）——装完必须 `xattr -cr`，勿回退成「仅 GUI 受影响」。③ 安装名是三段 `monkeychen/wx-kit/wx-kit`（用户/tap/包）；tap 过一次后短名 `brew install --cask wx-kit` 即可。④ 改安装说明时落点有四处：README、`agent/wx-kit-skill/SKILL.md`、cask caveats（update-brew-tap.sh 内嵌模板）、tap 仓库 README（独立仓库，脚本不管，要手动同步——曾漏改留过期文案）。⑤ **本地 tap clone 的 remote 是 https，本机 https 直连 github 会超时**（push 走 ssh 反而稳）——刷新本地 tap 用 `git -C "$(brew --repository monkeychen/wx-kit)" fetch git@github.com:monkeychen/homebrew-wx-kit.git main && git ... reset --hard FETCH_HEAD`，别死磕 `brew update`/`git pull`（v0.8.0 实录）。⑥ **别为了核实去重装一遍**：那个 dmg 就是我们自己上传的，拉回来要 139MB/20 分钟（v0.8.1 实测，国内直连约 100KB/s）。cask 每版只变 version + sha256，安装行为由模板固定；**要核实的是「cask 元数据是否指向正确的已发布资产」，这件事零下载可做**（`scripts/verify-brew-tap.sh`，靠 GitHub API 的 `.assets[].digest`）；**app 自身的行为用本地 build 产物验**，不必绕道 GitHub。仅两种情况才真装一遍：首次引入 cask、或改了安装结构（app 名/装载路径/caveats）。⑦ 真要装时用 `brew upgrade --cask wx-kit` 升主安装，别用 `--appdir=<临时目录>` 隔离——它会卸掉 `/Applications` 的主安装并把 appdir 记进 Caskroom（v0.7.0 踩过，收拾麻烦）。⑧ **`gh release download` 在国内直连会卡死**（v0.7.0/v0.8.0 连踩两次）——凡是「要拿已发布资产的哈希」，一律走 `gh api .../releases/tags/vX.Y.Z -q '.assets[].digest'`，别下载。
+
+## 结构约定
+- `src/core/`：UI 无关核心层，被 GUI（IPC）与 CLI 共享。**不得 import React/renderer/electron 运行时**（types 可以；electron 仅以注入的 BrowserWindow 构造器形式出现）。
+- `electron/`：主进程。`main.ts` 模式分流；`ipc.ts` IPC 处理器（薄委派）；`preload.ts` contextBridge；`protocol.ts` wxfile 协议；`services/` 主进程服务。
+- `src/cli/`：命令行入口，输出契约见 PRD §F4（stdout 纯 JSON，stderr 进度，退出码 0/1/2）。
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [monkeychen/wx-kit](https://github.com/monkeychen/wx-kit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
