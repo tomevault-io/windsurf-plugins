@@ -1,0 +1,110 @@
+---
+trigger: always_on
+description: Guidance for Claude Code and other agentic assistants working in this
+---
+
+# AGENTS.md
+
+Guidance for Claude Code and other agentic assistants working in this
+repository. Keep this file concise. The architecture documentation in
+[`docs/`](docs/README.md) holds internal project notes. Developer-facing guides
+live in the DocC catalogs under `Sources/`.
+
+## Build & Test Commands
+
+```bash
+bun run test                                       # Repo gate: shared suite + policy checks
+bun run test:all                                   # Exhaustive checked-in primary-repo test surface
+swiftly run swift build                            # Build all root-package targets
+swiftly run swift test                             # Run root-package tests
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests             # One test suite
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/testName    # One test
+swift format format -i --configuration .swift-format.json Sources/ Tests/     # Format
+```
+
+Always run `bun run test` after changes that touch shared code, platform
+products, or repository tooling. Make sure that it passes before you complete
+the work. Example-package coverage lives in `SwiftTUI/swift-tui-examples`.
+Do not run repo-local builds or tests with bare `swift` or `xcrun swift` — use
+`swiftly run swift ...` so runs match the pinned toolchain. See
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full toolchain, gate, and
+release story.
+
+## Architecture (one-page summary)
+
+```
+SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUIRuntime
+```
+
+- **SwiftTUIPrimitives** — leaf vocabulary: inert value types only (geometry,
+  identity, style/color values, draw/layout metadata, the `Animatable` math). No
+  engine, no render algorithms. Builds independently. Foundation-free.
+- **SwiftTUIGraph** — the reconciliation engine (the AttributeGraph analog).
+  It owns `ViewGraph`/`ResolvedNode`, state slots, dependency tracking,
+  invalidation planning, reuse gates, checkpoints, and entity routing. It also
+  owns the runtime registries, the scheduler, and animation intent. Depends on
+  `SwiftTUIPrimitives` **only** —
+  the compiler enforces that graph code names no render type. Foundation-free.
+- **SwiftTUICore** — the render engine: measure/place/draw/raster/commit phases
+  and their typed products, extractors, style resolution, content engine. Consumes
+  the graph's `ResolvedNode` snapshots. It `@_exported`-imports Graph and
+  Primitives, so
+  `import SwiftTUICore` is unchanged. Terminal-IO-free.
+- **SwiftTUIViews** — the SwiftUI-shaped authoring surface (`View`, controls,
+  layout, state, focus, gestures). `@_exported`-imports Core so the published
+  `SwiftTUIViews` product is a self-sufficient authoring surface for external
+  view libraries (SwiftTUICharts consumes exactly this).
+- **SwiftTUIRuntime** — the run loop, renderer, scenes, and host integration.
+- **SwiftTUI** — the batteries-included convenience product. It re-exports the
+  combined terminal/WebHost runner and `SwiftTUIAnimatedImage`.
+- **SwiftTUICharts** — chart and graph views. It ships from the peer repository
+  [`SwiftTUI/swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts),
+  composed on the public `SwiftTUIViews` surface.
+
+`DefaultRenderer` runs one composed runtime stage pipeline:
+
+```
+head -> animation injection -> late-preference reconciliation -> fused frame tail -> commit
+```
+
+The fused tail produces the seven typed phase products in order:
+
+```
+resolve -> measure -> place -> semantics -> draw -> raster -> commit
+```
+
+Full developer-facing detail lives in
+[Runtime-Render-Pipeline.md](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
+Internal source-layout context lives in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Development Guidelines
+
+- When a new feature replaces an existing constraint, search for and remove
+  **all** old guards and assertions that enforce the previous constraint. Do
+  not leave stale invariants behind.
+- Put each new file in one subsystem. Keep the source layout in
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) aligned with file moves.
+- New files that touch C stdio/POSIX (`open`/`write`/`getenv`/`FILE`, …) must
+  stay **WASI-safe and strict-memory-safety clean**. Import each libc:
+  `Darwin`, `Glibc`, `Android`, and `Musl`. Exclude path-based POSIX code with
+  `#if !canImport(WASILibc)`. Use `DiagnosticTraceSink` and
+  `TerminalPOSIXController` as models. Mark each unsafe call `unsafe`.
+  A WASI-only break in 0.0.19 passed the Linux-only gate. The
+  `EnvFrameTraceSink` break in 0.0.26 also passed it. The repository gate now has a
+  `wasm32-wasi cross-compile` lane for
+  `SwiftTUIWASI`. Before you push a WASI-related change, run `swiftly run swift
+  build --swift-sdk swift-6.3.3-RELEASE_wasm --target SwiftTUIWASI`. Use
+  `--target`, not `--product`. A library-product build includes non-WASI PTY
+  targets.
+- Treat fixture changes as evidence, not housekeeping — see
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#rendered-text-fixtures).
+- For runtime state bugs, distinguish transient flicker from true state loss.
+  If state must survive lazy-tab, deferred-content, or presentation churn,
+  hoist ownership above that seam. Do not hoist unrelated state. Distinguish
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [SwiftTUI/swift-tui](https://github.com/SwiftTUI/swift-tui) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
