@@ -7,11 +7,11 @@ Local, persistent and auditable memory layer for Claude Code and Codex. Your cod
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ma-nucho-pro/wife](https://github.com/ma-nucho-pro/wife).
+Original source: `AGENTS.md` in [ma-nucho-pro/wife](https://github.com/ma-nucho-pro/wife).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
