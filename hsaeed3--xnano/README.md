@@ -7,11 +7,11 @@ an extremely nano python ui experience, built on rust
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hsaeed3/xnano](https://github.com/hsaeed3/xnano).
+Original source: `AGENTS.md` in [hsaeed3/xnano](https://github.com/hsaeed3/xnano).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
