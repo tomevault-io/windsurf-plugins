@@ -1,195 +1,91 @@
 ---
 trigger: always_on
-description: Specification authoring — how to write, structure, and manage specs as the single source of truth
+description: Technology selection framework — choosing the right tools for the job
 ---
 
 
-# Specification Authoring
+# Technology Selection
 
-## Principles
+## Decision Criteria
 
-- Specs are **the single source of truth** for the system's behavior and contracts.
-- Specs must be **machine-readable** whenever possible — they generate tests, docs, and stubs.
-- Specs must be **human-readable** — any developer should understand the system from specs alone.
-- Specs are **living documents** — they evolve with the project, never become stale.
-- Specs are **versioned** — changes to specs are tracked, reviewed, and approved like code.
+Evaluate every technology choice against:
 
-## Spec Directory Structure
+1. **Fitness**: Does it solve the actual problem well?
+2. **Maturity**: Is it production-proven with a stable API?
+3. **Ecosystem**: Are there good libraries, tools, and integrations?
+4. **Community**: Active maintenance, documentation, Stack Overflow presence?
+5. **Team expertise**: Can the team be productive quickly?
+6. **Scalability**: Will it handle the expected growth?
+7. **Cost**: Licensing, infrastructure, and operational costs.
 
-```
-specs/
-  api/                    # API contracts
-    openapi.yaml          # REST API specification (OpenAPI 3.x)
-    schema.graphql        # GraphQL schema definition
-    service.proto         # gRPC service definition
-    asyncapi.yaml         # Event-driven API specification
-  schemas/                # Data contracts
-    user.schema.json      # JSON Schema for User entity
-    order.schema.json     # JSON Schema for Order entity
-    shared/               # Shared schema definitions ($ref targets)
-      address.schema.json
-      pagination.schema.json
-      error.schema.json
-  contracts/              # Integration contracts
-    payment-api.pact.json # Consumer-driven contract (Pact)
-    email-service.yaml    # External service contract
-  features/               # Behavior specifications
-    auth.feature          # Gherkin / Given-When-Then
-    checkout.feature
-  ui/                     # UI component contracts
-    button.props.ts       # Component prop types and variants
-    form-field.props.ts
-  slos/                   # Performance/reliability specs
-    api-performance.yaml  # SLOs, SLIs, error budgets
-  decisions/              # Architecture Decision Records
-    001-database-choice.md
-    002-auth-strategy.md
-```
+## Stack Recommendations by Project Type
 
-## Data Contracts
+### SaaS Web App
 
-Define every entity as a formal schema:
+| Layer | Recommended | Alternatives |
+|-------|------------|--------------|
+| **Frontend** | Next.js + React + TypeScript | Nuxt + Vue, SvelteKit |
+| **Styling** | Tailwind CSS + shadcn/ui | Chakra UI, MUI |
+| **Backend** | Node.js (Fastify/Express) or Next.js API routes | Python (FastAPI), Go (Gin/Fiber) |
+| **Database** | PostgreSQL + Prisma | MySQL, MongoDB |
+| **Auth** | NextAuth.js / Lucia / Clerk | Auth0, Supabase Auth |
+| **Cache** | Redis | Memcached |
+| **Hosting** | Vercel / AWS / GCP | Railway, Fly.io |
 
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "User",
-  "type": "object",
-  "required": ["id", "email", "name", "role", "createdAt"],
-  "properties": {
-    "id": { "type": "string", "format": "uuid" },
-    "email": { "type": "string", "format": "email" },
-    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
-    "role": { "enum": ["admin", "user", "viewer"] },
-    "createdAt": { "type": "string", "format": "date-time" }
-  },
-  "additionalProperties": false
-}
-```
+### API / Backend Service
 
-Rules for data contracts:
-- Every entity has a schema. No untyped data flows through the system.
-- Use `$ref` for shared definitions (address, pagination, error envelope).
-- Define `required` fields explicitly. Default to required, opt-in to optional.
-- Use `additionalProperties: false` to catch unexpected fields.
-- Include format constraints (`email`, `uuid`, `date-time`, `uri`).
-- Define enums for all finite value sets.
+| Layer | Recommended | Alternatives |
+|-------|------------|--------------|
+| **Runtime** | Node.js + TypeScript | Python, Go, Rust, Java, C# |
+| **Framework** | Fastify / Hono | Express, FastAPI, Gin, Actix |
+| **Database** | PostgreSQL | MySQL, MongoDB, DynamoDB |
+| **ORM** | Prisma / Drizzle | SQLAlchemy, GORM, Diesel |
+| **Validation** | Zod | Joi, class-validator, Pydantic |
+| **Testing** | Vitest | Jest, pytest, go test |
 
-## API Contracts
+### Mobile App
 
-### REST API (OpenAPI)
+| Layer | Recommended | Alternatives |
+|-------|------------|--------------|
+| **Framework** | React Native + Expo | Flutter, Swift/Kotlin native |
+| **Navigation** | Expo Router | React Navigation |
+| **State** | Zustand / TanStack Query | Redux, Riverpod (Flutter) |
+| **Backend** | Supabase / Firebase | Custom API |
 
-Define every endpoint in OpenAPI format:
+### CLI Tool
 
-```yaml
-paths:
-  /api/v1/users:
-    get:
-      summary: List users
-      operationId: listUsers
-      parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
-      responses:
-        '200':
-          description: Paginated list of users
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    post:
-      summary: Create a user
-      operationId: createUser
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateUserRequest'
-      responses:
-        '201':
-          description: User created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '409':
-          $ref: '#/components/responses/Conflict'
-```
+| Layer | Recommended | Alternatives |
+|-------|------------|--------------|
+| **Language** | Go / Rust | Python, Node.js |
+| **CLI Framework** | Cobra (Go), Clap (Rust) | Click (Python), Commander (Node) |
+| **Distribution** | Single binary (Go/Rust) | pip/npm package |
 
-Rules for REST API contracts:
-- Every endpoint has a full OpenAPI definition BEFORE implementation.
-- Define all response codes (success + every error case).
-- Use `$ref` to reference data schemas — don't duplicate.
-- Include request/response examples for each endpoint.
-- Define shared components: error envelope, pagination, auth headers.
-- Version the API in the spec (`/api/v1/`).
+## Dependency Selection Criteria
 
-### GraphQL Schema
+Before adding any dependency:
 
-Define the schema using SDL:
+- [ ] Is it actively maintained (commits in last 6 months)?
+- [ ] Does it have adequate documentation?
+- [ ] How many open issues and PRs? Are they addressed?
+- [ ] Are there known security vulnerabilities?
+- [ ] What's the bundle size impact (for frontend)?
+- [ ] Can you implement it yourself in reasonable time? (if yes, consider it)
+- [ ] Is it the most popular/standard solution for this problem?
 
-```graphql
-type Query {
-  """List users with pagination"""
-  users(page: Int = 1, limit: Int = 20): UserConnection!
+## Anti-Patterns
 
-  """Get a single user by ID"""
-  user(id: ID!): User
-}
+- **Resume-Driven Development**: choosing tech to learn, not to ship.
+- **Hype-Driven Development**: choosing the newest/trendiest tool without evaluating fit.
+- **Over-engineering**: microservices for a todo app, Kubernetes for a blog.
+- **Lock-in Blindness**: deep coupling to a vendor without abstraction layer.
+- **Dependency Bloat**: npm-installing a package for a 5-line utility function.
 
-type Mutation {
-  """Create a new user"""
-  createUser(input: CreateUserInput!): CreateUserPayload!
+## Version Pinning
 
-  """Update an existing user"""
-  updateUser(id: ID!, input: UpdateUserInput!): UpdateUserPayload!
-
-  """Delete a user"""
-  deleteUser(id: ID!): DeleteUserPayload!
-}
-
-type User {
-  id: ID!
-  email: String!
-  name: String!
-  role: UserRole!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-enum UserRole {
-  ADMIN
-  USER
-  VIEWER
-}
-
-input CreateUserInput {
-  email: String!
-  name: String!
-  password: String!
-  role: UserRole = USER
-}
-
-type CreateUserPayload {
-  user: User
-  errors: [UserError!]
-}
-
-type UserError {
-  field: String!
-  message: String!
-  code: String!
-}
-
-type UserConnection {
-  nodes: [User!]!
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Always pin exact versions for production dependencies.
+- Use lockfiles (`package-lock.json`, `uv.lock`, `go.sum`) and commit them.
+- Update dependencies regularly (weekly or bi-weekly) with automated tools.
+- Run tests after every dependency update. Never blindly bump versions.
 
 ---
 > Source: [GaetanOff/WAF-GaetanDev](https://github.com/GaetanOff/WAF-GaetanDev) — distributed by [TomeVault](https://tomevault.io).
