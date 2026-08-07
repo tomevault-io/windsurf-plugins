@@ -7,11 +7,11 @@ Self-hosted technical news inbox for curated feeds, article triage, source healt
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lihor-hub/news-dashboard](https://github.com/lihor-hub/news-dashboard).
+Original source: `AGENTS.md` in [lihor-hub/news-dashboard](https://github.com/lihor-hub/news-dashboard).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
