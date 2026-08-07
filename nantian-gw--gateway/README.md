@@ -7,11 +7,11 @@ Nantian Gateway — Kubernetes Gateway API implementation with AI proxy, WASM pl
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [nantian-gw/gateway](https://github.com/nantian-gw/gateway).
+Original source: `AGENTS.md` in [nantian-gw/gateway](https://github.com/nantian-gw/gateway).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
