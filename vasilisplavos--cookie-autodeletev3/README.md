@@ -7,11 +7,11 @@ Manifest V3 fork of Cookie AutoDelete — automatically deletes unused cookies. 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [VasilisPlavos/Cookie-AutoDeleteV3](https://github.com/VasilisPlavos/Cookie-AutoDeleteV3).
+Original source: `AGENTS.md` in [VasilisPlavos/Cookie-AutoDeleteV3](https://github.com/VasilisPlavos/Cookie-AutoDeleteV3).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
