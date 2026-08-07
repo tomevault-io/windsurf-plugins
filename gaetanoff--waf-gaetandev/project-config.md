@@ -1,180 +1,183 @@
 ---
 trigger: always_on
-description: Spec-driven migration and versioning — schema evolution, API versioning, backward compatibility
+description: Spec-driven observability — structured logging, metrics, tracing, SLOs, alerting defined as contracts
 ---
 
 
-# Migration & Versioning Strategy
+# Observability (Spec-Driven)
 
-## Schema Migration Lifecycle
+## Overview
 
-Every data contract change follows this lifecycle:
+Observability is not an afterthought — it's a **contract**. Define logging, metrics, and tracing specs alongside your API and data contracts. Every observable signal traces back to a spec.
 
-```
-Draft → Reviewed → Tested → Applied → Verified → (Rolled Back if needed)
-```
+## Structured Logging Contract
 
-### Migration Rules
+### Log Entry Schema
 
-- Every schema change produces a **versioned migration** (up + down).
-- Migrations are **atomic** — one logical change per migration file.
-- Migrations must be **reversible** — every `up` has a matching `down`.
-- Migrations are **idempotent** — running the same migration twice is safe.
-- Migration files are **immutable** once applied — never edit an applied migration.
-- Test migrations against a copy of production data before applying.
-
-### Migration File Naming
-
-```
-migrations/
-  001_create_users_table.sql          # or .ts, .py depending on stack
-  002_add_email_verified_to_users.sql
-  003_create_orders_table.sql
-  004_add_index_orders_user_id.sql
-```
-
-Naming convention: `<sequence>_<verb>_<description>.<ext>`
-- Verbs: `create`, `add`, `remove`, `rename`, `alter`, `drop`, `seed`
-- Always increment the sequence number — never reuse or reorder.
-
-### Migration Script Template
-
-```sql
--- Migration: 001_create_users_table
--- Created: YYYY-MM-DD
--- Spec: specs/schemas/user.schema.json
-
--- UP
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) NOT NULL UNIQUE,
-  name VARCHAR(100) NOT NULL,
-  role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user', 'viewer')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_users_email ON users(email);
-
--- DOWN
-DROP TABLE IF EXISTS users;
-```
-
-## API Versioning Strategy
-
-### Versioning Methods
-
-| Method | When to Use | SDD Signal |
-|--------|-------------|------------|
-| **URL path** (`/api/v1/`) | Public APIs, clear consumer contracts | Recommended default |
-| **Header** (`Accept: application/vnd.api.v2+json`) | Internal APIs, granular version control | When URL versioning is too coarse |
-| **Query param** (`?version=2`) | Simple APIs, quick iteration | Prototyping only |
-
-**Default recommendation**: URL path versioning (`/api/v1/`).
-
-### Version Lifecycle
-
-```
-v1 (current) → v2 (development) → v2 (current) + v1 (deprecated) → v1 (sunset)
-```
-
-- **Current**: actively maintained, receives bug fixes and security patches.
-- **Deprecated**: still functional, no new features, sunset date announced (minimum 6 months).
-- **Sunset**: removed, returns `410 Gone` with migration guide link.
-
-### Deprecation Contract
-
-When deprecating an endpoint or API version, include these headers:
-
-```yaml
-headers:
-  Deprecation:
-    schema:
-      type: string
-      format: date-time
-    description: Date when this endpoint was deprecated
-  Sunset:
-    schema:
-      type: string
-      format: date-time
-    description: Date when this endpoint will be removed
-  Link:
-    schema:
-      type: string
-    description: URL to migration guide
-```
-
-## Breaking vs Non-Breaking Changes
-
-### Non-Breaking (Safe — backward compatible)
-
-- ✅ Add a new optional field to a response body.
-- ✅ Add a new endpoint.
-- ✅ Add a new optional query parameter.
-- ✅ Add a new enum value (if clients handle unknown values gracefully).
-- ✅ Add a new error code.
-- ✅ Widen a type constraint (e.g. `maxLength: 50` → `maxLength: 100`).
-- ✅ Add new response headers.
-
-### Breaking (Requires major version bump)
-
-- ❌ Remove or rename a field from a response body.
-- ❌ Remove or rename an endpoint.
-- ❌ Change a field's type (e.g. `string` → `number`).
-- ❌ Make an optional field required.
-- ❌ Remove an enum value.
-- ❌ Tighten a type constraint (e.g. `maxLength: 100` → `maxLength: 50`).
-- ❌ Change a status code for an existing response.
-- ❌ Change the authentication mechanism.
-
-### Gray Area (Evaluate case by case)
-
-- ⚠️ Add a required field to a request body (breaking for existing clients).
-- ⚠️ Change default values.
-- ⚠️ Reorder fields (if clients depend on order — shouldn't but some do).
-
-## Data Contract Evolution Rules
-
-### Additive Changes (Preferred)
+Define a standard log format as a JSON Schema:
 
 ```json
-// v1: Original schema
-{ "required": ["id", "email", "name"] }
-
-// v1.1: Add optional field (non-breaking)
-{ "required": ["id", "email", "name"],
-  "properties": { "avatar": { "type": "string", "format": "uri" } } }
+{
+  "title": "LogEntry",
+  "type": "object",
+  "required": ["timestamp", "level", "message", "service"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error", "fatal"]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable log message"
+    },
+    "service": {
+      "type": "string",
+      "description": "Service name emitting the log"
+    },
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation ID — traces a request across services"
+    },
+    "traceId": {
+      "type": "string",
+      "description": "Distributed trace ID (W3C Trace Context)"
+    },
+    "spanId": {
+      "type": "string",
+      "description": "Current span ID"
+    },
+    "userId": {
+      "type": "string",
+      "description": "Authenticated user ID (never log PII)"
+    },
+    "context": {
+      "type": "object",
+      "description": "Additional structured context (endpoint, method, duration, etc.)"
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "message": { "type": "string" },
+        "stack": { "type": "string" }
+      }
+    }
+  }
+}
 ```
 
-### Deprecation Workflow
+### Logging Rules
 
-1. Mark the field as deprecated in the spec:
-   ```yaml
-   properties:
-     legacyField:
-       type: string
-       deprecated: true
-       description: "DEPRECATED: Use newField instead. Will be removed in v3."
-   ```
-2. Add the replacement field alongside.
-3. Update all internal consumers to use the new field.
-4. After the deprecation period, remove the old field with a major version bump.
+- **Always log**: request start/end, errors, auth failures, business events, performance anomalies.
+- **Never log**: passwords, tokens, PII (email, phone, address), credit card numbers, API keys.
+- **Log levels**:
+  - `debug`: detailed diagnostic info (disabled in production).
+  - `info`: normal operations (request handled, job completed, user action).
+  - `warn`: unexpected but recoverable situations (deprecated API call, retry, degraded service).
+  - `error`: failures that need attention (unhandled exception, external service down).
+  - `fatal`: system cannot continue (missing critical config, database unreachable on startup).
+- Every log entry includes `requestId` for correlation.
+- Use structured logging (JSON) — never `console.log("user: " + user)`.
 
-### Schema Versioning
+## Metrics Contract
 
-- Embed version in `$id`: `https://example.com/schemas/v2/user.schema.json`.
-- Use `$comment` to document breaking changes.
-- Tag schema versions alongside API versions.
+### RED Method (Request-Driven Services)
 
-## Backward Compatibility Verification
+Define these metrics for every API endpoint in the spec:
 
-### Pre-Merge Checklist
+| Metric | Type | Description | Labels |
+|--------|------|-------------|--------|
+| `http_requests_total` | Counter | Total requests received | `method`, `path`, `status` |
+| `http_request_duration_seconds` | Histogram | Request latency | `method`, `path` |
+| `http_request_errors_total` | Counter | Total error responses (4xx, 5xx) | `method`, `path`, `status` |
 
-- [ ] Run the OpenAPI diff tool (`oasdiff`, `openapi-diff`) against the previous version.
-- [ ] Verify no fields removed from response schemas.
-- [ ] Verify no required fields added to request schemas.
-- [ ] Verify no type changes on existing fields.
-- [ ] Verify no status code changes on existing endpoints.
+### USE Method (Resource-Driven Systems)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `cpu_utilization_ratio` | Gauge | CPU usage (0-1) |
+| `memory_utilization_bytes` | Gauge | Memory usage |
+| `db_connections_active` | Gauge | Active database connections |
+| `db_connections_pool_size` | Gauge | Connection pool size |
+| `queue_depth` | Gauge | Number of messages waiting in queue |
+| `disk_utilization_ratio` | Gauge | Disk usage (0-1) |
+
+### Business Metrics (From Specs)
+
+Derive business metrics from behavior specs:
+
+```yaml
+# Example: derived from the checkout behavior spec
+business_metrics:
+  - name: orders_created_total
+    type: counter
+    description: Total orders created
+    labels: [payment_method, currency]
+    spec_ref: specs/features/checkout.feature
+
+  - name: order_value_total
+    type: counter
+    description: Total order value in cents
+    labels: [currency]
+
+  - name: checkout_abandonment_total
+    type: counter
+    description: Carts abandoned during checkout
+    labels: [step]
+```
+
+## Distributed Tracing Contract
+
+### Span Naming Convention
+
+Derive span names from API contracts:
+
+| Operation | Span Name |
+|-----------|-----------|
+| HTTP endpoint | `HTTP {METHOD} {path}` (e.g. `HTTP GET /api/v1/users`) |
+| Database query | `DB {operation} {table}` (e.g. `DB SELECT users`) |
+| External API call | `EXT {service} {operation}` (e.g. `EXT Stripe createCharge`) |
+| Message publish | `MSG PUBLISH {channel}` (e.g. `MSG PUBLISH orders.created`) |
+| Message consume | `MSG CONSUME {channel}` |
+| Background job | `JOB {name}` (e.g. `JOB sendWelcomeEmail`) |
+
+### Required Span Attributes
+
+```yaml
+# From OpenAPI spec
+http.method: GET
+http.url: /api/v1/users
+http.status_code: 200
+http.request_id: <uuid>
+
+# From data contracts
+db.system: postgresql
+db.statement: SELECT * FROM users WHERE id = $1
+db.operation: SELECT
+
+# From error contracts
+error: true
+error.code: NOT_FOUND
+error.message: User not found
+```
+
+### Trace Context Propagation
+
+- Use **W3C Trace Context** (`traceparent`, `tracestate` headers) for inter-service propagation.
+- Every HTTP client must forward trace headers.
+- Every message must include trace context in metadata.
+- Every background job must inherit the parent trace.
+
+## SLO/SLI/SLA Definitions
+
+### SLO Spec Format
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
