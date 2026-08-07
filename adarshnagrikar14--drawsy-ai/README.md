@@ -7,12 +7,12 @@ AI-powered visual workspace for drawing, planning, building, and working with co
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [adarshnagrikar14/drawsy-ai](https://github.com/adarshnagrikar14/drawsy-ai).
+Original source: `AGENTS.md` in [adarshnagrikar14/drawsy-ai](https://github.com/adarshnagrikar14/drawsy-ai).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
