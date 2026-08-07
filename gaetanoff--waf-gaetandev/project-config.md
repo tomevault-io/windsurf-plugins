@@ -1,175 +1,175 @@
 ---
 trigger: always_on
-description: Spec-driven project scaffolding — directory structures, spec tooling, CI/CD configuration
+description: Spec lifecycle management — states, transitions, ownership, and enforcement rules for every specification artifact
 ---
 
 
-# Scaffolding (Spec-Driven)
+# Core Spec Lifecycle
 
-## The `specs/` Directory
+> Every specification artifact has a state. State transitions are explicit, gated, and tracked. No code ships against an unapproved spec.
 
-Every project, regardless of the tech stack, must have a `specs/` directory at the root. This is the single source of truth for the project.
+---
 
-```text
-my-project/
-├── specs/                   # The single source of truth
-│   ├── api/                 # OpenAPI, GraphQL, gRPC specs
-│   ├── schemas/             # JSON Schema data contracts
-│   ├── features/            # Gherkin behavior specs
-│   ├── contracts/           # Pact provider/consumer contracts
-│   ├── ui/                  # Component prop contracts
-│   ├── slos/                # Performance/reliability specs
-│   └── decisions/           # Architecture Decision Records (ADRs)
-├── src/                     # Implementation
-├── tests/                   # Conformance and unit tests
-├── .cursor/rules/           # AI behavior rules
-├── package.json
-└── README.md
+## Spec States
+
+```
+draft ──► reviewed ──► approved ──► implemented ──► validated ──► deprecated
+  │                        │              │                │
+  └──────── rejected ──────┘              └── superseded ──┘
 ```
 
-## Spec Validation Tooling
+| State | Meaning | Who Can Set | What It Enables |
+|---|---|---|---|
+| `draft` | Work in progress, not ready for review | Author | Nothing — no implementation |
+| `reviewed` | Reviewed, feedback addressed | Reviewer | Nothing — awaiting approval |
+| `approved` | Contract is final, ready to implement | Lead / Stakeholder | Implementation may start |
+| `implemented` | Code conforms to spec | Developer | Validation may start |
+| `validated` | Conformance tests pass, contract verified | QA / CI | Release may proceed |
+| `deprecated` | Spec is no longer active, sunset in progress | Lead | Migration required |
+| `superseded` | Replaced by a newer version of the spec | Author | Old spec archived |
 
-When scaffolding a new project, immediately set up tooling to validate the specs themselves.
+---
 
-### Node.js / JavaScript Scaffolding
+## Frontmatter Convention
 
-Add these to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "spec:lint": "spectral lint specs/api/*.yaml",
-    "spec:validate": "ajv validate -s specs/schemas/**/*.json -d specs/schemas/**/*.json",
-    "spec:generate:types": "openapi-typescript specs/api/openapi.yaml -o src/types/api.ts",
-    "spec:test": "prism mock specs/api/openapi.yaml",
-    "test:conformance": "dredd specs/api/openapi.yaml http://localhost:3000",
-    "pre-commit": "npm run spec:lint && npm run spec:validate"
-  },
-  "devDependencies": {
-    "@stoplight/spectral-cli": "^6.0.0",
-    "ajv-cli": "^5.0.0",
-    "openapi-typescript": "^6.0.0",
-    "@stoplight/prism-cli": "^4.0.0",
-    "dredd": "^14.0.0"
-  }
-}
-```
-
-## Architectural Scaffolding Templates
-
-### 1. API Backend (Node/Python/Go)
-
-Organize by feature (vertical slices), not by layer:
-
-```text
-src/
-├── app.ts                 # App entrypoint (wires up modules)
-├── server.ts              # HTTP server (binds ports)
-├── lib/                   # Shared utilities (logger, db connection)
-│   ├── logger.ts
-│   └── db.ts
-└── modules/               # Feature modules
-    ├── auth/              # Auth module (implements specs/api/openapi.yaml#/paths/~1auth)
-    │   ├── api.ts         # Route handlers (must conform to OpenAPI)
-    │   ├── service.ts     # Business logic (must pass Gherkin specs)
-    │   ├── repository.ts  # Data access (must conform to JSON schema)
-    │   └── tests/         # Module-specific tests
-    └── users/
-        ├── api.ts
-        ├── service.ts
-        └── repository.ts
-```
-
-### 2. Frontend Web App (React/Vue/Next.js)
-
-```text
-src/
-├── app/                   # Routing (Next.js/Nuxt) or Pages (React/Vue)
-├── components/            # UI Components
-│   ├── shared/            # Generic components (Button, Input)
-│   └── domain/            # Domain-specific (UserCard, CheckoutForm)
-├── lib/                   # Shared utilities
-│   ├── api-client.generated.ts # GENERATED from OpenAPI
-│   └── query-client.ts    # React Query / SWR setup
-├── types/                 # Type definitions
-│   └── api.generated.ts   # GENERATED from JSON Schemas
-└── features/              # Complex logic grouped by feature
-    └── checkout/
-        ├── hooks.ts
-        └── state.ts
-```
-
-### 3. Mobile App (React Native / Flutter)
-
-```text
-src/
-├── app/                   # Navigation/Routing
-├── screens/               # Screen components
-│   ├── auth/
-│   └── profile/
-├── components/            # Reusable UI elements
-├── core/                  # Core services
-│   ├── api.generated.ts   # GENERATED from OpenAPI
-│   ├── auth.service.ts
-│   └── storage.ts
-├── models/                # Domain models
-│   └── entities.gen.ts    # GENERATED from JSON Schemas
-└── store/                 # State management
-```
-
-### 4. CLI Tool (Go / Rust / Node)
-
-```text
-src/
-├── cmd/                   # Command definitions (CLI entrypoints)
-│   ├── root.ts
-│   ├── get.ts
-│   └── apply.ts
-├── internal/              # Private business logic
-│   ├── config/            # Config parsing & validation
-│   └── executor/          # Core execution logic
-├── pkg/                   # Public APIs (if any)
-└── api/                   # API clients (if it talks to servers)
-    └── client.generated.ts # GENERATED from OpenAPI
-```
-
-## CI/CD Pipeline Scaffolding
-
-Every spec-driven project must have a CI pipeline configured at scaffolding time.
-
-### GitHub Actions Template (`.github/workflows/ci.yml`)
+Every spec file **must** include a `status` field in its YAML frontmatter:
 
 ```yaml
-name: CI (Spec-Driven)
+---
+id: spec-001
+title: User Authentication API
+type: openapi | json-schema | gherkin | adr | pact | asyncapi
+status: draft | reviewed | approved | implemented | validated | deprecated
+version: 1.0.0
+authors:
+  - name: John Doe
+    email: john@example.com
+created: 2024-01-15
+updated: 2024-03-20
+depends_on:
+  - spec-002  # User schema
+supersedes: ~
+---
+```
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+**Required fields**: `id`, `title`, `type`, `status`, `version`, `authors`, `created`, `updated`
 
-jobs:
-  validate-specs:
-    name: 1. Validate Specs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-      - run: npm ci
-      - name: Lint OpenAPI
-        run: npm run spec:lint
-      - name: Validate JSON Schemas
-        run: npm run spec:validate
-      - name: Check for breaking spec changes
-        run: npx oasdiff breaking specs/api/openapi-main.yaml specs/api/openapi.yaml || echo "Warning: breaking changes detected"
+---
 
-  type-check:
-    name: 2. Type Check (Contract Validation)
-    needs: validate-specs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+## Transition Rules
+
+### `draft` → `reviewed`
+
+Requirements to transition:
+- [ ] Spec is syntactically valid (YAML/JSON lints cleanly, OpenAPI validates)
+- [ ] All required sections are filled (no `TODO` or `TBD` placeholders)
+- [ ] At least one example per endpoint / field / scenario
+- [ ] Error cases are documented
+- [ ] Author has self-reviewed the spec
+
+Action: Open a spec review (PR, doc comment, or team review session).
+
+### `reviewed` → `approved`
+
+Requirements to transition:
+- [ ] All review comments addressed or explicitly rejected with reason
+- [ ] No open blocking questions
+- [ ] Lead or designated approver has signed off
+- [ ] Dependent specs are also at `approved` or `validated`
+- [ ] ADR exists if the spec introduces a new architectural pattern
+
+Action: Approver sets status to `approved`. This is a binding decision.
+
+### `approved` → `implemented`
+
+Requirements to transition:
+- [ ] All conformance tests generated from the spec
+- [ ] Code passes all conformance tests
+- [ ] No deviations from spec — if a deviation was found, spec was updated first
+- [ ] Code review completed with spec conformance verified
+
+Action: Developer sets status to `implemented` in the spec file.
+
+### `implemented` → `validated`
+
+Requirements to transition:
+- [ ] Conformance test suite passes in CI
+- [ ] Integration tests pass
+- [ ] Performance SLOs meet spec thresholds
+- [ ] Security review passed (if spec declares security requirements)
+- [ ] No spec debt items remain open
+
+Action: CI/CD pipeline or QA engineer sets status to `validated`.
+
+### `validated` → `deprecated`
+
+Requirements to transition:
+- [ ] Migration guide written
+- [ ] Consumers notified (internal teams, external clients)
+- [ ] Sunset date published
+- [ ] Replacement spec exists at `validated` status
+- [ ] Deprecation header added to API responses if applicable
+
+Action: Lead sets status to `deprecated`. Start sunset clock.
+
+---
+
+## Spec Types and Their Artifacts
+
+| Type | File Pattern | Tool | Validates With |
+|---|---|---|---|
+| OpenAPI 3.1 | `specs/api/*.openapi.yaml` | Spectral | Dredd, Prism |
+| JSON Schema | `specs/schemas/*.schema.json` | AJV | Unit tests |
+| Gherkin | `specs/features/*.feature` | Cucumber | Playwright, Vitest |
+| ADR | `specs/decisions/ADR-*.md` | Manual review | PR approval |
+| Pact | `specs/contracts/*.pact.json` | Pact Broker | Pact verifier |
+| AsyncAPI | `specs/events/*.asyncapi.yaml` | Spectral | Event bus tests |
+| SLO | `specs/slos/*.slo.yaml` | Custom | Alerting system |
+
+---
+
+## Spec Versioning
+
+Specs follow **semantic versioning**. Version increments are governed by the change type:
+
+| Change Type | Version Bump | Example |
+|---|---|---|
+| Typo fix, clarification | `patch` | 1.0.0 → 1.0.1 |
+| New optional field, new endpoint | `minor` | 1.0.0 → 1.1.0 |
+| Renamed field, removed field, changed type | `major` | 1.0.0 → 2.0.0 |
+
+**Major version bumps require**:
+- A new ADR documenting the breaking change
+- A migration guide
+- A deprecation period for the previous version
+
+---
+
+## Spec ID Convention
+
+Specs are assigned a unique, stable ID at creation:
+
+```
+<type>-<domain>-<sequence>
+
+Examples:
+  api-user-001       → First user API spec
+  schema-order-003   → Third order schema
+  feat-checkout-007  → Seventh checkout feature spec
+  adr-auth-002       → Second auth decision record
+```
+
+IDs never change, even after spec updates.
+
+---
+
+## Spec Directory Structure
+
+```
+specs/
+├── api/                    # OpenAPI specs
+│   ├── user.openapi.yaml   # status: approved
+│   └── order.openapi.yaml  # status: draft
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
