@@ -1,90 +1,175 @@
 ---
 trigger: always_on
-description: Spec-driven planning — requirements as specifications, contracts as acceptance criteria
+description: Conformance gates — automated and manual validation that code exactly matches specifications, with PR checklist and hard blocking rules
 ---
 
 
-# Spec-Driven Planning
+# Quality Gates (Spec-Driven)
 
-## Requirements as Specifications
+> A quality gate is not "do the tests pass?" It is "does the system exactly match the contract?" These gates are non-negotiable. No exceptions for "it works locally" or "the client can adapt."
 
-- Decompose the project into epics → features → specs → tasks.
-- For each feature, write a **feature spec** defining: inputs, outputs, contracts, edge cases, error cases.
-- Distinguish between must-have (MVP), should-have, and nice-to-have specs.
-- Identify external dependencies and define **integration contracts** for each.
-- Map out the user journey for each core use case as a sequence of contract interactions.
+---
 
-## Scoping
+## Gate Philosophy
 
-- Define MVP scope as a **minimal set of specs** that delivers value.
-- Identify risks and unknowns early. Write **spike specs** to prototype the riskiest contracts.
-- List assumptions and validate them against specs before building on top of them.
-- Estimate relative complexity for each spec (S/M/L/XL).
-- Plan for incremental delivery — each increment delivers a complete set of conforming specs.
+Gates are either **blocking** (merge is rejected until resolved) or **releasing** (deployment is blocked until resolved). There are no advisory gates — every issue is either fixed or explicitly documented as accepted risk with a timeline.
 
-## Spec-Based Acceptance Criteria
+---
 
-Write acceptance criteria as **executable specifications**:
+## Gate 1 — Spec Validity (Blocking)
 
+Before any code is considered, specs must be syntactically and semantically valid.
+
+### Checks
+
+| Check | Tool | Pass Condition |
+|---|---|---|
+| OpenAPI 3.1 validity | `spectral lint` | 0 errors, 0 warnings |
+| JSON Schema validity | `ajv compile` | 0 errors |
+| Gherkin syntax | `cucumber --dry-run` | 0 parse errors |
+| AsyncAPI validity | `spectral lint` (AsyncAPI ruleset) | 0 errors |
+| All `$ref` resolvable | `redocly lint` | 0 unresolved refs |
+
+### Enforcement
+```bash
+# CI step
+npm run spec:lint
+# Must exit 0. Any error blocks the pipeline.
 ```
-Feature: [Feature Name]
-Spec: [Contract Reference]
 
-Given [precondition — initial state / data contract]
-When [action — API call / user interaction / event]
-Then [expected outcome — response contract / state change / side effect]
-And [contract validation — response matches schema X]
+### Fail → Fix Protocol
+A spec lint failure means the spec is incomplete or malformed. Fix the spec — never bypass this gate.
+
+---
+
+## Gate 2 — Code Generation (Blocking)
+
+Types and interfaces generated from specs must compile without errors.
+
+### Checks
+- TypeScript types generated from JSON Schema compile: `tsc --noEmit`
+- OpenAPI client/server stubs compile (if using generator)
+- No type drift between spec and implementation (no `as any` escape hatches)
+
+### Enforcement
+```bash
+npm run spec:generate && npm run typecheck
 ```
 
-Every feature spec needs:
-- Happy path criteria with exact input/output contracts.
-- Error path criteria with exact error response contracts.
-- Performance criteria (response time, throughput) as measurable SLOs.
-- Security criteria (access control, data protection) as authorization contracts.
+If generation fails, the spec is invalid or incompatible with the target. Fix the spec, not the generator output.
 
-## Spec-Driven Task Breakdown
+---
 
-For each feature, create a spec-first implementation plan:
+## Gate 3 — API Conformance (Blocking)
 
-1. **Spec authoring**: write data contracts, API contracts, UI contracts.
-2. **Spec review**: validate contracts with stakeholders, check consistency.
-3. **Conformance tests**: generate tests from specs before any implementation.
-4. **Data layer**: models and schema derived from data contracts.
-5. **Business logic**: services and validation derived from behavior specs.
-6. **API/Interface**: endpoints derived from API contracts.
-7. **UI** (if applicable): components derived from UI contracts.
-8. **Conformance validation**: all tests pass against implementation.
-9. **Documentation**: auto-generated from specs (OpenAPI docs, type docs).
+The running application must respond exactly as the OpenAPI spec defines.
 
-## Prioritization
+### What "Exactly" Means
+- Correct HTTP status codes (201 not 200 for resource creation)
+- Response body matches JSON Schema referenced in the spec (no extra undocumented fields, no missing required fields)
+- Request validation rejects invalid inputs with the correct error codes
+- Auth requirements enforced as declared in `securitySchemes`
+- Headers present as required by spec (Content-Type, Location, ETag, etc.)
 
-- Start with **foundational contracts** (auth contract, core entity schemas).
-- Build specs that unblock other specs first (shared types, common error contracts).
-- Defer optimization and polish specs until core contracts are stable.
-- Allocate time for spec review, conformance testing, and contract evolution.
+### Tools
 
-## Constraints Checklist
+| Tool | Use Case |
+|---|---|
+| Dredd | Run OpenAPI spec as a test suite against live server |
+| Prism | Mock + validation proxy; contract testing |
+| Portman | Generate Postman/Newman tests from OpenAPI |
+| Pact | Consumer-driven contract testing for microservices |
+| Schemathesis | Property-based API testing from OpenAPI |
 
-Before writing specs, clarify:
-- [ ] Target platforms and browsers.
-- [ ] Performance requirements as SLOs (latency p50/p95/p99, throughput, concurrent users).
-- [ ] Security and compliance requirements (GDPR, HIPAA, SOC2) as security contracts.
-- [ ] Accessibility standards (WCAG level) as UI contracts.
-- [ ] Internationalization / localization needs as data format contracts.
-- [ ] Deployment environment (cloud provider, containers, serverless).
-- [ ] API versioning strategy and backward compatibility constraints.
-- [ ] Budget constraints for infrastructure and third-party services.
+```bash
+# Start server
+npm run start:test &
 
-## Spec Formats by Layer
+# Run conformance suite
+npx dredd specs/api/openapi.yaml http://localhost:3000
 
-| Layer | Spec Format | Example |
-|-------|-------------|---------|
-| **API** | OpenAPI 3.x / AsyncAPI | `specs/api/openapi.yaml` |
-| **Data** | JSON Schema / TypeScript interfaces | `specs/schemas/user.schema.json` |
-| **Events** | AsyncAPI / CloudEvents schema | `specs/events/order-created.yaml` |
-| **UI** | Component prop types / Storybook stories | `specs/ui/button.props.ts` |
-| **Integration** | Contract tests (Pact, Dredd) | `specs/contracts/payment-api.pact.json` |
-| **Behavior** | Given-When-Then / Cucumber | `specs/features/checkout.feature` |
+# Or with Prism in validation mode
+npx prism proxy specs/api/openapi.yaml http://localhost:3000 --errors
+```
+
+### Hard Rules
+- Every endpoint in the OpenAPI spec must have at least one passing conformance test
+- Undocumented endpoints (routes in code with no OpenAPI entry) fail the gate
+- Response body with extra undocumented fields fails the gate (use `additionalProperties: false`)
+
+---
+
+## Gate 4 — Behavior Conformance (Blocking)
+
+All Gherkin scenarios in `specs/features/` must pass.
+
+### Scope
+- Happy path scenarios (required)
+- Error path scenarios (required for all `4xx` and `5xx` codes in spec)
+- Edge cases (empty inputs, boundary values, concurrency scenarios)
+
+```bash
+npx cucumber-js specs/features/ --require test/steps/
+```
+
+### Coverage Target
+- 100% of `specs/features/` scenarios must have step definitions and pass
+- No skipped (`@wip`) scenarios in a validated spec — they indicate incomplete implementation
+
+---
+
+## Gate 5 — Security (Blocking)
+
+### Automated Checks
+| Check | Tool | Pass Condition |
+|---|---|---|
+| No hardcoded secrets | `trufflehog` / `gitleaks` | 0 detections |
+| Dependency vulnerabilities | `npm audit --audit-level=high` | 0 high/critical |
+| SAST analysis | `semgrep` | 0 high severity findings |
+| Auth enforcement | Custom conformance test | All protected endpoints return 401 without token |
+
+### Manual Check
+- Auth scheme in code matches `securitySchemes` in OpenAPI spec
+- Role-based access control matches actor permissions defined in discovery
+- PII fields not logged (cross-reference logging config with data schemas)
+
+```bash
+npm run security:audit
+# Must exit 0 for merge.
+```
+
+---
+
+## Gate 6 — Performance (Release-Blocking)
+
+Performance gates block release, not merge. Measured against SLOs in `specs/slos/*.slo.yaml`.
+
+### Default SLO Thresholds (override in your SLO spec)
+
+| Endpoint Type | p50 | p95 | p99 | Error Rate |
+|---|---|---|---|---|
+| Read (GET) | < 50ms | < 200ms | < 500ms | < 0.1% |
+| Write (POST/PUT/PATCH) | < 100ms | < 500ms | < 1s | < 0.5% |
+| Heavy computation | < 500ms | < 2s | < 5s | < 1% |
+| Async job trigger | < 50ms | < 200ms | < 500ms | < 0.1% |
+
+### Tools
+- `k6` for load testing
+- `autocannon` for HTTP benchmarking
+- `clinic.js` for Node.js profiling
+
+---
+
+## Gate 7 — PR Checklist (Blocking — Human Review)
+
+Every pull request must include a signed-off checklist. No merge without all boxes checked.
+
+```markdown
+## PR Conformance Checklist
+
+### Spec
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GaetanOff/WAF-GaetanDev](https://github.com/GaetanOff/WAF-GaetanDev) — distributed by [TomeVault](https://tomevault.io).
