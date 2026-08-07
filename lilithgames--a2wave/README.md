@@ -7,11 +7,11 @@ Turn the agent CLIs you already use into shared services your whole team can cal
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [LilithGames/a2wave](https://github.com/LilithGames/a2wave).
+Original source: `AGENTS.md` in [LilithGames/a2wave](https://github.com/LilithGames/a2wave).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
