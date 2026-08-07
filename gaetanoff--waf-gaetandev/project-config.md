@@ -1,131 +1,196 @@
 ---
 trigger: always_on
-description: Contract-first architecture — design driven by specifications, C4 model, DDD patterns
+description: Changelog management, semantic versioning, and release checklist for spec-driven projects
 ---
 
 
-# Contract-First Architecture
+# Core Changelog & Release Management
 
-## Decision Framework
+> Every release is a set of spec promotions. The changelog documents what contracts changed, not what code changed.
 
-For every architectural decision, document as an ADR referencing the specs that drove it:
+---
 
-1. **Context**: What spec requirement or contract constraint drives this decision?
-2. **Options**: What are the viable approaches? (minimum 2)
-3. **Trade-offs**: Pros and cons of each option against the spec requirements.
-4. **Decision**: Which option and why — with spec references.
-5. **Consequences**: What contracts are affected? What new specs are needed?
+## Semantic Versioning — Spec-Driven Rules
 
-## Architecture Patterns
-
-Choose based on the contracts defined in the Specification phase:
-
-| Pattern | When to Use | Spec Signal |
-|---------|-------------|-------------|
-| **Monolith** | Small team, single product, few API contracts | <10 endpoints, single data store |
-| **Modular Monolith** | Growing product, clear contract boundaries | Multiple bounded contexts in specs |
-| **Microservices** | Independent contracts, different scaling needs | Separate API specs per domain |
-| **Serverless** | Event-driven contracts, async workflows | AsyncAPI specs, event schemas |
-| **Jamstack** | Content-heavy, static + dynamic hybrid | Few API contracts, CDN-friendly |
-| **Event-Driven** | Async workflows, decoupled contracts | Event schemas, pub/sub contracts |
-
-## C4 Architecture Model
-
-Document architecture at four levels of abstraction, driven by specs:
-
-### Level 1: System Context Diagram
-
-Shows the system and its external actors/dependencies. Derived from integration contracts.
+Version increments are driven by the **spec changes**, not by line count or effort.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   SYSTEM CONTEXT                     │
-│                                                      │
-│  [User] ──→ [Your System] ──→ [Payment Provider]    │
-│                  │                                    │
-│                  ├──→ [Email Service]                 │
-│                  └──→ [Auth Provider]                 │
-│                                                      │
-│  Sources: specs/contracts/*.pact.json                │
-│           specs/api/openapi.yaml (security schemes)  │
-└─────────────────────────────────────────────────────┘
+MAJOR.MINOR.PATCH
+
+MAJOR — Breaking contract change (field removed, type changed, endpoint renamed)
+MINOR — Additive contract change (new optional field, new endpoint, new event)
+PATCH — Non-contract change (bug fix within existing contract, perf, docs)
 ```
 
-Rules:
-- Every external dependency must have an integration contract.
-- Every actor must be referenced in behavior specs.
-
-### Level 2: Container Diagram
-
-Shows the major containers (apps, databases, queues). Derived from API specs and data contracts.
+### Version Determination Workflow
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    CONTAINER DIAGRAM                        │
-│                                                             │
-│  [Web App (Next.js)] ──API──→ [API Server (Node.js)]       │
-│                                     │                       │
-│                              ┌──────┼──────┐                │
-│                              ↓      ↓      ↓                │
-│                          [PostgreSQL] [Redis] [S3]          │
-│                                                             │
-│  [Mobile App] ──API──→ [API Server]                         │
-│                                                             │
-│  Sources: specs/api/openapi.yaml (API boundaries)           │
-│           specs/schemas/ (data store decisions)              │
-│           specs/decisions/ (ADRs)                            │
-└────────────────────────────────────────────────────────────┘
+1. List all spec changes in this release
+2. For each changed spec, classify the change (breaking / additive / patch)
+3. Apply the highest-severity classification to the release version
+4. If any spec is MAJOR → bump MAJOR, reset MINOR and PATCH to 0
+5. If highest is MINOR → bump MINOR, reset PATCH to 0
+6. If all are PATCH → bump PATCH only
 ```
 
-### Level 3: Component Diagram
+### Breaking Change Definition (triggers MAJOR)
 
-Shows modules within a container. Derived from feature specs and bounded contexts.
+A breaking change is any change that **requires existing clients to update**:
+
+- Removing a field from a response schema
+- Renaming a field in a request or response
+- Changing a field's type (string → number, optional → required)
+- Removing or renaming an endpoint
+- Changing an HTTP method for an existing endpoint
+- Changing authentication scheme
+- Removing an enum value that clients may have stored
+- Changing event payload structure in AsyncAPI specs
+
+---
+
+## Changelog Format — Keep a Changelog Standard
+
+Every project maintains a `CHANGELOG.md` at the root with this structure:
+
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+
+## [Unreleased]
+<!-- Changes staged for next release. Updated with every merge to main. -->
+
+### Added
+- POST /users endpoint (spec: api-user-003, status: validated)
+
+### Changed
+- User.email field now requires RFC 5322 format (spec: schema-user-001 v1.3.0)
+
+### Deprecated
+- GET /users/search — use GET /users?q= instead. Sunset: 2025-01-01
+
+### Removed
+### Fixed
+### Security
+
+---
+
+## [2.1.0] — 2024-03-20
+
+### Added
+- Order webhook events via AsyncAPI spec (spec: events-order-001)
+- Rate limiting headers on all endpoints (X-RateLimit-Limit, X-RateLimit-Remaining)
+
+### Changed
+- Order.status now uses enum values instead of free-form string
+
+### Fixed
+- Pagination cursor was not URL-safe (spec: api-order-002 patch)
+
+[2.1.0]: https://github.com/org/repo/compare/v2.0.0...v2.1.0
+```
+
+### Changelog Sections
+
+| Section | Use When |
+|---|---|
+| `Added` | New endpoints, fields, features, events — additive changes |
+| `Changed` | Modified behavior within existing contract |
+| `Deprecated` | Fields or endpoints marked for removal — include sunset date |
+| `Removed` | Previously deprecated items now removed |
+| `Fixed` | Bug fixes that do not change the contract |
+| `Security` | Vulnerability fixes, auth changes, CVE patches |
+
+**Always link to the relevant spec** in changelog entries: `(spec: api-user-003)`.
+
+---
+
+## Release Process
+
+### Pre-Release Gate — Full Checklist
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│              API SERVER — COMPONENT DIAGRAM               │
-│                                                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐           │
-│  │   Auth   │  │  Users   │  │   Orders     │           │
-│  │  Module  │  │  Module  │  │   Module     │           │
-│  └────┬─────┘  └────┬─────┘  └──────┬───────┘           │
-│       │              │               │                    │
-│  ┌────┴──────────────┴───────────────┴────┐              │
-│  │         Shared Infrastructure           │              │
-│  │  (middleware, error handler, logger)     │              │
-│  └─────────────────────────────────────────┘              │
-│                                                           │
-│  Sources: specs/features/ (one module per feature area)   │
-│           specs/schemas/ (shared schemas = shared infra)  │
-└──────────────────────────────────────────────────────────┘
+Release Readiness Gate
+
+Spec Status
+[ ] All specs referenced in this release are at status: validated
+[ ] SPEC-INDEX.md is up to date
+[ ] No spec debt items classified as Critical or High remain open
+[ ] Breaking changes are documented with migration guide
+
+Code Quality
+[ ] All conformance tests pass in CI
+[ ] Unit test coverage ≥ 80% on business logic
+[ ] Integration tests pass
+[ ] No open security vulnerabilities (npm audit / cargo audit / etc.)
+[ ] No linting errors
+[ ] Build is reproducible (lock files committed)
+
+Changelog & Versioning
+[ ] CHANGELOG.md [Unreleased] section is complete
+[ ] Version bump applied to package manifest (package.json, Cargo.toml, pyproject.toml, etc.)
+[ ] Git tag matches version
+[ ] [Unreleased] section renamed to [X.Y.Z] — YYYY-MM-DD
+[ ] Compare link added at bottom of CHANGELOG.md
+
+Documentation
+[ ] README.md reflects current version and usage
+[ ] API documentation regenerated from OpenAPI spec
+[ ] Migration guide written for any MAJOR version bump
+
+Deployment
+[ ] Staging environment validated
+[ ] Rollback plan documented
+[ ] Feature flags configured (if applicable)
+[ ] Database migrations tested (up and down)
+[ ] Dependent services notified of breaking changes
 ```
 
-### Level 4: Code Diagram
+### Release Commit Convention
 
-Shows classes/functions within a component. Derived from data contracts and behavior specs. Use sparingly — code should be self-documenting at this level.
+```bash
+# Version bump commit
+git commit -m "chore(release): v2.1.0"
 
-## Domain-Driven Design Patterns (Spec-Driven)
+# Tag the release
+git tag -a v2.1.0 -m "Release v2.1.0 — Order webhooks, rate limiting"
 
-For complex domains, use DDD patterns mapped to specs:
-
-### Bounded Contexts
-
-Each bounded context maps to a separate set of specs:
-
+# Never push without a complete changelog and passing CI
 ```
-specs/
-  contexts/
-    identity/               # Auth & user management context
-      api/openapi.yaml
-      schemas/user.schema.json
-      features/auth.feature
-    ordering/               # Order management context
-      api/openapi.yaml
-      schemas/order.schema.json
-      features/checkout.feature
-    shipping/               # Shipping context
-      api/openapi.yaml
-      schemas/shipment.schema.json
+
+---
+
+## Deprecation Protocol
+
+When deprecating a contract (field, endpoint, event):
+
+### Step 1 — Mark in Spec
+
+```yaml
+# In OpenAPI spec
+/users/search:
+  get:
+    deprecated: true
+    description: |
+      DEPRECATED as of v2.1.0. Sunset date: 2025-01-01.
+      Use GET /users?q= instead.
+      Migration guide: docs/migration/v2.1.0.md
+```
+
+### Step 2 — Add Response Header
+
+```http
+Deprecation: true
+Sunset: Mon, 01 Jan 2025 00:00:00 GMT
+Link: <https://api.example.com/docs/migration/v2.1.0>; rel="deprecation"
+```
+
+### Step 3 — Changelog Entry
+
+```markdown
+### Deprecated
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
