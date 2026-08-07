@@ -1,158 +1,106 @@
 ---
 trigger: always_on
-description: Master workflow for Spec Driven Development — specifications are the single source of truth, covering greenfield and legacy modes
+description: Clean code fundamentals — naming, functions, readability, simplicity, code smells, refactoring patterns
 ---
 
 
-# SDD Workflow (Spec Driven Development)
+# Clean Code Fundamentals
 
-> Specifications are the single source of truth. Code is a consequence of specs, not the other way around. Every phase is gated. No phase starts until the previous one is complete and signed off.
+## Naming
 
----
+- Use descriptive, intention-revealing names. A reader should understand purpose without comments.
+- **Booleans**: prefix with `is`, `has`, `should`, `can` (e.g., `isVisible`, `hasPermission`).
+- **Functions**: use verb phrases (`fetchUser`, `calculateTotal`, `validateInput`).
+- **Constants**: `UPPER_SNAKE_CASE` for true compile-time constants only.
+- **Classes**: noun or noun phrases (`Customer`, `AccountParser`).
+- Avoid abbreviations, single-letter variables (except short lambdas/loops), and Hungarian notation.
+- Use the same vocabulary found in the specifications (Domain-Driven Design).
 
-## Quick Reference
+## Functions
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         SDD WORKFLOW PHASES                                 │
-├─────────────┬───────────────┬──────────────────┬───────────────────────────┤
-│ Phase 0     │ Phase 1       │ Phase 2          │ Phase 3                   │
-│ DISCOVERY   │ SPECIFICATION │ ARCHITECTURE     │ PLANNING                  │
-│ Anti-vibe   │ OpenAPI,      │ ADRs, C4,        │ Epics, slices,            │
-│ questions   │ Schema,       │ data model,      │ task breakdown,           │
-│ constraints │ Gherkin       │ tech stack       │ acceptance criteria       │
-├─────────────┼───────────────┼──────────────────┼───────────────────────────┤
-│ Phase 4     │ Phase 5       │ Phase 6          │ Phase 7                   │
-│ SCAFFOLDING │ SPEC-FIRST    │ CONFORMANCE      │ ITERATION &               │
-│ Structure,  │ IMPLEMENTATION│ GATES            │ RELEASE                   │
-│ tooling,    │ Tests first,  │ Validate,        │ Specs evolve first,       │
-│ stubs       │ then code     │ gate checks      │ changelog, semver         │
-└─────────────┴───────────────┴──────────────────┴───────────────────────────┘
-```
+- Keep functions short — ideally under 20 lines, max 40.
+- One level of abstraction per function. Extract helpers instead of nesting.
+- Max 3 parameters. Use an options/config object beyond that.
+- Avoid boolean flag parameters (`render(true)`) — split into two functions instead (`renderWithDetails()`, `renderSimple()`).
+- **Command-Query Separation (CQS)**: Functions should either **do** something (Command) or **return** something (Query), not both.
 
----
+## Readability
 
-## Project Mode Selection
+- Prefer early returns / guard clauses over deeply nested `if-else`.
+- Avoid magic numbers and strings — extract to named constants.
+- Keep line length under 100 characters.
+- Group related code with blank lines; separate concerns with clear section breaks.
+- Delete dead code — don't comment it out. Version control exists.
 
-Before starting, select the correct mode. Rules differ between modes.
+## Simplicity & Design Principles
 
-### Greenfield Mode
+- **YAGNI (You Aren't Gonna Need It)**: Write the simplest code that works now. Don't build for hypothetical future requirements.
+- **Rule of Three**: Avoid premature abstraction. Wait until you see the exact same pattern three times before extracting it into a reusable component.
+- Prefer **composition over inheritance**.
+- Avoid clever one-liners that sacrifice clarity. "Any fool can write code that a computer can understand. Good programmers write code that humans can understand."
 
-Use when: building from scratch, no existing codebase, no legacy constraints.
+## Complexity Metrics
 
-```
-Greenfield Workflow
-─────────────────
-Phase 0 → Discovery (full)
-Phase 1 → Write all specs from scratch
-Phase 2 → Design architecture from specs
-Phase 3 → Plan implementation
-Phase 4 → Scaffold from specs
-Phase 5 → Implement spec by spec
-Phase 6 → Validate all gates
-Phase 7 → Release v1.0.0
-```
+Configure your linter to enforce these limits:
 
-### Legacy Mode
+| Metric | Target Limit | Description |
+|--------|--------------|-------------|
+| **Cyclomatic Complexity** | < 10 | Number of independent paths through code. High complexity means hard to test. |
+| **Cognitive Complexity** | < 15 | How hard the code is to understand for a human. Penalizes deep nesting. |
+| **Function Length** | < 40 lines | Lines of executable code per function. |
+| **File Length** | < 300 lines | Total lines per file. Split files when they get too large. |
+| **Parameters** | ≤ 3 | Number of arguments a function accepts. |
 
-Use when: existing codebase, adding features, refactoring, or fixing bugs.
+## Code Smell Catalog
 
-```
-Legacy Workflow
-──────────────
-Phase 0 → Spec Audit (inventory what exists)
-          ↓
-Phase 0b → Write retro-specs (describe current behavior as-is)
-          ↓
-Phase 0c → Identify gaps (what is not yet specified)
-          ↓
-Phase 1 → Write delta specs (what changes)
-Phase 2 → Check architecture impact (ADR if breaking)
-Phase 3 → Plan migration
-Phase 4 → Scaffold migration artifacts (if needed)
-Phase 5 → Implement against new specs
-Phase 6 → Validate conformance (retro + new specs)
-Phase 7 → Release with migration guide
-```
+When you spot these smells during implementation or review, fix them:
 
----
+### 1. Spec-Implementation Mismatch
+- **Smell**: Code validates input manually that is already defined as required in the JSON Schema.
+- **Fix**: Rely on the schema validator middleware. Remove redundant manual checks.
 
-## Phase 0: Discovery (see `core-discovery` rule)
+### 2. Duplicated Logic
+- **Smell**: The exact same block of code appears in 3+ places.
+- **Fix**: Extract to a private helper method or shared utility function.
 
-**Required artifacts:**
-- `specs/mission.md` — problem statement, actors, goals, non-goals
-- `specs/requirements.md` — functional + non-functional requirements
-- `specs/decisions/ADR-000-project-context.md` — initial context
+### 3. Long Method
+- **Smell**: A method is 100+ lines long and does multiple things (fetch data, process it, format it).
+- **Fix**: Apply `Extract Method`. Break it down by levels of abstraction.
 
-**Gate to pass:** All discovery questions answered. No open unknowns. Stakeholder sign-off.
+### 4. Large Class / Module
+- **Smell**: A file has 1000+ lines and handles unrelated concerns (e.g., Auth, Users, and Emails in one file).
+- **Fix**: Apply `Extract Class` or split into separate modules by domain context.
 
-**Anti-vibe protocol:** Never proceed to specification if:
-- The request is vague, unbounded, or missing success criteria
-- Actors are not named
-- Edge cases are not defined for business-critical flows
+### 5. Primitive Obsession
+- **Smell**: Passing raw strings/numbers instead of domain objects (e.g., passing `string email` instead of an `Email` value object).
+- **Fix**: Use specific types/classes for domain concepts that have validation rules.
 
----
+### 6. Data Clumps
+- **Smell**: The same 3-4 parameters are passed together to multiple functions (e.g., `startDate, endDate, timezone`).
+- **Fix**: Extract into a single parameter object (`DateRangeContext`).
 
-## Phase 1: Specification (see `core-specification` and `core-spec-lifecycle` rules)
+### 7. Deep Nesting
+- **Smell**: 3+ levels of `if/else/for` indentation (Arrow Anti-Pattern).
+- **Fix**: Use early returns (guard clauses), extract loop bodies into functions, or use functional array methods (`map/filter/reduce`).
 
-Write formal, machine-readable specs BEFORE any design or code decision.
+## Refactoring Patterns
 
-### Spec Format by Project Type
+Apply these patterns to improve code without changing its external behavior (keep conformance tests passing).
 
-```
-What are you building?
-│
-├── REST API?
-│   ├── OpenAPI 3.1 (mandatory) → specs/api/*.openapi.yaml
-│   ├── JSON Schema for entities (mandatory) → specs/schemas/*.schema.json
-│   ├── Gherkin for behavior (required for critical paths) → specs/features/*.feature
-│   └── Pact for consumer-driven contracts (if external consumers) → specs/contracts/
-│
-├── GraphQL API?
-│   ├── GraphQL SDL (mandatory)
-│   ├── JSON Schema for complex inputs/outputs
-│   └── Gherkin for behavior
-│
-├── Event-Driven / Message Queue?
-│   ├── AsyncAPI (mandatory) → specs/events/*.asyncapi.yaml
-│   └── JSON Schema for event payloads (mandatory)
-│
-├── Frontend (SPA/SSR)?
-│   ├── OpenAPI for all consumed APIs (mandatory)
-│   ├── Component prop types (mandatory)
-│   └── Storybook stories as UI specs (recommended)
-│
-├── Mobile App?
-│   ├── OpenAPI for consumed APIs (mandatory)
-│   └── Screen flow spec (recommended)
-│
-└── CLI Tool?
-    ├── Command spec in Markdown (flags, args, output format) (mandatory)
-    └── Gherkin for behavior (recommended)
-```
+1. **Extract Function/Method**: Move a cohesive block of code into its own named function.
+2. **Inline Function/Method**: Revert a poorly extracted function back into its caller if the indirection adds no value.
+3. **Replace Conditional with Polymorphism**: Convert massive `switch` statements into separate strategy classes or objects.
+4. **Introduce Parameter Object**: Replace a long list of related parameters with a single grouped object/interface.
+5. **Rename Variable**: Change cryptic variable names (`const t = ...`) to intention-revealing names (`const transactionDuration = ...`).
+6. **Replace Magic Number with Constant**: `if (status === 4)` → `if (status === STATUS_COMPLETED)`.
 
-### Spec Rules
-- Every spec starts with `status: draft` (see spec lifecycle)
-- Specs must be reviewed and set to `status: approved` before implementation
-- No `TODO` or `TBD` in an approved spec — replace with a tracked assumption
-- All error cases must be specified, not just the happy path
-- All specs must include at least one example
+### Refactoring Workflow in SDD
 
----
-
-## Phase 2: Architecture (see `core-architecture` rule)
-
-Design the system from approved specs. Never design before specs exist.
-
-### Architecture Deliverables
-- `specs/decisions/ADR-001-*.md` — architecture decisions driven by specs
-- C4 model Level 1 (System Context) and Level 2 (Containers) diagrams
-- Data model diagram derived from JSON Schema contracts
-- Sequence diagrams for critical flows derived from Gherkin scenarios
-
-### Architecture Rules
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. Ensure the feature passes all **conformance tests**.
+2. Identify the code smell.
+3. Apply the refactoring pattern (one at a time).
+4. Run tests again. (Green → Refactor → Green).
+5. Commit the refactoring separately from feature changes (`refactor(domain): extract user validation`).
 
 ---
 > Source: [GaetanOff/WAF-GaetanDev](https://github.com/GaetanOff/WAF-GaetanDev) — distributed by [TomeVault](https://tomevault.io).
