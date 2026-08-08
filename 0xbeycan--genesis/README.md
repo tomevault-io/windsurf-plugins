@@ -7,13 +7,13 @@ From Idea to First Commit
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [0xBeycan/genesis](https://github.com/0xBeycan/genesis).
+Original source: `CLAUDE.md` in [0xBeycan/genesis](https://github.com/0xBeycan/genesis).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
