@@ -7,11 +7,11 @@ Run LLMs, VLMs, ASR, TTS, diarization and more fully on-device with Apple's Core
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [john-rocky/coreai-kit](https://github.com/john-rocky/coreai-kit).
+Original source: `AGENTS.md` in [john-rocky/coreai-kit](https://github.com/john-rocky/coreai-kit).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
