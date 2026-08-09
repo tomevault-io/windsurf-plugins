@@ -1,134 +1,149 @@
 ---
 trigger: always_on
-description: Client desktop de bases de données moderne construit avec **Tauri 2 + React 19 + Rust**.
+description: Modern desktop database client built with Tauri 2 + React 19 + Rust.
 ---
 
 # QoreDB
 
-Client desktop de bases de données moderne construit avec **Tauri 2 + React 19 + Rust**.
-Alternative légère et rapide à DBeaver/pgAdmin pour développeurs.
+Modern desktop database client built with Tauri 2 + React 19 + Rust.
+A lightweight, fast alternative to DBeaver/pgAdmin for developers.
 
-## Stack technique
+## Collaboration principles (read first)
 
-| Couche   | Technologies                                         |
+These principles take precedence over speed. For a trivial task, use your judgment.
+
+### 1. Think before coding
+
+**Don't assume. Don't hide confusion. Surface the trade-offs.**
+
+Before implementing:
+
+- State your assumptions explicitly. When in doubt, ask.
+- If several interpretations are possible, present them — don't choose silently.
+- If a simpler approach exists, say so. Push for it when it's warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity first
+
+**The minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No unrequested "flexibility" or "configurability".
+- No error handling for impossible scenarios.
+- If you write 200 lines and 50 would do, rewrite.
+
+Ask yourself: "Would a senior engineer say this is over-engineered?" If so, simplify.
+
+### 3. Surgical changes
+
+**Touch only what's necessary. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor what isn't broken.
+- Respect the existing style, even if you'd do it differently.
+- If you spot unrelated dead code, flag it — don't delete it.
+
+When your changes create orphans:
+
+- Remove the imports/variables/functions that YOUR changes made unused.
+- Don't delete pre-existing dead code unless explicitly asked.
+
+The test: every changed line must trace directly back to the user's request.
+
+### 4. Goal-driven execution
+
+**Define success criteria. Iterate until verified.**
+
+Turn tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Make sure the tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```text
+1. [Step] → verification: [check]
+2. [Step] → verification: [check]
+3. [Step] → verification: [check]
+```
+
+Strong success criteria let you iterate autonomously. Weak criteria ("make it work") require constant clarification.
+
+## Tech stack
+
+| Layer    | Technologies                                         |
 | -------- | ---------------------------------------------------- |
 | Frontend | React 19, TypeScript, Vite 7, Tailwind 4, CodeMirror |
-| Backend  | Rust (edition 2021), Tauri 2, SQLx, tokio            |
-| BDD      | PostgreSQL, MySQL, MongoDB, SQLite                   |
+| Backend  | Rust (edition 2024), Tauri 2, SQLx, tokio            |
+| Database | PostgreSQL, MySQL, MongoDB, SQLite                   |
 
-## Structure du projet
+## Project structure
 
 ```
-src/                    # Frontend React/TypeScript
-├── components/         # Composants UI (Browser/, Query/, Results/, ui/)
-├── hooks/              # Hooks React (useTabs, useTheme, useKeyboardShortcuts)
-├── lib/                # Bindings Tauri, utilitaires, types
-└── locales/            # Traductions i18n (en.json, fr.json)
+src/                    # React/TypeScript frontend
+├── components/         # UI components (Browser/, Query/, Results/, ui/)
+├── hooks/              # React hooks (useTabs, useTheme, useKeyboardShortcuts)
+├── lib/                # Tauri bindings, utilities, types
+└── locales/            # i18n translations (en.json, fr.json)
 
-src-tauri/              # Backend Rust
-├── src/commands/       # Handlers Tauri (query, mutation, export, vault)
-├── src/engine/         # Abstraction BDD (traits.rs, drivers/, session_manager)
-└── src/vault/          # Gestion credentials chiffrés
+src-tauri/              # Rust backend (Cargo workspace)
+├── src/                # Tauri binary crate
+│   ├── commands/       # Tauri handlers (query, mutation, export, vault)
+│   └── engine/         # Glue to the engine crates
+└── crates/             # Workspace crates
+    ├── qore-core/      # Engine abstraction (traits.rs, types, registry, error)
+    ├── qore-drivers/   # Database drivers + session manager
+    ├── qore-query/     # Query AST, compiler, dialects
+    ├── qore-sql/       # SQL generation, safety, connection URLs
+    ├── qore-service/   # Vault, governance/policy, service context
+    └── qore-{cli,mcp,server}/  # Entry-point binaries
 
-doc/                    # Documentation détaillée
-├── audits/             # Audits sécurité & conformité
-├── internals/          # Architecture interne
-├── private/            # Notes open-core (interne)
-├── release/            # Process release & événements
-├── rules/              # Standards UI/design & features
-├── security/           # Modèle de menaces, politiques
-├── tests/              # Contraintes de tests
-└── todo/               # Roadmap & specs à venir
+doc/                    # Detailed documentation
+├── audits/             # Security & compliance audits
+├── internals/          # Internal architecture
+├── private/            # Open-core notes (internal)
+├── release/            # Release process & events
+├── rules/              # UI/design standards & features
+├── security/           # Threat model, policies
+├── tests/              # Testing constraints
+└── todo/               # Roadmap & upcoming specs
 ```
 
-## Commandes essentielles
+## Essential commands
 
 ```bash
-pnpm install            # Installer les dépendances
-pnpm tauri dev          # Lancer l'app en dev (hot reload)
-pnpm lint:fix           # Linter + fix automatique
-pnpm format:write       # Formater le code
-pnpm test               # Tests Rust (cargo test)
-pnpm tauri build        # Build production
+pnpm install            # Install dependencies
+pnpm tauri dev          # Run the app in dev (hot reload)
+pnpm lint:fix           # Lint + auto-fix
+pnpm format:write       # Format the code
+pnpm test               # Rust tests (cargo test)
+pnpm tauri build        # Production build
 ```
 
-Docker pour les BDD de test : `docker-compose up -d`
+Docker for test databases: `docker-compose up -d`
 
-## Architecture clé
+## Key architecture
 
-**Frontend → Backend** : Les appels passent par `src/lib/tauri.ts` qui expose des bindings typés vers les commandes Rust.
-**Drivers BDD** : Chaque driver implémente le trait `DataEngine` (`src-tauri/src/engine/traits.rs`). Le `DriverRegistry` gère l'instanciation.
-**Sécurité** : Vault chiffré (Argon2), validation SQL avant exécution (`sql_safety.rs`), mode sandbox.
+**Frontend → Backend**: Calls go through `src/lib/tauri.ts`, which exposes typed bindings to the Rust commands.
+**Database drivers**: Each driver implements the `DataEngine` trait (`src-tauri/crates/qore-core/src/traits.rs`), lives in `qore-drivers`, and is registered in the `DriverRegistry` (qore-core) from `qore-service/src/context.rs`.
+**Security**: Encrypted vault (Argon2), SQL validation before execution (`qore-sql/src/safety.rs`), sandbox mode.
 
 ## Conventions
 
-- Composants UI réutilisables dans `src/components/ui/` (basés sur shadcn/Radix)
-- Hooks personnalisés préfixés `use*` dans `src/hooks/`
-- Commandes Tauri dans `src-tauri/src/commands/`, exports dans `lib.rs`
-- Erreurs Rust : types custom dans `engine/error.rs`, propagation avec `?`
+- Reusable UI components in `src/components/ui/` (based on shadcn/Radix)
+- Custom hooks prefixed with `use*` in `src/hooks/`
+- Tauri commands in `src-tauri/src/commands/`, exports in `lib.rs`
+- Rust errors: custom types in `engine/error.rs`, propagation with `?`
 
-## Licensing Open Core (important)
+## Open Core licensing (important)
 
-- Le repo utilise un modèle **Open Core**.
-- **Core** : licence Apache 2.0 (`LICENSE`)
-- **Premium** : licence Business Source License 1.1 (`LICENSE-BSL`)
-- Référence SPDX à utiliser pour Premium : `BUSL-1.1` (et non `BSL-1.1`)
-
-### Règle obligatoire sur les fichiers code
-
-Chaque fichier code `*.ts`, `*.tsx`, `*.rs` doit commencer par un header SPDX :
-
-```ts
-// SPDX-License-Identifier: Apache-2.0
-```
-
-ou, pour les fichiers Premium :
-
-```ts
-// SPDX-License-Identifier: BUSL-1.1
-```
-
-### Périmètre Premium actuel
-
-Les fichiers suivants sont actuellement marqués Premium (`BUSL-1.1`) :
-
-- `src/components/Diff/*`
-- `src/components/Schema/ERDiagram.tsx`
-- `src/lib/diffUtils.ts`
-- `src-tauri/src/interceptor/profiling.rs`
-
-Tout le reste est Core par défaut (`Apache-2.0`), sauf décision explicite contraire.
-
-### Quand tu crées/déplaces un fichier
-
-- Nouveau fichier : ajoute le header SPDX dès la création.
-- Si un fichier passe de Core à Premium (ou inversement), mets à jour son header SPDX dans le même commit.
-- Garde la cohérence entre le code et les licences racine (`LICENSE`, `LICENSE-BSL`).
-
-## Documentation approfondie
-
-Consulte ces fichiers selon le contexte de ta tâche :
-
-| Sujet                    | Fichier                                        |
-| ------------------------ | ---------------------------------------------- |
-| Index docs               | `doc/README.md`                                |
-| Vision produit           | `doc/PROJECT.md`                               |
-| Features (liste)         | `doc/FEATURES.csv`                             |
-| Design system UI         | `doc/rules/DESIGN_SYSTEM.md`                   |
-| Fondations visuelles     | `doc/rules/VISUAL_FOUNDATION.md`               |
-| Features (spécs)         | `doc/rules/FEATURES.md`                        |
-| Spécificités drivers BDD | `doc/rules/DATABASES.md`                       |
-| Sécurité / menaces       | `doc/security/THREAT_MODEL.md`                 |
-| Sécurité / prod          | `doc/security/PRODUCTION_SAFETY.md`            |
-| Audits sécurité          | `doc/audits/SECURITY_AUDIT.md`                 |
-| Audits GDPR              | `doc/audits/GDPR_AUDIT.md`                     |
-| Tests SSH                | `doc/tests/TESTING_SSH.md`                     |
-| Limitations drivers      | `doc/tests/DRIVER_LIMITATIONS.md`              |
-| Intercepteur de requêtes | `doc/internals/UNIVERSAL_QUERY_INTERCEPTOR.md` |
-| URLs de connexion        | `doc/internals/connection-url-instructions.md` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [QoreDB/QoreDB](https://github.com/QoreDB/QoreDB) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
