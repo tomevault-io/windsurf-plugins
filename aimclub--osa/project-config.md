@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: ::: osa_tool.osa_agent.agents.repo_analysis.agent
+description: ::: osa_tool.osa_agent.agents.finalizer.agent
 ---
 
-# Repo Analysis Agent
+# Finalizer Agent
 
-::: osa_tool.osa_agent.agents.repo_analysis.agent
+::: osa_tool.osa_agent.agents.finalizer.agent
 
 ---
 > Source: [aimclub/OSA](https://github.com/aimclub/OSA) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
