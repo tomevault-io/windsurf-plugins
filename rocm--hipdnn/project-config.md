@@ -3,7 +3,7 @@ trigger: always_on
 description: - Use CamelCase for class and struct names (e.g., `BatchNormTestCase`, `SimpleTensorBundle`)
 ---
 
-# Copilot Rules for hipDNN Project
+# Cline Rules for hipDNN Project
 
 ## C++ Code Style
 
@@ -45,7 +45,7 @@ description: - Use CamelCase for class and struct names (e.g., `BatchNormTestCas
 
 #### Test Naming Guidelines
 
-Rules below apply ONLY to the TestSuite name (first parameter of `TEST` / `TEST_F` / `TEST_P`). The TestCase (second parameter) can be descriptive but should still avoid the reserved keywords where noted.
+Rules below apply ONLY to the TestSuite name (first parameter of `TEST` / `TEST_F` / `TEST_P`). The TestCase (second parameter) can be descriptive but should still avoid the reserved keywords where noted. 
 TestCase should be PascalCase.
 
 **Ordering & Composition (left → right):**
@@ -135,4 +135,4 @@ TEST_F(MyTestFixture, testSomething)
 
 ---
 > Source: [ROCm/hipDNN](https://github.com/ROCm/hipDNN) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
