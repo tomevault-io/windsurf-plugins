@@ -80,4 +80,4 @@ Agentic Coding should be a collaboration between Human System Design and Agent I
 
 ---
 > Source: [The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge](https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
