@@ -106,4 +106,4 @@ Ultracite enforces strict type safety, accessibility standards, and consistent c
 
 ---
 > Source: [FranciscoMoretti/ai-registry](https://github.com/FranciscoMoretti/ai-registry) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
