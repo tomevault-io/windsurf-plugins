@@ -1,101 +1,53 @@
 ---
 trigger: always_on
-description: This file provides instructions for AI coding agents and human maintainers working on **XCP-D**, a BIDS App for robust postprocessing of fMRI data.
+description: This project is one of four PennLINC BIDS Apps (qsiprep, qsirecon, xcp_d, aslprep) sharing
 ---
 
-# AGENTS.md -- XCP-D
+# PennLINC BIDS App Shared Conventions
 
-This file provides instructions for AI coding agents and human maintainers working on **XCP-D**, a BIDS App for robust postprocessing of fMRI data.
+This project is one of four PennLINC BIDS Apps (qsiprep, qsirecon, xcp_d, aslprep) sharing
+the same architecture and conventions. See [AGENTS.md](mdc:AGENTS.md) for full details.
 
----
+## Architecture
 
-## Shared Instructions (All PennLINC BIDS Apps)
+- CLI in `xcp_d/cli/` (parser.py, run.py, workflow.py, version.py)
+- Singleton config in [config.py](mdc:xcp_d/config.py) with sections: environment, execution, workflow, nipype, seeds
+- Workflows in `xcp_d/workflows/` using Nipype's `pe.Workflow`, `pe.Node`, `pe.MapNode`
+- Interfaces in `xcp_d/interfaces/` following Nipype patterns
+- Tests in `xcp_d/tests/` with pytest; integration tests gated by markers
 
-The following conventions apply equally to **qsiprep**, **qsirecon**, **xcp_d**, and **aslprep**. All four are PennLINC BIDS Apps built on the NiPreps stack.
+## Workflow Rules
 
-### Ecosystem Context
+- Name all workflow factory functions `init_<name>_wf`; return a Workflow object
+- Use `LiterateWorkflow` from `niworkflows.engine.workflows`
+- Define `inputnode` and `outputnode` as `niu.IdentityInterface` nodes
+- Use `workflow.connect([(src, dst, [('out', 'in')])])` syntax with `# fmt:skip` on multi-line connects
+- Read global settings from `config` module, not function parameters
 
-- These projects belong to the [NiPreps](https://www.nipreps.org/) ecosystem and follow its community guidelines.
-- Core dependencies include **nipype** (workflow engine), **niworkflows** (reusable workflow components), **nireports** (visual reports), **pybids** (BIDS dataset querying), and **nibabel** (neuroimaging I/O).
-- All four apps are containerized via Docker and distributed on Docker Hub under the `pennlinc/` namespace.
-- Contributions follow the [NiPreps contributing guidelines](https://www.nipreps.org/community/CONTRIBUTING/).
+## Interface Rules
 
-### Architecture Overview
+- Use Nipype traits for input/output specs (`File`, `traits.Bool`, etc.)
+- Implement `_run_interface(self, runtime)`, return `runtime`
+- Set outputs via `self._results['field'] = value`
 
-Every PennLINC BIDS App follows this execution flow:
+## Code Style
 
-```
-CLI (parser.py / run.py)
-  -> config singleton (config.py, serialized as ToML)
-    -> workflow graph construction (workflows/*.py)
-      -> Nipype interfaces (interfaces/*.py)
-        -> BIDS-compliant derivative outputs
-```
+- Linter: `ruff check`; Formatter: `ruff format`
+- Import sorting via ruff (isort-compatible)
+- Add `# fmt:skip` after multi-line `workflow.connect()` calls
 
-- **CLI** (`<pkg>/cli/`): `parser.py` defines argparse arguments; `run.py` is the entry point; `workflow.py` builds the execution graph; `version.py` handles `--version`.
-- **Config** (`<pkg>/config.py`): A singleton module with class-based sections (`environment`, `execution`, `workflow`, `nipype`, `seeds`). Config is serialized to ToML and passed across processes via the filesystem. Access settings as `config.section.setting`.
-- **Workflows** (`<pkg>/workflows/`): Built using `nipype.pipeline.engine` (`pe.Workflow`, `pe.Node`, `pe.MapNode`). Use `LiterateWorkflow` from `niworkflows.engine.workflows` for auto-documentation. Every workflow factory function must be named `init_<descriptive_name>_wf`.
-- **Interfaces** (`<pkg>/interfaces/`): Custom Nipype interfaces wrapping external tools or Python logic. Follow standard Nipype patterns: define `_InputSpec` / `_OutputSpec` with `BaseInterfaceInputSpec` / `TraitedSpec`, implement `_run_interface()`.
-- **Utilities** (`<pkg>/utils/`): Shared helper functions. BIDS-specific helpers live in `utils/bids.py`.
-- **Reports** (`<pkg>/reports/`): HTML report generation using nireports.
-- **Data** (`<pkg>/data/`): Static package data (config files, templates, atlases). Accessed via `importlib.resources` or the `acres` package.
-- **Tests** (`<pkg>/tests/`): Pytest-based. Unit tests run without external data. Integration tests are gated behind pytest markers and are skipped by default.
+## Testing
 
-### Workflow Authoring Rules
+- Unit tests in `test_*.py` -- no external data or network access required
+- Integration tests use `@pytest.mark.<marker>` and are excluded by default
+- Fixtures: `data_dir`, `working_dir`, `output_dir` in conftest.py
 
-1. Every workflow factory function must be named `init_<name>_wf` and return a `Workflow` object.
-2. Use `LiterateWorkflow` (from `niworkflows.engine.workflows`) to enable automatic workflow graph documentation.
-3. Define `inputnode` and `outputnode` as `niu.IdentityInterface` nodes to declare the workflow's external API.
-4. Connect nodes using `workflow.connect([(source, dest, [('out_field', 'in_field')])])` syntax.
-5. Add `# fmt:skip` after multi-line `workflow.connect()` calls to prevent ruff from reformatting them.
-6. Include a docstring with `Workflow Graph` and `.. workflow::` Sphinx directive for auto-generated documentation.
-7. Use `config` module values (not function parameters) for global settings inside workflow builders.
+## BIDS
 
-### Interface Conventions
-
-1. Input/output specs use Nipype traits (`File`, `traits.Bool`, `traits.Int`, etc.).
-2. `mandatory = True` for required inputs; provide `desc=` for all traits.
-3. Implement `_run_interface(self, runtime)` -- never `run()`.
-4. Return `runtime` from `_run_interface`.
-5. Set outputs via `self._results['field'] = value`.
-
-### Config Module Usage
-
-```python
-from <pkg> import config
-
-# Read a setting
-work_dir = config.execution.work_dir
-
-# Serialize to disk
-config.to_filename(path)
-
-# Load from disk (in a subprocess)
-config.load(path)
-```
-
-The config module is the single source of truth for runtime parameters. Never pass global settings as function arguments when they are available via config.
-
-### Testing Conventions
-
-- **Unit tests**: Files named `test_*.py` in `<pkg>/tests/`. Must not require external neuroimaging data or network access.
-- **Integration tests**: Decorated with `@pytest.mark.<marker_name>`. Excluded by default via `addopts` in `pyproject.toml`. Require Docker or pre-downloaded test datasets.
-- **Fixtures**: Defined in `conftest.py`. Common fixtures include `data_dir`, `working_dir`, `output_dir`, and `datasets`.
-- **Coverage**: Configured in `pyproject.toml` under `[tool.coverage.run]` and `[tool.coverage.report]`.
-
-### Documentation
-
-- Built with Sphinx using `sphinx_rtd_theme`.
-- Source files in `docs/`.
-- Workflow graphs are auto-rendered via `.. workflow::` directives that call `init_*_wf` functions.
-- API docs generated via `sphinxcontrib-apidoc`.
-- Bibliography managed with `sphinxcontrib-bibtex` and `boilerplate.bib`.
-
-### Docker
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Outputs must conform to BIDS Derivatives specification
+- Use `pybids.BIDSLayout` for input queries
+- Use `DerivativesDataSink` for writing BIDS-compliant outputs
 
 ---
 > Source: [PennLINC/xcp_d](https://github.com/PennLINC/xcp_d) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
