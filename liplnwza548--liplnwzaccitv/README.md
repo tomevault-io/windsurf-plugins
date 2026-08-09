@@ -7,11 +7,11 @@ AI-interview-driven video production template — reverse-engineer reference vid
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [liplnwza548/liplnwzaCCITV](https://github.com/liplnwza548/liplnwzaCCITV).
+Original source: `AGENTS.md` in [liplnwza548/liplnwzaCCITV](https://github.com/liplnwza548/liplnwzaCCITV).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
