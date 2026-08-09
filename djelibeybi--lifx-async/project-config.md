@@ -70,7 +70,7 @@ uv run ruff format .
 # Lint with auto-fix
 uv run ruff check . --fix
 
-# Type check (strict Pyright validation)
+# Type check (Pyright, standard mode)
 uv run pyright
 ```
 
@@ -156,8 +156,9 @@ gh workflow run docs.yml
    - `DeviceGroup`: Batch operations (set_power, set_color, etc.)
    - `LocationGrouping` / `GroupGrouping`: Organizational structures for location/group-based grouping
 
+
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Djelibeybi/lifx-async](https://github.com/Djelibeybi/lifx-async) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
