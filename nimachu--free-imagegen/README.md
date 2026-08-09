@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [NimaChu/free-imagegen](https://github.com/NimaChu/free-imagegen).
+Original source: `AGENTS.md` in [NimaChu/free-imagegen](https://github.com/NimaChu/free-imagegen).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
