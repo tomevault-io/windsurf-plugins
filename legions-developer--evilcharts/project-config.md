@@ -1,214 +1,84 @@
 ---
 trigger: always_on
-description: > This document is mainly for agents and LLMs to follow when maintaining,
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# React Composition Patterns
+# CLAUDE.md
 
-**Version 1.0.0**  
-Engineering  
-January 2026
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Note:**  
-> This document is mainly for agents and LLMs to follow when maintaining,  
-> generating, or refactoring React codebases using composition. Humans  
-> may also find it useful, but guidance here is optimized for automation  
-> and consistency by AI-assisted workflows.
+## What this repo is
 
----
+EvilCharts (evilcharts.com) — a shadcn-compatible registry of animated Recharts chart components, plus the Next.js docs site that serves it. The installable components are the product; the site documents them and serves the registry JSON, markdown-for-LLMs docs, an MCP endpoint, and agent skills.
 
-## Abstract
+Deep context documents for specific subsystems live in `.contexts/` — read `.contexts/echarts-provider.md` BEFORE working on anything under `src/registry/charts/echarts/` or the provider/docs-split infrastructure.
 
-Composition patterns for building flexible, maintainable React components. Avoid boolean prop proliferation by using compound components, lifting state, and composing internals. These patterns make codebases easier for both humans and AI agents to work with as they scale.
+## Model usecase
 
----
+- Always use Fable for main task/research and use opus 4.8 model for subagents/workflows always.
+- if message contains any link to urls, and according to message you need context or data from url, then use Firecrawl MCP (only use if its available else proceed with default method)
+- agent-browser screenshots are temp files — NEVER commit or push them. Save them to the session scratchpad (not the repo); if one lands in the repo, delete it right after reading it, and always sweep for stray images before any commit/push.
 
-## Table of Contents
+## Commands
 
-1. [Component Architecture](#1-component-architecture) — **HIGH**
-   - 1.1 [Avoid Boolean Prop Proliferation](#11-avoid-boolean-prop-proliferation)
-   - 1.2 [Use Compound Components](#12-use-compound-components)
-2. [State Management](#2-state-management) — **MEDIUM**
-   - 2.1 [Decouple State Management from UI](#21-decouple-state-management-from-ui)
-   - 2.2 [Define Generic Context Interfaces for Dependency Injection](#22-define-generic-context-interfaces-for-dependency-injection)
-   - 2.3 [Lift State into Provider Components](#23-lift-state-into-provider-components)
-3. [Implementation Patterns](#3-implementation-patterns) — **MEDIUM**
-   - 3.1 [Create Explicit Component Variants](#31-create-explicit-component-variants)
-   - 3.2 [Prefer Composing Children Over Render Props](#32-prefer-composing-children-over-render-props)
-4. [React 19 APIs](#4-react-19-apis) — **MEDIUM**
-   - 4.1 [React 19 API Changes](#41-react-19-api-changes)
+Uses **bun** (bun.lock). CONTRIBUTING.md is outdated where it conflicts with this (it references yarn, a root `charts/` directory, and a `gen-cli` script — none exist anymore).
 
----
+- `bun install` — install dependencies
+- `bun run dev` — dev server at localhost:3000 (`/` redirects to `/docs`)
+- `bun run build` — rebuilds the registry (`registry:fresh`) then `next build`
+- `bun run lint` — ESLint
+- `bun run registry:fresh` — clean + rebuild all registry artifacts; run after adding/renaming any registry item
+- There is no test suite.
 
-## 1. Component Architecture
+## Architecture
 
-**Impact: HIGH**
+Stack: Next.js 16 App Router, React 19, Tailwind CSS v4, Base UI (`@base-ui/react` — migrated off Radix), Fumadocs for docs, Recharts + motion for charts. Path alias `@/*` → `src/*`.
 
-Fundamental patterns for structuring components to avoid prop
-proliferation and enable flexible composition.
+### Registry (the core)
 
-### 1.1 Avoid Boolean Prop Proliferation
+`src/registry/` is the source of truth for everything installable:
 
-**Impact: CRITICAL (prevents unmaintainable component variants)**
+- `charts/` — the 8 chart components (area, bar, line, pie, radar, radial, composed, sankey). Each is a **compound component**: a root `Evil<X>Chart` owns data/config/selection state in React context, and sub-parts (`<Area />`, `<XAxis />`, `<Grid />`, `<Tooltip />`, `<Legend />`, `<Dot />`, …) are composed as children and read that context. **`charts/area-chart.tsx` is the reference implementation** — new charts should follow its structure (context + `use()` hook, per-series SVG defs scoped by `useId`, variants as SVG patterns/gradients, motion.dev reveal masks with `useReducedMotion` opt-out, loading skeleton with shimmer).
+- `ui/` — shared primitives the charts depend on: `chart.tsx` (ChartContainer/ChartConfig), `tooltip.tsx`, `legend.tsx`, `dot.tsx`, `evil-brush.tsx` (zoom brush), `background.tsx`.
+- `examples/` — `ex-*` demo components, one per docs preview.
+- `blocks/` — `b-*` larger showcase blocks.
+- `registry-chart.ts` / `registry-ui.ts` / `registry-example.ts` / `registry-blocks.ts` — registry item definitions (name, deps, `registryDependencies` like `@evilcharts/chart`, target install paths under `components/evilcharts/`), aggregated in `index.ts`.
 
-Don't add boolean props like `isThread`, `isEditing`, `isDMThread` to customize
+Adding a registry item requires both the component file and an entry in the matching `registry-*.ts` file, then `bun run registry:fresh`.
 
-component behavior. Each boolean doubles possible states and creates
+### Registry build pipeline
 
-unmaintainable conditional logic. Use composition instead.
+`src/scripts/build-registry.mts` (run via `registry:build`) generates three things from `src/registry/index.ts`:
 
-**Incorrect: boolean props create exponential complexity**
+1. `src/registry/__index__.tsx` — a `React.lazy` component map the docs use to render previews
+2. `registry.json` — the shadcn registry manifest
+3. `public/r/*.json` — the served registry files, via `bunx shadcn build`
 
-```tsx
-function Composer({
-  onSubmit,
-  isThread,
-  channelId,
-  isDMThread,
-  dmId,
-  isEditing,
-  isForwarding,
-}: Props) {
-  return (
-    <form>
-      <Header />
-      <Input />
-      {isDMThread ? (
-        <AlsoSendToDMField id={dmId} />
-      ) : isThread ? (
-        <AlsoSendToChannelField id={channelId} />
-      ) : null}
-      {isEditing ? (
-        <EditActions />
-      ) : isForwarding ? (
-        <ForwardActions />
-      ) : (
-        <DefaultActions />
-      )}
-      <Footer onSubmit={onSubmit} />
-    </form>
-  )
-}
-```
+All three are generated — never edit them by hand.
 
-**Correct: composition eliminates conditionals**
+### Docs
 
-```tsx
-// Channel composer
-function ChannelComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Attachments />
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+Fumadocs MDX. Content lives in `src/content/docs/**` (one folder per chart type with `static.mdx` + `meta.json`); the collection is defined in `source.config.ts` (rehype-pretty-code with min-light/vesper themes) and loaded by `src/lib/source.ts`. `src/app/docs/[[...slug]]/page.tsx` renders pages with the custom MDX components in `src/components/docs/mdx`. In MDX, `<ComponentPreview name="ex-..." />` looks the example up in the generated `__index__.tsx` — so a preview only works after the registry has been built and the example registered.
 
-// Thread composer - adds "also send to channel" field
-function ThreadComposer({ channelId }: { channelId: string }) {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <AlsoSendToChannelField id={channelId} />
-      <Composer.Footer>
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+### LLM/agent surfaces (`src/app/`)
 
-// Edit composer - different footer actions
-function EditComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.CancelEdit />
-        <Composer.SaveEdit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
-```
+- `/llms.txt`, `/llms-full.txt` — route handlers serving doc indexes
+- `/docs/**.md` — rewritten (see `next.config.ts`) to `/llm/[[...slug]]`, which serves any doc page as markdown via `src/lib/llm.ts` / `src/lib/agent-docs.ts`
+- `/mcp` — a minimal JSON-RPC MCP server exposing `search_docs` and `read_doc`
+- `/skill.md` and `/.well-known/{skills,agent-skills}` — agent skill files
 
-Each variant is explicit about what it renders. We can share internals without
+Axiom (`src/lib/axiom.ts`) tracks docs markdown fetches and registry installs; it is a no-op unless `AXIOM_TOKEN`/`AXIOM_DATASET` are set.
 
-sharing a single monolithic parent.
+### shadcn config
 
-### 1.2 Use Compound Components
+`components.json`: style `base-nova`, the `@evilcharts` registry points at `http://localhost:3000/r/{name}.json` for local testing. Generic site UI lives in `src/components/ui`; docs-site chrome in `src/components/docs`.
 
-**Impact: HIGH (enables flexible composition without prop drilling)**
+## Conventions
 
-Structure complex components as compound components with a shared context. Each
-
-subcomponent accesses shared state via context, not props. Consumers compose the
-
-pieces they need.
-
-**Incorrect: monolithic component with render props**
-
-```tsx
-function Composer({
-  renderHeader,
-  renderFooter,
-  renderActions,
-  showAttachments,
-  showFormatting,
-  showEmojis,
-}: Props) {
-  return (
-    <form>
-      {renderHeader?.()}
-      <Input />
-      {showAttachments && <Attachments />}
-      {renderFooter ? (
-        renderFooter()
-      ) : (
-        <Footer>
-          {showFormatting && <Formatting />}
-          {showEmojis && <Emojis />}
-          {renderActions?.()}
-        </Footer>
-      )}
-    </form>
-  )
-}
-```
-
-**Correct: compound components with shared context**
-
-```tsx
-const ComposerContext = createContext<ComposerContextValue | null>(null)
-
-function ComposerProvider({ children, state, actions, meta }: ProviderProps) {
-  return (
-    <ComposerContext value={{ state, actions, meta }}>
-      {children}
-    </ComposerContext>
-  )
-}
-
-function ComposerFrame({ children }: { children: React.ReactNode }) {
-  return <form>{children}</form>
-}
-
-function ComposerInput() {
-  const {
-    state,
+- Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, …)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [legions-developer/evilcharts](https://github.com/legions-developer/evilcharts) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
