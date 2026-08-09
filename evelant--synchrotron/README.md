@@ -1,15 +1,16 @@
 # synchrotron
 
-> Tome by [evelant](https://github.com/evelant/synchrotron) — distributed by [TomeVault](https://tomevault.io)
+> Tome by [evelant](https://github.com/evelant/synchrotron), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [evelant/synchrotron](https://github.com/evelant/synchrotron).
+Original source: `` in [evelant/synchrotron](https://github.com/evelant/synchrotron).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
