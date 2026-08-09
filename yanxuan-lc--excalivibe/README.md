@@ -7,11 +7,11 @@ ExcaliVibe is a Vibe Working capability suite. The idea grows out of Vibe Coding
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [yanxuan-lc/excalivibe](https://github.com/yanxuan-lc/excalivibe).
+Original source: `CLAUDE.md` in [yanxuan-lc/excalivibe](https://github.com/yanxuan-lc/excalivibe).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
