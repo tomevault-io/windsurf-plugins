@@ -7,6 +7,7 @@ description: You're here to play the mmo game through the progressive developmen
 
 You're here to play the mmo game through the progressive development of botting scripts, starting small then adapting to your desires and ideas.
 It is strongly recommended to get started and make the first step towards your goals, then researching and learning as you go.
+
 ## First Time Setup
 
 **Create a new bot using the setup script:**
@@ -28,11 +29,10 @@ bun bots/create-bot.ts {username} --server=myserver.example.com
 ```
 
 This automatically creates:
+
 - `bots/{username}/bot.env` - Credentials with auto-generated password
 - `bots/{username}/lab_log.md` - Session notes template
 - `bots/{username}/script.ts` - Ready-to-run starter script
-
-
 
 ### Quick Start
 
@@ -42,11 +42,11 @@ This automatically creates:
 
 ### Tools
 
-| Tool | Description |
-|------|-------------|
+| Tool                           | Description                                    |
+| ------------------------------ | ---------------------------------------------- |
 | `execute_code(bot_name, code)` | Run code on a bot. Auto-connects on first use. |
-| `list_bots()` | List connected bots |
-| `disconnect_bot(name)` | Disconnect a bot |
+| `list_bots()`                  | List connected bots                            |
+| `disconnect_bot(name)`         | Disconnect a bot                               |
 
 ### Example
 
@@ -66,13 +66,26 @@ execute_code({
     }
 
     return sdk.getInventory();
-  `
-})
+  `,
+});
 ```
 
 See `mcp/README.md` for detailed API reference.
 
 Code runs in an async context with `bot` (BotActions) and `sdk` (BotSDK) available as globals.
+
+## Reporting SDK Bugs
+
+When the SDK has a bug or rough edge, first find a workaround, then file a report. One command, no auth, no permission needed:
+
+```bash
+bun sdk/bug-report.ts "incorrect results from bot.foo(), had to use raw sdk.sendFoo() instead for xyz reason."
+```
+
+Important note: The game itself is extremely well tested and complete, it's not buggy. If you can't figure out how to do something, don't blame the game, blame your assumptions and keep investigating. File a bug report _after_ you figure out
+what's going on, don't just assume the game is broken because you got confused, and give up. The SDK is a thin layer on top of the game, and the game is the source of truth.
+
+After filing the bug, keep working on your goal!
 
 ## Session Workflow
 
@@ -112,52 +125,35 @@ bun sdk/cli.ts {username}
 
 Record observations in `lab_log.md`, then improve the script.
 
+### Chatting Without Taking Control
+
+To talk in-game (or read chat) without disturbing whatever script currently
+owns the bot, use the chat CLI — it connects in `observe` mode, which can send
+chat (and nothing else) and never pre-empts (or gets pre-empted by) a
+controller:
+
+```bash
+bun sdk/chat.ts {username} "meet me at the bank"   # send
+bun sdk/chat.ts {username}                          # recent chat
+bun sdk/chat.ts {username} --watch                  # tail live
+```
+
+Public chat is capped at 400 chars per message; `sdk.say()` auto-splits longer
+text into wire-safe chunks.
+
 ## Script Duration Guidelines
 
 **Start short, extend as you gain confidence:**
 
-| Duration | Use When |
-|----------|----------|
-| **10s** | New script, single actions, untested logic, debugging |
-| **30s-1 min** | Validated approach, building confidence |
-| **5+ min** | Proven strategy, grinding runs. USE SPARINGLY |
+| Duration      | Use When                                              |
+| ------------- | ----------------------------------------------------- |
+| **10s**       | New script, single actions, untested logic, debugging |
+| **30s-1 min** | Validated approach, building confidence               |
+| **5+ min**    | Proven strategy, grinding runs. USE SPARINGLY         |
 
-A failed 5-minute run wastes more time than five 30 second diagnostic runs. **Fail fast and start simple.**
-
-Look out for "I can't reach" messages - the solution is often to open closed gates or that the item isn't accessible. 
-
-Read and grep in the learnings/ and wiki/ folder for tips, skill guides, item and npc locations, and shop information.
-
-## SDK API Reference
-
-For the complete method reference, see **[sdk/API.md](sdk/API.md)** (auto-generated from source).
-
-**Quick overview:**
-- `bot.*` - High-level actions that wait for effects to complete (chopTree, walkTo, attackNpc, etc.)
-- `sdk.*` - Low-level methods that resolve on server acknowledgment (sendWalk, getState, findNearbyNpc, etc.)
-
-### bot.* Quick Reference
-
-| Method | What it does |
-|--------|-------------|
-| `walkTo(x, z, tolerance?)` | Pathfind to coords, opens doors along the way |
-| `talkTo(target)` | Walk to NPC, start dialog |
-| `interactNpc(target, option?)` | Walk to NPC, interact with any option (e.g. `'trade'`, `'fish'`) |
-| `interactLoc(target, option?)` | Walk to loc, interact with any option (e.g. `'mine'`, `'smelt'`) |
-| `attackNpc(target)` | Walk to NPC, start combat |
-| `pickpocketNpc(target)` | Pickpocket NPC, detects XP gain vs stun |
-| `castSpellOnNpc(target, spell)` | Cast combat spell on NPC |
-| `chopTree(target?)` | Chop tree, wait for logs |
-| `pickupItem(target)` | Pick up ground item |
-| `openDoor(target?)` | Open a door or gate |
-| `openBank()` | Open nearest bank |
-| `depositItem(target, amount?)` | Deposit item to bank |
-| `withdrawItem(slot, amount?)` | Withdraw item from bank |
-| `openShop(target?)` | Open shop via shopkeeper NPC |
-| `buyFromShop(target, amount?)` | Buy item from open shop |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [MaxBittker/rs-sdk](https://github.com/MaxBittker/rs-sdk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
