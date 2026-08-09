@@ -61,7 +61,7 @@ rg 'secret_store|SecretStore' src-tauri/src
 
 ### R6. 不要建"分析文档" / "实施计划归档"
 
-工作流要求临时 `IMPLEMENTATION_PLAN.md` 时，用完即删。不要把过程记录沉淀成新的 `NOTES.md` / `ARCHITECTURE.md` / `DESIGN.md`；除非用户明确要长期文档，仓库导航就维护这一份。
+工作流要求临时 `IMPLEMENTATION_PLAN.md` / `DESIGN.md` 等文件时，用完即删，不要把过程记录沉淀下来；除非用户明确要长期文档。
 
 ### R7. Svelte 5 runes only
 
@@ -116,6 +116,10 @@ rg 'reserve_resource|\.activate\(|reconcile_owner|close_owner' src-tauri/src/com
 rg 'dynamic_discovery_sources|DynamicDiscoveredTarget|connectDynamicTarget' src src-tauri/src
 ```
 
+### R13. Github/WebDav 配置同步的兼容规则
+如果修改了同步的payload，需要保证新客户端运行没有任何问题，比如旧配置是：{a,b,c,d}，新配置是：{a, b: {c, d}}，新客户端在第一次启动或者拉取旧配置是，需要将c,d映射到b里面
+而旧客户端，使用新配置，如果有问题不用管，即新客户端生成的配置是：{a, b: {c, d}}，而不是{a, b: {c, d}, c, d}
+
 ---
 
 ## 事实（Facts）— 文件 + 概念 + 核对命令
@@ -139,11 +143,9 @@ rg 'dynamic_discovery_sources|DynamicDiscoveredTarget|connectDynamicTarget' src 
 | 终端层 | `src/lib/components/TerminalPane.svelte` | 单文件，xterm + 高亮 + auth 全在内 |
 | OSC 解码 | `src/lib/osc/handler.ts` | `registerRsshOscHandlers` |
 | Headless IPC shim | `src/lib/ipc-shim.ts` | Tauri 外安装兼容 `invoke` / `listen` 的 WebSocket adapter |
-| 键盘注册表 | `src/lib/keyboard/registry.ts` | `attachShortcuts` |
-| i18n | `src/lib/i18n/index.svelte.ts` + `locales/{en,zh}.ts` | `t('key')` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shihuili1218/rssh](https://github.com/shihuili1218/rssh) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
