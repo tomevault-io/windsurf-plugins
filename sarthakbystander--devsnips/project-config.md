@@ -1,0 +1,71 @@
+---
+trigger: always_on
+description: DevSnips is an open-source, framework-free frontend component library organized as design-system "families". Each Tailwind family lives under `Tailwind/Components/` (e.g. `Tailwind/Components/Accordions/`, `Tailwind/Components/Tables/`) and contains variant sub-folders.
+---
+
+# DevSnips — Repository Knowledge
+
+## What this repo is
+DevSnips is an open-source, framework-free frontend component library organized as design-system "families". Each Tailwind family lives under `Tailwind/Components/` (e.g. `Tailwind/Components/Accordions/`, `Tailwind/Components/Tables/`) and contains variant sub-folders.
+
+## Folder + file convention (per variant)
+Every variant folder (kebab-case) must contain exactly three files:
+- `code.html` — component ONLY. No `<html>`/`<head>`/`<body>`/`<!doctype>`/Tailwind CDN. Copy-paste ready.
+- `preview.html` — full `<!DOCTYPE html>` page with Tailwind CDN (`https://cdn.tailwindcss.com`), Inter font, responsive layout, and realistic application context around the component.
+- `metadata.json` — see schema below.
+
+The `code.html` snippet comment header is optional but follows CONTRIBUTING.md:
+`<!-- Snippet Name / Description / Author: DevSnips Contributors / Usage Example -->`
+
+## metadata.json schema (used across Tables, Cards, Accordions)
+```json
+{
+  "name": "Display Name",
+  "slug": "kebab-folder-name",
+  "component": "accordion",        // singular family noun
+  "family": "accordions",          // plural
+  "variant": "basic",              // short variant key
+  "description": "...",
+  "framework": "Tailwind CSS",
+  "language": "HTML",
+  "tags": ["..."],
+  "related": ["other-variant-slug"],
+  "features": ["..."]
+}
+```
+Required keys: name, slug, component, family, variant, description, framework, language, tags, related, features. `slug` must equal the folder name.
+
+## snippets-index.json registration
+- Top-level `families[]` array; each family has `name`, `path`, `tech`, `category`, `description`, `variantsCount`, `variants[]` (each with name/path/description/features/tags/files), `tags`, `searchTerms`.
+- Update `stats.totalFamilies` and `stats.totalVariants` (sum of variantsCount) after adding a family.
+- Also add the family name to `technologies[].families` for the matching tech (`Tailwind CSS`).
+
+## Accordion JS pattern (verified working)
+Use a `<div data-accordion="name">` wrapper containing `<div data-accordion-item>` blocks and an inline `<script>` at the end. The script scopes itself with:
+```js
+const root = document.currentScript.closest('[data-accordion]');
+```
+This works because the `<script>` parses inside the root. Panel animation uses the CSS-grid trick:
+`grid grid-rows-[0fr]` ↔ toggle `grid-rows-[1fr]` with `transition-[grid-template-rows] duration-300 ease-out`, wrapped in `overflow-hidden`. Chevron rotates via `style.transform = 'rotate(180deg)'`. Single-open mode: add `data-single-open` attr and close siblings on open. Always set `aria-expanded` + `aria-controls` + `role="region"` + `aria-labelledby` + `focus-visible:ring`.
+
+## Code standards
+- HTML + Tailwind CSS only. Vanilla JS only where interaction is required.
+- NO React/Vue/Alpine/Bootstrap/jQuery.
+- 2-space indentation. Semantic HTML. Accessibility required (ARIA, keyboard, focus rings).
+
+## Tailwind SaaS Sections — `Tailwind/Sections/saas/`
+Premium SaaS website sections (one variant/style per section, mixed across the three design styles). Same 3-file convention as other Sections families (`code.html` / `preview.html` / `metadata.json`).
+15 sections shipped: product-hero (vercel), launch-hero (neo-brutalism), dashboard-hero (sharp-glassmorphism), feature-grid (neo-brutalism), bento-showcase (sharp-glassmorphism), product-workflow (vercel), three-tier-pricing (sharp-glassmorphism), usage-pricing (neo-brutalism), pricing-comparison (vercel), logo-cloud (vercel), testimonials (sharp-glassmorphism), metrics (neo-brutalism), screenshot-showcase (sharp-glassmorphism), trial-cta (neo-brutalism), enterprise-footer (vercel). Several include scoped vanilla-JS interactivity (countdown, billing toggle, usage calculator, workflow step switcher, screenshot tabs, count-up, newsletter) using the `document.currentScript.closest('[data-<scope>="<style>"]')` pattern. Registered in `snippets-index.json` under `tech: "Tailwind CSS"`, `category: "Sections"`.
+
+## Tailwind Sections — `Tailwind/Sections/`
+Multi-style website sections organized as `category/section/style/` (three levels, all kebab-case). Each style folder contains exactly: `preview.html` (full `<!DOCTYPE html>` page with Tailwind CDN + app-context shell), `code.html` (snippet only — no DOCTYPE/CDN), `metadata.json` (keys: name, slug, category, subcategory, section, style, description, framework, language, tags, features, responsive, dependencies). `slug` = `<section>-<style>`.
+
+Three shared design styles with distinct token palettes (canonical reference in `Tailwind/Sections/STYLE_TOKENS.md`):
+- `neo-brutalism` — Archivo + JetBrains Mono; hard `border-2 border-black`, offset `shadow-[8px_8px_0_0_#000]`, flat bright accents (#FFE600/#FF4FA3/#00E676/#00C2FF), press-down hover, cream `#FFFDF5` bg. Scope attrs use `="nb"`.
+- `vercel` — Geist + Geist Mono; dark `#050505`/`#0a0a0a`, `border-white/10` hairlines, single teal `#50e3c2` accent, white primary buttons. Scope attrs use `="vc"`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [sarthakbystander/DevSnips](https://github.com/sarthakbystander/DevSnips) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
