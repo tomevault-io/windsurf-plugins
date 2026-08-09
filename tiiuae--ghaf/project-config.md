@@ -1,126 +1,117 @@
 ---
 trigger: always_on
-description: **Ghaf Framework** is a Nix-based open-source security framework for enhancing security through compartmentalization on edge devices. It creates secure images for various hardware platforms (x86, ARM, RISC-V) using NixOS.
+description: SPDX-FileCopyrightText: 2022-2026 TII (SSRC) and the Ghaf contributors
 ---
 
-# Ghaf Framework Development Instructions
+<!--
+SPDX-FileCopyrightText: 2022-2026 TII (SSRC) and the Ghaf contributors
+SPDX-License-Identifier: Apache-2.0
+-->
 
-**Ghaf Framework** is a Nix-based open-source security framework for enhancing security through compartmentalization on edge devices. It creates secure images for various hardware platforms (x86, ARM, RISC-V) using NixOS.
+# Ghaf — instructions for coding agents
 
-**CRITICAL: Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+Ghaf is a Nix/NixOS security framework that compartmentalises a device into a host plus a
+fleet of microVMs, with inter-VM communication over GIVC. Targets are x86_64 and aarch64.
 
-## Tool Initialization
+This file is the shared instruction set for every agent working in this repo. Detailed
+procedures live in skills (see [Where the depth is](#where-the-depth-is)); keep this file
+short and limited to things that are true for all work.
 
-When starting a new session, **ALWAYS initialize these tools first** before proceeding with any tasks:
+## Before you commit
 
-### Serena (Code Intelligence)
+These are enforced by CI, so a change that skips them will fail there instead of here:
 
-**REQUIRED**: Initialize Serena MCP for semantic code navigation and intelligent editing.
-
-Start by activating the project with this command:
-
-```
-#serena activate project
-```
-
-This invokes the Serena MCP server for code intelligence. The `#serena` prefix is required to access the MCP tools.
-
-**Key Serena capabilities**:
-- Semantic code search and navigation
-- Symbol-level understanding (find_symbol, get_symbols_overview)
-- Intelligent code editing (replace_symbol_body, insert_after_symbol)
-- Cross-reference analysis (find_referencing_symbols)
-- Memory system for project context
-
-**When to use `#serena` commands**:
-- Understanding code structure and relationships
-- Finding specific functions, classes, or modules
-- Making precise code modifications
-- Analyzing dependencies between components
-- Any task requiring code comprehension
-
-All Serena commands must be prefixed with `#serena` to invoke the MCP server.
-
-### Context7 (Documentation Intelligence)
-
-**REQUIRED**: Use Context7 for up-to-date library documentation:
-
-**Available Context7 libraries**:
-
-- `/NixOS/nixos` - NixOS system configuration options
-- `/NixOS/nixpkgs` - Nixpkgs package set and functions
-- `/NixOS/nix` - Nix language and package manager
-- `/nix-community/home-manager` - Home Manager user environment management
-- `/Mic92/sops-nix` - SOPS secrets management for NixOS
-- `/numtide/flake-utils` - Flake utility functions
-
-**Note**: Always resolve library IDs first unless you know the exact Context7-compatible ID format.
-
-## Project Overview
-
-Ghaf Framework is a security-focused operating system framework that:
-- **Compartmentalizes** applications and services into isolated VMs
-- **Supports multiple architectures**: x86_64, aarch64 (ARM), riscv64
-- **Targets diverse hardware**: From laptops to embedded devices (Jetson, i.MX)
-- **Uses NixOS**: Declarative, reproducible, and immutable system configuration
-- **Implements security by design**: Inter-VM communication via GIVC, minimal attack surface
-
-### Architecture
-
-The configuration uses a modular architecture:
-- **`modules/`** - NixOS system modules
-  - **`common/`** - Base configurations (networking, security, services, users, logging, etc.)
-  - **`hardware/`** - Hardware-specific configurations (x86_64-generic, aarch64, passthrough)
-  - **`desktop/`** - Desktop environment configurations
-  - **`microvm/`** - MicroVM configurations for compartmentalization
-  - **`givc/`** - Ghaf Inter-VM Communication library
-  - **`development/`** - Debug tools, SSH, testing utilities
-  - **`reference/`**, **`profiles/`**, **`partitioning/`** - Additional configs
-- **`targets/`** - Hardware target configurations (vm, generic-x86_64, laptop, nvidia-jetson-orin, imx8mp-evk, etc.)
-- **`packages/`** - Custom packages and overlays (pkgs-by-name structure)
-- **`lib/`** - Library functions and build helpers
-- **`docs/`** - Documentation (Astro Starlight framework)
-- **`overlays/`** - Nix overlays
-- **`nix/`** - Flake infrastructure
-- **`tests/`** - Test configurations
-
-## Prerequisites and Setup
-
-### Initial Setup
-- Install Nix package manager: `curl -L https://nixos.org/nix/install | sh`
-- Enable flakes: `echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf`
-- **CRITICAL**: For cross-compilation, set up an AArch64 remote builder: https://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html
-
-### Development Environment
-Enter the development shell to access all tools:
 ```bash
-nix develop
+nix fmt -- --fail-on-change          # treefmt: nixfmt-rfc-style, ruff, shellcheck, prettier
+nix develop --command reuse lint     # every file needs SPDX copyright + licence
+nix flake check                      # full validation
 ```
 
-This provides: treefmt, reuse, and all formatting tools configured for the project.
+New files need an SPDX header — Apache-2.0 for code, CC-BY-SA-4.0 for documentation:
 
-## Code Quality Standards
+```nix
+# SPDX-FileCopyrightText: 2022-2026 TII (SSRC) and the Ghaf contributors
+# SPDX-License-Identifier: Apache-2.0
+```
 
-### **ALWAYS Strip Trailing Whitespace**
-- **Automatically remove trailing whitespace** from any files you create or modify
-- **Use sed command**: `sed -i 's/[[:space:]]*$//' filename` to clean files
-- **Verify cleanup**: Ensure no trailing whitespace remains before staging changes
-- **Project-wide consistency**: Maintain clean, professional code formatting standards
+If a file cannot carry a header (YAML frontmatter must come first, binary assets), add it
+to the annotations block in `REUSE.toml` instead.
 
-### **File Formatting Requirements**
-- **All commits must be properly formatted** using treefmt before making a PR
-- **Run formatting**: `nix fmt` or `nix fmt -- --fail-on-change`
-- **License headers**: Always add proper SPDX license headers to new files
-- **No trailing whitespace**: Clean, professional code standards
+Commit subjects follow conventional commits: `feat:`, `fix:`, `chore:`, `docs:`,
+`refactor:`, `test:`, with an optional scope — `fix(vm): resolve networking in gui-vm`.
+Do not commit or push unless you were asked to.
 
-## Working Effectively
+## Layout
 
-### Essential Build Commands
-- View all available targets: `nix flake show` -- takes 30-60 seconds
-- Build documentation: `nix build .#doc` -- takes 5-10 minutes. NEVER CANCEL. Set timeout to 15+ minutes.
+- `modules/` — NixOS modules: `common/`, `hardware/`, `desktop/`, `microvm/`, `givc/`,
+  `development/`, `reference/`, `profiles/`, `partitioning/`
+- `targets/` — target definitions (`laptop`, `vm`, `generic-x86_64`, `nvidia-jetson-orin`, …)
+- `packages/pkgs-by-name/<package-name>/package.nix` — flat, no first-letter sharding
+- `overlays/`, `lib/`, `nix/`, `tests/`, `docs/`
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+New modules go to `modules/<category>/<name>.nix`, or a directory with `default.nix` when
+they grow. File names are kebab-case; option names are camelCase under a `ghaf.` prefix:
+
+```nix
+{ config, lib, pkgs, ... }:
+let cfg = config.ghaf.<module-name>;
+in {
+  options.ghaf.<module-name>.enable = lib.mkEnableOption "<feature>";
+  config = lib.mkIf cfg.enable { };
+}
+```
+
+## Everyday commands
+
+| Task | Command | Depth |
+|---|---|---|
+| See what a build will cost | `nix build --dry-run .#<target>` | `ghaf-build` |
+| Build an image | `nix build .#intel-laptop-debug` | `ghaf-build` |
+| Build many targets | `nix-fast-build --flake '.#packages.x86_64-linux' --select …` | `ghaf-build` |
+| Deploy without reflashing | `nix develop --command ghaf-rebuild <netvm-ip> .#<target> switch` | `ghaf-deploy` |
+| Flash an image | `sudo nix develop --command ghaf-flash -d /dev/sdX -i result/ghaf-image.raw.zst` | `ghaf-deploy` |
+| Reach a device or VM | `ssh ghaf@<host_ip>`, then `ssh <vm>` from there | `ghaf-connect` |
+| Collect logs across VMs | `.claude/skills/ghaf-logs/scripts/collect-logs.sh --machine <name>` | `ghaf-logs` |
+| Run hardware tests | `.github/skills/ghaf-hw-test/ghaf-hw-test test --device <name> --ip <IP>` | `ghaf-test` |
+
+Device details (addresses, drives, serial nodes, target and test names per machine) live in
+`.github/skills/ghaf-hw-test/config.yaml`, with per-machine values (addresses, MACs, ssh
+identities, drive nodes) in the gitignored `config.local.yaml` beside it. Read them rather than
+asking or guessing; if a field is null in both, ask once and offer to write it to the local file.
+
+## Things that bite
+
+- **x86 laptops share one generic image**: `intel-laptop-debug`. Per-machine targets still
+  exist but are no longer the default path.
+- **Jetson targets must be named `-from-x86_64` on an x86 build host.** The native aarch64
+  attributes are not in `packages.x86_64-linux`, so the plain name resolves to nothing.
+- **The image you flash is always `result/ghaf-image.raw.zst`** (plus `ghaf-image.bmap`,
+  used automatically). No target emits `result/<target>.img` any more.
+- **The test suite names the physical machine, not the image**: `robot-test -d` takes
+  `darter-pro`, `lenovo-x1`, `dell-7330`, `orin-agx`, … A wrong value does not error, it
+  silently runs a different subset of tests.
+- **Flakes ignore untracked files.** A new file is invisible to `nix build` until at least
+  `git add -N`.
+- **`nixos-rebuild switch` cannot repartition, rewrite a bootloader, or change the kernel
+  cmdline.** Those need a reflash, and switching anyway leaves a device that disagrees with
+  your source tree.
+- **A host switch does not restart the microVMs.** They keep their old configuration until
+  `systemctl restart microvm@<vm>.service`.
+
+## Where the depth is
+
+- `.claude/skills/ghaf-*/SKILL.md` — build, deploy, connect, logs, test, and the full
+  development loop. Claude Code loads these automatically; other agents should read them as
+  documentation when the task matches.
+- `.github/skills/ghaf-hw-test/` — the hardware test CLI, discovered by Copilot CLI.
+- `docs/src/content/docs/ghaf/` — user and developer documentation (Astro Starlight).
+
+## Related repositories
+
+- [ghafpkgs](https://github.com/tiiuae/ghafpkgs) — Ghaf-specific packages
+- [ghaf-infra](https://github.com/tiiuae/ghaf-infra) — CI/CD infrastructure
+- [ci-test-automation](https://github.com/tiiuae/ci-test-automation) — the Robot Framework suite
 
 ---
 > Source: [tiiuae/ghaf](https://github.com/tiiuae/ghaf) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
