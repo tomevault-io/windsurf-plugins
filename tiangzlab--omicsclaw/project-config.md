@@ -1,120 +1,118 @@
 ---
 trigger: always_on
-description: This guide is for AI coding agents working on the OmicsClaw codebase.
+description: This subtree publishes OmicsClaw to npm so `npm install -g omicsclaw` yields a
 ---
 
-# AGENTS.md — OmicsClaw Guide for AI Coding Agents
+# npm distribution — agent guide
 
-This guide is for AI coding agents working on the OmicsClaw codebase.
+This subtree publishes OmicsClaw to npm so `npm install -g omicsclaw` yields a
+working CLI with no Python prerequisite.
 
-## Repository Working Contract
+## Layout
 
-Before any complex repository maintenance, feature, or refactor task, read
-`README.md` first for project context and prior decisions. Then read this
-`AGENTS.md`, root `SPEC.md`, and the directly relevant code/docs.
+- `omicsclaw/` — the wrapper package published as `omicsclaw`. Carries no
+  runtime; ~20 KB. `bin/omicsclaw.mjs` locates the platform runtime and hands
+  arguments to its interpreter.
+- `build-runtime-package.mjs` — wraps a prebuilt runtime into a publishable
+  `@omicsclaw/runtime-<target>` package. Does **not** build the runtime.
+- `dist/` — build output, gitignored.
 
-Core rules:
+## The distribution model
 
-- Reply in the user's language, usually Chinese or English.
-- Stay concise, practical, and execution-focused.
-- Use `docs/superpowers/playbooks/` as the repository's on-demand workflow
-  guidance for debugging, TDD, planning, parallelization, verification,
-  code review, and branch completion.
-- Treat those playbooks as binding workflow guardrails with iron laws, red
-  flags, and required evidence, not as optional summaries.
-- When you make an important decision or complete a meaningful milestone,
-  update `README.md` while preserving its existing structure.
+The standard npm "thin wrapper + platform packages" pattern (esbuild, swc,
+biome): the wrapper lists one `@omicsclaw/runtime-<target>` per host in
+`optionalDependencies`, each declaring `os` / `cpu`. npm refuses to install
+non-matching ones, and because they are *optional* that refusal is a silent
+skip. Exactly one runtime lands on disk.
 
-## Project Overview
+The runtime content itself comes from `scripts/build-backend-runtime.py` at the
+repo root — python-build-standalone plus the `DESKTOP_DEPS` whitelist plus
+`pip install --no-deps omicsclaw`. Do not reimplement any of that here; there
+must be exactly one definition of what a runtime contains.
 
-OmicsClaw is a multi-omics analysis platform supporting 5 domains: spatial transcriptomics, single-cell omics, genomics, proteomics, and metabolomics. Each skill is a self-contained module that performs a specific analysis task via CLI or Python API. All processing is local-first. Design is inspired by [ClawBio](https://github.com/ClawBio/ClawBio).
+That script used to live in the private OmicsClaw-App repo and be checked out
+over a PAT. OmicsClaw-App@faf1e16 dropped its embedded Python distribution and
+deleted it, so it now lives here — which is where it belonged anyway, since the
+environment it builds is defined by *this* project's dependencies.
 
-**Note**: OmicsClaw evolved from SpatialClaw and now uses a unified `omicsclaw.py` entrypoint.
+## Hard constraints
 
-## Setup
+**`npm pack` silently drops every symlink.** A PBS runtime has ~1048 of them.
+The published tarball would otherwise arrive with `python/bin/python3.11` but no
+`python/bin/python3`, and no `python/lib/libpython3.11.so`. Two independent
+mitigations, both required:
 
-```bash
-cd /data1/TianLab/zhouwg/project/OmicsClaw
-pip install -e .
+1. `build-runtime-package.mjs` records the **dereferenced** interpreter path into
+   `omicsclawRuntime.pythonRelPath` in the runtime package's manifest, and
+   `resolveRuntime` prefers it. This is what makes the package work even under
+   `--ignore-scripts`.
+2. Every link is recorded into `runtime-symlinks.json` and recreated by
+   `lib/restore-symlinks.mjs` during postinstall.
 
-# Add optional extras only when needed
-# pip install -e ".[interactive]"
-# pip install -e ".[tui]"
-# pip install -e ".[memory]"
-# pip install -e ".[full]"
+Never make resolution depend on a symlink existing.
 
-python omicsclaw.py list   # or: oc list
-python omicsclaw.py run spatial-preprocess --demo
-```
+**The postinstall entry point must be CommonJS.** `scripts/postinstall.cjs` is a
+version-gated shim around `postinstall-main.mjs`. An ESM entry point is a *parse*
+error on old Node, which kills the script before any `try` / `catch` and fails
+the whole install with `ELIFECYCLE` — observed on npm 6.14.4 / Node 10.19.0. The
+`engines` field does not prevent this; npm only warns. The dynamic `import()` is
+built through `new Function` so the expression is never parsed by a runtime that
+would reject it.
 
-> **`oc` short alias**: After `pip install -e .`, both `omicsclaw` and `oc` commands
-> are available system-wide. `oc` is registered via `[project.scripts]` in
-> `pyproject.toml` and points to `omicsclaw.cli:main` — the same entry point as
-> `omicsclaw`. No PATH tricks needed.
->
-> **Dependency source of truth**: Root dependency management lives in
-> `pyproject.toml`. The repository does not use a root `requirements.txt` as a
-> primary install entrypoint.
+**The postinstall must never fail an install.** Every path exits 0. A migration
+that could not run is a message, not a broken install.
 
-## Commands
+**The migration must never touch what it cannot positively identify.** A shim
+qualifies only when it realpath-resolves outside our package AND its content
+carries a Python entry-point marker AND it is not a Node shim. Note that
+`bin/omicsclaw.mjs` embeds the string
+`from omicsclaw.surfaces.cli.launcher import main` in its Python bootstrap, so it
+matches the marker — hence the `node_modules` counter-check in
+`migrate.mjs`. `oc` is also the OpenShift client's command name; an unrecognised
+`oc` is reported and left alone.
 
-> Both `python omicsclaw.py <cmd>` and the short alias `oc <cmd>` work identically
-> after `pip install -e .` (or `make install-oc`).
+**The package must stay dependency-free.** It runs inside `npm install`, so
+having dependencies of our own would be a bootstrapping problem. Tests use
+stdlib `node:test` only.
 
-| Command | Purpose |
-|---------|---------|
-| `oc list` | List all 50+ skills across 5 domains |
-| `oc run <skill> --demo` | Run a skill with demo data |
-| `oc run <skill> --input <file> --output <dir>` | Run with user data |
-| `oc interactive` | **Start interactive terminal chat (CLI mode)** |
-| `oc interactive --ui tui` | **Start full-screen Textual TUI** |
-| `oc interactive -p "<prompt>"` | **Single-shot mode (non-interactive)** |
-| `oc interactive --session <id>` | **Resume a previous session** |
-| `oc tui` | Alias for `interactive --ui tui` |
-| `oc app-server` | Start the FastAPI backend used by OmicsClaw-App / web frontends |
-| `oc mcp list` | List configured MCP servers |
-| `oc mcp add <name> <cmd> [args]` | Add an MCP server |
-| `oc mcp remove <name>` | Remove an MCP server |
-| `oc mcp config` | Show MCP config file path |
-| `oc onboard` | Run interactive setup wizard for LLM, runtime, memory, and channels |
-| `python -m pytest -v` | Run all tests |
-| `make test` | Alias for pytest |
-| `make demo` | Run preprocess demo |
-| `make install-oc` | (Re)install package + activate `oc` alias |
-| `make oc-link` | Quick wrapper script in `~/.local/bin/oc` (no pip) |
-| `make bot-telegram` | Start Telegram bot |
-| `make bot-feishu` | Start Feishu bot |
+## Sync contract — five places, all manual
 
-## Project Structure
+Adding or removing a target means touching **all** of these:
 
-```
-OmicsClaw/
-├── omicsclaw.py                # Main CLI runner (SKILLS dict, DOMAINS registry)
-├── omicsclaw/                  # Core framework (domain-agnostic)
-│   ├── common/                 # report.py, session.py, checksums.py
-│   ├── core/                   # registry.py, dependency_manager.py
-│   ├── loaders/                # File-extension → domain detection helpers
-│   ├── memory/                 # Graph memory system
-│   ├── routing/                # Multi-agent routing
-│   ├── agents/                 # Agent definitions
-│   └── interactive/            # Interactive CLI/TUI package
-│       ├── __init__.py         # Package entry: run_interactive(), main()
-│       ├── _constants.py       # Banner, LOGO, slash commands, slogans
-│       ├── _session.py         # SQLite session persistence (aiosqlite)
-│       ├── _mcp.py             # MCP server config / YAML management
-│       ├── interactive.py      # prompt_toolkit REPL loop (CLI mode)
-│       └── tui.py              # Textual full-screen TUI (TUI mode)
-├── skills/                     # Domain-organized skills + shared utilities
-│   ├── spatial/                # 15 spatial transcriptomics skills
-│   │   ├── _lib/               # ★ Shared spatial utilities (adata_utils, viz, loader, etc.)
-│   │   │   ├── viz/            # Unified visualization package (13 modules)
-│   │   │   ├── adata_utils.py  # AnnData helper functions
-│   │   │   ├── loader.py       # Multi-platform data loader
-│   │   │   ├── dependency_manager.py  # Lazy import manager
-│   │   │   ├── exceptions.py   # Domain-specific exceptions
+1. `NPM_TARGETS` in `build-runtime-package.mjs`
+2. `SUPPORTED_TARGETS` in `omicsclaw/lib/resolve-runtime.mjs`
+3. `optionalDependencies` in `omicsclaw/package.json`
+4. `SUPPORTED_TARGETS` in `scripts/build-backend-runtime.py`
+5. the `build-runtime` matrix in `.github/workflows/npm-release.yml`
+
+`omicsclaw/test/units.test.mjs` asserts the current list, so (2) will fail loudly
+if it drifts — nothing guards the other four.
+
+Only four of six plausible targets ship a runtime. `darwin-x64` is out because
+llvmlite stopped publishing macOS x86_64 wheels; `win32-arm64` is out because
+there is no native runner and no Rosetta equivalent. Both are marked
+`skip-runtime: true` in the App's CI. Never package a runtime directory
+containing a `SKIPPED` marker — the build script refuses, because shipping an
+interpreter without `omicsclaw` in it is worse than shipping nothing.
+
+## The descriptor contract
+
+Postinstall writes `~/.omicsclaw/runtime.json`; OmicsClaw-App reads it in
+`src/lib/npm-runtime-descriptor.ts`. Both sides validate structurally and the
+schema version must move together.
+
+npm has **no working uninstall hook for global packages** — `preuninstall` does
+not fire for `npm uninstall -g` — so this file outlives the runtime it
+describes. Every reader must verify `pythonPath` still exists before trusting the
+entry. That check is load-bearing, not defensive garnish.
+
+## Releasing
+
+`.github/workflows/npm-release.yml`, manual dispatch only. Four matrix cells
+build a runtime and pack one platform package each; a separate `publish` job
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TianGzlab/OmicsClaw](https://github.com/TianGzlab/OmicsClaw) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
