@@ -1,179 +1,93 @@
 ---
 trigger: always_on
-description: Plasma is Coveo's design system used in Coveo Cloud Administration Console. This is a monorepo containing multiple packages that provide design tokens, Mantine-themed components, React icons, and documentation.
+description: Guidance for AI coding agents working in the Plasma monorepo. The goal of this file is to let an agent contribute a complete, review-ready pull request **without having to ask a human how**. Read it before making changes.
 ---
 
-# GitHub Copilot Instructions for Plasma
+# AGENTS.md
 
-## Repository Overview
+Guidance for AI coding agents working in the Plasma monorepo. The goal of this file is to let an agent contribute a complete, review-ready pull request **without having to ask a human how**. Read it before making changes.
 
-Plasma is Coveo's design system used in Coveo Cloud Administration Console. This is a monorepo containing multiple packages that provide design tokens, Mantine-themed components, React icons, and documentation.
+Humans should read [CONTRIBUTING.md](CONTRIBUTING.md) and the [README](README.md) instead — they cover the same ground with more narrative.
 
-### Key Packages
+## What Plasma is
 
-- **`@coveord/plasma-mantine`**: Plasma-flavoured Mantine theme with custom components
-- **`@coveord/plasma-tokens`**: Design tokens (colors, spacing, typography, etc.)
-- **`@coveord/plasma-react-icons`**: Icon components for React
-- **`@coveord/plasma-storybook`**: Storybook for component documentation
-- **`@coveord/plasma-figma`**: CodeConnect instances to document components in Figma
-- **`@coveord/plasma-llms`**: LLM-friendly component specs (`llms.txt`, `llms-full.txt`, per-component markdown)
-- **`@coveord/plasma-mcp-server`**: MCP server exposing Plasma docs to AI coding agents
+Plasma is Coveo's design system, used in the Coveo Cloud Administration Console. It ships a Mantine-themed React component library, design tokens, React icons, and documentation. It is a monorepo managed with **pnpm workspaces** and **Turbo**.
 
-### Architecture
+**Import invariant:** always import components from `@coveord/plasma-mantine`, even when Mantine's own docs were the reference source.
 
-- **Monorepo**: Managed with pnpm workspaces and Turbo for build orchestration
-- **UI Framework**: React 19 with Mantine UI library
-- **Testing**: Vitest with React Testing Library
-- **Package Manager**: pnpm
+## Repository layout
 
-## Coding Standards
+Packages live in `packages/*` (declared in `pnpm-workspace.yaml`):
 
-### Code Style
+| Package                              | Purpose                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| `@coveord/plasma-mantine`            | Plasma-flavoured Mantine theme and custom components (main library)          |
+| `@coveord/plasma-tokens`             | Design tokens (colors, spacing, typography, …)                               |
+| `@coveord/plasma-react-icons`        | React icon components (`src/generated` is generated — do not edit by hand)   |
+| `@coveord/plasma-storybook`          | Storybook component documentation site                                       |
+| `@coveord/plasma-figma-code-connect` | Figma Code Connect instances                                                 |
+| `@coveord/plasma-llms`               | LLM-friendly component specs (`llms.txt`, `llms-full.txt`, per-component)    |
+| `@coveord/plasma-mcp-server`         | MCP server exposing Plasma docs to AI agents                                 |
+| `@coveord/plasma-style` / `-react`   | **Maintenance mode** — do not add features. Legacy lives on the `v53` branch |
 
-- **Prettier**: Automatic formatting with these settings:
-    - Print width: 120 characters
-    - Tab width: 4 spaces
-    - Single quotes for strings
-    - No bracket spacing in objects
-- **ESLint**: TypeScript ESLint with React-specific rules
-- **Stylelint**: SCSS linting with standard configuration
-- **Case Convention**: camelCase for keyframes and most identifiers
+## Tech stack
 
-### TypeScript
+- **Node.js 24** and **pnpm** (pinned via `packageManager`; enable with `corepack enable`). pnpm is enforced — npm/yarn are blocked by `only-allow`.
+- **React 19** with the **Mantine** UI library.
+- **TypeScript** (strict).
+- **Vitest** + **React Testing Library** for tests.
+- **oxfmt** for formatting and **oxlint** for linting (not Prettier/ESLint). **Stylelint** for SCSS/CSS.
+- **Turbo** for build/test orchestration, **Changesets** for versioning, **Husky** + **lint-staged** for pre-commit hooks.
 
-- Use TypeScript for all new code
-- Enable strict mode
-- Prefer type inference where possible
-- Export types and interfaces for public APIs
+## Setup
 
-### React
-
-- Use functional components with hooks
-- Follow React 19 patterns
-- Use JSX runtime (no need to import React)
-- Prefer named exports over default exports
-
-### File Naming
-
-- Components: PascalCase (e.g., `Button.tsx`)
-- Utilities: camelCase (e.g., `formatDate.ts`)
-- Tests: Same name as file with `.spec.tsx` or `.spec.ts` suffix
-- Styles: CSS module with the same name as component with `.module.css` or `.css` suffix
-
-## Testing Practices
-
-### Test Framework
-
-- **Vitest**: Primary test runner
-- **React Testing Library**: For component testing
-- **Testing Library principles**: Test user behavior, not implementation details
-
-### Writing Tests
-
-- All new tests must use Vitest and React Testing Library
-- Test files should be co-located with source files
-- Use descriptive test names that explain the behavior being tested
-- Avoid using `should` at the start of test names; use present tense instead
-    - **Correct**: `it('returns true when value is valid')`, `it('throws an error')`
-    - **Incorrect**: `it('should return true when value is valid')`, `it('should throw an error')`
-- Run tests in UTC timezone (`TZ=UTC`)
-
-### Test Coverage
-
-- Write unit tests for all new components and utilities
-- Focus on user-facing behavior and edge cases
-- Test accessibility features
-
-### Documentation
-
-- Update documentation when making changes to public APIs
-- Keep README files up to date with new features
-- Document complex logic and architectural decisions
-- Add JSDoc comments for exported functions and components
-
-## Build and Development
-
-### Setup
+Run everything from the repository root.
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build all packages
-pnpm build
-
-# Start development server
-pnpm start
+pnpm install   # install and link all workspace packages
 ```
 
-### Development Workflow
+## Everyday commands
 
-1. Run `pnpm start` to launch the development server with hot reload
-2. Changes to any package source files trigger automatic rebuild
-3. The demo site is available locally for testing
+| Command          | What it does                                               |
+| ---------------- | ---------------------------------------------------------- |
+| `pnpm build`     | Build all packages (`turbo run build`)                     |
+| `pnpm start`     | Build deps then start the demo/dev servers with hot reload |
+| `pnpm test`      | Run all tests (`turbo run test`, runs in UTC)              |
+| `pnpm lint`      | Lint with oxlint                                           |
+| `pnpm fmt`       | Format with oxfmt                                          |
+| `pnpm fmt:check` | Verify formatting without writing (this is what CI runs)   |
+| `pnpm lintfix`   | Auto-fix lint/style issues across packages                 |
+| `pnpm changeset` | Create a changeset for a releasable change                 |
 
-### Linting and Formatting
+You can run tests for a single package from `packages/{name}` with `pnpm test`, `pnpm test:watch`, or `pnpm test:debug`.
 
-```bash
-# Auto-fix linting and formatting issues
-pnpm lintfix
+If `pnpm lint` fails with `Error: Invalid tsconfig`, set `OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS=true` (CI does this).
 
-# This runs:
-# - Prettier on all supported files
-# - ESLint on TypeScript files
-# - Stylelint on SCSS/CSS files
-```
+## Code style and conventions
 
-### Pre-commit Hooks
+Formatting is enforced by **oxfmt** (see `.oxfmtrc.json`): print width 120, tab width 4, single quotes, no bracket spacing in objects. Run `pnpm fmt` before committing — don't hand-format.
 
-- **Husky**: Manages Git hooks
-- **lint-staged**: Runs linting and formatting on staged files
-- Automatically runs on `git commit`:
-    - Sorts package.json files
-    - Formats code with Prettier
-    - Fixes style issues with Stylelint
+- **TypeScript** for all new code; prefer type inference; export types for public APIs.
+- **React**: functional components with hooks, React 19 patterns, JSX runtime (no `import React`), prefer **named exports**.
+- **File naming**: components `PascalCase.tsx`; utilities `camelCase.ts`; tests co-located as `*.spec.ts(x)`; styles as `*.module.css` / `*.css`.
+- Match existing patterns in the surrounding package before introducing new ones.
 
-## Contribution Guidelines
+## Testing
 
-### Commit Messages
+- Use **Vitest** + **React Testing Library**; test user-facing behavior, not implementation details.
+- Co-locate `*.spec.ts(x)` files with the source.
+- Do **not** prefix test names with "should"; use present tense: `it('returns true when value is valid')`, not `it('should return …')`.
+- Cover new components/utilities and their edge cases, including accessibility.
+- Add or update tests for every behavior change and confirm `pnpm test` passes before opening a PR.
 
-**REQUIRED**: All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) specification.
+## Internal skills
 
-Format: `<type>(<scope>): <description>`
-
-Types:
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, no logic change)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
-
-Examples (specify the subject when possible):
-
-- `feat(mantine, button): add new variant`
-- `fix(tokens, colors): correct primary color value`
-- `docs(readme): update installation instructions`
-
-### Pull Request Process
-
-1. Create a feature branch from the default branch
-2. Make your changes following the coding standards
-3. Ensure all tests pass: `pnpm test`
-4. Ensure code is properly formatted: `pnpm lintfix`
-5. Commit with conventional commit messages
-6. Push your branch and create a pull request
-7. CI will automatically:
-    - Lint changed files
-    - Run tests
-    - Build and deploy a demo to S3
-    - Add demo links as PR comments
+This repo ships agent **skills** in `.github/skills/`. Use them when the task matches — they encode the exact expected format and workflow:
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [coveo/plasma](https://github.com/coveo/plasma) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
