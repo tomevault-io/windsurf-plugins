@@ -1,61 +1,147 @@
 ---
 trigger: always_on
-description: This repository is friendly to AI-assisted edits, but agents should stay inside the same guardrails as human contributors.
+description: This is a Python library for interacting with the Datawrapper API to create and manage charts.
 ---
 
-# Agent guide for Datawrapper
+# Datawrapper Python Library
 
-This repository is friendly to AI-assisted edits, but agents should stay inside the same guardrails as human contributors.
+This is a Python library for interacting with the Datawrapper API to create and manage charts.
 
-## Start here
+## IMPORTANT: Prefer Object-Oriented API Over Legacy Methods
 
-1. Read `README.md`, `CONTRIBUTING.md`, and this file before changing code.
-2. Work from the latest `main` branch unless the maintainer tells you otherwise.
-3. Keep pull requests focused. Do not mix dependency upgrades, broad refactors, generated artifacts, and product changes in one PR.
-4. Prefer the object-oriented chart API (`BarChart`, `LineChart`, `get_chart`, etc.) for new work. Treat lower-level `Datawrapper` methods as legacy compatibility paths unless a task explicitly targets them.
+**For AI Agents and Developers:** This library provides two ways to interact with Datawrapper:
 
-## Canonical local commands
+1. **Object-Oriented API (RECOMMENDED)** - Use chart-specific classes like `BarChart`, `LineChart`, `ColumnChart`, etc.
+2. **Legacy Lower-Level API (DEPRECATED)** - Direct methods on the `Datawrapper` class like `create_chart()`, `update_chart()`, etc.
 
-Install the locked dependencies:
+### Why Use the Object-Oriented API?
 
-```bash
-uv sync --frozen --all-extras
+- **Type Safety**: Full type hints and IDE autocomplete support
+- **Better Developer Experience**: Intuitive, Pythonic interface with method chaining
+- **Rich Features**: Access to enums, validation, and chart-specific configuration options
+- **Modern Design**: Follows current Python best practices and design patterns
+- **Future-Proof**: The legacy API is deprecated and will be removed in a future version
+
+### Migration Examples
+
+**Legacy API (DEPRECATED - AVOID IN NEW CODE):**
+```python
+from datawrapper import Datawrapper
+
+dw = Datawrapper(access_token="your_token")
+chart_id = dw.create_chart(title="My Chart", chart_type="d3-bars")
+dw.add_data(chart_id=chart_id, data=df)
+dw.update_chart(chart_id=chart_id, title="Updated Title")
+dw.publish_chart(chart_id=chart_id)
 ```
 
-Run the same deterministic checks expected before a PR:
+**Object-Oriented API (RECOMMENDED - USE THIS):**
+```python
+from datawrapper.charts import BarChart
 
-```bash
-uv run ruff check ./datawrapper ./tests
-uv run ruff format --check ./datawrapper ./tests
-uv run mypy ./datawrapper --ignore-missing-imports
-uv run pytest
-uv build --sdist --wheel
+# Method chaining approach
+chart = BarChart(
+    title="My Chart",
+    data=df
+).create().publish()
+
+# Or step-by-step
+chart = BarChart(title="My Chart", data=df)
+chart.create()
+chart.title = "Updated Title"
+chart.update().publish()
 ```
 
-Before committing, run the hook suite against all files:
+### Available Chart Classes
 
-```bash
-uv run pre-commit run --all-files
-```
+All chart classes are in `datawrapper.charts`:
+- `AreaChart` - Area charts
+- `ArrowChart` - Arrow/slope charts
+- `BarChart` - Horizontal bar charts
+- `ColumnChart` - Vertical column charts
+- `LineChart` - Line charts
+- `MultipleColumnChart` - Grouped column charts
+- `ScatterPlot` - Scatter plots
+- `StackedBarChart` - Stacked bar charts
 
-## Test strategy
+### Key Features of Object-Oriented API
 
-- Put fast, isolated validation in `tests/unit/`.
-- Put mocked multi-component behavior in `tests/integration/` or `tests/functional/`.
-- Mark tests that require the real Datawrapper API with `@pytest.mark.api` and a `DATAWRAPPER_ACCESS_TOKEN` skip guard. The default local and CI test runs must pass without credentials.
-- Prefer `responses`, `pytest-mock`, or `unittest.mock` over live HTTP calls for regression tests.
-- When fixing a bug, add a regression test that would fail before the fix.
+1. **Type-Safe Enums**: Use semantic enums instead of magic strings
+   ```python
+   from datawrapper.charts import BarChart, NumberFormat, GridDisplay
 
-## Change boundaries
+   chart = BarChart(
+       title="Sales Report",
+       axis_label_format=NumberFormat.THOUSANDS_SEPARATOR,
+       y_grid_display=GridDisplay.ON
+   )
+   ```
 
-- Do not commit `.venv/`, `.ruff_cache/`, `.mypy_cache/`, `htmlcov/`, `coverage.xml`, `dist/`, or other generated outputs.
-- Do not edit `uv.lock` or dependency constraints unless the task is explicitly about dependency maintenance.
-- Do not add secrets, API tokens, recordings of API responses containing private data, or maintainer-specific local configuration.
-- Do not publish releases, merge pull requests, or change repository settings.
+2. **Method Chaining**: Fluent interface for concise workflows
+   ```python
+   chart = BarChart(title="Sales").create().update().publish()
+   ```
 
-## AI-specific safety checks
+3. **Rich Configuration**: Chart-specific options with validation
+   ```python
+   from datawrapper.charts import LineChart, Line, LineWidth, LineDash
 
-Agents commonly make mistakes in this codebase by using stale legacy examples, weakening CI to make failures disappear, or adding broad generated documentation. Avoid those shortcuts. If a check is too slow or flaky, document the evidence in the PR and choose the strongest practical alternative instead of disabling it silently.
+   chart = LineChart(
+       title="Temperature Trends",
+       lines=[
+           Line(column="temp", width=LineWidth.THICK, dash=LineDash.DASHED)
+       ]
+   )
+   ```
+
+4. **Easy Retrieval**: Get existing charts with full type safety
+   ```python
+   chart = BarChart.get(chart_id="abc123")
+   chart.title = "New Title"
+   chart.update()
+   ```
+
+### Deprecation Warnings
+
+The legacy API methods in `datawrapper/__main__.py` now emit `DeprecationWarning` messages:
+- `create_chart()` - Use chart classes instead (e.g., `BarChart().create()`)
+- `update_chart()` - Use `chart.update()` on chart instances
+- `publish_chart()` - Use `chart.publish()` on chart instances
+- `delete_chart()` - Use `chart.delete()` on chart instances
+- `copy_chart()` - Use `chart.duplicate()` on chart instances
+- `fork_chart()` - Use `chart.fork()` on chart instances
+- `add_data()` - Pass data to chart constructor or set `chart.data = df`
+
+These warnings will be visible to both human developers and AI agents, signaling that the object-oriented API should be used instead.
+
+## Project Structure
+
+- `datawrapper/` - Main package directory
+  - `__main__.py` - Main Datawrapper API client
+  - `charts/` - Chart-specific implementations
+    - `base.py` - BaseChart class with common functionality
+    - `models/` - Pydantic models for API metadata structures
+      - `mixins.py` - Reusable mixins for shared chart functionality
+      - `api_sections.py` - Models for API metadata sections
+      - `text_annotations.py` - Text annotation models
+      - `range_annotations.py` - Range annotation models
+      - `transforms.py` - Data transformation models
+    - `enums/` - Enum classes for type-safe configuration (organized by category)
+      - `number_divisor.py` - NumberDivisor enum
+      - `number_format.py` - NumberFormat enum
+      - `date_format.py` - DateFormat enum
+      - `line_width.py` - LineWidth enum
+      - `line_dash.py` - LineDash enum
+      - `grid_display.py` - GridDisplay enum
+      - `grid_label.py` - GridLabelPosition, GridLabelAlign enums
+      - `plot_height.py` - PlotHeightMode enum
+      - `value_label.py` - ValueLabelDisplay, ValueLabelPlacement, ValueLabelAlignment, ValueLabelMode enums
+      - `replace_flags.py` - ReplaceFlagsType enum
+      - `interpolation.py` - LineInterpolation enum
+      - `annos.py` - ConnectorLineType, StrokeWidth, ArrowHead enums
+      - `symbol_shape.py` - SymbolShape, SymbolStyle, SymbolDisplay enums
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [chekos/Datawrapper](https://github.com/chekos/Datawrapper) — distributed by [TomeVault](https://tomevault.io).
