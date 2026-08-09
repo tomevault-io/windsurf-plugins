@@ -1,145 +1,75 @@
 ---
 trigger: always_on
-description: When generating code for this repository:
+description: Guidance for Claude Code when working in this repository.
 ---
 
-# GitHub Copilot Instructions for plantuml-libs
+# CLAUDE.md
 
-## Priority Guidelines
+Guidance for Claude Code when working in this repository.
 
-When generating code for this repository:
+## Project
 
-1. **Version Compatibility**: Respect TypeScript 5.0+, Node.js 22.7+, and all npm dependencies as specified in package.json
-2. **Context Files**: Follow patterns and standards defined in the .github/copilot directory
-3. **Codebase Patterns**: Scan existing code in the source directory for established patterns
-4. **Architectural Consistency**: Maintain the monolithic package-based architecture with clear separation between generator and library concerns
-5. **Code Quality**: Prioritize maintainability, testability, and security in all generated code
+`@tmorin/plantuml-libs` — generates PlantUML sprite/icon libraries (AWS, Azure, C4, EIP, Font Awesome, GCP, Material, Simple Icons, etc.) and their documentation website. Node.js CLI entry point: `bin/gdiag.js`.
 
-## Technology Stack
+## Stack
 
-### Core Technologies
-- **TypeScript**: 5.0.3
-  - Strict mode enabled
-  - ES2021 target
-  - Node module resolution
-  - ESM module format
-  - allowSyntheticDefaultImports: true
-- **Node.js**: 22.7.4
-- **Build System**: npm scripts
-- **Code Generation**: ts-node for runtime TypeScript execution
+- TypeScript, run via `ts-node`, `moduleResolution: Node`. Source uses ESM `import` syntax but the package has no `"type": "module"` and `bin/gdiag.js` uses `require()` — this is CommonJS, not ESM, despite the import syntax.
+- Node.js >=24 <25 (see `engines` in package.json)
+- Mocha + `assert.strict` for tests
+- ESLint flat config (`eslint.config.mjs`) + Prettier (no semicolons, double quotes)
 
-### Key Dependencies
-- **CLI Framework**: yargs (command-line argument parsing)
-- **File I/O**: fs-extra (promise-based file operations)
-- **Utilities**: lodash, moment, glob
-- **Parsing/Generation**: cheerio, csv-parse, html-minifier-terser, marked, yaml
-- **Versioning**: standard-version (semantic versioning)
+Check `package.json` for exact dependency versions rather than assuming.
 
-## Code Organization & Patterns
+## Architecture: Library vs Generator
 
-### Project Structure
-```
-source/
-├── library/
-│   ├── index.ts              # Main library factory and exports
-│   └── packages/             # Individual package factories (AWS, Azure, C4, etc.)
-│       └── {package-name}/
-│           └── index.ts      # Package-specific factory
-└── generator/
-    ├── website/              # Website generation pipeline (ETL stages)
-    │   ├── index.ts          # Entry point with yargs CLI
-    │   ├── stage.ts          # Stage interface
-    │   ├── extract.ts        # Extract stage
-    │   ├── transform.ts      # Transform stage
-    │   ├── load.ts           # Load stage
-    │   ├── config.ts         # Configuration interface
-    │   ├── resource.ts       # Resource types
-    │   └── ...               # Supporting modules
-    └── workdir/              # Work directory generation
+- `source/library/` — one factory per technology package (`source/library/packages/{name}/index.ts`), each producing raw PlantUML sprite/icon resources. Packages are independent but follow shared patterns.
+- `source/generator/workdir/` — orchestrates all library packages into a single `.workdir/library.yaml` manifest plus supporting assets. Run: `npm run generate:workdir`
+- `source/generator/website/` — ETL pipeline (Extract → Transform → Load) that turns `.workdir/library.yaml` into the documentation site and `distribution/` output. Each stage implements the generic `Stage<I, O>` interface (`source/generator/website/stage.ts`).
+- Full build: `scripts/generate-library.sh` chains workdir → website → distribution/. Requires Podman/Docker and the `plantuml-generator` image.
+- Single-package build: `scripts/generate-package.sh <package>` (invoked via `npm run generate:package -- -p <package>`) regenerates the workdir then builds just that one package through Podman.
+
+## Code Conventions
+
+- Classes: private constructor + static factory, e.g. `static create(...): X`
+- Import aliases for common modules: `import P from "path"`, `import Fe from "fs-extra"`, `import U from "util"`
+- Import order: stdlib → external packages → local modules, no blank lines between groups
+- `readonly` for immutable class properties; interfaces declared inline near their implementation
+- async/await throughout, no callbacks or `.then()` chains
+
+## Testing
+
+- Files: `test/*.spec.js` / `test/*.spec.mjs`, run with `npm test`
+- Run one file: `npm test -- test/gdiag.spec.js`
+- Run by pattern: `npm test -- --grep "gdiag"`
+- Test functions must be `async function` (not arrows) to access `this.timeout(...)`
+- AWS/Azure spec files make real network requests — expect them to be slow
+- Clean temp state in `beforeEach()`; use `.tmp/` for scratch output
+
+## Commands
+
+```bash
+npm run generate:workdir            # library packages -> .workdir/library.yaml
+npm run generate:website            # runs the website ETL stages
+npm run generate:package -- -p aws  # regenerate + build a single package (needs Podman)
+scripts/generate-library.sh         # full build: workdir -> website -> distribution/ (needs Podman/Docker)
+npm test                            # mocha
+npm run lint                        # eslint . (bin/**, test/**, .workdir/**, distribution/** ignored)
 ```
 
-### Two-Tier Architecture: Library and Generator
+## Versioning & Commits
 
-**Library** (source/library/):
-- Implements factory pattern for each technology package (AWS, Azure, C4, etc.)
-- Each factory generates raw PlantUML sprite and icon resources
-- Packages are independently designed but share common patterns
-- Run with: `npm run generate:workdir`
+- Semantic Versioning via `standard-version` (`npm run release`)
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description` — common types `feat`, `fix`, `refactor`, `chore`, `docs`, `test`
+- Pre-releases: `npm run alpha` (`--prerelease alpha`)
 
-**Generator** (source/generator/):
-- **workdir/**: Orchestrates library packages, produces `.workdir/` manifest
-  - Aggregates all packages into a single `library.yaml` manifest
-  - Copies supporting resources (templates, assets)
-  - Used by: `npm run generate:workdir`
-  
-- **website/**: ETL pipeline for rendering documentation
-  - **Extract**: Parses `.workdir/library.yaml` and asset manifests
-  - **Transform**: Processes resources, generates Markdown documentation
-  - **Load**: Writes distribution/* with PlantUML files and docs
-  - Used by: Docker container (plantuml-generator image)
-  - Validates structure with: `npm run generate:website`
+## Package Upgrades
 
-The full build (scripts/generate-library.sh) chains: workdir → website → distribution/
+Upgrading an icon/shape package (AWS, Azure, EIP, Font Awesome, GCP, Material, Simple Icons) or npm dependencies has a dedicated skill under `.claude/skills/` for each package (e.g. `aws-package-upgrading`, `npm-dependency-management`) — use those rather than improvising the process.
 
-### Architecture Patterns
-- **Pipeline/ETL Pattern**: Website generation uses Extract → Transform → Load stages
-- **Factory Pattern**: Each package implements a factory interface
-- **Configuration-Driven**: Extensive use of yargs for CLI configuration
-- **Promise-Based**: Async/await throughout; no callbacks
-- **Stream-Based Processing**: Large data processing uses Node.js streams
+## When in Doubt
 
-### Naming Conventions
-- **Class Names**: PascalCase (e.g., `ExtractStage`, `TransformStage`)
-- **Interface Names**: PascalCase with optional `I` prefix not used (e.g., `Stage`, `Config`)
-- **Variables**: camelCase for local variables and parameters
-- **Constants**: UPPER_SNAKE_CASE (e.g., `PACKAGE_FACTORIES`)
-- **Imports**: Use short aliases for common libraries
-  - `import P from "path"` (path module)
-  - `import Fe from "fs-extra"`
-  - `import Fx from "fs-extra".promises`
-  - `import U from "util"`
-
-### Interface Patterns
-- Define interfaces inline with implementations
-- Use `readonly` for immutable properties
-- Declare generic interfaces for reusable patterns (e.g., `Stage<I, O>`)
-- Export interfaces alongside implementations
-
-### Class Patterns
-- Private constructor with static factory method: `static create(...): ClassName`
-- Implement interfaces explicitly
-- Constructor injection for dependencies
-- Methods marked `async` return `Promise<T>`
-- Use object destructuring in method signatures
-
-Example:
-```typescript
-export class ExtractStage implements Stage<void, ExtractStageOutput> {
-  constructor(readonly config: Config, readonly input: undefined) {}
-
-  static create(config: Config): ExtractStage {
-    return new ExtractStage(config, undefined)
-  }
-
-  async execute(): Promise<ExtractStageOutput> {
-    // implementation
-  }
-}
-```
-
-### Import Organization
-1. Standard library imports (path, util, stream)
-2. External package imports (yargs, fs-extra, glob)
-3. Local module imports (relative paths)
-4. No blank lines between import groups (contrary to many style guides)
-
-Example:
-```typescript
-import P from "path"
-import yargs from "yargs"
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Match existing patterns in the surrounding file over generic best practices — this codebase has consistent, if unconventional, house style (no semicolons, aliased imports, factory-pattern classes).
 
 ---
 > Source: [tmorin/plantuml-libs](https://github.com/tmorin/plantuml-libs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
