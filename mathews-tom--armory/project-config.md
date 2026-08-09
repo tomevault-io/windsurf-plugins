@@ -1,178 +1,111 @@
 ---
 trigger: always_on
-description: OWASP Top 10 vulnerability scanner producing severity-ranked findings with
+description: Transforms topics and source material into channel-optimized content across
 ---
 
 
-# Security Reviewer
+# Content Strategist
 
-OWASP Top 10 vulnerability scanner producing severity-ranked findings with
-exploit scenarios, impact assessment, and remediation code.
+Transforms topics and source material into channel-optimized content across
+multiple formats through a structured research-strategy-production pipeline.
 
 ---
 
 ## Scope and Trigger Conditions
 
-Activate when:
+### Activate when:
 
-- User requests security review, vulnerability scan, or security audit
-- User asks to check for injection, XSS, auth issues, or OWASP patterns
-- Code handles user input, authentication, database queries, or file operations
+- User requests content creation across multiple channels or formats
+- User wants to repurpose existing material (article, video, talk) into new formats
+- User asks for a content strategy or content plan for a topic
+- User needs a LinkedIn post, blog article, slide deck, or PDF report produced
+- User provides a topic and wants channel recommendations
+- User wants to turn research or technical material into publishable content
 
-Do NOT activate when:
+### Do NOT activate when:
 
-- User asks for general code quality review (use code-reviewer)
-- User asks for secret/credential detection only (use secret-scanner)
-- User asks for dependency vulnerability audit (use dependency-audit)
-- User asks for repository-level security posture (use repo-sentinel)
-
----
-
-## Analysis Phases
-
-### Phase 1: Attack Surface Mapping
-
-1. Identify entry points:
-   - HTTP route handlers, API endpoints, GraphQL resolvers
-   - CLI argument parsers, stdin readers
-   - File upload handlers, webhook receivers
-   - Message queue consumers, event handlers
-2. Map data flow from entry points to:
-   - Database queries (SQL, ORM, NoSQL)
-   - File system operations
-   - External HTTP requests
-   - Template rendering
-   - Command execution
-   - Serialization/deserialization
-3. Classify each data flow by trust boundary crossings
-
-### Phase 2: Injection Analysis
-
-Scan for injection vectors across all identified data flows:
-
-**SQL Injection**
-
-- String concatenation or f-strings in SQL queries
-- Dynamic table/column names from user input
-- ORM raw query usage without parameterization
-- Stored procedure calls with unsanitized input
-- Flag: any user input reaching SQL without parameterized queries
-
-**Command Injection**
-
-- `os.system()`, `subprocess.run(shell=True)`, `exec()`, `eval()`
-- Template strings in shell commands
-- User input in `child_process.exec()` (Node.js)
-- Flag: any external input reaching command execution
-
-**NoSQL Injection**
-
-- MongoDB query operators from user input (`$gt`, `$ne`, `$where`)
-- Unvalidated JSON in query construction
-- Flag: user-controlled query operators
-
-**Template Injection**
-
-- User input in template strings (Jinja2, Handlebars, EJS)
-- Server-side template injection via render context
-- Flag: user input reaching template engine without escaping
-
-### Phase 3: Cross-Site Scripting (XSS)
-
-Scan for XSS vectors:
-
-**Reflected XSS**
-
-- User input rendered in HTML responses without encoding
-- Query parameters echoed in page content
-- Error messages containing user input
-
-**Stored XSS**
-
-- Database content rendered without sanitization
-- User-generated content (comments, profiles, messages) displayed raw
-- Rich text fields without allowlist sanitization
-
-**DOM XSS**
-
-- `innerHTML`, `outerHTML`, `document.write()` with dynamic content
-- `dangerouslySetInnerHTML` in React without sanitization
-- URL fragment (`location.hash`) used in DOM manipulation
-
-Flag: all XSS as HIGH or CRITICAL depending on context.
-
-### Phase 4: Authentication and Authorization
-
-Scan for:
-
-- **Broken authentication**: plaintext password storage, weak hashing
-  (MD5, SHA1), missing rate limiting on login, session fixation
-- **Broken authorization**: missing access control checks, IDOR
-  (direct object reference without ownership validation), privilege
-  escalation paths, missing role checks on sensitive operations
-- **Session management**: predictable session tokens, missing expiry,
-  session not invalidated on logout, cookies without Secure/HttpOnly
-- **JWT issues**: none algorithm acceptance, secret in source code,
-  missing expiry validation, symmetric signing with weak secret
-
-Flag: all authentication bypass as CRITICAL.
-
-### Phase 5: Insecure Deserialization
-
-Scan for:
-
-- `pickle.loads()`, `yaml.load()` (without SafeLoader), `marshal.loads()`
-- Java `ObjectInputStream` without type filtering
-- `JSON.parse()` followed by prototype access without validation
-- Custom deserializers that instantiate arbitrary classes
-- XML external entity (XXE) in XML parsers without entity disabled
-
-Flag: deserialization of untrusted input as CRITICAL.
-
-### Phase 6: Path Traversal and File Operations
-
-Scan for:
-
-- User input in file paths without sanitization (`../` sequences)
-- `os.path.join()` with absolute path override
-- Missing path canonicalization before access control check
-- File upload without extension/type validation
-- Temporary file creation with predictable names
-
-Flag: path traversal as HIGH, unrestricted file upload as CRITICAL.
-
-### Phase 7: Server-Side Request Forgery (SSRF)
-
-Scan for:
-
-- User-supplied URLs in server-side HTTP requests
-- URL parsing bypass (IP address forms, DNS rebinding)
-- Internal service access via user-controlled URLs
-- Redirect following without destination validation
-- Cloud metadata endpoint access (169.254.169.254)
-
-Flag: SSRF reaching internal services as CRITICAL.
-
-### Phase 8: Security Misconfiguration
-
-Scan for:
-
-- Debug mode enabled in production configurations
-- CORS with wildcard origin (`Access-Control-Allow-Origin: *`)
-- Missing security headers (CSP, X-Frame-Options, HSTS)
-- Default credentials in configuration files
-- Verbose error messages exposing stack traces to users
-- TLS/SSL configuration weaknesses
-
-Flag: debug mode in production as HIGH, missing CORS restrictions as MEDIUM.
+- User asks for a single LinkedIn post with no broader strategy (use `linkedin-post-style` skill)
+- User asks only to convert markdown to PDF (use `md-to-pdf` skill)
+- User asks only to build slides (use `html-presentation` skill)
+- User asks only to humanize existing text (use `humanize` skill)
+- User asks for web research without content production (use `tavily` skill)
+- User asks for YouTube video analysis without content production (use `youtube-analysis` skill)
 
 ---
 
-## Severity Classification
+## Input Requirements
+
+| Input                    | Required | Description                                                                                   |
+| ------------------------ | -------- | --------------------------------------------------------------------------------------------- |
+| Topic or source material | Yes      | A topic description, URL, document, video link, or existing content to work from.             |
+| Target channels          | No       | Specific formats requested (blog, LinkedIn, slides, PDF). Agent recommends if omitted.        |
+| Audience                 | No       | Target audience profile. Defaults to technical professionals.                                 |
+| Tone                     | No       | Desired voice (conversational, formal, authoritative). Agent selects per channel if omitted.  |
+| Goal                     | No       | Content goal (awareness, education, conversion, thought leadership). Agent infers if omitted. |
+
+---
+
+## Composition Map
+
+| Component           | Type  | Invoked In | Purpose                                        |
+| ------------------- | ----- | ---------- | ---------------------------------------------- |
+| tavily              | skill | Phase 2    | Topic research and fact gathering              |
+| youtube-analysis    | skill | Phase 2    | Extract insights and quotes from video sources |
+| linkedin-post-style | skill | Phase 4    | Platform-optimized LinkedIn post generation    |
+| html-presentation   | skill | Phase 4    | HTML slide deck production                     |
+| md-to-pdf           | skill | Phase 4    | Polished PDF document output                   |
+| humanize            | skill | Phase 5    | Remove AI patterns, ensure natural voice       |
+
+---
+
+## Workflow Phases
+
+### Phase 1: Goal & Audience Analysis
+
+1. Parse the user's request to determine:
+   - **Content goal:** awareness, education, conversion, or thought leadership
+   - **Target audience:** developers, executives, general technical, non-technical
+   - **Existing assets:** URLs, documents, videos, or raw notes to repurpose
+   - **Desired channels:** explicit requests or gaps to recommend
+2. Ask up to 3 clarifying questions if critical information is missing:
+   - What is the primary goal of this content?
+   - Who is the target audience?
+   - Which channels/formats matter most?
+3. Do not ask questions if the request provides sufficient context to proceed.
+
+### Phase 2: Research & Source Gathering
+
+1. If the topic requires factual grounding or the user's source material is thin:
+   - Invoke the `tavily` skill to research the topic, gather current data, statistics, and expert perspectives
+2. If the user provides video URLs or references video content:
+   - Invoke the `youtube-analysis` skill to extract key insights, quotes, timestamps, and structural patterns
+3. Compile a source brief: key facts, data points, quotes, and narrative angles gathered from research
+4. Skip this phase entirely if the user provides comprehensive source material that needs no supplementation.
+
+### Phase 3: Content Strategy
+
+1. Define the **core message** — one sentence that every content piece reinforces
+2. Identify **3-5 key points** that support the core message with evidence from Phase 2
+3. Map key points to channels, determining which formats serve the goal:
+   - **Long-form** (blog/article): deep exploration, SEO value, education goals
+   - **Social** (LinkedIn): awareness, thought leadership, conversational reach
+   - **Presentations** (slides): education, internal communication, conference talks
+   - **Documents** (PDF): formal reports, whitepapers, executive summaries
+4. Define channel-specific adaptations:
+   - What angle each channel takes on the core message
+   - What length and depth each channel requires
+   - What CTA (if any) each channel uses
+5. Present the content plan to the user before proceeding to production.
+
+### Phase 4: Content Generation
+
+Produce content for each planned format. Order of production: long-form first (establishes depth), then adapt to other channels.
+
+**Long-form (blog/article):**
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Mathews-Tom/armory](https://github.com/Mathews-Tom/armory) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
