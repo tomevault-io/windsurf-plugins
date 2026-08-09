@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: **tomat** is a Pomodoro timer with daemon support designed for waybar and other
+description: handles formatting/display
 ---
 
 # LLM Agent Instructions for tomat
@@ -8,7 +8,7 @@ description: **tomat** is a Pomodoro timer with daemon support designed for wayb
 ## Repository Overview
 
 **tomat** is a Pomodoro timer with daemon support designed for waybar and other
-status bars. It's a Rust project (~4,300 lines across multiple modules) that
+status bars. It's a Rust project (\~4,300 lines across multiple modules) that
 implements a server/client architecture using Unix sockets for inter-process
 communication.
 
@@ -155,4 +155,4 @@ clippy and rustfmt automatically if using the Nix devenv.
 
 ---
 > Source: [jolars/tomat](https://github.com/jolars/tomat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
