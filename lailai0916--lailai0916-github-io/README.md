@@ -1,15 +1,15 @@
 # lailai0916.github.io
 
-> Source: [lailai0916/lailai0916.github.io](https://github.com/lailai0916/lailai0916.github.io) — distributed by [TomeVault](https://tomevault.io)
+> Source: [lailai0916/lailai0916.github.io](https://github.com/lailai0916/lailai0916.github.io). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lailai0916/lailai0916.github.io](https://github.com/lailai0916/lailai0916.github.io).
+Original source: `AGENTS.md` in [lailai0916/lailai0916.github.io](https://github.com/lailai0916/lailai0916.github.io).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
