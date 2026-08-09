@@ -34,4 +34,4 @@ See [README.md](README.md) for detailed guidance.
 
 ---
 > Source: [kroxylicious/kroxylicious](https://github.com/kroxylicious/kroxylicious) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
