@@ -1,174 +1,92 @@
 ---
 trigger: always_on
-description: **unordered_dense** is a header-only C++17/20/23 library providing fast and densely stored hashmap and hashset implementations (`ankerl::unordered_dense::{map, set}`) based on robin-hood backward shift deletion. It is designed as a high-performance alternative to `std::unordered_map` and `std::unordered_set`.
+description: Guidance for working on `unordered_dense` — a single-header C++17 dense open-addressing hash map/set (`ankerl::unordered_dense::{map, set}`).
 ---
 
-# Copilot Coding Agent Instructions for unordered_dense
+# CLAUDE.md
 
-## Project Overview
+Guidance for working on `unordered_dense` — a single-header C++17 dense open-addressing hash map/set (`ankerl::unordered_dense::{map, set}`).
 
-**unordered_dense** is a header-only C++17/20/23 library providing fast and densely stored hashmap and hashset implementations (`ankerl::unordered_dense::{map, set}`) based on robin-hood backward shift deletion. It is designed as a high-performance alternative to `std::unordered_map` and `std::unordered_set`.
+The entire implementation lives in `include/ankerl/unordered_dense.h`. Tests and benchmarks are in `test/` and build into a single doctest executable `udm-test`.
 
-- **Type**: Header-only C++ library
-- **Languages**: C++17, C++20, C++23
-- **Build Systems**: Meson (primary), CMake (for installation)
-- **Size**: Small to medium (single main header: `include/ankerl/unordered_dense.h`)
-- **Main Header**: `include/ankerl/unordered_dense.h`
-- **Test Framework**: doctest
-- **Benchmarking**: nanobench (custom framework)
+## Build (meson)
 
-## Build System & Commands
+Meson and ninja are required (`pip install -r requirements.txt` if missing). Dependencies (doctest, fmt) are fetched automatically as meson subprojects via `subprojects/*.wrap`.
 
-### Build System: Meson (Primary)
+```sh
+# one-time setup of a release build (required for benchmarking; also sets -DNDEBUG)
+CXX="ccache clang++" meson setup --buildtype release builddir/clang_release
 
-**CRITICAL**: This project uses **Meson** as its primary build system. Always use Meson commands for building and testing.
-
-#### Prerequisites
-```bash
-pip install meson ninja  # Install from requirements.txt
+# compile (incremental, run after every change)
+ninja -C builddir/clang_release
 ```
 
-#### Setup Build Directory
+A debug build for development: `CXX="ccache clang++" meson setup builddir/clang_debug`.
 
-**ALWAYS** set up a build directory before building or testing. Common configurations:
+Warnings are errors (`werror=true`, `warning_level=3`, plus `-Wconversion`, `-Wold-style-cast`, …), so code must compile clean.
 
-```bash
-# Debug build (C++17, default)
-meson setup builddir/gcc_cpp17_debug
+## Benchmarking
 
-# Release build (C++17)
-meson setup --buildtype=release builddir/gcc_cpp17_release
+The main performance metric is `bench_quick_overall_udm`. It runs six nanobench benchmarks covering the most important primitives — iterate-while-modifying, random insert/erase, and random find (50% hit rate) — each for both `map<uint64_t, size_t>` and `map<std::string, size_t>`, then prints the geometric mean of the median elapsed times:
 
-# C++20 build
-meson setup -Dcpp_std=c++20 builddir/gcc_cpp20_debug
-
-# C++23 build
-meson setup -Dcpp_std=c++23 builddir/gcc_cpp23_debug
-
-# 32-bit build
-meson setup -Dcpp_args=-m32 -Dcpp_link_args=-m32 builddir/gcc_cpp17_debug_32
-
-# Sanitizer builds
-meson setup -Db_sanitize=address builddir/gcc_sanitize_address
-meson setup -Db_sanitize=thread builddir/gcc_sanitize_thread
-meson setup -Db_sanitize=undefined builddir/gcc_sanitize_undefined
+```sh
+# benchmarks are marked doctest::skip(), so -ns (no-skip) is required
+./builddir/clang_release/test/udm-test -ns -tc=bench_quick_overall_udm
 ```
 
-**IMPORTANT**: The build directory name convention is `<compiler>_<standard>_<buildtype>` (e.g., `gcc_cpp17_release`).
-
-#### Build Commands
-
-```bash
-# Compile (from project root)
-meson compile -C builddir/gcc_cpp17_release
-
-# Clean before build
-meson compile --clean -C builddir/gcc_cpp17_release
-meson compile -C builddir/gcc_cpp17_release
-```
-
-#### Test Commands
-
-**ALWAYS run tests after making changes**. Tests are run with Meson:
-
-```bash
-# Run all tests (with error logs)
-meson test -C builddir/gcc_cpp17_release -v
-
-# Run tests quietly
-meson test -C builddir/gcc_cpp17_release -q --print-errorlogs
-
-# Run without rebuilding
-meson test -C builddir/gcc_cpp17_release --no-rebuild -v
-```
-
-**Test location**: Test logs are written to `builddir/<config>/meson-logs/testlog.txt`
-
-### CMake (Installation Only)
-
-CMake is **only** used for installing the library, not for testing:
-
-```bash
-mkdir build && cd build
-cmake ..
-cmake --build . --target install
-```
-
-**Do NOT use CMake for building tests or running the test suite.**
-
-## Linting & Code Quality
-
-### Lint Scripts (MUST PASS)
-
-All lint scripts are in `scripts/lint/`. They MUST pass before submitting changes:
-
-```bash
-# Run ALL linters (recommended)
-./scripts/lint/all.py
-
-# Individual linters
-./scripts/lint/lint-version.py        # Check version consistency across files
-./scripts/lint/lint-clang-tidy.py     # Run clang-tidy on main header
-./scripts/lint/lint-clang-format.py   # Check code formatting
-```
-
-### Code Formatting
-
-- **Tool**: clang-format
-- **Config**: `.clang-format` (LLVM-based, 127 column limit)
-- **Standard**: C++17
-- **Style**: snake_case for all identifiers (classes, functions, variables)
-- **Indentation**: 4 spaces, no tabs
-
-**Key formatting rules**:
-- Column limit: 127
-- Pointer alignment: Left (`Type* ptr`)
-- Break before commas in constructor initializers
-- No short lambdas on single line
-
-### Clang-Tidy
-
-- **Config**: `.clang-tidy`
-- **Header filter**: Only checks `unordered_dense.h`
-- **Naming**: snake_case for everything, UPPER_CASE for macros
-- **Command**: `./scripts/lint/lint-clang-tidy.py`
-
-## CI/CD Pipeline (GitHub Actions)
-
-**Workflow**: `.github/workflows/main.yml` runs on all pushes and PRs.
-
-### CI Jobs
-
-1. **lint** (Ubuntu): Runs `lint-version.py` and `lint-clang-tidy.py`
-2. **mingw** (Windows): MinGW 32-bit and 64-bit builds
-3. **windows** (Windows): MSVC 32-bit and 64-bit builds
-4. **macos** (macOS): clang builds
-5. **linux** (Ubuntu): gcc/clang × C++17/23 × 32/64-bit matrix
-6. **linux-sanitizers** (Ubuntu): address/thread/undefined sanitizers
-
-**CRITICAL**: All these jobs must pass. If you make changes:
-- Ensure they work on gcc AND clang
-- Test both C++17 and C++23 when relevant
-- Consider 32-bit compatibility (avoid 64-bit assumptions)
-- Sanitizers must pass (especially address/undefined)
-
-### Common CI Failures & Fixes
-
-1. **Linting failures**: Run `./scripts/lint/all.py` locally first
-2. **32-bit failures**: Don't use `size_t` in hashes without consideration
-3. **Sanitizer failures**: Check for undefined behavior, use-after-free, data races
-4. **Windows/MSVC**: Check for MSVC-specific warnings (see `test/meson.build`)
-
-## Project Structure
-
-### Directory Layout
+The last line of output is the score, e.g.:
 
 ```
-unordered_dense/
-├── include/ankerl/unordered_dense.h   # Main header (ALL implementation)
+0.0767 bench_quick_overall_map_udm
+```
+
+**Lower is better.** This single number is what to optimize.
+
+Benchmarking practices:
+
+- Always benchmark a `--buildtype release` build (never debug).
+- Record a baseline score on the unmodified code first, then compare after each change. Run each measurement 2–3 times; treat differences within run-to-run noise (~1–2%) as no change.
+- On noisy/shared machines, don't compare runs made at different times — the machine can drift by >10% over minutes. Instead keep a baseline binary around (copy `udm-test` elsewhere before rebuilding) and run baseline and candidate **interleaved** (A B A B A B), then compare paired runs. A change is real when it wins in (almost) every pair.
+- Beware code-layout luck: any edit (even to never-executed code) can shift alignment and move individual sub-benchmarks by ±3%. Judge micro-optimizations by mechanism plus a focused microbenchmark, and confirm on the paired geomean, not on a single sub-benchmark delta.
+- nanobench prints per-benchmark `err%`; rerun if it's high (> ~3%). A warning about CPU governor/turbo is normal on non-tuned machines — it just means more noise.
+- Other useful benchmarks in `test/bench/` (e.g. `bench_copy`, `bench_game_of_life`, find variants) can be run the same way via `-tc=<name>`; run all with `-ns -ts=bench`. List all test cases with `-ltc`.
+
+## Optimization dead ends (verified with interleaved A/B runs; re-test before assuming they still hold)
+
+Measured on a shared x86-64 VM with clang 18, default `-march` (baseline x86-64, so no BMI2/AVX2 in generated code). The `bench_quick_overall_udm` hot paths are close to machine limits: a lookup is hash + two dependent cache accesses (~10 ns map-side), and hashing the 200-byte string keys (~42 cycles each) is ~45% of the wall time of the string sub-benchmarks. Ideas that consistently **regressed** and were reverted:
+
+- Force-inlining `wyhash::hash` into the map (icache/register pressure outweighs saved call overhead).
+- A branchless `do_find` fast path for scalar keys (unconditional key compare + conditional-move result): the speculative value load doubles cache misses on the ~50% miss lookups.
+- Explicit `__builtin_prefetch` of `m_values[bucket->m_value_idx]` in `do_find`, and computing the moved element's hash early + prefetching its home bucket in `do_erase`: out-of-order execution already hides these latencies.
+- Replacing wyhash with rapidhash (v3, 2025): the wyhash implementation here is *faster* for inputs ≥ 24 bytes in both latency and throughput; rapidhash only won at ≤ 16 bytes, and that trick (two plain 8-byte reads instead of building `a`/`b` from four 4-byte reads) has been adopted.
+
+## Testing
+
+Any change to `include/ankerl/unordered_dense.h` must pass the unit tests:
+
+```sh
+meson test -C builddir/clang_release unit --verbose
+# or directly (runs all non-skipped tests):
+./builddir/clang_release/test/udm-test
+```
+
+## Fuzzing
+
+The `fuzz` test suite replays the committed corpora in `data/fuzz/<target>` on every test run, which
+only ever re-finds what has already been found. The libFuzzer targets are what go looking. They are
+clang only and not built by default:
+
+```sh
+CXX=clang++ meson setup builddir/fuzz
+ninja -C builddir/fuzz test/fuzz_api          # or fuzz_insert_erase, fuzz_replace_map, fuzz_string
+./builddir/fuzz/test/fuzz_api -max_total_time=60 scratch-dir data/fuzz/fuzz_api
+```
+
+libFuzzer writes new inputs into the *first* corpus directory it is given, so keep `data/fuzz/...`
+second and it stays read-only. Passing it alone — `./test/fuzz_api data/fuzz/fuzz_api` — quietly
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [martinus/unordered_dense](https://github.com/martinus/unordered_dense) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
