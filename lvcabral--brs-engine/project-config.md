@@ -1,69 +1,85 @@
 ---
 trigger: always_on
-description: **brs-engine** is a TypeScript-based interpreter for Roku's BrightScript language that runs on browsers, Node.js, and Electron. It simulates Roku's runtime environment, including the Draw 2D API and SceneGraph framework, enabling Roku app development and testing outside of Roku hardware.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# BrightScript Engine - AI Agent Instructions
+# AGENTS.md
 
-## Project Overview
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-**brs-engine** is a TypeScript-based interpreter for Roku's BrightScript language that runs on browsers, Node.js, and Electron. It simulates Roku's runtime environment, including the Draw 2D API and SceneGraph framework, enabling Roku app development and testing outside of Roku hardware.
+## Overview
 
-**Key Architecture:**
-- **Monorepo structure** with three packages: `packages/browser` (web/Electron) published as `brs-engine`, `packages/node` (CLI/server) published as `brs-node`, and `packages/scenegraph` published as `brs-scenegraph`
-- **Web Worker architecture**: Browser package runs interpreter in a Web Worker (`brs.worker.js`) with API library (`brs.api.js`) for host communication
-- **Lexer → Parser → Interpreter pipeline**: Code flows through `src/core/lexer` → `src/core/parser` → `src/core/interpreter`
-- **Component System**: BrightScript objects live in `src/core/brsTypes/components`; SceneGraph nodes live in `src/extensions/scenegraph/nodes`
-- **Extension System**: SceneGraph (and other future features) are plug-in extensions implementing `BrsExtension` interface (`src/core/extensions.ts`); registered with `registerExtension()`
-- **Device Simulation**: `BrsDevice` (in `src/core/device/`) maintains simulated Roku device state (registry, file system, device info)
-- **Roku OS Version**: Currently synchronized with Roku OS 15.x features and APIs
+**brs-engine** is a BrightScript Simulation Engine: an interpreter for the BrightScript language that runs Roku apps (channels) in web browsers and Node.js. It simulates the BrightScript runtime, the Draw 2D API (`roScreen`, `roCompositor`, `roRegion`, …), the SceneGraph framework, the Roku file system, registry, remote control, and the Micro Debugger — targeting compatibility up to Roku OS 15. It is **not** a Roku OS or hardware emulator; it is a development/automation tool. The repo was originally forked from [rokucommunity/brs](https://github.com/rokucommunity/brs).
 
-## Recent Major Improvements
+Node.js **v22 or newer** is required to build and to run the CLI.
 
-### SceneGraph Extension Architecture (v2.x)
-- **Third package**: `packages/scenegraph` (published as `brs-scenegraph` v0.1.0+) is a standalone addon that owns the XML component parser, `RoSGScreen`, all nodes, and Task execution helpers
-- **Extension system**: `BrsExtension` interface (`src/core/extensions.ts`) is the plug-in contract; `registerExtension()` wires extensions into every new interpreter instance without forking the core
-- **BrightScriptExtension class**: The entry point for the SceneGraph addon (`src/extensions/scenegraph/index.ts`), implements `BrsExtension`
-- **SGRoot singleton** (`src/extensions/scenegraph/SGRoot.ts`): Holds the active scene, `m.global`, focus, threads, timers, and animations
-- **SupportedExtension enum**: `SupportedExtension.SceneGraph` (`"brs-scenegraph"`), `SDK1` and `BrightSign` extensions are planned
+## Monorepo layout
 
-### SceneGraph Rendezvous & Threads (v2.1.0)
-- **Real Rendezvous**: SceneGraph now implements thread updates similar to Roku's Rendezvous pattern for safe cross-thread field access
-- **Multiple roMessagePort in Main thread**: Tasks and Main thread can each own multiple ports
-- **Task debugger support**: Task threads can be paused at breakpoints via the MicroDebugger
+This is an npm **workspaces** monorepo (root package `brs-engine-workspace`). All TypeScript source lives in the top-level `src/` directory and is compiled into three published packages under `packages/`:
 
-### RoSGNode Refactoring & Field System
-- **Abstract base class**: `RoSGNode` is abstract; all nodes must extend either `RoSGNode` or the concrete `Node` class
-- **Field type validation**: `Field.canAcceptValue()` validates typed arrays (`intarray`, `floatarray`, `boolarray`, `stringarray`, `colorarray`, `timearray`) and converts string values to the correct type
-- **Field aliases**: Nodes support multiple comma-separated field aliases; aliases fire observers correctly and support child change propagation
-- **System fields are protected**: Cannot be removed via `removeField()` or added via `setFields()`; use `addFields()` for new fields
-- **setValue vs setValueSilent**: `setValue()` triggers observers; `setValueSilent()` does not (used during initialization)
-- **`setValue()` signature**: Does NOT create a field if it does not already exist (prevents accidental field creation on assignment)
+- **brs-engine** (`packages/browser`) — browser / Web Worker interpreter for web, PWA, and Electron apps. Build output: `packages/browser/lib/brs.api.js` + `brs.worker.js`, types in `packages/browser/types/`.
+- **brs-node** (`packages/node`) — Node.js library plus the `brs-cli` command, ECP + SSDP servers. Build output: `packages/node/bin/{brs.cli.js, brs.ecp.js, brs.node.js}`.
+- **brs-scenegraph** (`packages/scenegraph`) — SceneGraph runtime shipped as a standalone **extension** bundle (`brs-sg.js` / `brs-sg.node.js`) that auto-loads when an app contains `pkg:/components/` assets.
 
-### New SceneGraph Nodes (v2.0 – v2.1)
-- **Animation system**: `Animation`, `ParallelAnimation`, `SequentialAnimation`, `FloatFieldInterpolator`, `ColorFieldInterpolator`, `Vector2DFieldInterpolator`
-- **Panel nodes**: `PanelSet`, `Panel`, `ListPanel`, `GridPanel`, `OverhangPanelSetScene`, `Overhang`
-- **Standard dialogs**: `StandardKeyboardDialog`, `StandardProgressDialog`, `StdDlgContentArea`, `StdDlgProgressItem`, `StdDlgTitleArea`
-- **Input nodes**: `PinPad`, `VoiceTextEditBox`, `ScrollableText`, `ScrollingLabel`
-- **Grid nodes**: `PosterGrid`, `MaskGroup`
-- **Other**: `InfoPane`, `RSGPalette`, `ChannelStore`
+### Required deployment asset: `assets/common.zip`
 
-### Content Handling Pattern
-- **Standardized content caching**: All list/grid nodes follow the `refreshContent()` pattern
-- **setValue override**: Content fields processed in `setValue()`, triggering `refreshContent()`
-- **Performance optimization**: Content cached once, never re-fetched per frame
+`packages/browser/assets/common.zip` (and its SceneGraph-aware counterpart in `packages/scenegraph/assets/common.zip`) is the **`common:/` volume** — it contains the default fonts, system audio, CA certificates, and BrightScript library stubs (`LibCore`, `roku_ads`, `roku_analytics`, `roku_browser`) that all BrightScript apps expect to be present. **Any web app that embeds the engine must serve this file at `./assets/common.zip` relative to `brs.api.js`.** The API library fetches it automatically on startup via `fetch('./assets/common.zip')` — if the file is missing, fonts and system libraries will be unavailable and most apps will fail or look broken.
 
-### File System Improvements
-- **Case preservation**: Writeable volumes (`tmp:`, `cachefs:`) preserve original case
-- **Shared volumes**: `tmp:` and `cachefs:` are shared among threads
-- **Pinned `@zenfs/core` v2.5.0**: Using synchronous config for reliability
+## Commands
 
-### Type System Enhancements
-- **Uninitialized validation**: Raises type mismatch error when passing `Uninitialized` to non-dynamic function parameters
-- **Double support**: Added `d` flag to `ParseJson()` for parsing to `double` type
+Run from the repo root (scripts fan out to workspaces):
+
+```bash
+npm install              # install all workspace dependencies
+
+npm run build            # dev build of all packages (--workspaces)
+npm run build:api        # build only brs-engine (browser)
+npm run build:node        # build only brs-node (CLI/Node library)
+npm run build:sg         # build only brs-scenegraph
+npm run build:web        # build engine + scenegraph, then open the example web app
+npm run build:cli        # build Node + scenegraph
+npm run release          # minified production build of all packages
+npm run clean            # remove compiled lib/ bin/ types/ from all packages
+
+npm start                # webpack-dev-server for the example web app (brs-engine)
+
+npm run lint             # eslint over ./src
+npm run prettier         # check formatting (4-space indent, printWidth 120)
+npm run prettier:write   # auto-format
+
+npm test                 # vitest (config in vitest.config.mts)
+```
+
+Tests live in `test/` (`brsTypes/`, `core/`, `interpreter/`, `lexer/`, `parser/`, `preprocessor/`, `stdlib/`, `extensions/`, `simulator/`, `cli/`). The e2e suite in `test/e2e/` is driven by `test/e2e/E2ETests.js`, comparing interpreter output against `.brs` fixtures in `test/e2e/resources/`. Test files are plain `.test.js`.
+
+```bash
+npx vitest run test/e2e/Functions.test.js   # run a single test file
+npx vitest run -t "name of the test"        # run by test name
+npx vitest run --update                     # refresh snapshots
+```
+
+After `npm run build:cli`, link the CLI for local use: `cd packages/node && npm link`, then `brs-cli`.
+
+## Core architecture
+
+### Two-thread split (browser model)
+
+The browser build is two bundles that run on **separate threads** and communicate via `postMessage` + a shared `Int32Array` over `SharedArrayBuffer`:
+
+- **API library** — entry `src/api/index.ts`, output `brs.api.js`. Runs on the **main thread**. Creates/manages the worker, renders the display canvas (expects a `canvas` named `display` and a `video` named `player` on `document`), plays audio, routes remote-control/gamepad input, and exposes the public API (`initialize`, `subscribe`, `execute`, `terminate`, `sendKeyPress`, `debug`, …). See `docs/engine-api.md`.
+- **Worker library** — entry `src/core/index.ts`, output `brs.worker.js`. Runs in a **Web Worker** (browser) or **Worker Thread** (Node). Its `onmessage` handler receives a msgpack-encoded `AppPayload`/`TaskPayload` (load + run an app) or the `SharedArrayBuffer` for control state (`BrsDevice.setSharedArray`). This is where the interpreter actually executes.
+
+The Node CLI runs the interpreter on a **single thread**; remote control there requires the ECP server (`--ecp`).
+
+### Interpreter pipeline (`src/core/`)
+
+`lex → parse → preprocess → interpret`
+
+- `src/core/lexer/` — tokenizer.
+- `src/core/parser/` — builds the AST (`Expression.ts`, `Statement.ts`).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lvcabral/brs-engine](https://github.com/lvcabral/brs-engine) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
