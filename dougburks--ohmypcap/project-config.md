@@ -70,29 +70,15 @@ When updating styles or frontend logic, edit the appropriate split file. Keep `s
 
 ### Theming Conventions
 
-SO-CRATES supports five themes via CSS custom properties:
-
-- **Midnight** (default dark theme)
-- **Matte Black** — dark theme with orange/yellow accents
-- **Hacker** — green-on-black terminal aesthetic with a subtle code-rain background
-- **Daylight** (light theme)
-- **Sguil** — light theme inspired by the classic Sguil NSM interface, with gray chrome and navy headers
+SO-CRATES supports themes via CSS custom properties. The full, current list (name, group, and a short description of each) is the `THEMES` registry in `static/socrates.js` and [Themes](docs/themes.md) — don't duplicate that list here, it goes stale the same way any full list does (see `docs/filtering.md`'s "Column Overlap" note for the same reasoning). As of this writing there are 32: 17 Dark, 5 Light, 10 Fun.
 
 - **Use CSS variables** (`var(--bg-primary)`, `var(--text-primary)`, `var(--accent)`, etc.) instead of hardcoded hex values for all structural/theme colors.
-- **Add theme overrides** in the appropriate `[data-theme="..."]` block (e.g., `light`, `sguil`, `hacker`, or `matte-black`) when a default dark color lacks contrast or does not match the theme's aesthetic.
+- **Add theme overrides** in the appropriate `[data-theme="<key>"]` block (the theme's registry key in `static/socrates.js`'s `THEMES` object) when a default dark color lacks contrast or does not match the theme's aesthetic.
 - **Preserve hardcoded colors** only for functional/data-driven elements (event type colors, severity colors, ASCII transcript direction colors) that must stay consistent across themes.
-- **Use `currentColor`** for inline SVG icons so they inherit the surrounding text color and adapt automatically.
-- **Avoid emojis** for UI icons when possible — use inline SVGs instead, since emojis render as full-color system glyphs that ignore CSS `color` and may be invisible in one theme.
-
-Theme selection is in the gear icon menu in the upper right corner. The menu shows **Help** first, then a divider, then the **Dark Themes** section (Midnight, Matte Black, Hacker), followed by the **Light Themes** section (Daylight, Sguil). Hovering a theme name previews it temporarily; clicking commits it. The user's choice is persisted to `localStorage` as `socrates-theme` and restored on page load to prevent a flash of unstyled content.
-
-To add a new theme:
-
-1. Add it to the `THEMES` registry and the `toggleTheme()` cycle order in `static/socrates.js`. `setTheme()` and `previewTheme()` work automatically for any theme in the registry.
-2. Add a `[data-theme="your-name"]` CSS override block in `static/socrates.css`.
+- **Don't define a variable in every theme block "for completeness" without a real consumer.** `--accent-rgb` and `--filter-bar-bg` were defined identically in all 23 theme blocks but never referenced via `var(--name)` anywhere in CSS/JS/HTML — removed as dead CSS (`test_dead_theme_vars_removed` locks this in). If you add a new per-theme variable, grep for `var(--your-name` before considering it done.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dougburks/ohmypcap](https://github.com/dougburks/ohmypcap) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
