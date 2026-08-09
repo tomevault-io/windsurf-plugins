@@ -1,105 +1,123 @@
 ---
 trigger: always_on
-description: > Instructions for Claude Code, pi, Cursor, Copilot, and other AI coding agents working on this project.
+description: The agent API wraps exec mode in an HTTP server, letting AI agents create isolated WASM sandboxes, upload files, execute code, and retrieve structured output, all via REST.
 ---
 
-# AGENTS.md — AI Coding Agent Instructions for Wasmrun
 
-> Instructions for Claude Code, pi, Cursor, Copilot, and other AI coding agents working on this project.
+# Agent API
 
----
+The agent API wraps exec mode in an HTTP server, letting AI agents create isolated WASM sandboxes, upload files, execute code, and retrieve structured output, all via REST.
 
-## Project Overview
+## Starting the Server
 
-**Wasmrun** is a WebAssembly runtime. It compiles, runs, inspects, and manages WASM modules with multi-language support (Rust, Go, Python, C/C++, AssemblyScript) via a plugin architecture.
+```sh
+wasmrun agent [OPTIONS]
+```
 
-- **Repository:** https://github.com/anistark/wasmrun
-- **Crate:** https://crates.io/crates/wasmrun
-- **Docs:** https://wasmrun.readthedocs.io
-- **License:** MIT
-- **Minimum Rust Version:** 1.85
-- **Recommended Rust Version:** 1.88
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-P, --port` | `8430` | Server port |
+| `-t, --timeout` | `300` | Default session idle timeout (seconds) |
+| `-m, --max-sessions` | `100` | Maximum concurrent sessions |
+| `--max-memory` | `256` | Maximum linear memory per session (MB) |
+| `--max-fuel` | `0` | Instruction budget per execution (`0` = unlimited) |
+| `--max-output` | `10` | Captured stdout+stderr per execution (MB) |
+| `--max-file-size` | `50` | Maximum size of any single file write (MB) |
+| `--max-disk` | `100` | Maximum total disk usage per session (MB) |
+| `--max-body` | `32` | Maximum accepted request body size (MB) |
+| `--max-concurrent-exec` | `100` | Maximum executions in flight across all sessions |
+| `--npm-registry` | `https://registry.npmjs.org` | npm registry base URL for dependency vendoring |
+| `--allow-cors` | off | Enable wildcard CORS |
+| `-v, --verbose` | off | Add a request-received line per request (a structured access log is always emitted; see [Observability](./usage/agent-observability.md)) |
+| `--auth <PATH>` | off | Path to a TOML auth config; enables API-key auth & tenant isolation (omit = open) |
+| `--hash-key <KEY>` | - | Print `sha256(KEY)` for the auth config and exit (does not start the server) |
 
----
+For every size/count limit, `0` means **unlimited**. Memory, fuel, output, file-size, and disk caps are **per session** and can be overridden per session at creation (see [Sessions](./usage/agent-sessions.md)); body size and exec concurrency are **server-wide** ingress guards.
 
-## ⚠️ The Three Modes — Read This First
+All endpoints are under `http://<host>:<port>/api/v1/`.
 
-Wasmrun has **three distinct execution modes**. They are separate systems with separate philosophies. **Do not conflate them.** When working on one mode, do not break another mode's functionality.
+## Authentication
 
-### 1. Server Mode (`wasmrun` / `wasmrun run`)
+By default the server is **open**; any caller can create and access any session. Pass `--auth <path>` to require an API key on every request and isolate sessions per tenant. Without `--auth`, behavior is exactly as before (no header needed).
 
-**Philosophy:** A development server that compiles source code to WASM and serves it in a browser with a UI.
+```sh
+wasmrun agent --port 8430 --auth ./auth.toml
+# banner shows:  Auth:  enabled (2 tenants)
+```
 
-- **Trigger:** `wasmrun run ./project` or just `wasmrun ./project`
-- **What it does:** Detects project language → compiles to WASM via plugins → starts HTTP server → serves browser UI that loads and runs the WASM
-- **Key files:**
-  - `src/commands/run.rs` — command handler
-  - `src/config/server.rs` — server config, `run_server()`
-  - `src/server/` — HTTP server infrastructure (handler, API, wasm serving, lifecycle)
-  - `src/compiler/` — project compilation
-  - `src/plugin/` — plugin system (compile plugins)
-  - `src/watcher.rs` — live reload file watching
-  - `src/template.rs` — HTML template injection
-  - `ui/src/` — Preact UI source (builds into `templates/app/`, `templates/console/` at compile time via `build.rs`)
-- **Uses plugins:** Yes — plugins provide compilation (wasmrust, wasmgo, waspy, wasmasc)
-- **Uses browser:** Yes — serves HTML + JS that loads WASM via `WebAssembly.instantiate()`
-- **Docs:** `docs/docs/server/`
+### Config file
 
-### 2. Exec Mode (`wasmrun exec`)
+The auth config is a TOML file listing tenants. Keys are stored **hashed** (SHA-256, hex), never in plaintext:
 
-**Philosophy:** A native WASM interpreter. No browser, no server, no compilation. Just parse and execute a `.wasm` binary directly.
+```toml
+[[tenants]]
+id = "copilot"
+key_sha256 = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 
-- **Trigger:** `wasmrun exec ./file.wasm [args...]`
-- **What it does:** Parses WASM binary → initializes memory → links WASI host functions → interprets bytecode → prints output → returns exit code
-- **Key files:**
-  - `src/commands/exec.rs` — command handler
-  - `src/runtime/core/` — **the entire WASM interpreter engine**
-    - `module.rs` — binary parser
-    - `executor.rs` — instruction executor (~4400 lines, all WASM opcodes)
-    - `memory.rs` — linear memory (pages, bounds checking)
-    - `values.rs` — value types (i32, i64, f32, f64)
-    - `linker.rs` — host function imports/exports linking
-    - `native_executor.rs` — high-level API: `execute_wasm_file()`, `execute_wasm_file_with_args()`
-    - `control_flow.rs` — control flow analysis
-  - `src/runtime/wasi/` — WASI syscall implementations (fd_write, args_get, clock, etc.)
-    - `mod.rs` — WasiEnv, create_wasi_linker()
-    - `syscalls.rs` — individual syscall host functions
-- **Uses plugins:** No
-- **Uses browser:** No
-- **Docs:** `docs/docs/exec/`
+[[tenants]]
+id = "ci"
+key_sha256 = "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"
+```
 
-### 3. OS Mode (`wasmrun os`)
+Each `id` and `key_sha256` must be unique, and `key_sha256` must be 64 lowercase hex characters. Invalid or missing config **aborts startup**; the server never silently runs open when auth was requested. Restrict the file so other users can't read the hashes:
 
-**Philosophy:** A browser-based micro-kernel environment. Runs projects (Node.js, Python) inside a WASM VM in the browser with a full development UI (console, filesystem, logs, kernel status).
+```sh
+chmod 600 auth.toml
+```
 
-- **Trigger:** `wasmrun os ./project`
-- **What it does:** Detects language → starts HTTP server → serves Preact UI → fetches language runtime WASM from wasmhub → populates virtual FS with project files → boots WASM VM in browser → runs user code sandboxed
-- **Key files:**
-  - `src/commands/os.rs` — command handler
-  - `src/runtime/os_server.rs` — OS mode HTTP server (serves UI, APIs for kernel/fs/logs/tunnel)
-  - `src/runtime/multilang_kernel.rs` — multi-language kernel (process management, language detection)
-  - `src/runtime/microkernel.rs` — base micro-kernel (process table, WASI, VFS)
-  - `src/runtime/dev_server.rs` — per-process dev server (serves WASI filesystem files)
-  - `src/runtime/scheduler.rs` — process scheduler
-  - `src/runtime/network_namespace.rs` — network isolation, port forwarding
-  - `src/runtime/wasi_fs.rs` — virtual filesystem (in-memory, mount points)
-  - `src/runtime/project_files.rs` — project file collection for browser transfer
-  - `src/runtime/runtime_cache.rs` — language runtime WASM caching (from wasmhub)
-  - `src/runtime/tunnel/` — bore tunneling for public access
-  - `src/runtime/languages/` — language runtime traits (Node.js, Go, Python)
-  - `src/logging/` — structured log trail system
-  - `ui/src/` — Preact UI source (components, OS panels, WASI shim; builds into `templates/os/` at compile time via `build.rs`)
-- **Uses plugins:** No (uses its own language detection and wasmhub runtimes)
-- **Uses browser:** Yes — full Preact UI with console, filesystem, kernel panels
-- **Docs:** `docs/docs/os/`
+### Generating a key hash
 
-### Mode Boundaries — Critical Rules
+Generate a high-entropy random key, then hash it for the config:
 
-1. **Never mix mode-specific logic.** Exec mode must never start an HTTP server. Server mode must never invoke the bytecode interpreter. OS mode has its own kernel — don't route it through the server mode pipeline.
+```sh
+KEY=$(openssl rand -hex 32)
+wasmrun agent --hash-key "$KEY"
+# → 4b4090ccee1e713c3d411b96a4226b90bd0f0deb34e02d19475a951316fd04ee
+```
+
+Put the hash in `key_sha256`, hand the raw `$KEY` to that tenant, and keep the raw key out of the config.
+
+### Making authenticated requests
+
+Send the raw key as a Bearer token on every `/api/v1/*` request (including `/tools`):
+
+```sh
+curl -X POST http://localhost:8430/api/v1/sessions \
+  -H "Authorization: Bearer $KEY"
+```
+
+A missing, malformed, or unknown key returns **401 Unauthorized**.
+
+### Tenant isolation
+
+Each session is owned by the tenant that created it. A tenant can only see and operate on its own sessions; any request targeting another tenant's session returns **404 Not Found**, identical to a nonexistent session so existence isn't leaked.
+
+### Per-tenant limits and rate limits
+
+Each tenant can carry its own resource ceiling and request budget, layered on top of the server defaults. Both are optional sub-tables under a `[[tenants]]` entry:
+
+```toml
+[[tenants]]
+id = "ci"
+key_sha256 = "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"
+
+  [tenants.limits]
+  max_memory_mb = 128
+  max_disk_mb = 50
+
+  [tenants.rate]
+  max_sessions = 10
+  max_concurrent_exec = 4
+  max_requests_per_min = 600
+```
+
+`[tenants.limits]` sets a per-tenant resource ceiling, with the same fields as a [per-session override](./usage/agent-sessions.md#per-session-limit-overrides) (`max_memory_mb`, `max_fuel`, `max_output_mb`, `max_file_size_mb`, `max_disk_mb`). Effective session limits compose in three layers: **server defaults → tenant baseline → per-session override clamped to the tenant baseline**. The tenant ceiling is a hard cap; a per-session override may only *tighten* a dimension, never raise it above the tenant's cap (a per-session "unlimited" `0` is pulled down to the tenant's finite ceiling).
+
+`[tenants.rate]` throttles the tenant independently so one tenant cannot exhaust the shared server: `max_sessions`, `max_concurrent_exec`, `max_requests_per_min` (each `0` or omitted inherits the server-wide default). Over any of these limits returns **429 Too Many Requests**.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [anistark/wasmrun](https://github.com/anistark/wasmrun) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
