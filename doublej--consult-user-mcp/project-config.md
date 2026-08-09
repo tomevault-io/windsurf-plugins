@@ -1,129 +1,124 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 ---
 
-# CLAUDE.md
+# Agent Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
-## Build & Run Commands
+> **Architecture in one line:** Issues live in a local Dolt database
+> (`.beads/dolt/`); cross-machine sync uses `bd dolt push/pull` (a
+> git-compatible protocol), stored under `refs/dolt/data` on your git
+> remote — separate from `refs/heads/*` where your code lives.
+> `.beads/issues.jsonl` is a passive export, not the wire protocol.
+>
+> See [SYNC_CONCEPTS.md](https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md)
+> for the one-screen overview and anti-patterns (don't treat JSONL as the
+> source of truth; don't `bd import` during normal operation; don't
+> reach for third-party Dolt hosting before trying the default).
 
-```bash
-bun install          # Install dependencies
-bun run build        # Compile TypeScript + Swift CLI
-bun run build:ts     # TypeScript only
-bun run start        # Run the compiled server
-bun run dev          # Watch mode for development
-bun test             # Run tests
-```
-
-## Architecture
-
-This is an MCP (Model Context Protocol) server that exposes native UI dialogs as tools for LLMs. Supports macOS (Swift/AppKit) and Windows (WPF/.NET).
-
-```
-src/
-├── index.ts                 # MCP server + tool registration (ask, notify, tweak, propose_layout)
-├── compact.ts               # Response transformer (provider → compact output)
-├── css-resolver.ts          # CSS selector/property → file location resolver (for tweak)
-├── humanize.ts              # Optional human-readable response formatting
-├── resolve-utils.ts         # Shared resolution utilities for tweak parameters
-├── settings.ts              # User settings reader
-├── text-search-resolver.ts  # Text pattern search → file location resolver (for tweak)
-├── types.ts                 # Shared types and interfaces
-├── update-check.ts          # GitHub release update checker
-├── validate-choices.ts      # Choice validation (no "all of above")
-├── index.test.ts            # Tests
-├── providers/
-│   ├── interface.ts         # DialogProvider interface
-│   ├── swift.ts             # macOS: Swift CLI + sketch CLI implementation
-│   └── windows.ts           # Windows: WPF CLI implementation
-```
-
-**Provider pattern**: Platform-specific code is abstracted behind `DialogProvider` interface. `createProvider()` in `index.ts` selects `WindowsDialogProvider` on Windows, `SwiftDialogProvider` on macOS.
-
-**Tool architecture**: Each tool in `index.ts`:
-1. Defines Zod schema for inputs
-2. Registers via `server.registerTool()` with metadata
-3. Delegates to `provider.methodName()` for platform execution
-
-**Key files**:
-- `types.ts`: `DialogPosition`, option interfaces, result types
-- `providers/interface.ts`: `DialogProvider` interface contract
-- `providers/swift.ts`: macOS implementation using Swift CLI
-- `providers/windows.ts`: Windows implementation using WPF CLI
-
-## Available Tools
-
-| Tool | Purpose |
-|------|---------|
-| `ask` | Unified interactive dialog (type: confirm/pick/text/form) |
-| `notify` | Notification banner |
-| `tweak` | Real-time numeric value adjustment with live file writes |
-| `propose_layout` | Interactive grid layout editor (macOS only) |
-
-The `ask` tool routes to provider methods via `type` field:
-- `confirm` → `provider.confirm()` — Yes/No
-- `pick` → `provider.choose()` — List picker (single or multi-select)
-- `text` → `provider.textInput()` — Free-form input (supports password masking)
-- `form` → `provider.questions()` — Multi-question (wizard or accordion)
-
-Responses are transformed by `compact.ts` to strip verbose/null fields.
-
-## Checkpoints & Rewind Limitations
-
-**IMPORTANT**: These tools are designed as checkpoints to replace `AskUserQuestion` in MCP workflows, BUT they have a critical limitation with Claude Code's rewind feature:
-
-- ❌ **MCP tool interactions do NOT create rewind points**
-- ✅ **Only user text messages create rewind points**
-
-This means:
-- When Claude uses `ask`, your response via the dialog won't appear in the rewind timeline
-- You cannot rewind to restore code/conversation state at MCP interaction points
-- Only your typed messages in the chat create restore points
-
-**Recommended Workaround**: Use pre/post-change hooks to commit to a `claude/*` branch:
+## Quick Reference
 
 ```bash
-# In your Claude Code settings, configure hooks:
-# Pre-change hook (before MCP checkpoint):
-git add -A && git commit -m "checkpoint: before $(date +%H:%M:%S)" --allow-empty
-
-# Post-change hook (after MCP response):
-git add -A && git commit -m "checkpoint: after user response $(date +%H:%M:%S)"
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work atomically
+bd close <id>         # Complete work
+bd dolt push          # Push beads data to remote
 ```
 
-This creates git commits at each checkpoint, giving you:
-- ✅ Actual code state snapshots
-- ✅ Easy revert via `git checkout <commit>`
-- ✅ Timeline of all checkpoints via `git log`
-- ✅ Works independently of Claude Code's rewind feature
+## Verification
 
-**Alternative**: Send a brief text message (e.g., "approved") after checkpoints to create a rewind point, but this only restores conversation, not code state.
+**Run the suites in the macOS container.** `bun run test:container`, or a
+subset with `SUITES="unit layout" bun run test:container`. Setup, knobs and
+gotchas: `container/README.md`.
 
-**Why this matters**: While these tools provide excellent control over Claude's workflow, they're invisible to the rewind feature, making it harder to jump back to key decision points without git-based checkpoints.
+```bash
+bun run test:container   # everything, in the VM — the verdict
+bun test                 # mcp-server tests            (anywhere)
+bun run test:layout      # clipping, overlap, text-fit (anywhere — off-screen)
+bun run test:visual      # screenshot + OCR per fixture ⚠ container
+bun run test:keyboard    # the keyboard contract        ⚠ container
+```
 
-## Common Parameters
+The two marked ⚠ spawn a real dialog per case. On a machine somebody is using
+they take the screen and the keyboard for minutes, and any focus change
+corrupts the result silently — the visual suite spent months photographing one
+stuck window and reporting OK. `test:layout` is the exception: it renders
+off-display, so it is safe anywhere and it is the one that fails a build.
 
-All dialog tools support:
-- `position`: `"left"` | `"right"` | `"center"` (default: `"left"`) - screen position
-- Titles are automatically prefixed with the calling client name (e.g., "Claude Desktop - Confirmation")
+A green layout run is not a clean surface. It waives every state with a known
+open bug and prints a `NOT VOUCHED FOR` line naming them. Read it.
 
-## Handling Snooze & Feedback Responses
+Changing a dialog type touches more places than it looks — the checklist is in
+`.claude/rules/dialog-parity.md`. A fixture without a row in
+`test-cases/skin-states/states.tsv` is never measured.
 
-All interactive dialogs can return three types of responses:
+## Non-Interactive Shell Commands
 
-### Normal Response
-User answered the question. The `answer` field contains: `true/false` (confirm), `string` (pick single/text), `string[]` (pick multi), or `Record<string, string>` (form).
+**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
 
-### Snooze Response
+Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
 
-**CRITICAL**: When `snoozed: true` is returned, you MUST:
-1. **Actually wait** using `sleep` command (NOT just say "waiting")
+**Use these forms instead:**
+```bash
+# Force overwrite without prompting
+cp -f source dest           # NOT: cp source dest
+mv -f source dest           # NOT: mv source dest
+rm -f file                  # NOT: rm file
+
+# For recursive operations
+rm -rf directory            # NOT: rm -r directory
+cp -rf source dest          # NOT: cp -r source dest
+```
+
+**Other commands that may prompt:**
+- `scp` - use `-o BatchMode=yes` for non-interactive
+- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
+- `apt-get` - use `-y` flag
+- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
+
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
+## Beads Issue Tracker
+
+This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
+
+### Quick Reference
+
+```bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work
+bd close <id>         # Complete work
+```
+
+### Rules
+
+- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Run `bd prime` for detailed command reference and session close protocol
+- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+
+## Agent Context Profiles
+
+The managed Beads block is task-tracking guidance, not permission to override repository, user, or orchestrator instructions.
+
+- **Conservative (default)**: Use `bd` for task tracking. Do not run git commits, git pushes, or Dolt remote sync unless explicitly asked. At handoff, report changed files, validation, and suggested next commands.
+- **Minimal**: Keep tool instruction files as pointers to `bd prime`; use the same conservative git policy unless active instructions say otherwise.
+- **Team-maintainer**: Only when the repository explicitly opts in, agents may close beads, run quality gates, commit, and push as part of session close. A current "do not commit" or "do not push" instruction still wins.
+
+## Session Completion
+
+This protocol applies when ending a Beads implementation workflow. It is subordinate to explicit user, repository, and orchestrator instructions.
+
+1. **File issues for remaining work** - Create beads for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [doublej/consult-user-mcp](https://github.com/doublej/consult-user-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
