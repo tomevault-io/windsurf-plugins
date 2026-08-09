@@ -1,46 +1,96 @@
 ---
 trigger: always_on
-description: Notion's defining idea is that there is no document type. A page is a list of blocks, a block is a row, and a database is just a page with a `properties_schema` whose rows happen to be structured. Headings, toggles, code fences, Kanban cards, and table rows are all the same storage primitive with a different `type` string and a different `properties` JSONB payload. That uniformity is what makes "turn this paragraph into a heading" a one-column update rather than a migration between document mode
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# Notion — Development with Claude
+# AGENTS.md
 
-## Project Context
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-Notion's defining idea is that there is no document type. A page is a list of blocks, a block is a row, and a database is just a page with a `properties_schema` whose rows happen to be structured. Headings, toggles, code fences, Kanban cards, and table rows are all the same storage primitive with a different `type` string and a different `properties` JSONB payload. That uniformity is what makes "turn this paragraph into a heading" a one-column update rather than a migration between document models.
+## Table of Contents
 
-The consequence is that *ordering* becomes the hard problem. When every block is an independent row and two people are inserting into the same list at once, the position of a block can't be an integer — integers require renumbering siblings, and renumbering is a write that conflicts with every concurrent edit in the same list. So position is a lexicographically sortable string, and inserting between two blocks means finding a string between two strings.
+- [Repository Overview](#repository-overview)
+- [Quick Start for Any Project](#quick-start-for-any-project)
+- [Project Structure](#project-structure)
+  - [Writing Architecture Documents](#writing-architecture-documents)
+  - [Writing System Design Answers](#writing-system-design-answers)
+  - [Explaining Trade-offs in Depth](#explaining-trade-offs-in-depth)
+- [Common Commands](#common-commands)
+- [Repository Scripts](#repository-scripts)
+- [CI/CD](#cicd)
+- [Technology Stack Defaults](#technology-stack-defaults)
+- [Key Design Principles](#key-design-principles)
+- [Port Conventions](#port-conventions)
+- [Frontend Best Practices](#frontend-best-practices)
+- [Backend Architecture Pattern](#backend-architecture-pattern)
+- [Database Selection Guide](#database-selection-guide)
+- [Creating New Projects](#creating-new-projects)
+- [Local Development Philosophy](#local-development-philosophy)
+- [Infrastructure Options](#infrastructure-options)
+- [ESM Import Convention](#esm-import-convention)
 
-The second hard problem is that collaboration needs an ordering across clients whose clocks disagree. A wall-clock timestamp will happily report that a reply happened before the message it replies to when one laptop is 400ms fast. That's what the Hybrid Logical Clock is for.
+## Repository Overview
 
-**Learning goals:** the block-as-row data model and what it buys, fractional indexing for conflict-free insertion, hybrid logical clocks for causal ordering under clock drift, and the difference between a system that *broadcasts* edits and one that genuinely *converges*.
+This is a **system design learning repository** where each subdirectory represents an independent system design challenge. Most projects have both design documentation and working implementations.
 
-## Architecture at a Glance (what actually runs)
+**Node.js Requirement:** >=20.0.0
 
-| Component | Port / detail | Why this one |
-|-----------|--------------|--------------|
-| **API + WebSocket server** (`backend/src/index.ts`) | **3001** (`npm run dev` → `PORT=3001 tsx watch`) | Express REST plus a `ws` server on the same HTTP server; Vite proxies both `/api` and `/ws` |
-| **Four workers** (`backend/src/workers/`) | `dev:worker:notification` / `:export` / `:email` / `:search` | Separate processes so a slow export can't block a notification |
-| **PostgreSQL 16** | 5432 (`notion`/`notion_password`, db `notion_db`) | `users`, `workspaces`, `workspace_members`, `pages`, `blocks`, `database_views`, `database_rows`, `page_permissions`, `sessions`, `operations`, `audit_log` |
-| **Valkey 7** | 6379 | Sessions and per-page presence (who is viewing, plus cursor position) |
-| **RabbitMQ 3.12** | 5672 / management 15672 (`notion`/`notion_local`) | 5 queues with per-queue TTL, prefetch, retry counts, and DLQs |
-| **Prometheus + Grafana** | 9090 / 3002 — `--profile observability` | Opt-in; the stack runs fine without them |
+## Quick Start for Any Project
 
-The two files that carry the ideas are `backend/src/utils/fractionalIndex.ts` and `backend/src/utils/hlc.ts`. Real-time handling is `backend/src/services/websocket.ts`; queue topology is declared once in `backend/src/shared/queue.ts` as `QUEUES`. Frontend is React 19 + TanStack Router (file-based) + Zustand + Tailwind, with block components under `frontend/src/components/blocks/` (text, heading, list, code, quote, callout, divider, toggle, plus `BlockTypeMenu` for slash commands), database views under `components/database/` (Table, Board, List), and the editor store in `stores/editor.ts`.
+1. Read the project's `architecture.md` first to understand the design
+2. Check `AGENTS.md` for iteration history and key decisions (primary source of truth for project-specific guidance - captures the "why" behind implementation choices)
+3. Look at `README.md` for setup instructions
+4. Check `package.json` to find available scripts
 
-## Key Design Decisions
+## Project Structure
 
-### 1. Block position is a lexicographic string, not an integer
+Each project folder typically contains:
+```
+<project>/
+├── README.md                  # Setup instructions and implementation guide
+├── architecture.md            # System design documentation and trade-offs
+├── system-design-answer-frontend.md   # Frontend-focused interview answer
+├── system-design-answer-backend.md    # Backend-focused interview answer
+├── system-design-answer-fullstack.md  # Full-stack interview answer
+├── AGENTS.md                  # LLM collaboration notes and iteration history
+├── frontend/                  # React + TypeScript frontend (when applicable)
+├── backend/                   # Node.js + Express backend (when applicable)
+├── training/                  # ML training code (Python, when applicable)
+└── docker-compose.yml         # Infrastructure services (PostgreSQL, Redis, etc.)
+```
 
-`blocks.position VARCHAR(100)` holds strings over `a`–`z`, and `generatePosition(before, after)` returns a string that sorts strictly between its neighbors. Reading a page is `ORDER BY position` against `idx_blocks_position (page_id, position)`.
+**Documentation file purposes:**
+- `architecture.md`: Dual-layer design document — production-scale architecture (the ideal) with diagrams, schemas, and trade-off analysis, plus local implementation notes (the actual) mapping to Docker + Node.js + React
+- `system-design-answer-{frontend,backend,fullstack}.md`: Concise 45-minute interview answers using ASCII diagrams (no code blocks), trade-off tables, and first-person rationale. Each variant is tailored to a specific interview focus.
+- `AGENTS.md`: Captures iteration history and the "why" behind key decisions
 
-Integer positions fail here in a way that gets worse the more collaborative the document is. Inserting at index 3 of a 200-block page means `UPDATE blocks SET position = position + 1 WHERE position >= 3` — 197 row updates for one keystroke's worth of intent. Every one of those rows is now a write that conflicts with any concurrent edit to those blocks, and the update has to be broadcast to every connected client. Two users inserting into the same list simultaneously each renumber the other's target, and the results interleave incorrectly. Fractional indexing turns the same operation into a single-row insert that touches nothing else, so two concurrent inserts in the same place produce two distinct positions and both survive.
+### Writing Architecture Documents
 
-What we give up is bounded key length. Repeatedly inserting between the same two blocks makes the string grow one character at a time — pathologically, dragging one block back and forth in the same gap. `VARCHAR(100)` is the ceiling, which is generous but not infinite, and there is no rebalancing pass to compact positions when they get long. The implementation is also alphabet-only (26 symbols) rather than the wider base real libraries use, so keys grow somewhat faster than they need to.
+The `architecture.md` files serve a dual purpose: documenting the **production-scale design** (how this system would work at millions of users) and the **local implementation** (what we actually built with Docker + Node.js + Express + React). These two layers should be explicit, not interleaved.
+
+**Recommended section structure:**
+
+| Section | Scope | Purpose |
+|---------|-------|---------|
+| System Overview | Production | One-paragraph description + learning goals |
+| Requirements | Production | Functional requirements + NFR targets at production scale (99.99% uptime, p99 < 50ms) |
+| Capacity Estimation | Both | Optional. Production-scale estimates first; optional "Local Development Scale" subsection for component sizing. ~46% of projects include this |
+| High-Level Architecture | Production | Box diagram showing the ideal architecture (CDN, API Gateway, microservices) |
+| Core Components / Request Flows | Both | Component responsibilities and data flow at production scale, noting local simplifications inline |
+| Database Schema | Both | Full SQL schemas with indexes and constraints — production-ready but run locally |
+| API Design | Both | Endpoint listing with request/response examples |
+| Key Design Decisions | Production | Trade-off analysis for major architectural choices |
+| Consistency and Idempotency | Both | Idempotency keys, retry semantics, exactly-once guarantees |
+| Security / Auth | Both | Authentication, authorization, rate limiting |
+| Observability | Both | Prometheus metrics, structured logging, health checks |
+| Failure Handling | Both | Circuit breakers, retry strategies, graceful degradation |
+| Scalability Considerations | Production | Horizontal scaling path, sharding strategy, read replicas |
+| Trade-offs Summary | Production | Summary table (see format below) |
+| Implementation Notes | **Local** | Maps production design to local Docker + Node.js setup |
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [evgenyvinnik/llm-driven-system-design](https://github.com/evgenyvinnik/llm-driven-system-design) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
