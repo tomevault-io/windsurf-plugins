@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [timothystewart6/k3s-ansible](https://github.com/timothystewart6/k3s-ansible).
+Original source: `AGENTS.md` in [timothystewart6/k3s-ansible](https://github.com/timothystewart6/k3s-ansible).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
