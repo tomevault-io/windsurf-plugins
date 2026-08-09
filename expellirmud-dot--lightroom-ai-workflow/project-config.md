@@ -1,0 +1,162 @@
+---
+trigger: always_on
+description: Build a Windows-first Lightroom Classic exposure assistant.
+---
+
+# AGENTS.md
+
+## Project Mission
+
+Build a Windows-first Lightroom Classic exposure assistant.
+
+The user opens a Lightroom folder, selects the intended photos, and runs
+AI Exposure Assist. The system renders Lightroom previews, asks a vision
+model to judge exposure consistency, writes approved exposure changes to
+XMP sidecars, and returns a result report.
+
+The MVP adjusts exposure only.
+
+## Required Read Order
+
+Before changing any file, read these files in order:
+
+1. `AGENTS.md`
+2. `docs/ARCHITECTURE.md`
+3. `docs/XMP_SAFETY.md`
+4. `docs/AI_JUDGE_CONTRACT.md`
+5. `work-orders/CURRENT_WORK_ORDER.md`
+6. The active work order referenced by `CURRENT_WORK_ORDER.md`
+
+Do not begin implementation until the active work order is identified.
+
+## Sources of Authority
+
+Authority order:
+
+1. Active Work Order
+2. `AGENTS.md`
+3. `docs/XMP_SAFETY.md`
+4. `docs/ARCHITECTURE.md`
+5. Existing tests
+6. Existing implementation
+7. README
+
+When authorities conflict, stop and report the conflict.
+
+## MVP Workflow
+
+The canonical workflow is:
+
+1. User opens the intended Lightroom Classic folder.
+2. User selects the intended photos.
+3. Lightroom plug-in renders JPEG previews.
+4. Plug-in writes an ordered manifest.
+5. Python CLI validates the job.
+6. Vision AI returns one decision per image.
+7. Python validates and clamps decisions.
+8. Existing XMP files are backed up.
+9. Only `crs:Exposure2012` may be changed.
+10. A result report is written.
+11. User reads metadata back into Lightroom.
+12. User reviews, rejects unwanted photos, and exports manually.
+
+## Non-Negotiable Boundaries
+
+- Do not edit RAW, NEF, JPEG originals, or Lightroom Catalog files.
+- Do not read or write `.lrcat`, `.lrcat-wal`, `.lrcat-shm`, or `.lrdata`
+  directly in the MVP.
+- Do not modify EXIF camera-capture fields.
+- Do not modify White Balance, Contrast, Highlights, Shadows, Crop,
+  Masks, Keywords, Rating, Label, Sharpening, or Noise Reduction.
+- The only editable Lightroom development property is
+  `crs:Exposure2012`.
+- Back up every affected XMP before any real write.
+- Default execution mode is `dry_run`.
+- Never delete or move user photographs.
+- Reject decisions are suggestions only in the MVP.
+- Do not automate final export in the MVP.
+- Never store API keys or secrets in tracked files.
+
+## XMP Rules
+
+- Treat `crs:Exposure2012` as an EV value.
+- New exposure equals existing exposure plus validated AI delta.
+- Preserve all unrelated XML elements, attributes, namespaces,
+  whitespace where practical, and file encoding.
+- Write through a temporary file and replace atomically.
+- A failed write must leave the original XMP intact.
+- Missing, malformed, or ambiguous XMP must stop that image and create
+  a review result. Do not guess.
+
+## AI Decision Rules
+
+- Produce exactly one decision for every manifest image.
+- Never invent filenames or file paths.
+- Preserve manifest order.
+- `delta_ev` must be numeric.
+- Clamp `delta_ev` to the configured maximum.
+- Low-confidence decisions must not be applied automatically.
+- AI output is untrusted input and must be schema validated.
+- The AI never writes files directly.
+
+## Seven Execution Rules
+
+1. **Task Classification**  
+   Classify the task, scope, risk level, and required evidence before editing.
+
+2. **Define Done First**  
+   Identify acceptance criteria and completion evidence before implementation.
+
+3. **Parallel Evidence Gathering**  
+   Inspect repository truth, relevant files, tests, Git state, and governing
+   documents before choosing a solution.
+
+4. **Single Recommendation**  
+   Once sufficient evidence exists, choose one best bounded approach.
+   Do not delegate routine technical decisions back to the user.
+
+5. **Surgical Change**  
+   Make the smallest correct change. Touch only files and behavior required
+   by the active Work Order.
+
+6. **Verify by Execution**  
+   Prove behavior by running the required tests, commands, or validation.
+   Reading code or relying on a worker report is not sufficient evidence.
+
+7. **Outcome-First Reporting**  
+   Report the implemented outcome, validation evidence, Git scope, and
+   remaining risks. Avoid unnecessary process narration.
+
+## Four Common AI Failure Modes
+
+1. **Memory Over Repository Truth**  
+   Repository files, Git status, current HEAD, and executed evidence always
+   override memory, prior summaries, and stale reports.
+
+2. **Treating Worker Reports as Final Evidence**  
+   A worker report is a claim. The final reviewer must inspect the actual
+   diff, validation output, and repository state.
+
+3. **Leaving the Proof Chain Open**  
+   Work is not complete until acceptance criteria, tests, diff review,
+   allowed-file scope, and Git status have all been verified.
+
+4. **Unauthorized Scope Expansion**  
+   Do not add refactors, frameworks, features, dependencies, or cleanup
+   outside the active Work Order, even when they appear beneficial.
+
+## Engineering Rules
+
+- Work on one bounded Work Order at a time.
+- Make the smallest safe change satisfying the Work Order.
+- Do not redesign architecture unless explicitly required.
+- Do not add frameworks without a demonstrated need.
+- Prefer the Python standard library when practical.
+- Add or update tests for every behavior change.
+- Do not use broad staging commands such as `git add .`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [expellirmud-dot/Lightroom-AI-Workflow-](https://github.com/expellirmud-dot/Lightroom-AI-Workflow-) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
