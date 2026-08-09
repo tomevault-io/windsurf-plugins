@@ -1,193 +1,148 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: I am Cline, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
 ---
 
-# CLAUDE.md
+# Cline's Memory Bank
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+I am Cline, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
 
-## Project Overview
+## Memory Bank Structure
 
-GenAI Intelligent Document Processing (GenAIIDP) is a serverless solution for automated document processing using AWS services. It combines OCR with generative AI to extract structured data from unstructured documents at scale.
+The Memory Bank consists of core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy:
 
-The system uses a modular architecture with nested CloudFormation stacks supporting multiple document processing patterns while maintaining common infrastructure for queueing, tracking, and monitoring.
-
-## Build & Development Commands
-
-### Building and Publishing
-
-Build and publish deployment artifacts to S3:
-
-```bash
-# Primary build script (recommended)
-python3 publish.py <cfn_bucket_basename> <cfn_prefix> <region> [--verbose]
-
-# Example
-python3 publish.py idp-1234567890 idp us-east-1
-
-# With verbose output for debugging build failures
-python3 publish.py idp-1234567890 idp us-east-1 --verbose
-
+```mermaid
+flowchart TD
+    PB[projectbrief.md] --> PC[productContext.md]
+    PB --> SP[systemPatterns.md]
+    PB --> TC[techContext.md]
+    
+    PC --> AC[activeContext.md]
+    SP --> AC
+    TC --> AC
+    
+    AC --> P[progress.md]
 ```
 
-The build process:
-- Checks system dependencies (AWS CLI, SAM CLI, Docker, Python 3.12+, Node.js 22.12+)
-- Builds CloudFormation templates and assets using SAM
-- All pattern functions are built within the unified pattern directory
-- Uploads artifacts to S3 bucket named `<cfn_bucket_basename>-<region>`
+### Core Files (Required)
+1. `projectbrief.md`
+   - Foundation document that shapes all other files
+   - Created at project start if it doesn't exist
+   - Defines core requirements and goals
+   - Source of truth for project scope
 
-### Code Quality & Linting
+2. `productContext.md`
+   - Why this project exists
+   - Problems it solves
+   - How it should work
+   - User experience goals
 
-```bash
-# Run all linting and formatting (includes UI)
-make lint
+3. `activeContext.md`
+   - Current work focus
+   - Recent changes
+   - Next steps
+   - Active decisions and considerations
+   - Important patterns and preferences
+   - Learnings and project insights
 
-# Fast lint (skips UI lint if unchanged via checksum)
-make fastlint
+4. `systemPatterns.md`
+   - System architecture
+   - Key technical decisions
+   - Design patterns in use
+   - Component relationships
+   - Critical implementation paths
 
-# Python linting only
-make ruff-lint
+5. `techContext.md`
+   - Technologies used
+   - Development setup
+   - Technical constraints
+   - Dependencies
+   - Tool usage patterns
 
-# Python formatting only
-make format
+6. `progress.md`
+   - What works
+   - What's left to build
+   - Current status
+   - Known issues
+   - Evolution of project decisions
 
-# Type checking with basedpyright
-make typecheck
-make typecheck-stats
+### Additional Context
+Create additional files/folders within memory-bank/ when they help organize:
+- Complex feature documentation
+- Integration specifications
+- API documentation
+- Testing strategies
+- Deployment procedures
 
-# UI linting (checks for changes via checksum)
-make ui-lint
+## Core Workflows
 
-# UI build verification
-make ui-build
+When interacting with a user query, I have two modes of workflows: plan mode & act mode. This is explained in the next subsections. I ALWAYS start in PLAN mode for new tasks or significant changes, and only transition to ACT mode after a comprehensive plan is created and approved by the user.
 
-# CI/CD linting (check-only, no modifications)
-make lint-cicd
+### Plan Mode
+In plan mode, I focus on understanding requirements, reasoning through solutions, and creating a comprehensive plan before any implementation. I DO NOT use tools to create/modify files or directory structures in this mode.
+
+```mermaid
+flowchart TD
+    Start[Start] --> ReadFiles[Read Memory Bank]
+    ReadFiles --> CheckFiles{Files Complete?}
+    
+    CheckFiles -->|No| CreateMissing[Create Missing Files]
+    CreateMissing --> GatherInfo[Gather Requirements]
+    
+    CheckFiles -->|Yes| Verify[Verify Context]
+    Verify --> GatherInfo
+    
+    GatherInfo --> Reasoning[Explicit Reasoning]
+    Reasoning --> Alternatives[Consider Alternatives]
+    Alternatives --> Strategy[Develop Strategy]
+    Strategy --> PlanDoc[Create Planning Document]
+    PlanDoc --> UserInput[Request User Feedback]
+    UserInput --> Approval{User Approves?}
+    Approval -->|Yes| TransitionToAct[Transition to ACT Mode]
+    Approval -->|No| RefineStrategy[Refine Strategy]
+    RefineStrategy --> PlanDoc
 ```
 
-### Testing
+#### Planning Document Structure
+Every comprehensive plan must include:
+1. **Problem Understanding**: Clear articulation of the problem/task
+2. **Requirements Analysis**: Explicit and implicit requirements
+3. **Solution Alternatives**: At least 2-3 approaches with pros/cons
+4. **Selected Approach**: Detailed implementation strategy with reasoning
+5. **Implementation Steps**: Specific, actionable steps with dependencies
+6. **Testing Strategy**: How to verify the solution works
+7. **Risks & Mitigations**: Potential issues and how to address them
 
-```bash
-# Run all tests (idp_common_pkg + idp_cli + srt security scan)
-make test
+### Act Mode
+In act mode, I implement the approved plan, using all available tools to read, write, and execute commands.
 
-# Run tests in idp_common_pkg only
-cd lib/idp_common_pkg && make test
-
-# Run unit tests only
-cd lib/idp_common_pkg && make test-unit
-
-# Run integration tests (requires AWS resources)
-cd lib/idp_common_pkg && make test-integration
-
-# Run idp_cli tests
-cd idp_cli && python -m pytest -v
-
-# Run specific test markers
-pytest -m "unit"
-pytest -m "integration"
+```mermaid
+flowchart TD
+    Start[Start] --> Context[Check Memory Bank]
+    Context --> ReviewPlan[Review Approved Plan]
+    ReviewPlan --> Update[Update Documentation]
+    Update --> Execute[Execute Task]
+    Execute --> Verify[Verify Implementation]
+    Verify --> Document[Document Changes]
 ```
 
-### Security Scanning
+I should be in one of the modes. I will always start with `MODE: PLAN` or `MODE: ACT` when responding depending on which mode I am. I will only transition from PLAN to ACT after creating a comprehensive plan and receiving explicit user approval. I will make sure that I remember to keep the same mode unless told to change.
 
-The project includes automated security scanning with the [Sample Security Review Tool (SRT)](https://github.com/aws-samples/sample-security-review-tool):
+## Documentation Updates
 
-```bash
-# Run full SRT workflow (setup → scan → optional fix)
-make srt
+Memory Bank updates occur when:
+1. Discovering new project patterns
+2. After implementing significant changes
+3. When user requests with **update memory bank** (MUST review ALL files)
+4. When context needs clarification
 
-# Or run individual steps:
-make srt-setup     # Download and configure SRT
-make srt-scan      # Run security assessment
-make srt-fix       # Interactive fix mode
-```
-
-**CI/CD Integration:**
-- SRT automatically runs on merge requests targeting `develop` branch (GitLab CI `security_review` stage)
-- Does not run on feature branch pushes to avoid blocking development
-- Pipeline fails if high-priority security findings are detected
-- Provides security gate before code is merged to `develop`
-
-### IDP CLI Commands
-
-The IDP CLI is used for programmatic deployment and batch processing:
-
-```bash
-# Install all packages into current Python environment
-make setup
-# Or create an isolated .venv first
-make setup-venv
-
-# Deploy a new stack
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --pattern pattern-2 \
-    --admin-email your.email@example.com \
-    --max-concurrent 100 \
-    --wait
-
-# Deploy with custom configuration
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --pattern pattern-2 \
-    --custom-config ./config_library/unified/bank-statement-sample/config.yaml \
-    --wait
-
-# Process documents in batch
-idp-cli run-inference \
-    --stack-name <your-stack-name> \
-    --dir ./samples/ \
-    --monitor
-
-# Download results
-idp-cli download-results \
-    --stack-name <your-stack-name> \
-    --batch-id <batch-id> \
-    --output-dir ./results/
-```
-
-### Local Lambda Testing
-
-```bash
-cd patterns/unified/
-sam build
-sam local invoke OCRFunction -e ../../testing/OCRFunction-event.json --env-vars ../../testing/env.json
-```
-
-### Development Setup
-
-```bash
-# Install idp_common library in edit mode with all dependencies
-cd lib/idp_common_pkg && make dev
-```
-
-## Architecture Overview
-
-### Nested Stack Architecture
-
-The solution uses a modular architecture with the main template (`template.yaml`) and nested pattern stacks:
-
-**Main Stack** (`template.yaml`) - Pattern-agnostic resources:
-- S3 Buckets (Input, Output, Working, Configuration, Evaluation Baseline)
-- SQS Queues and Dead Letter Queues
-- DynamoDB Tables (Execution Tracking, Concurrency, Configuration)
-- Lambda Functions (Queue Processing, Queue Sending, Workflow Tracking, Document Status Lookup, Evaluation, UI Integration)
-- CloudWatch Alarms and Dashboard
-- Web UI Infrastructure (CloudFront, S3 for static assets, CodeBuild)
-- Authentication (Cognito User Pool, Identity Pool)
-- AppSync GraphQL API (for UI-backend communication)
-
-**Unified Pattern Stack** (`patterns/unified/template.yaml`) - Processing resources:
-- Step Functions State Machine (BDA branch + Pipeline branch + shared tail)
-- Lambda Functions (OCR, Classification, Extraction, Assessment, Summarization, Evaluation, etc.)
-- CloudWatch Dashboard
-
-### Processing Modes
-
+```mermaid
+flowchart TD
+    Start[Update Process]
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
