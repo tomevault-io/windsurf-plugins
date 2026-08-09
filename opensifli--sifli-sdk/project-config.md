@@ -3,7 +3,7 @@ trigger: always_on
 description: This file provides guidance to agents when working with code in this repository.
 ---
 
-# SiFli-SDK
+# SiFliSDK
 
 This file provides guidance to agents when working with code in this repository.
 
@@ -146,4 +146,4 @@ Hardware (Cortex-M33 HCPU, optional low-power LCPU co-processor)
 
 ---
 > Source: [OpenSiFli/SiFli-SDK](https://github.com/OpenSiFli/SiFli-SDK) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
