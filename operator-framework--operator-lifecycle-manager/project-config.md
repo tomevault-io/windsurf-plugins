@@ -1,121 +1,93 @@
 ---
 trigger: always_on
-description: Manages the installation of resources defined in InstallPlans.
+description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 ---
 
-# AGENTS.md
+# Agent Guide for opentelemetry-go
 
-This file provides AI agents with comprehensive context about the Operator Lifecycle Manager (OLM) v0 codebase to enable effective navigation, understanding, and contribution.
+This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 
-## Project Status
+Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
+Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
 
-**CRITICAL**: This repository is in **maintenance mode**. OLM v0 accepts only critical bug fixes and security updates. For new development, use [operator-controller](https://github.com/operator-framework/operator-controller) (OLM v1).
+## Core expectations
 
-## Project Overview
+- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
+- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
+- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
+- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
+- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
+- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
+- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
+- Keep dependencies minimal and justified.
+- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
+- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
+- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
 
-Operator Lifecycle Manager (OLM) extends Kubernetes to provide declarative installation, upgrade, and lifecycle management for Kubernetes operators. It's part of the [Operator Framework](https://github.com/operator-framework) ecosystem.
+## Default workflow
 
-### Core Capabilities
-- **Over-the-Air Updates**: Automatic operator updates via catalog channels
-- **Dependency Resolution**: Automatic resolution and installation of operator dependencies
-- **Multi-tenancy**: Namespace-scoped operator management via OperatorGroups
-- **Discovery**: Catalog-based operator discovery and installation
-- **Stability**: Prevents conflicting operators from owning the same APIs
+For new features and behavior changes, use this order unless the task explicitly says otherwise:
 
-## Architecture
+1. Read the relevant package, its tests, and any package docs or `README.md`.
+2. Add or update a failing unit test that captures the required behavior or regression.
+3. Implement the smallest change that makes the test pass.
+4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
+5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
+6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
+7. Run `make precommit` each time before considering the work complete.
 
-OLM consists of two main operators working together:
+For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
 
-### 1. OLM Operator (`cmd/olm`)
-**Responsibility**: Manages the installation and lifecycle of operators defined by ClusterServiceVersions (CSVs)
+## Verification
 
-**Key Functions**:
-- Creates Deployments, ServiceAccounts, Roles, and RoleBindings from CSV specifications
-- Manages CSV lifecycle states: None → Pending → InstallReady → Installing → Succeeded/Failed
-- Monitors installed operator health and rotates certificates
-- Enforces OperatorGroup namespace scoping
+- Use `make` as the canonical repository verification command. The default target is `precommit`.
+- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
+- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
+- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
 
-**Primary Controllers**:
-- CSV Controller (pkg/controller/operators/olm)
-- OperatorGroup Controller
+## Documentation and changelog
 
-### 2. Catalog Operator (`cmd/catalog`)
-**Responsibility**: Manages operator catalogs, subscriptions, and dependency resolution
+- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
+- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
+- Prefer examples over long code snippets in GoDoc when practical.
+- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
+- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
 
-**Key Functions**:
-- Monitors CatalogSources and builds operator catalogs
-- Processes Subscriptions to track operator updates
-- Generates InstallPlans with resolved dependencies
-- Creates CRDs and CSVs from catalog content
+## Repository habits
 
-**Primary Controllers**:
-- Subscription Controller
-- InstallPlan Controller
-- CatalogSource Controller
-- Registry Reconciler
+- Prefer focused diffs. Avoid drive-by cleanup.
+- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
+- Generated files are checked in. If your change affects generation, keep generated output up to date.
+- Prefer fast local search tools such as `rg` when exploring the repository.
+- When changing behavior, make the invariants explicit in tests.
 
-## Custom Resource Definitions (CRDs)
+## Personas
 
-| Resource | API Group | Owner | Description |
-|----------|-----------|-------|-------------|
-| **ClusterServiceVersion (CSV)** | operators.coreos.com/v1alpha1 | OLM | Defines operator metadata, installation strategy, permissions, and owned/required CRDs |
-| **Subscription** | operators.coreos.com/v1alpha1 | Catalog | Tracks operator updates from a catalog channel; drives automatic upgrades |
-| **InstallPlan** | operators.coreos.com/v1alpha1 | Catalog | Calculated list of resources to install/upgrade; requires approval (manual or automatic) |
-| **CatalogSource** | operators.coreos.com/v1alpha1 | Catalog | Repository of operators and metadata; served via grpc from operator-registry |
-| **OperatorGroup** | operators.coreos.com/v1 | OLM | Groups namespaces for operator installation scope; enables multi-tenancy |
-| **OperatorCondition** | operators.coreos.com/v2 | OLM | Tracks operator health status and conditions |
+### Feature Agent
 
-## Directory Structure
+Use this persona for new behavior, new API surface, or spec-driven feature work.
 
-```
-operator-lifecycle-manager/
-├── cmd/                          # Entry point binaries
-│   ├── catalog/                  # Catalog Operator main
-│   ├── olm/                      # OLM Operator main
-│   ├── package-server/           # Package API server
-│   └── copy-content/             # Content copy utility
-│
-├── pkg/                          # Core implementation
-│   ├── api/                      # API client and wrappers
-│   │   ├── client/               # Generated Kubernetes clients
-│   │   └── wrappers/             # Client wrapper utilities
-│   │
-│   ├── controller/               # Main controllers
-│   │   ├── bundle/               # Bundle lifecycle controller
-│   │   ├── install/              # Installation controller
-│   │   ├── operators/            # Operator/CSV controllers (OLM Operator)
-│   │   └── registry/             # Catalog/registry controllers (Catalog Operator)
-│   │
-│   ├── lib/                      # Shared libraries and utilities
-│   │   ├── catalogsource/        # CatalogSource utilities
-│   │   ├── csv/                  # CSV manipulation utilities
-│   │   ├── operatorclient/       # Operator client abstractions
-│   │   ├── operatorlister/       # Informer-based listers
-│   │   ├── operatorstatus/       # Status management
-│   │   ├── ownerutil/            # Owner reference utilities
-│   │   ├── queueinformer/        # Queue-based informers
-│   │   ├── scoped/               # Scoped client for multi-tenancy
-│   │   └── [other utilities]
-│   │
-│   ├── metrics/                  # Prometheus metrics
-│   └── package-server/           # Package server implementation
-│
-├── test/                         # Testing infrastructure
-│   ├── e2e/                      # End-to-end tests
-│   └── images/                   # Test container images
-│
-├── doc/                          # Documentation
-│   ├── design/                   # Architecture and design docs
-│   └── contributors/             # Contributor guides
-│
-└── vendor/                       # Vendored dependencies
-```
+- Start with a failing unit test.
+- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
+- Implement the smallest viable change.
+- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
+- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
 
-## Key Packages and Their Responsibilities
+### Refactoring Agent
+
+Use this persona when improving structure without intentionally changing behavior.
+
+- Treat behavior preservation as the default contract.
+- Add or tighten tests before moving code if current behavior is not already pinned down.
+- Avoid broad rewrites, clever abstractions, or package-wide cleanup unless explicitly requested.
+- If a refactor touches a hot path, benchmark before and after.
+- Keep API shape, semantics, concurrency guarantees, and failure modes unchanged unless the task says otherwise.
+
+### Test Agent
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [operator-framework/operator-lifecycle-manager](https://github.com/operator-framework/operator-lifecycle-manager) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
