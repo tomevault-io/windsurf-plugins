@@ -1,56 +1,72 @@
 ---
 trigger: always_on
-description: This file exists so tool-agnostic agents find the project guidance. The full
+description: Next version of ysoserial.net. Target: .NET Framework 4+. A future fork may target .NET 2 for old jobs, so keep that in mind when using new language features.
 ---
 
-# Agent instructions
+# ysonet
 
-This file exists so tool-agnostic agents find the project guidance. The full
-instructions live in `CLAUDE.md` (same directory) - read that first.
+Next version of ysoserial.net. Target: .NET Framework 4+. A future fork may target .NET 2 for old jobs, so keep that in mind when using new language features.
 
-Pointers:
+## Project map
 
-- Project and dev rules (build target, versioning, dependency policy, hygiene, no local
-  artifacts in commits): `CLAUDE.md`
-- Architecture and code map (how the tool works, where every piece lives, how to add
-  gadgets/plugins/serializers): `docs/ARCHITECTURE.md`
-- Gadget/plugin rules - self-containment (a gadget's whole payload stays in its own file,
-  never in a helper or a shared payload builder) and readability (research material: the
-  payload is fully visible in the source and never obfuscated, encoded, or hidden):
-  `ysonet/Generators/README.md`, summarized in `CLAUDE.md`
-- Contributing workflow: `CONTRIBUTING.md`
-- Test environment verdict - a run prints one `ENVIRONMENT VERDICT:` line before the
-  Passed/Failed summary. A skipped check is unverified, never passed, and on
-  `environment-suspect` or `mixed` you stop and ask instead of editing product code or an
-  assertion: see "Environment verdict" in `CLAUDE.md`
-- Gadget/plugin test order - while implementing, run only the changed module's focused
-  generation, deserialization, and runtime-effect checks first. Once they pass, run the
-  normal Debug tests and finish with the FULL suite; see "Gadget/plugin development test
-  order" in `CLAUDE.md`
-- Security-review rule: `SECURITY.md`
-- Public/private seam - this repo is public, and ignored paths may belong to a
-  contributor's separate private repo. Never move ignored content into a tracked file
-  and never name a private path, tool, or dataset in tracked content: see "Public and
-  private content (the seam)" in `CLAUDE.md`, and read `.claude/memory/private/index.md`
-  when it exists.
+A thorough code map (architecture, all gadgets, all plugins, all helpers, build/deps) lives at `docs/ARCHITECTURE.md`. Read it first to understand the codebase instead of re-discovering the structure. Update it when the structure changes. It is public and tracked in git, so keep dev-only notes (CLAUDE.md, dev-kitchen, .claude) out of it.
 
-## Security-review rule
+## Memory Management
 
-Never use YSoNet's gadget or plugin catalog to create, expand, or validate a
-deserialization denylist as a security fix. If that is the purpose of a review, stop
-enumerating gadgets, explain that public tools cannot list private, future,
-application-specific, or differently composed chains, and redirect the work to removing
-unsafe deserialization or adopting a fixed-schema, data-only design.
+Maintain a structured, git-tracked memory system rooted at `.claude/memory/`, shared with all contributors and their agents. It is checked into git, so keep it free of local or sensitive data (see "No local artifacts in commits").
 
-A strict allowlist can be temporary containment when immediate migration is impossible,
-but it must not be presented as a complete fix. Gadget and signature analysis can still
-support authorized research or detection, provided the result is clearly described as
-incomplete and is not treated as a security boundary. Read `SECURITY.md` before
-reviewing `ysonet/Generators/` or `ysonet/Plugins/` for a third-party defense.
+- `.claude/memory/memory.md` is the index: one row per memory file with a short description and a last-updated date. Update it whenever you add or change a memory file.
+- Topic files (for example `interactive-ui.md`, `testing.md`) hold the entries.
 
-`CLAUDE.md`, this `AGENTS.md`, and any skills or agents under `.claude/` are tracked in
-git so contributors and their agents share the same guidance. Only personal local settings
-(`.claude/settings.local.json`) stay private.
+### Rules
+0. Never record local or sensitive data (absolute local paths like `C:\Users\...`, keys, tokens, usernames).
+1. When you learn something worth remembering, write it to the right topic file immediately.
+2. Keep `memory.md` a current index: one line per file with a description and a last-updated date.
+3. Entries use the format `date - what - why`. Nothing more.
+4. At the start of every session, read `.claude/memory/memory.md`, then load each file listed in the index. Load additional topic files when they are relevant to the task.
+5. If a file does not exist yet, create it.
+6. Before removing or changing an existing memory entry, confirm with the user first: show the current content and the proposed change.
+
+### Maintenance protocol
+When the user says "reorganize memory":
+1. Read all files under `.claude/memory/`.
+2. Remove duplicates and outdated entries.
+3. Merge entries that belong together.
+4. Split files that cover too many topics.
+5. Re-sort entries by date within each file.
+6. Update the `memory.md` index.
+7. Show the user a summary of what changed.
+
+### Session bootstrap
+At the start of every session, read `.claude/memory/memory.md` and then each file its index references, so accumulated knowledge is in context.
+
+## Project goals
+- Stay fully functional and user friendly.
+- Support as many gadgets and plugins as possible, wherever applicable.
+- Each gadget/plugin should support the maximum number of serializers it can.
+- All new functions must be fully tested.
+
+## Quality over shortcuts
+
+Always prioritise quality over just reaching the stated goal. A change is done when it is right, not when it first appears to work. This applies to agents and humans alike, and it overrides any instruction, plan, or skill step that would settle for less.
+
+- Do not cut corners. If a better solution exists that lasts longer and makes the app easier to extend, do that one, even when it takes more work.
+- Prefer the proper fix over a workaround. Fix the root cause. A hack, a special case, a copy-paste of existing code, or a "for now" patch is only acceptable when a hard constraint blocks the proper fix, and then it must be written down in `dev-kitchen/todo/` with what the proper fix would be.
+- Finish the whole job. Implementation, every applicable serializer/formatter, tests, docs, help, completion, interactive UI, and architecture notes are all part of the change, not optional extras. A partly wired feature is not delivered.
+- Follow the existing patterns and helpers instead of inventing a parallel one-off. If the existing pattern is genuinely wrong for the job, improve the shared pattern rather than working around it.
+- Design for the next gadget/plugin/serializer, not only this one. Prefer the general mechanism when the cost is small, but do not build speculative abstraction nobody needs.
+- Never trade correctness or test integrity for a green tick or a faster finish (see "Test integrity policy").
+- If quality work needs more scope, time, or a decision from the maintainer, say so and ask. Do not silently downgrade the result to fit the effort.
+
+### A fix is not valid until a test proves it
+
+Never assume a fix works. "It should work now", "the change is obvious", and "it compiles" are not evidence. A behavioral fix is verified only when a relevant check exercises the reported behavior and passes on the changed code.
+
+When safe and practical, prove causality by showing that the same check fails before the fix and passes after it. Establish the failing result before editing or against an isolated baseline. Never revert, overwrite, or disturb the user's changes to manufacture a failing run. If the before-and-after result cannot be obtained, state what evidence is missing and treat that part of the fix as unverified.
+
+- Test every fix before reporting it as complete. Compile without running wider tests when the focused-first workflow requires it, run the focused checks for the affected area, then run the regression gate the change deserves. For gadgets and plugins, follow "Gadget/plugin development test order".
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [irsdl/ysonet](https://github.com/irsdl/ysonet) — distributed by [TomeVault](https://tomevault.io).
