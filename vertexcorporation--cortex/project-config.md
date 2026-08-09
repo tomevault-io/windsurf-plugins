@@ -174,4 +174,4 @@ Add `ggml-ci` to commit message to trigger heavy CI workloads on the custom CI i
 
 ---
 > Source: [VertexCorporation/Cortex](https://github.com/VertexCorporation/Cortex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
