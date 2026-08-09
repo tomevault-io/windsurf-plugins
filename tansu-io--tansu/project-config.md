@@ -1,13 +1,13 @@
 ---
 trigger: always_on
-description: `tansu-sans-io` is the Kafka wire protocol implementation at the heart of Tansu. As its name implies, it performs **no I/O** — it operates purely on bytes, converting between raw Kafka protocol frames and typed Rust structures. This makes it suitable for embedding in any async runtime or network stack (Tansu uses `rama`).
+description: `nisshi-sans-io` is the Kafka wire protocol implementation at the heart of Nisshi. As its name implies, it performs **no I/O** — it operates purely on bytes, converting between raw Kafka protocol frames and typed Rust structures. This makes it suitable for embedding in any async runtime or network stack (Nisshi uses `rama`).
 ---
 
-# Research: tansu-sans-io Crate
+# Research: nisshi-sans-io Crate
 
 ## Overview
 
-`tansu-sans-io` is the Kafka wire protocol implementation at the heart of Tansu. As its name implies, it performs **no I/O** — it operates purely on bytes, converting between raw Kafka protocol frames and typed Rust structures. This makes it suitable for embedding in any async runtime or network stack (Tansu uses `rama`).
+`nisshi-sans-io` is the Kafka wire protocol implementation at the heart of Nisshi. As its name implies, it performs **no I/O** — it operates purely on bytes, converting between raw Kafka protocol frames and typed Rust structures. This makes it suitable for embedding in any async runtime or network stack (Nisshi uses `rama`).
 
 The crate's description from `Cargo.toml`: *"A Kafka protocol implementation using serde"*.
 
@@ -16,7 +16,7 @@ The key insight of the design is that the entire Kafka binary protocol — seria
 ## Source Layout
 
 ```
-tansu-sans-io/
+nisshi-sans-io/
 ├── build.rs                 # Code generator (1,276 lines)
 ├── Cargo.toml
 ├── message/                 # 185 official Kafka JSON descriptors
@@ -97,7 +97,7 @@ Key descriptor properties:
 The `build.rs` (1,276 lines) uses `proc_macro2`, `quote`, and `syn` to generate Rust source at compile time:
 
 1. **Read**: `read_value()` strips `//` comments from JSON files and parses them via `serde_json`
-2. **Parse**: Converts JSON values into `tansu_model::Message` structs (which model version ranges, field metadata, nested structures)
+2. **Parse**: Converts JSON values into `nisshi_model::Message` structs (which model version ranges, field metadata, nested structures)
 3. **Filter**: Only processes messages where `listeners` includes `"broker"` and an `apiKey` is defined
 4. **Generate**: For each message, produces:
 
@@ -113,11 +113,9 @@ pub enum Body {
     // ... ~90 variants
 }
 ```
-Plus `From<MessageType> for Body` and `TryFrom<Body> for MessageType` impls for each variant.
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tansu-io/tansu](https://github.com/tansu-io/tansu) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
