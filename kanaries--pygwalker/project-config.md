@@ -1,115 +1,32 @@
 ---
 trigger: always_on
-description: This is the fast-start map of the PyGWalker repo for both human contributors and coding
+description: This project's contributor & agent guide is maintained in **[AGENTS.md](AGENTS.md)** — a
 ---
 
-# AGENTS.md — PyGWalker contributor & agent guide
+# CLAUDE.md
 
-This is the fast-start map of the PyGWalker repo for both human contributors and coding
-agents. It explains how the project is put together, how to run it in **dev mode with live
-frontend reload**, and where all the logs go. Read this first — it is written to save you
-from re-deriving the architecture by grepping.
+This project's contributor & agent guide is maintained in **[AGENTS.md](AGENTS.md)** — a
+single source of truth for the architecture, dev-mode workflow, and log locations. Read it
+before making changes.
 
-> Deeper references: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (how it is built),
-> [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) (dev workflow + troubleshooting),
-> [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) (validation & CI).
+@AGENTS.md
 
----
+## TL;DR for a coding agent
 
-## 1. What PyGWalker is (30-second model)
-
-PyGWalker turns a pandas / polars / pyarrow dataframe into an interactive
-[Graphic Walker](https://github.com/Kanaries/graphic-walker) UI inside notebooks, Streamlit,
-and plain web servers. It has **two halves that ship together**:
-
-- **Python package** (`pygwalker/`) — public API (`walk`, `render`, `table`, `Walker`,
-  `to_html`), data parsing, and the transports that talk to the UI.
-- **Frontend app** (`app/`, React + Vite) — the UI. It is compiled into JavaScript bundles
-  that are checked into the wheel under `pygwalker/templates/dist/` and loaded by the Python
-  side at render time.
-
-The Python side never renders charts itself; it hands built JS + serialized data to a
-notebook/browser and then answers data/spec requests over a message channel.
-
----
-
-## 2. Repo map
-
-| Path | What lives here |
-|------|-----------------|
-| `pygwalker/api/` | Public entry points. `adapter.py` picks jupyter vs webserver; `jupyter.py` = notebook dispatch; `walker.py` = the reusable `Walker`; `pygwalker.py` = the core `PygWalker`. |
-| `pygwalker/services/` | Rendering + display. `anywidget_widget.py` (default transport), `render.py` + `templates/*.html` (iframe transport), `global_var.py` (runtime globals), `jupyter_display.py`. |
-| `pygwalker/communications/` | Kernel⇄frontend transports: `anywidget_comm.py` (default), `hacker_comm.py` (iframe), `streamlit_comm.py`, `gradio_comm.py`, `reflex_comm.py`. `protocol.py` is the shared message schema. |
-| `pygwalker/data_parsers/` | Dataframe/connector adapters (pandas, polars, pyarrow, SQL, spark…). |
-| `pygwalker/templates/dist/` | **Build output** (git-ignored). The JS bundles the Python side loads. |
-| `pygwalker/utils/` | Helpers: `frontend_assets.py` (locate/load bundles), `log.py` (logging), encoders. |
-| `app/src/` | Frontend source. `index.tsx` = entry; `utils/communication.tsx` = transports; `dataSource/` = data ingest; `interfaces/comm.generated.ts` = **generated** protocol types; `store/` = MobX state. |
-| `scripts/` | `dev.py` (dev orchestrator), `compile.sh` (build frontend), `local_ci.py` (mirror CI), `generate_comm_protocol_ts.py` (regenerate protocol types). |
-| `tests/` | Python tests + `*.ipynb` notebooks run by `nbmake`. `app/tests/` holds Playwright smoke tests. |
-
----
-
-## 3. How the two halves fit together (build & load model)
-
-```
-app/src/*  --(vite build)-->  pygwalker/templates/dist/*.js  --(read at runtime)-->  Python renders it
-```
-
-**Frontend build variants** (`app/vite.config.ts`, output to `pygwalker/templates/dist/`):
-
-| Bundle | Built from | Loaded by |
-|--------|-----------|-----------|
-| `pygwalker-app.es.js` | `src/index.tsx` | **anywidget** transport (the default `pyg.walk` path) |
-| `pygwalker-app.iife.js` | `src/index.tsx` | iframe transport / static `to_html()` |
-| `dsl-to-workflow.umd.js` | `src/lib/dslToWorkflow.ts` | kernel-side DSL→workflow conversion |
-| `vega-to-dsl.umd.js` | `src/lib/vegaToDsl.ts` | kernel-side Vega→DSL conversion |
-
-`yarn build` builds all four (+ typecheck). `yarn build:app` builds only the two app
-bundles (fast, no typecheck) — good for a quick manual rebuild, not for CI.
-
-**The message protocol is generated, not hand-written.** Python Pydantic models in
-`pygwalker/communications/protocol.py` are the source of truth. Running
-`python scripts/generate_comm_protocol_ts.py` regenerates
-`app/src/interfaces/comm.generated.ts`. **If you change `protocol.py`, regenerate and rebuild
-the frontend.** Never edit `comm.generated.ts` by hand.
-
-**Transports.** The default notebook transport is **anywidget** (`env='JupyterAnywidget'`).
-`env='Jupyter'` / `env='JupyterWidget'` are deprecated aliases that are coerced to anywidget
-and slated for removal in 0.7.0. Streamlit/Gradio/Reflex/web-server have their own transports.
-
----
-
-## 4. First-time setup
-
-Requires **Python 3.10+**, **Node.js 22.x**, **Yarn 1.x**.
-
-```bash
-# Python (editable install with dev extras)
-python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -e ".[dev]"
-
-# Frontend deps + one full build so pygwalker/templates/dist/ is populated
-cd app && yarn install && yarn build && cd ..
-```
-
----
-
-## 5. Dev mode: edit the frontend and see it live (anywidget HMR)
-
-The default `pyg.walk(df)` uses the anywidget transport, which loads
-`pygwalker-app.es.js` from disk. In dev mode we (a) rebuild that bundle on every source
-change and (b) let anywidget hot-reload it into open widgets. **One command starts
-everything and captures all logs:**
-
-```bash
-source venv/bin/activate
-python scripts/dev.py
-```
-
-This launches, and tees the output of, two long-running processes:
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Setup:** `python -m venv venv && source venv/bin/activate && pip install -e ".[dev]"`,
+  then `cd app && yarn install && yarn build`.
+- **Run everything in dev mode with live reload + centralized logs:** `python scripts/dev.py`
+  (starts the frontend watch build + JupyterLab with `PYGWALKER_DEV=1` / `ANYWIDGET_HMR=1`).
+  Pass `--no-browser` for headless runs.
+- **Logs:** `logs/frontend.log` (build/watch), `logs/jupyter.log` (server URL + token),
+  `logs/pygwalker.log` (kernel-side Python logs). Frontend runtime logs are in the browser
+  console.
+- **In a notebook:** just `import pygwalker as pyg; pyg.walk(df)` — no special setup; edits
+  under `app/src/` hot-reload into the widget.
+- **Before pushing:** `python scripts/local_ci.py` (or, narrower, `yarn typecheck` + `yarn build`
+  in `app/`, and `ruff check`/`ruff format --check`/`pytest` from the root).
+- **Don't:** commit `pygwalker/templates/dist/`, hand-edit `app/src/interfaces/comm.generated.ts`,
+  or rely on `PYGWALKER_DEV`/`ANYWIDGET_HMR` at runtime for end users.
 
 ---
 > Source: [Kanaries/pygwalker](https://github.com/Kanaries/pygwalker) — distributed by [TomeVault](https://tomevault.io).
