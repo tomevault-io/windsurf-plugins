@@ -3,180 +3,59 @@ trigger: always_on
 description: > This file is auto-generated. Do not edit directly.
 ---
 
-# Nuxt SEO Best Practices - Complete Reference
+# Nuxt Agent-Ready Best Practices - Complete Reference
 
 > This file is auto-generated. Do not edit directly.
-> Edit individual rule files in the `rules/` directory and run `bun run build`.
+> Edit individual rule files in the `rules/` directory and run `pnpm build`.
 
-# Nuxt SEO Best Practices
+# Nuxt Agent-Ready Best Practices
 
-Comprehensive SEO optimization guide for Nuxt 4 applications deployed to Cloudflare Pages/Workers. Contains 11 rules across 4 categories, prioritized by impact to guide automated refactoring and code generation.
+Guidelines for making a Nuxt 4 site **operable by autonomous AI agents** — measured by the [isitagentready.com](https://isitagentready.com) scanner (Cloudflare's "Is Your Site Agent-Ready?"). This is a different axis from GEO: GEO is about being _cited_ in AI answers; agent-readiness is about being _operated_ — an agent authenticating, discovering your API, calling your tools, and taking action.
+
+Proven on production Nuxt 4 + Nitro `cloudflare_module` Workers:
+
+- A **marketing site** (only public POST endpoints, no auth/MCP server): **21 → 50+ (Level 1 → Level 4 "Agent-Integrated")** — the auth + MCP surfaces are honesty-gated OFF (see below).
+- A **full platform** with a real OAuth server (Better-Auth oauth-provider) + a real remote MCP server: **21 → 100/100 (Level 5 "Agent-Native"), all 14 checks green**. The auth + MCP surfaces are legitimately publishable there, which is what unlocks the last ~40 points.
+
+**The ceiling is set by what you actually run, not by effort.** A marketing site tops out around Level 4 and that is the _correct_ score — do not fabricate an auth server to chase 100 (see THE HONESTY RULE). Only a site with a real authorization server and a real MCP server can honestly reach Level 5.
+
+## GEO vs Agent-Readiness (know the difference)
+
+|          | GEO (`nuxt-geo-best-practices`)                            | Agent-Readiness (this skill)                                           |
+| -------- | ---------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Goal     | Be **cited** in AI answers                                 | Be **operated** by agents                                              |
+| Question | "Will ChatGPT mention me?"                                 | "Can an agent call my tools and act?"                                  |
+| Levers   | llms.txt, crawler allowlist, RAG content, JSON-LD entities | MCP/WebMCP, API/skill discovery, agent auth, DNS-AID, agentic commerce |
+
+**Shared primitives live in the GEO skill.** `robots.txt` AI-crawler allowlisting, `llms.txt`/`llms-full.txt`, and the XML sitemap are covered by `nuxt-geo-best-practices` (rules `ai-robots-allowlist`, `ai-llms-txt`, `ai-sitemap`). The isitagentready scanner scores those too — set them up via the GEO skill first, then apply this skill for the agent-operation layer on top.
 
 ## When to Apply
 
-Reference these guidelines when:
+- Raising a site's score on `https://isitagentready.com/<domain>`
+- Supporting `Accept: text/markdown` content negotiation for agents
+- Advertising resources via RFC 8288 `Link` headers
+- Publishing an RFC 9727 API catalog (`/.well-known/api-catalog`)
+- Publishing an Agent Skills discovery index (`/.well-known/agent-skills/index.json`)
+- Exposing site actions to in-browser agents via WebMCP (`navigator.modelContext`)
+- Publishing an MCP Server Card (only if you run a real MCP server)
+- Publishing OAuth/OIDC discovery for agent auth (only if you run a real auth server)
+- Publishing DNS-AID records (`_index._agents.<domain>`) + DNSSEC
 
-- Generating dynamic OG images on Cloudflare Workers
-- Setting up page-level SEO meta tags and composables
-- Adding JSON-LD structured data
-- Configuring Nitro for Cloudflare Pages deployment
-- Handling SSR-incompatible client-only libraries
-- Setting up social sharing meta (Open Graph, Twitter Cards)
-- Working with Satori for image generation (NEVER use React)
+## THE HONESTY RULE (load-bearing — read before publishing anything)
 
-## Rule Categories by Priority
+**Only publish discovery for services that actually exist.** A discovery document that sends an agent to a dead end — a `/.well-known/openid-configuration` with no auth server behind it, an MCP Server Card whose transport endpoint 404s, a `_mcp._agents` DNS record with no MCP server — is **worse than a lower score**. Agents will try to use it and fail.
 
-| Priority | Category                  | Impact   | Prefix    |
-| -------- | ------------------------- | -------- | --------- |
-| 1        | OG Image Generation       | CRITICAL | `og-`     |
-| 2        | Page SEO & Meta           | HIGH     | `meta-`   |
-| 3        | Structured Data           | MEDIUM   | `schema-` |
-| 4        | Cloudflare & Nitro Config | HIGH     | `cf-`     |
+This mirrors the "never fake customers/logos/scale" rule: a fabricated capability that fails on first contact destroys trust. On a marketing site with only public POST endpoints, **skip** OAuth/OIDC discovery, oauth-protected-resource, auth.md, and the MCP Server Card — they belong on the app/console domain (real auth server) or require building a real MCP server. Decline these explicitly and say why.
 
-## Quick Reference
+**The flip side — when you DO run the real thing, publish it fully.** If your site runs a real OAuth authorization server (e.g. Better-Auth `oauth-provider` plugin) and a real remote MCP server, the auth + MCP surfaces are no longer dishonest — they are the highest-value checks and unlock Level 5. maps.guru scored 100/100 precisely because those services exist. The honesty rule cuts both ways: don't fake it, but don't under-claim a real capability either.
 
-### 1. OG Image Generation (CRITICAL)
+## THE SCANNER-BEHAVIOR RULES (what actually flips a check green)
 
-- `og-cf-workers` - Generate dynamic OG images on Cloudflare Workers with @cf-wasm/og
-- `og-no-react` - Use plain JS objects for Satori elements, NEVER React
-- `og-cache-headers` - Cache OG images with immutable headers for CDN
+Passing the harder checks is NOT "publish the file and move on" — the isitagentready scanner inspects **content and runtime behavior**, not just presence. Three non-obvious behaviors cost real time to discover:
 
-### 2. Page SEO & Meta (HIGH)
-
-- `meta-use-page-seo` - Reusable composable for consistent page-level SEO
-- `meta-social-tags` - Proper Open Graph and Twitter Card meta tags
-- `meta-canonical-url` - Canonical URLs and og:url for every page
-
-### 3. Structured Data (MEDIUM)
-
-- `schema-json-ld` - JSON-LD structured data in app.vue for Google Rich Results
-
-### 4. Cloudflare & Nitro Config (HIGH)
-
-- `cf-compatibility-date` - Pin compatibilityDate, never use 'latest'
-- `cf-nitro-config` - Nitro config for CF Pages (nodeCompat, process.stdout, WASM)
-- `cf-ssr-externals` - SSR external config for client-only libraries
-- `cf-wasm-import` - WASM module configuration for Cloudflare Workers
-
-## How to Use
-
-Read individual rule files for detailed explanations and code examples:
-
-```
-rules/og-cf-workers.md
-rules/meta-use-page-seo.md
-rules/_sections.md
-```
-
-Each rule file contains:
-
-- Brief explanation of why it matters
-- Incorrect code example with explanation
-- Correct code example with explanation
-- Additional context and Nuxt/Cloudflare-specific notes
-
-## Full Compiled Document
-
-For the complete guide with all rules expanded: `AGENTS.md`
-
----
-
-# Detailed Rules
-
-### Pin compatibilityDate, Never Use 'latest'
-
-**Impact:** HIGH - Prevents unpredictable Nitro behavior changes between builds
-
-## Pin compatibilityDate, Never Use 'latest'
-
-Nuxt's `compatibilityDate` controls which Nitro runtime behaviors are active. Using `'latest'` resolves to a different date on every build, which can silently change how your app behaves in production.
-
-**Incorrect (using 'latest'):**
-
-```typescript
-// ❌ WRONG — 'latest' resolves to a different date on each build
-// nuxt.config.ts
-export default defineNuxtConfig({
-  compatibilityDate: 'latest',
-  // Today it might be 2025-07-18, tomorrow 2025-07-19
-  // Each date can change Nitro's internal behavior
-});
-```
-
-**Correct (pinned date):**
-
-```typescript
-// ✅ CORRECT — Pinned to a specific date
-// nuxt.config.ts
-export default defineNuxtConfig({
-  compatibilityDate: '2025-07-18',
-  // Consistent behavior across all builds
-  // Update intentionally when you want new Nitro features
-});
-```
-
-**When to update:**
-
-- When upgrading Nuxt or Nitro versions
-- When you need a specific Nitro feature that requires a newer date
-- Always test after updating — some changes are breaking
-
-**How to find the right date:**
-
-- Use the date of your current Nuxt release
-- Check [Nitro changelog](https://github.com/unjs/nitro/releases) for what changed
-- Pin to the latest date that works with your deployment target
-
-**Real-world impact:** A `compatibilityDate` change can affect:
-
-- How `process.env` is handled in server routes
-- WASM module loading behavior
-- Node.js API compatibility layer
-- Response header defaults
-
----
-
-### Configure Nitro for Cloudflare Pages Deployment
-
-**Impact:** HIGH - Ensures WASM support, Node.js compatibility, and proper builds on CF Pages
-
-## Configure Nitro for Cloudflare Pages Deployment
-
-Cloudflare Pages/Workers have specific requirements for WASM modules, Node.js APIs, and global objects. Without proper Nitro configuration, builds fail or runtime errors occur.
-
-**Incorrect (minimal config):**
-
-```typescript
-// ❌ WRONG — Missing critical CF Workers config
-export default defineNuxtConfig({
-  nitro: {
-    preset: 'cloudflare-pages',
-  },
-});
-```
-
-**Correct (full CF Pages config):**
-
-```typescript
-// ✅ CORRECT — Full Cloudflare Pages configuration
-export default defineNuxtConfig({
-  compatibilityDate: '2025-07-18',
-
-  nitro: {
-    preset: 'cloudflare-pages',
-  },
-
-  cloudflare: {
-    // Enable Node.js API compatibility (Buffer, crypto, etc.)
-    nodeCompat: true,
-  },
-
-  vite: {
-    // Replace process.stdout (not available in CF Workers)
-    define: {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [geoql/v-maplibre](https://github.com/geoql/v-maplibre) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
