@@ -1,165 +1,93 @@
 ---
 trigger: always_on
-description: This directory contains state tests that compare Giga vs V2 EVM execution.
+description: `testutil/configtest` and `testutil/fuzzing` are the harness that pins how a seid
 ---
 
-# State Tests Documentation
+# Configuration Characterization
 
-## Overview
+`testutil/configtest` and `testutil/fuzzing` are the harness that pins how a seid
+node resolves configuration. The suites built on them record the current behavior
+of the legacy configuration path as executable tests, including the parts of that
+behavior nobody would choose on purpose.
 
-This directory contains state tests that compare Giga vs V2 EVM execution.
+The surface is worth pinning because it is large and mostly implicit. A value
+reaches running code from four layers (an in-code default, a TOML file, an
+environment variable, a cobra flag), resolved through several viper instances whose
+environment prefixes differ, and it lands in two places the rest of the boot reads,
+a Tendermint config struct and a flat key-value map. None of that was written down
+anywhere a second implementation could be compared against, which is what these
+tests supply. They exist so the SeiConfigManager work (PLT-775) can replace that
+path and prove the replacement resolves every key the same way.
 
-- **Test data location:** `giga/tests/data/`
-- **Skip list:** `giga/tests/data/skip_list.json`
+## Standing Rule
 
-## Running Tests
+Inside the surface the suite covers, a change to how a configuration value is read,
+defaulted, named, or cast is a change to a pinned contract, so the suite fails. That
+failure is the review prompt. Record the new behavior and put the old and new value in
+the diff, rather than loosening the assertion until it passes.
 
-### Basic Commands
+What that surface is has to be read alongside the rule, because the rule is
+unconditional only inside it. A key added to a struct field some row already claims is
+not caught, and nothing mechanical will prompt you (`Adding a Key to an Existing
+Section`). A rename fails here and still has to be carried by hand into the app.toml
+template, the flag registration and the documentation (`Renaming a Key`). And whole
+classes of read sit outside the suite (`Out of Scope`). None of that softens the
+paragraph above for the reads the suite does cover: there, the failure is not optional
+and not something to route around.
 
-```bash
-# Run all non-skipped tests
-go test -v -run TestGigaVsV2_StateTests ./giga/tests/...
+Four ways of making a failure go away are wrong here, because each one turns a
+visible change into an invisible one:
 
-# Run specific category
-STATE_TEST_DIR=stExample go test -v -run TestGigaVsV2_StateTests ./giga/tests/...
+1. `t.Skip` on a row whose behavior changed. CI stays green and a skip line in
+   verbose output is what nobody reads.
+2. Widening an assertion to accept both the old and new value.
+3. Deleting a row rather than updating it.
+4. Editing a row's `Cast`, `Unguarded` or `Checked` until it matches a reader you
+   changed, without having intended the behavior change. A row describes the reader,
+   so editing one is correct only alongside a deliberate change to that reader in the
+   same PR.
 
-# Run specific test within category
-STATE_TEST_DIR=stExample STATE_TEST_NAME=add11 go test -v -run TestGigaVsV2_StateTests ./giga/tests/...
+If a pinned behavior is genuinely wrong and worth fixing, fix it in the production
+reader and update the row in the same PR. The row then records the improvement.
 
-# Ignore skip list (run skipped tests)
-IGNORE_SKIP_LIST=true STATE_TEST_DIR=stCreate2 go test -v -run TestGigaVsV2_StateTests ./giga/tests/...
+## Primitives
 
-# Use regular KVStore (for debugging)
-USE_REGULAR_STORE=true STATE_TEST_DIR=stChainId go test -v -run TestGigaVsV2_StateTests ./giga/tests/...
-```
+`CheckRow` is `CheckKey` plus `CheckDeterministic`, so there is one fewer property than there
+are calls. A fuzz target names only `CheckRow` and gets both. The table below is the enumeration,
+and `TestGuideListsEveryPrimitive` holds it to the exported surface.
 
-## Running Tests in Parallel (Best Practices)
+| Check | The failure it prevents | Held against |
+|---|---|---|
+| `CheckDefaults` | a declared default moves with nothing independent to compare against | `testdata/<section>.golden` |
+| `CheckKeyNames` | an operator-facing key is renamed while the row and the reader move together | `testdata/<section>.keys.golden` |
+| `CheckKey` | a reader does not resolve `Key` into `Path` through `Cast` | the reader's own empty-`AppOpts` result, with the row's leaf spliced in |
+| `CheckDeterministic` | a reader is not a pure function of its `AppOpts` | a second read of the same input |
+| `CheckAbsent` | an omitted key resolves to something other than the declared default | the declared defaults struct |
+| `CheckManifestCoversEveryField` | a resolved field no row claims | the manifest's `Path` and `AlsoWrites` entries |
+| `CheckEveryRowHasADiscriminatingSeed` | a row whose every seed would also pass against a reader that never looks its key up | the recorded seed corpus |
+| `CheckWiring` | one of the calls above is deleted | `testdata/wiring_coverage.txt` |
 
-### Critical Learnings
+The third column is the spec, and it is the one to read before wiring anything. Three of these
+compare against a checked-in file, one against the declared defaults, one against the reader's own
+output, one against a second read of the same input, one against the manifest, and one against the
+seeds the target declared. A check whose right-hand side comes from the same place as its left-hand
+side holds for any reader.
 
-- Running too many parallel test processes causes PebbleDB panics
-- Limit to **2-4 parallel test processes** maximum
-- Use `-timeout 20m` or longer for large categories
-- Categories that timeout at 20min: stPreCompiledContracts, stStaticCall, stBadOpcode, stEIP1559, stQuadraticComplexityTest, stTimeConsuming
+Two of them read no prediction column, and that is the invariant any new check
+inherits. `CheckKeyNames` is blind to `Path`, `Cast`, `Unguarded` and `Checked`, and
+`CheckEveryRowHasADiscriminatingSeed` to `Cast`, `Unguarded` and `Checked`. A check that
+read the column it exists to hold could be silenced by editing that column, which is
+forbidden move 4 above.
 
-### Recommended Approach
+`CheckKey` compares against the reader's own empty-`AppOpts` result rather than the
+declared defaults, because some readers fill fields from outside the config.
+`CheckAbsent` is what ties that result to the declared defaults, so a section wired for
+rows and not for `CheckAbsent` has an unanchored baseline.
 
-```bash
-# Run 2-3 categories in parallel with timeouts
-STATE_TEST_DIR=stCategory1 go test -v -run TestGigaVsV2_StateTests ./giga/tests/... -timeout 30m 2>&1 | tee /tmp/results_stCategory1.log &
-STATE_TEST_DIR=stCategory2 go test -v -run TestGigaVsV2_StateTests ./giga/tests/... -timeout 30m 2>&1 | tee /tmp/results_stCategory2.log &
-wait
-```
-
-## Extracting Failing Test Names
-
-### From test output logs
-
-```bash
-# Count passes and failures
-grep -e "PASS:" results.log | grep "stCategory" | wc -l
-grep -e "FAIL:" results.log | grep "stCategory" | wc -l
-
-# List specific failing tests (shows test name)
-grep -e "FAIL:" results.log | grep "stCategory"
-
-# Check for specific failure types in output
-grep "gas_mismatch\|result_code\|state_mismatch\|balance_mismatch" results.log
-```
-
-## Skip List Format
-
-**File:** `giga/tests/data/skip_list.json`
-
-```json
-{
-  "skipped_tests": {
-    "category/relPath.json/FullTestNameFromJSON/index": "reason"
-  },
-  "skipped_categories": [
-    "stTimeConsuming"
-  ],
-  "skipped_category_reasons": {
-    "stCategory": "ANALYZED: X/Y tests pass. N failures: type1(count), type2(count)"
-  }
-}
-```
-
-### Test Name Format for `skipped_tests`
-
-The test name key must match the exact format used internally. Get the correct format from the test summary output:
-
-```bash
-# Run tests and look for failure summary lines starting with "- category/..."
-grep -E "^\s+- category/" /tmp/results.log
-```
-
-**Format:** `category/relPath/FullJSONKey/index`
-
-- `category` - The STATE_TEST_DIR value (e.g., `Shanghai`, `stTransactionTest`)
-- `relPath` - Relative path from category dir to the .json file (e.g., `subdir/test.json` or just `test.json`)
-- `FullJSONKey` - The full key from inside the JSON file (includes `GeneralStateTests/...`)
-- `index` - Optional subtest index (e.g., `/5`) if the test has multiple post states
-
-**Examples:**
-
-```json
-{
-  "skipped_tests": {
-    "Shanghai/stEIP3651-warmcoinbase/coinbaseWarmAccountCallGas.json/GeneralStateTests/Shanghai/stEIP3651-warmcoinbase/coinbaseWarmAccountCallGas.json::coinbaseWarmAccountCallGas-fork_[Cancun-Prague]-d[0-7]g0v0/5": "gas_mismatch",
-    "stTransactionTest/HighGasPriceParis.json/GeneralStateTests/stTransactionTest/HighGasPriceParis.json::HighGasPriceParis-fork_[Cancun-Prague]-d0g0v0": "fee_out_of_bound"
-  }
-}
-```
-
-### Per-test vs Per-category skipping
-
-- Use `skipped_tests` for specific failing tests (allows passing tests to run)
-- Use `skipped_categories` only for categories not yet analyzed or with extensive failures
-- `skipped_category_reasons` tracks analysis status (use "ENABLED:" prefix for categories with individual test skips)
-
-## Failure Types
-
-| Type | Description |
-|------|-------------|
-| `result_code` | Transaction success/failure mismatch |
-| `gas_mismatch` | Gas calculation differences |
-| `state_mismatch` | Storage value differences |
-| `balance_mismatch` | Balance differences |
-| `code_mismatch` | Contract code differences |
-| `nonce_mismatch` | Account nonce differences |
-| `v2_error` | V2 execution error |
-| `giga_error` | Giga execution error |
-
-## Test Categories Status
-
-### Categories with 100% pass rate (removed from skip list)
-
-- stExample, stSLoadTest, stChainId, stCodeCopyTest, stExpectSection, stEIP158Specific
-- stLogTests, stShift, stHomesteadSpecific, stAttackTest, stRecursiveCreate
-
-### Categories enabled with individual test skips
-
-- Shanghai (26/27 passing, 1 skipped)
-- stArgsZeroOneBalance (91/96 passing, 5 skipped)
-- stTransactionTest (248/259 passing, 11 skipped)
-- stSpecialTest (21/22 passing, 1 skipped)
-- stSolidityTest (21/23 passing, 2 skipped)
-- stNonZeroCallsTest (21/24 passing, 3 skipped)
-- stRefundTest (23/26 passing, 3 skipped)
-- stWalletTest (41/46 passing, 5 skipped)
-- stEIP150singleCodeGasPrices (422/450 passing, 28 skipped)
-
-### Categories needing longer timeout (>20min)
-
-- stPreCompiledContracts, stStaticCall, stBadOpcode, stEIP1559
-- stQuadraticComplexityTest, stTimeConsuming
-
-## Workflow for Analyzing New Categories
-
+**Before adding one.** Advancing coverage is normally wiring an existing check to another
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sei-protocol/sei-chain](https://github.com/sei-protocol/sei-chain) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
