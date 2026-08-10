@@ -1,0 +1,111 @@
+---
+trigger: always_on
+description: Guidance for coding agents (Claude Code, Codex, …) working in this repository.
+---
+
+# AGENTS
+
+Guidance for coding agents (Claude Code, Codex, …) working in this repository.
+This file holds only the **mandatory** knowledge. Everything else lives
+in `docs/` — read the matching doc before working in an area.
+
+## Project Overview
+
+DecBench is a benchmarking suite for evaluating decompiler performance. It
+implements a three-stage pipeline (compile → decompile → evaluate) with
+pluggable decompilers and three core metrics, and publishes the results as a
+static site (https://decbench.com). The associated data produced from this
+benchmark can be found at https://huggingface.co/datasets/noelo-lab/decbench-dataset.
+
+## Docs index
+
+| Doc | Read it before |
+| --- | --- |
+| `docs/benchmarking.md` | running anything at scale — this machine's decompiler installs + versions, the corpus (sailr/cps/malware), the run drivers + env knobs, and the overlay → finalize flow behind the published numbers |
+| `docs/metrics.md` | touching a metric — GED / type_match / byte_match internals, fairness passes, metric caching |
+| `docs/decompilers.md` | adding or debugging a backend — the plugin contract, the LLM/coding-agent backends, external submissions (the eval kit) |
+| `docs/site.md` | touching the report or site — rendering architecture, the content system, build/deploy, the data schema |
+| `docs/dataset-publishing.md` | publishing to / consuming the HuggingFace dataset repo |
+
+## Environment
+
+- Use the `decbench` virtualenv at `/home/mahaloz/.virtualenvs/decbench`
+  (Python 3.14; decbench installed editable). Activate with
+  `source /home/mahaloz/.virtualenvs/decbench/bin/activate`.
+- Benchmark backends working on this machine: angr, ghidra (12.1/12.0 + three
+  historical versions), ida (9.2 idalib), binja (5.3), kuna, r2dec, dewolf,
+  and the codex/claude-code LLM agents. retdec/reko need their Docker images
+  built first, and kimi-code needs a Kimi OAuth login.
+  `decbench list-decompilers` shows live availability; install paths,
+  licenses, and per-version config are in `docs/benchmarking.md`.
+- Docker works here (no sudo needed).
+
+## Common Commands
+
+```bash
+pip install -e ".[dev]"             # install for development
+pytest                              # all tests, with coverage (real-decompiler tests auto-skip)
+ruff check .                        # lint
+black .                             # format
+mypy decbench                       # type check
+
+decbench run project.toml -O O0 -O O2 -d angr -d ghidra   # full pipeline, one project
+decbench list-decompilers           # show available decompilers
+decbench list-metrics               # show available metrics
+decbench report scoreboard.toml     # render the HTML report
+decbench site build results/full_run -o site/   # build the deployable Pages tree
+```
+
+Real benchmark runs use `scripts/compile_all.py` + `scripts/run_benchmark.py`
+(checkpointed, resumable, spawn-based) — NOT a bare `decbench run`. A "full
+run" always means every project in `projects/{sailr,cps,malware}/` × every
+supported decompiler. Drivers, env knobs, and the full-run recipe:
+`docs/benchmarking.md`.
+
+## Architecture
+
+```
+decbench/
+  pipeline/         # compile -> decompile -> evaluate (executor.py / PipelineExecutor)
+  metrics/          # ged.py, type_match.py, byte_match.py, fixup.py
+  decompilers/      # raw angr/ghidra/ida/binja + dewolf, dockerized, LLM agents
+  compilers/        # gcc plugin
+  models/           # Pydantic data models (project.py, function_data.py, ...)
+  scoring/          # aggregation, scoreboard, dataset presets, report extras
+  rendering/        # the report + the deployable site (see docs/site.md)
+    content/        #   ALL editable prose/config; html.py is skeleton-only
+  utils/            # binfmt.py, cfg.py, source_extract.py
+  cli.py            # Click-based CLI entry point
+scripts/            # scalable run drivers + offline metric re-eval/rebuild
+projects/           # benchmark corpus TOMLs: sailr/ cps/ malware/
+site/               # the built Pages tree (committed; CI only deploys it)
+docs/               # the detailed reference docs (index above)
+```
+
+Data flow: project TOML → compile (binaries + preprocessed `.i` files) →
+decompile (`DecompilationResult` per binary) → metrics (`MetricResult`) →
+aggregate → `scoreboard.toml` + `function_results.json` → report / site.
+
+Key conventions:
+
+- **Decompiler identity is `name` or `name@version`** (e.g. `ghidra@12.1`);
+  each versioned spec is its own comparable column everywhere downstream.
+- **Addresses are stored in ELF-file-space** so they line up with DWARF.
+- **Optimization levels map to GCC flags via `opt_gcc_flags()`**
+  (`decbench/models/project.py`) — never `f"-{opt}"`. `O2-noinline` =
+  `-O2 -fno-inline`; plain `O2` is a genuine O2 (inlining enabled).
+
+## Critical rules (violating these silently corrupts results)
+
+- **The published metric numbers are the reeval OVERLAYS**, not the checkpoint
+  inline values. `function_results.json` is only ever written through
+  `decbench/results_store.py`; the canonical rebuild is
+  `scripts/finalize_results.py <tree>` (coverage-guarded; `--audit` scans for
+  silent gaps). After adding a decompiler, refresh the overlays and
+  re-finalize before publishing. Full flow: `docs/benchmarking.md`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Noelo-Lab/decbench](https://github.com/Noelo-Lab/decbench) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-10 -->
