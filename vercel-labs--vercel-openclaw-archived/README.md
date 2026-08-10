@@ -7,11 +7,11 @@ Deploy OpenClaw on Vercel
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [vercel-labs/vercel-openclaw-archived](https://github.com/vercel-labs/vercel-openclaw-archived).
+Original source: `CLAUDE.md` in [vercel-labs/vercel-openclaw-archived](https://github.com/vercel-labs/vercel-openclaw-archived).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
