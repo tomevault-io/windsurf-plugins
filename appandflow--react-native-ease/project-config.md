@@ -65,6 +65,15 @@ transition={{ type: 'spring', damping: 10 }}  →  transitionType="spring", tran
 - `docs/docs/api-reference.mdx` (API reference table)
 - `skills/react-native-ease-refactor/SKILL.md` (supported properties list, transition category keys, decision tree)
 
+## Fixing a Bug
+
+When fixing a reported bug, add a reproducer to the example app so we can manually verify the fix and catch regressions later.
+
+1. Create a new layout under `example/app/issues/<issue-number>/` — use whatever structure the bug needs (tabs, modals, nested stacks). Self-contained so it can be opened directly from the home screen.
+2. Register it in `example/src/demos/index.ts` under section `'Issues'` with a `route` field pointing at the new layout (e.g. `route: '/issues/42'`). No `component` is needed — the route owns its own rendering.
+3. Include enough context in the screen itself: title, GitHub issue link, repro steps, and visual cues so it's obvious whether the bug is present (e.g. a `mountId` to distinguish "remount" from "still mounted but broken").
+4. The reproducer should fail visibly on the broken code path and pass once the fix is in. Don't skip this even when the bug feels obvious — the regression test pays for itself the first time someone touches related code.
+
 ## Development Commands
 
 ```sh
@@ -87,32 +96,9 @@ Before committing, always run:
 yarn format:write && yarn lint && yarn test
 ```
 
-**Important:** Run `yarn format:write` (not `format:check`) first to auto-fix formatting before linting. This avoids redundant Prettier errors in lint output.
-
-Lefthook pre-commit hooks enforce ESLint and TypeScript checks. Fix all failures before committing.
-
-**Formatting tools:**
-- **Prettier** for TypeScript/JavaScript files
-- **clang-format** for Objective-C++, Kotlin, and C++ files
-
-## Codegen
-
-React Native Codegen generates the native component interface from `src/EaseViewNativeComponent.ts`. The generated spec name is `EaseViewSpec`.
-
-After changing the codegen spec, you need to rebuild the example app for the native side to pick up changes. On iOS, `pod install` in `example/ios/` may also be needed.
-
-## Testing
-
-- Unit tests are in `src/__tests__/` and test JS prop resolution and native prop passing
-- Uses `@testing-library/react-native` with a mocked native component
-- **No native integration tests** — test native behavior by running the example app on a device/simulator
-- Example app has demos for all features; use it to verify changes visually
-
-## Commit Style
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [AppAndFlow/react-native-ease](https://github.com/AppAndFlow/react-native-ease) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+> Source: [appandflow/react-native-ease](https://github.com/appandflow/react-native-ease) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
