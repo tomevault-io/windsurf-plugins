@@ -1,17 +1,15 @@
 # railpack
 
-> Tome by [railwayapp](https://github.com/railwayapp/railpack) — distributed by [TomeVault](https://tomevault.io)
-
-Zero-config application builder that automatically analyzes and turns your code into an image
+> Tome by [railwayapp](https://github.com/railwayapp/railpack), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [railwayapp/railpack](https://github.com/railwayapp/railpack).
+Original source: `AGENTS.md` in [railwayapp/railpack](https://github.com/railwayapp/railpack).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
