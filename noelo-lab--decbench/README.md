@@ -7,11 +7,11 @@ DecBench: An experimental living benchmark to measure how close we are to perfec
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Noelo-Lab/decbench](https://github.com/Noelo-Lab/decbench).
+Original source: `AGENTS.md` in [Noelo-Lab/decbench](https://github.com/Noelo-Lab/decbench).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
