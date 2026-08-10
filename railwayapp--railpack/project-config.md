@@ -1,91 +1,48 @@
 ---
 trigger: always_on
-description: Zero-config application builder that automatically analyzes your code and turns
+description: <!-- intent-skills:start -->
 ---
 
-# What is Railpack
+<!-- intent-skills:start -->
+# TanStack Intent - before editing files, run the matching guidance command.
+tanstackIntent:
+  - id: "@tanstack/devtools#devtools-app-setup"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools#devtools-app-setup"
+    for: "Install TanStack Devtools, pick framework adapter (React/Vue/Solid/Preact), register plugins via plugins prop, configure shell (position, hotkeys, theme, hideUntilHover, requireUrlFlag, eventBusConfig). TanStackDevtools component, defaultOpen, localStorage persistence."
+  - id: "@tanstack/devtools#devtools-marketplace"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools#devtools-marketplace"
+    for: "Publish plugin to npm and submit to TanStack Devtools Marketplace. PluginMetadata registry format, plugin-registry.ts, pluginImport (importName, type), requires (packageName, minVersion), framework tagging, multi-framework submissions, featured plugins."
+  - id: "@tanstack/devtools#devtools-plugin-panel"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools#devtools-plugin-panel"
+    for: "Build devtools panel components that display emitted event data. Listen via EventClient.on(), handle theme (light/dark), use @tanstack/devtools-ui components. Plugin registration (name, render, id, defaultOpen), lifecycle (mount, activate, destroy), max 3 active plugins. Two paths: Solid.js core with devtools-ui for multi-framework support, or framework-specific panels."
+  - id: "@tanstack/devtools#devtools-production"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools#devtools-production"
+    for: "Handle devtools in production vs development. removeDevtoolsOnBuild, devDependency vs regular dependency, conditional imports, NoOp plugin variants for tree-shaking, non-Vite production exclusion patterns."
+  - id: "@tanstack/devtools-event-client#devtools-bidirectional"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools-event-client#devtools-bidirectional"
+    for: "Two-way event patterns between devtools panel and application. App-to-devtools observation, devtools-to-app commands, time-travel debugging with snapshots and revert. structuredClone for snapshot safety, distinct event suffixes for observation vs commands, serializable payloads only."
+  - id: "@tanstack/devtools-event-client#devtools-event-client"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools-event-client#devtools-event-client"
+    for: "Create typed EventClient for a library. Define event maps with typed payloads, pluginId auto-prepend namespacing, emit()/on()/onAll()/onAllPluginEvents() API. Connection lifecycle (5 retries, 300ms), event queuing, enabled/disabled state, SSR fallbacks, singleton pattern. Unique pluginId requirement to avoid event collisions."
+  - id: "@tanstack/devtools-event-client#devtools-instrumentation"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools-event-client#devtools-instrumentation"
+    for: "Analyze library codebase for critical architecture and debugging points, add strategic event emissions. Identify middleware boundaries, state transitions, lifecycle hooks. Consolidate events (1 not 15), debounce high-frequency updates, DRY shared payload fields, guard emit() for production. Transparent server/client event bridging."
+  - id: "@tanstack/devtools-vite#devtools-vite-plugin"
+    run: "npx @tanstack/intent@latest load @tanstack/devtools-vite#devtools-vite-plugin"
+    for: "Configure @tanstack/devtools-vite for source inspection (data-tsd-source, inspectHotkey, ignore patterns), console piping (client-to-server, server-to-client, levels), enhanced logging, server event bus (port, host, HTTPS), production stripping (removeDevtoolsOnBuild), editor integration (launch-editor, custom editor.open). Must be FIRST plugin in Vite config. Vite ^6 || ^7 only."
+  - id: "@tanstack/react-start#lifecycle/migrate-from-nextjs"
+    run: "npx @tanstack/intent@latest load @tanstack/react-start#lifecycle/migrate-from-nextjs"
+    for: "Step-by-step migration from Next.js App Router to TanStack Start: route definition conversion, API mapping, server function conversion from Server Actions, middleware conversion, data fetching pattern changes."
+  - id: "@tanstack/react-start#react-start"
+    run: "npx @tanstack/intent@latest load @tanstack/react-start#react-start"
+    for: "React bindings for TanStack Start: createStart, StartClient, StartServer, React-specific imports, re-exports from @tanstack/react-router, full project setup with React, useServerFn hook."
+  - id: "@tanstack/react-start#react-start/server-components"
+    run: "npx @tanstack/intent@latest load @tanstack/react-start#react-start/server-components"
+    for: "Implement, review, debug, and refactor TanStack Start React Server Components in React 19 apps. Use when tasks mention @tanstack/react-start/rsc, renderServerComponent, createCompositeComponent, CompositeComponent, renderToReadableStream, createFromReadableStream, createFromFetch, Composite Components, React Flight streams, loader or query owned RSC caching, router.invalidate, structuralSharing: false, selective SSR, stale names like renderRsc or .validator, or migration from Next App Router RSC patterns. Do not use for generic SSR or non-TanStack RSC frameworks except brief comparison."
+  - id: "@tanstack/router-core#router-core"
 
-Zero-config application builder that automatically analyzes your code and turns
-it into a container image. It's built on BuildKit
-with support for Node, Python, Go, PHP, and more.
-
-# Architecture
-
-- **Core**: Analyzes apps and generates JSON build plans using language
-  providers
-- **BuildKit**: Converts build plans to BuildKit LLB (Low-Level Builder) format
-  for efficient image construction
-- **CLI**: Main entry point that coordinates core analysis and BuildKit
-  execution
-- **Providers**: Language-specific modules that detect project types (e.g. Node
-  detects package.json) and generate appropriate build steps
-- **Runtime**: The built images are based on @images/debian/runtime/Dockerfile
-
-# Code style
-
-- When writing a comment describing a function, do not start the comment with the name of the function
-- Assume the person reading this code is an expert software engineer, but is not familiar with the internals of every system. Include concise one-line comments explaining key hooks, API usage, blocks of logic, etc., to help the reader quickly understand the code you've written.
-- Follow Go conventions and existing patterns in the codebase
-- Prefer early returns or early continues to `if` nesting
-- Use appropriate error handling with proper error wrapping
-- Do not write comments that are obvious from the code itself; focus on
-  explaining why something is done, not what it does
-- Seriously, do not write comments that are obvious from the code itself.
-- Do not write one-line functions
-- Always use the App abstraction for file system operations.
-- When configuring Mise settings, prefer TOML settings in the generated
-  `mise.toml` (via `AddMiseSetting`) over environment variables, so users can
-  override defaults with their own `mise.toml`.
-- **Never manually update lockfiles** (yarn.lock, package-lock.json,
-  pnpm-lock.yaml, etc.). Always use the respective package manager to generate
-  or update lockfiles. Manual edits can result in invalid checksums and broken
-  builds.
-
-# Mise Setup
-
-If mise is not available in your environment, install it using the instructions at https://mise.jdx.dev/installing-mise.html.
-
-# Workflow
-
-- Take a careful look at @mise.toml to understand what commands should be run at different points in the project lifecycle
-- Do not worry about docker cache, etc. Never run `docker system prune` or any other similar commands.
-- Do not run `go` directly. Instead, inspect @mise.toml and use `mise run <task>` to run various dev lifecycle commands. For instance, you should not run `go vet`, `go fmt`, `go test`, etc directly.
-- After making code changes, first run `mise run check`
-- Then, run unit tests and a couple of relevant integration tests to verify your changes
-  - Don't run tests manually using `go test` unless instructed to do so
-  - If tests are failing that are unrelated to your changes, let me know and stop working.
-- Use the `cli` mise task to test your changes on a specific example project, i.e. `mise run cli -- --verbose build --show-plan examples/node-vite-react-router-spa/`
-- Do not run any write operations with `git`
-- Do not use `bin/railpack` instead use `mise run cli` (which is the development build of `railpack`)
-  - Therefore do not run `mise build`, we don't need a `railpack` binary for local testing
-- Use a local `tmp/` directory for temporary files instead of the global `/tmp/`
-  directory. Don't worry about cleaning up tmp directories.
-- You can clone the mise repo (https://github.com/jdx/mise) into `tmp/` to
-  inspect it when needed.
-
-# Tests
-
-There are normal unit tests, snapshot tests, and integration tests. The integration tests are most unique to this project:
-
-* They represent example projects that would be built using the `railpack` CLI
-* On CI, they are built and run to make sure `railpack` properly builds *and* runs the project
-* `test.json` and `docker-compose.yml` are used to help determine what assertions should be made and what services should be run for the test
-
-## Integration Tests
-
-* Run `mise run test-integration-cwd` from within an `examples/` directory to run the integration test for that example.
-* `test.json` files are JSONC format and support comments. Use comments to explain temporary workarounds or special test conditions.
-* In `test.json` we should avoid using `justBuild` for all but the most simple projects. `justBuild` does not test `expectedOutput` or any other assertions.
-* If the project has a server component, we should use a `httpCheck` test. Read the @docs/src/content/docs/guides/developing-locally.md guide, specifically the `### HTTP Checks` section for more information.
-* `httpCheck` assertions assume that `$PORT` is respected.
-* You can use `"env": { "SECRET": "123"}` to add a required environment variable to a test case.
-
-# File Conventions
-
-- Markdown files in @docs/src/content/docs/ should be limited to 80 columns
-- Do not fix indentation or formatting manually. This is corrected automatically using `mise run check`
-- NEVER commit language-specific cache or build artifacts (e.g. Python `__pycache__/`, `*.pyc`, `*.pyo` files). If you encounter build artifacts that are not excluded by .gitignore, add appropriate patterns to .gitignore to exclude them
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [railwayapp/railpack](https://github.com/railwayapp/railpack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
