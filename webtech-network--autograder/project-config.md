@@ -1,125 +1,97 @@
 ---
 trigger: always_on
-description: This document provides AI agents with the architectural context needed to navigate and modify the Autograder codebase effectively.
+description: This document is the authoritative architectural reference for anyone working on this codebase — human or AI agent. Read it before making any change. Every design decision described here is intentional and must be respected.
 ---
 
-# Autograder — Agent Skill Guide
+# Autograder — Agent & Contributor Reference
 
-This document provides AI agents with the architectural context needed to navigate and modify the Autograder codebase effectively.
+This document is the authoritative architectural reference for anyone working on this codebase — human or AI agent. Read it before making any change. Every design decision described here is intentional and must be respected.
 
 ---
 
-## Project Architecture
+## What this project is
 
-The Autograder is a **pipeline-based grading system**. Submissions flow through ordered steps, each receiving a `PipelineExecution` object:
+The autograder is a **general-purpose code grading engine**. It accepts a submission (a set of files) and an assignment configuration (a grading criteria definition), runs a configurable pipeline of evaluation steps, and returns a score from 0 to 100 together with a structured result tree and optional feedback.
+
+The core engine is deliberately domain-agnostic. It has no knowledge of GitHub, git, gamification, learning management systems, or any specific use case. Those concerns belong in the layers that sit on top of the core.
+
+---
+
+## Repository layout
 
 ```
-Load Template → Build Tree → Pre-Flight → Grade → Focus → Feedback → Export
+autograder/          Core grading engine — the only thing that must stay general
+sandbox_manager/     Infrastructure: Docker-based sandbox container management
+github_action/       Adapter: runs the grader inside a GitHub Actions workflow
+web/                 Adapter: FastAPI server exposing the grader as an HTTP API
+tests/               Unit, integration, e2e, and web tests
 ```
 
-### Module Layout
-
-| Module | Purpose |
-|--------|---------|
-| `autograder/` | Core grading engine (pipeline, steps, services, models, templates) |
-| `web/` | FastAPI REST API layer (routes, schemas, database, repositories) |
-| `sandbox_manager/` | Docker container pool management for code execution |
-| `github_action/` | GitHub Classroom integration adapter |
-| `examples/` | Demo app and example configurations |
-| `tests/` | Unit, integration, web, and performance tests |
-
-### Key Abstractions
-
-- **`AutograderPipeline`** (`autograder/autograder.py`) — Orchestrates step execution. Built via `build_pipeline()`.
-- **`PipelineExecution`** (`autograder/models/pipeline_execution.py`) — Carries submission data and step results through the pipeline.
-- **`Step`** (`autograder/models/abstract/step.py`) — ABC for pipeline steps. Each step implements `execute(pipeline_exec) -> PipelineExecution`.
-- **`Template`** (`autograder/models/abstract/template.py`) — ABC for grading templates. Contains test function collections.
-- **`TestFunction`** (`autograder/models/abstract/test_function.py`) — ABC for individual test logic. Implements `execute(files, sandbox, **kwargs) -> TestResult`.
-- **`CriteriaTree`** / **`ResultTree`** (`autograder/models/`) — Tree structures for grading rubrics and their scored results.
+The boundary between `autograder/` and everything else is the most important architectural line in the codebase. Code inside `autograder/` must not import from `web/`, `github_action/`, or any other adapter. The adapters import from `autograder/`, not the other way around.
 
 ---
 
-## How To: Add a New API Endpoint
+## The two inputs: Submission and Assignment Configuration
 
-1. **Define schema** in `web/schemas/` (Pydantic `BaseModel` for request/response)
-2. **Create route** in `web/api/v1/` (FastAPI `APIRouter` with endpoint function)
-3. **Add repository** (if DB access needed) in `web/repositories/`
-4. **Register router** in `web/api/v1/__init__.py` via `api_router.include_router()`
-5. **Add tests** in `tests/web/`
+Every grading execution starts with two independent inputs.
 
-Route prefix chain: `app → /api/v1 → /{router_prefix}`
+### Submission
 
----
+A `Submission` (`autograder/models/dataclass/submission.py`) represents what is being evaluated. It carries:
 
-## How To: Add a New Grading Template
+- `submission_files: Dict[str, SubmissionFile]` — the files to grade, keyed by filename. Each `SubmissionFile` holds a `filename` and the full text `content`.
+- `user_id` / `username` — identifiers for the submitter, used for logging and export. The autograder does not interpret or validate these values.
+- `assignment_id` — an opaque identifier that links this submission to a grading configuration. The autograder treats this as a correlation ID only.
+- `language: Optional[Language]` — the programming language of the submission. Required by any step that does language-specific analysis (AST parsing, sandbox execution).
+- `locale: str` — controls the language of generated feedback messages.
 
-1. **Create template file** in `autograder/template_library/` (e.g., `my_template.py`)
-2. **Implement `Template` ABC**: define `template_name`, `template_description`, `requires_sandbox`, `get_test(name)`
-3. **Implement test classes** extending `TestFunction` ABC: define `name`, `description`, `parameter_description`, `execute()`
-4. **Register in `__init__.py`**: add to `TEMPLATE_REGISTRY` dict
-5. **Add to `TemplateLibraryService`**: it auto-loads from `TEMPLATE_REGISTRY` at startup
+The autograder does not fetch files, call APIs, or talk to version control. The caller constructs the `Submission` object with whatever files are relevant and passes it to the pipeline. Responsibility for understanding what files to include, and from where, belongs entirely to the caller.
 
----
+### Assignment Configuration (Grading Config)
 
-## How To: Add a New Pipeline Step
+The assignment configuration is a set of JSON/dict structures passed to `build_pipeline()`:
 
-1. **Create step class** in `autograder/steps/` extending `Step` ABC
-2. **Add `StepName` enum value** in `autograder/models/dataclass/step_result.py`
-3. **Wire into `build_pipeline()`** in `autograder/autograder.py`
-4. **Store result** via `pipeline_exec.add_step_result(StepResult(...))`
+- `template_name` — selects which `Template` (test library) to use.
+- `grading_criteria` — a `CriteriaConfig` dict that defines the full scoring rubric: categories, subjects, tests, and weights. This is the central configuration artifact.
+- `feedback_config` — preferences for the feedback report generator.
+- `setup_config` — optional pre-flight instructions (required files, setup commands, assets to inject into the sandbox).
+
+The criteria config is what separates one assignment from another. Two assignments using the same template can have completely different rubrics, weights, and test selections. The template provides the available test functions; the criteria config decides which ones to use and how to weight them.
 
 ---
 
-## How To: Add a New Sandbox Language
+## The Criteria Tree: the pluggable scoring engine
 
-1. **Add enum value** to `Language` in `sandbox_manager/models/sandbox_models.py`
-2. **Create Dockerfile** in `sandbox_manager/images/Dockerfile.<lang>`
-3. **Add pool config** in `sandbox_config.yml`
-4. **Update `CommandResolver`** defaults in `autograder/services/command_resolver.py`
+The criteria tree is the most important concept in the codebase. Understanding it fully is required to work anywhere in `autograder/`.
 
----
+### What it is
 
-## Testing Conventions
+A `CriteriaTree` (`autograder/models/criteria_tree.py`) is the compiled, in-memory representation of a grading rubric. It is built from the `grading_criteria` dict during `BuildTreeStep` and is immutable for the duration of a pipeline execution.
 
-| Directory | Scope | Requires Docker |
-|-----------|-------|-----------------|
-| `tests/unit/` | Pure logic, mocked dependencies | No |
-| `tests/web/` | API routes, DB operations (mocked sandbox) | No |
-| `tests/integration/` | Full pipeline with real sandboxes | Yes |
-| `tests/performance/` | Load testing, stress testing | Yes |
-
-Run unit tests: `pytest tests/unit/ -v`
-Run web tests: `pytest tests/web/ -v`
-Run integration tests: `pytest tests/integration/ -v` (requires Docker)
-
----
-
-## Data Flow Through the Pipeline
+The tree has a fixed three-level top structure:
 
 ```
-Submission
-  → TemplateLoaderStep    → StepResult.data = Template
-  → BuildTreeStep         → StepResult.data = CriteriaTree
-  → PreFlightStep         → StepResult.data = SandboxContainer (or None)
-  → GradeStep             → StepResult.data = GradeStepResult (final_score + ResultTree)
-  → FocusStep             → StepResult.data = Focus (sorted failed tests by impact)
-  → FeedbackStep          → StepResult.data = feedback string
-  → ExporterStep          → StepResult.data = None (side effect: external write)
+CriteriaTree
+  ├── base: CategoryNode        (required — the main score, 0-100)
+  ├── bonus: CategoryNode       (optional — adds points)
+  └── penalty: CategoryNode     (optional — subtracts points)
 ```
 
-Steps access previous results via: `pipeline_exec.get_step_result(StepName.X).data`
+Each `CategoryNode` can contain either:
+- A flat list of `TestNode`s (leaves), or
+- A list of `SubjectNode`s, each of which can recursively contain more subjects or tests.
 
----
+This recursive subject structure allows arbitrary grouping and weighting of tests. A `SubjectNode` is just a weighted container — it has a `name`, a `weight`, and children that are either more subjects or test leaves.
 
-## Common Patterns
+### TestNode: the leaf
 
-- **Services** (`autograder/services/`) contain business logic, used by steps
-- **Models** (`autograder/models/`) are data structures (dataclasses, Pydantic, tree nodes)
-- **Templates** (`autograder/template_library/`) contain test function implementations
-- **Web schemas** (`web/schemas/`) are Pydantic models for API validation
-- **Web repositories** (`web/repositories/`) wrap SQLAlchemy queries
-- **Sandbox operations** go through `SandboxManager` → `LanguagePool` → `SandboxContainer`
+A `TestNode` is the leaf of the criteria tree. It holds:
+
+- `test_function: TestFunction` — a reference to the actual callable that will evaluate the submission.
+- `parameters: Dict[str, Any]` — the arguments that will be passed to the test function when it runs.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [webtech-network/autograder](https://github.com/webtech-network/autograder) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
