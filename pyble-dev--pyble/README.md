@@ -7,11 +7,11 @@ Open-source tablet-first MicroPython IDE over Bluetooth Low Energy, with the PBL
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [PyBLE-dev/PyBLE](https://github.com/PyBLE-dev/PyBLE).
+Original source: `CLAUDE.md` in [PyBLE-dev/PyBLE](https://github.com/PyBLE-dev/PyBLE).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
