@@ -7,13 +7,13 @@ Open-source AI-powered directory website template built with Next.js
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [MkThingsHQ/mkdirs](https://github.com/MkThingsHQ/mkdirs).
+Original source: `CLAUDE.md` in [MkThingsHQ/mkdirs](https://github.com/MkThingsHQ/mkdirs).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
