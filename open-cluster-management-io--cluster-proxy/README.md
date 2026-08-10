@@ -1,0 +1,28 @@
+# cluster-proxy
+
+> Tome by [open-cluster-management-io](https://github.com/open-cluster-management-io/cluster-proxy), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [open-cluster-management-io/cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+From [open-cluster-management-io/cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy) — a repo with 55+ stars on GitHub.
+
+---
+
+Install this config instantly:
+```
+npx tomevault install open-cluster-management-io/cluster-proxy
+```
+Source: [github.com/open-cluster-management-io/cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy).
+
+<!-- genome:t-i-s -->
