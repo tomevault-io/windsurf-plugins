@@ -7,11 +7,11 @@ An interactive security testing platform that demonstrates real vulnerabilities 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [AImaginationLab/vulnerable-llms](https://github.com/AImaginationLab/vulnerable-llms).
+Original source: `AGENTS.md` in [AImaginationLab/vulnerable-llms](https://github.com/AImaginationLab/vulnerable-llms).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
