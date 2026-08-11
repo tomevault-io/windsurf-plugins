@@ -7,11 +7,11 @@ Stream Deck plugin for managing Govee smart lights with advanced group functiona
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [felixgeelhaar/govee-light-management](https://github.com/felixgeelhaar/govee-light-management).
+Original source: `AGENTS.md` in [felixgeelhaar/govee-light-management](https://github.com/felixgeelhaar/govee-light-management).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
