@@ -1,120 +1,53 @@
 ---
 trigger: always_on
-description: Checklist for adding a social scheduler competitor to compare and alternatives surfaces — constants, icons, registry wiring, and UI icon styles
+description: Checklist for adding a social channel — backend provider + web composer/OAuth + docs + self-host env + public SEO landing page + agent channel SEO routes + public Photo Editor channel routes + public Best Time to Post channel routes + feature bento showcases + Extensions Hub listing tags
 ---
 
 
-# Adding a compare / alternatives competitor
+# Adding a social provider
 
-Ship **one new competitor constant** plus **registry and UI wiring** in the same change. Reference implementations: **`hootsuite.ts`**, **`buffer.ts`**. OpenQuok’s own entry is **`openquok.ts`** (special — see below).
-
-Competitor data powers:
-
-| Surface | Route | Behavior |
-| --- | --- | --- |
-| Compare hub | `/compare` | Dropdown + cards for every product in `PUBLIC_COMPARE_PRODUCTS` (default base: OpenQuok) |
-| Compare detail | `/compare/{productA}/{productB}` | Head-to-head page for any **distinct** pair (auto from `getComparePair`) |
-| Alternatives hub | `/alternatives` | Directory card per **non-OpenQuok** competitor (`ALTERNATIVES_TARGET_SLUGS`) |
-| Alternatives detail | `/alternatives/{slug}` | “Best {name} alternatives” SEO page; OpenQuok ranked first among listings |
-
-**No new route files** are required for compare or alternatives when adding a competitor — only data + the manual steps below.
-
-Follow **source-project-neutrality**: describe products and positioning in first-party terms; trademark notes belong only in `branded-icons.ts` where needed.
-
----
+Ship **backend + web + docs + self-host env + public channel landing page + agent channel SEO routes + public Photo Editor channel routes + public Best Time to Post channel routes + feature bento showcases + Extensions Hub listing tag** in one change. Reference implementations: **Threads** (single-step OAuth), **Instagram (Business)** (Page picker + compose settings), **Facebook Page** (Meta OAuth + link-preview settings). Public landing + bento references: **facebook**, **threads** in `publicChannelConfig.ts` and `web/src/lib/ui/templates/bento/minor-templates/`. Agent channel SEO references: **facebook** at `/agents/openclaw/facebook`. Photo Editor channel references: **facebook**, **instagram** at `/tools/photo-editor/{slug}`. Best Time to Post references: **tiktok**, **linkedin** at `/tools/best-time-to-post/{slug}`; benchmark tables in `web/src/lib/best-time-to-post/constants/benchmarkSlots.ts`. Listing tag + group reference: `backend/supabase/db/listing-tags/502_20260629_seed.sql`. Full guide: `web/src/content/docs/developer-guidelines/add-provider.md`.
 
 ## Identifier contract
 
-Use one **lowercase kebab-case** slug everywhere:
+Use one kebab-case slug everywhere: `provider.identifier`, DB `provider_identifier`, OAuth callback `/integration/oauth/{identifier}`, `getLaunchProviderConfig`, CLI filters, docs filenames, **`publicChannelConfig` `slug` / `platformId`**, **`listing_tags.slug`**, `/channels/{slug}`, **`/tools/best-time-to-post/{slug}`**, **`/tools/photo-editor/{slug}`**, and **`/agents/{agentSlug}/{slug}`** (agent channel SEO). Do not fork slugs between layers. When `platformId` differs from the marketing slug (rare), still key **`benchmarkSlots.ts` `PLATFORM_WINDOWS`** by every identifier the calculator can pass (`platformSlug` from channel config / platform select).
 
-- `CompareProduct.slug` and `CompareProductSlug` union member
-- Filename: `web/src/lib/content/constants/competitors/{slug}.ts`
-- Export name: `{slug}CompareProduct` (e.g. `hootsuiteCompareProduct`)
-- URLs: `/compare/openquok/{slug}`, `/alternatives/{slug}`
-- `COMPARE_PRODUCT_WEBSITE_URLS` key
-- Branded icon registry key (PascalCase, e.g. `Hootsuite` → `icons.Hootsuite.name`)
+## Backend (required)
 
-Do **not** add OpenQuok as an alternatives **target** — `COMPARE_HUB_BASE_SLUG` (`openquok`) is excluded from `ALTERNATIVES_TARGET_SLUGS` by design.
+1. **`SocialProvider` class** — `backend/integrations/providers/{id}/` implementing `social.integrations.interface.ts`: OAuth (`generateAuthUrl`, `authenticate`), `post`, `maxLength`, scopes. Split publish logic into helpers (e.g. `*GraphPublish.ts`) when non-trivial.
+2. **Register** — add `new YourProvider()` in `backend/integrations/integrationManager.ts` (no new REST routes).
+3. **Config** — secrets only via `config.integrations.*` in `GlobalConfig.ts` + `.env.development.example`. Also add the same empty keys to **`infra/self-host/.env.example`** (Social provider apps section) so self-host operators get the vars. Redirect URI: `oauthFrontendOrigin()` + `oauthFrontendSocialCallbackPath(identifier)`.
+4. **Between-steps OAuth** — when `isBetweenSteps: true`: implement `pages()` + `fetchPageInformation()`; extend `IntegrationConnectionService.saveProviderPageForOrganization` / `preservesUserTokenForRefresh` if user token must stay in `refresh_token` (Meta Page pattern).
+5. **Provider settings at publish** — read from `postDetails.settings.providerSettings`. Accept **flat CLI keys** and **nested web buckets** (e.g. `providerSettings.url` and `providerSettings.facebook.url`). Export a resolver + unit tests beside publish helpers.
+6. **Tests** — unit tests for OAuth edge cases, publish payload shaping, and connection save when behavior differs.
 
----
+## Extensions Hub listing tags (required for social channels)
 
-## Required files (manual)
+The public **Extensions Hub** (`/extensions`) filters skills and MCP listings by **tag** and **tag group**. Each social channel needs a matching `listing_tags` row and group associations so hub filters stay aligned with shipped providers.
 
-### 1. Branded icon
+Follow **backend-migrations-naming** (`listing-tags_<YYYYMMDD>_seed.sql` under `backend/supabase/db/listing-tags/`). Re-aggregate migrations after seed changes.
 
-**`web/src/data/icons/branded-icons.ts`**
-
-- Add `IconName` union entry and `icons.{Brand}` object (inline SVG preferred).
-- See **company-brand-icons** rule.
-
-### 2. Slug type
-
-**`web/src/lib/content/constants/competitors/types.ts`**
-
-- Extend `CompareProductSlug` with the new slug literal.
-
-### 3. Competitor constant (new file)
-
-**`web/src/lib/content/constants/competitors/{slug}.ts`**
-
-Export a `CompareProduct` with:
-
-| Field | Notes |
+| Artifact | Path / action |
 | --- | --- |
-| `slug`, `name`, `icon` | `icon: icons.{Brand}.name` |
-| `tagline` | Short subtitle under the name on compare pages |
-| `overview` | 2–3 sentences for platform overview and alternatives listings |
-| `pricingPlans` | `ComparePricingPlan[]` — public list prices in USD; `monthlyPrice: null` for custom/enterprise |
-| `channels` | Human labels aligned with `listAvailablePublicChannelCompareLabels()` in `channels/index.ts` so channel compare icons resolve |
-| `featureSupport` | `Partial<Record<PublicPricingCompareRowId, CompareFeatureCell>>` — one cell per row in `PUBLIC_PRICING_COMPARE_ROWS` (`included` / `excluded` / `text`) |
-| `comparison` | `headline`, `notAnother`, `builtFor`, `positioningWhenLeft`, optional `withoutTitle`, and `talkingPoints` |
+| Channel tag row | New `INSERT` in `backend/supabase/db/listing-tags/501_*.sql` (or a later `501`-tier seed if `501` already shipped) |
+| Group associations | `backend/supabase/db/listing-tags/502_*.sql` — append rows to `listing_tag_groups_listing_tags_association` with slug comments (see existing file) |
+| Slug + name | `slug` = `provider.identifier`; `name` = human label (e.g. `Facebook`, `X`) |
+| Description | One neutral sentence on what the channel integration covers (no third-party attribution) |
+| Stable UUID | New `d5f7c000-0000-4000-a000-…` id; never reuse or reassign ids |
 
-**Talking points** (`CompareTalkingPointId` keys in `shared.ts` → `COMPARE_TALKING_POINT_ORDER`):
+### Tag groups (social channels only)
 
-- For a pair row to appear in the with/without section, the **left** product needs `strength` and the **right** product needs `weakness` for the **same** topic id.
-- When OpenQuok is on the left, competitor `weakness` copy drives the “without” column.
-- When a competitor is on the left vs another competitor, both need matching topic keys.
+A channel tag usually belongs to **Social platforms** plus one or more **content-type** groups. Tags may belong to multiple groups. Group ids and membership rules live in `502_*.sql` — keep the overview comment block there up to date.
 
-### 4. Registry
-
-**`web/src/lib/content/constants/competitors/index.ts`**
-
-- Import and re-export `{slug}CompareProduct`.
-- Append to `PUBLIC_COMPARE_PRODUCTS` (keep **OpenQuok first**, then competitors alphabetically or by priority).
-
-`ALTERNATIVES_TARGET_SLUGS`, `getCompareProduct`, `getComparePair`, `listComparePairsForHub`, and `listAlternativeProductsFor` derive from this array — no separate list to maintain.
-
-### 5. Official website URL
-
-**`web/src/lib/content/constants/competitors/shared.ts`**
-
-- Add the slug to `COMPARE_PRODUCT_WEBSITE_URLS` (used for “Go to website” on alternatives detail).
-
-### 6. Product icon styles (UI)
-
-Add a `PRODUCT_ICON_STYLES` entry for the new slug in **all four** route components (gradient ring colors for cards/hero):
-
-| File |
-| --- |
-| `web/src/routes/(public)/compare/+page.svelte` |
-| `web/src/routes/(public)/compare/[productA]/[productB]/+page.svelte` |
-| `web/src/routes/(public)/alternatives/+page.svelte` |
-| `web/src/routes/(public)/alternatives/[slug]/+page.svelte` |
-
-Each file defines `Record<CompareProductSlug, { containerClass / heroContainerClass / cardContainerClass; iconClass? }>`. Match the visual language of existing competitors (distinct gradient, readable icon contrast).
-
----
-
-## Auto-wired (verify, do not duplicate)
-
-After `PUBLIC_COMPARE_PRODUCTS` and `COMPARE_PRODUCT_WEBSITE_URLS` are updated:
-
-| Area | What happens |
+| Group | When to add the channel tag |
 | --- | --- |
-| `PublicComparePagePresenter` | Hub pairs, detail VMs, related comparisons, SEO copy |
-| `PublicAlternativesPagePresenter` | Hub directory entries, detail listings, search filter |
-| `buildComparePair.ts` | Meta titles, keywords, with/without sections for new pairs |
-| Compare/alternatives `+page.server.ts` | JSON-LD `ItemList` / `SoftwareApplication` nodes |
+| **Social platforms** | **Always** — every social channel tag |
+| **Videos** | Video-first publish (e.g. YouTube, TikTok) |
+| **Photos** | Image-first feed workflows (e.g. Instagram, Facebook Page photos) |
+| **Text** | Text and microblog channels (e.g. Threads, LinkedIn, X) |
+
+Agent / MCP tags (OpenClaw, Cursor, Codex, …) are **not** part of this checklist — only add those when shipping agent or MCP catalog entries, not when adding a social provider.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
