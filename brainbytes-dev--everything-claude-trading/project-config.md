@@ -1,0 +1,77 @@
+---
+trigger: always_on
+description: This document defines all 18 specialized agents in the Everything Claude Trading plugin, their roles, orchestration rules, and multi-agent workflows.
+---
+
+# Agent Orchestration Guide
+
+This document defines all 18 specialized agents in the Everything Claude Trading plugin, their roles, orchestration rules, and multi-agent workflows.
+
+## Agents
+
+| # | Agent | Model | Purpose | When to Use |
+|---|-------|-------|---------|-------------|
+| 1 | `quant-researcher` | opus | Signal research, factor models, alpha generation | Researching new alpha signals, building predictive models, analyzing alternative data |
+| 2 | `algo-strategist` | opus | Systematic strategy design, execution algos | Designing systematic strategies, defining entry/exit rules, building execution algorithms |
+| 3 | `risk-manager` | opus | VaR, stress testing, exposure management | Calculating risk metrics, running stress tests, monitoring portfolio exposure limits |
+| 4 | `derivatives-analyst` | opus | Options pricing, vol surfaces, exotics | Pricing derivatives, building volatility surfaces, analyzing exotic structures |
+| 5 | `portfolio-manager` | opus | Allocation, optimization, rebalancing | Constructing portfolios, running optimizations, scheduling rebalances |
+| 6 | `technical-analyst` | sonnet | Chart patterns, indicators, price action | Identifying chart patterns, computing technical indicators, analyzing price action |
+| 7 | `market-microstructure` | opus | Order flow, liquidity, market making | Analyzing order book dynamics, measuring liquidity, designing market-making strategies |
+| 8 | `stat-arb-specialist` | opus | Pairs trading, cointegration, mean reversion | Finding cointegrated pairs, calibrating mean-reversion models, managing stat-arb books |
+| 9 | `options-strategist` | opus | Spreads, hedging, vol trading | Constructing option spreads, designing hedges, expressing volatility views |
+| 10 | `backtesting-engineer` | sonnet | Walk-forward, Monte Carlo, overfitting checks | Running backtests, performing walk-forward analysis, detecting overfitting |
+| 11 | `financial-data-scientist` | opus | Feature engineering, ML models, alt data | Engineering features, training ML models, integrating alternative data sources |
+| 12 | `crypto-defi-analyst` | sonnet | On-chain analytics, DEX, yield, tokenomics | Analyzing on-chain data, evaluating DeFi protocols, assessing token economics |
+| 13 | `fixed-income-analyst` | opus | Bonds, yield curves, duration, credit spreads | Analyzing bond markets, fitting yield curves, measuring duration and credit risk |
+| 14 | `fx-strategist` | opus | Currency pairs, carry trade, macro drivers | Analyzing FX markets, evaluating carry strategies, assessing macro currency drivers |
+| 15 | `commodities-analyst` | sonnet | Futures curves, seasonality, supply/demand | Analyzing commodity futures curves, identifying seasonal patterns, tracking supply/demand |
+| 16 | `volatility-trader` | opus | Vol surface, term structure, skew, VIX | Trading volatility, analyzing term structure, monitoring skew and VIX dynamics |
+| 17 | `execution-specialist` | sonnet | Slippage, TWAP/VWAP, smart routing | Minimizing execution costs, designing TWAP/VWAP schedules, routing orders |
+| 18 | `regulatory-compliance` | sonnet | MiFID II, Dodd-Frank, position limits | Checking regulatory compliance, validating position limits, generating compliance reports |
+
+## Orchestration Rules
+
+1. **Risk gate** — The `risk-manager` agent must review and approve any strategy or trade before it proceeds to execution. No exceptions.
+2. **Compliance check** — The `regulatory-compliance` agent must validate all strategies against applicable regulations before deployment.
+3. **Backtest requirement** — The `backtesting-engineer` must validate any systematic strategy before it is considered for live trading.
+4. **Specialist routing** — Route tasks to the most specialized agent. Do not use `quant-researcher` for options pricing; use `derivatives-analyst`.
+5. **Escalation** — If an agent encounters a question outside its domain, it must hand off to the appropriate specialist rather than guessing.
+6. **Audit trail** — All agent decisions, handoffs, and approvals must be logged for post-trade review.
+
+## Multi-Agent Workflows
+
+### Strategy Development Flow
+
+```
+quant-researcher → algo-strategist → backtesting-engineer → risk-manager
+```
+
+1. **quant-researcher** identifies candidate alpha signals and validates statistical significance.
+2. **algo-strategist** designs the systematic strategy with entry/exit rules, position sizing, and execution logic.
+3. **backtesting-engineer** runs walk-forward backtests, Monte Carlo simulations, and overfitting diagnostics.
+4. **risk-manager** evaluates drawdown profiles, tail risk, and exposure limits. Approves or rejects.
+
+### Options Trade Flow
+
+```
+derivatives-analyst → options-strategist → risk-manager → execution-specialist
+```
+
+1. **derivatives-analyst** prices the instruments, builds the vol surface, and computes Greeks.
+2. **options-strategist** constructs the optimal spread or hedge structure.
+3. **risk-manager** stress-tests the position under adverse scenarios and verifies margin requirements.
+4. **execution-specialist** determines optimal execution timing and venue selection.
+
+### Crypto Analysis Flow
+
+```
+crypto-defi-analyst → risk-manager → execution-specialist
+```
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [brainbytes-dev/everything-claude-trading](https://github.com/brainbytes-dev/everything-claude-trading) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-11 -->
