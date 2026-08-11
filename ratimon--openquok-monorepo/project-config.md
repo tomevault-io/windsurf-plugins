@@ -1,58 +1,40 @@
 ---
 trigger: always_on
-description: Layout and conventions for orchestrator package (Flowcraft graphs, BullMQ workers, testing)
+description: When adding API routes that allow anonymous access, add the path to publicPaths in core middleware; route-level auth still applies per method
 ---
 
 
-# Orchestrator package layout (`orchestrator/`)
+# Backend: public API paths and global auth
 
-Long-lived **worker processes** run Flowcraft graphs via the BullMQ adapter. When `config/orchestratorFlows.ts` uses `transport: "bullmq"`, the API **enqueues**; workers **execute**. See `orchestrator/README.md` for scripts and deployment.
+Global auth in `backend/middlewares/core.ts` runs for every request under the API prefix (`/api/v1`) **unless** the path is in `publicPaths`. Route-level middlewares (e.g. `requireFullAuthWithRoles`, `requireEditor`) run **after** the request reaches the router.
 
-Official Flowcraft guides (terminology and patterns): [Core concepts](https://flowcraft.js.org/guide/core-concepts), [Loops](https://flowcraft.js.org/guide/loops), [Testing](https://flowcraft.js.org/guide/testing), [BullMQ adapter](https://flowcraft.js.org/guide/adapters/bullmq).
+## Rule: new public routes
 
-## Directory roles
+When you add a **route that must be callable without authentication** (e.g. anonymous feedback submit, public form):
 
-| Area | Responsibility |
-|------|----------------|
-| **`worker/`** | Process entrypoints (`run*BullMqWorker.ts`): build adapters, `adapter.start()`, [Flowcraft BullMQ reconciler](https://flowcraft.js.org/guide/adapters/bullmq#reconciliation) (`flowcraftBullMqReconciliationTimer.ts`), shutdown, timers that enqueue repeatable work (e.g. digest flush, missing-post rescan for scheduled social). Wire domain **services** into adapter `dependencies`; avoid putting Redis key logic here—delegate to **`flows/*Execution`** or **`stores/`**. |
-| **`flows/`** | **Public orchestration surface** for the rest of the backend: `run*Orchestration` (enqueue + logging), re-exports of blueprint builders/IDs/types. Optional **`*Execution.ts`** for worker-only glue that must not create import cycles with `*Workflow.ts` (e.g. flush: Redis drain + call service). |
-| **`blueprints/`** | Flow graph definitions and **flow-scoped TypeScript types** (`*FlowTypes.ts`): context shape, `*WorkflowDependencies` (what nodes receive from the adapter). |
-| **`nodes/`** | Flowcraft node implementations; read/write **context** and call **`dependencies`** only—no direct env reads (use `GlobalConfig` in factories/workers/adapters). |
-| **`adapters/flowcraft-bullmq/<domain>/`** | Domain folders, e.g. `notification/`, `integration-refresh/`, `scheduled-social-post/`: `create*BullMqAdapter`, **enqueue** helpers, **seed** context. Uses `config` from `GlobalConfig`. |
-| **`stores/`** | Redis (or similar) **key names and low-level commands** shared by API-side writers and worker-side readers. Keeps list/set logic out of **`services/`** where possible. |
-| **`activities/`** | Non–Flowcraft-shaped helpers used by flows/workers when needed. |
-| **`index.ts`** | Re-export the **stable API** other packages import (`runRefreshTokenOrchestration`, notification helpers, types). Do not re-export worker entrypoints. |
+1. **Add the path prefix to `publicPaths`** in `backend/middlewares/core.ts`.
+   - Use the path **after** the API prefix (e.g. `/feedback`, not `/api/v1/feedback`).
+   - Matching is `routePath === p || routePath.startsWith(p + "/")`, so `/feedback` covers `/feedback` and `/feedback/...`.
 
-## Adding a new BullMQ-backed workflow
+2. **Keep route-level auth on methods that must be protected.**  
+   For the same path prefix, some methods can be public and others protected:
+   - **Public:** do not attach auth middleware (e.g. `POST /feedback` for anonymous submit).
+   - **Protected:** attach `authWithRoles` (or `requireFullAuth`) and any role/permission middleware (e.g. `GET /feedback`, `PATCH /feedback/:id` with `requireEditor`).
 
-1. **`blueprints/<name>FlowTypes.ts`** — blueprint ids/versions, context + `WorkflowDependencies`.
-2. **`blueprints/<name>Blueprint.ts`** — builders for distributed (and any in-process) graphs.
-3. **`nodes/<name>Nodes.ts`** — node functions registered via **`get<Name>NodeRegistry()`**.
-4. **`adapters/flowcraft-bullmq/<domain>/create<Name>BullMqAdapter.ts`** + enqueue/seed files in that domain folder.
-5. **`flows/<name>Workflow.ts`** — `run*Orchestration` wrappers and re-exports; register exports in **`orchestrator/index.ts`**.
-6. **`worker/run<Name>BullMqWorker.ts`** — thin bootstrap: repositories/services, `create*BullMqAdapter`, `adapter.start()`.
+## Example (feedback)
 
-If the worker needs **shared Redis staging** (lists/sets) used from both API and worker, put commands in **`stores/<name>RedisStore.ts`** and call them from **`flows/<name>Execution.ts`** (worker) and from the service **only** via the store (short-lived client on the API path is acceptable).
+- **core.ts:** `publicPaths = ["/auth", "/company", "/feedback"]`  
+  → All requests to `/api/v1/feedback` and `/api/v1/feedback/*` skip global auth.
 
-## Imports
+- **FeedbackRoute.ts:**
+  - `POST "/"` — no auth middleware → anonymous can submit (201).
+  - `GET "/"` — `authWithRoles`, `requireEditor` → 401 if no token, 403 if not editor/admin/super_admin.
+  - `PATCH "/:feedbackId"` — same as GET → only editor+ can mark handled.
 
-- **`backend/services/`** may import the **`openquok-orchestrator`** workspace package (enqueue and shared staging helpers).
-- Avoid **`services/`** importing **`adapters/flowcraft-bullmq/*`** directly when a **`flows/*Workflow`** wrapper exists.
-- Prevent **circular imports**: heavy worker flush logic that needs **`TransactionalNotificationEmailService`** belongs in **`flows/*Execution.ts`**, not in the same file as **`runNotificationSendPlainOrchestration`** if that file is imported by the service.
+## Do not
 
-## Configuration
-
-Queue names and `in_process` vs `bullmq` live in **`backend/config/orchestratorFlows.ts`** and **`GlobalConfig`** (`config.bullmq`). Do not read `process.env` in nodes/services for orchestrator wiring.
-
-## Flowcraft concepts (how we use them)
-
-- **Blueprint** — JSON-serializable graph: `id`, `nodes`, `edges`, optional **`metadata.version`** (required for distributed runs that validate or seed context). Keep blueprint ids stable; bump **`metadata.version`** when the graph or context contract changes.
-- **Context** — Typed in **`*FlowTypes.ts`**. Distributed runs persist context in Redis (per run); **seed** initial fields in **`adapters/flowcraft-bullmq/<domain>/seed*`** before enqueueing jobs. Nodes read fields with **`context.get`** / write as the runtime expects for your adapter.
-- **Nodes** — Prefer small **function nodes** that take **`NodeContext`** and call **`dependencies`** only (see **`nodes/`**). Class-based nodes are fine when you need structured lifecycles; keep side effects and I/O behind injected deps.
-- **Runtime** — **`FlowRuntime`** carries **`dependencies`** and optional **`eventBus`** (tests). Workers use the BullMQ adapter’s runtime options (blueprints + registry), not ad-hoc `process.env` in nodes.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Put a path in `publicPaths` and then forget to protect sensitive methods with route-level auth.
+- Use `publicPaths` for paths that must **always** require auth; leave them out so global auth applies.
 
 ---
 > Source: [Ratimon/openquok-monorepo](https://github.com/Ratimon/openquok-monorepo) — distributed by [TomeVault](https://tomevault.io).
