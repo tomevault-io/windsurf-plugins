@@ -7,11 +7,11 @@ A foreign exchange currency converter app that lets users convert currencies usi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Joseph-Abdullaah/FX-currency-converter](https://github.com/Joseph-Abdullaah/FX-currency-converter).
+Original source: `AGENTS.md` in [Joseph-Abdullaah/FX-currency-converter](https://github.com/Joseph-Abdullaah/FX-currency-converter).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
