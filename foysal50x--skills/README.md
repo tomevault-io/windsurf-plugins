@@ -7,11 +7,11 @@ Opinionated Laravel engineering skills for AI coding agents.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Foysal50x/skills](https://github.com/Foysal50x/skills).
+Original source: `CLAUDE.md` in [Foysal50x/skills](https://github.com/Foysal50x/skills).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
