@@ -7,11 +7,11 @@ Local-first work memory: rewind your timeline, understand your workflow, and pre
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [civitass/civitas-desktop](https://github.com/civitass/civitas-desktop).
+Original source: `CLAUDE.md` in [civitass/civitas-desktop](https://github.com/civitass/civitas-desktop).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
