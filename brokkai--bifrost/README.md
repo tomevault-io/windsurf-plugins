@@ -7,11 +7,11 @@ Multi-language static analysis for agents, editors, and large repositories.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [BrokkAi/bifrost](https://github.com/BrokkAi/bifrost).
+Original source: `CLAUDE.md` in [BrokkAi/bifrost](https://github.com/BrokkAi/bifrost).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
