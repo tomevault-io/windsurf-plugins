@@ -1,66 +1,44 @@
 ---
 trigger: always_on
-description: When public API routes change, keep Swagger JSDoc, SDK, apis-* docs, getting-started overview, and agent CLI (when exposed) in sync in the same change.
+description: Keep @openquok/node-sdk (sdk/) aligned with the public API, CLI, apis-* docs, overview docs, and runnable examples.
 ---
 
 
-# Public API surface: keep Swagger, SDK, docs, and CLI in sync
+# Node SDK (`@openquok/node-sdk`)
 
-`backend/routes/publicApi/` (mounted at `/api/v1/public/*`) is the **source of truth** for everything an API-key user can call. Any change to a public route — new endpoint, removed endpoint, renamed path, new/changed query/body/response shape — must be reflected in **Swagger, the Node SDK, the docs site, and (when exposed) the agent CLI** in the **same PR**. Do not wait for a follow-up request to add docs.
+Package root: `sdk/`. Published artifact is **`dist/` only** (gitignored; built via `pnpm run build` / `prepublishOnly`).
 
-| Layer | Path | What it provides |
-|---|---|---|
-| OpenAPI spec | `backend/swagger/jsdoc/*.doc.ts` (+ `openApiSpec.ts` tags) | `/api/v1/openapi.json` + interactive playground |
-| Node SDK | `sdk/src/index.ts`, `sdk/src/dtos.ts`, `sdk/README.md` | `@openquok/node-sdk` programmatic client |
-| Agent / CLI | `agent/src/api.ts` (+ `commands/`) | Subset of routes exposed as `openquok` commands |
-| API reference | `web/src/content/docs/apis-<domain>/*.md` | `/docs/apis-*` pages (body rendered from OpenAPI) |
-| Overview | `web/src/content/docs/getting-started-for-public-api/` | Auth, concepts (groups, plugs), SDK quickstart |
-| CLI usage | `web/src/content/docs/cli-usages/` | Command recipes when the CLI wraps the route |
+## Public API changes
 
-**Do not confuse layers:** `backend/swagger/jsdoc/*.doc.ts` files are **OpenAPI JSDoc sources only** (merged into `/api/v1/openapi.json`). They are **not** Vitest specs. Agent tests live under `agent/src/**/*.test.ts` (unit) and `agent/tests/e2e/**/*.e2e.test.ts` (e2e), with e2e filenames like `threads.schedule.post.e2e.test.ts` — see `agent-cli.mdc`.
+When `backend/routes/publicApi/**` changes, follow **`public-api-surface-sync.mdc`** end-to-end (that rule is always applied). For SDK work specifically:
 
-## 1. Swagger JSDoc (`backend/swagger/`)
+1. Update `sdk/src/index.ts` and `sdk/src/dtos.ts` (method names, URLs, DTO fields).
+2. Run `pnpm --filter ./sdk run build`.
+3. Update `sdk/README.md` method table when the surface changes.
+4. Update `web/src/content/docs/getting-started-for-public-api/index.md` SDK quickstart when new methods are user-facing.
+5. Ensure matching `web/src/content/docs/apis-<domain>/*.md` pages exist (frontmatter `openapi:` must match Swagger paths).
 
-For every public route handler, one `@openapi` block must exist in `backend/swagger/jsdoc/`. The frontend renders examples and field tables from this spec, so missing/empty schemas show up as `{"_note": "No JSON example in OpenAPI for this response."}` and empty `ParamField` / `ResponseField` rows.
+The SDK should stay in parity with `agent/src/api.ts` for shared routes, plus SDK-only methods when useful (`getPost`, `listNotifications`, etc.).
 
-- **One file per operation**, named `<domain>.<topic>.doc.ts` (e.g. `integrations.public-list.doc.ts`, `integrations.public-plug-catalog.doc.ts`, `posts.public-post-flip-status.doc.ts`). End the file with `export {};` so it stays a module.
-- The block must declare:
-  - `operationId` (camelCase, stable — SDKs / search rely on it).
-  - `tags: [<Tag>]` matching one of the tags registered in `backend/swagger/openApiSpec.ts` (`Integrations`, `Posts`, `Uploads`, …). **Add the tag there first** if you introduce a new section.
-  - `security: []` for routes that are **public/unauthenticated**, otherwise omit (the global `ApiKeyAuth` default applies).
-  - At least one `responses.<status>.content.application/json.example` (and `requestBody…example` for POST/PUT). The docs UI uses these for the rendered "Response" / "Body" panels.
-  - Full `schema` (or `$ref` to a `components.schemas.*` entry) for each request body / response so `flattenSchemaToResponseFields` can produce a complete field table.
-- **YAML pitfall**: never start a plain YAML value with a backtick. Quote descriptions that contain code spans: `description: '\`draft\` persists without enqueuing'`.
+## Types and build
 
-Reference: `backend/swagger/jsdoc/integrations.public-list.doc.ts`, `backend/swagger/jsdoc/integrations.public-plug-catalog.doc.ts`, `backend/swagger/jsdoc/posts.public-create.doc.ts`.
+- `tsconfig.json` must include `"types": ["node"]`.
+- When a public method uses `Buffer`, add `import type { Buffer } from "node:buffer"` in `src/index.ts` so `dist/index.d.ts` emits a valid import (consumers must use Node ≥18).
+- Do not commit `sdk/dist/` — match `agent/.gitignore` (`dist/`).
 
-## 2. SDK (`sdk/`)
+## Runnable examples (`sdk/examples/`)
 
-`sdk/src/index.ts` is a thin `fetch` wrapper. Each public endpoint should be reachable from a method on the default-exported `Openquok` class.
+- **`oauth2-express.mjs`** mirrors the Node.js section in `web/src/content/docs/oauth2-for-apps/nodejs-example.md`.
+- OAuth token exchange: `POST /api/v1/oauth/token` body is **`grant_type`, `code`, `client_id`, `client_secret` only** — redirect URL is configured on the app, not resent at exchange.
+- Public API calls use **`Authorization: Bearer opo_…`** (or construct `new Openquok(accessToken)`).
+- When editing the OAuth doc example or SDK OAuth example, update **both** in the same change.
 
-- Add/rename/remove the method to match the route (same HTTP method, same URL after `${this.apiRoot}`, same header set — `Authorization: <apiKey>` and `Content-Type: application/json` for JSON bodies).
-- Put request/response shapes in `sdk/src/dtos.ts` (e.g. `PublicCreatePostDto`, `PublicPlugUpsertBodyDto`). Keep field names identical to the OpenAPI schema so downstream consumers can cast safely.
-- Update `sdk/README.md` method table when the surface changes.
-- Run `pnpm --filter ./sdk run build`. Bump `sdk/package.json` `version` when publishing.
+## Publishing
 
-See also `sdk-maintenance.mdc`.
-
-## 3. Agent CLI (`agent/`)
-
-`agent/src/api.ts` defines `OpenquokApi`, the HTTP client used by the `openquok` CLI. **It is not required to mirror every method on the Node SDK** — only add or change `OpenquokApi` methods for routes that existing or new CLI commands actually call. The SDK (`sdk/src/index.ts`) is the full programmatic client; the CLI is an intentional subset.
-
-- Use the existing `requestJson` helper for JSON endpoints and `form-data` + `node-fetch` for multipart (see `uploadFile`).
-- When you add a user-facing CLI verb, add the matching `OpenquokApi` method (reuse the same URL, method, and naming as the SDK method for that operation when one exists) and wire it under `agent/src/commands/`.
-- Add or update `web/src/content/docs/cli-usages/<topic>.md` and the `cli-usages/index.md` `CardGrid` when new commands ship.
-
-See also `agent-cli.mdc`.
-
-## 4. Docs (`web/src/content/docs/apis-*/`)
-
-Public API reference pages live under `web/src/content/docs/apis-<domain>/` (e.g. `apis-integrations`, `apis-posts`, `apis-uploads`). Each page is a thin Markdown file whose body is auto-rendered from the OpenAPI spec by `OpenApiDocSplit.svelte`.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Bump `sdk/package.json` `version` before npm publish (see `sdk/PUBLISHING.md`).
+- Tag `sdk-vX.Y.Z` for `.github/workflows/release.yml`.
+- CI uses npm **trusted publishing** (OIDC): configure on npm for `@openquok/node-sdk` with workflow `release.yml`; do **not** set `NODE_AUTH_TOKEN` on the publish step (`EOTP` = token path + 2FA).
+- `repository.url` in `package.json` must be `git+https://github.com/Ratimon/openquok-monorepo.git` with `"directory": "sdk"`.
 
 ---
 > Source: [Ratimon/openquok-monorepo](https://github.com/Ratimon/openquok-monorepo) — distributed by [TomeVault](https://tomevault.io).
