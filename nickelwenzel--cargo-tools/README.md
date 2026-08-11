@@ -7,11 +7,11 @@ VSCode/OpenVSX extension for easy configuration of Rust projects
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [NickelWenzel/cargo-tools](https://github.com/NickelWenzel/cargo-tools).
+Original source: `AGENTS.md` in [NickelWenzel/cargo-tools](https://github.com/NickelWenzel/cargo-tools).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
