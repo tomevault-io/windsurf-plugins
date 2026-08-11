@@ -1,53 +1,53 @@
 ---
 trigger: always_on
-description: Page presenters, routes, parent/child wiring, toast patterns (A/B), area barrels, mutation flows
+description: Web repository / presenter layering — DTO/PM, Get* mappers, gateways; points to page-presenter rule for routes
 ---
 
 
-# Page presenter & route conventions (`$lib/area-*`)
+# Web repository / presenter architecture (short)
 
-Use this rule for **route-level pages**, **page presenters** under `web/src/lib/area-*/`, and how **`+page.svelte`** / **`$lib/ui`** children wire to them.
+## Layering (non‑negotiable)
 
-**Related:** repository layering, DTO/PM/`Get*` mapping, and naming for **repository outputs** live in **web-repository-presenter-architecture** — do not duplicate repository rules here.
+- **Route / component (`.svelte`)**: UI only — **no** `httpGateway` or repository calls from routes. See **web-page-presenter-conventions** for how routes import **page presenters** and wire toasts.
+- **Page presenter (`$lib/area-*/...Page.presenter.svelte.ts`)**: orchestrates a screen; owns `$state` where needed; accepts **feature presenters** (and repos) via constructor injection. **Route/toast/parent-child / feature injection** → **web-page-presenter-conventions**.
+- **Feature presenter (`$lib/<feature>/*.presenter.svelte.ts`)**: stateful presenter for a vertical slice (scheduler, composer, …); calls **repositories**; may expose **`$state`** view models; **no** `$app/*` / `goto`. Instantiated in **`area-*`** **`index.ts`** and injected into **page presenters**. Imports resolve as **`$lib/<feature>/<Name>.presenter.svelte`** (on-disk **`*.presenter.svelte.ts`**). Not the same as **`Get*`** (those are stateless PM→VM mappers).
+- **Repository (`*.repository.svelte.ts`)**: I/O via `HttpGateway`, **DTO → PM**, returns **PM** only.
+- **Get presenter (`Get*.presenter.svelte.ts`)**: stateless **PM → VM** mapping for reads/lists.
+
+## Type placement (default)
+
+- **DTOs / `*ResponseDto`**: next to the **repository** that consumes them.
+- **PM (`*ProgrammerModel`)**: same file as the **repository** class (unless shared across repos).
+- **VM for `Get*` outputs** (reads/lists): same file as **`Get*.presenter.svelte.ts`** (e.g. **`BlogPostCommentViewModel`** next to **`loadPublishedBlogPostComments`**).
+- **Mutation result `*ViewModel`** (discriminated `{ ok: … }` exposed to routes/UI): **not** in the repository file. Prefer **page presenter** when screen-specific (**`PublicBlogMutationResultViewModel`**), or **feature presenter** when shared orchestration wraps the repo (**`PlugMutationResultViewModel`** on **`UpsertGlobalPlugPresenter`**). Map from **`BlogUpsertProgrammerModel`**, **`PlugUpsertProgrammerModel`**, etc. inside that presenter.
+- **Feature `*.types.ts`**: Zod / form types and other **non-repository-only** shared UI types.
+
+## Naming (quick rules)
+
+- Repository results: **`*Pm`** (`resultPm`, `listPm`).
+- **Exported type / interface names** (rows, mutation results, screen VMs): **`*ViewModel`** only — e.g. **`AccountListingCollectionItemViewModel`**, **`ExtensionCardViewModel`**. **Do not** use **`*Vm`** as a type suffix (avoid **`FooRowVm`**, **`AccountListingCollectionItemVm`**).
+- **Presenter fields, locals, and getters** holding those types: **`*Vm`** suffix — e.g. **`exploreExtensionCardsVm`**, **`bookmarkedExtensionsVm`**, **`resultVm`**. Avoid bare names like **`exploreExtensionCards`** when the value is presenter-owned VM state.
+- DTOs: **`*Dto`**, **`*ResponseDto`**.
+
+### `Get*Presenter` method naming (project convention)
+
+- **PM → VM mappers**: prefer **`toXxxVm(pm)`** (or `toXxxListVm(listPm)` when helpful). Pure **`map*` / `merge*` / `format*`** helpers may live in the same file as **`Get*`** when they support one read path and tests
+- **Read/load methods that return UI shapes**: prefer **`loadXxxVm(...)`** / **`loadXxx*Vm(...)`**. For **aggregate reads** (parallel repository calls, merged result), use a **`loadXxxVmStateless`** name when the method **does not** mutate any presenter **`$state`**; a discriminated **`{ ok: true; … } | { ok: false; error: string }`** return is acceptable when the caller must treat **partial HTTP failure** as one screen-level error
+- **Avoid** `mapXxxPmToVm` / `getXxxVm` / `listXxx` on `Get*Presenter` **method names** unless there is a very specific reason (standalone **`map*`** **functions** next to **`Get*`** are fine).
+
+## Rule of thumb (enforced)
+
+- **Repositories return PM** (including discriminated **`{ ok: … }`** unions), not arbitrary screen **`…ViewModel`** types — except documented **DTO == PM** aliases.
+- **`Get*Presenter`** is the **read/list VM boundary** (map PM → VM); **`load…Vm`** methods return **`Vm`**, **`Vm[]`**, or **`Vm | null`** — not PM arrays to **`$lib/ui`** or routes.
+- **Page / feature presenters** are the usual **mutation VM boundary**: convert **`resultPm`** from **`await repo…`** into a **`*MutationResultViewModel`** (or delegate to a feature presenter that already returns one). Do not thread **`BlogUpsertProgrammerModel`** / **`PlugUpsertProgrammerModel`** through callback props typed for UI consumers.
+- **DTO == PM** is allowed only when the wire shape is identical; still treat the return as PM at the boundary.
+- **Prefer clean returns in presenters:** for public **read** flows, prefer returning `null` / `[]` over `{ ok: true } | { ok: false }` unions. Keep unions for **repository I/O**, **aggregate multi-fetch** **`Get*`** loads, or when the caller truly needs multiple failure modes.
 
 ---
 
-## Page presenter — role and placement
+# Repository / presenter architecture (web)
 
-- **File:** `$lib/area-protected/*Page.presenter.svelte.ts`, `$lib/area-admin/*Page.presenter.svelte.ts`, `$lib/area-public/*Page.presenter.svelte.ts`, etc.
-- **Class name:** e.g. `ProtectedSettingsPagePresenter`, `AdminFeedbackManagerPagePresenter`.
-- **Wiring:** Instantiate the page presenter in the area **`index.ts`**, export the **singleton** (e.g. `protectedSettingsPagePresenter`) and **status enums** the route needs (e.g. `UpdateProfileStatus`). See **Area `index.ts` exports** below for what not to re-export.
-- **Shapes:**
-  - **Thin coordinator:** constructor takes feature presenters (and deps); exposes getters or delegates; route uses one import from the area index.
-  - **Stateful page:** owns `$state`, calls repositories and/or `Get*` presenters for loads and mutations.
-  - **Cross-presenter composition (reference: analytics):** a page presenter may inject **another area page presenter** when that screen reuses its read model and behavior
-
----
-
-## Feature presenters (injected into page presenters)
-
-A **feature presenter** is a stateful **`*.presenter.svelte.ts`** under a **feature** package (e.g. `$lib/posts/Scheduler.presenter.svelte`, `$lib/posts/CreateSocialPost.presenter.svelte`) that owns reusable UI orchestration for that domain: repository calls, derived or **`$state`** view models (e.g. **`ScheduledPostsCalendarVm`** on **`SchedulerPresenter.scheduledPostsCalendarVm`**), and methods the screen needs. It is **not** an area route file; it lives next to the feature repository / exports.
-
-- **Injection:** The **page presenter** receives feature presenters **via constructor** as **`readonly`** fields (e.g. **`schedulerPresenter`**, **`createSocialPostPresenter`**). The route should use **`protectedCalendarPagePresenter.schedulerPresenter`** / **`.createSocialPostPresenter`** (or the home page singleton’s **`createSocialPostPresenter`**) for **`prepareOpen`**, **`bind:presenter`**, and passing into **`$lib/ui`** — **not** a parallel import of the same singleton from **`$lib/posts`** when the area barrel already wires it onto the page presenter.
-- **Composition root:** Construct repositories and shared helpers first, then **feature presenters**, then **`Protected*PagePresenter`** inside **`$lib/area-protected/index.ts`** (or the relevant **`area-*`** barrel), in **dependency order**. Example: **`GenerateMediaModalPresenter`** → **`CreateSocialPostPresenter(postsRepository, composerMediaModalPresenter)`** → **`ProtectedHomePagePresenter(..., createSocialPostPresenter)`** → **`ProtectedCalendarPagePresenter(..., schedulerPresenter, createSocialPostPresenter)`**. Keep feature **`index.ts`** (e.g. **`$lib/posts/index.ts`**) limited to **repository + class/type exports** so it does not import **`area-protected`** — cross-cutting wiring stays in the **area** barrel to avoid circular dependencies.
-- **Shared instances:** The **same** feature presenter instance may be injected into **more than one** page presenter when the product shares one composer or scheduler across screens; document that in the area **`index.ts`** next to the constructors.
-- **Boundary:** **Page presenter** = screen-specific orchestration and presenter-owned screen state; **feature presenter** = vertical slice reused across account routes. **`Get*Presenter`** remains stateless PM→VM only — see **web-repository-presenter-architecture**.
-
-### Repository call naming (`resultPm`)
-
-In **page presenters**, **feature presenters**, and stateless **`Get*Presenter`** classes, bind the value returned from **`await …Repository.someMethod(...)`** to **`resultPm`** (repository / programmer-model layer: discriminated `{ ok: … }` unions, PM payloads, etc.). Avoid opaque names like **`r`**, **`res`**, or **`data`** for that binding. For list reads use **`listPm`** (e.g. **`ApprovedAppsRepository.list()`** → **`ListApprovedAppsProgrammerModel`**); for a single mutation outcome **`revokePm`** / **`createPm`** is fine when **`resultPm`** would be ambiguous.
-
-**Type vs field naming (required):** exported row / screen types use the **`ViewModel`** suffix only (e.g. **`ApprovedAppRowViewModel`**, **`AccountListingCollectionItemViewModel`**). Presenter properties that hold those values use the **`*Vm`** suffix (e.g. **`itemsVm`**, **`exploreExtensionCardsVm`**, **`bookmarkedExtensionsVm`**). Do not name exported types **`…Vm`**; do not name presenter VM state without the **`Vm`** suffix (e.g. avoid **`exploreExtensionCards`**).
-
-After mapping to UI-facing shapes, use **`resultVm`** (or domain-specific names like **`groupVm`**) for the mapped view model. Example:
-
-```ts
-const resultPm = await this.postsRepository.getPostGroup(postGroup);
-if (!resultPm.ok) return null;
-return toPostGroupDetailsVm(resultPm.group);
-```
-
-### Mutation return types (`*ViewModel`, not PM)
+We use a **concept-first, layered architecture** so logic lives outside the framework and we can test **view models (presenter state) instead of the DOM**.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
