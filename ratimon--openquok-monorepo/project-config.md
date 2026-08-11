@@ -1,52 +1,52 @@
 ---
 trigger: always_on
-description: Checklist for adding a social channel — backend provider + web composer/OAuth + docs + self-host env + public SEO landing page + agent channel SEO routes + public Photo Editor channel routes + public Best Time to Post channel routes + feature bento showcases + Extensions Hub listing tags
+description: How to add or change the openquok CLI (yargs, agent/src/api.ts, JSON output, docs). Apply when editing agent/ or CLI-related docs.
 ---
 
 
-# Adding a social provider
+# Agent CLI (`openquok`)
 
-Ship **backend + web + docs + self-host env + public channel landing page + agent channel SEO routes + public Photo Editor channel routes + public Best Time to Post channel routes + feature bento showcases + Extensions Hub listing tag** in one change. Reference implementations: **Threads** (single-step OAuth), **Instagram (Business)** (Page picker + compose settings), **Facebook Page** (Meta OAuth + link-preview settings). Public landing + bento references: **facebook**, **threads** in `publicChannelConfig.ts` and `web/src/lib/ui/templates/bento/minor-templates/`. Agent channel SEO references: **facebook** at `/agents/openclaw/facebook`. Photo Editor channel references: **facebook**, **instagram** at `/tools/photo-editor/{slug}`. Best Time to Post references: **tiktok**, **linkedin** at `/tools/best-time-to-post/{slug}`; benchmark tables in `web/src/lib/best-time-to-post/constants/benchmarkSlots.ts`. Listing tag + group reference: `backend/supabase/db/listing-tags/502_20260629_seed.sql`. Full guide: `web/src/content/docs/developer-guidelines/add-provider.md`.
+The programmatic CLI lives in `agent/`, published as `@openquok/auto-cli`. It targets automation and agents: **stdout is JSON** for machine parsing; errors go through the shared JSON error printer.
 
-## Identifier contract
+## Layout
 
-Use one kebab-case slug everywhere: `provider.identifier`, DB `provider_identifier`, OAuth callback `/integration/oauth/{identifier}`, `getLaunchProviderConfig`, CLI filters, docs filenames, **`publicChannelConfig` `slug` / `platformId`**, **`listing_tags.slug`**, `/channels/{slug}`, **`/tools/best-time-to-post/{slug}`**, **`/tools/photo-editor/{slug}`**, and **`/agents/{agentSlug}/{slug}`** (agent channel SEO). Do not fork slugs between layers. When `platformId` differs from the marketing slug (rare), still key **`benchmarkSlots.ts` `PLATFORM_WINDOWS`** by every identifier the calculator can pass (`platformSlug` from channel config / platform select).
+- **Entry** — `agent/src/index.ts`: `scriptName("openquok")`, `.strict()`, `.fail` → `printErrorJson`, `stripNpmRunArgvPassthrough` so `pnpm … cli -- <args>` works (leading `--` would otherwise confuse yargs). Global `--help` text uses `.help("help", "…")` (second argument is the description yargs prints in the Options table).
+- **HTTP client** — `agent/src/api.ts` (`OpenquokApi`): JSON helpers and multipart where needed. Only add methods for routes the CLI actually calls (see `public-api-surface-sync`).
+- **Commands** — `agent/src/commands/*.ts`: each file exports `registerXCommands: RegisterCommands` chaining `.command(...)` onto the shared `Argv`.
+- **Registration** — `agent/src/commands/index.ts` calls each `register*` in a stable order; new domains get a new module plus one line here.
+- **Shared types** — `agent/src/commands/types.ts` (`CommandContext`, `RegisterCommands`).
+- **Helpers** — `agent/src/commands/utils.ts` (`runCommand`, `requireArg`, `parseJsonMaybe`, `toArrayFromCsv`, …). Wrap handlers in `runCommand("<name>", async () => { … })` so failures carry the command name.
+- **Pure logic** — When a command grows non-trivial (flag normalization, JSON shaping, provider merge rules), move deterministic helpers into a colocated `*.logic.ts` module and cover them with Vitest (`*.test.ts`).
 
-## Backend (required)
+## Unit tests (Vitest)
 
-1. **`SocialProvider` class** — `backend/integrations/providers/{id}/` implementing `social.integrations.interface.ts`: OAuth (`generateAuthUrl`, `authenticate`), `post`, `maxLength`, scopes. Split publish logic into helpers (e.g. `*GraphPublish.ts`) when non-trivial.
-2. **Register** — add `new YourProvider()` in `backend/integrations/integrationManager.ts` (no new REST routes).
-3. **Config** — secrets only via `config.integrations.*` in `GlobalConfig.ts` + `.env.development.example`. Also add the same empty keys to **`infra/self-host/.env.example`** (Social provider apps section) so self-host operators get the vars. Redirect URI: `oauthFrontendOrigin()` + `oauthFrontendSocialCallbackPath(identifier)`.
-4. **Between-steps OAuth** — when `isBetweenSteps: true`: implement `pages()` + `fetchPageInformation()`; extend `IntegrationConnectionService.saveProviderPageForOrganization` / `preservesUserTokenForRefresh` if user token must stay in `refresh_token` (Meta Page pattern).
-5. **Provider settings at publish** — read from `postDetails.settings.providerSettings`. Accept **flat CLI keys** and **nested web buckets** (e.g. `providerSettings.url` and `providerSettings.facebook.url`). Export a resolver + unit tests beside publish helpers.
-6. **Tests** — unit tests for OAuth edge cases, publish payload shaping, and connection save when behavior differs.
+- **Location** — `agent/src/**/*.test.ts` (e.g. `posts.logic.test.ts` exercises `posts.logic.ts`).
+- **Scope** — Prefer testing **pure functions** (payload builders, parsers, merge rules). Keep handlers thin and push deterministic shaping into `*.logic.ts` so unit tests stay fast.
 
-## Extensions Hub listing tags (required for social channels)
+## End-to-end CLI tests (Vitest)
 
-The public **Extensions Hub** (`/extensions`) filters skills and MCP listings by **tag** and **tag group**. Each social channel needs a matching `listing_tags` row and group associations so hub filters stay aligned with shipped providers.
+- **Location** — `agent/tests/e2e/**/*.e2e.test.ts` (included from `agent/vitest.config.mjs`).
+- **Style** — Scenario-based: build an `argv` string list the same order a user would pass after `openquok`, set `HOME` to a temp dir when touching credentials paths, point `OPENQUOK_API_URL` at a local stub server, then assert HTTP bodies + JSON stdout. Prefer filenames that reflect surface + command (e.g. `threads.schedule.post.e2e.test.ts`, `instagram.upload.e2e.test.ts`). Use `@faker-js/faker` for UUIDs and sample strings when values only need to be stable within the test.
+- **Runner** — Same as unit tests: `agent/run-vitest.mjs` spawns **`node web/node_modules/vitest/vitest.mjs`** from the repo root with `--config agent/vitest.config.mjs` (Vitest stays a `web` devDependency; no extra lockfile entry in `agent/`). It intentionally does **not** run `pnpm --filter ./web exec vitest`, because `pnpm agent:test` is already under pnpm and a second `pnpm exec` can **deadlock** on the store lock. **Do not** spawn nested `pnpm --filter ./agent exec …` from inside a test either. The e2e harness runs the **bundled** CLI (`node agent/dist/index.js`) via **async `spawn`** with **`stdio: ['ignore','pipe','pipe']`** — `spawnSync` inside Vitest workers has been observed to hang; default stdin pipes can also block CLIs that read stdin. If `dist/` is absent, the harness runs **`node agent/node_modules/tsup/dist/cli-default.js`** once (stdio ignored) instead of `pnpm exec tsup`.
+- **Commands** — `pnpm agent:test` (unit + e2e), `pnpm agent:test:unit`, `pnpm agent:test:e2e`; watch: `pnpm --filter ./agent test:watch`.
 
-Follow **backend-migrations-naming** (`listing-tags_<YYYYMMDD>_seed.sql` under `backend/supabase/db/listing-tags/`). Re-aggregate migrations after seed changes.
+## Yargs conventions
 
-| Artifact | Path / action |
-| --- | --- |
-| Channel tag row | New `INSERT` in `backend/supabase/db/listing-tags/501_*.sql` (or a later `501`-tier seed if `501` already shipped) |
-| Group associations | `backend/supabase/db/listing-tags/502_*.sql` — append rows to `listing_tag_groups_listing_tags_association` with slug comments (see existing file) |
-| Slug + name | `slug` = `provider.identifier`; `name` = human label (e.g. `Facebook`, `X`) |
-| Description | One neutral sentence on what the channel integration covers (no third-party attribution) |
-| Stable UUID | New `d5f7c000-0000-4000-a000-…` id; never reuse or reassign ids |
+- **Command names** — Use `group:verb` (e.g. `posts:create`, `integrations:list`). Match what users type; keep names stable once shipped.
+- **Examples** — Use `$0` in `.example()` strings so help text shows the correct binary name.
+- **Validation** — Prefer `.check((argv) => { … })` when rules involve multiple flags (e.g. “`--json` path OR (`--scheduledAt` + integrations + body)”). Avoid impossible combinations of `demandOption` on mutually exclusive paths.
+- **Aliases** — Offer short flags (`-c`, `-s`, `-i`, …) **and** long names that align with the public API / SDK where it helps scripts and docs stay consistent.
+- **Types** — Use explicit `choices` for enums that map to the API (e.g. `draft` | `scheduled`). If the CLI accepts a synonym (e.g. `schedule` → `scheduled`), normalize in the handler, not in the API request.
+- **Arrays** — For “repeat this flag” behavior, use `type: "string", array: true` (or equivalent) and normalize to `string[]` in code; document pairing order in `describe` / examples.
+- **Kebab-case options** — When matching common CLI spelling (e.g. `--release-id`), expose alongside camelCase if yargs normalizes; read both in the handler if needed.
 
-### Tag groups (social channels only)
+## Behavior and UX
 
-A channel tag usually belongs to **Social platforms** plus one or more **content-type** groups. Tags may belong to multiple groups. Group ids and membership rules live in `502_*.sql` — keep the overview comment block there up to date.
+- **Output** — Success paths should `printJson(…)` only; do not mix prose and JSON on stdout.
+- **Side effects** — Auth and uploads are the main exceptions; still end with JSON when possible.
+- **Config** — Respect `getConfig()`, credentials precedence (`readCredentialsFile` vs `OPENQUOK_API_KEY`), and `OPENQUOK_API_URL` as implemented in `agent/src/config.ts` and `index.ts`.
 
-| Group | When to add the channel tag |
-| --- | --- |
-| **Social platforms** | **Always** — every social channel tag |
-| **Videos** | Video-first publish (e.g. YouTube, TikTok) |
-| **Photos** | Image-first feed workflows (e.g. Instagram, Facebook Page photos) |
-| **Text** | Text and microblog channels (e.g. Threads, LinkedIn, X) |
-
-Agent / MCP tags (OpenClaw, Cursor, Codex, …) are **not** part of this checklist — only add those when shipping agent or MCP catalog entries, not when adding a social provider.
+## Docs that mention the CLI
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
