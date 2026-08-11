@@ -7,11 +7,11 @@ Turn the job-board firehose into a ranked shortlist and land interviews faster �
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [StevSant/HireSense](https://github.com/StevSant/HireSense).
+Original source: `AGENTS.md` in [StevSant/HireSense](https://github.com/StevSant/HireSense).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
