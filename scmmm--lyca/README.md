@@ -7,11 +7,11 @@ LYCA:more LIKe A human agent system
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [scmmm/LYCA](https://github.com/scmmm/LYCA).
+Original source: `AGENTS.md` in [scmmm/LYCA](https://github.com/scmmm/LYCA).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
