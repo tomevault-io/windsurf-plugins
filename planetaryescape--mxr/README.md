@@ -7,11 +7,11 @@ Local-first, keyboard-native terminal email client
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [planetaryescape/mxr](https://github.com/planetaryescape/mxr).
+Original source: `AGENTS.md` in [planetaryescape/mxr](https://github.com/planetaryescape/mxr).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
