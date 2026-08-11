@@ -7,11 +7,11 @@ A factory for building production-grade agent skills — benchmarked against gol
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [a-tokyo/agent-skills-harness](https://github.com/a-tokyo/agent-skills-harness).
+Original source: `CLAUDE.md` in [a-tokyo/agent-skills-harness](https://github.com/a-tokyo/agent-skills-harness).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
