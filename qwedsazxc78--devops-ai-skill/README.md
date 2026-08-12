@@ -7,14 +7,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [qwedsazxc78/devops-ai-skill](https://github.com/qwedsazxc78/devops-ai-skill).
+Original source: `AGENTS.md` in [qwedsazxc78/devops-ai-skill](https://github.com/qwedsazxc78/devops-ai-skill).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [qwedsazxc78/devops-ai-skill](https://github.com/qwedsazxc78/devops-ai-skill) — a repo with 10+ stars on GitHub.
