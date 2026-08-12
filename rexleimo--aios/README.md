@@ -7,11 +7,11 @@ Local-first AI agent bootstrap: Playwright Browser MCP + ContextDB for Codex CLI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [rexleimo/aios](https://github.com/rexleimo/aios).
+Original source: `CLAUDE.md` in [rexleimo/aios](https://github.com/rexleimo/aios).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
