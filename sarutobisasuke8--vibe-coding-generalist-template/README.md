@@ -7,14 +7,14 @@ Reusable AI-assisted vibe coding project template with agent instructions, perso
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [SarutobiSasuke8/vibe-coding-generalist-template](https://github.com/SarutobiSasuke8/vibe-coding-generalist-template).
+Original source: `CLAUDE.md` in [SarutobiSasuke8/vibe-coding-generalist-template](https://github.com/SarutobiSasuke8/vibe-coding-generalist-template).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [SarutobiSasuke8/vibe-coding-generalist-template](https://github.com/SarutobiSasuke8/vibe-coding-generalist-template) — a repo with 9+ stars on GitHub.
