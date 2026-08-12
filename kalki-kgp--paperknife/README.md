@@ -7,11 +7,11 @@ Privacy-first PDF utility — merge, split, compress, sign, encrypt, convert. Ru
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [kalki-kgp/PaperKnife](https://github.com/kalki-kgp/PaperKnife).
+Original source: `AGENTS.md` in [kalki-kgp/PaperKnife](https://github.com/kalki-kgp/PaperKnife).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
