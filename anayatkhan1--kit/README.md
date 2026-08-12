@@ -7,11 +7,11 @@ Add an agent with one CLI command. Source lands in your repo as real TypeScript 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [anayatkhan1/kit](https://github.com/anayatkhan1/kit).
+Original source: `CLAUDE.md` in [anayatkhan1/kit](https://github.com/anayatkhan1/kit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
