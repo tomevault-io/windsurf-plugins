@@ -7,14 +7,14 @@ GEO-optimized landing page template for startups. Astro 5, Schema.org JSON-LD, a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [fritzhand/geo-landing-page](https://github.com/fritzhand/geo-landing-page).
+Original source: `AGENTS.md` in [fritzhand/geo-landing-page](https://github.com/fritzhand/geo-landing-page).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [fritzhand/geo-landing-page](https://github.com/fritzhand/geo-landing-page) — a repo with 9+ stars on GitHub.
