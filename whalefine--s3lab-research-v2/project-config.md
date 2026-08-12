@@ -1,100 +1,154 @@
 ---
 trigger: always_on
-description: 以 run_backbone_numpy_shared_trunk.py 為 golden，將 numpy trunk 對齊轉 Verilog；backbone 對拍 verilog_backbone2/；head 對拍以 verilog_head2/ 為準（verilog_head/ 僅舊版參考）
+description: - Python 到 RTL 轉換計劃過程中只實作 **test / inference** 流程，不處理任何 train 會用到的邏輯。
 ---
 
 
-# Numpy Trunk → Verilog 對齊規則
+# Python 到 RTL 轉換計劃（CARE / test-only / post-embedding）
 
-本規則與 `verilog_rule.mdc`（語法／可合成底線）並存；若有衝突，**可合成與對拍語意**以本檔與 `verilog_rule.mdc` 較嚴者為準。
+## 專案邊界
 
-## 1. Golden 與產出位置
+- Python 到 RTL 轉換計劃過程中只實作 **test / inference** 流程，不處理任何 train 會用到的邏輯。
+- RTL 只處理 **一個 template + 一個 search** 的情況，不考慮 batch 與多 template / 多 search。
+- RTL **不實作** `patch_embed` 與 `position embedding`；這兩部分保留在 Python / PyTorch 端。
+- RTL 的輸入是 **已完成 patch embedding 與 position embedding 後的特徵 / token**。
+- RTL 的輸入形式固定為 **分開的 template token 與 search token**，不可將兩者在 Python 端先合成單一 `320 token` 再當成唯一 RTL 輸入。
+- RTL 的目標是從 post-embedding 特徵開始，跑完 **backbone + head + bbox 生成** 的 test 路徑。
+- 若與 Python test 對齊到最終 bbox，需納入 `score_map / size_map / offset_map / cal_bbox` 等 test-time head 邏輯。
 
-- **數學與流程依據**：`python/tracking/run_backbone_numpy_shared_trunk.py`（以下稱 **numpy trunk**）。
-- **Verilog 實作目錄**：`python/lib/models/verilog/`（僅在此目錄新增／修改 RTL；ROM/RAM 若已在外部生成，介面以現有 top / testbench 為準）。
-- **Verilog 目錄分工**（多條路徑並存，勿混淆）：
-  - **`python/lib/models/verilog_backbone2/`** — **目前 backbone 對拍基準**（`TEST_backbone.v` 等）；與 numpy trunk backbone 階段 golden 對拍。
-  - **`python/lib/models/verilog_head2/`** — **目前 head 對拍基準**：**不跑 backbone RTL**；以 numpy trunk 產出的**準確 activation**（例如 `backbone_after_norm_backbone_out_bi.txt`）串流進 `head_top`，驗證 conv → tail → `cal_bbox`；TB 為 `TEST_head.v`（編譯 `verilog_head2/*.v` + `Sram_tok1` 等）。
-  - **`python/lib/models/verilog/`** — **端到端整鏈路**（`TEST.v`，暫不動）：`sglatrack_top` 含 backbone + head。
-  - **`python/lib/models/verilog_head/`** — **舊版 head-only**（`Sram_sh1_lo`/`hi`、`mac_dv` 等）；**僅參考或比對舊實作，預設不作為對拍修改目標**。
-  - 修改 RTL 時須先確認目標目錄：backbone → `verilog_backbone2/`；**head → `verilog_head2/`**（除非使用者明確指定 `verilog_head/` 或 `verilog/`）；全鏈路 → `verilog/`。
-- **Activation 對答案檔**（Q8.8 二進位文字，一行一元素）：  
-  `python/output/golden/vit_care_relu6_numpy_trunk_dim32_out/Activation/*.txt`  
-  對應檔名多為 `*_bi.txt`（與腳本 `write_bi` 輸出一致）。RTL 除錯時以**此目錄**為 golden，不以「猜 golden」為準。
-- **階段對拍義務**：詳見 **§21**（numpy trunk 寫出的 activation 須與 Verilog 同階段輸出對答案）。
+## 固定點格式規則
 
-## 2. 不硬體化、不當作 RTL 行為依據的程式碼
+- 本專案 Python check、binary Python check、參數文字檔與 RTL 的**預設固定點格式一律使用 `Q8.8`**。
+- `Q8.8` 定義：
+  - signed fixed-point
+  - 1 個 sign bit
+  - 8 個整數位
+  - 8 個小數位
+  - 總位寬預設視為 16-bit signed
+- 若某個 stage 暫存器、累加器、乘法輸出需要更寬位寬，必須另外明確標註，但最終對外 dump / 對拍格式仍優先回到 `Q8.8`。
+- 沒有特別聲明時：
+  - activation 使用 `Q8.8`
+  - weight 使用 `Q8.8`
+  - bias 使用 `Q8.8`
+  - intermediate dump 使用 `Q8.8`
+- 若未來要改成其他格式，例如 `Q4.12`、`Q16.8`，必須先同步更新：
+  - Python check
+  - binary Python check
+  - `.txt` / binary `.txt` 轉檔規則
+  - RTL module 介面與 testbench
 
-- numpy trunk 內僅負責 **輸出 activation / weight 的 `*_bi.txt`** 的路徑（例如 `write_bi`、`save_npy`、`write_wbi`、目錄 `_bi_act_dir` / `_bi_wgt_dir`）**不實作進晶片**，也不當作 datapath 規格；它們的用途是 **給 Verilog 模擬對答案** 與產生 ROM 初值檔。
-- **主架構外**的輔助流程不強制硬體化：`argparse`、`main`、讀檔、`json`、`print`、`mkdir`、`cv2`（若有）等。
+## 固定研究主線
 
-## 3. 可合成性
+1. 使用 `vit_CARE_relu6.py` 訓練浮點模型。
+2. 使用 `vit_CARE_relu6.py` 訓練出的 checkpoint，載入到 `vit_CARE_relu6_fixed.py` 做 test / 量化驗證。
+3. 將該 checkpoint `.pth.tar` 轉成各個 parameter 的 `.npy`，給 Python check 使用。
+4. 撰寫 Python check（讀 `.npy`），用 hardware-friendly 方式重寫 **backbone + head + bbox** 的 test 流程。
+5. 將 `.npy` 轉成 `.txt` / binary text，給 RTL 讀取。
+6. 撰寫 binary 版 Python check，完全模擬未來 Verilog 的 bit-width、截斷、捨入、除法近似與控制流程。
+7. 將 binary Python check 對應轉成 Verilog RTL。
 
-- 所有要進晶片（或 FPGA 正式 image）的 RTL **必須可合成**，並遵守 `verilog_rule.mdc`（例如 Verilog-2001、禁止用於「硬體邏輯」的 `initial` / `#delay` 等，依該檔全文為準）。
-- 若為 **除錯專用**（例如僅模擬用的 `$display`、`ifdef` 區塊、不可綜合的暫時波形 dump），必須：
-  - 以註解或 `ifdef` 標題**明寫「不可合成／僅 simulation」**，且
-  - **註明為解決何種現象而插入**（例如：對拍哪一節點 golden、追查 argmax 錯位、SRAM 寫入下溢、sigmoid 全飽和等；見 **§10**），並
-  - 預設關閉或易於關閉，避免誤綜。
+## 參考檔案與路徑
 
-## 4. 修改必須有依據
+- 浮點訓練 backbone：`python/lib/models/sglatrack/vit_CARE_relu6.py`
+- 定點測試 backbone：`python/lib/models/sglatrack/vit_CARE_relu6_fixed.py`
+- 定點 test config：`python/experiments/sglatrack/vit_coco_uav123_care_relu6_fixed.yaml`
+- checkpoint 匯出腳本：`python/tracking/export_checkpoint_npy.py`
+- Python check 參考：`reference/rongxuan/05_PythonCheck/python_check.py`
+- Verilog 前 binary Python check 參考：`reference/rongxuan/06_GetBinary/python_check_verilog.py`
 
-- 修改 Verilog **不可憑猜**：需註明或可追溯至 **numpy trunk 對應函式與行數**、**golden 檔名與 flatten 順序**、或**已約定的定點規格**（例如 Q8.8、`fp`/`linear` 與 RTL 的對應說明）。
-- 若規格不明，應先補文件或先在 numpy／binary check 釐清，再改 RTL。
+## checkpoint 路徑規則
 
-## 5. 語義不對齊時的優先順序（Python 先可硬體化）
+- `vit_CARE_relu6.py` 訓練出的 checkpoint 預設路徑為：
+  - `python/output/checkpoints/train/sglatrack/vit_coco_uav123_care_relu6/sglatrack_ep0050.pth.tar`
+- 之所以優先使用 `ep0050`，是因為 config 的 `TEST.EPOCH = 50`，test 預設即會載入第 50 epoch。
+- 若之後改 config 名稱或 epoch，需同步更新：
+  - 訓練 checkpoint 路徑
+  - 匯出 NPY 的來源 checkpoint
+  - Python check / binary check / RTL testbench 使用的 golden 版本
 
-- 若發現 numpy trunk 某段**不易硬體化**或與已定 RTL **語義不一致**，優先 **修改 `run_backbone_numpy_shared_trunk.py`**，使演算法改為：
-  - 固定 shape、固定迴圈深度、
-  - 明確的定點／截斷／飽和步驟（與未來 RTL 可一一對應），
-  - 再更新 golden 與 RTL。
-- 避免為了遷就錯的 Python 語意而去寫「無法對拍」的 RTL。
+## patch embedding / position embedding 規則
 
-## 6. Verilog 改動幅度
+- `patch_embed` 與 `pos_embed` 不進 RTL。
+- Python 端必須先完成：
+  - patch embedding
+  - 加上 positional embedding
+  - 保留 template token 與 search token 分開的輸出
+- embedding 前段的 NPY dump 檔名固定為：
+  - `template_after_patch_embed_out.npy`
+  - `search_after_patch_embed_out.npy`
+  - `template_pos_embed.npy`
+  - `search_pos_embed.npy`
+  - `template_after_pos_add_out.npy`
+  - `search_after_pos_add_out.npy`
+- 上述檔名定義如下：
+  - `template_after_patch_embed_out.npy`：`template = patch_embed(template)` 之後的輸出
+  - `search_after_patch_embed_out.npy`：`search = patch_embed(search)` 之後的輸出
+  - `template_pos_embed.npy`：`self.pos_embed_z`
+  - `search_pos_embed.npy`：`self.pos_embed_x`
+  - `template_after_pos_add_out.npy`：`patch_embed(template) + pos_embed_z`
+  - `search_after_pos_add_out.npy`：`patch_embed(search) + pos_embed_x`
+- 硬體驗證的 golden input 應該是 **post-embedding tensor**，不是原始 RGB image。
+- Python 端可做 `patch_embed(template) + pos_embed_z` 與 `patch_embed(search) + pos_embed_x`，但 **`combine_tokens` 必須保留在 RTL 端**。
+- RTL 輸入固定定義為：
+  - `template_post_embed`：shape `(1, 64, 768)`
+  - `search_post_embed`：shape `(1, 256, 768)`
+- 上述兩個 tensor 才是 RTL 測試與對拍的第一級 golden input；`320 token merged tensor` 只能作為 Python / RTL 中間節點 dump，不可取代 RTL 正式輸入介面。
+- 若匯出 parameter 只為 RTL 使用，可排除：
+  - `patch_embed.*`
+  - `pos_embed*`
+  - `cls_token`
+  - 任何只屬於 embedding 前段的權重
+- 若匯出 parameter 也要保留完整 Python 對照，可額外保存完整 checkpoint 對應 NPY，但 RTL 實際使用時只讀 post-embedding 之後需要的參數。
 
-- 以 **最小 diff** 為原則：盡量保留原有模組結構、介面與命名；**只改必要區段**解決對拍或合成問題。
-- 非經使用者同意，不做與當前 bug 無關的大重構。
+## test-only 流程規則
 
-## 7. 訊號 ↔ Golden 檔名註解（強制）
+- 僅分析與實作 test path。
+- 不閱讀、不修改、不 RTL 化以下 train-only 項目：
+  - dataloader
+  - data augmentation
+  - loss function
+  - optimizer
+  - backward
+  - scheduler
+  - AMP
+  - candidate elimination warm-up / train-only control
+- Python / RTL 對齊時，優先以 `forward_test` 與 tracker `track()` 實際推論路徑為準。
 
-- 在 `python/lib/models/verilog/` 內，凡會對應到 numpy trunk 中間輸出、且可用 Activation golden 對拍的 **模組輸出／暫存陣列／串流**，應在適當位置（模組頭或該訊號旁）加註解，格式建議：
+## Golden 版本規則
 
-  `// Golden: vit_care_relu6_numpy_trunk_dim32_out/Activation/<檔名>_bi.txt`
-
-  若一訊號對應多檔或子路徑，寫清楚檔名與 tensor 對應關係（例如 token 順序、flatten 為 row-major 等，若 golden 有文件則引用）。
-
-- 若某節點 numpy 有 `save_npy("xxx.npy")` 但 golden 實際為 `xxx_bi.txt`，註解以 **實際存在的 `Activation/` 檔名** 為準。
-
-## 8. 硬體化範圍（排除清單）
-
-- **不必**硬體化：僅供寫檔、寫 log、路徑組合、與 `np.load`/CLI 相關的程式碼（見第 2 節）。
-- **必須**能對應到硬體 datapath 的：依 numpy trunk **主流程**會執行到的 `block_forward`、`attention_forward`、`layer_norm`、`linear`、`head_shared_trunk`、`conv2d`、以及（若納入範圍）`cal_bbox` 與 tracker 相關運算等；實作時以「可合成 + 可對拍」為取捨邊界。
-
-## 9. 主架構優先
-
-- 判斷「要不要硬體化」時，以 numpy trunk **正常 main 路徑**會跑到的運算為準；冷門分支、僅在缺少 golden 時才走的 fallback（例如自行算 adaptive）可標為軟體或第二階段，除非使用者明確要求納入 RTL。
-
-## 10. 除錯環境（模擬不在本 repo）
-
-- 假設 **Verilog simulation 在外部環境**執行；除錯可依賴：
-  - 使用者**截圖**（波形／訊號），或
-  - 在 RTL 暫加 **`$display`**（須標註僅 simulation、見 **§3**），由使用者截圖或貼 log 回傳數值。
-- 凡為除錯而加入的 **`ifdef`／`$display` 區塊**，除 **§3** 外，**必須**在區塊上方或模組頭註解寫清：**為了解決／驗證什麼**（症狀或對拍目標）、**與哪個 golden 檔或哪一層節點相關**；避免僅寫「debug」而後續無法判斷是否可刪、與何問題綁定。細節見 **§10.1**（**註解義務**與 **`ifdef` 分區**兩條）。
-- 若使用者**無法使用波形圖**（無 FSDB/VPD 或無法開 viewer），除錯方式以 **§10.1** 為準，不應假設能依波形縮小問題。
-- Agent 修改 RTL 時應避免依賴「本機跑完 sim」作為唯一驗證，改以 **golden 檔 + 程式依據** 推進。
-- 使用者實機之 **VCS 編譯／`./simv`** 流程見 **§22**。
-
-### 10.1 僅能以 `$display` 除錯（無波形圖）
-
-當環境**無法使用波形 viewer**、僅能靠仿真 log 中的 **`$display`／`$strobe`／`$fdisplay`** 觀察訊號時，建議遵守下列做法，以便與 **§16** 前向對拍且不致洗版：
-
-- **取樣時機**：只在有意義的拍列印（例如 `mac_bp && mac_dv` 寫 SRAM 當拍、`done` 拉高當拍、`state` 切換後第一拍）；避免每個 `posedge` 盲目列印。
-- **NBA 後數值**：要看 nonblocking 更新後的結果，優先用 **`$strobe`**，或在下一拍再讀已鎖存的 `reg`。
-- **SRAM `CLK(~clk)`**：讀 `*_q` 時可改在 **`negedge clk`** 列印（與 macro 讀取邊沿一致），避免 posedge 上位址已變而 `Q` 仍舊的錯覺（與 `head_top` 內 `DUMP_HEAD_BBOX_SRAM_NEGEDGE` 類思路一致）。
-- **格式**：定點以 **`%h` 為主**，並在註解或同一行標明 **Q8.8／Q0.8**；負值須明示 **signed 二補數** 解讀，勿將 `0xff..` 誤當無號大正數。
-- **列印語言（強制）**：`$display`／`$strobe`／`$fdisplay`／`$fwrite`／`$monitor` 等**仿真 log 內可見字串必須為英文（ASCII）**；使用者執行 `.v` 的環境**不支援中文**，禁止在 format string 或訊息內使用中文（含簡繁）。說明性文字請寫在 `//` 註解，或 Agent 回覆給使用者；RTL／TB 內僅輸出英文標籤（例如 `PASS`、`FAIL`、`bbox_mismatch`、`golden=`）。
-- **`ifdef` 分區**：除錯列印一律以 **`ifdef` 編譯開關**封裝（預設關閉），見 **§3**；可按模組拆成多個 macro（例如 `DUMP_HEAD_SIZE_SAT`），按需開啟。**每個 macro 對應的區塊**須有註解說明：**欲診斷的問題**（例如「追查 tail_size 寫入前 `mac_cl` 過大導致 sigmoid 全飽和」）、**建議搭配編譯選項**、以及**若問題已解決是否應移除或改為預設關閉**。
-- **註解義務（`ifdef`／`$display` 區塊）**：凡為除錯插入的列印，**不可**只留開關名稱；至少應在 **`ifdef` 上一行區塊註解**或**模組頭對應小節**寫明：
-  - **要解決／驗證的現象**（例如 bbox 與 golden 差、`sc_q` 全為下限、與某 `Activation/*_bi.txt` 第一個分歧層級等）；
+- 本專案 golden 驗證採用 **軟體先產生 template/search post-embedding token，RTL 只驗證第二幀 model path** 的策略。
+- 第一幀在 Python / PyTorch 端的用途是：
+  - 讀入 `frame1`
+  - 使用 `init_bbox` 建立 template crop
+  - 完成 preprocess、`patch_embed`、`pos_embed_z`
+  - 產生 `template_post_embed`
+- 第二幀在 Python / PyTorch 端的用途是：
+  - 讀入 `frame2`
+  - 依第一幀初始化後的 state 建立 search crop
+  - 完成 preprocess、`patch_embed`、`pos_embed_x`
+  - 產生 `search_post_embed`
+- RTL 的第一版不負責：
+  - 第一幀初始化
+  - image crop
+  - preprocess / normalize
+  - patch embedding
+  - position embedding
+- RTL 的第一版只負責從：
+  - `template_post_embed`
+  - `search_post_embed`
+  開始，完成 `combine_tokens -> backbone -> head -> bbox`。
+- 若日後要做 system-level RTL，才再把第一幀初始化、第二幀 search crop 與 tracker 後處理往前後延伸；第一版 golden 規則不預設納入。
+- golden 版本至少要保存：
+  - 第一幀的 `template_post_embed`
+  - 第二幀的 `search_post_embed`
+  - 第二幀的 `merged_tokens`
+  - 第二幀的 block-level outputs
+  - 第二幀的 `backbone_out`
+  - 第二幀的 `score_map`
+  - 第二幀的 `size_map`
+  - 第二幀的 `offset_map`
+  - 第二幀的 `pred_boxes`
+  - 若有納入 tracker 後處理，再保存 `response_after_window`、`bbox_after_cal_bbox`、`final_bbox`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
