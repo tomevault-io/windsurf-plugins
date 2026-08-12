@@ -1,81 +1,239 @@
 ---
 trigger: always_on
-description: 金融分析师核心能力与MCP工具使用规范
+description: MCP数据工具配置与使用指南
 ---
 
 
-# 金融分析师
+# MCP工具配置与使用指南
 
-## 核心能力
+## 快速导航
 
-- 财务报表分析（ROE、现金流、杜邦分析）
-- 行业研究（波特五力、竞争格局）
-- 估值建模（DCF、PE/PB/PS）
-- 研报撰写（头部券商标准格式）
+| 你想要... | 使用这个工具 |
+|---|---|
+| 搜学术论文（全文） | `user-openalex`、`user-arxiv`、`user-context7`、`user-semantic-scholar` |
+| 查A股行情/财务 | `user-tushare`（需Token）或 akshare（免费备选） |
+| 查A股财务（免费） | `user-yfinance`（中概股/港股ADR） |
+| 查宏观指标（GDP/CPI/M2） | `user-financial`（免费akshare+WorldBank） |
+| 查美国国债收益率/经济日历 | `user-eodhd`（需Key）或 `user-fed-data`（免费） |
+| 读研报、看新闻、找分析师 | `user-eastmoney-reports`（免费） |
+| 查外汇/大宗商品/航运 | `user-enhanced-finance`（免费） |
+| SEC年报/10-K/8-K | `user-sec-edgar`（免费） |
+| 美股行情/财务/期权/ETF | `user-yfinance`（免费） |
+| 网络搜索（中英文） | `user-brave-search`（需Key）或 WebSearch |
+| 中国省级/市级统计 | `user-province-stats`、`user-hubei-stats` |
 
-## MCP工具使用（优先调用）
+**核心原则：每个数据需求都有四层fallback，确保任何情况下都能获取数据。**
 
-### 1. 股票行情与财务
+---
 
-```
-server: user-tushare
-tool: get_daily_quote
-params: { "ts_code": "000001.SZ", "start_date": "20240101", "end_date": "20241231" }
+## MCP服务概览（43个目录服务器）
 
-server: user-tushare
-tool: get_financial_report
-params: { "ts_code": "000001.SZ", "report_type": "income" }
+### 学术文献（5个）
 
-server: user-yfinance
-tool: get_yf_financials
-params: { "ticker": "AAPL" }
-```
+| 服务 | 功能 | API Key |
+|---|---|---|
+| `user-openalex` | OpenAlex论文元数据（2亿+，免费） | 无需 |
+| `user-arxiv` | ArXiv论文搜索（免费） | 无需 |
+| `user-context7` | 论文全文索引（免费） | 无需 |
+| `user-semantic-scholar` | Semantic Scholar（需Key可选） | 免费层够用 |
+| `user-nber-wp` | NBER工作论文（免费） | 无需 |
 
-### 2. 美股/港股行情
+### A股数据（4个）
+
+| 服务 | 功能 | API Key | 免费备选 |
+|---|---|---|---|
+| `user-tushare` | A股财务/行情/融资融券 | TUSHARE_TOKEN | akshare / baostock |
+| `user-eastmoney-reports` | 研报/新闻/概念/分析师 | 无需 | — |
+| `user-wind` | Wind数据 | 无Key（需Wind账号） | akshare |
+| `user-csmar` | CSMAR国泰安 | CSMAR_API_KEY（机构） | akshare |
+
+### 美股/全球市场（3个）
+
+| 服务 | 功能 | API Key |
+|---|---|---|
+| `user-yfinance` | 美股/港股行情/财务/期权/ETF | 无需 |
+| `user-sec-edgar` | SEC 10-K/10-Q/8-K公告 | 无需 |
+| `user-enhanced-finance` | 外汇/航运指数/白银/期货 | 无需 |
+
+### 宏观经济（10个）
+
+| 服务 | 功能 | API Key |
+|---|---|---|
+| `user-financial` | 中国宏观（GDP/CPI/M2/EPU，akshare+WorldBank） | 无需 |
+| `user-eodhd` | 国债收益率/经济日历 | EODHD_API_KEY |
+| `user-fed-data` | 美联储/FOMC数据 | 无需 |
+| `user-wb-data` | 世界银行宏观指标 | 无需 |
+| `user-imf-data` | IMF世界经济展望 | 无需 |
+| `user-oecd-data` | OECD经济数据 | 无需 |
+| `user-bea-data` | 美国经济分析局GDP | 无需 |
+| `user-macro-ceic` | CEIC中国宏观 | 无需 |
+| `user-macro-datas` | 宏观数据聚合 | 无需 |
+| `user-macro-stats` | 宏观统计 | 无需 |
+
+### 工具类（10个）
+
+| 服务 | 功能 |
+|---|---|
+| `user-brave-search` | 网络搜索（中英文，需Key） | BRAVE_SEARCH_API_KEY |
+| `user-latex-mcp` | LaTeX排版检查 |
+| `user-pandas-mcp` | 数据处理（pandas） |
+| `user-playwright-mcp` | 浏览器自动化 |
+| `user-e2b-mcp` | 云端代码执行 |
+| `user-filesystem-mcp` | 文件系统操作 |
+| `user-province-stats` | 中国省级统计 |
+| `user-hubei-stats` | 湖北省统计 |
+| `user-wuhan-stats` | 武汉市统计 |
+| `user-cryptocompare` | 加密货币（BTC/ETH等） |
+| `user-newsapi` | 全球财经新闻（需Key） |
+| `user-eastmoney-fund` | 公募基金数据 |
+| `user-eastmoney-bond` | 债券数据 |
+| `user-eastmoney-option` | 期权数据 |
+
+### 美股数据（user-yfinance）
 
 ```
 server: user-yfinance
 tool: get_yf_quote
 params: { "ticker": "AAPL" }
+
+server: user-yfinance
+tool: get_yf_historical
+params: { "ticker": "MSFT", "start_date": "2024-01-01", "end_date": "2024-12-31" }
+
+server: user-yfinance
+tool: get_yf_financials
+params: { "ticker": "GOOGL" }
+
+server: user-yfinance
+tool: get_yf_etf_holdings
+params: { "ticker": "SPY" }
+
+server: user-yfinance
+tool: get_yf_options
+params: { "ticker": "SPY" }
+```
+**无需API Key**，直接使用 Yahoo Finance。
+
+### SEC EDGAR（user-sec-edgar）
+
+```
+server: user-sec-edgar
+tool: get_sec_cik_by_ticker
+params: { "ticker": "AAPL" }
+
+server: user-sec-edgar
+tool: get_sec_10k
+params: { "cik": "0000320183", "year": 2024 }
+
+server: user-sec-edgar
+tool: get_sec_8k
+params: { "cik": "0000320183", "limit": 10 }
+```
+**无需API Key**，SEC数据完全免费公开。
+
+### OpenAlex（user-openalex）
+
+```
+server: user-openalex
+tool: get_openalex_works
+params: { "query": "carbon trading innovation policy", "per_page": 25 }
+
+server: user-openalex
+tool: get_openalex_authors
+params: { "author_id": "A123456789" }
+```
+**无需API Key**，2亿+学术成果。
+
+### Context7（user-context7）
+
+```
+server: user-context7
+tool: get_context7_by_arxiv
+params: { "arxiv_id": "2301.12345" }
+
+server: user-context7
+tool: get_context7_by_query
+params: { "query": "digital finance fintech", "max_results": 10 }
+
+server: user-context7
+tool: get_context7_by_doi
+params: { "doi": "10.1000/xyz123" }
+```
+**无需API Key**，论文全文获取。
+
+### CryptoCompare（user-cryptocompare）
+
+```
+server: user-cryptocompare
+tool: get_cc_price
+params: { "symbol": "BTC" }
+
+server: user-cryptocompare
+tool: get_cc_historical
+params: { "symbol": "ETH", "start_date": "2024-01-01", "end_date": "2024-12-31" }
+
+server: user-cryptocompare
+tool: get_cc_top_coins
+params: { "limit": 20 }
+```
+**无需API Key**，免费tier足够研究使用。
+
+### NewsAPI（user-newsapi）
+
+```
+server: user-newsapi
+tool: get_news_search
+params: { "query": "Federal Reserve interest rate", "language": "en" }
+
+server: user-newsapi
+tool: get_news_top_headlines
+params: { "category": "business", "country": "us" }
+```
+需要 `NEWSAPI_API_KEY`（免费注册：https://newsapi.org/register）
+
+## 宏观数据（MCP）
+
+### 1. 全球宏观指标（user-financial / World Bank API）
+
+```
+server: user-financial
+tool: get_wb_indicator
+params: { "country_code": "USA", "indicator": "wb_gdp_usd" }
 ```
 
-### 3. 研报与新闻
+覆盖：全球所有国家，指标包括GDP/CPI/人口/贸易/债务。
+**无需API Key**，直接调用 World Bank API。
 
-```
-server: user-eastmoney-reports
-tool: get_research_report
-params: { "ts_code": "000001.SZ", "max_results": 20 }
-
-server: user-eastmoney-reports
-tool: get_analyst_rank
-params: { "year": 2024 }
-```
-
-### 4. 宏观数据
+### 2. 中国宏观指标（user-financial / akshare）
 
 ```
 server: user-financial
 tool: get_macro_china
-params: { "indicator": "gdp" }
-
-server: user-wb-data
-tool: get_wb_indicator
-params: { "country_code": "CHN", "indicator": "wb_gdp_usd" }
+params: { "indicator": "cpi" }
 ```
 
-## 输出格式
+可用指标：cpi, ppi, gdp, pmi, m2, fdi, retail, lpr, shibor, new_financial_credit
+**无需API Key**，akshare 本地缓存数据。
 
-1. 核心结论（一句话）
-2. 财务分析（关键指标表格）
-3. 成长性分析
-4. 估值方法与结果
-5. 风险提示
+### 3. 英国/日本/德国/澳大利亚/加拿大宏观（user-financial）
 
-## 约束
+```
+server: user-financial
+tool: get_macro_uk
+params: { "indicator": "cpi" }
 
-- 数据标注来源和截止日期
-- 预测假设必须明确
-- 必须包含风险提示
+server: user-financial
+tool: get_macro_japan
+params: { "indicator": "unemployment_rate" }
+```
+
+**无需API Key**。
+
+### 4. 美国国债收益率曲线（user-eodhd）
+
+```
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [csmar432/finai-research](https://github.com/csmar432/finai-research) — distributed by [TomeVault](https://tomevault.io).
