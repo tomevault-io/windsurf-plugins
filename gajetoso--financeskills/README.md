@@ -7,11 +7,11 @@ AI-powered skills for financial professionals. Comprehensive collection of finan
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [GAJETOso/financeskills](https://github.com/GAJETOso/financeskills).
+Original source: `AGENTS.md` in [GAJETOso/financeskills](https://github.com/GAJETOso/financeskills).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
