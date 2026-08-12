@@ -7,14 +7,14 @@ AI Agent Skills collection
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [zrong/skills](https://github.com/zrong/skills).
+Original source: `AGENTS.md` in [zrong/skills](https://github.com/zrong/skills).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [zrong/skills](https://github.com/zrong/skills) — a repo with 11+ stars on GitHub.
