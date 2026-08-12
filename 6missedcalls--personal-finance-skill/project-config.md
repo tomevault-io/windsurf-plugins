@@ -1,114 +1,103 @@
 ---
 trigger: always_on
-description: >
+description: For AI agent usage, tool catalog, workflows, and guardrails, see **SKILL.md**.
 ---
 
+# Personal Finance Skill — Developer Guide
 
-# Personal Finance Skill
+## Skill Documentation
 
-A comprehensive personal finance management skill with 75 tools across 7 extensions for banking, investing, tax, market intelligence, social sentiment, and financial analysis workflows.
+For AI agent usage, tool catalog, workflows, and guardrails, see **SKILL.md**.
 
-## When to Use
-
-Activate this skill when a user asks for:
-
-- **Account aggregation** — connecting bank accounts, viewing balances, syncing transactions
-- **Net worth / cash flow** — computing totals, tracking spending, savings rate analysis
-- **Portfolio monitoring** — positions, allocation, performance, drift detection
-- **Trading** — placing/canceling orders, market data, asset lookup (Alpaca)
-- **Tax optimization** — estimated liability, TLH candidates, wash sale checks, quarterly payments
-- **Tax document processing** — parsing W-2, 1099-B/DIV/INT, K-1, Form 1040, Schedules A-E/SE, Form 8949, Form 6251 (AMT), state returns
-- **Market intelligence** — company news, SEC filings, analyst recommendations, economic data (FRED, BLS), news sentiment
-- **Social sentiment** — StockTwits sentiment, X/Twitter cashtag analysis, trending symbols, congressional trading
-- **Recurring expense tracking** — subscriptions, bills, income streams
-- **Anomaly detection** — unusual transactions, balance drops, duplicate charges
-- **Financial briefings** — weekly/monthly summaries with action items
-- **Scheduled finance workflows** — cron-based scans, alerts, reports
-
-## Architecture Overview
-
-Seven extensions organized in three layers:
+## Project Structure
 
 ```
-Intelligence Layer
-  tax-engine (23 tools) — parsing (15), liability, TLH, wash sales, lots,
-    Schedule D computation, state tax, AMT
-  market-intel (10 tools) — news, fundamentals, SEC filings, economic data
-  social-sentiment (6 tools) — StockTwits, X/Twitter, congressional trades
-
-Data Source Adapters
-  plaid-connect (8)   alpaca-trading (10)   ibkr-portfolio (9)
-
-Foundation Layer
-  finance-core (9 tools) — canonical models, storage, normalization,
-    policy checks, anomaly detection, briefs
+personal-finance-skill/
+  SKILL.md                    # AI agent entry point (75 tools, 7 extensions)
+  CLAUDE.md                   # This file — developer instructions
+  references/                 # All reference documentation (self-contained)
+    ext-finance-core.md       # 9 tools — storage, normalization, policy, briefs
+    ext-plaid-connect.md      # 8 tools — Plaid Link, accounts, transactions
+    ext-alpaca-trading.md     # 10 tools — trading, positions, market data
+    ext-ibkr-portfolio.md     # 9 tools — portfolio, allocation, performance
+    ext-tax-engine.md         # 23 tools — parsers (15) + calculators (8)
+    ext-market-intel.md       # 10 tools — Finnhub, SEC EDGAR, FRED, BLS, Alpha Vantage
+    ext-social-sentiment.md   # 6 tools — StockTwits, X/Twitter, Quiver Quantitative
+    data-models-and-schemas.md
+    risk-and-policy-guardrails.md
+    api-plaid.md              # Plaid API reference (219 KB)
+    api-alpaca-trading.md     # Alpaca API reference (185 KB)
+    api-ibkr-client-portal.md # IBKR Web API reference
+    api-openclaw-framework.md # OpenClaw architecture
+    api-openclaw-extension-patterns.md
+    api-irs-tax-forms.md      # IRS tax form schemas + rules
+  extensions/
+    finance-core/             # Canonical models, storage, normalization, policy
+    plaid-connect/            # Plaid API integration
+    alpaca-trading/           # Alpaca brokerage integration
+    ibkr-portfolio/           # IBKR Client Portal integration
+    tax-engine/               # Tax document parsing + tax strategy
+    market-intel/             # Market intelligence (news, filings, economic data)
+    social-sentiment/         # Social sentiment (StockTwits, X, congressional)
 ```
 
-**Data flow**: Adapters fetch provider data → finance-core normalizes and stores → intelligence layer analyzes → policy engine gates actions.
+## Stack
 
-## Tool Catalog
+- TypeScript
+- OpenClaw extension format (`openclaw.plugin.json` + tool registration)
+- Each extension is a standalone OpenClaw plugin
 
-### finance-core — 9 tools
+## Rules
 
-| Tool | Description | Risk |
-|------|-------------|------|
-| `finance_upsert_snapshot` | Store normalized financial data snapshot (idempotent) | LOW |
-| `finance_get_state` | Get current financial state (accounts, positions, etc.) | READ |
-| `finance_get_transactions` | Query transactions with filters and pagination | READ |
-| `finance_get_net_worth` | Calculate net worth breakdown by category/account | READ |
-| `finance_detect_anomalies` | Scan for unusual transactions, balance drops, fee spikes | READ |
-| `finance_cash_flow_summary` | Income vs expenses by category with savings rate | READ |
-| `finance_subscription_tracker` | Identify recurring charges and subscription patterns | READ |
-| `finance_generate_brief` | Create structured financial summary with action items | READ |
-| `finance_policy_check` | Validate proposed action against policy rules | READ |
+- Read the reference docs BEFORE writing any code
+- Follow OpenClaw extension patterns exactly (`references/api-openclaw-extension-patterns.md`)
+- Each extension must have: `openclaw.plugin.json`, `src/index.ts`, `package.json`
+- Tools return strict JSON — agent reasons over structured data
+- Include comprehensive error handling
+- Write tests
+- All financial calculations must be deterministic (no LLM arithmetic)
+- Side-effecting tools must integrate with `finance_policy_check`
 
-> Full schemas: [references/ext-finance-core.md](references/ext-finance-core.md)
+## Extension Architecture
 
-### plaid-connect — 8 tools
+```
+┌─────────────────────────────────────────────────┐
+│              Intelligence Layer                  │
+│  tax-engine (23)  market-intel (10)             │
+│  social-sentiment (6)                           │
+├─────────────────────────────────────────────────┤
+│            Data Source Adapters                   │
+│  plaid-connect (8)  alpaca-trading (10)          │
+│  ibkr-portfolio (9)                              │
+├─────────────────────────────────────────────────┤
+│              Foundation Layer                     │
+│  finance-core (9 tools)                          │
+└─────────────────────────────────────────────────┘
+```
 
-| Tool | Description | Risk |
-|------|-------------|------|
-| `plaid_create_link_token` | Initialize Plaid Link for account connection | LOW |
-| `plaid_exchange_token` | Exchange public token for permanent access | MED |
-| `plaid_get_accounts` | List connected accounts with balances | READ |
-| `plaid_get_transactions` | Fetch transactions via cursor-based sync | READ |
-| `plaid_get_investments` | Fetch holdings, securities, investment transactions | READ |
-| `plaid_get_liabilities` | Fetch credit, student loan, and mortgage data | READ |
-| `plaid_get_recurring` | Identify recurring inflow/outflow streams | READ |
-| `plaid_webhook_handler` | Process incoming Plaid webhook events | LOW |
+- **finance-core** defines canonical types that all other extensions normalize into
+- Data source adapters fetch provider-specific data and store via `finance_upsert_snapshot`
+- Tax engine operates on the canonical data for analysis and strategy
+- Market intelligence fetches external data (news, filings, economic indicators)
+- Social sentiment monitors social media signals (StockTwits, X, congressional trades)
+- Policy engine in finance-core gates all side-effecting actions
 
-> Full schemas: [references/ext-plaid-connect.md](references/ext-plaid-connect.md)
+## Key References
 
-### alpaca-trading — 10 tools
+| Need | Read |
+|------|------|
+| Tool schemas and usage | `references/ext-*.md` |
+| Canonical data types | `references/data-models-and-schemas.md` |
+| Policy rules and guardrails | `references/risk-and-policy-guardrails.md` |
+| Plaid API details | `references/api-plaid.md` |
+| Alpaca API details | `references/api-alpaca-trading.md` |
+| IBKR API details | `references/api-ibkr-client-portal.md` |
+| OpenClaw patterns | `references/api-openclaw-extension-patterns.md` |
+| Tax form rules | `references/api-irs-tax-forms.md` |
 
-| Tool | Description | Risk |
-|------|-------------|------|
-| `alpaca_get_account` | Get account balances, buying power, status | READ |
-| `alpaca_list_positions` | List all open positions | READ |
-| `alpaca_get_position` | Get single position by symbol | READ |
-| `alpaca_list_orders` | List orders with status/date filters | READ |
-| `alpaca_create_order` | Submit buy/sell order with safety checks | **HIGH** |
-| `alpaca_cancel_order` | Cancel a pending order | MED |
-| `alpaca_portfolio_history` | Historical equity and P/L over time | READ |
-| `alpaca_get_assets` | Search tradable assets by class/exchange | READ |
-| `alpaca_market_data` | Get snapshots, bars, or quotes for symbols | READ |
-| `alpaca_clock` | Check if market is open, next open/close | READ |
-
-> Full schemas: [references/ext-alpaca-trading.md](references/ext-alpaca-trading.md)
-
-### ibkr-portfolio — 9 tools
-
-| Tool | Description | Risk |
-|------|-------------|------|
-| `ibkr_auth_status` | Check gateway authentication status | READ |
-| `ibkr_tickle` | Keep gateway session alive (~1 min interval) | LOW |
-| `ibkr_list_accounts` | List accounts (must call first) | READ |
-| `ibkr_get_positions` | Get positions for an account (paginated) | READ |
-| `ibkr_portfolio_allocation` | Allocation by asset class, sector, group | READ |
-| `ibkr_portfolio_performance` | NAV time series and returns | READ |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+# currentDate
+Today's date is 2026-02-23.
 
 ---
 > Source: [6missedcalls/personal-finance-skill](https://github.com/6missedcalls/personal-finance-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-11 -->
