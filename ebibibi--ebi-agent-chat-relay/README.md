@@ -7,11 +7,11 @@ Multi-frontend agent relay: run Claude Code, Codex, local, and AG-UI agents from
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ebibibi/ebi-agent-chat-relay](https://github.com/ebibibi/ebi-agent-chat-relay).
+Original source: `CLAUDE.md` in [ebibibi/ebi-agent-chat-relay](https://github.com/ebibibi/ebi-agent-chat-relay).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
