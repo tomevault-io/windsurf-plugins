@@ -7,11 +7,11 @@ Sema is a content-addressed vocabulary for AI agents. Precise thinking, reliable
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [emergent-wisdom/sema](https://github.com/emergent-wisdom/sema).
+Original source: `CLAUDE.md` in [emergent-wisdom/sema](https://github.com/emergent-wisdom/sema).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
