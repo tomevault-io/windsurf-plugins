@@ -7,11 +7,11 @@ A Web-based tool that generates lip-sync animation videos from .ust, .ustx, .vsq
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Riciwaaaa/UST-lip-sync-generator](https://github.com/Riciwaaaa/UST-lip-sync-generator).
+Original source: `CLAUDE.md` in [Riciwaaaa/UST-lip-sync-generator](https://github.com/Riciwaaaa/UST-lip-sync-generator).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
