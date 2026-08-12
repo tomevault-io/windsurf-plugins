@@ -1,100 +1,130 @@
 ---
 trigger: always_on
-description: 將reg修改成SRAM
+description: SGLATrack historical benchmark results for comparing experiments
 ---
 
 
-# RTL → SRAM 改造建議（backbone + head + 整合版 verilog2）
+# SGLATrack Benchmark Results
 
-> **規格**：Q8.8（16-bit signed），全專案共用。
-> **規則依據**：[.cursor/rules/verilog_rule.mdc](../../.cursor/rules/verilog_rule.mdc)（**§7.7 SRAM 時序**、**§8 Reg→SRAM 檢查清單**）、[.cursor/rules/numpy-trunk-to-verilog.mdc](../../.cursor/rules/numpy-trunk-to-verilog.mdc)
-> **判斷門檻**（全文件通用）：
->
-> | 等級 | depth | 處理建議 |
-> |------|-------|----------|
-> | **必改 SRAM** | depth ≥ 1024（≥ 16 Kb / 2 KB 起跳） | 使用 1R1W 或單埠 SRAM macro |
-> | **建議 SRAM** | 512 ≤ depth < 1024 | 視製程 macro 表決定，通常 ≥ 256 word 即可省面積 |
-> | **可留 reg** | depth < 256 | flip-flop register file 即可 |
->
-> 容量計算：**bits = depth × width**，**KB = bits / 8 / 1024**。
+Pre-train: MAE ViT-Base (mae_pretrain_vit_base.pth)
+Training: COCO17 + GOT10K_train_full, Epoch 50, Batch 32, LR 5e-5
 
----
+## COCO+GOT10K（Epoch 50）彙整表
 
-## 工作流總覽
+（AUC / Prec 皆為 %；Avg. 為五個資料集 AUC 平均）
 
-| 目錄 | 角色 | SRAM 改造作為 |
-|------|------|--------------|
-| [python/lib/models/verilog_backbone2/](../lib/models/verilog_backbone2/) | **分模組除錯**：backbone 獨立驗證 | Phase 1：先在此改 SRAM port，獨立通過對拍 |
-| [python/lib/models/verilog_head2/](../lib/models/verilog_head2/) | **分模組除錯**：head 獨立驗證 | Phase 2：先在此改 SRAM port，獨立通過對拍 |
-| [python/lib/models/verilog2/](../lib/models/verilog2/) | **整合版**：backbone + head 端到端 | Phase 3：同步上述改動，加入 sglatrack_top 共享 SRAM mux |
+| Model | UAV123 AUC | UAV123 P | UAV123_10fps AUC | UAV123_10fps P | UAVTrack112 AUC | UAVTrack112 P | UAVTrack112L AUC | UAVTrack112L P | DTB70 AUC | DTB70 P | Avg. AUC |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 論文寫的 vit | 66.10 | 83.90 | 64.50 | 82.20 | 66.90 | 81.30 | 64.70 | 81.70 | 63.80 | 83.50 | 64.70 |
+| vit.py（原架構） | 63.79 | 83.07 | 63.30 | 82.40 | 64.10 | 82.50 | 60.60 | 80.10 | 58.90 | 77.40 | 62.10 |
+| vit_sima.py（原） | 59.21 | 77.62 | 58.62 | 77.02 | 57.28 | 75.40 | 53.73 | 73.51 | 52.69 | 71.24 | 56.31 |
+| vit_CARE.py（attention=elu()+1） | 55.80 | 73.77 | 57.14 | 75.79 | 53.57 | 71.88 | 49.98 | 64.38 | 51.76 | 69.31 | 52.65 |
+| vit_CARE_relu.py（attention=relu()） | 62.59 | 81.67 | 62.33 | 81.02 | 59.97 | 77.95 | 55.97 | 75.64 | 54.82 | 72.94 | 59.14 |
+| vit_CARE_relu6.py（attention=relu6(), MLP=GELU） | 62.59 | 81.67 | 62.33 | 81.02 | 59.97 | 77.95 | 55.97 | 75.64 | 54.82 | 72.94 | 59.14 |
+| vit_CARE_relu6.py（attention=relu6(), MLP=ReLU） | 60.88 | 79.31 | 61.44 | 79.96 | 60.62 | 79.17 | 56.52 | 76.36 | 53.84 | 71.45 | 58.66 |
+| vit_CARE_relu6_fixed.py（relu6(), fixed-point, MLP=ReLU） | 60.65 | 78.83 | 61.49 | 80.07 | 60.16 | 78.56 | 56.45 | 76.56 | 53.37 | 71.05 | 58.43 |
+| vit_CARE_relu6_fixed.py（fixed-point 自訓/自測） | 34.30 | 44.83 | 34.80 | 45.20 | 29.87 | 37.70 | 17.39 | 22.22 | 33.65 | 44.09 | 30.00 |
+| vit_CARE_relu_BN.py | 58.85 | 77.08 | 58.94 | 77.16 | 58.87 | 77.85 | 54.12 | 75.07 | 52.66 | 70.49 | 56.69 |
+| vit_CARE_relu6_BN.py | 59.10 | 77.49 | 58.44 | 76.48 | 56.99 | 74.56 | 54.82 | 74.18 | 54.51 | 73.39 | 56.77 |
+| vit_CARE_gelu.py | 55.40 | 74.20 | 55.00 | 73.50 | 52.10 | 70.00 | 45.00 | 64.70 | 50.90 | 68.70 | 51.70 |
+| vit_MALA.py（原） | 61.51 | 79.88 | 62.63 | 81.68 | 61.53 | 79.49 | 57.40 | 76.44 | 55.74 | 74.18 | 59.76 |
+| vit_MALA_relu.py（attention=relu()） | 61.66 | 80.44 | 62.60 | 81.70 | 60.30 | 78.90 | 57.30 | 77.70 | 55.90 | 74.50 | 59.60 |
+| vit_MALA_relu6.py（attention=relu6()） | 62.08 | 80.90 | 61.75 | 80.02 | 61.55 | 80.04 | 58.08 | 78.21 | 55.45 | 74.12 | 59.78 |
+| vit_MALA_relu6_BN.py | 57.65 | 75.63 | 58.10 | 76.85 | 58.72 | 76.74 | 55.21 | 75.17 | 53.66 | 73.19 | 56.67 |
+| vit_square.py（原） | 58.64 | 77.24 | 58.80 | 77.50 | 56.60 | 74.20 | 52.20 | 70.40 | 56.10 | 74.30 | 56.50 |
 
-> **本文件結構**：第一、二部分為 verilog_backbone2 / verilog_head2 的獨立分析（debug 階段參考），**第三部分為最終整合方案（verilog2，採用 Unified Shared SRAM Pool）**。
+## 論文 vit (reported)
+- UAV123: AUC=66.1, Prec=83.9
+- UAV123_10fps: AUC=64.5, Prec=82.2
+- UAVTrack112: AUC=66.9, Prec=81.3
+- UAVTrack112L: AUC=64.7, Prec=81.7
+- DTB70: AUC=63.8, Prec=83.5
 
----
+## vit.py (原架構 baseline)
+- UAV123: AUC=63.79, Prec=83.07
+- UAV123_10fps: AUC=63.3, Prec=82.4
+- UAVTrack112: AUC=64.1, Prec=82.5
+- UAVTrack112L: AUC=60.6, Prec=80.1
+- DTB70: AUC=58.9, Prec=77.4
+- Avg AUC=62.1, FPS=160.0
 
-## 編譯開關與 RTL 雙路徑（`USE_REG_BUF` / `USE_SRAM_BUF`）
+## vit_sima.py
+- UAV123: AUC=59.21, Prec=77.62
+- UAV123_10fps: AUC=58.62, Prec=77.02
+- UAVTrack112: AUC=57.28, Prec=75.40
+- UAVTrack112L: AUC=53.73, Prec=73.51
+- DTB70: AUC=52.69, Prec=71.24
+- Avg AUC=56.31, FPS=161.49
 
-改 activation buffer 時，**必須**在 VCS 與 RTL 內維持兩條互斥路徑，方便 regression 與除錯：
+## vit_CARE.py (原; attention 改 `elu()`)
+- UAV123: AUC=55.80, Prec=73.77
+- UAV123_10fps: AUC=57.14, Prec=75.79
+- UAVTrack112: AUC=53.57, Prec=71.88
+- UAVTrack112L: AUC=49.98, Prec=64.38
+- DTB70: AUC=51.76, Prec=69.31
+- UAVDT: AUC=36.4, Prec=55.6
+- Avg AUC=52.65, FPS=158.14
 
-| `+define` | 行為 |
-|-----------|------|
-| **`USE_REG_BUF`** | 保留 legacy **大 `reg` 陣列**（flip-flop register file）；對拍 baseline |
-| **`USE_SRAM_BUF`** | 拆掉對應大 `reg`，改接 **SHC-SPMBSRAM compiler 產出的 macro**（見 §3.9 指令） |
+## vit_CARE_relu.py (attention 改 `relu()`)
+- UAV123: AUC=**62.59**, Prec=81.67
+- UAV123_10fps: AUC=62.33, Prec=81.02
+- UAVTrack112: AUC=59.97, Prec=77.95
+- UAVTrack112L: AUC=55.97, Prec=75.64
+- DTB70: AUC=54.82, Prec=72.94
+- Avg AUC=59.14, FPS=159.31
 
-**規則（必守）**：
+## vit_CARE_relu6.py (attention 改 `relu6()`, MLP `GELU`)
+- UAV123: AUC=**62.59**, Prec=81.67
+- UAV123_10fps: AUC=62.33, Prec=81.02
+- UAVTrack112: AUC=59.97, Prec=77.95
+- UAVTrack112L: AUC=55.97, Prec=75.64
+- DTB70: AUC=54.82, Prec=72.94
+- Avg AUC=59.14, FPS=160.00
 
-1. **二選一**：禁止同時 `+define+USE_REG_BUF` 與 `+define+USE_SRAM_BUF`。 [TEST_backbone.v](../lib/models/verilog_backbone2/TEST_backbone.v) 若兩者皆定義會 `$finish`；兩者皆未定義時 TB 預設 `` `define USE_REG_BUF ``。
-2. **RTL 用 `` `ifdef USE_REG_BUF `` / `` `ifndef USE_REG_BUF ``**（或對稱的 `USE_SRAM_BUF`）包住 reg 陣列與 SRAM mux／latency 邏輯；**同一模組內不可混用未 ifdef 的 `reg [15:0] buf [0:N-1]` 與 macro**。
-3. **改完一步就對拍一步**：先確認 `USE_REG_BUF` 仍 PASS，再切 `USE_SRAM_BUF`。
-4. **編譯列表示例**（macro `.v` 路徑依工作站；**不要**依賴 `*_wrap.v`）：
-   ```bash
-   # Reg baseline
-   vcs verilog_backbone2/*.v memory/*.v \
-     +define+TSMC_CM_NO_WARNING +define+USE_REG_BUF | tee runvcs.log
+## vit_CARE_relu6.py (attention 改 `relu6()`, MLP `ReLU`)
+- UAV123: AUC=60.88, Prec=79.31
+- UAV123_10fps: AUC=61.44, Prec=79.96
+- UAVTrack112: AUC=60.62, Prec=79.17
+- UAVTrack112L: AUC=56.52, Prec=76.36
+- DTB70: AUC=53.84, Prec=71.45
+- Avg AUC=58.66, FPS=158.63
 
-   # SRAM（含 compiler 產物；路徑依工作站）
-   vcs verilog_backbone2/*.v memory/*.v \
-     /path/Sram_tok1.v /path/Sram_tok2.v \
-     /path/Sram_x.v /path/Sram_q.v /path/Sram_k.v /path/Sram_v.v /path/Sram_qkm.v \
-     +define+TSMC_CM_NO_WARNING +define+USE_SRAM_BUF | tee runvcs.log
-   ./simv | tee simv.log
-   ```
+## vit_CARE_relu6_fixed.py (attention `relu6()`, fix-point, MLP `ReLU`)
+- UAV123: AUC=60.65, Prec=78.83
+- UAV123_10fps: AUC=61.49, Prec=80.07
+- UAVTrack112: AUC=60.16, Prec=78.56
+- UAVTrack112L: AUC=56.45, Prec=76.56
+- DTB70: AUC=53.37, Prec=71.05
+- Avg AUC=58.43, FPS=120.26
 
-> **注意**：`Sram_tok1` 與 `Sram_x` 為**不同 compiler 模組檔**（深度皆可用 12288×16，但 **不可** 只編譯一種檔名取代全部 instance）。instance 顆數見 **§1.0**。
+## vit_CARE_relu_BN.py
+- UAV123: AUC=58.85, Prec=77.08
+- UAV123_10fps: AUC=58.94, Prec=77.16
+- UAVTrack112: AUC=58.87, Prec=77.85
+- UAVTrack112L: AUC=54.12, Prec=75.07
+- DTB70: AUC=52.66, Prec=70.49
+- Avg AUC=56.69, FPS=149.69
 
----
+## vit_CARE_relu6_BN.py
+- UAV123: AUC=59.10, Prec=77.49
+- UAV123_10fps: AUC=58.44, Prec=76.48
+- UAVTrack112: AUC=56.99, Prec=74.56
+- UAVTrack112L: AUC=54.82, Prec=74.18
+- DTB70: AUC=54.51, Prec=73.39
+- Avg AUC=56.77
 
-# 第一部分：Backbone（`verilog_backbone2/`）— 分模組除錯版
+## vit_CARE_relu6_fixed.py（fixed-point 自訓/自測）
+- UAV123: AUC=34.30, Prec=44.83
+- UAV123_10fps: AUC=34.80, Prec=45.20
+- UAVTrack112: AUC=29.87, Prec=37.70
+- UAVTrack112L: AUC=17.39, Prec=22.22
+- DTB70: AUC=33.65, Prec=44.09
+- Avg AUC=30.00
 
-> **目錄**：[python/lib/models/verilog_backbone2/](../lib/models/verilog_backbone2/)
-> **常數**：`EMBED_DIM=32`、`NUM_HEADS=4`、`HEAD_DIM=8`、`N_TOKENS=320`、`MLP_DIM=128`
-> **注意**：此版為**分模組除錯目錄**，`backbone_top` 內 **7 次** 呼叫 `transformer_block`（每 block 一組 `u_attn` macro）。整合到 `verilog2` 後為 **單一 `transformer_block` instance reuse 7 次**（見第三部分）。
-
-## 1.0 Phase 1 實作快照（`USE_SRAM_BUF`，2026-05）
-
-> 下列為 **目前 RTL 已落地** 之配置；與 **第三部分 Unified Pool（Phase 3）**、**§5.3 跳過 S_LOAD_X（Phase 3 目標）** 不同者已標 **(目標)**。
-
-### 1.0.1 各檔 inline macro 顆數（`+define+USE_SRAM_BUF`）
-
-| 模組 | macro 型號 | instance 名 | 顆數 | 有效深度×寬 | 對應 legacy reg |
-|------|------------|-------------|------|-------------|-----------------|
-| [backbone_top.v](../lib/models/verilog_backbone2/backbone_top.v) | `Sram_tok2` | `u_sram_tok2` | **1** | 10240×16 | `tok_buf`（block 間 ping-pong） |
-| [backbone_top.v](../lib/models/verilog_backbone2/backbone_top.v) | `Sram_tok1` | `u_sram_tok1` | **1** | 10240×16 | `out_buf`（backbone norm 輸出） |
-| [transformer_block.v](../lib/models/verilog_backbone2/transformer_block.v) | `Sram_tok1` | `u_sram_x` | **1** | 10240×16 | `x_buf`（主幹＋residual 錨點） |
-| [transformer_block.v](../lib/models/verilog_backbone2/transformer_block.v) | `Sram_tok1` | `u_sram_tmp` | **1** | 10240×16 | `tmp_buf`（norm1/2、attn、mlp 暫存） |
-| [care_attention.v](../lib/models/verilog_backbone2/care_attention.v) | `Sram_x` | `u_sram_x` | **1** | 10240×16 | `x_in_buf`（norm1 快照；**與 `Sram_q` 不可共用**，見 §1.0.3） |
-| [care_attention.v](../lib/models/verilog_backbone2/care_attention.v) | `Sram_q` | `u_sram_q` | **1** | 10240×16 | `q_buf`（head-major） |
-| [care_attention.v](../lib/models/verilog_backbone2/care_attention.v) | `Sram_k` | `u_sram_k` | **1** | 10240×16 | `k_buf` |
-| [care_attention.v](../lib/models/verilog_backbone2/care_attention.v) | `Sram_v` | `u_sram_v` | **1** | 10240×16 | `v_buf` + **`ao_buf`（deviation：時間多工）** |
-| [care_attention.v](../lib/models/verilog_backbone2/care_attention.v) | `Sram_qkm` | `u_sram_qkm` | **1** | 1280×16 | `qkm_buf` + `zr_buf`（時間多工） |
-| [mlp.v](../lib/models/verilog_backbone2/mlp.v) | — | — | **0** | — | **無** 本地 10240 SRAM；FC1 讀 parent `u_sram_tmp` |
-
-**單次 `backbone_top` 仿真編譯（macro `.v` 檔）**：`Sram_tok1`×2 檔案 + `Sram_tok2`×1 + `Sram_x`×1 + `Sram_q`×1 + `Sram_k`×1 + `Sram_v`×1 + `Sram_qkm`×1 = **7 種** compiler 產物。
-
-**單次 `backbone_top` 仿真 instance 總數**（7 blocks）：`Sram_tok1`×(1+7×2)=**15**、`Sram_tok2`×1、`Sram_x`×7、`Sram_q/k/v/qkm`×7 各 = **15+1+7+28 = 51** 顆 macro instance（面積估算用；非 Phase 3 的 7 顆 pool）。
-
-### 1.0.2 `mlp` 與 `transformer_block` 資料流（已實作）
-
+## vit_CARE_gelu.py
+- UAV123: AUC=55.4, Prec=74.2
+- UAV123_10fps: AUC=55.0, Prec=73.5
+- UAVTrack112: AUC=52.1, Prec=70.0
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
