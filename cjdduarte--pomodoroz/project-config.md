@@ -1,0 +1,119 @@
+---
+trigger: always_on
+description: > Operational rules for AI agents working on this codebase.
+---
+
+# Pomodoroz — Agent Rules
+
+> Operational rules for AI agents working on this codebase.
+> For project overview, stack, and commands, see `CLAUDE.md`.
+> For pending improvements roadmap, see `docs/IMPROVEMENTS.md`.
+
+---
+
+## Scope
+
+- Platform: Tauri desktop app.
+- Architecture: standalone, no server, no cloud. All data is local.
+- Direction: incremental evolution with focus on stability, security, and predictability.
+
+---
+
+## Mission
+
+1. Preserve functional stability (timer, tasks, settings, tray, compact mode).
+2. Maintain security hardening (Tauri commands/capabilities/CSP).
+3. Evolve dependencies in small, testable, reversible blocks.
+4. Keep cross-platform builds green (Windows, macOS, Linux).
+5. Log changes in CHANGELOG; track decisions in docs.
+
+---
+
+## Rules
+
+1. Work in small, testable, reversible blocks.
+2. Preserve UX and behavior of timer/tasks/settings.
+3. Before adding a new library: present options, impact, and wait for confirmation.
+4. Never swap technology silently.
+5. Code in English. Comments/logs in Portuguese (PT-BR) where appropriate.
+6. Commit messages and PR titles must be in English (Conventional Commits).
+7. At the end of each finalized implementation, AI agents must suggest a ready-to-use commit message (Conventional Commits, English).
+
+---
+
+## Documentation Policy
+
+| What                         | Where                                          |
+| ---------------------------- | ---------------------------------------------- |
+| Implemented changes          | `CHANGELOG.md` (EN) and `CHANGELOG.pt.md` (PT) |
+| Pending improvements roadmap | `docs/IMPROVEMENTS.md`                         |
+| Migration closure reference  | `docs/MIGRATION_TO_TAURI.md`                   |
+| Release/update operations    | `docs/RELEASE_OPERATIONS.md`                   |
+| Versions and update policy   | `docs/VERSIONS.md`                             |
+| Agent operational rules      | This file (`AGENTS.md`)                        |
+| Claude Code guide            | `CLAUDE.md`                                    |
+| Session handoff state        | `RETOMADA.md`                                  |
+| Session handoff template     | `RETOMADA.example.md`                          |
+
+Do not create loose specs/checklists for topics already covered in the documents above.
+
+### RETOMADA.md Rules
+
+`RETOMADA.md` is an operational handoff document — a lean snapshot to resume work in a new chat without rebuilding context. It is **not** a source of truth for governance (that is `AGENTS.md`) and **not** a planning document (that is `docs/IMPROVEMENTS.md`).
+
+1. Update `RETOMADA.md` at the end of each major phase, relevant operational fix, or real/manual validation that changes the next step.
+2. Use `RETOMADA.example.md` only as the reset template if `RETOMADA.md` needs to be recreated.
+3. Replace old context with current context; **do not accumulate history**.
+4. Keep it lean — it should contain only what the next session needs to pick up where work stopped.
+5. Do not store secrets, tokens, credentials, private endpoints, or personal data in `RETOMADA.md`.
+
+### Changelog Rules
+
+1. Source of truth for GitHub Release notes: `CHANGELOG.md` section `## [x.y.z]`.
+2. Before creating a tag/release, update both `CHANGELOG.md` and `CHANGELOG.pt.md`.
+3. Never edit items of an already-published version; new changes go in the next version.
+4. Keep the next version at the top as `A definir` (PT) / `TBD` (EN); set date only on release day.
+5. Do not create tag `v*` without a valid entry in both changelogs.
+6. When an AI agent suggests running `./scripts/release.sh` or `./scripts/release.ps1`, it must first set the target version date (`YYYY-MM-DD`) in both changelog headers for that version.
+
+---
+
+## MCP (Recommended Usage)
+
+| MCP                 | When to use                              |
+| ------------------- | ---------------------------------------- |
+| context7            | API and official documentation questions |
+| sequential-thinking | Planning larger migrations               |
+| playwright          | UI behavior investigation                |
+
+Use MCP as decision support; do not duplicate history or roadmap in this file.
+
+<!-- ai-memory:start -->
+
+## Long-term memory (ai-memory)
+
+This project uses [ai-memory](https://github.com/akitaonrails/ai-memory)
+for cross-session continuity.
+
+**Default to the current project - always.** Every ai-memory tool
+auto-scopes to the project resolved from your session's working
+directory. **Do NOT pass `project`, `workspace`, or `cwd` arguments unless
+the user explicitly references a _different_ project by name** (e.g. "what
+did we decide in the `other-app` project?"). Phrases like "this project",
+"here", "we", "our work", and "where did we leave off" all mean the
+_current_ project, so call tools with no scoping args.
+
+This default assumes the MCP client can identify the current agent
+session. Static MCP clients in parallel sessions for the same user cannot
+forward the real agent session id automatically; pass explicit
+`workspace` + `project` / `scopes`, or use a session-aware bridge that
+forwards the lifecycle-hook session id on MCP calls.
+
+**Lifecycle hooks already capture every prompt and tool call
+automatically.** Do not manually write routine notes. Only write durable
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [cjdduarte/pomodoroz](https://github.com/cjdduarte/pomodoroz) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-12 -->
