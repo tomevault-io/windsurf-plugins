@@ -7,11 +7,11 @@ A cute pixel-art system audio recorder for Windows — WAV/MP3, live waveform, c
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [darkdarkcocoa/Reccoo](https://github.com/darkdarkcocoa/Reccoo).
+Original source: `AGENTS.md` in [darkdarkcocoa/Reccoo](https://github.com/darkdarkcocoa/Reccoo).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
