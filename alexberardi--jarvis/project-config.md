@@ -1,135 +1,115 @@
 ---
 trigger: always_on
-description: Core Jarvis project rules, architecture, and coding standards. Always active.
+description: Personal voice assistant with Pi Zero nodes and self-hosted microservices.
 ---
 
+# Jarvis
 
-# Jarvis - Personal Voice Assistant
+Personal voice assistant with Pi Zero nodes and self-hosted microservices.
 
-Private, self-hosted voice assistant with Pi Zero nodes and microservices.
+**See also:**
+- [RULES.md](RULES.md) — development rules (working style, coding style, TDD, performance targets)
+- **Each service has its own CLAUDE.md** — read the relevant one *first* when working in that service. This meta doc is for cross-cutting concerns only.
 
-**See also:** `CLAUDE.md` and `RULES.md` for full details.
+---
 
 ## Core Principles
 
-1. **Fully private and open source** - No cloud dependencies by default, all data stays local
-2. **Self-hostable with optional cloud** - Same open-source codebase for both
-3. **Fully extensible** - Add capabilities via `IJarvisCommand` interface
+1. **Fully private and open source** — no cloud dependencies by default, all data stays local
+2. **Self-hostable with optional cloud** — same open-source codebase for both
+3. **Fully extensible** — add capabilities by implementing `IJarvisCommand` (see `jarvis-command-sdk` for the interface, `jarvis-node-setup` for the runtime)
 
-## Architecture
+---
+
+## For Claude: Use MCP Tools
+
+**Prefer jarvis-mcp tools over direct curl/HTTP/docker calls** when available:
+
+| Instead of... | Use MCP tool... |
+|---|---|
+| `curl localhost:7702/health` etc. | `debug_health` |
+| Querying logs via curl | `query_logs`, `logs_tail`, `get_log_stats` |
+| Getting service info | `debug_service_info` |
+| `docker ps` | `docker_ps` |
+| `docker logs <container>` | `docker_logs` |
+| `docker restart <container>` | `docker_restart` / `docker_stop` / `docker_start` |
+| `docker compose up/down` | `docker_compose_up` / `docker_compose_down` / `docker_compose_list` |
+
+> jarvis-mcp is **potentially deprecated** — see its CLAUDE.md. The tools above still work today; don't extend the surface without checking first.
+
+---
+
+## Services (directory)
+
+| Service | Port | One-liner |
+|---|---|---|
+| jarvis-config-service | 7700 | Service registry + first-boot bootstrap + settings gateway |
+| jarvis-auth | 7701 | Users, JWT, app-to-app, nodes, households |
+| jarvis-logs | 7702 | Loki/Grafana fronted by FastAPI |
+| jarvis-command-center | 7703 | The brain — voice orchestration, memory, tools, routines |
+| jarvis-llm-proxy-api | 7704 / 7705 | OpenAI-compatible API + model service + queue worker |
+| jarvis-whisper-api | 7706 | STT (in-process pywhispercpp) + speaker recognition |
+| jarvis-tts | 7707 | TTS (Piper / Kokoro) with streaming |
+| jarvis-settings-server | 7708 | **Deprecation candidate** — use config-service's `/v1/settings/*` |
+| jarvis-mcp | 7709 | **Potentially deprecated** — MCP server for Claude Code |
+| jarvis-admin | 7710 | Web admin (Fastify backend + React SPA) |
+| jarvis-notifications | 7712 | Push + inbox |
+| jarvis-pantry | 7721 | Cloud package store + AI Forge |
+| jarvis-web | 7722 | Browser chat (Next.js, rewrites to backends) |
+| jarvis-recipes-server | 7030 | Recipes + meal planning |
+| jarvis-ocr-service | 7031 | OCR (Tesseract / EasyOCR / Apple Vision) |
+
+**Libraries:** `jarvis-log-client`, `jarvis-config-client`, `jarvis-web-scraper`, `jarvis-command-sdk`
+**Clients:** `jarvis-node-setup` (Pi Zero), `jarvis-node-mobile`
+**Shared infra:** PostgreSQL, Redis, MinIO, Mosquitto (MQTT)
+
+Each service has its own CLAUDE.md with the dependency graph, recipes, invariants, and failure modes for that service. **Read it first.**
+
+---
+
+## Service communication patterns
+
+| Auth mode | Header | Validated where |
+|---|---|---|
+| **User JWT** | `Authorization: Bearer <jwt>` | Locally in each service using shared `AUTH_SECRET_KEY` |
+| **App-to-app** | `X-Jarvis-App-Id` + `X-Jarvis-App-Key` | Round-trip to `jarvis-auth /internal/app-ping` (or `/internal/validate-app`) |
+| **Node** | `X-API-Key: node_id:node_key` | Round-trip to `jarvis-auth /internal/validate-node` (also checks per-service access) |
+| **Admin** | `X-Jarvis-Admin-Token` (or service-specific `X-Admin-Token`) | Local env-var compare |
+
+**Service discovery:** every service queries `jarvis-config-service /services` for URLs at startup (via `jarvis-config-client`, cached locally with 5min background refresh).
+
+### Hot path: voice command from a node
 
 ```
-Pi Zero Nodes → Command Center (7703) → Speech-to-Text (Whisper)
-                                      → LLM Processing
-                                      → Tool Execution → Service Response
+Pi node ──(X-API-Key)──▶ jarvis-command-center ──┬─▶ jarvis-llm-proxy-api (inference)
+                                                  ├─▶ jarvis-whisper-api (STT, via /media proxy)
+                                                  ├─▶ jarvis-tts (audio out, streamed)
+                                                  └─▶ jarvis-auth (node validation, speaker resolve)
 ```
 
-## Service Inventory
+Per-service detail lives in each service's CLAUDE.md.
 
-| Service | Port | Description |
-|---------|------|-------------|
-| jarvis-auth | 7701 | JWT authentication, user management, app-to-app credentials |
-| jarvis-command-center | 7703 | Central voice/command API, node management, tool routing |
-| jarvis-whisper-api | 7706 | Speech-to-text via whisper.cpp |
-| jarvis-ocr-service | 7031 | OCR with pluggable backends (Tesseract, EasyOCR, Apple Vision) |
-| jarvis-recipes-server | 7030 | Recipe CRUD and meal planning |
-| jarvis-tts | 7707 | Text-to-speech via Piper TTS |
-| jarvis-logs | 7702 | Centralized logging (Loki + Grafana) |
-| jarvis-mcp | 7709 | MCP server for Claude Code integration |
-| jarvis-config-service | 7700 | Service discovery and configuration |
-| jarvis-llm-proxy-api | 7704/7705 | LLM proxy (API + queue worker) |
+---
 
-### Libraries
+## Cross-service environment variables
 
-| Library | Purpose |
-|---------|---------|
-| jarvis-log-client | Structured logging with async batching |
-| jarvis-config-client | Service discovery client |
-| jarvis-auth-client | Shared auth (superuser JWT + app-to-app) |
-| jarvis-settings-client | Multi-tenant settings with caching |
+| Variable | Used by | Notes |
+|---|---|---|
+| `DATABASE_URL` | most services | PostgreSQL connection (each service has its own DB) |
+| `AUTH_SECRET_KEY` | every service that validates JWTs | **Must match across all services.** In jarvis-auth it's `AUTH_SECRET_KEY`; older docs may say `SECRET_KEY` — that's stale. |
+| `JARVIS_CONFIG_URL` | every service | Config-service URL (typically `http://localhost:7700`) |
+| `JARVIS_APP_ID` / `JARVIS_APP_KEY` | every service | App-to-app credentials for outbound calls |
+| `JARVIS_AUTH_ADMIN_TOKEN` | trusted infrastructure only | Master admin token for jarvis-auth `/admin/*` |
+| `ADMIN_API_KEY` | command-center, notifications, pantry | Per-service admin endpoint protection (distinct from `JARVIS_AUTH_ADMIN_TOKEN`) |
 
-### Client Software & Apps
+Per-service env vars live in each service's CLAUDE.md.
 
-| Client | Type | Purpose |
-|--------|------|---------|
-| jarvis-node-setup | Python (Pi Zero) | Voice node client software |
-| jarvis-admin | React 19 + Vite | Web admin dashboard |
-| jarvis-installer | React 19 + Vite | Static SPA for install configuration |
-| jarvis-node-mobile | React Native + Expo | Mobile companion app for node provisioning |
-| jarvis-recipes-mobile | React Native + Expo | Mobile recipes app |
+---
 
-## Data Services (Shared Infrastructure)
+## Development model (mixed local/Docker)
 
-Shared infrastructure containers live in `jarvis-data-stores/` (this repo):
+The `./jarvis` CLI handles platform differences automatically.
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| PostgreSQL | 5432 | Shared database server (each service has its own DB) |
-| Redis | 6379 | Queue for async jobs (OCR, LLM training) |
-| MinIO | 9000 | Object storage |
-| Mosquitto | 1883 | MQTT broker (node ↔ TTS communication) |
-
-Each backend service connects to the **shared PostgreSQL** but uses its **own database** (e.g., `jarvis_auth`, `jarvis_command_center`, `jarvis_recipes`).
-
-## Common Patterns
-
-- **Framework**: FastAPI + Uvicorn (all Python services)
-- **Database**: Shared PostgreSQL server, per-service databases. SQLite acceptable for local dev/testing.
-- **Migrations**: Alembic
-- **Auth**: JWT access tokens + hashed refresh tokens
-- **App-to-App Auth**: `X-Jarvis-App-Id` + `X-Jarvis-App-Key` headers
-- **Node Auth**: `X-API-Key` header (node_id:node_key format)
-- **Containerization**: Docker + docker-compose
-- **Service Discovery**: jarvis-config-service with jarvis-config-client
-- **Settings**: Non-sensitive config belongs in database via jarvis-settings-client. Env vars should ONLY hold sensitive values (auth keys, app IDs) and the `JARVIS_CONFIG_URL` for bootstrap discovery.
-
-## Service Dependencies (Common Base)
-
-Almost all backend services depend on these four:
-- **jarvis-auth** - Authentication (app-to-app credentials)
-- **jarvis-config-service** - Service discovery (find other service URLs)
-- **jarvis-logs** - Centralized logging
-- **jarvis-settings-client** - Runtime configuration
-
-Beyond that, dependencies are service-specific (see each service's .mdc file).
-
-## Coding Style
-
-### Python
-
-- **Imports**: ALL imports MUST be at the top of the file. Group: stdlib → third-party → local
-- **Type hints**: ALWAYS use type hints for parameters, return types, and variable declarations
-- **Prefer** `X | None` over `Optional[X]` (Python 3.10+)
-- **Logging**: ALL logging MUST go through `jarvis-log-client` / `JarvisLogger`. No `print()` for logging
-- **Exceptions**: Use specific exception types. Never bare `except:`. Always `except SomeException as e:`
-
-### TypeScript/React (jarvis-admin, jarvis-installer)
-
-- React 19, TypeScript, Tailwind CSS v4
-- TanStack Query for data fetching
-
-## Development Rules
-
-### TDD is Mandatory
-
-1. **RED** - Write a failing test that defines expected behavior
-2. **GREEN** - Write minimum code to make it pass
-3. **REFACTOR** - Clean up while keeping tests green
-
-### Running Services
-
-**Standard for backend services:**
-```bash
-./run.sh --docker              # Start in Docker
-./run.sh --docker --rebuild    # Rebuild after dependency/Dockerfile changes
-```
-
-**Exceptions (macOS only - need native access to Metal GPU / Apple Vision):**
-- `jarvis-llm-proxy-api` → `./run.sh` (native, Metal acceleration)
-- `jarvis-ocr-service` → `./run.sh` (native, Apple Vision backend)
-- On Linux, these two also use `./run.sh --docker` like everything else
-
-**Mobile apps (React Native / Expo):**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
