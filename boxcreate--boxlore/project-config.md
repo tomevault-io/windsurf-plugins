@@ -1,83 +1,76 @@
 ---
 trigger: always_on
-description: PR labels for user-impact level (required), optional backend-change, and merge gate
+description: Short entrypoint for Cursor / Codex / cloud agents. Prefer this over long essays.
 ---
 
+# AGENTS.md — Boxlore agent contract
 
-# PR impact labels (required + optional)
+Short entrypoint for Cursor / Codex / cloud agents. Prefer this over long essays.
 
-Every `boxlore` PR must have **exactly one** user-impact label. `backend-change` is optional and **pairable** with any level.
+## Non-negotiables
 
-**Changelog / README upcoming workflows read these labels** — do not open a PR without the user-impact level. See also [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md).
+- Read [`ARCHITECTURE.md`](ARCHITECTURE.md) + the touched module `README.md` before editing; **ARCHITECTURE wins** on conflicts.
+- Before editing `scripts/sync/` (catalog pipeline): read [`scripts/README.md`](scripts/README.md) **and** the **Catalog sync** section below. Sync **does not** run on GitHub Actions — only on the Netcup VPS. A `git push` alone does **not** update the live runner.
+- No feature→feature deps/imports; no PostHog in features (use `:core:analytics`); no Hilt/Koin/MockK.
+- Never break identity/storage contracts (`applicationId`, DataStore `user_preferences`, Room names, `rss:` IDs, single `PlaybackRepository`, smart-queue refill ownership). See ARCHITECTURE identity table.
+- Update the touched module README in the same change (template: [`docs/MODULE_README_TEMPLATE.md`](docs/MODULE_README_TEMPLATE.md)).
+- Extend JVM `src/test` for touched logic; **bug fix ⇒ regression test** (same failure mode app-wide when shared). No Compose `androidTest` / emulator CI.
+- Commit / push / open a PR **only when the user asks**. Conventional Commits titles.
+- Every PR needs **exactly one** user-impact label (`user-impact-high|medium|low` or `no-user-impact`); optional `backend-change`. Changelog / README upcoming workflows depend on these — see [`.cursor/rules/pr-impact-labels.mdc`](.cursor/rules/pr-impact-labels.mdc).
+- Merge when required checks are green (squash). Required checks: **`testDebugUnitTest`** + **`coderabbit-threads-resolved`**. SonarCloud / Gitleaks / CodeRabbit apps still run on PRs (fix Sonar issues). Unit suite cancels prior in-progress runs on new commits; `[skip unit]` / `[skip changelog]` only when appropriate. No merge queue / `merge-ci`.
+- CodeRabbit (mandatory for agents):
+  - Address every CodeRabbit finding and mark **every** CodeRabbit review thread **Resolved** before merge. Do not rely on the bare `CodeRabbit` status (that only means the review job finished). The hard gate is **`coderabbit-threads-resolved`**.
+  - If the PR review decision is **`CHANGES_REQUESTED`** (CodeRabbit or anyone with write access): **stop**. Do **not** dismiss the review, do **not** force-merge / queue merge. Tell the user the PR is blocked on requested changes and ask them to merge (or dismiss) manually.
+- SonarCloud: **0 new-code issues** on the PR (App quality gate). Fix Sonar findings; do not treat a missing Sonar ruleset requirement as permission to ignore them.
+- Never commit secrets (`local.properties`, `.env`, keystores, `google-services.json`).
+- Do **not** hand-edit `CHANGELOG.md` or README Upcoming / What's New regions (`<!-- release-upcoming:* -->` / `<!-- release-whats-new:* -->`) — `changelog-on-merge` owns those. Hand-edits are OK only for intentional release-note rewrites with matching script contracts.
+- **boxlore-only:** do not change other `boxcreate` repos or org-wide bot settings unless asked. Keep proxy/backend internals out of public Android PR text.
+- Product name in user-facing copy is **boxlore** (all lowercase), not “Boxlore” / “BoxLore”.
+- Cards / panels: solid Material 3 surfaces only — no glassmorphism / translucent card backgrounds.
 
-## User impact (pick one)
+## Source of truth (priority order)
 
-| Label | Meaning | README / notification |
-|:--|:--|:--|
-| `user-impact-high` | Listeners clearly notice | Always prioritize |
-| `user-impact-medium` | Noticeable, not headline | Include |
-| `user-impact-low` | Minor user-facing | CHANGELOG; README if space |
-| `no-user-impact` | No listener-facing change | CHANGELOG only |
+1. Latest user message (explicit overrides win)
+2. This file + [`.cursor/rules/*.mdc`](.cursor/rules/)
+3. [`ARCHITECTURE.md`](ARCHITECTURE.md)
+4. Touched module `README.md`
+5. [`docs/TESTING.md`](docs/TESTING.md) and [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)
 
-## Backend (optional, pairable)
+## Where to look
 
-| Label | Meaning |
-|:--|:--|
-| `backend-change` | Server / proxy / infra involved — add alongside any user-impact level |
+| Topic | Doc |
+| :--- | :--- |
+| Module graph, DI, identity | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Unit / Kover / Konsist / CI | [`docs/TESTING.md`](docs/TESTING.md) |
+| Catalog sync pipeline (VPS, not GHA) | [`scripts/README.md`](scripts/README.md) |
+| Always-on agent rules | [`.cursor/rules/`](.cursor/rules/) |
+| PR body / merge checklist | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) |
+| Impact labels + merge gate | [`.cursor/rules/pr-impact-labels.mdc`](.cursor/rules/pr-impact-labels.mdc) |
 
-Examples:
+## Catalog sync (VPS — not GitHub Actions)
 
-- `--label user-impact-high --label backend-change`
-- `--label no-user-impact --label backend-change`
-- `--label user-impact-medium`
+**Hard stop before editing `scripts/sync/`.** Full detail: [`scripts/README.md`](scripts/README.md).
 
-## Merge gate — required before merge
+### Sync does not run on GitHub
 
-There is **no `merge-ci` label flow** and **no merge queue**. Unit CI (detekt / ktlint / Kover) runs on **every PR push**, plus optional `workflow_dispatch`. A new commit cancels any in-progress unit run for that PR.
+- The old GHA workflow **`sync-pi-data` is sunset / removed**.
+- There is **no** GitHub cron for charts, PI import, episode sync, or vectorization.
+- Do **not** re-add a GitHub sync workflow unless the user explicitly asks.
+- Do **not** assume `git push` to `master` updates the live pipeline by itself.
 
-Master is protected by a branch ruleset. Required checks:
+### Sync runs on the Netcup VPS
 
-| Check | Meaning |
-|:--|:--|
-| `testDebugUnitTest` | Full unit / static / Kover gate (PR; cancels prior run on new commit) |
-| `coderabbit-threads-resolved` | Every non-outdated CodeRabbit review thread is Resolved |
+| What | Where |
+| :--- | :--- |
+| Live runner root | `/opt/boxlore-sync/` |
+| **Code the cron executes** | `/opt/boxlore-sync/repo/scripts/sync/` (`run-sync.sh` → `cd $REPO`) |
+| Orchestrator | `/opt/boxlore-sync/run-sync.sh` (systemd timers; panel install from `netcup-panel`) |
+| Secrets / budgets | `/opt/boxlore-sync/.env` (never commit) |
+| Run logs | `/opt/boxlore-sync/logs/runs/` |
+| Local Turso / Qdrant | `/opt/boxlore-stack` |
 
-Still run on PRs (not ruleset-required): SonarCloud App, CodeRabbit App status, Gitleaks.
 
-Agent / maintainer flow:
-
-1. Open and iterate the PR (unit suite cancels prior runs; Sonar/CodeRabbit/Gitleaks also run).
-2. Wait for **`testDebugUnitTest`** and **`coderabbit-threads-resolved`** green.
-3. Address **every** CodeRabbit finding and mark each CodeRabbit thread **Resolved**. After resolving without a push, re-run **CodeRabbit Threads Resolved** (`workflow_dispatch` with `pr_number`).
-4. If review decision is **`CHANGES_REQUESTED`**: **stop** — do not dismiss, do not merge. Ask the user to merge (or dismiss) manually.
-5. Otherwise squash-merge the PR when required checks are green.
-6. Optional: Actions → Run workflow (`Unit Tests`) for a manual full gate.
-
-**Title skips (when appropriate only):**
-
-- `[skip unit]` in the PR title — no-ops the unit suite on PR (still reports green). **Only** for safe docs/chore with no logic risk.
-- `[skip changelog]` — skips changelog-on-merge (e.g. `release: vX.Y.Z [skip changelog]`).
-
-**Bot bypass:** **boxlore-master-pusher** (GitHub App 4340323) and organization admins bypass the ruleset so scheduled workflows can push chore commits to `master` directly. Never remove that Integration bypass.
-
-Do **not** hand-edit `CHANGELOG.md` or README Upcoming / What's New marker regions before merge — changelog-on-merge owns those (labels help prioritize README / notifications).
-
-## PR title (required)
-
-Use Conventional Commits only:
-
-- `feat(scope): …` / `fix(scope): …` / `chore: …` / `docs: …` / `release: vX.Y.Z [skip changelog]`
-- Never open or leave a PR with a sentence-case title (e.g. `Polish the announcement dialog`).
-
-## Agent checklist
-
-1. Before `gh pr create`, set a Conventional Commit title and choose exactly one of `user-impact-high|medium|low` or `no-user-impact`.
-2. Add `backend-change` when the PR also touches backend/proxy/infra.
-3. Do not open a PR without a user-impact level label.
-4. Never apply two user-impact level labels on the same PR.
-5. If the label is `user-impact-high` or `user-impact-medium`, the PR body **must** include **Listener impact → What changes in the user’s life** in plain listener language (not just engineering bullets). Skip that section only for `user-impact-low` or `no-user-impact`.
-6. If a PR title violates Conventional Commits, rename it with `gh pr edit <n> --title "type(scope): …"` before merge.
-7. Before merging: confirm **`testDebugUnitTest`** + **`coderabbit-threads-resolved`** are green, every CodeRabbit thread is Resolved, and review decision is **not** `CHANGES_REQUESTED`. If it is `CHANGES_REQUESTED`, stop and ask the user to merge manually.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [boxcreate/boxlore](https://github.com/boxcreate/boxlore) — distributed by [TomeVault](https://tomevault.io).
