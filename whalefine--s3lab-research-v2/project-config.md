@@ -1,130 +1,100 @@
 ---
 trigger: always_on
-description: SGLATrack historical benchmark results for comparing experiments
+description: 以 run_backbone_numpy_shared_trunk.py 為 golden，將 numpy trunk 對齊轉 Verilog；backbone 對拍 verilog_backbone2/；head 對拍以 verilog_head2/ 為準（verilog_head/ 僅舊版參考）
 ---
 
 
-# SGLATrack Benchmark Results
+# Numpy Trunk → Verilog 對齊規則
 
-Pre-train: MAE ViT-Base (mae_pretrain_vit_base.pth)
-Training: COCO17 + GOT10K_train_full, Epoch 50, Batch 32, LR 5e-5
+本規則與 `verilog_rule.mdc`（語法／可合成底線）並存；若有衝突，**可合成與對拍語意**以本檔與 `verilog_rule.mdc` 較嚴者為準。
 
-## COCO+GOT10K（Epoch 50）彙整表
+## 1. Golden 與產出位置
 
-（AUC / Prec 皆為 %；Avg. 為五個資料集 AUC 平均）
+- **數學與流程依據**：`python/tracking/run_backbone_numpy_shared_trunk.py`（以下稱 **numpy trunk**）。
+- **Verilog 實作目錄**：`python/lib/models/verilog/`（僅在此目錄新增／修改 RTL；ROM/RAM 若已在外部生成，介面以現有 top / testbench 為準）。
+- **Verilog 目錄分工**（多條路徑並存，勿混淆）：
+  - **`python/lib/models/verilog_backbone2/`** — **目前 backbone 對拍基準**（`TEST_backbone.v` 等）；與 numpy trunk backbone 階段 golden 對拍。
+  - **`python/lib/models/verilog_head2/`** — **目前 head 對拍基準**：**不跑 backbone RTL**；以 numpy trunk 產出的**準確 activation**（例如 `backbone_after_norm_backbone_out_bi.txt`）串流進 `head_top`，驗證 conv → tail → `cal_bbox`；TB 為 `TEST_head.v`（編譯 `verilog_head2/*.v` + `Sram_tok1` 等）。
+  - **`python/lib/models/verilog/`** — **端到端整鏈路**（`TEST.v`，暫不動）：`sglatrack_top` 含 backbone + head。
+  - **`python/lib/models/verilog_head/`** — **舊版 head-only**（`Sram_sh1_lo`/`hi`、`mac_dv` 等）；**僅參考或比對舊實作，預設不作為對拍修改目標**。
+  - 修改 RTL 時須先確認目標目錄：backbone → `verilog_backbone2/`；**head → `verilog_head2/`**（除非使用者明確指定 `verilog_head/` 或 `verilog/`）；全鏈路 → `verilog/`。
+- **Activation 對答案檔**（Q8.8 二進位文字，一行一元素）：  
+  `python/output/golden/vit_care_relu6_numpy_trunk_dim32_out/Activation/*.txt`  
+  對應檔名多為 `*_bi.txt`（與腳本 `write_bi` 輸出一致）。RTL 除錯時以**此目錄**為 golden，不以「猜 golden」為準。
+- **階段對拍義務**：詳見 **§21**（numpy trunk 寫出的 activation 須與 Verilog 同階段輸出對答案）。
 
-| Model | UAV123 AUC | UAV123 P | UAV123_10fps AUC | UAV123_10fps P | UAVTrack112 AUC | UAVTrack112 P | UAVTrack112L AUC | UAVTrack112L P | DTB70 AUC | DTB70 P | Avg. AUC |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 論文寫的 vit | 66.10 | 83.90 | 64.50 | 82.20 | 66.90 | 81.30 | 64.70 | 81.70 | 63.80 | 83.50 | 64.70 |
-| vit.py（原架構） | 63.79 | 83.07 | 63.30 | 82.40 | 64.10 | 82.50 | 60.60 | 80.10 | 58.90 | 77.40 | 62.10 |
-| vit_sima.py（原） | 59.21 | 77.62 | 58.62 | 77.02 | 57.28 | 75.40 | 53.73 | 73.51 | 52.69 | 71.24 | 56.31 |
-| vit_CARE.py（attention=elu()+1） | 55.80 | 73.77 | 57.14 | 75.79 | 53.57 | 71.88 | 49.98 | 64.38 | 51.76 | 69.31 | 52.65 |
-| vit_CARE_relu.py（attention=relu()） | 62.59 | 81.67 | 62.33 | 81.02 | 59.97 | 77.95 | 55.97 | 75.64 | 54.82 | 72.94 | 59.14 |
-| vit_CARE_relu6.py（attention=relu6(), MLP=GELU） | 62.59 | 81.67 | 62.33 | 81.02 | 59.97 | 77.95 | 55.97 | 75.64 | 54.82 | 72.94 | 59.14 |
-| vit_CARE_relu6.py（attention=relu6(), MLP=ReLU） | 60.88 | 79.31 | 61.44 | 79.96 | 60.62 | 79.17 | 56.52 | 76.36 | 53.84 | 71.45 | 58.66 |
-| vit_CARE_relu6_fixed.py（relu6(), fixed-point, MLP=ReLU） | 60.65 | 78.83 | 61.49 | 80.07 | 60.16 | 78.56 | 56.45 | 76.56 | 53.37 | 71.05 | 58.43 |
-| vit_CARE_relu6_fixed.py（fixed-point 自訓/自測） | 34.30 | 44.83 | 34.80 | 45.20 | 29.87 | 37.70 | 17.39 | 22.22 | 33.65 | 44.09 | 30.00 |
-| vit_CARE_relu_BN.py | 58.85 | 77.08 | 58.94 | 77.16 | 58.87 | 77.85 | 54.12 | 75.07 | 52.66 | 70.49 | 56.69 |
-| vit_CARE_relu6_BN.py | 59.10 | 77.49 | 58.44 | 76.48 | 56.99 | 74.56 | 54.82 | 74.18 | 54.51 | 73.39 | 56.77 |
-| vit_CARE_gelu.py | 55.40 | 74.20 | 55.00 | 73.50 | 52.10 | 70.00 | 45.00 | 64.70 | 50.90 | 68.70 | 51.70 |
-| vit_MALA.py（原） | 61.51 | 79.88 | 62.63 | 81.68 | 61.53 | 79.49 | 57.40 | 76.44 | 55.74 | 74.18 | 59.76 |
-| vit_MALA_relu.py（attention=relu()） | 61.66 | 80.44 | 62.60 | 81.70 | 60.30 | 78.90 | 57.30 | 77.70 | 55.90 | 74.50 | 59.60 |
-| vit_MALA_relu6.py（attention=relu6()） | 62.08 | 80.90 | 61.75 | 80.02 | 61.55 | 80.04 | 58.08 | 78.21 | 55.45 | 74.12 | 59.78 |
-| vit_MALA_relu6_BN.py | 57.65 | 75.63 | 58.10 | 76.85 | 58.72 | 76.74 | 55.21 | 75.17 | 53.66 | 73.19 | 56.67 |
-| vit_square.py（原） | 58.64 | 77.24 | 58.80 | 77.50 | 56.60 | 74.20 | 52.20 | 70.40 | 56.10 | 74.30 | 56.50 |
+## 2. 不硬體化、不當作 RTL 行為依據的程式碼
 
-## 論文 vit (reported)
-- UAV123: AUC=66.1, Prec=83.9
-- UAV123_10fps: AUC=64.5, Prec=82.2
-- UAVTrack112: AUC=66.9, Prec=81.3
-- UAVTrack112L: AUC=64.7, Prec=81.7
-- DTB70: AUC=63.8, Prec=83.5
+- numpy trunk 內僅負責 **輸出 activation / weight 的 `*_bi.txt`** 的路徑（例如 `write_bi`、`save_npy`、`write_wbi`、目錄 `_bi_act_dir` / `_bi_wgt_dir`）**不實作進晶片**，也不當作 datapath 規格；它們的用途是 **給 Verilog 模擬對答案** 與產生 ROM 初值檔。
+- **主架構外**的輔助流程不強制硬體化：`argparse`、`main`、讀檔、`json`、`print`、`mkdir`、`cv2`（若有）等。
 
-## vit.py (原架構 baseline)
-- UAV123: AUC=63.79, Prec=83.07
-- UAV123_10fps: AUC=63.3, Prec=82.4
-- UAVTrack112: AUC=64.1, Prec=82.5
-- UAVTrack112L: AUC=60.6, Prec=80.1
-- DTB70: AUC=58.9, Prec=77.4
-- Avg AUC=62.1, FPS=160.0
+## 3. 可合成性
 
-## vit_sima.py
-- UAV123: AUC=59.21, Prec=77.62
-- UAV123_10fps: AUC=58.62, Prec=77.02
-- UAVTrack112: AUC=57.28, Prec=75.40
-- UAVTrack112L: AUC=53.73, Prec=73.51
-- DTB70: AUC=52.69, Prec=71.24
-- Avg AUC=56.31, FPS=161.49
+- 所有要進晶片（或 FPGA 正式 image）的 RTL **必須可合成**，並遵守 `verilog_rule.mdc`（例如 Verilog-2001、禁止用於「硬體邏輯」的 `initial` / `#delay` 等，依該檔全文為準）。
+- 若為 **除錯專用**（例如僅模擬用的 `$display`、`ifdef` 區塊、不可綜合的暫時波形 dump），必須：
+  - 以註解或 `ifdef` 標題**明寫「不可合成／僅 simulation」**，且
+  - **註明為解決何種現象而插入**（例如：對拍哪一節點 golden、追查 argmax 錯位、SRAM 寫入下溢、sigmoid 全飽和等；見 **§10**），並
+  - 預設關閉或易於關閉，避免誤綜。
 
-## vit_CARE.py (原; attention 改 `elu()`)
-- UAV123: AUC=55.80, Prec=73.77
-- UAV123_10fps: AUC=57.14, Prec=75.79
-- UAVTrack112: AUC=53.57, Prec=71.88
-- UAVTrack112L: AUC=49.98, Prec=64.38
-- DTB70: AUC=51.76, Prec=69.31
-- UAVDT: AUC=36.4, Prec=55.6
-- Avg AUC=52.65, FPS=158.14
+## 4. 修改必須有依據
 
-## vit_CARE_relu.py (attention 改 `relu()`)
-- UAV123: AUC=**62.59**, Prec=81.67
-- UAV123_10fps: AUC=62.33, Prec=81.02
-- UAVTrack112: AUC=59.97, Prec=77.95
-- UAVTrack112L: AUC=55.97, Prec=75.64
-- DTB70: AUC=54.82, Prec=72.94
-- Avg AUC=59.14, FPS=159.31
+- 修改 Verilog **不可憑猜**：需註明或可追溯至 **numpy trunk 對應函式與行數**、**golden 檔名與 flatten 順序**、或**已約定的定點規格**（例如 Q8.8、`fp`/`linear` 與 RTL 的對應說明）。
+- 若規格不明，應先補文件或先在 numpy／binary check 釐清，再改 RTL。
 
-## vit_CARE_relu6.py (attention 改 `relu6()`, MLP `GELU`)
-- UAV123: AUC=**62.59**, Prec=81.67
-- UAV123_10fps: AUC=62.33, Prec=81.02
-- UAVTrack112: AUC=59.97, Prec=77.95
-- UAVTrack112L: AUC=55.97, Prec=75.64
-- DTB70: AUC=54.82, Prec=72.94
-- Avg AUC=59.14, FPS=160.00
+## 5. 語義不對齊時的優先順序（Python 先可硬體化）
 
-## vit_CARE_relu6.py (attention 改 `relu6()`, MLP `ReLU`)
-- UAV123: AUC=60.88, Prec=79.31
-- UAV123_10fps: AUC=61.44, Prec=79.96
-- UAVTrack112: AUC=60.62, Prec=79.17
-- UAVTrack112L: AUC=56.52, Prec=76.36
-- DTB70: AUC=53.84, Prec=71.45
-- Avg AUC=58.66, FPS=158.63
+- 若發現 numpy trunk 某段**不易硬體化**或與已定 RTL **語義不一致**，優先 **修改 `run_backbone_numpy_shared_trunk.py`**，使演算法改為：
+  - 固定 shape、固定迴圈深度、
+  - 明確的定點／截斷／飽和步驟（與未來 RTL 可一一對應），
+  - 再更新 golden 與 RTL。
+- 避免為了遷就錯的 Python 語意而去寫「無法對拍」的 RTL。
 
-## vit_CARE_relu6_fixed.py (attention `relu6()`, fix-point, MLP `ReLU`)
-- UAV123: AUC=60.65, Prec=78.83
-- UAV123_10fps: AUC=61.49, Prec=80.07
-- UAVTrack112: AUC=60.16, Prec=78.56
-- UAVTrack112L: AUC=56.45, Prec=76.56
-- DTB70: AUC=53.37, Prec=71.05
-- Avg AUC=58.43, FPS=120.26
+## 6. Verilog 改動幅度
 
-## vit_CARE_relu_BN.py
-- UAV123: AUC=58.85, Prec=77.08
-- UAV123_10fps: AUC=58.94, Prec=77.16
-- UAVTrack112: AUC=58.87, Prec=77.85
-- UAVTrack112L: AUC=54.12, Prec=75.07
-- DTB70: AUC=52.66, Prec=70.49
-- Avg AUC=56.69, FPS=149.69
+- 以 **最小 diff** 為原則：盡量保留原有模組結構、介面與命名；**只改必要區段**解決對拍或合成問題。
+- 非經使用者同意，不做與當前 bug 無關的大重構。
 
-## vit_CARE_relu6_BN.py
-- UAV123: AUC=59.10, Prec=77.49
-- UAV123_10fps: AUC=58.44, Prec=76.48
-- UAVTrack112: AUC=56.99, Prec=74.56
-- UAVTrack112L: AUC=54.82, Prec=74.18
-- DTB70: AUC=54.51, Prec=73.39
-- Avg AUC=56.77
+## 7. 訊號 ↔ Golden 檔名註解（強制）
 
-## vit_CARE_relu6_fixed.py（fixed-point 自訓/自測）
-- UAV123: AUC=34.30, Prec=44.83
-- UAV123_10fps: AUC=34.80, Prec=45.20
-- UAVTrack112: AUC=29.87, Prec=37.70
-- UAVTrack112L: AUC=17.39, Prec=22.22
-- DTB70: AUC=33.65, Prec=44.09
-- Avg AUC=30.00
+- 在 `python/lib/models/verilog/` 內，凡會對應到 numpy trunk 中間輸出、且可用 Activation golden 對拍的 **模組輸出／暫存陣列／串流**，應在適當位置（模組頭或該訊號旁）加註解，格式建議：
 
-## vit_CARE_gelu.py
-- UAV123: AUC=55.4, Prec=74.2
-- UAV123_10fps: AUC=55.0, Prec=73.5
-- UAVTrack112: AUC=52.1, Prec=70.0
+  `// Golden: vit_care_relu6_numpy_trunk_dim32_out/Activation/<檔名>_bi.txt`
+
+  若一訊號對應多檔或子路徑，寫清楚檔名與 tensor 對應關係（例如 token 順序、flatten 為 row-major 等，若 golden 有文件則引用）。
+
+- 若某節點 numpy 有 `save_npy("xxx.npy")` 但 golden 實際為 `xxx_bi.txt`，註解以 **實際存在的 `Activation/` 檔名** 為準。
+
+## 8. 硬體化範圍（排除清單）
+
+- **不必**硬體化：僅供寫檔、寫 log、路徑組合、與 `np.load`/CLI 相關的程式碼（見第 2 節）。
+- **必須**能對應到硬體 datapath 的：依 numpy trunk **主流程**會執行到的 `block_forward`、`attention_forward`、`layer_norm`、`linear`、`head_shared_trunk`、`conv2d`、以及（若納入範圍）`cal_bbox` 與 tracker 相關運算等；實作時以「可合成 + 可對拍」為取捨邊界。
+
+## 9. 主架構優先
+
+- 判斷「要不要硬體化」時，以 numpy trunk **正常 main 路徑**會跑到的運算為準；冷門分支、僅在缺少 golden 時才走的 fallback（例如自行算 adaptive）可標為軟體或第二階段，除非使用者明確要求納入 RTL。
+
+## 10. 除錯環境（模擬不在本 repo）
+
+- 假設 **Verilog simulation 在外部環境**執行；除錯可依賴：
+  - 使用者**截圖**（波形／訊號），或
+  - 在 RTL 暫加 **`$display`**（須標註僅 simulation、見 **§3**），由使用者截圖或貼 log 回傳數值。
+- 凡為除錯而加入的 **`ifdef`／`$display` 區塊**，除 **§3** 外，**必須**在區塊上方或模組頭註解寫清：**為了解決／驗證什麼**（症狀或對拍目標）、**與哪個 golden 檔或哪一層節點相關**；避免僅寫「debug」而後續無法判斷是否可刪、與何問題綁定。細節見 **§10.1**（**註解義務**與 **`ifdef` 分區**兩條）。
+- 若使用者**無法使用波形圖**（無 FSDB/VPD 或無法開 viewer），除錯方式以 **§10.1** 為準，不應假設能依波形縮小問題。
+- Agent 修改 RTL 時應避免依賴「本機跑完 sim」作為唯一驗證，改以 **golden 檔 + 程式依據** 推進。
+- 使用者實機之 **VCS 編譯／`./simv`** 流程見 **§22**。
+
+### 10.1 僅能以 `$display` 除錯（無波形圖）
+
+當環境**無法使用波形 viewer**、僅能靠仿真 log 中的 **`$display`／`$strobe`／`$fdisplay`** 觀察訊號時，建議遵守下列做法，以便與 **§16** 前向對拍且不致洗版：
+
+- **取樣時機**：只在有意義的拍列印（例如 `mac_bp && mac_dv` 寫 SRAM 當拍、`done` 拉高當拍、`state` 切換後第一拍）；避免每個 `posedge` 盲目列印。
+- **NBA 後數值**：要看 nonblocking 更新後的結果，優先用 **`$strobe`**，或在下一拍再讀已鎖存的 `reg`。
+- **SRAM `CLK(~clk)`**：讀 `*_q` 時可改在 **`negedge clk`** 列印（與 macro 讀取邊沿一致），避免 posedge 上位址已變而 `Q` 仍舊的錯覺（與 `head_top` 內 `DUMP_HEAD_BBOX_SRAM_NEGEDGE` 類思路一致）。
+- **格式**：定點以 **`%h` 為主**，並在註解或同一行標明 **Q8.8／Q0.8**；負值須明示 **signed 二補數** 解讀，勿將 `0xff..` 誤當無號大正數。
+- **列印語言（強制）**：`$display`／`$strobe`／`$fdisplay`／`$fwrite`／`$monitor` 等**仿真 log 內可見字串必須為英文（ASCII）**；使用者執行 `.v` 的環境**不支援中文**，禁止在 format string 或訊息內使用中文（含簡繁）。說明性文字請寫在 `//` 註解，或 Agent 回覆給使用者；RTL／TB 內僅輸出英文標籤（例如 `PASS`、`FAIL`、`bbox_mismatch`、`golden=`）。
+- **`ifdef` 分區**：除錯列印一律以 **`ifdef` 編譯開關**封裝（預設關閉），見 **§3**；可按模組拆成多個 macro（例如 `DUMP_HEAD_SIZE_SAT`），按需開啟。**每個 macro 對應的區塊**須有註解說明：**欲診斷的問題**（例如「追查 tail_size 寫入前 `mac_cl` 過大導致 sigmoid 全飽和」）、**建議搭配編譯選項**、以及**若問題已解決是否應移除或改為預設關閉**。
+- **註解義務（`ifdef`／`$display` 區塊）**：凡為除錯插入的列印，**不可**只留開關名稱；至少應在 **`ifdef` 上一行區塊註解**或**模組頭對應小節**寫明：
+  - **要解決／驗證的現象**（例如 bbox 與 golden 差、`sc_q` 全為下限、與某 `Activation/*_bi.txt` 第一個分歧層級等）；
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
