@@ -7,11 +7,11 @@ Graph-based tool retrieval for LLM agents — 248 tools → 82% accuracy, 79% fe
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [SonAIengine/graph-tool-call](https://github.com/SonAIengine/graph-tool-call).
+Original source: `AGENTS.md` in [SonAIengine/graph-tool-call](https://github.com/SonAIengine/graph-tool-call).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
