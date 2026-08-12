@@ -7,11 +7,11 @@ MCP (Model Context Protocol) server for Autodesk Revit 2023–2027 — 173 tools
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [LuDattilo/RevitCortex](https://github.com/LuDattilo/RevitCortex).
+Original source: `AGENTS.md` in [LuDattilo/RevitCortex](https://github.com/LuDattilo/RevitCortex).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
