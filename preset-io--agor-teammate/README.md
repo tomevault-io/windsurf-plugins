@@ -7,11 +7,11 @@ Agent operating framework for Agor - inspired by OpenClaw
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [preset-io/agor-teammate](https://github.com/preset-io/agor-teammate).
+Original source: `AGENTS.md` in [preset-io/agor-teammate](https://github.com/preset-io/agor-teammate).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
