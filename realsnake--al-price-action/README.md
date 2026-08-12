@@ -7,11 +7,11 @@ AL Brooks 价格行为学
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [realsnake/AL_price_action](https://github.com/realsnake/AL_price_action).
+Original source: `CLAUDE.md` in [realsnake/AL_price_action](https://github.com/realsnake/AL_price_action).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
