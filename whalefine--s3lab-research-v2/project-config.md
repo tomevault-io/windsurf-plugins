@@ -1,156 +1,117 @@
 ---
 trigger: always_on
-description: - Python 到 RTL 轉換計劃過程中只實作 **test / inference** 流程，不處理任何 train 會用到的邏輯。
+description: 本研究整體歷程、改動方向、軟硬體流程與論文敘事主軸（SGLATrack → softmax-free CARE → Q8.8 → Python golden → ROM → Verilog → APR）
 ---
 
 
-# Python 到 RTL 轉換計劃（CARE / test-only / post-embedding）
+# 研究敘事與技術路線（論文／協作參考）
 
-## 專案邊界
+本檔記錄本研究**從模型改動到晶片收尾**的主線、設計取捨與產物意義，供撰寫論文方法與系統章節、以及與 Agent 協作時對齊語境使用。若使用者未提到「研究流程／論文敘事／本專案階段」，可不強制套用全文，但**討論 SGLATrack、CARE、fixed-point、Verilog 或 APR 時**應優先對照本檔以免敘事矛盾。
 
-- Python 到 RTL 轉換計劃過程中只實作 **test / inference** 流程，不處理任何 train 會用到的邏輯。
-- RTL 只處理 **一個 template + 一個 search** 的情況，不考慮 batch 與多 template / 多 search。
-- RTL **不實作** `patch_embed` 與 `position embedding`；這兩部分保留在 Python / PyTorch 端。
-- RTL 的輸入是 **已完成 patch embedding 與 position embedding 後的特徵 / token**。
-- RTL 的輸入形式固定為 **分開的 template token 與 search token**，不可將兩者在 Python 端先合成單一 `320 token` 再當成唯一 RTL 輸入。
-- RTL 的目標是從 post-embedding 特徵開始，跑完 **backbone + head + bbox 生成** 的 test 路徑。
-- 若與 Python test 對齊到最終 bbox，需納入 `score_map / size_map / offset_map / cal_bbox` 等 test-time head 邏輯。
+正式論文標題與章節語氣仍以 `.cursor/rules/thesis_rule.mdc` 為準。
 
-## 固定點格式規則
+---
 
-- 本專案 Python check、binary Python check、參數文字檔與 RTL 的**預設固定點格式一律使用 `Q8.8`**。
-- `Q8.8` 定義：
-  - signed fixed-point
-  - 1 個 sign bit
-  - 8 個整數位
-  - 8 個小數位
-  - 總位寬預設視為 16-bit signed
-- 若某個 stage 暫存器、累加器、乘法輸出需要更寬位寬，必須另外明確標註，但最終對外 dump / 對拍格式仍優先回到 `Q8.8`。
-- 沒有特別聲明時：
-  - activation 使用 `Q8.8`
-  - weight 使用 `Q8.8`
-  - bias 使用 `Q8.8`
-  - intermediate dump 使用 `Q8.8`
-- 若未來要改成其他格式，例如 `Q4.12`、`Q16.8`，必須先同步更新：
-  - Python check
-  - binary Python check
-  - `.txt` / binary `.txt` 轉檔規則
-  - RTL module 介面與 testbench
+## 研究目標（一句話）
 
-## 固定研究主線
+以 **Softmax-Free Vision Transformer** 為核心的視覺追蹤模型，經 **定點（Q8.8）化** 與 **Python 硬體對齊檢查**，完成 **RTL → APR**，並以 **DRC／LVS clean** 作為研究收尾條件。
 
-1. 使用 `vit_CARE_relu6.py` 訓練浮點模型。
-2. 使用 `vit_CARE_relu6.py` 訓練出的 checkpoint，載入到 `vit_CARE_relu6_fixed.py` 做 test / 量化驗證。
-3. 將該 checkpoint `.pth.tar` 轉成各個 parameter 的 `.npy`，給 Python check 使用。
-4. 撰寫 Python check（讀 `.npy`），用 hardware-friendly 方式重寫 **backbone + head + bbox** 的 test 流程。
-5. 將 `.npy` 轉成 `.txt` / binary text，給 RTL 讀取。
-6. 撰寫 binary 版 Python check，完全模擬未來 Verilog 的 bit-width、截斷、捨入、除法近似與控制流程。
-7. 將 binary Python check 對應轉成 Verilog RTL。
+---
 
-## 參考檔案與路徑
+## 階段一：在 SGLATrack 上探索 Softmax-Free Attention
 
-- 浮點訓練 backbone：`python/lib/models/sglatrack/vit_CARE_relu6.py`
-- 定點測試 backbone：`python/lib/models/sglatrack/vit_CARE_relu6_fixed.py`
-- 定點 test config：`python/experiments/sglatrack/vit_coco_uav123_care_relu6_fixed.yaml`
-- checkpoint 匯出腳本：`python/tracking/export_checkpoint_npy.py`
-- Python check 參考：`reference/rongxuan/05_PythonCheck/python_check.py`
-- Verilog 前 binary Python check 參考：`reference/rongxuan/06_GetBinary/python_check_verilog.py`
+### 1-A 問題起點
 
-## checkpoint 路徑規則
+標準 softmax attention 公式為 `softmax(QKᵀ/√d)V`，其中 `exp()` 與 `row-wise division` 在硬體中代價高昂（需要 LUT 或 CORDIC 實作 exp，面積與延遲均大），是 ViT 加速器的主要瓶頸。本研究目標為在保住 SGLATrack 追蹤精度的前提下，找到一個可直接對應 RTL 的 attention 替代方案。
 
-- `vit_CARE_relu6.py` 訓練出的 checkpoint 預設路徑為：
-  - `python/output/checkpoints/train/sglatrack/vit_coco_uav123_care_relu6/sglatrack_ep0050.pth.tar`
-- 之所以優先使用 `ep0050`，是因為 config 的 `TEST.EPOCH = 50`，test 預設即會載入第 50 epoch。
-- 若之後改 config 名稱或 epoch，需同步更新：
-  - 訓練 checkpoint 路徑
-  - 匯出 NPY 的來源 checkpoint
-  - Python check / binary check / RTL testbench 使用的 golden 版本
+---
 
-## patch embedding / position embedding 規則
+### 1-B 嘗試過的四條路線（依序）
 
-- `patch_embed` 與 `pos_embed` 不進 RTL。
-- Python 端必須先完成：
-  - patch embedding
-  - 加上 positional embedding
-  - 保留 template token 與 search token 分開的輸出
-- embedding 前段的 NPY dump 檔名固定為：
-  - `template_after_patch_embed_out.npy`
-  - `search_after_patch_embed_out.npy`
-  - `template_pos_embed.npy`
-  - `search_pos_embed.npy`
-  - `template_after_pos_add_out.npy`
-  - `search_after_pos_add_out.npy`
-- 上述檔名定義如下：
-  - `template_after_patch_embed_out.npy`：`template = patch_embed(template)` 之後的輸出
-  - `search_after_patch_embed_out.npy`：`search = patch_embed(search)` 之後的輸出
-  - `template_pos_embed.npy`：`self.pos_embed_z`
-  - `search_pos_embed.npy`：`self.pos_embed_x`
-  - `template_after_pos_add_out.npy`：`patch_embed(template) + pos_embed_z`
-  - `search_after_pos_add_out.npy`：`patch_embed(search) + pos_embed_x`
-- 硬體驗證的 golden input 應該是 **post-embedding tensor**，不是原始 RGB image。
-- Python 端可做 `patch_embed(template) + pos_embed_z` 與 `patch_embed(search) + pos_embed_x`，但 **`combine_tokens` 必須保留在 RTL 端**。
-- RTL 輸入固定定義為：
-  - `template_post_embed`：shape `(1, 64, 768)`
-  - `search_post_embed`：shape `(1, 256, 768)`
-- 上述兩個 tensor 才是 RTL 測試與對拍的第一級 golden input；`320 token merged tensor` 只能作為 Python / RTL 中間節點 dump，不可取代 RTL 正式輸入介面。
-- 若匯出 parameter 只為 RTL 使用，可排除：
-  - `patch_embed.*`
-  - `pos_embed*`
-  - `cls_token`
-  - 任何只屬於 embedding 前段的權重
-- 若匯出 parameter 也要保留完整 Python 對照，可額外保存完整 checkpoint 對應 NPY，但 RTL 實際使用時只讀 post-embedding 之後需要的參數。
+#### ① Squaremax（reference [61]）
+- **機制**：`Attn = normalize(ReLU(QKᵀ)²) V`，以 ReLU² 取代 exp，normalization 改為 shift + 小 decoder（不需要 divider）。
+- **複雜度**：仍為 **O(N²)**（必須計算完整 N×N attention 矩陣）。
+- **硬體友善度**：高——無 exp，無 LUT。
+- **為何未採用**：O(N²) 的 memory bandwidth 成本在 token 數多時仍難以接受；無 per-head gating，attention 表達力較弱，追蹤指標有下降。
 
-## test-only 流程規則
+#### ② SimA（Simple Softmax-free Attention，reference/sima）
+- **機制**：對 Q、K 做 **L1 normalization**，再做 `q @ (kᵀ @ v)`（linear attention，**O(N)**）。
+- **複雜度**：O(N)——先算 kᵀv（d×d 矩陣），再乘 q，token 數不影響主要計算量。
+- **硬體友善度**：中——L1 norm 需要絕對值累加，相較可接受，但 normalization 邊界在 fixed-point 下需額外處理。
+- **為何未採用**：移植到 SGLATrack 後追蹤性能下降明顯；L1 norm 的語意與 SGLATrack 訓練假設不吻合。
 
-- 僅分析與實作 test path。
-- 不閱讀、不修改、不 RTL 化以下 train-only 項目：
-  - dataloader
-  - data augmentation
-  - loss function
-  - optimizer
-  - backward
-  - scheduler
-  - AMP
-  - candidate elimination warm-up / train-only control
-- Python / RTL 對齊時，優先以 `forward_test` 與 tracker `track()` 實際推論路徑為準。
+#### ③ MALA（Magnitude-Aware Linear Attention，reference/MALA）
+- **機制**：`q = ELU(q)+1`，`k = ELU(k)+1`，線性注意力 + additive correction + **RoPE** 位置編碼。
+- **複雜度**：O(N)。
+- **硬體友善度**：低——ELU 內含 exp（與 softmax 同樣問題）；RoPE 需要 sin/cos 計算，硬體成本大。
+- **為何未採用**：兩個難實作的非線性（ELU+RoPE）同時存在，等同放棄硬體友善的目標。
 
-## Golden 版本規則
+#### ④ CARE-Transformer（原版，reference/CARE-Transformer）
+- **機制**：`q = ELU(q)+1`，`k = ELU(k)+1`，線性注意力 `kv = kᵀv/N`，`x = q @ kv * z`，其中 `z = 1/(q @ k_mean ᵀ)`。
+- **複雜度**：**O(N)**——先算 kv（d×d），再乘 q，具有 per-head gating（z）保持 attention 銳利度。
+- **硬體友善度**：中——架構設計優秀，但 kernel function **ELU+1 仍含 exp**。
+- **為何未採用原版**：ELU 的 exp 是唯一硬體障礙；若能替換 kernel function，CARE 架構本身非常適合 RTL 實作。
 
-- 本專案 golden 驗證採用 **軟體先產生 template/search post-embedding token，RTL 只驗證第二幀 model path** 的策略。
-- 第一幀在 Python / PyTorch 端的用途是：
-  - 讀入 `frame1`
-  - 使用 `init_bbox` 建立 template crop
-  - 完成 preprocess、`patch_embed`、`pos_embed_z`
-  - 產生 `template_post_embed`
-- 第二幀在 Python / PyTorch 端的用途是：
-  - 讀入 `frame2`
-  - 依第一幀初始化後的 state 建立 search crop
-  - 完成 preprocess、`patch_embed`、`pos_embed_x`
-  - 產生 `search_post_embed`
-- RTL 的第一版不負責：
-  - 第一幀初始化
-  - image crop
-  - preprocess / normalize
-  - patch embedding
-  - position embedding
-- RTL 的第一版只負責從：
-  - `template_post_embed`
-  - `search_post_embed`
-  開始，完成 `combine_tokens -> backbone -> head -> bbox`。
-- 若日後要做 system-level RTL，才再把第一幀初始化、第二幀 search crop 與 tracker 後處理往前後延伸；第一版 golden 規則不預設納入。
-- golden 版本至少要保存：
-  - 第一幀的 `template_post_embed`
-  - 第二幀的 `search_post_embed`
-  - 第二幀的 `merged_tokens`
-  - 第二幀的 block-level outputs
-  - 第二幀的 `backbone_out`
-  - 第二幀的 `score_map`
-  - 第二幀的 `size_map`
-  - 第二幀的 `offset_map`
-  - 第二幀的 `pred_boxes`
-  - 若有納入 tracker 後處理，再保存 `response_after_window`、`bbox_after_cal_bbox`、`final_bbox`
+---
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### 1-C 最終選型：CARE + ReLU6 + Q8.8
+
+- **改動邏輯**：在 CARE 架構上，將 `ELU()+1` kernel function 替換為 **ReLU6**。
+  - **ReLU → ReLU6 的理由**：純 ReLU 輸出無上界，在 Q8.8 定點格式下可能 overflow；ReLU6 將輸出截在 [0, 6]，與 Q8.8 的整數部分（8 bit 表示最大 127）配合更佳，數值穩定。
+  - **結果**：O(N) 線性注意力、無 exp、輸出有界、per-head gating 保留 → 四個硬體友善條件全部滿足。
+- **模型檔**：`python/lib/models/sglatrack/vit_CARE_relu6_fixed.py`（ViT-B/16，depth=12，embed=768，Q8.8 截斷插入每一個中間結果）。
+- **論文可寫重點**：
+  - 為何 softmax-free（exp 硬體成本）
+  - 四種方案的比較表（O(N²) vs O(N)、kernel function、硬體成本、追蹤精度）
+  - 為何最終選 CARE + ReLU6（O(N) + 無 exp + bounded + gating）
+  - ReLU vs ReLU6 的差異及對 Q8.8 的影響
+  - 數字比較引用 benchmark-results.mdc
+
+---
+
+## 階段二：固定點插入主架構（FP32 → Q8.8）
+
+- **工作內容**：在已定案的 CARE 類架構上，將運算流程改為 **fixed-point** 語意一致之模擬／訓練後流程。
+- **量化格式**：固定為 **Q8.8**（與專案中 fixed-point／硬體友善設計 skill 對齊）。
+- **論文可寫重點**：哪一層／哪條路徑插入定點、截斷與尺度約定、與 FP32 的誤差傳播界線。
+
+---
+
+## 階段三：Python Check（硬體語意一致性與 Golden）
+
+- **目的**：在撰寫／驗證 Verilog 前，用 Python **模擬「硬體會怎麼算」**，確認數值流程正確。
+- **輸出產物**：
+  - **Weight**：以 **binary 格式** 輸出並以 **txt** 儲存；**權重來源使用 NPY 而非 PTH**。
+    - **理由**：後續撰寫 Verilog 時需知道 **在各段落／模組邊界要餵入哪一段 weight**；NPY 便於與記憶體映射、位址區段、ROM 初值對齊，勝過直接依賴 PyTorch `.pth` 的抽象封裝。
+  - **Activation**：同樣以適合對照的格式輸出（binary／txt），作為 **golden reference**。
+    - **理由**：撰寫 Verilog 時 **逐步對答案**，確認每一級 pipeline／每個 function 區塊輸出與 Python golden 一致。
+- **論文可寫重點**：軟硬體協同驗證方法、golden 生成流程、與 RTL 對位的介面（word width、endianness、區塊邊界）。
+
+---
+
+## 階段四：ROM 先行與 Verilog 整合現況
+
+- **順序**：需 **先把權重寫入 ROM（或等價之常數表／初始化映像）**，才能進行 **完整頂層／系統級** Verilog 整合與時序完整的驗證。
+- **限制**：在 ROM／完整記憶體映像尚未就緒前，**完整 testbench／端到端仿真** 不易撰寫或意義不完整。
+- **現況**：**各功能模組（function-level）的 Verilog 已分別完成**；待 ROM 與介面對齊後，再接成可仿真的完整 datapath／control。
+- **論文可寫重點**：硬體模組化策略、memory hierarchy、為何採 ROM 先行與驗證分層。
+
+---
+
+## 階段五：APR 與結案條件
+
+- **後續流程**：RTL 與驗證收斂後進行 **APR（自動佈局繞線）**。
+- **研究收尾條件**：**DRC、LVS 皆 clean**（必要時於論文註明製程／PDK／signoff 工具鏈版本與約束）。
+- **論文可寫重點**：實體設計結果、面積／時脈／功耗若可得則放入結果章。
+
+---
+
+## 給 Agent 的協作提示
+
+1. **模型／量化**：修改 PyTorch 時優先對齊 **CARE + Q8.8** 與既有 skill（如 `sglatrack-fixedpoint-q8-8`、`sglatrack-qat`）的目錄與慣例。
+2. **產物格式**：輸出給硬體的 weight／activation，維持 **binary + txt** 與 **NPY 權重管線** 的敘事一致。
+3. **Verilog**：區分 **已完成之 function block** 與 **待 ROM／頂層串接後才完成的 TB**；避免假設端到端仿真已可跑。
+4. **論文引用**：方法與貢獻敘述應可對應到上述五階段；數字比較以 `benchmark-results.mdc` 與實際實驗為準。
 
 ---
 > Source: [whalefine/s3lab_research_v2](https://github.com/whalefine/s3lab_research_v2) — distributed by [TomeVault](https://tomevault.io).
