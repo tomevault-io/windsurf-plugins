@@ -7,11 +7,11 @@ A Tauri plugin for accessing the device's AI and Machine Learning APIs
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [hypothesi/tauri-plugin-device-ai-apis](https://github.com/hypothesi/tauri-plugin-device-ai-apis).
+Original source: `CLAUDE.md` in [hypothesi/tauri-plugin-device-ai-apis](https://github.com/hypothesi/tauri-plugin-device-ai-apis).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
