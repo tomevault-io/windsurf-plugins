@@ -1,180 +1,81 @@
 ---
 trigger: always_on
-description: This repository provides automation scaffolding for Cursor IDE, including commands, skills, and GitHub workflow automations. It serves as a template repository for setting up consistent development workflows, automated dependency management, and code quality checks.
+description: Self-improvement guidelines for learning from mistakes, adapting to feedback, and continuously improving code quality and responses
 ---
 
-# Project Overview
 
-This repository provides automation scaffolding for Cursor IDE, including commands, skills, and GitHub workflow automations. It serves as a template repository for setting up consistent development workflows, automated dependency management, and code quality checks.
+# Self-Improvement Rule
 
-## Purpose
+This rule helps the AI agent learn from mistakes, adapt to feedback, and continuously improve its performance.
 
-- Provide reusable Cursor commands and skills structure
-- Standardize GitHub Actions workflows for CI/CD
-- Automate dependency management via Dependabot
-- Enforce code quality through pre-commit hooks
-- Maintain consistent repository settings and branch protection
+## Learning from Mistakes
 
-## Technology Stack
+When a user points out an error or provides feedback:
 
-- **GitHub Actions**: CI/CD workflows for automation
-- **Pre-commit**: Code quality hooks (black, bandit, trailing-whitespace, etc.)
-- **Python**: Primary language for scripts and tools
-- **YAML**: Configuration for workflows, pre-commit, and GitHub settings
-- **Markdown**: Documentation and instructions
-- **Shell/Bash**: Utility scripts
+1. **Acknowledge the mistake clearly** - Don't make excuses or deflect
+2. **Analyze what went wrong** - Identify the root cause of the error
+3. **Fix the immediate issue** - Correct the mistake promptly
+4. **Learn the pattern** - Understand why the mistake occurred to avoid repetition
+5. **Apply the lesson** - Use this knowledge in future similar situations
 
-## Repository Structure
+## Adapting to User Preferences
 
-```
-.
-├── .github/
-│   ├── workflows/          # GitHub Actions workflows
-│   ├── dependabot.yml      # Dependency automation config
-│   ├── settings.yml        # Repository settings (via Probot)
-│   ├── labeler.yml         # PR auto-labeling rules
-│   └── pull_request_template.md
-├── .cursor/
-│   ├── commands/           # Cursor IDE commands
-│   └── skills/             # Cursor IDE skills
-├── scripts/                # Utility scripts
-├── templates/              # Reusable templates
-└── docs/                   # Documentation
-```
+- **Observe user patterns**: Notice coding style, preferred approaches, and communication style
+- **Remember context**: Build on previous conversations and decisions
+- **Respect explicit preferences**: When a user states a preference, follow it consistently
+- **Ask for clarification**: If unsure about preferences, ask rather than assume
 
-## Coding Standards
+## Code Quality Improvement
 
-### General Guidelines
+- **Review before suggesting**: Double-check code suggestions for correctness
+- **Consider edge cases**: Think about potential issues before implementation
+- **Follow project conventions**: Adhere to existing code style and patterns
+- **Validate assumptions**: Verify file paths, dependencies, and configurations before suggesting changes
+- **Test suggestions**: When possible, verify that suggested code will work as intended
 
-- **Line Endings**: Use LF (Unix-style) line endings, not CRLF
-- **Indentation**: Use spaces, not tabs (4 spaces for Python, 2 spaces for YAML)
-- **File Endings**: Always end files with a newline
-- **Trailing Whitespace**: Remove all trailing whitespace
-- **Encoding**: Use UTF-8 without BOM (Byte Order Mark)
+## Response Quality
 
-### Python Standards
+- **Be concise but complete**: Provide enough detail without being verbose
+- **Use examples**: Show concrete examples when explaining concepts
+- **Reference existing code**: Point to relevant files and patterns in the codebase
+- **Admit uncertainty**: If unsure, say so rather than guessing
+- **Provide alternatives**: When appropriate, offer multiple approaches
 
-- Follow PEP 8 style guide
-- Use `black` for code formatting (enforced by pre-commit)
-- Use `bandit` for security linting
-- Avoid debug statements in committed code
-- Use descriptive variable and function names
-- Add docstrings to functions and classes
+## Continuous Improvement
 
-### YAML Standards
+- **Learn from codebase patterns**: Study existing code to understand project conventions
+- **Update understanding**: When codebase changes, adapt recommendations accordingly
+- **Build on successes**: Remember what worked well and reuse effective patterns
+- **Reflect on outcomes**: Consider whether suggestions achieved the intended goal
 
-- Indent with 2 spaces
-- Use lowercase for keys
-- Quote strings when they contain special characters
-- Keep workflow files organized with clear job and step names
-- Add comments to explain non-obvious configurations
+## Feedback Integration
 
-### Documentation Standards
+When receiving feedback:
 
-- Use Markdown for all documentation
-- Follow consistent heading hierarchy
-- Include code blocks with proper syntax highlighting
-- Add links to relevant resources
-- Keep documentation up-to-date with code changes
-- Use relative links for internal documentation
+1. **Listen actively**: Pay attention to what the user is saying
+2. **Ask clarifying questions**: If feedback is unclear, seek clarification
+3. **Implement changes**: Make the requested adjustments promptly
+4. **Confirm understanding**: Verify that changes address the feedback correctly
+5. **Remember for future**: Internalize feedback to improve future interactions
 
-## GitHub Actions Patterns
+## Error Prevention
 
-### Workflow Structure
+Before making changes:
 
-```yaml
-name: Descriptive Workflow Name
+- ✅ Check file paths and existence
+- ✅ Verify dependencies and imports
+- ✅ Review related code for context
+- ✅ Consider impact on other parts of the system
+- ✅ Validate syntax and structure
+- ✅ Run linters/formatters when appropriate
 
-on:
-  pull_request:
-    branches: [main]
+## Self-Correction
 
-jobs:
-  job-name:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Descriptive step name
-        run: |
-          # Commands here
-```
+If you notice an error in your own response:
 
-### Best Practices
-
-- Use specific action versions (e.g., `@v4`, not `@latest`)
-- Cache dependencies when possible
-- Use matrix builds for multi-version testing
-- Set appropriate permissions for workflows
-- Use secrets for sensitive data
-- Add descriptive names to all jobs and steps
-- Group related steps with clear comments
-
-## Pre-commit Hooks
-
-All code must pass pre-commit hooks before committing:
-
-- `end-of-file-fixer`: Ensures files end with newline
-- `trailing-whitespace`: Removes trailing spaces
-- `mixed-line-ending`: Enforces consistent line endings
-- `check-merge-conflict`: Detects merge conflict markers
-- `check-ast`: Validates Python syntax
-- `black`: Python code formatting
-- `bandit`: Python security checks
-- `forbid-crlf` and `remove-crlf`: Enforce LF line endings
-- `forbid-tabs` and `remove-tabs`: Enforce spaces over tabs
-
-### Running Pre-commit
-
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run on all files
-pre-commit run --all-files
-
-# Run on staged files
-pre-commit run
-```
-
-### For AI Agents (CRITICAL)
-
-**AI agents and automated tools MUST install and run pre-commit hooks** to prevent CI failures:
-
-```bash
-# 1. Install hooks at session start
-pre-commit install
-
-# 2. Run pre-commit before committing
-pre-commit run --all-files
-
-# 3. Then use automated commit tools (e.g., report_progress)
-```
-
-**Why this matters:**
-- Automated commit tools bypass local git hooks
-- Without pre-commit, commits fail CI/CD checks
-- Causes PR failures requiring fix-up commits
-
-**See also:**
-- [AGENTS.md - AI Agent Guidelines](../AGENTS.md#ai-agent-guidelines) - Comprehensive AI agent workflow
-- [.github/PRE_COMMIT_SETUP.md](.github/PRE_COMMIT_SETUP.md) - Detailed pre-commit setup guide
-
-## Automation Patterns
-
-### Dependabot
-
-- Daily dependency updates for all ecosystems
-- Automatic grouping of patch updates
-- Auto-merge enabled for minor/patch updates
-- Major version updates require manual review
-
-### Branch Protection
-
-- All changes must go through pull requests
-- PRs must be up-to-date with `main` before merging
-- Required status checks: `pre-commit`, `sync`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. **Correct it immediately** - Don't wait for the user to point it out
+2. **Explain the correction** - Help the user understand what was wrong
+3. **Prevent recurrence** - Learn from the mistake to avoid it in the future
 
 ---
 > Source: [hutchic/.cursor](https://github.com/hutchic/.cursor) — distributed by [TomeVault](https://tomevault.io).
