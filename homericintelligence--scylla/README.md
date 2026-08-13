@@ -7,11 +7,11 @@ ProjectScylla is a testing and optimization framework inspired by Odysseus’ tr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [HomericIntelligence/Scylla](https://github.com/HomericIntelligence/Scylla).
+Original source: `CLAUDE.md` in [HomericIntelligence/Scylla](https://github.com/HomericIntelligence/Scylla).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
