@@ -7,14 +7,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [wellwelwel/lagune](https://github.com/wellwelwel/lagune).
+Original source: `GEMINI.md` in [wellwelwel/lagune](https://github.com/wellwelwel/lagune).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 Graded against the Tome Standard, TomeVault's public ruleset for whether AI instructions load, read clearly and stay safe. Source: [github.com/wellwelwel/lagune](https://github.com/wellwelwel/lagune)
