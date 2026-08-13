@@ -7,11 +7,11 @@ Governance architecture for LLM memory. A markdown wiki with an executable const
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [cumberland-laboratories/memex](https://github.com/cumberland-laboratories/memex).
+Original source: `CLAUDE.md` in [cumberland-laboratories/memex](https://github.com/cumberland-laboratories/memex).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
