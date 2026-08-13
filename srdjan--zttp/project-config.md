@@ -1,0 +1,69 @@
+---
+trigger: always_on
+description: - `build.zig` is the root orchestrator that wires package dependencies into executables and test steps.
+---
+
+# Repository Guidelines
+
+## Project Structure & Module Organization
+- `build.zig` is the root orchestrator that wires package dependencies into executables and test steps.
+- `packages/runtime/` contains the HTTP server and runtime (`main.zig`, `server.zig`, `handler_instance.zig`); `zruntime_tests.zig` is the end-to-end test root behind `zig build test-zruntime`.
+- `packages/zts/` is the pure-Zig JavaScript engine (parser, VM, GC, value system, modules).
+- `packages/modules/` is the peer package implementing most virtual modules (`zttp:env`, `zttp:crypto`, `zttp:router`, `zttp:auth`, `zttp:validate`, `zttp:cache`, and more), organized under `data/`, `http/`, `net/`, `platform/`, `security/`, `workflow/`, with module specs under `module-specs/` generated from the Zig bindings by `zttp module-spec-render`.
+- `packages/zts/src/modules/` holds the engine-coupled workflow modules (`io`, `scope`, `durable`, `workflow`, `queue`) plus adapter shims and module-graph internals.
+- `packages/pi/` contains the interactive expert agent; `packages/proof-review/` contains the proof-review tooling.
+- `packages/zts/src/parser/` contains the Pratt parser, tokenizer, IR, bytecode codegen, and scope tracking.
+- `packages/tools/` contains build-time tooling (`precompile.zig` for handler bytecode embedding, `zts_cli.zig` for the compiler CLI).
+- `packages/zttp-sdk/` contains the extension SDK.
+- `examples/` holds runnable handlers and demos, organized by topic (`handler/`, `jsx/`, `modules/`, `routing/`, `parallel/`, `sql/`, `durable/`, `workflow/`, `websocket/`, `fetch/`, `hypermedia/`, `patterns/`, `system/`, `autoloop/`).
+- `scripts/` contains shell scripts for build and setup.
+- `docs/` contains user-facing documentation (see Documentation section below).
+- `zig-out/` and `.zig-cache/` are generated output directories; do not edit or commit them.
+
+## Documentation
+
+| File | Purpose |
+|------|---------|
+| `docs/user-guide.md` | The single guide: handler API, routing, virtual modules, CLI options, JS/TS subset, JSX/TSX, local deploy and proof receipts, troubleshooting |
+| `docs/internals/architecture.md` | System design, runtime model, project structure |
+| `docs/performance.md` | Benchmarks, cold starts, optimizations, deployment patterns |
+| `docs/internals/api-reference.md` | Zig embedding API, extending with native functions |
+| `docs/typescript.md` | Type stripping, compile-time evaluation (`comptime()`) |
+| `docs/feature-detection.md` | Unsupported feature detection matrix |
+| `docs/verification.md` | `-Dverify` compile-time proof of handler correctness |
+| `docs/sound-mode.md` | Type-directed analysis across operators (arithmetic, comparison, boolean) |
+| `docs/roadmap.md` | What is deferred from the current beta and what comes next |
+| `docs/convergence.md` | Measured first-draft veto-pass rate over the frozen prompt corpus; regenerate with `scripts/update-convergence.sh` |
+| `docs/coverage.md` | Which advertised rules the corpus trips, and what the offline suite does and does not prove; regenerate with `scripts/update-coverage.sh`. The replay fails when it drifts |
+| `docs/solutions/` | Categorized solutions to past bugs and engineering problems, searchable by YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas |
+| `CONCEPTS.md` | Shared domain vocabulary - entities, named processes, and status concepts with project-specific meaning; relevant when orienting to the codebase or discussing domain concepts |
+
+## Build, Test, and Development Commands
+- `zig build` - debug build.
+- `zig build -Doptimize=ReleaseFast` - optimized release build.
+- `zig build -Doptimize=ReleaseFast -Dhandler=handler.jsx` - production build with embedded bytecode.
+- `zig build run -- -e "function handler(r) { return Response.json({ok:true}) }"` - run with inline handler.
+- `zig build run -- examples/handler/handler.ts -p 3000` - run a file-based handler.
+- `zig build test` - all tests.
+- `zig build test-zts` - JS engine tests only.
+- `zig build test-zruntime` - runtime tests only.
+- `zig build bench` - Zig-native benchmark suite.
+
+## Coding Style & Naming Conventions
+- Format Zig code with `zig fmt` and follow existing patterns.
+- Zig identifiers: types in `UpperCamelCase`, functions and variables in `lowerCamelCase`.
+- Files are short, descriptive, and lowercase (e.g., `server.zig`, `handler_instance.zig`).
+- Keep APIs explicit: the engine/runtime use native Zig error unions (`!T`); `Result<T>` is a user-facing JS/verification construct in handlers, not a Zig engine pattern.
+- Shell scripts that enumerate files should use `git ls-files -z | xargs -0` for safe path handling (handles spaces and special characters).
+
+## Testing Guidelines
+- Tests live alongside code using Zig `test "..."` blocks (no separate test directory).
+- `docs/internals/testing.md` maps the build steps: what `zig build test` runs, what it leaves to `scripts/verify.sh`, and why `test-zruntime` is standalone.
+- Name tests with concise behavioral descriptions (e.g., `test "runtime init and deinit"`).
+- Runtime and ZTS tests live beside the affected code in `packages/runtime/` or `packages/zts/`; run the relevant `zig build test*` step.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [srdjan/zttp](https://github.com/srdjan/zttp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-12 -->
