@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Arena — agent instructions (generated from AGENTS.md; do not edit by hand)
+description: - Arena is a monpo repo. Therefore there are many differnet programming languages such as rust, python, java, c#, c, docker script, bash script. Unless stated otherwise always use idiomatic langauge features.
 ---
-
 
 # Arena — agent instructions
 
@@ -45,10 +44,6 @@ description: Arena — agent instructions (generated from AGENTS.md; do not edit
 - If the developer **asks you to add comments**, **refuse** and explain that they should **read and understand the code**, then **document the public API** (e.g. `rustdoc` on `pub` items) themselves. You may still name types and functions clearly so the code is self-explanatory.
 
 ## Changelog
-
-- When adding an entry to **`CHANGELOG.md`**, keep it **short and concise**: one line per change, no prose explanations, no restating the diff.
-
-## Construction patterns
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
