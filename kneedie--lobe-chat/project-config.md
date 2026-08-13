@@ -1,45 +1,228 @@
 ---
 trigger: always_on
-description: You are an expert in full-stack Web development, proficient in JavaScript, TypeScript, CSS, React, Node.js, Next.js, Postgresql, all kinds of network protocols.
+description: 本文档详细说明了 LobeChat 项目中 Zustand Action 的组织方式、命名规范和实现模式，特别关注乐观更新与后端服务的集成。
 ---
 
-## System Role
+# LobeChat Zustand Action 组织模式
 
-You are an expert in full-stack Web development, proficient in JavaScript, TypeScript, CSS, React, Node.js, Next.js, Postgresql, all kinds of network protocols.
+本文档详细说明了 LobeChat 项目中 Zustand Action 的组织方式、命名规范和实现模式，特别关注乐观更新与后端服务的集成。
 
-You are an expert in LLM and Ai art. In Ai image generation, you are proficient in Stable Diffusion and ComfyUI's architectural principles, workflows, model structures, parameter configurations, training methods, and inference optimization.
+## Action 类型分层
 
-You are an expert in UI/UX design, proficient in web interaction patterns, responsive design, accessibility, and user behavior optimization. You excel at improving user retention and paid conversion rates through various interaction details.
+LobeChat 的 Action 采用分层架构，明确区分不同职责：
 
+### 1. Public Actions
+对外暴露的主要接口，供 UI 组件调用：
+- 命名：动词形式（`createTopic`, `sendMessage`, `updateTopicTitle`）
+- 职责：参数验证、流程编排、调用 internal actions
+- 示例：[src/store/chat/slices/topic/action.ts](mdc:src/store/chat/slices/topic/action.ts)
 
-## Problem Solving
+```typescript
+// Public Action 示例
+createTopic: async () => {
+  const { activeId, internal_createTopic } = get();
+  const messages = chatSelectors.activeBaseChats(get());
+  
+  if (messages.length === 0) return;
+  
+  const topicId = await internal_createTopic({
+    sessionId: activeId,
+    title: t('defaultTitle', { ns: 'topic' }),
+    messages: messages.map((m) => m.id),
+  });
+  
+  return topicId;
+},
+```
 
-- When modifying existing code, clearly describe the differences and reasons for the changes
-- Provide alternative solutions that may be better overall or superior in specific aspects
-- Always consider using the latest technologies, standards, and APIs to strive for code optimization, not just the conventional wisdom
-- Provide optimization suggestions for deprecated API usage
-- Cite sources whenever possible at the end, not inline
-- When you provide multiple solutions, provide the recommended solution first, and note it as `Recommended`
-- Express uncertainty when there might not be a correct answer
-- Admit when you don't know something instead of guessing
+### 2. Internal Actions (`internal_*`)
+内部实现细节，处理核心业务逻辑：
+- 命名：`internal_` 前缀 + 动词（`internal_createTopic`, `internal_updateMessageContent`）
+- 职责：乐观更新、服务调用、错误处理、状态同步
+- 不应该被 UI 组件直接调用
 
-## Code Implementation
+```typescript
+// Internal Action 示例 - 乐观更新模式
+internal_createTopic: async (params) => {
+  const tmpId = Date.now().toString();
+  
+  // 1. 立即更新前端状态（乐观更新）
+  get().internal_dispatchTopic(
+    { type: 'addTopic', value: { ...params, id: tmpId } },
+    'internal_createTopic',
+  );
+  get().internal_updateTopicLoading(tmpId, true);
+  
+  // 2. 调用后端服务
+  const topicId = await topicService.createTopic(params);
+  get().internal_updateTopicLoading(tmpId, false);
+  
+  // 3. 刷新数据确保一致性
+  get().internal_updateTopicLoading(topicId, true);
+  await get().refreshTopic();
+  get().internal_updateTopicLoading(topicId, false);
+  
+  return topicId;
+},
+```
 
-- Write minimal code changes that are ONLY directly related to the requirements
-- Write correct, up-to-date, bug-free, fully functional, secure, maintainable and efficient code
-- First, think step-by-step: describe your plan in detailed pseudocode before implementation
-- Confirm the plan before writing code
-- Focus on maintainable over being performant
-- Leave NO TODOs, placeholders, or missing pieces
-- Be sure to reference file names
-- Please respect my prettier preferences when you provide code
-- When you notice I have manually modified the code, that was definitely on purpose and do not revert them
-- Don't remove meaningful code comments, be sure to keep original comments when providing applied code
-- Update the code comments when needed after you modify the related code
-- If documentation links or required files are missing, ask for them before proceeding with the task rather than making assumptions
-- If you're unable to access or retrieve content from websites, please inform me immediately and request the specific information needed rather than making assumptions
-- Sometimes ESLint errors may not be reasonable, and making changes could introduce logical bugs. If you find an ESLint rule unreasonable, disable it directly. For example, with the 'prefer-dom-node-text-content' rule, there are actual differences between innerText and textContent
-- You can use emojis, npm packages like `chalk`/`chalk-animation`/`terminal-link`/`gradient-string`/`log-symbols`/`boxen`/`consola`/`@clack/prompts` to create beautiful terminal output
+### 3. Dispatch Methods (`internal_dispatch*`)
+专门处理状态更新的方法：
+- 命名：`internal_dispatch` + 实体名（`internal_dispatchTopic`, `internal_dispatchMessage`）
+- 职责：调用 reducer、更新 Zustand store、处理状态对比
+
+```typescript
+// Dispatch Method 示例
+internal_dispatchTopic: (payload, action) => {
+  const nextTopics = topicReducer(topicSelectors.currentTopics(get()), payload);
+  const nextMap = { ...get().topicMaps, [get().activeId]: nextTopics };
+
+  if (isEqual(nextMap, get().topicMaps)) return;
+  
+  set({ topicMaps: nextMap }, false, action ?? n(`dispatchTopic/${payload.type}`));
+},
+```
+
+## 何时使用 Reducer 模式 vs. 简单 `set`
+
+### 使用 Reducer 模式的场景
+
+**适用于复杂的数据结构管理**，特别是：
+- 管理对象列表或映射（如 `messagesMap`, `topicMaps`）
+- 需要乐观更新的场景
+- 状态转换逻辑复杂
+- 需要类型安全的 action payload
+
+```typescript
+// Reducer 模式示例 - 复杂消息状态管理
+export const messagesReducer = (state: ChatMessage[], payload: MessageDispatch): ChatMessage[] => {
+  switch (payload.type) {
+    case 'updateMessage': {
+      return produce(state, (draftState) => {
+        const index = draftState.findIndex((i) => i.id === payload.id);
+        if (index < 0) return;
+        draftState[index] = merge(draftState[index], { 
+          ...payload.value, 
+          updatedAt: Date.now() 
+        });
+      });
+    }
+    case 'createMessage': {
+      return produce(state, (draftState) => {
+        draftState.push({ 
+          ...payload.value, 
+          id: payload.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          meta: {}
+        });
+      });
+    }
+    // ...其他复杂状态转换
+  }
+};
+```
+
+### 使用简单 `set` 的场景
+
+**适用于简单状态更新**：
+- 切换布尔值
+- 更新简单字符串/数字
+- 设置单一状态字段
+
+```typescript
+// 简单 set 示例
+updateInputMessage: (message) => {
+  if (isEqual(message, get().inputMessage)) return;
+  set({ inputMessage: message }, false, n('updateInputMessage'));
+},
+
+togglePortal: (open?: boolean) => {
+  set({ showPortal: open ?? !get().showPortal }, false, 'togglePortal');
+},
+```
+
+## 乐观更新实现模式
+
+乐观更新是 LobeChat 中的核心模式，用于提供流畅的用户体验：
+
+### 标准乐观更新流程
+
+```typescript
+// 完整的乐观更新示例
+internal_updateMessageContent: async (id, content, extra) => {
+  const { internal_dispatchMessage, refreshMessages } = get();
+
+  // 1. 立即更新前端状态（乐观更新）
+  internal_dispatchMessage({
+    id,
+    type: 'updateMessage',
+    value: { content },
+  });
+
+  // 2. 调用后端服务
+  await messageService.updateMessage(id, {
+    content,
+    tools: extra?.toolCalls ? internal_transformToolCalls(extra.toolCalls) : undefined,
+    // ...其他字段
+  });
+
+  // 3. 刷新确保数据一致性
+  await refreshMessages();
+},
+```
+
+### 创建操作的乐观更新
+
+```typescript
+internal_createMessage: async (message, context) => {
+  const { internal_createTmpMessage, refreshMessages, internal_toggleMessageLoading } = get();
+  
+  let tempId = context?.tempMessageId;
+  if (!tempId) {
+    // 创建临时消息用于乐观更新
+    tempId = internal_createTmpMessage(message);
+    internal_toggleMessageLoading(true, tempId);
+  }
+
+  try {
+    const id = await messageService.createMessage(message);
+    if (!context?.skipRefresh) {
+      await refreshMessages();
+    }
+    internal_toggleMessageLoading(false, tempId);
+    return id;
+  } catch (e) {
+    internal_toggleMessageLoading(false, tempId);
+    // 错误处理：更新消息错误状态
+    internal_dispatchMessage({
+      id: tempId,
+      type: 'updateMessage',
+      value: { error: { type: ChatErrorType.CreateMessageError, message: e.message } },
+    });
+  }
+},
+```
+
+## 加载状态管理模式
+
+LobeChat 使用统一的加载状态管理模式：
+
+### 数组式加载状态
+
+```typescript
+// 在 initialState.ts 中定义
+export interface ChatMessageState {
+  messageLoadingIds: string[];      // 消息加载状态
+  messageEditingIds: string[];      // 消息编辑状态
+  chatLoadingIds: string[];         // 对话生成状态
+}
+
+// 在 action 中管理
+internal_toggleMessageLoading: (loading, id) => {
+  set({
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [KneeDie/lobe-chat](https://github.com/KneeDie/lobe-chat) — distributed by [TomeVault](https://tomevault.io).
