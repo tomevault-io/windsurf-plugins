@@ -1,0 +1,107 @@
+---
+trigger: always_on
+description: ParselFire Core gives AI coding agents a small routed set of architectural guardrails
+---
+
+# ParselFire Core Portable Routing Contract
+
+ParselFire Core gives AI coding agents a small routed set of architectural guardrails
+instead of one large always-on rules dump.
+
+## Default Workflow
+
+First match scope to the task, then pick the path:
+
+- Focused change (the operator asked for a specific function, fix, or feature):
+  stay inside that scope. Make only the change requested, apply the stage
+  guidance to what you touch, and prove it with a check. Do not scan the whole
+  file or build a file-wide ledger; turning a scoped coding task into a
+  file-wide refactor breaks the task boundary and gets rejected.
+- Open-ended refactor, cleanup, or review of existing code: run the two-pass
+  audit below, scoped to what the task covers.
+
+Two-pass audit (refactor / review / cleanup). Never fix while you are still
+searching; the first strong improvement you find is not the finish line.
+
+Pass 1, Audit (read-only). Read the target across the task's scope. Walk stages
+S00 upward and emit a findings ledger that covers every in-scope stage,
+including stages with nothing to change. Do not edit anything in this pass. Use
+one row per finding:
+
+`path | stage | status | id | kernel | anchor | check`
+
+Columns: `path` the file touched; `stage` the S00-S06 stage; `status` `todo`,
+`done`, or `skip`; `id` the kernel id; `kernel` what it requires in one phrase;
+`anchor` the concrete code location the finding rests on; `check` the test or
+lint that proves it.
+
+- `status` is one of `todo`, `done`, `skip`, and every `skip` carries a reason.
+- Record every fix you name while auditing as its own row with all fields
+  filled, and resolve it as `done` or `skip:<reason>`; never leave a fix you
+  mentioned in reasoning off the ledger.
+- `skip:clean` means Pass 1 found nothing on that stage; every in-scope stage
+  still gets a row, never an omitted one.
+- A finding you deliberately will not act on is `skip:<reason>` whose reason
+  names the blocking kernel (for example, keeping a genuine special case instead
+  of flattening it), never `skip:clean`.
+- A row recorded as `todo` resolves only to `done` (with its check) or
+  `skip:<reason>`; never downgrade a `todo` to `skip:clean`.
+
+Pass 2, Apply. Drain the ledger one row at a time: make the single edit, run the
+narrowest check that proves it (a test or a lint), then mark the row `done` with
+how it was checked. Do not batch unrelated findings into one sweep.
+
+The task is complete only when every ledger row is `done` or `skip` and the
+checks are green, not when the first improvement lands.
+
+Minimalism still governs what you ADD (no speculative abstractions, no
+unrequested files, prefer the simplest correct change), but it never licenses
+dropping a stage, a trust-boundary validation, data-loss prevention, security,
+or accessibility. Non-trivial logic leaves one minimal runnable check behind.
+
+## Stage Pipeline
+
+Walk stages from S00 upward when reasoning about code changes. Earlier stages
+override later ones on conflict. At each stage, inspect matching EXCLUDES first
+as a rejection filter, then matching KERNELS as positive guidance. Use the
+universal stage `refs=` and the loaded language-family `## STAGE-REFS` to know
+which K ids belong to the current stage. Each K id has a mirrored X id with
+the same numeric suffix in the same leaf, so the same refs also locate the
+EXCLUDES to consult first. Each `## LEAVES` record declares the `stages=` it
+carries; to cover the current stage, load every leaf whose `stages=` includes
+it. Stage-to-leaf resolution is a direct index lookup, never a filesystem
+search.
+
+- S00 scope: stay within requested scope and keep blast radius low
+- S01 invariants: prove exact invariants, preserve true special cases, obey contracts
+- S02 state modeling: make meaningful states explicit, keep distinct outcomes distinct
+- S03 lifecycle: centralize mutable state, clarify ownership, rebuild atomically
+- S04 shared abstractions: extract shared invariants only after semantics are clear
+- S05 boundaries: make subsystem boundaries explicit, thread semantics end to end
+- S06 convergence: converge broadly, remove displaced layers
+
+When a task touches code:
+
+1. Load `packs/universal/pack.urf.md`.
+2. Detect the active source family from the file being changed:
+   - Python: also load `packs/python-architecture/pack.urf.md`
+   - C++: also load `packs/cpp-architecture/pack.urf.md`
+   - Plain C: stay on universal only
+   - Ambiguous `.h`: use the C++ family only when the file contains C++
+     constructs
+   - Any other language: stay on the universal index only
+3. Treat each loaded `pack.urf.md` as a routing index, not as the dense
+   guidance body.
+4. Human-oriented `packs/**/README.md` guides are not part of the runtime
+   guidance surface. Load only pack indexes and the leaf files resolved from
+   those indexes.
+5. From each loaded `## ROUTING`, match `signals=` against the active code
+   context to select your primary leaf per family. If several routes match,
+   pick the route matching the change's dominant mechanic and let the stage
+   walk pull in any remaining leaves; if no route matches, skip signal routing
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [MicSm/boffin](https://github.com/MicSm/boffin) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-13 -->
