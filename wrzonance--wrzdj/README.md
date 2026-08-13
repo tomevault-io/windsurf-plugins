@@ -7,11 +7,11 @@ A song requester app with web dashboard, guest-facing kiosk, and automatic track
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [wrzonance/WrzDJ](https://github.com/wrzonance/WrzDJ).
+Original source: `CLAUDE.md` in [wrzonance/WrzDJ](https://github.com/wrzonance/WrzDJ).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
