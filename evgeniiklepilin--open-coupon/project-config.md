@@ -130,5 +130,5 @@ description: **Description:** An open-source, full-stack browser extension frame
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/EvgeniiKlepilin) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [EvgeniiKlepilin/open-coupon](https://github.com/EvgeniiKlepilin/open-coupon) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-12 -->
