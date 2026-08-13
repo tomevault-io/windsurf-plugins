@@ -1,0 +1,108 @@
+---
+trigger: always_on
+description: Guidelines for coding agents when working on the Duets repository.
+---
+
+# AGENTS.md
+
+Guidelines for coding agents when working on the Duets repository.
+
+> **Note:** `CLAUDE.md` is a symlink to this file (`AGENTS.md`). Edits via
+> either path modify `AGENTS.md` on disk. When staging changes, always use
+> `git add AGENTS.md` explicitly — `git add CLAUDE.md` will not work because
+> Git tracks the symlink target, not the symlink itself.
+
+> **IMPORTANT — Language policy (read before responding):**
+> - **Assistant prose outside repository content** (chat responses, reviews,
+    > explanations, summaries, plans, status updates, scratch notes, handoff notes,
+    > and design discussion notes): write in **the same language the user used**.
+    > Never default to English.
+> - **Repository content** (source code, comments, commits, docs, ADRs):
+    > always write in **English only**.
+
+## Build & Run
+
+```bash
+# Build the entire solution
+dotnet build
+
+# Run the sample application
+dotnet run --project src/Duets.Sandbox
+
+# Run tests
+dotnet test
+```
+
+The solution targets **.NET 10**. The SDK version may be pinned via `mise.toml`.
+
+## Project Structure
+
+- `Duets.slnx` — Solution file (XML-based slnx format)
+- `Directory.Build.props` — Shared build properties (TFM, nullable, etc.) applied to all projects
+- `src/`
+  - `Duets/` — Core library (public API): session, declarations, transpiler interface
+    - `Resources/language-service.js` — Embedded TypeScript language service script loaded server-side by `TypeScriptService` for completions
+  - `Duets.Pad/` — DuetsPad browser debug pad package; depends on `Duets` and `HttpHarker` (see `src/Duets.Pad/README.md`)
+    - `Resources/StaticFiles/` — Embedded web assets compiled as `EmbeddedResource` and served by `DuetsPadService` at runtime
+  - `Duets.Jint/` — [Jint](https://github.com/sebastienros/jint) backend package: `JintScriptEngine`,
+    `BabelTranspiler`, `TypeScriptService`, `ExtensionMethodRegistry`, `DuetsSessionConfigurationExtensions`
+  - `HttpHarker/` — Standalone lightweight HTTP server library (may be extracted to its own repo)
+  - `Duets.Sandbox/` — Multi-mode debugging CLI (batch, repl, serve, complete); not part of the public API
+  - `shared/` — `internal` utility code shared across all projects via `<Compile Include>` (not a separate assembly);
+    place cross-project internal helpers here
+- `samples/` — Runnable file-based app examples, grouped per package (run with `dotnet run samples/<package>/<file>.cs`)
+- `docs/`
+  - `architecture.md` — Architecture overview (current snapshot)
+  - `decisions/` — Architecture Decision Records (ADRs)
+- `tests/`
+  - `Duets.Tests/` — Unit tests (xUnit v3)
+  - `Duets.Pad.Tests/` — Unit tests for `Duets.Pad`
+  - `HttpHarker.Tests/` — Unit tests for `HttpHarker`
+  - `shared/` — test-support sources shared across test projects via `<Compile Include>`
+
+## Architecture & Design
+
+- [docs/architecture.md](docs/architecture.md) — Current architecture snapshot. Read this before making structural
+  changes or answering any design or feasibility question.
+- [docs/decisions/index.md](docs/decisions/index.md) — ADR index: Title, Keywords, and Abstract for all ADRs. Read this
+  to identify relevant decisions before reading full ADRs.
+- [docs/decisions/](docs/decisions/) — Architecture Decision Records (ADRs). ADR-N is at `docs/decisions/<N>_*.md`.
+
+When a session involves a design decision (new component, technology choice, API design trade-off, etc.), draft an ADR
+in `docs/decisions/` at the end of the session. If the decision affects the overall architecture, update
+`docs/architecture.md` to reflect the new state.
+
+## Committing
+
+Use the `/commit` skill to commit changes. It handles commit granularity, code style, pre-commit checks, and message
+authoring.
+
+## Language
+
+There are two distinct contexts with different language rules:
+
+**Repository content** — source code, comments, commit messages, documentation, ADRs, and any other checked-in text
+files — **must be in English**.
+
+**Assistant prose outside repository content** — chat responses, reviews, explanations, summaries, plans, status
+updates, scratch notes, handoff notes, design discussion notes, and other non-committed working prose — **must be in the
+same language the user used**. Do not default to English. These are conversational or working outputs, not repository
+content, and the distinction must be respected even when the subject matter is code.
+
+## Code Style
+
+Use `scripts/format.cs` as the repository formatting entry point. It is okay to run this script manually, even though
+Agent Stop hooks also run it automatically. Generated code must still follow the code style and rules defined in
+`.editorconfig`.
+
+Format/lint suggestions must be resolved, not merely observed. `scripts/format.cs` auto-applies only safe fixes; tools
+such as biome additionally *report* unsafe fixes (e.g. `useOptionalChain`) without applying them — deliberately, because
+they may change behavior and require judgment. The script is not changed to blanket-apply unsafe fixes; exercising that
+judgment is the agent's job. Every reported suggestion must be triaged to a decision before a session ends: review each
+one and either apply it (when it is behavior-preserving and correct) or reject it deliberately (suppress via config or an
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [takeshik/Duets](https://github.com/takeshik/Duets) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-12 -->
