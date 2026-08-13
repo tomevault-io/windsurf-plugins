@@ -1,204 +1,205 @@
 ---
 trigger: always_on
-description: Private AI automation platform for ArcticGrey that monitors client health through call analysis and triggers automated workflows. **MVP = Authentication + Dashboard UI with mock data.**
+description: - Use folder-based routing: `routes/dashboard/route.tsx` instead of `routes/dashboard.tsx`
 ---
-
-
-# ArcticGrey Dashboard - Project Roadmap & Development Rules
-
-## 🎯 MVP Scope (14-Hour Sprint)
-
-### **What We're Building**
-Private AI automation platform for ArcticGrey that monitors client health through call analysis and triggers automated workflows. **MVP = Authentication + Dashboard UI with mock data.**
-
-### **MVP Features (Must Have)**
-- ✅ Google OAuth authentication (Clerk)
-- ✅ Dark theme dashboard matching reference design
-- ✅ Client health metrics with mock data
-- ✅ Professional sidebar navigation
-- ✅ Responsive design
-- ✅ Type-safe architecture
-
-### **NOT in MVP (Future)**
-- ❌ Real Fireflies integration
-- ❌ Claude AI analysis
-- ❌ n8n automation
-- ❌ Database operations
-- ❌ Complex business logic
-
-## 🛠️ Technology Stack
-
-```
-Frontend: Remix v2 + TypeScript + Vite
-Database: SQLite + Prisma (prepared, not used in MVP)
-Auth: Clerk (Google OAuth only)
-UI: shadcn/ui + shadcn/charts + Tailwind CSS
-Charts: Recharts (via shadcn/charts)
-Icons: Lucide React
-Deployment: Vercel
-```
-
-## 📋 14-Hour Development Plan
-
-### **Hours 1-3: Foundation Setup**
-```
-✅ Create Remix v2 project
-✅ Install dependencies (Clerk, shadcn, Prisma)
-✅ Configure Clerk authentication
-✅ Setup basic routing structure
-✅ Configure dark theme
-```
-
-### **Hours 4-8: Dashboard UI**
-```
-✅ Build sidebar with navigation
-✅ Create metrics cards with mock data
-✅ Implement chart component
-✅ Add responsive design
-✅ Polish visual design
-```
-
-### **Hours 9-12: Integration & Polish**
-```
-✅ Connect authentication flow
-✅ Add loading states
-✅ Implement error boundaries
-✅ Test responsive design
-✅ Add smooth animations
-```
-
-### **Hours 13-14: Deploy & Test**
-```
-✅ Deploy to Vercel
-✅ Test production authentication
-✅ Fix any deployment issues
-✅ Document and demo
-```
 
 ## 🏗️ Clean Architecture Rules
 
-### **File Structure**
+### **File Organization Rules**
+
+#### **Routes Structure**
+- Use folder-based routing: `routes/dashboard/route.tsx` instead of `routes/dashboard.tsx`
+- Each route folder contains only `route.tsx`
+- Keep routes thin - only data loading and basic logic
+- Move all business logic to services
+
+#### **Components Structure**
+- `components/ui/` → Only shadcn/ui components (no custom logic)
+- NO custom dashboard components in components folder
+- Build dashboard UI directly in route files using shadcn/ui components
+- Compose complex UIs using multiple shadcn components
+
+#### **Lib Structure - Layered Architecture**
 ```
-app/
-├── routes/
-│   ├── dashboard/route.tsx        # Main dashboard
-│   ├── login/route.tsx           # Login page
-│   └── _index.tsx                # Root redirect
-├── components/ui/                # Only shadcn/ui components
-├── lib/
-│   ├── constants/                # Mock data, routes, config
-│   ├── types/                    # TypeScript interfaces
-│   ├── helpers/                  # Pure utility functions
-│   └── utils.ts                  # shadcn utilities
-└── styles/globals.css            # Tailwind + theme
+lib/
+├── services/       # Business logic (pure functions)
+├── repositories/   # Data access (Prisma queries)
+├── hooks/          # React hooks (state + effects)
+├── helpers/        # Pure utility functions
+├── constants/      # Static data and config
+├── types/          # TypeScript interfaces
+└── utils.ts        # shadcn utilities only
 ```
 
 ### **Layer Responsibilities**
-- **Routes**: UI composition using shadcn/ui + mock data
-- **Constants**: All mock data and configuration
-- **Types**: TypeScript interfaces for type safety
-- **Helpers**: Pure utility functions (formatting, validation)
-- **Components/UI**: Only shadcn/ui components
 
-### **MVP Simplifications**
-- No services layer (direct mock data usage)
-- No repositories layer (no database calls)
-- No hooks layer (basic React hooks only)
-- Focus on UI composition and design
+#### **Services Layer (`lib/services/`)**
+- Pure business logic functions
+- No React hooks or components
+- No direct database calls (use repositories)
+- Input validation and data transformation
+- Example: `dashboard.service.ts`, `auth.service.ts`
 
-## 🎨 Design System Rules
+#### **Repositories Layer (`lib/repositories/`)**
+- All Prisma database queries
+- CRUD operations only
+- No business logic
+- Return raw data or Prisma models
+- Example: `user.repository.ts`, `client.repository.ts`
 
-### **UI Component Priority**
-1. **First choice**: Use shadcn/ui components
-2. **Second choice**: Compose multiple shadcn components
-3. **Last resort**: Custom components (following shadcn patterns)
+#### **Hooks Layer (`lib/hooks/`)**
+- React hooks that combine services + state
+- Handle loading states and errors
+- Connect services to React components
+- Example: `use-dashboard.ts`, `use-clients.ts`
 
-### **Dark Theme Standards**
-- Use configured CSS variables for colors
-- Consistent spacing with Tailwind utilities
-- Professional SaaS design aesthetic
-- Smooth transitions and hover effects
+#### **Helpers Layer (`lib/helpers/`)**
+- Pure utility functions
+- No side effects
+- Reusable across app
+- Example: `date.helpers.ts`, `format.helpers.ts`
 
-### **Typography Hierarchy**
-```
-Headings: font-semibold text-foreground
-Body: text-foreground
-Secondary: text-muted-foreground
-Success: text-green-500
-Warning: text-yellow-500
-Danger: text-red-500
-```
+#### **Constants Layer (`lib/constants/`)**
+- Static configuration
+- Mock data for MVP
+- Route definitions
+- App configuration
+- Example: `routes.ts`, `config.ts`, `mock-data.ts`
 
-### **Color Coding System**
-```
-Health Scores:
-- 8.0-10.0: Green (#10B981)
-- 6.0-7.9: Yellow (#F59E0B)
-- 4.0-5.9: Orange (#F97316)
-- 0.0-3.9: Red (#EF4444)
+### **Code Style Rules**
 
-Risk Levels:
-- Low: Green badge
-- Medium: Yellow badge
-- High: Red badge
-```
+#### **Functional Programming**
+- Prefer pure functions over classes
+- Immutable data transformations
+- Function composition
+- No side effects in business logic
 
-## 📊 Dashboard Specifications
+#### **Import Rules**
+```typescript
+// Route files import order:
+1. React/Remix imports
+2. UI components (shadcn/ui)
+3. Hooks (from lib/hooks)
+4. Types (from lib/types)
+5. Constants (from lib/constants)
 
-### **Sidebar Navigation**
-```
-🏢 ArcticGrey
-├─────────────────────┤
-│ ➕ Quick Action     │
-├─────────────────────┤
-│ 📊 Client Health    │ ← Active (MVP)
-│ 🤖 AI Automations   │ ← Disabled
-│ 📈 Analytics        │ ← Disabled
-│ 📁 Workflows        │ ← Disabled
-│ 👥 Team             │ ← Disabled
-├─────────────────────┤
-│ Brain System        │
-│ 🧠 Context Engine   │ ← Disabled
-│ 🔄 n8n Flows        │ ← Disabled
-│ 📚 Knowledge Base   │ ← Disabled
-├─────────────────────┤
-│ ⚙️ Settings         │
-│ 🔍 Search           │
-│ 👤 Profile          │
-└─────────────────────┘
+// Service files import order:
+1. External libraries
+2. Types
+3. Helpers
+4. Repositories
 ```
 
-### **Metrics Cards (2x2 Grid)**
+#### **Naming Conventions**
+- Services: `[domain].service.ts` 
+- Repositories: `[domain].repository.ts`
+- Hooks: `use-[feature].ts`
+- Helpers: `[category].helpers.ts`
+- Types: `[domain].types.ts`
+- Constants: `[category].ts`
+
+### **Data Flow Rules**
+
+#### **Route → Hook → Service → Repository → Database**
 ```
-┌─────────────────┬─────────────────┐
-│ Total Clients   │ Happy Clients   │
-│ 14              │ 8 (57%)         │
-│ +2 this month   │ ↑ Improving     │
-├─────────────────┼─────────────────┤
-│ At Risk Clients │ AI Actions      │
-│ 3               │ 12              │
-│ Need attention  │ This week       │
-└─────────────────┴─────────────────┘
+route.tsx
+  ├─ uses hook (useClients)
+  │   ├─ calls service (clientService.getAll)
+  │   │   ├─ calls repository (clientRepository.findAll)
+  │   │   │   └─ executes Prisma query
+  │   │   └─ transforms data
+  │   └─ manages React state
+  └─ renders UI with shadcn components
 ```
 
-### **Chart Component**
-- **Title**: "Client Health Trend"
-- **Subtitle**: "Average health score over time"
-- **Period Selector**: "Last 3 months"
-- **Chart Type**: Line chart with area fill
-- **Data**: Mock health score trends (6 months)
+#### **No Direct Database Calls**
+- Routes never call Prisma directly
+- Services never call Prisma directly
+- Only repositories call Prisma
+- Pass data up through layers
 
-## 🔧 Development Guidelines
+#### **State Management**
+- Use React hooks for local state
+- No global state management for MVP
+- Keep state close to where it's used
+- Use custom hooks to share stateful logic
 
-### **Code Style**
-- TypeScript strict mode
-- Functional programming approach
-- Pure functions for data transformations
-- Descriptive variable names
-- Consistent formatting with Prettier
+### **TypeScript Rules**
+
+#### **Strict Typing**
+- No `any` types
+- Define interfaces for all data shapes
+- Use Prisma generated types when possible
+- Export types from dedicated type files
+
+#### **Type Organization**
+- Domain-specific types in separate files
+- Share common types across domains
+- Use `as const` for constants
+- Prefer interfaces over types for objects
+
+### **Testing Rules**
+
+#### **Testable Architecture**
+- Pure functions are easily testable
+- Mock repositories in service tests
+- Mock services in hook tests
+- Keep side effects in outermost layers
 
 ### **Performance Rules**
-- Use Remix loaders for data
+
+#### **Efficient Data Loading**
+- Use Remix loaders for initial data
+- Implement optimistic updates
+- Cache expensive computations
+- Minimize database queries
+
+### **Error Handling Rules**
+
+#### **Layered Error Handling**
+- Repositories: Handle database errors
+- Services: Handle business logic errors
+- Hooks: Handle async errors and loading states
+- Routes: Handle user-facing errors
+
+### **MVP Simplification Rules**
+
+#### **Start Simple**
+- Use mock data in constants
+- Implement real services gradually
+- Keep repository methods basic
+- Add complexity incrementally
+
+#### **No Premature Optimization**
+- Don't over-engineer for MVP
+- Focus on clean separation of concerns
+- Build features as needed
+- Refactor when patterns emerge
+
+### **File Naming Examples**
+```
+routes/
+├── dashboard/route.tsx
+├── login/route.tsx
+└── auth.google.callback/route.tsx
+
+lib/
+├── services/
+│   ├── dashboard.service.ts
+│   └── auth.service.ts
+├── repositories/
+│   ├── user.repository.ts
+│   └── client.repository.ts
+├── hooks/
+│   ├── use-dashboard.ts
+│   └── use-auth.ts
+├── helpers/
+│   ├── date.helpers.ts
+│   └── format.helpers.ts
+├── constants/
+│   ├── routes.ts
+│   └── mock-data.ts
+└── types/
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
