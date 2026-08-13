@@ -7,11 +7,11 @@ Agentic game prototype generator - overnight generation of browser-playable incr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [J-Gierend/gamePocGen](https://github.com/J-Gierend/gamePocGen).
+Original source: `CLAUDE.md` in [J-Gierend/gamePocGen](https://github.com/J-Gierend/gamePocGen).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
