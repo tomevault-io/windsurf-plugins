@@ -7,12 +7,12 @@ Marketing Powerhouse (MP) ist unsere Basis für alle Marketingaktivitäten und b
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [Wamocon/momentum-marketing](https://github.com/Wamocon/momentum-marketing).
+Original source: `AGENTS.md` in [Wamocon/momentum-marketing](https://github.com/Wamocon/momentum-marketing).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
