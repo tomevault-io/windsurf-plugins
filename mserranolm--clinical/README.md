@@ -7,11 +7,11 @@ clinical
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mserranolm/clinical](https://github.com/mserranolm/clinical).
+Original source: `CLAUDE.md` in [mserranolm/clinical](https://github.com/mserranolm/clinical).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
