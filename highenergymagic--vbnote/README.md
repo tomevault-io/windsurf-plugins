@@ -7,11 +7,11 @@ Emulator of the VoiceNote QT / BrailleNote mPower notetaker: Windows CE 4.2 on P
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [highenergymagic/VBNote](https://github.com/highenergymagic/VBNote).
+Original source: `CLAUDE.md` in [highenergymagic/VBNote](https://github.com/highenergymagic/VBNote).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
