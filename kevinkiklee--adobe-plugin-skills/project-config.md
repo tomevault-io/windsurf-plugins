@@ -1,93 +1,47 @@
 ---
 trigger: always_on
-description: Use when building, modifying, or debugging Adobe Photoshop UXP plugins or Lightroom Classic plugins — panel UI, pixel access, develop-module observation, memory management in long-lived LrC processes, hybrid native bridges, UXP HTML/CSS/Canvas limits, and Spectrum widgets
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Adobe Plugin Development
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Reference for writing Photoshop UXP plugins (JavaScript/HTML) and Lightroom Classic plugins (Lua). Covers what the SDKs allow, what they don't, and the non-obvious pitfalls that burn hours.
+## What This Is
 
-Baseline: UXP 9.2.0 / Manifest v5 / Photoshop 27.4. LrC 15.3 SDK / Lua 5.1.5.
+An AI agent skill (following the [agentskills.io](https://agentskills.io) specification) that provides SDK knowledge for building Adobe Photoshop UXP plugins and Lightroom Classic plugins. There is no build system, no source code, and no tests — the deliverable is the markdown files themselves.
 
-## When to Use
+## Repository Structure
 
-Use when:
-- Writing or editing a UXP panel/command plugin (`manifest.json`, `entrypoints.setup`, Spectrum `sp-*` widgets)
-- Writing or editing a Lightroom Classic plugin (`Info.lua`, `LrView`, `LrDevelopController`)
-- Reading pixel data from Photoshop (`imaging.getPixels`)
-- Wiring develop-slider observation in LrC
-- Displaying generated images inside a UXP panel (no HTML canvas pixel ops!)
-- Bridging LrC to a native binary for pixel processing
-- Debugging memory leaks in long-lived LrC floating dialogs
-- Using batchPlay for Photoshop action descriptors
-- Manipulating Document/Layer DOM (create, modify, filter, composite)
-- Recording or replaying Photoshop actions programmatically
+- **`SKILL.md`** — Skill entry point with YAML frontmatter (500 lines — keep at or under the agentskills.io 500-line recommendation). The "90% file" that loads on every activation. Contains capability matrix, critical pitfalls, quick-reference code snippets (incl. file I/O + persistence), Info.lua essentials, data binding patterns, and common mistakes table. The develop-parameter/LrDevelopController catalogs and the full Info.lua table live ONLY in `lrc-sdk.md` — don't re-duplicate them here.
+- **`ps-uxp-sdk.md`** — Deep Photoshop UXP reference (~1390 lines), organized by use-case. Covers Document/Layer DOM model, batchPlay, Imaging API + ImageBlob, File I/O & storage (pickers, tokens, secureStorage), XMP, Spectrum components, CSS support, Text/Color APIs, executeAsModal, `.psjs` scripts, photoshop.constants, UDT workflow, path creation, hybrid C++ bridge, and 37 known issues.
+- **`lrc-sdk.md`** — Deep Lightroom Classic SDK reference (~1220 lines), organized by use-case. Covers plugin architecture, export/publish pipeline (incl. programmatic export via LrExportSession and the full publish callback catalog), memory leak prevention, LrCatalog method inventory, LrPhoto APIs, plugin develop presets, LrView/LrDialogs, data binding, 95 LrDevelopController functions, and 45+ module quick reference.
+- **`README.md`** — Installation instructions and project overview for GitHub.
 
-Don't use for:
-- General web UI — UXP is NOT a browser; different rules apply
-- ExtendScript / CEP (legacy Adobe plugin systems) — this covers UXP only
-- Lightroom Cloud REST APIs — those are separate from the LrC desktop SDK
+## SDK Versions Covered
 
-## Core Capability Matrix
+- UXP v9.2.0, Manifest v5
+- Photoshop API changelog 27.4 (verified still current as of July 2026 — the app is at 27.8 but Adobe has documented no plugin-API changes since 27.4; the 27.8 Beta began a UXP plugin-rendering replatform, announced 2026-05-12, with no documented API changes)
+- Lightroom Classic SDK v15.3 (latest published; the LrC 15.4 app, June 2026, shipped without a new SDK)
 
-| Capability | Photoshop UXP | Lightroom Classic |
-|---|---|---|
-| Language | JavaScript (HTML/CSS) | Lua 5.1.5 |
-| Pixel read | `imaging.getPixels()` | **None** — must export rendition + decode externally |
-| Pixel write | `imaging.putPixels()` | None |
-| UI | HTML/CSS/JS + Spectrum `sp-*` | `LrView` declarative widgets only |
-| Canvas/drawing | Limited 2D (no `drawImage`/`getImageData`/`toDataURL`) | None |
-| Document DOM | Full: 33 Document props + 29 methods, 28 Layer props + 55 methods (38 filter + 17 other) | Catalog-centric: `LrCatalog`, `LrPhoto` |
-| Selection API | Full `Selection` class (v25.0+) | `LrSelection` namespace (rating, flag, label, nav) |
-| AI features | `generativeUpscale` (v27.2+) | denoise, reflection removal, distraction detection |
-| Develop events | `action.addNotificationListener` | `LrDevelopController.addAdjustmentChangeObserver` |
-| Plugin types | Panel, Command | Export, Publish, Metadata, Filter, Library menu |
-| Develop-panel UI | Panels dock anywhere | **Cannot** add Develop-right-panel UI — only floating dialog |
-| Action recording | `recordAction` API (v25.0+) | Not available |
+## Reference Snapshots (docs/, gitignored)
 
-**Fundamental constraint:** LrC cannot read pixels from Lua. Any LrC plugin needing pixel access must export a thumbnail or rendition and hand it to a compiled external binary (C++/Rust).
+- `docs/references/ps-uxp-sdk/` — local clone of [AdobeDocs/uxp-photoshop](https://github.com/AdobeDocs/uxp-photoshop). Update with `git pull`. Since the May 2026 EDS replatform, paths are kebab-case (`src/pages/ps-reference/...`). This repo also embeds the UXP-level API docs under `src/pages/uxp-api/`.
+- `docs/references/lrc-sdk/` — the LrC SDK distribution (LuaDoc HTML in `API Reference/`, Guide PDF in `Manual/`). New SDKs are published on the [Adobe Developer Console](https://developer.adobe.com/console) (requires login) — check there when a new LrC major/MAX release ships.
+- `docs/references/uxp/` — clone of [AdobeDocs/uxp](https://github.com/AdobeDocs/uxp); dormant since April 2025 (UXP docs moved into the per-app repos). Historical reference only.
 
-## Critical Pitfalls
+## Editing Guidelines
 
-### UXP: `<canvas>` has no pixel ops
-- `<canvas>` exists (v7.0.0+) but has **no** `drawImage`, `getImageData`, `putImageData`, `toDataURL`, `toBlob`.
-- To display a generated image: build pixel buffer -> `imaging.createImageDataFromBuffer` -> `imaging.encodeImageData({ base64: true })` -> set `<img src="data:image/jpeg;base64,...">`.
-- Windows extra sharp edges: `createLinearGradient`, `createRadialGradient`, `clearRect` may fail entirely.
-- Real-render options: software renderer in JS, embedded WebView, or hybrid C++ plugin.
+- Content was compiled from Adobe's official docs ([AdobeDocs/uxp-photoshop](https://github.com/AdobeDocs/uxp-photoshop), [AdobeDocs/uxp](https://github.com/AdobeDocs/uxp)) and the LrC 15.3 SDK, supplemented with lessons from building [Chromascope](https://github.com/kevinkiklee/chromascope).
+- When updating API references, verify against Adobe's current documentation — APIs change between SDK releases.
+- **Currency signal:** the file to watch is `docs/references/ps-uxp-sdk/src/pages/ps-reference/changelog/index.md` (the PS API changelog). Photoshop app releases outpace the plugin API — don't bump the skill's baseline for app releases that add no changelog entry. For LrC, watch for SDK announcements on community.adobe.com and the Developer Console.
+- `SKILL.md` is the agent-facing "90% file" — it should cover most common use cases without needing the deep references. Deep details and complete API tables belong in `ps-uxp-sdk.md` or `lrc-sdk.md`, which are organized by use-case.
+- The YAML frontmatter in `SKILL.md` (`name`, `description`) controls how agent frameworks discover and trigger this skill. Changes there affect activation behavior. Per the agentskills.io spec, only `name`/`description`/`license`/`compatibility`/`metadata`/`allowed-tools` are valid root fields — the release version lives at `metadata.version`.
 
-### UXP: Imaging API gotchas
-- 16-bit range is **0-32768 by default**, not 0-65535. Pass `{ fullRange: true }` to `getData()` for full range.
-- **Always call `imageData.dispose()` after `getData()`**. UDT warns at 600MB.
-- Pass `targetSize` to leverage Photoshop's pyramid cache — dramatically faster than full-res reads.
-- `encodeImageData` only supports **RGB** (not Lab, not Grayscale).
-- `getPixels()` usually works without `executeAsModal`, but any pixel *write* requires it.
-- Default layout is "chunky" (interleaved `RGBRGB`); planar is `RRGGBB`.
+## Installation (for reference)
 
-### UXP: Layout and CSS limits
-- No CSS Grid, no `float`, no `transition`/`@keyframes`, no `text-transform`, no `font` shorthand, no `position: sticky`.
-- `box-shadow`, `transform-origin`, `scaleX`/`scaleY`, `translate` **require** the `CSSNextSupport` feature flag in manifest. Without it, CSS silently ignores these properties.
-- `window.devicePixelRatio` always returns 1 — cannot detect HiDPI.
-- `hide` panel lifecycle callback never fires; `show` fires only once (PS-57284). Don't rely on them for refresh gating.
-- `<label for="id">` doesn't work — wrap the label around the control instead.
-- `<option>` needs an explicit `value` attribute.
-
-### UXP: CSSNextSupport feature flag
-Enable in manifest.json to unlock additional CSS properties:
-```json
-{
-  "featureFlags": { "CSSNextSupport": true }
-}
-```
-Unlocks: `box-shadow`, `transform-origin`, `scaleX`, `scaleY`, `translate`. Without this flag these properties are silently ignored — no error, no warning.
-
-### UXP: localStorage and sessionStorage
-Both are available as global storage APIs — contrary to some older references listing them as unavailable. However, they are **not** available inside WebView when loading local content.
-
-### UXP: WebView availability
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Installed as a Claude Code skill by cloning/symlinking into `~/.claude/skills/adobe-plugin-development`. No dependencies to install.
 
 ---
 > Source: [kevinkiklee/adobe-plugin-skills](https://github.com/kevinkiklee/adobe-plugin-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-13 -->
