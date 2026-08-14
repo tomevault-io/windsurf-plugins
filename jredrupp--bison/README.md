@@ -7,12 +7,12 @@ A Mojo DataFrame library with a pandas-compatible API
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [JRedrupp/bison](https://github.com/JRedrupp/bison).
+Original source: `CLAUDE.md` in [JRedrupp/bison](https://github.com/JRedrupp/bison).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
