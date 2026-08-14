@@ -4,7 +4,7 @@
   "repo": "Arnav-site",
   "description": "Test",
   "type": "config",
-  "source_format": ".cursor/rules/*.mdc",
+  "source_format": "CLAUDE.md",
   "formats": [
     {
       "format": "claude_md",
@@ -40,5 +40,5 @@
   "skills": [],
   "source_url": "https://github.com/ananda04/Arnav-site",
   "distributed_by": "TomeVault",
-  "distributed_at": "2026-08-13T14:41:36Z"
+  "distributed_at": "2026-08-14T10:54:50Z"
 }
