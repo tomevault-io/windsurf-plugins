@@ -1,119 +1,59 @@
 ---
 trigger: always_on
-description: |
+description: gstack is a collection of SKILL.md files that give AI agents structured roles for
 ---
 
-<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
-<!-- Regenerate: bun run gen:skill-docs -->
+# gstack — AI Engineering Workflow
 
-## Preamble (run first)
+gstack is a collection of SKILL.md files that give AI agents structured roles for
+software development. Each skill is a specialist: CEO reviewer, eng manager,
+designer, QA lead, release engineer, debugger, and more.
 
-```bash
-_UPD=$(~/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
-[ -n "$_UPD" ] && echo "$_UPD" || true
-mkdir -p ~/.gstack/sessions
-touch ~/.gstack/sessions/"$PPID"
-_SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
-find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
-_CONTRIB=$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
-_PROACTIVE=$(~/.claude/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
-_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
-echo "BRANCH: $_BRANCH"
-echo "PROACTIVE: $_PROACTIVE"
-source <(~/.claude/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true
-REPO_MODE=${REPO_MODE:-unknown}
-echo "REPO_MODE: $REPO_MODE"
-_LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
-echo "LAKE_INTRO: $_LAKE_SEEN"
-_TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
-_TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
-_TEL_START=$(date +%s)
-_SESSION_ID="$$-$(date +%s)"
-echo "TELEMETRY: ${_TEL:-off}"
-echo "TEL_PROMPTED: $_TEL_PROMPTED"
-mkdir -p ~/.gstack/analytics
-echo '{"skill":"gstack","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
-# zsh-compatible: use find instead of glob to avoid NOMATCH error
-for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
-```
+## Available skills
 
-If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
-them when the user explicitly asks. The user opted out of proactive suggestions.
+Skills live in `.agents/skills/` (or `.cursor/skills/` for Cursor). Invoke them by name (e.g., `/office-hours`).
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+| Skill | What it does |
+|-------|-------------|
+| `/office-hours` | Start here. Reframes your product idea before you write code. |
+| `/plan-ceo-review` | CEO-level review: find the 10-star product in the request. |
+| `/plan-eng-review` | Lock architecture, data flow, edge cases, and tests. |
+| `/plan-design-review` | Rate each design dimension 0-10, explain what a 10 looks like. |
+| `/design-consultation` | Build a complete design system from scratch. |
+| `/review` | Pre-landing PR review. Finds bugs that pass CI but break in prod. |
+| `/debug` | Systematic root-cause debugging. No fixes without investigation. |
+| `/design-review` | Design audit + fix loop with atomic commits. |
+| `/qa` | Open a real browser, find bugs, fix them, re-verify. |
+| `/qa-only` | Same as /qa but report only — no code changes. |
+| `/ship` | Run tests, review, push, open PR. One command. |
+| `/document-release` | Update all docs to match what you just shipped. |
+| `/retro` | Weekly retro with per-person breakdowns and shipping streaks. |
+| `/browse` | Headless browser — real Chromium, real clicks, ~100ms/command. |
+| `/setup-browser-cookies` | Import cookies from your real browser for authenticated testing. |
+| `/careful` | Warn before destructive commands (rm -rf, DROP TABLE, force-push). |
+| `/freeze` | Lock edits to one directory. Hard block, not just a warning. |
+| `/guard` | Activate both careful + freeze at once. |
+| `/unfreeze` | Remove directory edit restrictions. |
+| `/gstack-upgrade` | Update gstack to the latest version. |
 
-If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
-Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
-thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
-Then offer to open the essay in their default browser:
+## Build commands
 
 ```bash
-open https://garryslist.org/posts/boil-the-ocean
-touch ~/.gstack/.completeness-intro-seen
+bun install              # install dependencies
+bun test                 # run tests (free, <5s)
+bun run build            # generate docs + compile binaries
+bun run gen:skill-docs   # regenerate SKILL.md files from templates
+bun run skill:check      # health dashboard for all skills
 ```
 
-Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
+## Key conventions
 
-If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: After the lake intro is handled,
-ask the user about telemetry. Use AskUserQuestion:
-
-> Help gstack get better! Community mode shares usage data (which skills you use, how long
-> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
-> No code, file paths, or repo names are ever sent.
-> Change anytime with `gstack-config set telemetry off`.
-
-Options:
-- A) Help gstack get better! (recommended)
-- B) No thanks
-
-If A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry community`
-
-If B: ask a follow-up AskUserQuestion:
-
-> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
-> no way to connect sessions. Just a counter that helps us know if anyone's out there.
-
-Options:
-- A) Sure, anonymous is fine
-- B) No thanks, fully off
-
-If B→A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `~/.claude/skills/gstack/bin/gstack-config set telemetry off`
-
-Always run:
-```bash
-touch ~/.gstack/.telemetry-prompted
-```
-
-This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
-
-## Contributor Mode
-
-If `_CONTRIB` is `true`: you are in **contributor mode**. At the end of each major workflow step, rate your gstack experience 0-10. If not a 10 and there's an actionable bug or improvement — file a field report.
-
-**File only:** gstack tooling bugs where the input was reasonable but gstack failed. **Skip:** user app bugs, network errors, auth failures on user's site.
-
-**To file:** write `~/.gstack/contributor-logs/{slug}.md`:
-```
-# {Title}
-**What I tried:** {action} | **What happened:** {result} | **Rating:** {0-10}
-## Repro
-1. {step}
-## What would make this a 10
-{one sentence}
-**Date:** {YYYY-MM-DD} | **Version:** {version} | **Skill:** /{skill}
-```
-Slug: lowercase hyphens, max 60 chars. Skip if exists. Max 3/session. File inline, don't stop.
-
-## Completion Status Protocol
-
-When completing a skill workflow, report status using one of:
-- **DONE** — All steps completed successfully. Evidence provided for each claim.
-- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
-- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- SKILL.md files are **generated** from `.tmpl` templates. Edit the template, not the output.
+- Run `bun run gen:skill-docs --host codex` to regenerate Codex-specific output.
+- Run `bun run gen:skill-docs --host cursor` to regenerate Cursor-specific output.
+- The browse binary provides headless browser access. Use `$B <command>` in skills.
+- Safety skills (careful, freeze, guard) use inline advisory prose — always confirm before destructive operations.
 
 ---
 > Source: [MFS-code/gstack](https://github.com/MFS-code/gstack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-14 -->
