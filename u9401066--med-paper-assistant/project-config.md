@@ -82,4 +82,4 @@ Pipeline 定義「何時」、Skill 定義「如何」、Hook 定義「品質」
 
 ---
 > Source: [u9401066/med-paper-assistant](https://github.com/u9401066/med-paper-assistant) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-15 -->
