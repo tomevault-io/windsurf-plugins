@@ -1,0 +1,71 @@
+---
+trigger: always_on
+description: Authoritative instructions for Pix3 development. These guidelines ensure consistent code generation and adherence to project architecture patterns.
+---
+
+# Pix3 Editor - AI Agent Guidelines
+
+Authoritative instructions for Pix3 development. These guidelines ensure consistent code generation and adherence to project architecture patterns.
+
+## Project Overview
+
+- **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers.
+- **Stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout.
+- **Architecture**: Operations-first with `OperationService` as mutation gateway.
+- **Source of Truth**: `docs/pix3-specification.md` (version is the number in its own title — don't cite one here).
+- **Capabilities catalog**: `docs/nodes-and-systems.md` — the inventory of every node, `core:*` behavior, system, and scripts-facing runtime API (and how to use each). **Check it before writing custom game logic**; it also carries the engine-vs-game decision. For agents building on the engine, the `pix3-game-dev` skill is the entry point.
+
+## Essential Architecture Patterns
+
+### Component System (Lit)
+
+- **Base Class**: Extend `ComponentBase` from `@/fw` (not raw `LitElement`).
+- **DOM Mode**: Default to **Light DOM** for global style integration.
+- **Shadow DOM**: Use only when explicitly needed: `static useShadowDom = true`.
+- **Styling**:
+  - Separate CSS files: `[component].ts.css`.
+  - Light DOM: `import './component.ts.css';`
+  - Shadow DOM: `import styles from './component.ts.css?raw';` + `static styles = css`${unsafeCSS(styles)}`;`
+- **Accent Color**: Use CSS variables `--pix3-accent-color` (#ffcf33) and `--pix3-accent-rgb`.
+- **Icons**: Use **vector icons via `IconService`** (`@inject(IconService)` → `getIcon(name, IconSize.*)`), never emoji or Unicode symbol glyphs (📎🔑✕✓📄↻●⏸). Register a custom SVG in `IconService` if the icon isn't in Feather. Emoji belong only in user-authored content, never in UI chrome.
+
+### Dependency Injection
+
+- **Decorators**: Use `@injectable()` for services and `@inject(ServiceClass)` for injection.
+- **Container**: Register services in `ServiceContainer` (singleton by default).
+- **Lifecycle**: Services must implement `dispose()` if they hold resources or subscriptions.
+- **Lazy injection**: `@injectLazy(() => import('…').then(m => m.ServiceClass))` makes the property a `LazyService<T>` async accessor — the module is `import()`-ed once (cached), and the service is resolved through the container on every `await this.foo()` call, so re-registration is observed and singleton/transient lifetimes behave exactly like `@inject`. Keeps heavy modules out of the eager bundle. Use **sparingly** for heavy, rarely-used services whose consumers only touch them inside async flows (e.g. Monaco IntelliSense, playable export); `@inject` remains the default.
+- **Collab CRDT stack is lazy**: the ~140 KB `yjs`/`@hocuspocus/provider` stack loads only when `CollaborationService.connect()` runs (`connect()` is `async` and `import()`s it on first collab connect), so solo/local sessions never pull it — new code must NOT add eager top-level `yjs`/`@hocuspocus` value imports anywhere except `src/services/collab/SceneCRDTBinding.ts` (itself reached only via dynamic `import()`); use `import type` for CRDT types elsewhere.
+
+### State Management (Valtio)
+
+- **Global State**: `appState` proxy in `src/state/AppState.ts`. **Never mutate directly**.
+- **Gateway scope**: The Command→Operation gateway governs **document state** — the scene graph, node properties, and project files, i.e. anything undoable/saveable. **Session/UI/infrastructure state** in `appState` (auth, collab connection/presence, router, project open/close lifecycle, script-load status, error surfacing, tab management, refresh signals) is owned by its dedicated service and may be written by that service directly, outside the gateway. (Audit 2026-07-22: every current direct `appState` writer falls in this second category.)
+- **Nodes & State**: Nodes live in `SceneGraph` (managed by `SceneManager`), **not in reactive state**.
+- **Sync**: State tracks node IDs for selection and hierarchy. UI subscribes via `subscribe(appState.section, callback)`.
+- **Cleanup**: Always dispose subscriptions in `disconnectedCallback` or `dispose`.
+
+### Scripting & Component System
+
+- **Unified Components**: All scripts are `Script` instances in `node.components` (Unity-style).
+- **Base Class**: Extend `Script` from `@pix3/runtime` (provides `onAttach`, `onStart`, `onUpdate`, `onDetach`).
+- **Registration**: Register new script types in `ScriptRegistry`.
+- **Mutations**: Use `AddComponentCommand` / `RemoveComponentCommand` for management.
+
+### Commands and Operations
+
+- **Operations**: Encapsulate mutation logic. Implement `perform()` returning `undo`/`redo` closures.
+- **Commands**: Thin wrappers around operations. Validate state in `preconditions()`.
+- **Dispatcher**: All actions **MUST** flow through `CommandDispatcher.execute(CommandClass, args)`.
+- **Menu System**: Commands opt-in via metadata: `menuPath`, `shortcut`, `addToMenu`. Register in `CommandRegistry`.
+
+### Property Schema System
+
+- **Metadata**: Node/Script classes implement `static getPropertySchema()`.
+- **Dynamic UI**: Inspector consumes schemas to render property editors (Vector2, Color, Enum, etc.).
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [pix3dev/pix3](https://github.com/pix3dev/pix3) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-13 -->
