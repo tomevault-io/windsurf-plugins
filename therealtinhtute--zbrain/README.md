@@ -7,11 +7,11 @@ a Go-native CLI for local-first trusted memory and workspace-isolated agent cont
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [therealtinhtute/zbrain](https://github.com/therealtinhtute/zbrain).
+Original source: `CLAUDE.md` in [therealtinhtute/zbrain](https://github.com/therealtinhtute/zbrain).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
