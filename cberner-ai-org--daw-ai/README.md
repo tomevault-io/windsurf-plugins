@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [cberner-ai-org/daw-ai](https://github.com/cberner-ai-org/daw-ai).
+Original source: `AGENTS.md` in [cberner-ai-org/daw-ai](https://github.com/cberner-ai-org/daw-ai).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
