@@ -7,11 +7,11 @@ A shelf-top AMOLED screen showing your Claude Code & Codex usage, live agent act
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [niclasvestlund-YT/vibepulse](https://github.com/niclasvestlund-YT/vibepulse).
+Original source: `AGENTS.md` in [niclasvestlund-YT/vibepulse](https://github.com/niclasvestlund-YT/vibepulse).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
