@@ -7,11 +7,11 @@ Generic, decoupled bidirectional task/board sync engine (SQLite workable-items S
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [vasic-digital/task_bridge](https://github.com/vasic-digital/task_bridge).
+Original source: `CLAUDE.md` in [vasic-digital/task_bridge](https://github.com/vasic-digital/task_bridge).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
