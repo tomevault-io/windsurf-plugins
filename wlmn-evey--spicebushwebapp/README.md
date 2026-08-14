@@ -7,11 +7,11 @@ Spicebush Montessori School Website
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [wlmn-evey/SpicebushWebapp](https://github.com/wlmn-evey/SpicebushWebapp).
+Original source: `CLAUDE.md` in [wlmn-evey/SpicebushWebapp](https://github.com/wlmn-evey/SpicebushWebapp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
