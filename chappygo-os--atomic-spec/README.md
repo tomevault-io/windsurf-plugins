@@ -7,11 +7,11 @@ Stop your AI from vibe-coding. Governance layer that forces Claude, Cursor, Copi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Chappygo-OS/Atomic-Spec](https://github.com/Chappygo-OS/Atomic-Spec).
+Original source: `AGENTS.md` in [Chappygo-OS/Atomic-Spec](https://github.com/Chappygo-OS/Atomic-Spec).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
