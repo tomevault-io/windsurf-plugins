@@ -7,11 +7,11 @@ Self-hosted AI workspace for building containerized React and Go applications fr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [hoangnhat42/guru-mono](https://github.com/hoangnhat42/guru-mono).
+Original source: `CLAUDE.md` in [hoangnhat42/guru-mono](https://github.com/hoangnhat42/guru-mono).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
