@@ -7,11 +7,11 @@ An LLM-friendly, single-binary, drop-in replacement to Supabase
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [instancez/instancez](https://github.com/instancez/instancez).
+Original source: `CLAUDE.md` in [instancez/instancez](https://github.com/instancez/instancez).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
