@@ -1,0 +1,98 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A **Bun-native MCP server** that exposes MikroTik **RouterOS** (over SSH) as several
+hundred risk-annotated tools, one module per RouterOS scope, so an MCP client can
+read and configure a router in natural language. Runs on **Bun ≥ 1.3** — there is no
+npm/Node build; do not introduce `child_process`/OS-shell usage (all device I/O is
+SSH via `ssh2`). The live tool/module counts are whatever the catalog
+(`src/tools/index.ts`) holds.
+
+## Commands
+
+```bash
+bun run test                      # all tests — Vitest via vite-plus (offline, no device)
+bunx vp test run tests/catalog.spec.ts   # a single test file
+bunx vp test run -t "quoteValue"  # tests matching a name
+bun run test:watch                # Vitest watch mode
+bun run test:types                # tsc --noEmit typecheck
+bun run lint                      # vp lint (vite-plus / oxlint); lint:fix to autofix
+bun run gen                       # regenerate schemas/ + docs/tools-reference.md
+bun run build                     # bunup -> dist/cli.js (+ build:ui single-file views)
+bun run build:mcp                 # .mcpb bundle for this platform (build:mcp:all for every target)
+bun run start                     # serve (stdio transport by default)
+bun run inspect                   # MCP Inspector against the server
+```
+
+Tests are **Vitest** (`tests/**/*.spec.ts`, helpers imported from `vite-plus/test`);
+`vitest.config.ts` aliases the Bun-native `"bun"` module to an inert stub so the
+Node runner can load Bun-importing source. Pre-commit gate: `bun run test:types &&
+bun run test && bun run lint`.
+Run each **un-piped** in the `&&` chain — piping through `tail` masks the exit code
+and lets a failing check pass the gate.
+
+## Architecture
+
+**One choke point for the device.** Every tool reaches RouterOS through
+`executeMikrotikCommand(command, ctx)` in `src/core/connector.ts` — never by
+opening a transport directly. It routes the command through Safe Mode's persistent
+session when active (`src/ssh/safe-mode.ts`), otherwise `runOnce()` opens a fresh
+one-shot connection. The default transport is an SSH channel (`src/ssh/client.ts`);
+when the resolved device config carries a `mac` (instead of a routable `host`),
+`runOnce` instead uses **MAC-Telnet** — a Layer-2 terminal over UDP 20561 that
+reaches a device by MAC with no IP. `MikroTikMacTelnetClient` mirrors
+`MikroTikSSHClient`'s `connect/run/disconnect/lastError` shape so the branch is one
+line and every tool inherits it. The MAC-Telnet **wire codec, session, and MTWEI/MD5
+auth come from the `@tikoci/centrs` package** (`@tikoci/centrs/protocols`), the
+de-facto MikroTik reference; `src/mac-telnet/` keeps only the local layers that
+package doesn't provide — `console.ts` (turns the interactive console stream into
+one-shot command/response) and `client.ts` (the SSH-shaped facade). Safe Mode is
+SSH-only. The target device rides on `ctx.device`.
+
+Three knobs make the Bun-native `@tikoci/centrs` consumable here: it ships raw
+`.ts`, so `tsconfig` sets `allowImportingTsExtensions`, `vitest.config.ts` inlines
+it (`server.deps.inline`), and `bunup.config.ts` marks it `external` (Bun resolves
+it from `node_modules` at runtime — bunup mis-bundles its `export *`). Import its
+symbols by **named** import, never `export *`. Caveat: centrs' MAC-Telnet route
+resolution may shell out (`Bun.spawnSync(["ifconfig", …])`) as a fallback when the
+OS reports a zero MAC, so the "all device I/O is SSH, no OS-shell" rule no longer
+holds strictly for the MAC path.
+
+**Command construction is the injection boundary.** Build every device command
+with the `Cmd` builder in `src/core/routeros.ts` (`.set/.opt/.flag/.bool/.raw/
+.build`) — never string-concatenate user input. `quoteValue` quotes/escapes any
+non-bare-safe value, including control chars/newlines (a raw `\n` would otherwise
+terminate the command mid-string over the SSH exec channel). Detect device-side
+failures in handler output with `looksLikeError()`; other shared helpers are
+`whereClause()`, `isEmpty()`, `yesno()`, `commandUnsupported()`,
+`containsRawParserError()`.
+
+**Tools.** Each `src/tools/<scope>.ts` exports a `ToolModule` (an array of
+`defineTool({...})`, `src/core/registry.ts`). A tool has: `name` (snake_case,
+globally unique), `title`, `description` (the prompt the model reads to decide when
+to call), `annotations` (one risk preset: `READ` / `WRITE` / `WRITE_IDEMPOTENT` /
+`DESTRUCTIVE` / `DANGEROUS`), `inputSchema` (a Zod raw shape), and
+`handler(args, ctx) => string`. In multi-device setups the registry auto-injects an
+optional `device` enum and peels it off before the handler runs; a backstop turns
+raw RouterOS parser errors into `isError` results.
+
+**The catalog is the single source of truth.** `src/tools/index.ts` `moduleCatalog`
+registers every module exactly once (`{label, slug, group, description, tools}`).
+The catalog test enforces unique slugs, unique snake_case tool names, valid
+Zod→JSON-Schema, and `moduleCatalog.length === allToolModules.length`.
+
+**MCP Bundle (`.mcpb`) packaging.** `manifest.json` + `scripts/build-mcpb.ts` pack a
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [mikrotik-mcp/mikrotik-mcp](https://github.com/mikrotik-mcp/mikrotik-mcp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-14 -->
