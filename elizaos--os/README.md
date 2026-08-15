@@ -7,11 +7,11 @@ Agentic operating system built on elizaOS, Android Open Source and Debian Linux
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [elizaOS/os](https://github.com/elizaOS/os).
+Original source: `CLAUDE.md` in [elizaOS/os](https://github.com/elizaOS/os).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
