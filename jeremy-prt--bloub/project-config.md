@@ -1,0 +1,102 @@
+---
+trigger: always_on
+description: pnpm dev       # 5190 (set in vite.config.ts, mirrored in .claude/launch.json)
+---
+
+# bloub: notes for Claude
+
+## Commands
+
+```bash
+pnpm dev       # 5190 (set in vite.config.ts, mirrored in .claude/launch.json)
+pnpm test      # vitest
+pnpm build     # vue-tsc --noEmit && vite build
+```
+
+Vue 3.5 + Vite 8 + TS strict + Tailwind 4 (`@tailwindcss/vite` plugin, no
+`tailwind.config.js`), pnpm.
+
+Style: 2 spaces, single quotes, **no semicolons**, comments in French. No ESLint
+and no Prettier: `vue-tsc` is the only gate, so run `pnpm build` before
+concluding.
+
+## The most important rule
+
+**The bot's numeric constants are measurements taken off the reference video, not
+settings.** Gaze angles, eye sizes, radii, timings, colours: all of it comes from
+frame-by-frame analysis. Don't round them, don't simplify them, don't replace them
+with values that look tidier: it breaks the resemblance, which is the only
+success criterion here.
+
+The verified traps that must not be "corrected" are listed in
+[docs/measurements.md](docs/measurements.md). Read it before touching a number in
+`src/bot/`.
+
+One deliberate exception: **`--ink` (`styles.css`) is the interface colour, chosen,
+not measured**, a night blue. The video's black is the bot's, in `skins.ts`
+(`encre`, `#0a0a0c`). Retouching one doesn't touch the other.
+
+## Invariants worth knowing before editing
+
+Details and the reasoning behind each are in [docs/](docs/):
+
+- **`src/bot/` has no framework and no clock.** `engine.sample(t)` is a pure
+  function of time. That's what makes `frozenAt`, the state board and the
+  DOM-less tests work. No real-time state, no `Date.now()`, no Vue import. And
+  **`sample()` must not mutate**: purging a stale previous state during playback
+  makes the engine non-replayable (there's a dedicated test). Shared Vue code goes
+  in `src/ui/`.
+- **The montage holds or cuts, it never scales time** (`cycles.ts`). Hence
+  `MIN_BLOCK` (0.6 s) and `StateDef.minDuration`, which is read off the state's
+  `pose()` constants. Fill it in for any new narrative state.
+- **All silhouettes share the same angular sampling** (`PROFILE_SAMPLES`), which is
+  what makes morphing a linear interpolation of radii. A new shape must go through
+  a radial profile, or `profileFromPolygon`.
+- **The eyes are holes in a `<mask>`**, not white shapes on top. That's what makes
+  them clip against the silhouette on their own.
+- **Anything sitting "on" the body must follow its real radius**: `radiusAtAngle`
+  (defined in `shape.ts`, applied by `engine.ts`) for the eyes and the notification
+  pastille. A new element anchored to the outline needs the same treatment.
+- **States declare `ArcSpec`; only the engine rasterises.** Don't call `arcRender`
+  from `states.ts`.
+- **Transitions are exponential ease-outs and the body never overshoots.** The one
+  spring is the notification pop (`NOTIF_POP = 1.14`). There is deliberately no
+  spring engine. A new bouncing effect belongs in the state that needs it.
+- **Two sources of shapes, not to be mixed.** `profiles.ts` is generated from the
+  video and drives the animated states; `skins.ts` holds the customiser's shapes,
+  built analytically. A user's shape only replaces the body on `baseBody` states
+  (`idle`, `wink`, `wide`, `notify`, `swirl`); elsewhere the silhouette IS the
+  animation.
+- **Among catalogue states only `idle` carries `baseFace: true`** (`swirl` does too,
+  but it isn't in the catalogue). The other face states have an expression measured
+  off the video. That's the point.
+- **A tilt is only visible on an elongated eye.** `expressions.test.ts` enforces it:
+  width/height outside `[0.6, 1.7]` for a tilt of 20°+, outside `[0.8, 1.25]` below.
+  Already went wrong once.
+- **Labels don't live in `src/bot/`.** The catalogues carry ids and the display
+  resolves `t('states.orbit')`. Their ids are **literal unions** so the compiler
+  checks that every entry has a label in all three languages. Adding a shape
+  without its label doesn't compile. (`StateDef.hint` is a leftover French string
+  nothing reads.)
+- **One state isn't measured: `swirl`**, the settings view's entry transition. It's
+  deliberately outside `SEQUENCE` (a test locks that) and carries both `baseBody`
+  and `baseFace`.
+- **`mediabunny` is the only dependency besides Vue, and it must stay a DYNAMIC import.**
+  It encodes the cycle's MP4 (`src/ui/video.ts`). Imported statically it adds **43 kB gzip**
+  to the initial bundle, more than the 34 kB that got `vue-i18n` rejected in favour of the
+  in-house layer. Behind `await import(...)` it costs 0.7 kB and only arrives when someone
+  exports a video. Turning it into a top-level import would silently undo that.
+- **A UI element that must appear once uses a `transition`, not an `animation`.** An
+  animation replays on every mount: every view change, every reload. A transition
+  doesn't run on an element's first computed style, so it stays quiet there. That's
+  why `.panneau` and `.barre-export` are built that way, and why the latter is
+  mounted-but-hidden during the arrival rather than absent.
+- **`Look` aims in ABSOLUTE terms on both axes, and the engine does the mixing**:
+  only it knows the pose at instant t. `mix` and `wander` are distinct, and drift is
+  added *after* the mix. **`setLook` refuses a non-finite target**: the engine keeps
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [jeremy-prt/bloub](https://github.com/jeremy-prt/bloub) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-15 -->
