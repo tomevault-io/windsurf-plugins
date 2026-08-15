@@ -1,55 +1,69 @@
 ---
 trigger: always_on
-description: SolidKG MCP usage guide, when to use which tool
+description: This file provides guidance to Agents when working with code in this repository.
 ---
 
-<!-- SOLIDKG_START -->
-## SolidKG
+# AGENTS.md
 
-This project has a SolidKG MCP server configured. SolidKG is a tree-sitter-parsed knowledge graph of source files, symbols, relationships, and line-numbered source.
+This file provides guidance to Agents when working with code in this repository.
 
-### Default workflow
+## Project Overview
 
-The default MCP profile exposes only `solidkg_explore`, the answer-producing tool. Give it a natural-language structural question or precise symbol/file/code terms. It returns the best production source grouped by file, relationship and flow evidence, dynamic-dispatch links, and an answer packet.
+SolidKG is a local-first code intelligence library + CLI + MCP server. It parses any supported codebase with tree-sitter, stores symbols, pairwise edges, semantic hyperedges, and files in SQLite (FTS5), and exposes a knowledge graph to AI agents (Claude Code, Cursor, Codex CLI, opencode, Hermes Agent) over MCP. Per-project data lives in `.solidkg/`. Extraction is deterministic — derived from AST, not LLM-summarized.
 
-ONE call usually answers a structural question. Treat returned source as already Read. Do not re-open shown files with Read/Grep, and do not call `solidkg_explore` again unless the question needs a different named symbol or file.
+Distributed as `solidkg` on npm; same binary serves as installer, indexer, and MCP server.
 
-- **Interpret source completeness narrowly.** Source-completeness fields are returned-source coverage only, not answer/path/runtime correctness, confidence, query quality, or global false-path guarantees. Omitted peripheral candidates and bounded windows do not make selected evidence unusable.
-- **Stop on sufficient evidence.** When an answer packet says the returned context is sufficient, answer from that context instead of drilling further.
-- **Follow up only for a real blocker.** Another graph call is warranted for missing required anchors, stale or unreadable required source, no results, no static path, or explicit endpoint ambiguity. Do not follow up solely because candidate coverage is partial, omitted, or truncated.
-- **Prefer SolidKG over broad grep/read loops.** Fall back to targeted Read only when the answer packet is insufficient because required source is stale, unreadable, or absent.
-- **Natural language is not symbol ambiguity.** Generic words such as "send" or "request" in a prose question do not become flow endpoints. Explicit unqualified duplicate symbols still require a qualified or path-qualified name.
-- **Exclusions are constraints.** Phrases such as "not tests" or "excluding generated metadata" are not positive search terms. `missing_query_concept` means explicit counterfactual concepts were not all evidenced, so the packet is intentionally partial.
-- **Index lag.** When a response names files pending re-index, Read only those stale files. Files not listed in the staleness banner remain graph-fresh.
+## Build, Test, Run
 
-The raw MCP server tool names use `solidkg_*`. Some clients display a host-specific server prefix around those names; do not add another `solidkg_` prefix in calls.
+Use pnpm for local agent work in this repo. The package scripts are npm-compatible for published users, but do not use bare `npm` while developing here unless a release workflow explicitly requires it.
 
-### Advanced profile
+```bash
+pnpm exec tsc           # TypeScript build/check
+pnpm run copy-assets    # copy schema.sql and native-grammars.json into dist/
+node -e "require('fs').chmodSync('dist/bin/solidkg.js', 0o755)"  # executable bit
 
-Set `SOLIDKG_MCP_TOOLS=all` on the MCP server to expose every advanced graph tool. Explicit comma-separated names remain supported for custom profiles.
+pnpm run dev            # tsc --watch
+pnpm run clean          # rm -rf dist
 
-| Need | Advanced tool |
-|---|---|
-| Exact call path | `solidkg_trace` inlines each hop's body/source and destination callees in one call |
-| Exact symbol references | `solidkg_precise_refs` uses optional SCIP facts |
-| One missing symbol or hop | `solidkg_node`. Use solidkg_node for one specific missing symbol or hop, not as a loop over many symbols |
-| Callers / callees / impact | `solidkg_callers`, `solidkg_callees`, `solidkg_impact` |
-| Search / context / status | `solidkg_search`, `solidkg_context`, and `solidkg_status` (including SCIP import/link/generation state) |
-| Repository map | `solidkg_files` with `format: "overview"`, derived from the index |
-| Refactor graph diff | `solidkg_snapshot` before and after indexing |
-| Package/layer coupling | `solidkg_architecture` |
+pnpm test               # vitest run (all)
+pnpm run test:watch
 
-Capability footprints in `solidkg_trace` and `solidkg_node` are may-behavior evidence, not runtime proof. Coverage states (`complete`, `partial`, `unsupported`, `failed`, `not_run`, `stale`) describe producer coverage; empty assertions do not prove no capability exists.
+# Single test file / pattern
+pnpm exec vitest run __tests__/installer-targets.test.ts
+pnpm exec vitest run __tests__/extraction.test.ts -t "TypeScript"
+```
 
-### Retrieval extensions
+`copy-assets` (called from `build`) copies `src/db/schema.sql` and `src/extraction/native-grammars.json` into `dist/`. `prepare:native-runtime` stages the host parser libraries in `.native-grammars/<platform>-<arch>`, and `build-bundle.sh` copies that allowlisted set into the platform bundle.
 
-- Source-body chunk retrieval is local and deterministic: persisted source-body/code-token chunks can seed or boost results with visible `source_body_chunk` ranking evidence. Exact symbols, paths, flow evidence, semantic relations, and SCIP facts remain higher-salience.
-- External dense/vector embeddings, vector databases, rerankers, and hybrid retrieval providers are not enabled by default. Optional hybrid extension seams remain disabled unless a future build explicitly supports and configures them; do not assume LanceDB, API keys, network calls, or telemetry are active.
+Node engines: `>=24.0.0`; use Node 24 LTS for local development when possible. The CLI hard-blocks Node <24 unless explicitly overridden (see `src/bin/node-version-check.ts`). Released bundles ship their own Node runtime.
 
-### If `.solidkg/` doesn't exist
+## Public source checkout, repair, and MCP adoption
 
-The MCP server returns "not initialized." Ask the user: *"I notice this project doesn't have SolidKG initialized. Want me to run `solidkg init -i` to build the index?"*
-<!-- SOLIDKG_END -->
+Use this workflow when an agent is operating in a clone or GitHub source archive on a user's computer. The goal is to prove that the downloaded source is complete before changing any user-level coding-tool configuration.
+
+### Install and prove the checkout
+
+1. Confirm the checkout is running Node 24 and the exact pnpm version in `package.json#packageManager`. If pnpm is unavailable, offer to enable it with Corepack; do not change the user's global toolchain without permission.
+2. Install exactly the committed dependency graph and run the complete deterministic readiness suite:
+
+   ```bash
+   pnpm install --frozen-lockfile
+   pnpm run verify:source:full
+   ```
+
+   `verify:source:full` builds from TypeScript, verifies copied SQL/native grammar metadata and the staged host parser libraries, requires every maintained vendored SCIP source tree, indexes a fresh two-file project with real SQLite and tree-sitter, generates/imports/links a real TypeScript SCIP index, exercises library search, starts the real stdio MCP server, calls `solidkg_explore`, checks agent-install diagnostics are read-only, runs every Vitest file present in the checkout, and validates release-package file lists without publishing. The full internal repository contains additional maintainer-only benchmark/evidence contracts that are absent from the initial public archive.
+3. The top-level `vendored/` directory is part of the public source contract. It contains pinned SolidKG compatibility variants of the SCIP indexers, including SolidKG-specific changes where official upstream behavior diverges from the integration contract. Do not replace them with upstream HEAD or an arbitrary official binary when reproducing or repairing SolidKG behavior. `pnpm run build` does not compile every polyglot indexer: when the user needs a non-bundled SCIP language, use the matching `vendored/scip-*` README/toolchain, expose the command expected by `src/scip/index.ts` on `PATH`, run `solidkg scip generate --path <project>`, and confirm the generated/imported/linked state with `solidkg status <project>`.
+
+Both `vendored/` and `src/extraction/native-grammars.json` must be present in a public source download. The former preserves the supported indexer implementations; the latter is the allowlist used to stage parser libraries from the pinned language-pack release. Never "repair" either with a floating upstream revision, an empty placeholder, or an arbitrary grammar/indexer binary.
+
+### Correct a failed source install
+
+- Wrong Node major: switch to Node 24, remove only this checkout's `node_modules`, rerun `pnpm install --frozen-lockfile`, then rerun the verifier.
+- Wrong pnpm version: use the version pinned by `packageManager`; do not weaken or remove `--frozen-lockfile`.
+- Lockfile mismatch: stop and inspect the manifest/lock diff. A maintainer must deliberately refresh the appropriate lockfile; do not silently regenerate dependency resolutions just to obtain a pass.
+- Missing `src/db/schema.sql` or `src/extraction/native-grammars.json`: treat the download as incomplete and re-clone or re-download the same commit.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Valid-Systems/SolidKG](https://github.com/Valid-Systems/SolidKG) — distributed by [TomeVault](https://tomevault.io).
