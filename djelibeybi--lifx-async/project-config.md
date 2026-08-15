@@ -90,6 +90,18 @@ uv run python -m lifx.protocol.generator
 uv run python -m lifx.products.generator
 ```
 
+### Theme Data Update
+
+```bash
+# Source: data/themes.jsonl (committed; no network, no device required)
+# Regenerate the theme data module
+uv run scripts/generate_theme_data.py
+```
+
+The generator lives in `scripts/`, not the package: its input sits outside `src/` and is
+deliberately not shipped in the wheel. CI regenerates and diffs `src/lifx/theme/data.py`
+on every change to `data/**`.
+
 ### Documentation
 
 ```bash
@@ -150,15 +162,9 @@ gh workflow run docs.yml
 
    - `discover()`: Async generator yielding devices via UDP broadcast
    - `discover_mdns()`: Async generator yielding devices via mDNS (faster, single query)
-   - `find_by_serial()`: Find specific device by serial number
-   - `find_by_label()`: Async generator yielding devices matching label (exact or substring)
-   - `find_by_ip()`: Find device by IP address using targeted broadcast
-   - `DeviceGroup`: Batch operations (set_power, set_color, etc.)
-   - `LocationGrouping` / `GroupGrouping`: Organizational structures for location/group-based grouping
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Djelibeybi/lifx-async](https://github.com/Djelibeybi/lifx-async) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-15 -->
