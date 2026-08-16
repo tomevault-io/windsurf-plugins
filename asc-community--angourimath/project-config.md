@@ -1,93 +1,40 @@
 ---
 trigger: always_on
-description: For AI agents working on AngouriMath. Humans: [CONTRIBUTING.md](CONTRIBUTING.md) is yours, and
+description: The instructions for this repository are in **[AGENTS.md](AGENTS.md)**. Read it before doing
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-For AI agents working on AngouriMath. Humans: [CONTRIBUTING.md](CONTRIBUTING.md) is yours, and
-everything below applies to you too.
+The instructions for this repository are in **[AGENTS.md](AGENTS.md)**. Read it before doing
+anything else here; this file exists only so that tools looking for `CLAUDE.md` find their way there.
 
-AngouriMath is a computer algebra system. The thing being built is *mathematics*, and the code is
-how it is expressed. Read this as instructions for doing mathematics well, using C# and F#.
+Four things from it that are most often learned the hard way, so that they are visible even if
+nothing else is read:
 
-## The one rule everything else follows from
+1. **Be a mathematician first.** When correctness and backward compatibility disagree, correctness
+   wins — and every changed answer is recorded in [BREAKING-CHANGES.md](BREAKING-CHANGES.md), measured
+   on a build of each version rather than read off a diff.
+2. **Not answering is a legitimate answer; answering wrongly is not.** Unevaluated means "I could not
+   settle this", `NaN` means "this does not exist", and confusing them ships a wrong answer.
+3. **Read [#746](https://github.com/asc-community/AngouriMath/issues/746) before a release or a
+   version number.** Its `v1.0`–`v9.0` are capability tiers, not shipping versions, and it names
+   conditions — measured performance, deliberate package boundaries — that a release has to meet. See
+   *Read the roadmap before you release anything* in AGENTS.md.
+4. **Before adding or changing a simplification rule**, read
+   [`Contributing/SimplificationContract.md`](Sources/AngouriMath/Docs/Contributing/SimplificationContract.md).
+   A rule states the assumptions under which it holds, or it is asserting there are none.
 
-**Be a mathematician first.** When mathematical correctness and backward compatibility disagree,
-correctness wins. A published API that returns the wrong answer is not an asset to preserve; it is
-a bug with users. Say so in the changelog, and change it.
+The measurement harnesses live outside this repository, in the analysis workspace one directory up
+(`work/`): a self-verifying solver corpus, a property checker, root-completeness and
+simplification sweeps, a boundary checker, a crash harness that survives a stack overflow, and a
+checker for the documentation's code samples. Run them before claiming anything is fixed.
 
-Saying so is not optional, and it has a place: [BREAKING-CHANGES.md](BREAKING-CHANGES.md). Anything
-that makes the same input give a different answer goes there before the branch merges, with the old
-value, the new one, and why — measured on a build of each, not read off the diff. A user whose code
-depended on the wrong answer deserves to find out from us why it moved, rather than from their own
-test suite.
-
-The same goes for convention. If mathematicians write it one way and the library writes it another,
-the library is wrong — even where the library's way is defensible in isolation. `arcsinh` is not a
-thing; the inverse of `sinh` is an *area*, not an arc, so it is `arsinh` (#687). Follow the notation
-of the people who use the subject, not the notation that was easiest to parse.
-
-When you have to choose a convention, **check what the other systems answer** — SymPy,
-Mathematica, Maxima — and match the mathematics rather than the language you are writing in.
-`mod` takes the sign of the divisor because that is what a mathematician means by mod and what
-all three of those give; C's `%` truncates, but C's `%` is an operation on machine integers.
-Check it, do not reason about it from memory: this exact case was got wrong first time round.
-
-**Consistency is the point.** [#497](https://github.com/asc-community/AngouriMath/issues/497), the
-2.0 paper, names inconsistency as the central defect: *"one may find it inconsistent in a lot of
-places in API, behaviour, and internal structure of code."* A rule that fires for `sin` but not
-`tan`, a limit that works from both sides but not from one, an evaluation that holds precision for
-large numbers and drops it for small — each is a bug even when every individual case is defensible.
-When you fix something, ask what else is the same shape, and fix that too, or write down why not.
-
-## Not answering is a legitimate answer. Answering wrongly is not.
-
-The most important distinction in this codebase:
-
-| result | means |
-|---|---|
-| unevaluated (`Limitf`, the original expression back) | "I could not settle this" |
-| `NaN` | "**this does not exist**" |
-| a value | "this is the value" |
-
-These are three different claims and they are not interchangeable. Returning `NaN` for a limit you
-merely failed to compute is a *wrong answer*, not a graceful failure — it tells the caller the limit
-does not exist. Returning an unevaluated node is honest.
-
-So, in order of preference: right answer > no answer > slow answer > wrong answer. A wrong answer is
-worse than a hang, because a hang is visible.
-
-Say "no answer" by returning **`null`**, not by handing back an unevaluated node of the expression
-you were asked about. `Limitf(this, ...)` looks like the honest answer and is in fact a cycle: the
-caller evaluates it to compare, evaluating computes the limit, and computing arrives back where it
-started. That overflows the stack, which kills the process rather than raising anything catchable.
-`null` reads the same to the caller and terminates.
-
-### But "no answer" is the floor, not the target
-
-Read that ordering forwards. *Right answer* comes first, and refusing is what you do when you have
-established there is nothing better — not when the right answer looks like more work than you
-wanted. Difficulty is not an argument, and neither is "I cannot promise this lands cleanly": the
-way to find out whether a fix lands is to write it and measure it, and a failure you measured is a
-finding worth having. These *are* reasons to prefer one fix over another — it degrades output
-callers depend on, it rests on an assumption that is not true in general, it cannot be validated by
-anything you can run. These are not: it touches more files, it might break tests you would then
-have to understand, a smaller change exists that suppresses the wrong answer without producing the
-right one.
-
-The worked example is [#757](https://github.com/asc-community/AngouriMath/issues/757).
-`(x - a)(x + a) <= 0` was answered with an interval whose endpoints are ordered for one sign of `a`
-only, and the two candidate fixes were a case split on that sign, or declining to answer a symbolic
-coefficient at all. Refusing is not a fix that works — it is a stopgap — and choosing it would have
-been choosing the smaller diff over the answer.
-
-**And before building a case analysis, look for the closed form.** That same issue looked like it
-needed three branches on the sign of `a`; the answer is the single interval `[-|a|; |a|]`, because
-`min(p, q)` is `(p + q - |p - q|)/2` and `max(p, q)` is `(p + q + |p - q|)/2`. One interval, right
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Inside the repository there is one measurement, and it is a *gate* rather than a harness:
+`Sources/Tests/UnitTests/Corpus` runs forty problems on every commit and reports **solved / unsolved
+/ wrong / error / timeout**. It fails on a wrong answer, and on any case that stops matching its
+recorded verdict — including one that improves, which is a prompt to record the improvement rather
+than a complaint. See *The corpus runs on every commit* in [AGENTS.md](AGENTS.md).
 
 ---
 > Source: [asc-community/AngouriMath](https://github.com/asc-community/AngouriMath) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
