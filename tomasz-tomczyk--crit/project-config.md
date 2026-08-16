@@ -1,80 +1,121 @@
 ---
 trigger: always_on
-description: A single-binary Go CLI tool that opens a browser-based UI for reviewing code changes and markdown files with GitHub PR-style inline commenting. Supports multi-file review with git diff rendering and structured review file output for AI coding agents.
+description: crit — frontend architecture
 ---
 
-# Crit — Development Guide
 
-## What This Is
+# Frontend Architecture
 
-A single-binary Go CLI tool that opens a browser-based UI for reviewing code changes and markdown files with GitHub PR-style inline commenting. Supports multi-file review with git diff rendering and structured review file output for AI coding agents.
+## Two-Paradigm Page Fork
 
-## Project Structure
+`index.html` serves both modes from a single HTML shell. A script block at load time checks `window.location.pathname`:
+- `/live` → live mode (iframe-based pin review)
+- Everything else → code-review mode (file tree + diff/document views)
 
-```
-crit/
-├── main.go              # Entry point: subcommand dispatcher + individual runX() functions
-├── server.go            # HTTP handlers: REST API (session, file, comments CRUD, finish, share, config)
-├── session.go           # Core state: multi-file session, comment storage, review file persistence, SSE
-├── watch.go             # File/git watching, round-complete handlers, comment carry-forward
-├── git.go               # Git integration: branch detection, changed files, diff parsing
-├── github.go            # GitHub PR sync: fetch/post PR comments, crit comment CLI, review file I/O
-├── config.go            # Config file loading: ~/.crit.config.json + .crit.config.json merge, ignore patterns
-├── diff.go              # LCS-based line diff for inter-round markdown comparison
-├── status.go            # Terminal status output formatting
-├── daemon.go            # Daemon lifecycle: spawn, connect, stop, session registry
-├── share.go             # Share/unpublish to crit-web, share CLI subcommand
-├── plans.go             # Plan file detection and handling
-├── integrations.go      # Integration config installation (crit install <agent>)
-├── gen_integration_hashes.go     # Script to regenerate integration content hashes
-├── integration_hashes_gen.go     # Generated integration content hashes
-├── main_test.go         # Subcommand argument parsing tests
-├── testutil_test.go     # Shared test helpers (initTestRepo, runGit, writeFile, flushWrites)
-├── *_test.go            # Tests for all Go files above
-├── frontend/
-│   ├── index.html       # HTML shell — references style.css, theme.css, and app.js
-│   ├── app.js           # All JS (multi-file state, rendering, comments, SSE, keyboard shortcuts)
-│   ├── style.css        # Layout, diff rendering, file sections, components
-│   ├── theme.css        # Color themes (light/dark/system CSS variables)
-│   ├── markdown-it.min.js    # Markdown parser (provides source line mappings via token.map)
-│   ├── highlight.min.js      # Syntax highlighter core (languages bundled)
-│   └── mermaid.min.js        # Mermaid diagram renderer
-├── integrations/        # Drop-in config files for AI coding tools (claude-code, cursor, aider, etc.)
-├── e2e/                 # Playwright E2E tests for the frontend
-│   ├── playwright.config.ts         # Five projects: git-mode, file-mode, single-file, no-git, multi-file
-│   ├── setup-fixtures.sh            # Git repo with feature branch
-│   ├── setup-fixtures-filemode.sh   # Plain files without git
-│   ├── setup-fixtures-singlefile.sh # Single markdown file
-│   ├── setup-fixtures-multifile.sh  # Multiple code + markdown files
-│   ├── setup-fixtures-nogit.sh      # File mode without git (no-git)
-│   └── tests/           # Test specs (naming convention determines which project runs them)
-├── go.mod
-├── Makefile             # build / build-all (cross-compile) / update-deps / clean / e2e
-├── package.json         # Frontend dependency management (markdown-it, highlight.js, mermaid)
-├── copy-deps.js         # Copies npm deps to frontend/ for embedding
-├── LICENSE              # MIT
-└── README.md
+Each mode dynamically loads its own script set. They share: theme pill, settings overlay, and extracted modules.
+
+## Module Pattern
+
+All custom JS uses the IIFE + dual-export pattern:
+
+```javascript
+(function () {
+  'use strict';
+  // ... implementation ...
+  var api = { publicFn1, publicFn2 };
+  if (typeof window !== 'undefined') {
+    window.crit = window.crit || {};
+    window.crit.<namespace> = api;
+  }
+  if (typeof module === 'object' && module.exports) {
+    module.exports = api;
+  }
+})();
 ```
 
-## Key Architecture Decisions
+- Runtime: accessed via `window.crit.<namespace>`
+- Tests: required via `module.exports` (Node.js `--test`)
+- Never use ES modules (`import`/`export`) — no build step exists
 
-1. **All frontend assets embedded** via Go's `embed.FS` — produces a true single binary
-2. **No frontend build step** — vanilla JS, no npm/webpack/framework. npm is only for fetching vendor libs.
-3. **Multi-file sessions** — `crit` (no args) auto-detects git changes; `crit file1 file2` reviews specific files
-4. **Two modes**: "git" mode (auto-detect from git) and "files" mode (explicit file arguments)
-5. **markdown-it for parsing** — chosen because it provides `token.map` (source line mappings per block)
-6. **Block-level splitting** — lists, code blocks, tables, blockquotes are split into per-item/per-line/per-row blocks so each source line is independently commentable
-7. **Diff hunk rendering** — code files show git diffs with dual gutters (old/new line numbers)
-8. **Comments reference source line numbers** — stored in the review file (`~/.crit/reviews/<key>.json`) with per-file sections
-9. **Real-time output** — review file written on every comment change (200ms debounce)
-10. **GitHub-style gutter interaction** — click-and-drag on line numbers to select ranges
-11. **File watching** — git mode polls `git status --porcelain`; files mode polls mtimes; reloads via SSE
-12. **Localhost only** — server binds to `127.0.0.1`, no CORS headers needed
-13. **Two-level config** — `~/.crit.config.json` (global) merged with `.crit.config.json` (project), CLI flags override both. Exception: `agent_cmd` is global-only and cannot be set by project config (prevents malicious repos from hijacking the agent command)
-14. **GitHub PR sync** — `crit pull` / `crit push` bridge between the review file and GitHub PR review comments via `gh` CLI
+## Shared Modules (used by both modes)
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| Module | Namespace | Purpose |
+|--------|-----------|---------|
+| `crit-shared.js` | `window.crit.shared` | Cookie helpers, theme, tip rotation, image upload |
+| `crit-renderer.js` | `window.crit.renderer` | ContentRenderer registry (register/deregister/current) |
+| `crit-sse.js` | `window.crit.sse` | SSE client factory (createSSE) |
+| `crit-draft.js` | `window.crit.draft` | Autosave drafts to localStorage |
+| `crit-comment-templates.js` | `window.crit.commentTemplates` | Template bar + saved-snippet CRUD |
+| `crit-comment-form.js` | `window.crit.commentForm` | Shared comment form creation |
+| `crit-comment-card.js` | `window.crit.commentCard` | Comment card rendering + reply threading |
+| `crit-comment-card-helpers.js` | `window.crit.commentCardHelpers` | Author colors, timestamps, markdown rendering |
+| `crit-settings-overlay.js` | `window.crit.settingsOverlay` | Settings dialog lifecycle |
+| `crit-settings-panes.js` | `window.crit.settingsPanes` | Settings tab content |
+
+## Code-Review Modules (used only by code-review mode)
+
+| Module | Namespace | Purpose |
+|--------|-----------|---------|
+| `crit-icons.js` | `window.crit.icons` | SVG icon constants (ICON_CHEVRON, ICON_EDIT, etc.) |
+| `crit-line-blocks.js` | `window.crit.lineBlocks` | buildLineBlocks, splitHighlightedCode, buildCodeLineBlocks |
+| `crit-diff-renderer.js` | `window.crit.diffRenderer` | Word-level diff computation (lineSimilarity, wordDiff, etc.) |
+
+## ContentRenderer Interface
+
+Modes register a renderer that the shared chrome (comment cards, settings) can call without knowing the active mode:
+
+```javascript
+window.crit.renderer.register({
+  scrollToAnchor(anchor),     // scroll viewport to a comment's target
+  highlightAnchor(anchor),    // visually highlight the target
+  clearHighlight(),           // remove highlight
+  onAnnotationIntent(cb),     // subscribe to "user wants to comment here"
+  getMode(),                  // "code-review" | "live"
+  getAnchorType(),            // "line" | "dom"
+});
+```
+
+Code-review registers its renderer in `app.js`. Live-mode registers in `live-mode.js`.
+
+## Script Loading
+
+No bundler. Scripts are loaded dynamically with `async=false` (preserves execution order while loading in parallel). A Promise-based boot gate waits for all dependencies before loading the mode's main entry point:
+
+1. Early scripts (shared helpers) load first
+2. `liveDeps` array lists all sub-modules
+3. `Promise.all(bootGate)` waits for all load events
+4. Only then loads `live-mode.js` (or `app.js` for code-review)
+
+When adding a new shared module:
+- Add to `liveDeps` array in `index.html` if live-mode needs it
+- Add to the code-review script chain if code-review needs it
+- Both modes must load shared modules BEFORE their main entry point
+
+## Live-Mode Sub-Modules
+
+Live-mode splits into focused files under `window.crit.live.<name>`:
+
+| File | Namespace | Concern |
+|------|-----------|---------|
+| `live-mode.dispatch.js` | `.live.dispatch` | Message dispatch table |
+| `live-mode.toggle.js` | `.live.toggle` | Pin/Browse mode toggle |
+| `live-mode.composer.js` | `.live.composer` | Comment composition UI |
+| `live-mode.panel.js` | `.live.panel` | Side panel lifecycle |
+| `live-mode.panel-render.js` | `.live.panelRender` | Panel card rendering |
+| `live-mode.sse.js` | `.live.sse` | Live-mode SSE handlers |
+| `live-mode.size.js` | `.live.size` | Panel resize logic |
+| `live-mode.queue.js` | `.live.queue` | Batched pin push queue |
+| `live-mode.origin.js` | `.live.origin` | Origin/proxy URL resolution |
+| `live-mode.row.js` | `.live.row` | Per-route section rendering |
+
+## Adding a New Module
+
+1. Create the IIFE file with the dual-export pattern
+2. Add it to `liveDeps` or code-review script chain in `index.html`
+3. Create a matching `web/__tests__/<name>.test.js` using Node's `--test`
+4. Add the test file to `Makefile` `e2e-live-utils` target (if live-mode)
+5. Document dependencies in a header comment (which `window.crit.*` namespaces it reads)
 
 ---
 > Source: [tomasz-tomczyk/crit](https://github.com/tomasz-tomczyk/crit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
