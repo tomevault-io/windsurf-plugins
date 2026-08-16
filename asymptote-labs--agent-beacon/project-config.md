@@ -1,121 +1,120 @@
 ---
 trigger: always_on
-description: Guidance for Claude Code and other coding agents working in this repository.
+description: Instructions for a coding agent asked to verify a Beacon change end to end.
 ---
 
-# CLAUDE.md
+# beacon-sandbox: agent guide
 
-Guidance for Claude Code and other coding agents working in this repository.
+Instructions for a coding agent asked to verify a Beacon change end to end.
 
-## Project Scope
+This tool rents a disposable Linux sandbox, installs the Beacon under test, runs a **real Claude
+Code session** inside it, and checks whether Beacon recorded what the agent actually did. Human
+documentation is in `README.md` and on the docs site; this file is the operating manual.
 
-Beacon Endpoint Agent is a local-only endpoint telemetry agent for AI runtimes. The shipping code paths are:
-
-- `cli/beacon`: public `beacon` CLI and endpoint runtime.
-- `cli/beacon-hooks`: hook adapter invoked by Cursor and other supported runtimes.
-- `collector-builder`: OpenTelemetry Collector distribution and Beacon JSONL exporter.
-- `packaging`: macOS packaging and deployment assets.
-
-Do not recreate or depend on removed `asymptote` mirror trees. Keep new work focused on the Beacon paths above.
-
-## Product Posture
-
-- Beacon is visibility-first endpoint telemetry for local AI agent runtimes, not a hosted policy service or general endpoint protection product.
-- Preserve the local-only product posture. The public Beacon build should not require a hosted account, remote policy fetch, hosted dashboard, or external network dependency during normal hook execution.
-- Do not add dependency vulnerability scanning, OSV/GHSA lookups, package remediation, or other vulnerability-enforcement flows to the public hook path.
-- Do not add broad runtime enforcement unless explicitly requested. Current control behavior is limited to hook-native approvals/denials exposed by supported agent runtimes.
-- Keep direct destination support scoped to local JSONL/Wazuh unless explicitly requested. Other SIEM/observability systems should consume the local output through customer-managed forwarding.
-- Default content retention should remain metadata-only. Prompt text, command output, raw tool inputs, raw OTLP attributes, and raw diffs must be opt-in via explicit retention configuration and must pass through local redaction/size limits where supported.
-
-## Telemetry Scope
-
-Supported runtime surfaces today:
-
-- Claude Code and Codex CLI telemetry configuration through local OpenTelemetry settings.
-- Cursor hook telemetry for sessions, prompt submission, tool use, command execution, MCP-like tool activity, approval decisions, and file edits where hook payloads expose those fields.
-- Claude Cowork admin-configured OpenTelemetry setup guidance and local validation.
-- `beaconjson` OpenTelemetry Collector exporter that converts OTLP logs, traces, metrics, and resource attributes into Beacon endpoint JSONL.
-- A local-only dashboard served by `beacon endpoint dashboard`, bound to loopback by default and backed by the runtime JSONL log.
-
-Current non-goals unless explicitly requested:
-
-- Kernel/process monitoring, EDR replacement, shell history scraping, cloud audit ingestion, browser/SaaS telemetry, credential-use attribution, and MCP configuration inventory.
-- Direct hosted integrations for Datadog, Splunk, Elastic, Snowflake, Chronicle, Panther, or other SIEM destinations.
-- Dependency vulnerability scanning or package security remediation.
-
-## Common Commands
-
-Run tests for the public CLI:
+## Always start here
 
 ```bash
-cd cli/beacon
-go test ./...
-go test -race ./internal/endpoint/...
+cd beacon-sandbox
+go run ./cmd/beacon-sandbox doctor                      # for a Linux run (the default)
+go run ./cmd/beacon-sandbox doctor --provider github    # for a Windows run
 ```
 
-Run hook adapter tests:
+`--provider` decides which prerequisites are checked, because they differ: a Linux run needs a
+Modal account and a local Beacon build, a Windows run needs `gh` and a dispatchable workflow.
+Running the wrong set reports failures for things the chosen provider does not use.
+
+`doctor` is free, needs no sandbox, and catches the failure modes that otherwise appear
+mid-run as something else entirely. Add `--fix` to let it download the collector binary.
+
+If `doctor` reports FAIL, apply the printed `fix` and rerun it. Do not proceed to `run` with a
+failing check — the run will fail later and more confusingly.
+
+`doctor --json` gives machine-readable output with a top-level `ready` boolean.
+
+### What you can fix yourself, and what you must not
+
+Resolve these two directly:
 
 ```bash
-cd cli/beacon-hooks
-go test ./...
+cd cli/beacon && make build-linux-amd64                          # beacon_binary
+cd beacon-sandbox && go run ./cmd/beacon-sandbox doctor --fix    # collector_binary (downloads it)
 ```
 
-Run packaging wrapper checks:
+**Do not attempt the other two.** They need the user, and trying them yourself wastes a turn or
+hangs outright:
+
+- **`modal_auth`** — `modal token new` completes through an authenticated *web session*, so it
+  opens a browser and blocks. Running it yourself hangs until timeout. Ask the user to run it,
+  suggesting `! pip install modal && modal token new` so the output lands in the conversation. In
+  CI, `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` work non-interactively instead.
+- **`anthropic_credential`** — never invent, echo, or write a key. Ask which path the user wants:
+  `ANTHROPIC_API_KEY`, `--api-key-command CMD`, or `--modal-secret NAME` (most secure; the value
+  never enters this process, at the cost of the artifact leak check reporting *unverified*).
+
+## Before spending money
+
+A run costs roughly **$0.06 of sandbox time plus a few cents of Anthropic API usage**. That is
+real money on the user's account, so:
+
+- Tell the user what you are about to run and roughly what it costs.
+- Use `--scenario <id>` while iterating. Only run the full suite when asked or before a PR.
+- Never loop the suite unattended, and never use `--repeat` without being asked.
+- If you only changed *what counts as correct*, use `verify` instead — it is free.
+
+## Choosing what to run
+
+| You changed | Run |
+|---|---|
+| Command capture / exporter tool handling | `--scenario s02-bash-command` |
+| File read or write signals | `--scenario s03-file-write` or `s04-file-read` |
+| Prompt, session, token, or cost capture | `--scenario s01-hello` |
+| Approval or permission handling | `--scenario s07-denied-tool` |
+| `endpoint install`, config paths, service startup | `--scenario i01-install-supervised` |
+| The systemd backend, unit files, Linux system mode | `--scenario i02-install-systemd` |
+| Anything Windows | `--provider github --scenario w00-probe` |
+| Something broad, or preparing a PR | the whole suite (no `--scenario`) |
 
 ```bash
-sh packaging/macos/test-endpoint-scripts.sh
+go run ./cmd/beacon-sandbox run --scenario s02-bash-command   # one scenario
+go run ./cmd/beacon-sandbox run                               # the whole suite, ~30 min, ~$0.70
 ```
 
-Run the macOS endpoint smoke test:
+`run` with no `--scenario` is the suite command. Other flags: `--repeat N` to tell flaky from
+broken, `--keep-sandbox` to leave the instance up for debugging.
+
+## The trap that matters most
+
+**If the change touches `collector-builder/`, the collector must be rebuilt.** Telemetry
+normalization compiles into `beacon-otelcol`, not the `beacon` CLI. Verifying an exporter change
+against a downloaded or previously built collector produces a passing run that proves nothing
+about the change.
+
+`doctor` warns about this (`collector_freshness`). When it does, rebuild:
 
 ```bash
-sh packaging/macos/smoke-endpoint.sh
+go install go.opentelemetry.io/collector/cmd/builder@v0.121.0
+cd collector-builder && mkdir -p dist
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 "$(go env GOPATH)/bin/builder" --config builder.yaml
+cp dist/beacon-otelcol/beacon-otelcol dist/beacon-otelcol/linux_amd64/beacon-otelcol
 ```
 
-Build the CLI:
+This has already caused one wasted investigation: a stale collector made an
+already-fixed bug still look broken.
 
-```bash
-cd cli/beacon
-make build
-```
+`collector_freshness` covers three ways the binary can be wrong: uncommitted changes under
+`collector-builder/`, a downloaded release binary with exporter changes committed since that
+release, and a locally built binary older than its sources. It also reports a release tag the clone
+cannot resolve as *unknowable* rather than fresh — if you see that, run `git fetch --tags` or
+rebuild. Rebuilding locally clears the warning; provenance is tied to the binary on disk, so the
+warning can always be satisfied by doing what it asks.
 
-Run Collector exporter tests:
+## Reading the result
 
-```bash
-cd collector-builder/exporter/beaconjsonexporter
-go test ./...
-```
+Three outcomes, and the third is what makes the tool trustworthy:
 
-Run the local dashboard during manual testing:
 
-```bash
-cd cli/beacon
-go run . endpoint dashboard --user
-```
-
-## Implementation Notes
-
-- Prefer deterministic tests that use `t.TempDir()`, `t.Setenv("HOME", ...)`, fake binaries, and free local ports.
-- Avoid tests that require root, real `launchctl` service changes, Wazuh, a live collector, or external network access.
-- For macOS-only behavior, gate tests with `runtime.GOOS == "darwin"` or assert the non-Darwin contract explicitly.
-- Keep endpoint event schema fields stable: `vendor`, `product`, `schema_version`, required event fields, and Wazuh-compatible JSONL output are release contracts.
-- Preserve optional event fields for agent-native metadata (`session`, `tool`, `file`, `command`, `mcp`, `approval`, `content`, `model`, `repository`, and `branch`) without changing existing required field semantics.
-- Prefer metadata-first telemetry. If adding a new signal, include stable identifiers/counts/hashes before considering raw content.
-- Keep the dashboard read-only. It should inspect local status and JSONL events but must not mutate endpoint configuration or telemetry.
-- Keep the release readiness guidance in `README.md` up to date when install, packaging, collector, or dashboard behavior changes.
-
-## CI Expectations
-
-CI runs:
-
-- `go test ./...` in `cli/beacon`.
-- `go test -race ./internal/endpoint/...` in `cli/beacon`.
-- `go test ./...` in `cli/beacon-hooks`.
-- `go test ./...` in `collector-builder/exporter/beaconjsonexporter`.
-- CLI help smoke checks for the public command tree.
-- macOS packaging script validation via `packaging/macos/test-endpoint-scripts.sh`.
-- macOS endpoint smoke validation via `packaging/macos/smoke-endpoint.sh`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Asymptote-Labs/agent-beacon](https://github.com/Asymptote-Labs/agent-beacon) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
