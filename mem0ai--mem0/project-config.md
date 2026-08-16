@@ -1,127 +1,74 @@
 ---
 trigger: always_on
-description: This file provides context for AI coding assistants (Claude Code, Cursor, GitHub Copilot, Codex, etc.) working with the Mem0 repository.
+description: > **Do not modify any workflow without explicit approval from a maintainer.** Publishing
 ---
 
-# AGENTS.md
+# CI/CD and repository automation (`.github/`)
 
-This file provides context for AI coding assistants (Claude Code, Cursor, GitHub Copilot, Codex, etc.) working with the Mem0 repository.
+> **Do not modify any workflow without explicit approval from a maintainer.** Publishing
+> credentials are bound to workflow filenames, and the gate workflows decide whether
+> contributions are accepted. Read this file before proposing any change here.
 
-## Project Overview
+## CI: one gate, many pipelines
 
-**Mem0** ("mem-zero") is an intelligent memory layer for AI agents and assistants. It provides persistent, personalized memory via both a hosted platform API and self-hosted open-source SDKs.
+`ci-gate.yml` (**CI Gate**) is the single entry point. It runs on every PR, detects which packages changed, and calls only the relevant package workflows as reusable workflows (`workflow_call`). Its final `CI Gate` job aggregates the results: skipped pipelines pass, failed or cancelled ones fail. It is the **only CI status check that needs to be required** in branch protection.
 
-- **Repository**: https://github.com/mem0ai/mem0
-- **Documentation**: https://docs.mem0.ai
-- **License**: Apache-2.0
+Package workflows keep their own push-to-main and manual triggers. Their `pull_request` triggers live in the gate's path filters instead.
 
-## Repository Structure
+| Workflow | File | Standalone triggers | Runs |
+|----------|------|---------------------|------|
+| CI Gate | `ci-gate.yml` | All PRs | Routes to and aggregates everything below |
+| Python SDK | `ci.yml` | Push to main | Ruff + pytest on Python 3.10, 3.11, 3.12 |
+| TypeScript SDK | `ts-sdk-ci.yml` | Push to main (`mem0-ts/`) | Prettier + build + jest on Node 20, 22 |
+| Python CLI | `cli-python-ci.yml` | Push to main (`cli/python/`), manual | Ruff + pytest + hatch build on Python 3.10, 3.11, 3.12 |
+| Node CLI | `cli-node-ci.yml` | Push to main (`cli/node/`), manual | Biome + tsc + vitest + tsup on Node 20, 22 |
+| OpenClaw | `openclaw-checks.yml` | Push to main (`integrations/openclaw/`), manual | tsc + vitest (Codecov) + tsup on Node 20, 22 |
+| Mem0 Plugin | `mem0-plugin-checks.yml` | Push to main (`integrations/mem0-plugin/`, excluding `.opencode-plugin/`), manual | pytest + hook exec bits + JSON manifest validation on Python 3.10, 3.11, 3.12 |
+| OpenCode Plugin | `opencode-plugin-checks.yml` | Push to main (`.opencode-plugin/`), manual | Bun: tsc + build + dist artifact check |
+| Pi Agent Plugin | `pi-agent-plugin-checks.yml` | Push to main (`integrations/pi-agent-plugin/`), manual | tsc + vitest + tsup on Node 20, 22 |
+| n8n Node | `n8n-nodes-mem0-checks.yml` | Push to main (`integrations/n8n-nodes-mem0/`), manual | ESLint + tsc build on Node 20 |
+| Zapier App | `zapier-mem0-checks.yml` | Push to main (`integrations/zapier-mem0/`), manual | tsc + `zapier validate` + offline unit tests on Node 22 |
+| docs llms.txt | `docs-llms-txt-check.yml` | Manual | `docs/llms.txt` coverage |
 
-This is a **polyglot monorepo** containing Python and TypeScript packages, CLIs, servers, plugins, and documentation.
+Adding a package CI workflow: give it `workflow_call` plus `push` / `workflow_dispatch` as needed but **no `pull_request` trigger**, then register it in `ci-gate.yml` with a path filter under the `changes` job, a call job, and an entry in the gate job's `needs` list.
 
-### Key Directories
+## Branch protection on `main`
 
-| Directory | Description |
-|-----------|-------------|
-| `mem0/` | Core Python SDK (`mem0ai` on PyPI) — memory, LLMs, embeddings, vector stores, graphs, rerankers |
-| `mem0-ts/` | TypeScript SDK (`mem0ai` on npm) — client + OSS memory |
-| `cli/python/` | Python CLI (`mem0-cli` on PyPI) — Typer-based, entry point `mem0` |
-| `cli/node/` | Node CLI (`@mem0/cli` on npm) — Commander-based, entry point `mem0` |
-| `integrations/` | **Agent & editor integrations**, one directory per integration (see "Adding a New Integration") |
-| `integrations/mem0-plugin/` | AI editor plugins (Claude Code, Cursor, Codex) — MCP server connection, lifecycle hooks, skills. Contains nested `.opencode-plugin/` (`@mem0/opencode-plugin`) |
-| `integrations/openclaw/` | `@mem0/openclaw-mem0` — OpenClaw plugin for Claude Code / AI editors |
-| `integrations/pi-agent-plugin/` | `@mem0/pi-agent-plugin` — Pi Agent plugin |
-| `integrations/vercel-ai-sdk/` | `@mem0/vercel-ai-provider` — Vercel AI SDK memory provider |
-| `server/` | FastAPI REST server for self-hosted Mem0 (Docker: FastAPI + PostgreSQL/pgvector + Neo4j) |
-| `openmemory/` | Self-hosted memory platform — `api/` (FastAPI + Alembic + MCP server) and `ui/` (Next.js 15 + React 19) |
-| `skills/` | Claude Code skill definitions. Reference skills (SDK knowledge, always-on): `mem0/`, `mem0-cli/`, `mem0-vercel-ai-sdk/`. Pipeline skills (run on demand): `mem0-integrate/`, `mem0-test-integration/`, `mem0-oss-to-platform/` |
-| `docs/` | Documentation site (Mintlify) |
-| `tests/` | Python SDK tests (pytest) |
-| `evaluation/` | Submodule → [`mem0ai/memory-benchmarks`](https://github.com/mem0ai/memory-benchmarks) — benchmarking (LOCOMO, LongMemEval, BEAM) lives in that repo |
-| `examples/` | Sample projects & runnable demos — apps, Chrome extension, multi-agent patterns, and Jupyter notebooks (`notebooks/`) |
-| `pr-reviews/` | Pull request review materials |
-| `scripts/` | Repo-wide utility scripts (e.g., `check-llms-txt-coverage.py` for docs/llms.txt sync) |
+A repository ruleset named `Main Branch Rule`, id `11813754`. It enforces squash-only merges, linear history, no deletion, no force-push, and one approving review. Two status checks belong in its `required_status_checks` rule:
 
-### Core Package Dependencies
+| Context | Posted by | Why |
+|---------|-----------|-----|
+| `CI Gate` | `ci-gate.yml` | Aggregates every package pipeline |
+| `license/cla` | CLA Assistant | Proves the CLA is signed, not merely requested |
 
-```
-mem0 (Python SDK)          mem0-ts (TypeScript SDK)
-├── mem0/memory/           ├── src/client/        (MemoryClient — hosted)
-├── mem0/llms/             └── src/oss/           (Memory — self-hosted)
-├── mem0/embeddings/           ├── src/llms/
-├── mem0/vector_stores/        ├── src/embeddings/
-├── mem0/graphs/               ├── src/vector_stores/
-└── mem0/reranker/             └── src/graphs/
+Editing the ruleset requires repo **admin**. `maintain` is not enough, and the API returns 404 rather than 403 in that case. Until `license/cla` is required, the claim in `CONTRIBUTING.md` that unsigned PRs are blocked from merging holds by convention only.
 
-cli/python/ ──▶ mem0ai (optional, for OSS mode)
-cli/node/   ──▶ mem0ai (npm, for API calls)
-integrations/vercel-ai-sdk/ ──▶ ai, @ai-sdk/* providers
-integrations/openclaw/ ──▶ mem0ai (npm)
-```
+Requiring `CI Gate` also means fork PRs from first-time contributors cannot merge until a maintainer approves the workflow run. Those sit at `action_required`, which is intended behavior.
 
-## Development Setup
+## CD: one router, many publishers
 
-### Requirements
+`release.yml` (**Release Router**) is the only workflow listening to `release: published`. It matches the tag prefix and dispatches the matching package workflow through `workflow_dispatch`, so one release produces exactly one routed run.
 
-- **Python**: 3.9+ (3.10+ for CLI)
-- **Node.js**: v18+ (v20 or v22 recommended)
-- **pnpm**: v10+ (`npm install -g pnpm@10`) — used for all TypeScript packages
-- **Hatch**: Python build/environment tool (`pip install hatch`)
-- **Docker**: Required for `server/` and `openmemory/` development
+| Workflow | File | Tag prefix | Target |
+|----------|------|------------|--------|
+| Release Router | `release.yml` | all releases | dispatches the rows below |
+| Python SDK | `cd.yml` | `v*` | PyPI (`mem0ai`) |
+| TypeScript SDK | `ts-sdk-cd.yml` | `ts-v*` | npm (`mem0ai`) |
+| Python CLI | `cli-python-cd.yml` | `cli-v*` | PyPI (`mem0-cli`) |
+| Node CLI | `cli-node-cd.yml` | `cli-node-v*` | npm (`@mem0/cli`) |
+| Vercel AI SDK | `vercel-ai-cd.yml` | `vercel-ai-v*` | npm (`@mem0/vercel-ai-provider`) |
+| OpenClaw | `openclaw-cd.yml` | `openclaw-v*` | npm (`@mem0/openclaw-mem0`) |
+| OpenCode Plugin | `opencode-plugin-cd.yml` | `opencode-v*` | npm (`@mem0/opencode-plugin`) |
+| Pi Agent Plugin | `pi-agent-plugin-cd.yml` | `pi-agent-v*` | npm (`@mem0/pi-agent-plugin`) |
+| n8n Node | `n8n-nodes-mem0-cd.yml` | `n8n-nodes-mem0-v*` | npm (`@mem0/n8n-nodes-mem0`) |
 
-### Initial Setup
-
-```bash
-# Python SDK
-hatch shell dev_py_3_11           # creates environment with all deps
-pre-commit install                # install git hooks
-
-# TypeScript packages
-cd mem0-ts && pnpm install        # TS SDK
-cd cli/node && pnpm install       # Node CLI
-cd integrations/vercel-ai-sdk && pnpm install  # Vercel AI provider
-cd integrations/openclaw && pnpm install       # OpenClaw plugin
-```
-
-## Build, Lint, and Test Commands
-
-### Python SDK (`mem0/`)
-
-```bash
-# Environment setup (uses Hatch)
-hatch shell dev_py_3_11           # or dev_py_3_9, dev_py_3_10, dev_py_3_12
-
-# Linting and formatting
-make lint                          # ruff check
-make format                        # ruff format
-make sort                          # isort mem0/
-
-# Tests
-make test                          # pytest tests/
-make test-py-3.9                   # test specific Python version (3.9–3.12)
-
-# Build and publish
-make build                         # hatch build
-make publish                       # hatch publish
-```
-
-- **Python:** 3.9, 3.10, 3.11, 3.12
-- **Linter/formatter:** Ruff (line length **120**)
-- **Import sorting:** isort (`profile = "black"`)
-- **Test framework:** pytest (with pytest-mock, pytest-asyncio)
-- **Pre-commit hooks:** ruff + isort — run `pre-commit install` before committing
-
-### TypeScript SDK (`mem0-ts/`)
-
-```bash
-cd mem0-ts
-pnpm install
-pnpm run build                     # tsup
-pnpm run test                      # jest (all tests)
-pnpm run test:unit                 # jest --coverage (unit tests only)
+- Package CD workflows are `workflow_dispatch`-only, with `tag` and `prerelease` inputs. They check out and build the given tag.
+- All publishing uses **OIDC trusted publishing**. No tokens, no secrets.
+- Registry trusted-publisher settings are pinned to each package's own workflow **filename**. Renaming a CD workflow breaks publishing for that package.
+- First publish of a new npm package must be done manually. OIDC works from the second version onward.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mem0ai/mem0](https://github.com/mem0ai/mem0) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
