@@ -1,130 +1,94 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code when working with the OpenRewrite TypeScript implementation.
+description: This module parses Ruby with **Prism**, run standalone: `RubyParser` hands the source
 ---
 
-# CLAUDE.md
+# rewrite-ruby Guidelines
 
-This file provides guidance to Claude Code when working with the OpenRewrite TypeScript implementation.
+## Parser front end
 
-## Module Overview
+This module parses Ruby with **Prism**, run standalone: `RubyParser` hands the source
+bytes to `org.ruby_lang.prism.wasm.Prism` with explicit `ParsingOptions` and loads the
+result with `Loader`. There is no `org.jruby.Ruby` runtime, and the dependencies are
+`prism-parser-api`/`prism-parser-wasm` directly, pinned to the versions JRuby 10.1.1.0
+ships.
 
-TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON and YAML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
+Compile against `org.ruby_lang.prism.*`. The same classes appear relocated as
+`org.jruby.internal.prism.*` inside `jruby-complete` — never depend on that jar.
 
-Self-contained Node.js project, separate from the Java monorepo build system.
+Three things shape `RubyParserVisitor`:
 
-## Project Setup
+- **Byte offsets.** Every Prism node carries `startOffset`/`length` as offsets into the
+  source *bytes*, while the LST and the printer work on the decoded `String`.
+  `PrismSource` owns both and translates between them; that translation is what makes
+  non-ASCII source round-trip. Use `prefix(node)` to consume up to a node's start — it
+  asserts the cursor landed exactly there, so a desync fails with file and offset
+  context instead of corrupting everything downstream.
+- **No comments, no token positions.** `ParseResult` has no comment array and the node
+  classes carry no `nameLoc`/`operatorLoc`/`openingLoc`, so whitespace, comments and
+  keywords are still re-lexed from the source with a linear `int cursor`. Node offsets
+  anchor that scanning; `peekWhitespace` survives only for genuinely optional tokens
+  (`then`, `do`, trailing commas).
+- **Heredocs live outside their node's span.** A heredoc node covers only its `<<~ID`
+  opener. Openers are queued as they are seen and their bodies are claimed the first
+  time the cursor crosses a newline, then folded into the tree by a final pass keyed by
+  node id. A body only closes on a line holding nothing but the terminator — indented
+  only for `<<~`/`<<-`, at column 0 for a plain `<<ID`. `Rb.Heredoc` keeps the opener and
+  the terminator as their own fields, and the printer replays the body at the first
+  newline it emits after the opener, so no recipe that rewrites whitespace can strand it.
 
-From `rewrite-javascript/rewrite/`:
-```bash
-npm install
-```
+Three Prism behaviors worth knowing: `partialScript` is on so that fragments with a
+top-level `next`/`break`/`return` parse, `mainScript` is off so that a shebang naming
+something other than ruby is just a comment, and Prism will not close a heredoc whose
+terminator ends the file without a trailing newline, so it is always handed a
+newline-terminated copy of the bytes.
 
-Via Gradle (from repo root):
-```bash
-./gradlew :rewrite-javascript:npmInstall
-./gradlew :rewrite-javascript:npm_test
-./gradlew :rewrite-javascript:npm_run_build
-```
+Prism models no location for several tokens the printer has to put back, and in each
+case the source is read at a node offset rather than guessed:
 
-Requires Node.js 18+.
+- **Brackets, parentheses and their absence.** An array literal and an implicit array
+  (`a, b = 1, 2`) share one node type, as do a parenthesized target list and a bare
+  one; they are told apart by the gap the delimiter leaves between the node's own start
+  and its first element. A parameter or argument list is written on the same line as
+  the name it follows, so a `(` opening the next line is a grouped expression.
+- **Operators and index calls.** `a.+(b)` and `x&.[](i)` are ordinary calls that share
+  a node with `a + b` and `x[i]`; what the source writes after the receiver decides.
+- **The `=` of an endless method**, found by peeking past the parameter list.
+- **The `begin` keyword.** The implicit begin of a `def`, block or class body spans the
+  whole construct, so only a node starting at the cursor has a `begin` of its own.
 
-## Running Tests
+Ruby syntax the visitor has not been taught reaches `defaultVisit`, which throws with
+the Prism node name. There are no known gaps: every file that is Ruby in the redmine and
+dependabot-core corpora parses. `README.md` has the full inventory of what maps where.
 
-```bash
-# Full suite (typecheck + build + test)
-npm test
+`RubyCorpusTest` measures where a new gap would bite. It is skipped unless
+`-Druby.corpus.dir=<dir>` is set, and prints a parse rate plus a histogram of failure
+causes; alongside its report it writes `<report>.failures` (one `cause<TAB>path` line
+per file) and `<report>.messages` (the full message per file), since the histogram
+keeps only one sample per cause.
 
-# Fast iteration (skip typecheck)
-npm run testhelper
+## Mapping notes
 
-# Type-checking only
-npm run typecheck
+**`;` is a statement separator, and lives on the statement it follows.** A `;` after a
+statement is the existing `org.openrewrite.java.marker.Semicolon` marker on that
+statement's `JRightPadded`, whose suffix holds the space in front of it — the same
+place Java puts it, and the only place that prints in the right order. A `;` with
+nothing in front of it (`def x; end`, `if c; body end`, the second `;` of `a;;b`) is a
+`J.Empty` statement carrying the same marker, so the statement list still accounts for
+every byte and recipes see a real element rather than a hidden one. `bodyStatement`
+therefore keeps a `J.Block` whenever a separator is present instead of collapsing to
+the sole statement.
 
-# Individual test file
-npm run testhelper -- test/javascript/recipes/order-imports.test.ts
-```
+**An endless method body is a `J.Block` marked `OmitBraces`** holding one statement:
+the block prefix is the space before the `=`, the statement prefix the space after it.
+`rewrite-scala` prints `def f = expr` the same way.
 
-Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `ci:test`, `start`.
-
-### Java RPC Integration Tests
-
-Tests under `test/rpc/` that exercise real Java recipes spawn `org.openrewrite.maven.rpc.JavaRewriteRpc` via `JavaRpcTestServer` (see `src/rpc/java-rpc-client.ts`). They need a classpath file generated from the Java side:
-
-```bash
-# From repo root
-./gradlew :rewrite-javascript:generateTestClasspath
-```
-
-This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Alternatively set `REWRITE_JAVASCRIPT_CLASSPATH` to override. Tests in `test/rpc/java-recipe-via-rpc.test.ts` skip cleanly with a one-line warning when neither is configured.
-
-## Directory Structure
-
-```
-rewrite-javascript/rewrite/
-├── src/
-│   ├── index.ts                         # Main entry point / re-exports
-│   ├── tree.ts, visitor.ts, recipe.ts   # Core framework
-│   ├── markers.ts, execution.ts         # Metadata, execution context
-│   ├── print.ts, parser.ts              # Base printer, base parser
-│   ├── util.ts, uuid.ts                 # Utilities
-│   ├── java/                            # Java LST model
-│   │   ├── tree.ts                      # J namespace (Java AST)
-│   │   ├── visitor.ts                   # JavaVisitor
-│   │   ├── print.ts                     # Java-to-source printer
-│   │   ├── rpc.ts                       # RPC sender/receiver for Java
-│   │   └── type.ts, type-visitor.ts     # Java type system
-│   ├── javascript/                      # JavaScript/TypeScript
-│   │   ├── tree.ts                      # JS namespace (JavaScript AST)
-│   │   ├── visitor.ts                   # JavaScriptVisitor
-│   │   ├── print.ts                     # JS-to-source printer
-│   │   ├── parser.ts                    # JS/TS parser
-│   │   ├── rpc.ts                       # RPC sender/receiver for JS
-│   │   ├── assertions.ts               # Test helpers: typescript(), javascript(), jsx(), tsx(), packageJson()
-│   │   ├── add-import.ts, remove-import.ts  # Import manipulation
-│   │   ├── recipes/                     # Built-in recipes (order-imports, change-import, add-dependency, etc.)
-│   │   ├── format/                      # Formatting visitors
-│   │   ├── cleanup/                     # Cleanup recipes (add-parse-int-radix, prefer-optional-chain, etc.)
-│   │   ├── migrate/                     # Migration recipes (es6/, typescript/)
-│   │   ├── search/                      # Search patterns
-│   │   └── templating/                  # Template engine
-│   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
-│   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
-│   ├── search/                          # Cross-language search utilities
-│   ├── text/                            # Plain text support
-│   ├── rpc/                             # RPC infrastructure
-│   │   ├── queue.ts                     # Message queue
-│   │   ├── rewrite-rpc.ts              # Core RPC protocol
-│   │   ├── server.ts                    # RPC server
-│   │   ├── recipe.ts                    # Recipe RPC bridge
-│   │   ├── trace.ts                     # RPC tracing/debugging
-│   │   └── request/                     # Request types (parse, visit, get-object, etc.)
-│   └── test/                            # Testing infrastructure
-│       └── rewrite-test.ts              # RecipeSpec class, rewriteRun()
-├── test/                                # Vitest tests (mirrors src/ structure)
-│   ├── javascript/                      # JS/TS tests
-│   │   ├── recipes/                     # Recipe tests
-│   │   ├── fixtures/                    # Test npm projects
-│   │   ├── parser/, format/, cleanup/   # Category tests
-│   │   └── search/, templating/, migrate/
-│   ├── java/                            # Java model tests
-│   ├── json/, yaml/                     # JSON/YAML tests
-│   └── rpc/                             # RPC integration tests
-├── tsconfig.json
-├── vitest.config.mts
-└── package.json                         # name: @openrewrite/rewrite
-```
-
-## Development Patterns
-
-### Async Visitor Pattern
-
-**All visitor methods are async.** This supports the RPC nature of the framework.
-
-```typescript
+**A nested destructuring target is `J.Parentheses` around a bracket-less `Rb.Array`**,
+which is the same shape as the top-level target list of `Rb.MultipleAssignment`. `for`
+loops instead spread their targets across the names of one `J.VariableDeclarations`,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openrewrite/rewrite](https://github.com/openrewrite/rewrite) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
