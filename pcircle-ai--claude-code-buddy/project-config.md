@@ -1,87 +1,119 @@
 ---
 trigger: always_on
-description: Gemini can use MeMesh when your application code or local bridge calls the MeMesh HTTP API. Gemini web or AI Studio system instructions alone do not automatically call `localhost`.
+description: This file is a **pointer**, on purpose. It used to carry its own copy of the
 ---
 
-# MeMesh With Google Gemini
+# MeMesh — instructions for AI coding assistants
 
-Gemini can use MeMesh when your application code or local bridge calls the MeMesh HTTP API. Gemini web or AI Studio system instructions alone do not automatically call `localhost`.
+This file is a **pointer**, on purpose. It used to carry its own copy of the
+module tree, the dependency list and the development standards, and a copy is a
+thing that drifts. It was the last file in the repository still quoting a
+benchmark figure (95.40% R@5) that release 4.2.11 was spent proving wrong, and
+its test count was 44 behind. It was also untracked, so no reviewer ever saw it
+change. Both problems had one cause: it duplicated documents that already
+exist, are already public, and are already checked by CI.
 
-## Supported Shape
+So — **read the real documents.** Do not restate them here.
 
-Use this guide when you control one of these:
+| Question | Read |
+|---|---|
+| How do I contribute, what must a PR include, which docs move with a code change | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| What are the modules, how does data flow, why is it built this way | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| What is the MCP / HTTP / CLI surface, exactly | [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md) |
+| What does the product do, how is it installed | [README.md](README.md) |
+| Colour, type, spacing, interaction — before ANY dashboard change | [DESIGN.md](DESIGN.md) |
+| How do I report a vulnerability | [SECURITY.md](SECURITY.md) |
+| I am an agent INSTALLING memesh for a user | [llms-install.md](llms-install.md) |
+| I am an agent USING memesh (the loop, the 9 tools, hygiene) | [AGENTS.md](AGENTS.md) |
+| What changed, and what is merged but unreleased | [CHANGELOG.md](CHANGELOG.md) (`[Unreleased]`) |
 
-- A Gemini API application
-- A local tool wrapper around Gemini
-- A private connector/proxy that can reach local MeMesh
+---
 
-For direct Gemini web chat, use MeMesh manually through the CLI unless you have a connector.
+## The few things that live only here
 
-## Start MeMesh
+Everything below is either non-obvious from the code or specific to working
+with an assistant. If anything here starts duplicating a document above, delete
+it here and link instead.
 
-```bash
-npm install -g @pcircle/memesh
-memesh serve
-```
-
-Default endpoints:
-
-```text
-API:       http://localhost:3737/v1
-Dashboard: http://localhost:3737/dashboard
-```
-
-Verify:
-
-```bash
-curl http://localhost:3737/v1/health
-```
-
-## HTTP Operations
-
-Remember:
+### Running the tests
 
 ```bash
-curl -X POST http://localhost:3737/v1/remember \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "fastapi-backend-decision",
-    "type": "decision",
-    "observations": ["Use FastAPI for automatic OpenAPI docs"],
-    "tags": ["project:api", "tech:fastapi", "topic:backend"]
-  }'
+node scripts/run-tests-isolated.mjs        # whole suite, against a throwaway HOME
+npm test -- --run                          # vitest directly — uses YOUR ~/.memesh
 ```
 
-Recall:
+Prefer the first. The suite writes to `~/.memesh`, so running vitest directly
+mutates your real knowledge graph.
+
+**Do not set `MEMESH_DB_PATH` when running the suite.** Several hook tests
+exercise the "no database yet" branches, and pointing the env var at an
+existing file makes those branches unreachable. An isolated `HOME` is the
+right isolation; a fixed DB path is not.
+
+Pool mode is `forks`, one worker, no file parallelism. That is not a
+preference — several test files share one HOME and therefore one SQLite
+database, and running them concurrently deadlocks on the write lock. It is
+expressed as `maxWorkers: 1` + `fileParallelism: false`; the older
+`singleFork`/`maxForks`/`minForks` keys do not exist in Vitest 4 and were being
+silently ignored.
+
+`npm run typecheck` uses `tsconfig.check.json`, which covers `src/`, `tests/`
+and the root config files. `tsconfig.json` is narrower on purpose — it is the
+config that emits `dist/`.
+
+### Coverage, and what a 0% file means
 
 ```bash
-curl -X POST http://localhost:3737/v1/recall \
-  -H "Content-Type: application/json" \
-  -d '{"query":"backend framework","limit":5}'
+npm run test:coverage        # whole suite + v8 coverage, throwaway HOME
 ```
 
-## Gemini System Instruction
+Read the report with one caveat, or it will mislead you. Coverage is measured
+**in-process**, and this project spawns a lot of what it tests: the CLI, the
+hooks, the MCP server and the packaged binaries are exercised through
+`spawnSync`, so they report **0% while being well tested**.
+`src/transports/cli/cli.ts` is the clearest case — a whole directory of tests
+against it, 0% in the report.
 
-Use this in a Gemini API app that has tools or application code wired to MeMesh:
+What the number is good for is the opposite direction: a file at 0% that is
+*not* spawned anywhere is genuinely unexercised. That is where most of the
+dashboard sits. Do not write the count down here — this file has already been
+wrong about it once, and `tests/dashboard/component-contracts.test.tsx` derives
+the real list from the directory and fails when a component belongs to neither
+side of it.
 
-```markdown
-You have access to MeMesh persistent memory through application-provided tools.
+### Verifying a change before claiming it works
 
-Recall relevant memories before making project-specific recommendations.
-Store durable decisions, bug lessons, architectural constraints, and coding patterns.
-Keep memories concise and tagged by project, topic, and technology.
-If the memory connector is unavailable, do not pretend memory was checked.
+Do not report a test result, a CI status or a benchmark number you did not
+produce in this session. Paste the runner's actual output. `npm run verify:release` is the same gate the publish path runs, and
+`scripts/check-doc-claims.mjs` — which it calls — checks every claim the public
+documents make about the code.
+
+**Read the exit code, not a grep of the output.** `cmd 2>&1 | grep …` returns
+*grep's* status and hides every line the pattern misses. Vitest prints
+`Errors  N errors` for unhandled rejections *while reporting every test as
+passed*, and exits 1 — a branch was pushed as green that way, and CI went
+eight-red on it. Capture the verdict first, then look at detail:
+
+```bash
+node scripts/run-tests-isolated.mjs > /tmp/t.log 2>&1; echo "exit=$?"
+grep -E 'Test Files|Tests |Errors ' /tmp/t.log
 ```
 
-## Minimal App Flow
+When you fix a bug, **revert the fix and confirm the test goes red.** A green
+suite is not evidence that a fix is protected: three tests in this repository
+have passed while the thing they guarded was removed.
 
-1. User asks a project question.
-2. Your app calls `POST /v1/recall` with the user's query.
-3. Your app includes the returned memories in the Gemini request.
-4. After Gemini identifies a durable decision or lesson, your app calls `POST /v1/remember` or `POST /v1/learn`.
+### Working policy
 
-See [Universal Integration Guide](./universal.md) and [API Reference](../api/API_REFERENCE.md).
+How much process a change deserves is decided by its blast radius, not by
+habit. Two modes:
+
+- **Lightweight** — the change is confined to one module or one clear path,
+  needs no multi-surface verification, and touches nothing security-sensitive
+  or destructive. Do it directly: implement, run the affected tests plus
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [PCIRCLE-AI/claude-code-buddy](https://github.com/PCIRCLE-AI/claude-code-buddy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
