@@ -1,12 +1,22 @@
 ---
 trigger: always_on
-description: - testing with sqlite simulation is enough for development. before committing, test the all simulations
+description: - Engine behavior tests use the canonical in-memory storage implementation.
 ---
 
 ## Lix Engine
 
-- testing with sqlite simulation is enough for development. before committing, test the all simulations
+- Engine behavior tests use the canonical in-memory storage implementation.
+- During development, `cargo test -p lix` runs the fast base simulation
+  without compiling external storage adapters.
+- Before committing, run `cargo test -p lix --features all-simulations`
+  to exercise both the base and tracked-state-rebuild simulations.
+- Storage adapters own their conformance tests. Run the relevant adapter package
+  when its implementation or the engine storage contract changes:
+  `cargo test -p lix_storage_rocksdb` or
+  `cargo test -p lix_storage_slatedb`.
+- Engine benchmarks live in `lix_e2e`, whose default backend is
+  RocksDB. Use `--all-features` for the complete backend benchmark build.
 
 ---
 > Source: [opral/lix](https://github.com/opral/lix) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
