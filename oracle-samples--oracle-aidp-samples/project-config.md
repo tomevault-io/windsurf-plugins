@@ -1,70 +1,132 @@
 ---
 trigger: always_on
-description: Global context for working with **Oracle AI Data Platform** from OpenAI Codex CLI. Place this file at
+description: Use this file when Claude Code is operating inside a customer bundle created
 ---
 
-# AGENTS.md — Oracle AI Data Platform (AIDP) Engineer Agent (Codex)
+# CLAUDE.md - Customer Bundle Guidance
 
-Global context for working with **Oracle AI Data Platform** from OpenAI Codex CLI. Place this file at
-`~/.codex/AGENTS.md` (global) or your project root. The 37 `aidp-*` skills under `~/.codex/skills/` (or
-`~/.agents/skills/`) load natively — when a task matches a skill's description, follow that skill.
+Use this file when Claude Code is operating inside a customer bundle created
+for `oracle-ai-data-platform-fusion-autopilot`.
 
-> **Self-contained.** This bundle needs only the **OCI CLI + a `DEFAULT` api_key profile + Python** — no MCP
-> server required. An AIDP MCP is an optional accelerator only (see `config/codex-config.toml.snippet`).
+This is customer/operator guidance, not plugin-maintainer guidance. Treat the
+current directory as a customer project unless the user explicitly asks to work
+on the plugin source code.
 
-## Your AIDP environment — fill these in (do NOT commit real OCIDs)
-Set as shell env vars, or replace the placeholders when a skill asks. Skills pass them to the helper/CLI.
+## Mission
 
-| Variable | Example | Meaning |
-|---|---|---|
-| `AIDP_REGION` | `us-ashburn-1` | OCI region |
-| `AIDP_DATALAKE` | `ocid1.aidataplatform.oc1.iad.<...>` | DataLake (instance) OCID |
-| `AIDP_WORKSPACE` | `<workspace-uuid>` | Workspace id/key |
-| `AIDP_CLUSTER` | `<cluster-key>` | Spark cluster key (must be RUNNING for data/SQL) |
+Help the user turn a Fusion analytics request into a live AIDP and OAC
+experience:
 
-```bash
-export AIDP_REGION=us-ashburn-1
-export AIDP_DATALAKE=<your-datalake-ocid>
-export AIDP_WORKSPACE=<your-workspace-id>
-export AIDP_CLUSTER=<your-cluster-key>
+```text
+Fusion BICC PVOs
+  -> AIDP bronze/silver/gold content-pack pipeline
+  -> OAC AIDP connection and dataset
+  -> OAC workbook
+  -> optional OAC MCP chat
 ```
 
-## The bundled helper
-Interactive Spark SQL / notebook cells run through the bundled helper at **`$HOME/.aidp/aidp_sql.py`**
-(it mints a UPST from the api_key `DEFAULT` profile, auto-creates a scratch notebook, returns JSON). Invoke
-it via Codex's `shell` tool:
+Prefer the conversational route first. Use `aidp-fusion-autopilot` as the
+front door when the user asks for a dashboard, mart, workbook, pipeline run, or
+status check.
 
-```bash
-python "$HOME/.aidp/aidp_sql.py" \
-  --region "$AIDP_REGION" --datalake "$AIDP_DATALAKE" --workspace "$AIDP_WORKSPACE" --cluster "$AIDP_CLUSTER" \
-  --code "spark.sql('SELECT 1').show()"
-```
-If you installed the helper elsewhere, `export AIDP_HOME=<dir>` and use `$AIDP_HOME` instead of `$HOME/.aidp`.
+## Local Project Files
 
-## Engine precedence (control-plane ops: catalogs, clusters, jobs, roles, …)
-1. **Preferred — official `aidp` CLI**: `aidp <group> <command> --instance-id "$AIDP_DATALAKE" --auth api_key --profile DEFAULT --region "$AIDP_REGION"` (github.com/oracle-samples/aidataplatform-sdk).
-2. **Fallback — `oci raw-request`** against the same REST API: `https://aidp.$AIDP_REGION.oci.oraclecloud.com/20240831/dataLakes/$AIDP_DATALAKE/…` (see `$HOME/.aidp/references/oci-raw-request.md`). Do NOT invent endpoints — use the references.
-3. **Interactive SQL / cells** → the helper above.
+Expected customer files:
 
-## Auth ladder
-`--profile DEFAULT` (api_key) → on `401/403` / "NotAuthenticated" / "Security Token":
-`oci session refresh --profile AIDP_SESSION` then retry with `--auth security_token --profile AIDP_SESSION`;
-if refresh fails, `oci session authenticate --profile AIDP_SESSION --region "$AIDP_REGION"`. The helper mints
-its own UPST from `DEFAULT`; pass `--session-profile AIDP_SESSION` only if a tenancy rejects IAD api keys.
+| Path | Purpose |
+|---|---|
+| `bundle.yaml` | Customer Fusion, AIDP schema, content-pack, scope, and dashboard policy. |
+| `aidp.config.yaml` | AIDP workspace, cluster, region, and credential-store settings. |
+| `profiles/<profile>.yaml` | Bootstrap-resolved tenant variation. Written by bootstrap. |
+| `overlays/<name>/` | Customer medallion extensions or mart overrides. |
+| `.aidp/diagnostics/` | Failure diagnostics, including `AIDPF-*` artifacts. |
 
-## Rules every skill inherits
-- **Workspace-first** — AIDP ops are workspace-scoped; pass the workspace explicitly.
-- **Cluster must be RUNNING** for any data/SQL op — check status, start it if stopped (`aidp-cluster-ops`).
-- **Persist + confirm every mutation** — before any create/update/delete/run/deploy/grant, write the request
-  body to `.aidp/payloads/<verb>-<resource>.json`, show it, and confirm.
-- **Never fabricate** endpoints, OCIDs, model names, or capabilities — cite a reference, the CLI, or a live
-  result. **Never hardcode or print OCIDs/keys/tokens**; never trust a local `.env` for region/OCID/profile.
+Do not edit the shipped starter content pack inside the plugin installation.
+Customer medallion changes belong in `overlays/<name>/`.
 
-## Where to start
-- "What can you do with AIDP?" / unsure which skill → **`aidp-engineer-overview`** (router).
-- First run → **`aidp-engineer-bootstrap`** (verify auth + deps), then **`aidp-catalog-init`** (grounding).
-- Connecting to an external source (Fusion/EPM/ADB/Snowflake/S3/…) → the **AIDP Spark Connectors** bundle.
+## Normal Workflow
+
+Follow the current workflow, not old phase reports:
+
+1. Confirm `bundle.yaml` and `aidp.config.yaml` exist.
+2. If AIDP coordinates are missing, use `/aidp-fusion-config` or run
+   `aidp-fusion-autopilot init-config`.
+3. Confirm the Fusion BICC password is stored in the AIDP credential store.
+   The default credential name is `fusion_bicc_password` and the default key is
+   `password`.
+4. Set up operator OAC MCP early with `aidp-fusion-autopilot dashboard mcp-setup`
+   or `aidp-fusion-autopilot dashboard mcp-token`, then ask the user to restart or
+   reconnect Claude Code.
+5. Run `aidp-fusion-autopilot validate`.
+6. Run `aidp-fusion-autopilot bootstrap --check-iam`.
+7. Preview seed with `aidp-fusion-autopilot run --mode seed --dry-run`.
+8. Run seed only after the user confirms the target is safe:
+   `aidp-fusion-autopilot run --mode seed`.
+9. Use `/oac-dataset-advisor` against the live AIDP catalog.
+10. If a needed mart is missing, use `/mart-author` to create an overlay.
+11. Have the user create the OAC AIDP connection and dataset manually in OAC.
+12. Use `/workbook-authoring` to save or update the workbook through OAC MCP.
+
+Use `workflow.md` and `docs/project_setup.md` from the plugin checkout when the
+user needs the full reference.
+
+## Evidence Rules
+
+- Do not claim an AIDP table exists from content-pack YAML alone. Query the
+  live AIDP catalog or use `aidp-fusion-status`.
+- Do not claim an OAC dataset or workbook exists when OAC MCP is disconnected.
+  Fix MCP connectivity first.
+- Do not infer the right OAC dataset from a dashboard request without checking
+  the live gold layer.
+- Do not invent OCIDs, workspace keys, cluster keys, schema names, dataset
+  names, or workbook paths.
+- If a command reports an `AIDPF-*` code, use `docs/aidpf-error-codes.md` from
+  the plugin checkout before proposing recovery.
+
+## OAC Manual Boundary
+
+The user must create these OAC objects manually today:
+
+- The OAC AIDP connection, usually from JSON generated by
+  `aidp-fusion-autopilot dashboard install --target oac --print-only`.
+- The OAC dataset over the advised AIDP gold table or tables.
+
+Reason:
+
+- OAC public REST does not reliably accept first-time AIDP `idljdbc` connection
+  creation.
+- OAC MCP can search, describe, query, save, export, and manage catalog
+  content, but it does not expose a create-dataset tool.
+
+After the dataset exists, resume autopilot or workbook authoring. Use OAC MCP
+to find and describe the dataset before generating workbook JSON.
+
+## Mart And Overlay Rules
+
+Use an overlay when the shipped gold layer does not satisfy the request.
+
+Allowed overlay changes:
+
+- Add a new gold mart.
+- Override shipped mart SQL while preserving the mart contract.
+- Add tenant-specific column aliases or semantic variants through
+  `/medallion-author`.
+- Retype (or additively extend) a **bronze** node's `outputSchema` columns via a
+  bronze type-overlay — either an `overrides: { bronze/<id>: { outputSchema: … }}`
+  block or a same-id `overlays/<name>/bronze/<id>.yaml` file. Use this for a
+  bronze column-type bug (e.g. `decimal(38,30)` → `decimal(18,0)`). The two
+  mechanisms are mutually exclusive per node (declaring both is an error).
+- Adjust a **bronze** node's `requiredColumns` (the source columns the extract
+  asserts exist in the PVO) via overlay — **adding** is additive: `overrides: {
+  bronze/<id>: { requiredColumns: { <src>: [COL, …] }}}` (or a same-id
+  `bronze/<id>.yaml` file, which is **add-only**). **Removing/relaxing** a
+  required column weakens a live safety gate, so it is allowed **only** through an
+  acknowledged block override: `overrides: { bronze/<id>: { relaxRequiredColumns:
+  { <src>: [{ column: COL, reason: "…" }] }}}` — the `reason` is mandatory.
+  A same-id file that drops a base required column fails closed (AIDPF-2062); a
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [oracle-samples/oracle-aidp-samples](https://github.com/oracle-samples/oracle-aidp-samples) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
