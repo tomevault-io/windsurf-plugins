@@ -1,21 +1,21 @@
 ---
 trigger: always_on
-description: This document provides essential guidelines for AI agents (like GitHub Copilot) working on the **SlimFaas** and **SlimData** projects. It covers compilation strategies, execution commands, testing procedures, and documentation requirements.
+description: This document provides essential guidelines for AI agents (like GitHub Copilot) working on the **SlimFaas**, **SlimData**, **SlimFaasMcp**, and client packages. It covers compilation strategies, execution commands, testing procedures, and documentation requirements.
 ---
 
 # Agent Guidelines for SlimFaas Development
 
 ## 🎯 Overview
 
-This document provides essential guidelines for AI agents (like GitHub Copilot) working on the **SlimFaas** and **SlimData** projects. It covers compilation strategies, execution commands, testing procedures, and documentation requirements.
+This document provides essential guidelines for AI agents (like GitHub Copilot) working on the **SlimFaas**, **SlimData**, **SlimFaasMcp**, and client packages. It covers compilation strategies, execution commands, testing procedures, and documentation requirements.
 
 ---
 
 ## 📦 Core Technologies
 
-### SlimFaas & SlimData: AOT Compilation
+### SlimFaas, SlimData & SlimFaasMcp: AOT Compilation
 
-**Both SlimFaas and SlimData are compiled using Ahead-of-Time (AOT) compilation**, a .NET feature that compiles IL code directly to native machine code at build time.
+**SlimFaas, SlimData, and SlimFaasMcp are compiled using Ahead-of-Time (AOT) compilation**, a .NET feature that compiles IL code directly to native machine code at build time.
 
 #### Why AOT?
 
@@ -26,7 +26,7 @@ This document provides essential guidelines for AI agents (like GitHub Copilot) 
 
 #### AOT Configuration
 
-Both projects have `<PublishAot>true</PublishAot>` in their `.csproj` files:
+The native .NET services below have `<PublishAot>true</PublishAot>` in their `.csproj` files:
 
 - **SlimFaas** (`src/SlimFaas/SlimFaas.csproj`):
   - Target Framework: `.NET 10.0`
@@ -39,12 +39,19 @@ Both projects have `<PublishAot>true</PublishAot>` in their `.csproj` files:
   - Optimization preference: Size
   - Full trimming enabled
 
+- **SlimFaasMcp** (`src/SlimFaasMcp/SlimFaasMcp.csproj`):
+  - Target Framework: `.NET 10.0`
+  - Full trimming enabled
+  - Symbols stripped
+  - Builds `ClientApp` with `npm ci` and `npm run build` before build/publish
+
 #### Important AOT Considerations
 
 - **Reflection Limitations**: Minimize runtime reflection; use code generation where needed
 - **Type Safety**: Ensure all types used in serialization are discoverable at compile time
 - **Native Dependencies**: Be careful with P/Invoke calls; verify they work across platforms
 - **Dependencies**: Only use NuGet packages with AOT support (e.g., `KubernetesClient.Aot`, `MemoryPack`, `prometheus-net`)
+- **Source-generated serialization**: Add new JSON payloads to existing `JsonSerializerContext` partials (for example `src/SlimFaasMcp/AppJsonContext.cs` or `src/SlimFaas/Local/ProcessControlContracts.cs`) and keep SlimData command payloads `MemoryPackable`.
 
 ---
 
@@ -54,6 +61,8 @@ Both projects have `<PublishAot>true</PublishAot>` in their `.csproj` files:
 
 - **.NET SDK**: Version `10.0.103` or later (see `global.json`)
 - **Node.js**: Version `24` or later (for UI/dashboard builds)
+- **pnpm**: Version `10.14.0` is used by CI for `src/SlimFaasSite` and `src/SlimFaasPlanetSaver`
+- **Python/UV**: Python `>=3.10` with `uv` for `client/python/slimfaas-client`
 - **Docker** or **Podman** (optional, for containerized deployments)
 
 ### Building
@@ -62,11 +71,17 @@ Both projects have `<PublishAot>true</PublishAot>` in their `.csproj` files:
 # Build the entire solution
 dotnet build
 
+# Fast backend-only SlimFaas build (skip embedded dashboard ClientApp)
+dotnet build src/SlimFaas/SlimFaas.csproj -p:SkipClientAppBuild=true
+
 # Build with AOT compilation (creates native executable)
 dotnet publish -c Release
 
 # Build a specific project
 dotnet build src/SlimFaas/SlimFaas.csproj
+
+# Build the documentation site
+(cd src/SlimFaasSite && pnpm install --frozen-lockfile && pnpm build)
 ```
 
 ### Running Locally
@@ -80,8 +95,14 @@ dotnet run --project src/SlimFaas/SlimFaas.csproj
 
 # Run examples
 dotnet run --project src/Fibonacci/Fibonacci.csproj
-dotnet run --project demo/
+dotnet run --project src/FibonacciBatch/FibonacciBatch.csproj
+
+# Validate and run the native local demo (paths are relative to the src/SlimFaas launch profile)
+dotnet run --project src/SlimFaas -- local validate -f ../../slimfaas.local.yaml
+dotnet run --project src/SlimFaas -- local up -f ../../slimfaas.local.yaml
 ```
+
+Use repeatable `-f` overlays such as `slimfaas.local.dev.yaml` or `slimfaas.local.debug.yaml`; `debugUrl` routes a function to an IDE process in native local mode.
 
 ### Docker
 
@@ -89,6 +110,12 @@ dotnet run --project demo/
 # Build Docker image
 docker build -t slimfaas:latest .
 
+# Run local Compose demo
+docker-compose up
+
+# Podman Compose on macOS
+chmod +x ./run-podman-compose.sh
+./run-podman-compose.sh up -d
 ```
 
 ---
@@ -116,73 +143,15 @@ SlimFaas maintains comprehensive test coverage across multiple test projects.
 - **SlimFaasKafka.Tests** (`tests/SlimFaasKafka.Tests/`)
   - Kafka connector and lag monitoring
 
-### Running Tests
+- **SlimFaasClient.Tests** (`client/dotnet/SlimFaasClient/tests/`)
+  - .NET WebSocket client registration, async handling, sync streaming
 
-```bash
-# Run all unit tests
-dotnet test
+- **Python slimfaas-client tests** (`client/python/slimfaas-client/tests/`)
+  - Python WebSocket client behavior with `uv run pytest`
 
-# Run with code coverage
-dotnet test --collect "Code Coverage;Format=cobertura"
-
-# Run specific test project
-dotnet test tests/SlimFaas.Tests/SlimFaas.Tests.csproj
-
-# Run specific test with verbose output
-dotnet test --filter "ClassName=YourTestClass" --verbosity detailed
-
-# Watch mode (re-run on file changes)
-dotnet watch test
-```
-
-### Code Coverage
-
-Code coverage reports are generated during CI/CD and stored in `TestResults/` directories:
-
-```bash
-# View coverage (after test run)
-open coveragereport/index.html
-```
-
-### Testing Best Practices
-
-✅ **Always**:
-- Write tests for new features or bug fixes
-- Use meaningful test names (e.g., `WhenScalingUpWith_TenRequests_ShouldCreateNewReplicas()`)
-- Mock external dependencies (Kubernetes API, HTTP calls)
-- Test both success and failure paths
-- Ensure tests are AOT-compatible (avoid reflection where possible)
-
-❌ **Never**:
-- Leave failing tests in the codebase
-- Ignore test failures in CI/CD
-- Write tests that depend on external services
-- Use hardcoded delays instead of proper async/await patterns
-
----
-
-## 📚 Documentation Requirements
-
-### Golden Rule: Always Update Documentation
-
-**Every code change that affects user-facing behavior, configuration, or architecture MUST be accompanied by documentation updates.**
-
-### Documentation Files to Update
-
-#### 1. **README.md** (Root)
-Located at `/README.md`, this is the first impression:
-- Update project description if scope changes
-- Keep feature list current with new capabilities
-- Update performance benchmarks if AOT compilation improves metrics
-- Add/remove links to documentation sections as needed
-
-#### 2. **Documentation Folder** (`./documentation/`)
-These files are **automatically published to the website** (https://slimfaas.dev):
-
-- **`get-started.md`** – Deployment instructions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SlimPlanet/SlimFaas](https://github.com/SlimPlanet/SlimFaas) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
