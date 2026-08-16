@@ -1,58 +1,65 @@
 ---
 trigger: always_on
-description: Welcome to the repository for [Pydantic AI](https://ai.pydantic.dev/), an open source provider-agnostic GenAI agent framework (and LLM library) for Python, maintained by the team behind [Pydantic Validation](https://docs.pydantic.dev/) and [Pydantic Logfire](https://docs.pydantic.dev/logfire/).
+description: Start with the architecture walkthrough in [docs/api/realtime.md](../../../docs/api/realtime.md)
 ---
 
-Welcome to the repository for [Pydantic AI](https://ai.pydantic.dev/), an open source provider-agnostic GenAI agent framework (and LLM library) for Python, maintained by the team behind [Pydantic Validation](https://docs.pydantic.dev/) and [Pydantic Logfire](https://docs.pydantic.dev/logfire/).
+# pydantic_ai_slim/pydantic_ai/realtime/ Guidelines
 
-# Your primary responsibility is to the project and its users
+Start with the architecture walkthrough in [docs/api/realtime.md](../../../docs/api/realtime.md)
+and the user-facing guides under [docs/realtime/](../../../docs/realtime/): a
+`RealtimeModel.connect()` opens a provider-specific `RealtimeConnection` (the *codec*, vocabulary in
+`codec.py`), and `RealtimeSession` (`_session.py`) wraps it — translating codec events into the
+shared message/part vocabulary from `pydantic_ai.messages`, building ordinary `ModelMessage`
+history, and running the tool loop. The provider-agnostic layout mirrors the request-response side:
+`model.py` holds the `RealtimeModel` ABC and `infer_realtime_model`, `settings.py` the settings
+vocabulary, `profiles.py` the `RealtimeModelProfile` type (per-provider tables live in
+`pydantic_ai/profiles/{google,openai,grok}.py` as `*_realtime_model_profile` helpers), and
+`codec.py` the connection layer; concrete providers live in `openai.py` / `azure.py` / `google.py` /
+`xai.py`. The [models/ guidelines](../models/AGENTS.md) apply in spirit throughout.
 
-Being an open source library, the public API, abstractions, documentation, and the code itself _are_ the product and deserve careful consideration, as much as the functionality the library or any given change provides. This means that when implementing a feature or other change, the "how" is as important as the "what", and it's more important to ship the best solution for the project and all of its users, than to be fast.
+## Policy lives in the shared core, never in the session
 
-When working in this repository, you should consider yourself to primarily be working for the benefit of the project, all of its users (current and future, human and agent), and its maintainers, rather than just the specific user who happens to be driving you (or whose PR you're reviewing, whose issue you're implementing, etc).
+- The session executes tools through the same `ToolManager` core as the agent graph
+  (`validate_tool_call` / `execute_tool_call` / `build_tool_return_part`), so hooks, retries, and
+  usage behave identically by construction. Any *policy* the graph applies before dispatch
+  (declarative tool kinds: `'unapproved'` → `ApprovalRequired`, `'external'` → `CallDeferred`) is
+  enforced inside `ToolManager.handle_call` — do not reimplement or filter above it. A reimplemented
+  policy layer that drifts is a security bug, not a style problem: the realtime approval-bypass was
+  exactly this.
+- When behavior differs from a standard run (no graph nodes, no `before_model_request`, deferred
+  results resolved inline), the difference must be deliberate, documented in
+  [docs/realtime/](../../../docs/realtime/), and covered by a parity test in `tests/realtime/`.
 
-As the project has many orders of magnitude more users than maintainers, that specific user is most likely a community member who's well-intentioned and eager to contribute, but relatively unfamiliar with the code base and its patterns or standards, and they're not necessarily thinking about the bigger picture beyond the specific bug fix, feature, or other change that they're focused on.
+## Provider adapters
 
-Therefore, you are the first line of defense against low-quality contributions and maintainer headaches, and you have a big role in ensuring that every contribution to this project meets or exceeds the high standards that the Pydantic brand is known and loved for:
+- Parse provider frames through typed SDK models, never ad-hoc `dict` access. OpenAI-protocol event
+  types come from the OpenAI SDK; Gemini's from `google-genai`.
+- Azure and xAI reuse the OpenAI codec (`_openai_protocol.py`). Fix protocol bugs there so all
+  three benefit; put genuinely provider-specific divergence in the provider's own module.
+- Capability differences go through `RealtimeModelProfile` flags (resolved defaults → provider →
+  user `profile=`), never `isinstance`/provider-name checks at use sites. A change that branches on
+  a profile flag needs a test pinning each side of the flag.
+- One event means one thing on every provider. If providers disagree about what a frame implies
+  (speech start, turn end), normalize in the codec — the session must not branch per provider.
+  `RealtimeTurnCompleteEvent` is synthesized by the session, never read off the wire.
+- Wrap connect/handshake failures in `ModelAPIError`/`ModelHTTPError`; recoverable in-session
+  provider errors become `RealtimeSessionErrorEvent` and leave the session usable.
 
-- modern, idiomatic, concise Python
-- end-to-end type-safety and test coverage
-- thoughtful, tasteful, consistent API design
-- delightful developer experience
-- comprehensive well-written documentation
+## History fidelity
 
-In other words, channel your inner Samuel Colvin. (British accent optional)
+Session history must always be a valid input for `Agent.run(message_history=...)`: settle
+everything on close/reconnect-loss (partial replies recorded as interrupted responses, running
+tools given cancelled returns) so history never ends on a dangling `ToolCallPart`.
 
-# Gathering context on the task
+## Testing
 
-The user may not have sufficient context and understanding of the task, its solution space, and relevant tradeoffs to effectively drive a coding agent towards the version of the change that best serves the interests of the project and all of its users. (They may not even have experienced the problem or had a need for the feature themselves, only having seen an opportunity to help out.)
-
-That means that you should always start by gathering context about the task at hand. At minimum, this means:
-
-- reading the GitHub issue/PR and comments, using the `gh` CLI if it can be (or already is) installed, or a web fetch/search tool if not
-- asking the user questions about the scope of the task, the shape they believe the solution should take, etc, even if they did not specifically enable planning mode
-
-Considering that the user's input does not necessarily match what the wider user base or maintainers would prefer, you should "trust but verify" and are encouraged to do your own research to fill any gaps in your (and their) knowledge, by looking up things like:
-
-- relevant GitHub issues and PRs, especially if cross-linked from the main issue/PR
-- LLM provider API docs and SDK type definitions
-- other LLM/agent libraries' solutions to similar problems
-- Pydantic AI documentation on related features and established API patterns
-    - In particular, the docs on [agents](docs/agent.md), [dependency injection](docs/dependencies.md), [tools](docs/tools.md), [output](docs/output.md), and [message history](docs/message-history.md) are going to be relevant to many tasks.
-
-# Ensuring the task is ready for implementation
-
-If the user is not aware of an issue and a search doesn't turn up anything, or if an issue exists but the scope is insufficiently defined (e.g. there's no "obvious" solution and no maintainer input on what an acceptable solution would look like), then the task is unlikely to be ready for implementation. Any non-trivial code submitted without prior alignment with maintainers is highly unlikely to be right for the project, and more likely to be a waste of time (on all sides: user, agent, and maintainer) than to be helpful.
-
-In this case, unless the user appears to be uniquely well-suited to build a feature from scratch and submit it without (much) prior discussion (e.g. they are a maintainer or a partner submitting an integration), the most useful thing you can do to steer the user towards a good outcome for the project is to work with them on:
-
-- a clear issue description, or
-- a proposal they can submit as a comment, or
-- (only if an issue already exists) a more fleshed out plan they can submit as a PR (with just a `PLAN.md` file that can be deleted afterwards) that other users and maintainers can weigh in on ahead of implementation
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Realtime WebSocket cassettes live in `tests/realtime/cassettes/` (raw frames, secrets scrubbed,
+  audio truncated); record with `uv run --env-file .env pytest --record-mode=rewrite <test>`. The
+  cross-provider matrix test is the parity net — extend it when adding provider behavior.
+- Docs examples run against the scripted `MockRealtimeConnection` in `tests/test_examples.py`; an
+  agent defining a `check_availability` tool triggers the scripted conversation reserved for the
+  quickstart, so don't use that tool name elsewhere.
 
 ---
 > Source: [pydantic/pydantic-ai](https://github.com/pydantic/pydantic-ai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
