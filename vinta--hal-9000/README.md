@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [vinta/hal-9000](https://github.com/vinta/hal-9000).
+Original source: `GEMINI.md` in [vinta/hal-9000](https://github.com/vinta/hal-9000).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [vinta/hal-9000](https://github.com/vinta/hal-9000) — a repo with 120+ stars on GitHub.
