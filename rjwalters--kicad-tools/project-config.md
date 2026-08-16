@@ -1,168 +1,127 @@
 ---
 trigger: always_on
-description: This repository uses **Loom** for AI-powered development orchestration.
+description: <!-- GENERATED FILE — DO NOT EDIT DIRECTLY.
 ---
 
-# Loom Orchestration - Repository Guide
+<!-- GENERATED FILE — DO NOT EDIT DIRECTLY.
+     Produced by defaults/scripts/generate-agents-md.sh from the
+     `agents-md:include` marker ranges in defaults/.loom/CLAUDE.md. To change
+     this file, edit those ranges in the source and re-run the generator;
+     CI (scripts/check-agents-md-sync.sh) fails if this file is stale.
+     Attribution: seeded by the gpeyton/loom fork's PR #8 (AGENTS.md codegen),
+     ported to single-source generation for issue #4479 (epic #4167). -->
+
+# Loom Orchestration - Repository Guide (AGENTS.md)
 
 This repository uses **Loom** for AI-powered development orchestration.
 
-**Loom Version**: 0.13.0
-**Installation Date**: 2026-07-22
+**Loom Version**: 0.18.0
+**Installation Date**: 2026-08-10
+
+> **Dual-runtime status**: this file is the runtime-neutral instruction anchor
+> read by AGENTS.md-aware runtimes (OpenAI Codex CLI and others — see
+> https://agents.md). Claude Code additionally reads the richer `.loom/CLAUDE.md`
+> sibling as its primary format; the content below is a strict subset extracted
+> from that same source, so the two files cannot diverge. Anything marked
+> **Claude Code only today** (see the end of this file) is not yet portable to
+> other runtimes — perform the equivalent `gh` / `git` / `./.loom/scripts/*`
+> steps directly instead.
 
 ## What is Loom?
 
-Loom is a CLI + daemon for AI-powered development orchestration. It coordinates AI development workers using git worktrees and a forge (GitHub or Gitea) as the coordination layer. It supports manual coordination (Manual Orchestration Mode) and continuous autonomous orchestration (Daemon Mode).
+Loom is a CLI + daemon for AI-powered development orchestration. It coordinates
+AI development workers using git worktrees and a forge (GitHub or Gitea) as the
+coordination layer, via manual roles, continuous autonomous orchestration (the
+Rust `loom-daemon` binary), and a local tmux agent pool.
 
 **Loom Repository**: https://github.com/rjwalters/loom
 
-> **Forge note**: The `gh` commands shown below are for GitHub. For Gitea repositories, Loom scripts handle API calls internally. The label-based workflow is identical regardless of forge.
+> **Forge note**: The `gh` commands shown below are for GitHub. For Gitea
+> repositories, Loom's scripts handle API calls internally — the label-based
+> workflow is identical regardless of forge.
 
-## Usage Modes
+## Orchestration Architecture
 
-Loom supports two complementary workflows:
+Loom decomposes development into three coordination tiers, with the forge
+(GitHub / Gitea) as the shared state.
 
-### 1. Manual Orchestration Mode (MOM)
-
-Use Claude Code terminals with specialized roles for hands-on development coordination.
-
-**Setup**:
-1. Open Claude Code in this repository
-2. Use slash commands to assume roles: `/builder`, `/judge`, `/curator`, etc.
-3. Each terminal acts as a specialized agent following role guidelines
-
-**When to use MOM**:
-- Learning Loom workflows
-- Direct control over agent actions
-- Debugging and iterating on processes
-- Working with smaller teams
-
-**Example workflow**:
-```bash
-# Terminal 1: Builder working on feature
-/builder
-# Claims loom:ready issue, implements, creates PR
-
-# Terminal 2: Judge reviewing PRs
-/judge
-# Reviews PR with loom:review-requested, provides feedback
-
-# Terminal 3: Curator maintaining issues
-/curator
-# Enhances unlabeled issues, marks as loom:ready
-```
-
-### 2. Daemon Mode
-
-Run the Loom daemon for fully autonomous system orchestration.
-
-**Setup**:
-```bash
-./.loom/scripts/daemon.sh start   # auto-build enabled (default)
-```
-
-```bash
-/loom           # Activate daemon orchestration (daemon must be started first)
-/loom --merge   # Aggressive autonomous development
-```
-
-**When to use Daemon Mode**:
-- Production-scale development
-- Fully autonomous agent workflows
-- Hands-off orchestration
-
-**Graceful shutdown**: `./.loom/scripts/daemon.sh stop` (or `touch .loom/stop-daemon`)
-
-## Agent Roles
-
-Loom provides specialized roles for different development tasks. Each role follows specific guidelines and uses GitHub labels for coordination.
-
-### Available Roles
-
-**Builder** (Manual, `builder.md`)
-- **Purpose**: Implement features and fixes
-- **Workflow**: Claims `loom:issue` → implements → tests → creates PR with `loom:review-requested`
-- **When to use**: Feature development, bug fixes, refactoring
-
-**Judge** (Autonomous 5min, `judge.md`)
-- **Purpose**: Evaluate pull requests
-- **Workflow**: Finds `loom:review-requested` PRs → evaluates → approves or requests changes
-- **When to use**: Code quality assurance, automated evaluations
-
-**Curator** (Autonomous 5min, `curator.md`)
-- **Purpose**: Enhance and organize issues
-- **Workflow**: Finds unlabeled issues → adds context → marks as `loom:issue`
-- **When to use**: Issue backlog maintenance, quality improvement
-
-**Architect** (Autonomous 15min, `architect.md`)
-- **Purpose**: Create architectural proposals
-- **Workflow**: Analyzes codebase → creates proposal issues with `loom:architect`
-- **When to use**: System design, technical decision making
-
-**Hermit** (Autonomous 15min, `hermit.md`)
-- **Purpose**: Identify code simplification opportunities
-- **Workflow**: Analyzes complexity → creates removal proposals with `loom:hermit`
-- **When to use**: Code simplification, reducing technical debt
-
-**Doctor** (Manual, `doctor.md`)
-- **Purpose**: Fix bugs and address PR feedback
-- **Workflow**: Claims bug reports or addresses PR comments → fixes → pushes changes
-- **When to use**: Bug fixes, PR maintenance
-
-**Guide** (Autonomous 15min, `guide.md`)
-- **Purpose**: Prioritize and triage issues
-- **Workflow**: Reviews issue backlog → updates priorities → organizes labels
-- **When to use**: Project planning, issue organization
-
-**Driver** (Manual, `driver.md`)
-- **Purpose**: Direct command execution
-- **Workflow**: Plain shell environment for custom tasks
-- **When to use**: Ad-hoc tasks, debugging, manual operations
-
-### Role Definitions
-
-Full role definitions with detailed guidelines are available in:
-- `.loom/roles/builder.md`
-- `.loom/roles/judge.md`
-- `.loom/roles/curator.md`
-- And more...
+| Tier | Entry point | Purpose | Mode |
+|------|-------------|---------|------|
+| Tier 3 | Human | Oversight — approve proposals, handle edge cases | Observer |
+| Tier 2 | `loom-daemon` (MCP) + tmux agent pool | Multi-issue dispatch + scheduled support roles | Continuous |
+| Tier 1 | `/loom:sweep <issue>` | Single-issue lifecycle (Curator → Merge) | Per-issue |
+| Tier 0 | `/loom:builder`, `/loom:judge`, etc. | Task execution — single focused work units | Per-task |
 
 ## Label-Based Workflow
 
-Agents coordinate work through GitHub labels. This enables autonomous operation without direct communication.
-
-### Label Flow
+Agents coordinate through labels. See `.github/labels.yml` for full definitions.
 
 **Issue Lifecycle**:
 ```
-(created) → loom:issue → loom:building → (closed)
-           ↑ Curator      ↑ Builder
+(created) → loom:triage → loom:curating → loom:curated → loom:issue → loom:building → (closed)
+           ↑ filer        ↑ Curator        ↑ Curator      ↑ human     ↑ Builder
 ```
 
 **PR Lifecycle**:
 ```
 (created) → loom:review-requested → loom:pr → (merged)
-           ↑ Builder                ↑ Judge    ↑ Human
+           ↑ Builder                ↑ Judge    ↑ Champion or human
 ```
 
 **Proposal Lifecycle**:
 ```
-(created) → loom:architect → (approved) → loom:issue
-           ↑ Architect       ↑ Human      ↑ Ready for Builder
-
-(created) → loom:hermit → (approved) → loom:issue
-           ↑ Hermit       ↑ Human      ↑ Ready for Builder
+(created) → loom:architect/loom:hermit/loom:auditor → (evaluated) → loom:issue
+           ↑ Architect/Hermit/Auditor                 ↑ Champion    ↑ Ready for Builder
 ```
 
-### Label Definitions
+**Epic Lifecycle**: `loom:epic` → phased `loom:architect` + `loom:epic-phase`
+child issues.
 
-- **`loom:issue`**: Issue approved for work, ready for Builder to claim
-- **`loom:building`**: Issue being implemented OR PR under review
-- **`loom:review-requested`**: PR ready for Judge to review
-- **`loom:pr`**: PR approved by Judge, ready for human to merge
+**Escape-hatch / status labels**: `loom:blocked` (implementation blocked, needs
+help), `loom:operator-only` (requires human action outside automation —
+credentials, infra, hardware; skipped by autonomous dispatch), `loom:abort`
+(signal to abort in-flight work for this issue, returns to `loom:issue`),
+`loom:urgent`. Priority axis: `tier:goal-advancing` / `tier:goal-supporting` /
+`tier:maintenance`.
+
+### REST vs GraphQL for forge queries
+
+Prefer forge REST calls over GraphQL-backed convenience commands when GraphQL is
+rate-limited or exhausted (they share separate hourly budgets). In practice:
+read and mutate issues/labels via `gh api repos/:owner/:repo/issues/:number`
+(and the `--method PATCH`/`POST` forms) rather than GraphQL-backed
+`gh issue list --label` / `gh issue view` queries when GraphQL quota is tight.
+The REST path stays available after GraphQL is exhausted, so it is the reliable
+fallback for issue reads, edits, and label changes during heavy dispatch.
+
+### Issues Are Suggestions (Role Autonomy)
+
+Filed issues are the *input queue*, not mandates. Curator, Builder, and Judge
+may **close** or **rescope** an issue — with a stated rationale — when building
+it is not the best outcome. Comment the rationale before closing; rescope
+instead of closing when the core is worth keeping (drop back to
+`loom:triage`/`loom:curated`, removing `loom:issue`, so it isn't re-dispatched
+with a stale scope). Never close an issue that encodes a pending human
+decision — route it to `loom:blocked` or `loom:operator-only` instead.
+
+## Git Worktree Workflow
+
+Loom uses git worktrees to isolate agent work. **Issue Worktrees**
+(`.loom/worktrees/issue-N`) hold issue-specific work for Builder agents.
+
+```bash
+gh issue edit 42 --remove-label "loom:issue" --add-label "loom:building"
+./.loom/scripts/worktree.sh 42 && cd .loom/worktrees/issue-42
+# ... work, commit ...
+git push -u origin feature/issue-42
+gh pr create --label "loom:review-requested"
+```
+
+- Always use `./.loom/scripts/worktree.sh <issue-number>` (writes a
+  `.loom-managed` sentinel that authorizes cleanup). **Never run `git worktree`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rjwalters/kicad-tools](https://github.com/rjwalters/kicad-tools) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
