@@ -1,170 +1,142 @@
 ---
 trigger: always_on
-description: This document provides guidelines for AI assistants working on the **fspec codebase**. This is about DEVELOPING fspec itself, not using it.
+description: This document defines the complete workflow for managing work (project management) and specifications (Gherkin features) when building this project.
 ---
 
-# Agent Development Guidelines for fspec
+# Project Management and Specification Guidelines for fspec
 
-This document provides guidelines for AI assistants working on the **fspec codebase**. This is about DEVELOPING fspec itself, not using it.
+This document defines the complete workflow for managing work (project management) and specifications (Gherkin features) when building this project.
 
----
+## CRITICAL: Project Management FIRST, Specifications SECOND
 
-## Project Overview
+**Before writing any Gherkin specifications or code, you MUST manage work using fspec's project management system.**
 
-**fspec** is a standardized CLI tool for AI agents to manage Gherkin-based feature specifications and project work units using Acceptance Criteria Driven Development (ACDD).
+## Project Management Workflow (STEP 1)
 
-- **Repository**: https://github.com/sengac/fspec
-- **License**: MIT
+### Understanding Work Organization
 
-For complete project context:
-- **Project foundation**: [spec/FOUNDATION.md](spec/FOUNDATION.md)
-- **Workflow**: run `fspec bootstrap` for complete details
+fspec uses a Kanban-based project management system with:
 
----
+- **Work Units**: Discrete pieces of work (e.g., AUTH-001, DASH-002)
+- **Prefixes**: Short codes namespacing work unit IDs (AUTH, DASH, API, SEC, PERF)
+- **Epics**: High-level business initiatives containing multiple work units
+- **Kanban States**: backlog → specifying → testing → implementing → validating → done (+ blocked)
 
-## MANDATORY CODING STANDARDS - ZERO TOLERANCE
+### Before Starting ANY Work
 
-**ALL CODE MUST PASS QUALITY CHECKS BEFORE COMMITTING**
+1. **Check what needs to be done**: `fspec list-work-units --status=backlog`
+2. **Pick a work unit**: Review the backlog and choose the next highest priority item
+3. **Move to specifying**: `fspec update-work-unit-status WORK-001 specifying`
+4. **Now proceed to write specifications** (see Specification Workflow below)
 
-### CRITICAL DO NOT VIOLATIONS - CODE WILL BE REJECTED
+### Managing Your Work Units
 
-#### TypeScript Violations:
+```bash
+# List all work units
+fspec list-work-units
 
-- ❌ **NEVER** use `any` type - use proper types always
-- ❌ **NEVER** use `as unknown as` - use proper type guards or generics
-- ❌ **NEVER** use `require()` - only ES6 `import`/`export`
-- ❌ **NEVER** use CommonJS syntax (`module.exports`, `__dirname`, `__filename`)
-- ❌ **NEVER** use file extensions in TypeScript imports (`import './file.ts'` or `import './file.js'` → `import './file'`)
-- ❌ **NEVER** use `var` - only `const`/`let`
-- ❌ **NEVER** use `==` or `!=` - only `===` and `!==`
-- ❌ **NEVER** skip curly braces: `if (x) doSomething()` → `if (x) { doSomething() }`
+# Show details of a specific work unit
+fspec show-work-unit WORK-001
 
-#### Import Violations:
+# Create a new work unit (if planning new work)
+fspec create-story PREFIX "Title" --description "Details" --epic=epic-name  # For features
+fspec create-bug PREFIX "Title" --description "Details" --epic=epic-name    # For bug fixes
+fspec create-task PREFIX "Title" --description "Details" --epic=epic-name   # For tasks
 
-- ❌ **NEVER** use dynamic imports unless absolutely necessary (e.g., `await import('./module')`)
-- ❌ **NEVER** write: `import { Type } from './types'` when only using as type
-- ✅ **ALWAYS** use static imports: `import { something } from './module'`
-- ✅ **ALWAYS** write: `import type { Type } from './types'` for type-only imports
-- ✅ **ALWAYS** omit file extensions in TypeScript imports - Vite handles the build
+# Set user story fields for work unit (used during Example Mapping)
+fspec set-user-story WORK-001 --role "user role" --action "what they want" --benefit "why they want it"
 
-#### Interface Violations:
+# Move work unit through Kanban workflow
+fspec update-work-unit-status WORK-001 specifying   # Writing specs
+fspec update-work-unit-status WORK-001 testing      # Writing tests
+fspec update-work-unit-status WORK-001 implementing # Writing code
+fspec update-work-unit-status WORK-001 validating   # Code review/testing
+fspec update-work-unit-status WORK-001 done         # Completed
 
-- ❌ **NEVER** use `type` for object shapes
-- ✅ **ALWAYS** use `interface` for object definitions
-
-#### Promise Violations:
-
-- ❌ **NEVER** have floating promises - all promises must be awaited or explicitly ignored with `void`
-- ❌ **NEVER** await non-promises
-
-#### Variable Violations:
-
-- ❌ **NEVER** declare unused variables
-- ❌ **NEVER** use `let` when value never changes - use `const`
-
-#### Console Violations:
-
-- ❌ **NEVER** use `console.log/error/warn` in source code (tests are OK)
-- ✅ **ONLY** use chalk for colored CLI output in commands
-
----
-
-## MANDATORY IMPLEMENTATION PATTERNS
-
-### ES Modules (Required):
-
-```typescript
-// ✅ CORRECT
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// ❌ WRONG
-const __dirname = require('path').dirname(__filename);
+# Mark work unit as blocked (with reason)
+fspec update-work-unit-status WORK-001 blocked --blocked-reason "Waiting for external API documentation"
 ```
 
-### Type Safety (Required):
+### ACDD with Project Management
 
-```typescript
-// ✅ CORRECT
-interface FeatureFile {
-  path: string;
-  tags: string[];
-}
-const feature: FeatureFile = loadFeature();
+**Acceptance Criteria Driven Development (ACDD)** combined with project management:
 
-// ❌ WRONG
-const feature: any = loadFeature();
+1. **Pick work unit** from backlog → move to `specifying`
+2. **Write specifications** (Gherkin feature files) → move to `testing`
+3. **Write tests** that map to scenarios → move to `implementing`
+4. **Write code** to make tests pass → move to `validating`
+5. **Review/validate** code and specs → move to `done`
+
+### Moving Backward Through Kanban States
+
+**CRITICAL**: You CAN and SHOULD move work units backward when mistakes are discovered, rather than creating new work units.
+
+**When to Move Backward:**
+
+- **From testing → specifying**: Tests revealed incomplete or wrong acceptance criteria
+- **From implementing → testing**: Need to add or fix test cases
+- **From implementing → specifying**: Discovered missing scenarios or acceptance criteria
+- **From validating → implementing**: Quality checks failed, need more implementation
+- **From validating → testing**: Tests are inadequate or need refactoring
+- **From any state → specifying**: Fundamental misunderstanding of requirements
+
+**How to Move Backward:**
+
+```bash
+# Example: Realized specifications are incomplete while writing tests
+fspec update-work-unit-status AUTH-001 specifying
+
+# Example: Quality checks failed during validation, need to fix code
+fspec update-work-unit-status AUTH-001 implementing
+
+# Example: Need to refactor tests based on implementation learnings
+fspec update-work-unit-status AUTH-001 testing
 ```
 
-### Error Handling (Required):
+**Why Move Backward (Not Create New Work Units):**
 
-```typescript
-// ✅ CORRECT - All async operations must have error handling
-try {
-  const result = await operation();
-  return result;
-} catch (error: any) {
-  console.error(chalk.red('Error:'), error.message);
-  throw error;
-}
-```
+✅ **DO** move backward when:
+- You discover incomplete specifications
+- Tests don't adequately cover scenarios
+- Implementation revealed gaps in acceptance criteria
+- Quality checks uncovered issues requiring earlier phase work
+- You realize you misunderstood requirements
 
-### CLI Output (Required):
+❌ **DON'T** create new work units for:
+- Fixing mistakes in current work unit
+- Refining existing specifications
+- Improving existing tests
+- Correcting implementation errors
 
-```typescript
-// ✅ CORRECT - Use chalk for colored output
-import chalk from 'chalk';
-console.log(chalk.green('✓ Feature file is valid'));
-console.error(chalk.red('✗ Validation failed'));
+**When to Create New Work Units:**
 
-// ❌ WRONG - Plain console.log in commands
-console.log('Feature file is valid');
-```
+Create new work units only for:
+- **Genuinely new features** not part of current work
+- **Out of scope** enhancements discovered during work
+- **Technical debt** or refactoring that should be tracked separately
+- **Bugs** discovered in already-completed work units (marked `done`)
 
----
+**Example Workflow with Backward Movement:**
 
-## File Organization
+```bash
+# 1. Start work
+fspec update-work-unit-status AUTH-001 specifying
+# ... write specifications
 
-- **Keep files under 300 lines** - refactor when approaching this limit
-- When a file exceeds 300 lines, stop and refactor BEFORE continuing
-- Ask for approval before major refactoring
+# 2. Move to testing
+fspec update-work-unit-status AUTH-001 testing
+# ... start writing tests
 
----
+# 3. DISCOVER: Specs are incomplete!
+# Move BACKWARD to fix specifications
+fspec update-work-unit-status AUTH-001 specifying
+# ... add missing scenarios
 
-## Testing Requirements
-
-- **Use Vitest exclusively** - NEVER use Jest
-- **Write ALL tests in TypeScript** - NEVER create standalone JavaScript test files
-- **NEVER write external JavaScript files for testing** - All tests must be TypeScript files running through Vitest
-- **NEVER create .mjs or .js test files** - Only .ts test files within the project structure
-- **NEVER test module imports using Node.js directly** - Always test through Vitest
-- Write meaningful tests that verify actual functionality
-- No trivial tests like `expect(true).toBe(true)`
-- **Test Coverage:** All new code must have corresponding unit tests
-- **Mock Patterns:** Use Vitest mocks, avoid actual file system in unit tests
-- **Type Safety:** No `any` types allowed in tests - use proper type assertions
-
-### Test File Requirements:
-
-- ❌ **NEVER** create `test.mjs`, `test.js`, or any external JavaScript test files
-- ❌ **NEVER** run tests with `node test.js` or `node test.mjs`
-- ✅ **ALWAYS** create `.test.ts` or `.spec.ts` files
-- ✅ **ALWAYS** run tests through `npm test` using Vitest
-- ✅ **ALWAYS** import and test TypeScript modules directly in TypeScript test files
-
-### Test Naming Convention:
-
-```typescript
-// Test file: src/commands/__tests__/validate.test.ts
-
-describe('Feature: Gherkin Syntax Validation', () => {
-  describe('Scenario: Validate single feature file with valid syntax', () => {
-    it('should exit with code 0 and display success message', async () => {
+# 4. Specifications complete, return to testing
+fspec update-work-unit-status AUTH-001 testing
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sengac/fspec](https://github.com/sengac/fspec) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
