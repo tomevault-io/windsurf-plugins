@@ -1,151 +1,53 @@
 ---
 trigger: always_on
-description: How to create MatterbridgeEndpoint instances, register them in Matterbridge plugins, and use the single-class devices exported by the package.
+description: How a plugin serves its own frontend SPA and custom REST API via onFetch
 ---
 
 
-# Matterbridge Endpoint Guide
+# Matterbridge Plugin Frontend Guide
 
-Use this guide when writing Matterbridge code in this repository or when authoring a plugin that consumes Matterbridge.
+Use this guide when writing plugin code that interacts with a plugin's own frontend SPA: bundling and serving that SPA and its custom REST API.
 
-## Public imports
+This guide is based on `packages/core/src/frontend.ts` and `packages/core/src/matterbridgePlatform.ts` in the `matterbridge` repository.
 
-- Import core classes, endpoint helpers, and device type definitions from `matterbridge`.
-- Import single-class devices from `matterbridge/devices`.
+## Serving a plugin's own bundled frontend SPA
+
+If the plugin package ships a built SPA at `apps/frontend/build/index.html`, `pluginManager.ts` sets `plugin.frontendPath` and Matterbridge automatically mounts, per plugin:
+
+- `/plugins/<pluginName>/*` — static hosting of the plugin's build output.
+- `/plugins/<pluginName>/api/:path` — the `onFetch`-backed REST namespace described below (JSON body parsing included).
+- `/plugins/<pluginName>/{*splat}` — SPA fallback serving the plugin's own `index.html` for unmatched routes.
+
+A plugin's own frontend should call its own namespace (`/plugins/<pluginName>/api/...`), not the core `/api/...` endpoints.
+
+## The plugin-extensible hook: `onFetch`
+
+The frontend's WebSocket RPC protocol is a fixed dispatch of built-in `/api/...` methods, and it has no plugin extension point. The one method that hands control back to plugin code for a plugin's own frontend is `onFetch`, declared on `MatterbridgePlatform` and meant to be overridden in your platform class.
+
+### `onFetch` — custom plugin REST API
 
 ```ts
-import {
-  MatterbridgeAccessoryPlatform,
-  MatterbridgeDynamicPlatform,
-  MatterbridgeEndpoint,
-  addFixedLabel,
-  addUserLabel,
-  contactSensor,
-  getAttribute,
-  onOffLight,
-  powerSource,
-  setAttribute,
-  subscribeAttribute,
-  updateAttribute,
-} from 'matterbridge';
-
-import { LaundryWasher, RoboticVacuumCleaner } from 'matterbridge/devices';
+async onFetch(method: string, path?: string, query?: Record<string, unknown>, body?: unknown): Promise<unknown>
 ```
 
-## Create a MatterbridgeEndpoint
+Called by the Matterbridge frontend for plugin API requests. Reached via `GET|POST|PUT|PATCH|DELETE /plugins/<pluginName>/api/:path`, mounted automatically for every enabled, error-free plugin.
 
-`MatterbridgeEndpoint` is the low-level building block for custom Matterbridge devices.
+- `method` — HTTP method.
+- `path` — the `:path` route param (e.g. `'devices'`, `'devices/42'`). Typed optional on `onFetch` because the method can be called directly (e.g. in tests) without one; via the real mounted route it is always a defined string, since Express requires `:path` to match at least one segment.
+- `query` — query string parameters.
+- `body` — request body (`POST`/`PUT`/`PATCH`).
+- Return a JSON-serializable value, or `undefined` to respond with **404**.
+- A thrown error becomes a **500** `{ error: 'Internal error in plugin <name>' }`.
+- `DELETE` responds **204** with no body; every other method responds `res.json(value)`.
+- If `plugin.platform` isn't running yet, the frontend returns **503** before calling `onFetch`.
 
-Constructor:
+The default base-class implementation logs and returns `undefined` (404) — override it to expose real endpoints.
 
-```ts
-new MatterbridgeEndpoint(
-  definition: DeviceTypeDefinition | AtLeastOne<DeviceTypeDefinition>,
-  options: MatterbridgeEndpointOptions = {},
-  debug = false,
-)
-```
+## Avoid these mistakes
 
-Recommended pattern:
-
-```ts
-const device = new MatterbridgeEndpoint([contactSensor, powerSource], { id: 'EntryDoor' })
-  .createDefaultIdentifyClusterServer()
-  .createDefaultBridgedDeviceBasicInformationClusterServer('Entry Door', 'ENTRY-DOOR-001', 0xfff1, 'Matterbridge', 'Entry Door Sensor')
-  .createDefaultBooleanStateClusterServer(false)
-  .createDefaultPowerSourceReplaceableBatteryClusterServer(75)
-  .addRequiredClusters();
-```
-
-Rules that matter:
-
-- `definition` can be a single device type or an array of device types.
-- Use multiple device types when the endpoint needs more than one role, for example `[contactSensor, powerSource]`.
-- Call one of the Basic Information helpers before `registerDevice()`. Without `deviceName`, `serialNumber`, and `uniqueId`, registration fails.
-- Call `addRequiredClusters()` at the end of the chain so any required clusters (server or client) that you did not explicitly create are added automatically.
-- Use `addOptionalClusterServers()` only when you really want the optional clusters defined by the selected device type(s).
-
-## MatterbridgeEndpointOptions
-
-`MatterbridgeEndpointOptions` supports:
-
-- `id`: stable storage key for the endpoint.
-- `number`: explicit endpoint number when you need one.
-- `tagList`: semantic tags used for disambiguation, especially for composed devices or `mode: 'matter'` endpoints.
-- `mode`: `undefined`, `'server'`, or `'matter'`.
-
-Mode selection:
-
-- `undefined`: normal bridged endpoint. This is the default for most DynamicPlatform devices.
-- `'server'`: create an independent Matter device with its own server node.
-- `'matter'`: add the endpoint directly to the Matterbridge server node alongside the aggregator.
-
-Practical guidance:
-
-- Use `mode: undefined` for normal bridged devices shown as children of the bridge.
-- Use `mode: 'server'` when the device must be paired independently.
-- Use `mode: 'matter'` when the device should be a native Matter endpoint on the server node.
-- When using `mode: 'matter'`, respect Matter disambiguation rules and supply a `tagList` when sibling endpoints could be ambiguous.
-
-Implementation details worth remembering:
-
-- Spaces and `.` are removed from the internal endpoint id. The original value is retained as `originalId`.
-- Non-Latin ids are normalized to a generated unique id.
-- `id` should remain stable across restarts.
-
-## Choose the right Basic Information helper
-
-Use the helper that matches how the endpoint is exposed:
-
-- `createDefaultBasicInformationClusterServer(...)`
-  Use for `mode: 'server'`, `mode: 'matter'`, and AccessoryPlatform devices.
-- `createDefaultBridgedDeviceBasicInformationClusterServer(...)`
-  Use for bridged DynamicPlatform endpoints.
-
-Important behavior:
-
-- `createDefaultBasicInformationClusterServer(...)` sets the metadata on the endpoint.
-- For bridged endpoints, `registerDevice()` can add the `BridgedDeviceBasicInformation` cluster automatically when the device is running as a bridged endpoint in bridge mode, or in childbridge mode on a `DynamicPlatform`.
-- Explicitly calling `createDefaultBridgedDeviceBasicInformationClusterServer(...)` is clearer for bridged devices and matches the repo examples.
-
-## Register the endpoint from a plugin
-
-In plugin code, call `this.registerDevice(device)`.
-
-DynamicPlatform bridged device:
-
-```ts
-import { MatterbridgeDynamicPlatform, MatterbridgeEndpoint, onOffLight } from 'matterbridge';
-
-export default function initializePlugin(matterbridge, log, config) {
-  return new ExamplePlatform(matterbridge, log, config);
-}
-
-class ExamplePlatform extends MatterbridgeDynamicPlatform {
-  async onStart(reason) {
-    await this.ready;
-
-    const device = new MatterbridgeEndpoint(onOffLight, { id: 'OnOffLightPlugin' })
-      .createDefaultBridgedDeviceBasicInformationClusterServer('Kitchen Light', 'LIGHT-001', 0xfff1, 'Matterbridge', 'Matterbridge OnOffLight')
-      .addRequiredClusters();
-
-    await this.registerDevice(device);
-  }
-}
-```
-
-AccessoryPlatform device:
-
-```ts
-import { MatterbridgeAccessoryPlatform, MatterbridgeEndpoint, temperatureSensor } from 'matterbridge';
-
-export default function initializePlugin(matterbridge, log, config) {
-  return new ExamplePlatform(matterbridge, log, config);
-}
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do not invent a custom WebSocket method name expecting the frontend to route to it — the WS dispatch is a fixed core method list with no plugin extension point. Use `onFetch` under `/plugins/<pluginName>/api/...` for a plugin's own frontend traffic.
+- Do not build a plugin's custom frontend to call core `/api/...` routes — use `/plugins/<pluginName>/api/...`, backed by your own `onFetch`.
 
 ---
 > Source: [Luligu/matterbridge-shelly](https://github.com/Luligu/matterbridge-shelly) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
