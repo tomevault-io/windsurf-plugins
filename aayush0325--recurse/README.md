@@ -7,11 +7,11 @@ Cursor for Reverse Engineering
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [aayush0325/recurse](https://github.com/aayush0325/recurse).
+Original source: `AGENTS.md` in [aayush0325/recurse](https://github.com/aayush0325/recurse).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
