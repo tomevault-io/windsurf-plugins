@@ -1,172 +1,112 @@
 ---
 trigger: always_on
-description: NVIDIA NeMo Curator is a generic, pluggable framework for building distributed data processing pipelines using Ray. It provides a unified API for running the same pipeline logic across different Ray orchestration backends.
+description: Use this guide when diagnosing or tuning a NeMo Curator pipeline running on the
 ---
 
-# GitHub Copilot Instructions for NVIDIA NeMo Curator
+# Ray Data Backend — Agent Tuning Guide
 
-## Overview
+Use this guide when diagnosing or tuning a NeMo Curator pipeline running on the
+Ray Data backend. Start from measured scheduler behavior; do not apply a setting
+only because it helped another pipeline.
 
-NVIDIA NeMo Curator is a generic, pluggable framework for building distributed data processing pipelines using Ray. It provides a unified API for running the same pipeline logic across different Ray orchestration backends.
+**Supported baseline:** Curator requires Ray 2.57.0 or later. The diagnostic shim
+in `diagnostics.py` targets exactly Ray 2.57.0 unless the installed Ray version
+already provides the diagnostics natively. Ray Data defaults and private APIs can
+change between releases, so re-check source before carrying this guidance forward.
 
-### 🎯 Core Concept
-Enable users to define a data processing pipeline once and execute it using different Ray backends in a multi-node setting (Xenna, Ray Actors, Ray Data) without changing the pipeline logic.
+## Start here
 
-This scalable data preprocessing tool focuses on data curation pipelines for text, audio, video, and image modalities with support for both CPU and GPU processing.
+1. Treat a Curator `Task`, not a document or ordinary Ray row, as the unit of work.
+2. Enable diagnostics and inspect `ray-data.log` before changing worker counts,
+   concurrency, memory, or backpressure.
+3. Distinguish starvation, actor saturation, resource admission, and downstream
+   backpressure. Similar GPU utilization can arise from different causes.
+4. Change one lever per run and compare scheduler events, operator timing, task
+   timing, object-store usage, and GPU telemetry—not wall time alone.
 
-## Development Environment
+## Curator execution model
 
-### Python Environment
-- **Python Version**: 3.13 (recommended and tested), supports 3.11-3.13
-- **Package Manager**: [uv](https://docs.astral.sh/uv/) for fast, reliable dependency management
-- **Virtual Environment**: Use uv's built-in virtual environment management
+Ray Data parallelizes map work over blocks, then forms row batches within those
+blocks. Curator constructs its initial dataset with:
 
-### CUDA Environment (Optional)
-- **CUDA Version**: 12.x (12.0+) for GPU acceleration
-- **GPU Requirements**: NVIDIA GPU with Volta™ architecture or higher (compute capability 7.0+)
-- **GPU Libraries**: RAPIDS (cuDF, cuML), PyTorch with CUDA 12 support, CuPy
-- **Note**: GPU features are optional and CPU fallbacks are provided
-
-## Key Technologies and Frameworks
-
-### Core Dependencies
-- **PyTorch**: Deep learning framework with CUDA support
-- **Ray**: Distributed computing framework for data processing
-- **Pandas/CuDF**: Data manipulation (CPU/GPU respectively)
-- **Transformers**: Hugging Face transformers library
-- **Loguru**: Structured logging
-
-### Modality-Specific Libraries
-- **Text Processing**: PyTorch, BeautifulSoup, fasttext, sentencepiece, trafilatura
-- **Audio Processing**: NeMo Toolkit ASR components
-- **Video Processing**: OpenCV, PyAV, CvCuda, PyNvVideoCodec
-- **Image Processing**: NVIDIA DALI for optimized data loading
-
-### Testing Framework
-- **pytest**: Primary testing framework
-- **pytest-asyncio**: Async testing support
-- **pytest-coverage**: Code coverage measurement
-- **GPU Testing**: Use `@pytest.mark.gpu` for GPU-dependent tests
-
-## Setup Instructions
-
-### Basic Setup
-```bash
-# Install uv package manager
-pip3 install uv
-
-# Clone and setup development environment
-git clone <repository-url>
-cd Curator
-uv sync
-
-# For GPU development (requires CUDA 12.x)
-uv sync --extra deduplication_cuda12x
-```
-
-### Optional Feature Groups
-```bash
-# Text processing capabilities
-uv sync --extra text
-
-# Video processing with GPU acceleration
-uv sync --extra video --extra video_cuda
-
-# All features (includes CUDA dependencies)
-uv sync --extra all
-```
-
-## Coding Standards and Patterns
-
-### Code Quality
-- **Linting**: Ruff with comprehensive rule set (see pyproject.toml)
-- **Line Length**: 119 characters maximum
-- **Type Hints**: Use comprehensive type annotations
-- **Imports**: Follow import sorting conventions
-
-### Module Structure
-- **Stages**: Processing stages organized by modality (`text/`, `video/`, `audio/`, `image/`)
-- **Utils**: Shared utilities for common operations
-- **Datasets**: Data loading and manipulation classes
-- **Modules**: Core processing algorithms
-
-### Error Handling Patterns
 ```python
-# Standard error handling for missing dependencies
-try:
-    import required_library
-except ImportError as e:
-    logger.error(f"Required dependency not found: {e}")
-    raise ImportError("Please install the required dependencies")
+ray.data.from_items(tasks, override_num_blocks=len(tasks))
 ```
 
-### Configuration Patterns
-- Use YAML configuration files for processing pipelines
-- Support hierarchical configuration (CLI args > env vars > config files > defaults)
-- Follow the configuration structure in `docs/admin/config/`
+This creates one opaque Task row per block. Fanout stages repartition their outputs
+back to one row per block. In practice, **one row = one block = one Task**.
 
-## Testing Guidelines
+The default stage `batch_size=1` passes one Task to each stage call. Ray cannot see
+or split records contained inside that Task. If a task is too large, too small, or
+too slow, tune Curator task partitioning and per-task payload size rather than Ray
+block-size knobs. Pipeline completion calls `take_all()`, so final Task payloads are
+collected back to the driver.
 
-### Test Organization
-- **Unit Tests**: Test individual functions and classes
-- **Integration Tests**: Test complete processing pipelines
-- **GPU Tests**: Mark with `@pytest.mark.gpu` decorator
-- **Mock External Dependencies**: Use pytest mocks for external services
+### Task stages and actor stages
 
-### Test Environment Setup
-```python
-# Example GPU test structure
-@pytest.mark.gpu
-def test_gpu_processing():
-    import cudf  # Only import in GPU tests
-    df = cudf.DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
-    assert len(df) == 3
-```
+`RayDataStageAdapter` applies every stage with `map_batches` and chooses the compute
+strategy as follows:
 
-### Test Configuration
-- Tests use a unified Ray cluster configuration via `conftest.py`
-- GPU availability is automatically detected using multiple methods (pynvml, nvidia-ml-py)
-- Tests gracefully handle missing GPU dependencies
+| Stage | Curator selection | Worker behavior |
+|---|---|---|
+| Actor | Overrides `setup()`, or requests both CPU and GPU; can be forced with `IS_ACTOR_STAGE=True` | Persistent state and `ActorPoolStrategy`; fixed or autoscaling pool |
+| Task | Stateless and not selected as an actor; can be forced with `IS_ACTOR_STAGE=False` | `TaskPoolStrategy`; no actor startup or actor autoscaler |
 
-### Running Tests
+For a task stage, `num_workers=N` caps the task pool at N; without it, Ray Data
+controls parallelism through resources and backpressure. For an actor stage,
+`num_workers=N` creates a fixed pool. Otherwise Curator passes `MIN_WORKERS`,
+`MAX_WORKERS`, and `INITIAL_WORKERS` to an autoscaling actor pool.
+
+## Log-first tuning workflow
+
+### 1. Record the pipeline shape
+
+Before tuning, record:
+
+- task count, representative serialized task size, and work contained in each Task;
+- stage `batch_size`, task-versus-actor selection, CPU/GPU request, and worker bounds;
+- `max_concurrency` and the global `max_tasks_in_flight_per_actor` override;
+- cluster CPU/GPU resources, object-store size, and Ray temporary directory;
+- per-stage processing time, gaps between tasks, and GPU utilization/power.
+
+Without this baseline, a faster run can be a workload, cache, GPU-power, or startup
+artifact rather than a scheduler improvement.
+
+### 2. Enable and find diagnostics
+
+Set the opt-in environment variable before starting the driver:
+
 ```bash
-# Run all tests (CPU only by default)
-uv run pytest
-
-# Run GPU tests (requires CUDA environment)
-uv run pytest -m gpu
-
-# Run specific test categories
-uv run pytest -m "not gpu"  # CPU tests only
-
-# Run tests for specific modules
-uv run pytest tests/stages/text/
-uv run pytest tests/stages/image/
+export NEMO_CURATOR_RAY_DATA_DIAGNOSTICS=1
 ```
 
-## Build and Development
+The values `true`, `yes`, and `on` also enable it.
 
-### Development Workflow
-```bash
-# Install development dependencies
-uv sync
+The shim emits structured logfmt events through the `ray.data` logger to:
 
-# Run linting and formatting
-uv run ruff check .
-uv run ruff format .
+```text
+$RAY_TEMP_DIR/session_latest/logs/ray-data/ray-data.log
+```
 
-# Run tests
-uv run pytest
+Set `RAY_TEMP_DIR` with `RayClient(ray_temp_dir=...)` or
+`SlurmRayClient(ray_temp_dir=...)`; the default is `~/.ray`. Ray can also resolve
+the directory with `ray.data._internal.logging.get_log_directory()`.
 
-# Run specific test modules
-uv run pytest tests/utils/test_nvcodec_utils.py
+Events are emitted on scheduler **state changes**, not on every tick. Actor counts
+and utilization in an event are snapshots, not a time series. Pair them with Ray
+operator timing and GPU telemetry.
 
-# Local docs dev server (Fern; see fern/README.md)
-make docs
+### 3. Classify the bottleneck
 
+| Symptom | Evidence to inspect | Likely interpretation | First controlled experiment |
+|---|---|---|---|
+| GPU actors are idle and `queued_input_blocks=0` | Upstream operator timing and admission events | GPU stage is starved | Adjust task partitioning or upstream parallelism; verify the producer is not blocked |
+| Inputs are queued but work is not admitted | `scheduling_reason`, remaining budget, actor slots | Resource, capacity, concurrency, or actor-slot limit | Change the indicated limit only |
+| Autoscaling pool stays near its minimum despite backlog | `utilization`, `tasks_in_flight`, scheduling reason | In-flight/concurrency ratio cannot reach scale-up threshold, or backpressure suppresses scaling | Fix the ratio or the blocking condition |
+| Producer stops while object-store bytes rise | Resource admission reason and internal/output bytes | Pending output or total object-store budget is exhausted | Reduce per-task payload or increase object-store capacity |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [NVIDIA-NeMo/Curator](https://github.com/NVIDIA-NeMo/Curator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
