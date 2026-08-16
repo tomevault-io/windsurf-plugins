@@ -1,16 +1,16 @@
 ---
 trigger: always_on
-description: `packaging/` mixes source templates/manifests with generated package outputs. Keep edits confined to source-of-truth files.
+description: `packing/` mixes source templates/manifests with generated package outputs. Keep edits confined to source-of-truth files.
 ---
 
 # PACKAGING KNOWLEDGE BASE
 
 ## OVERVIEW
-`packaging/` mixes source templates/manifests with generated package outputs. Keep edits confined to source-of-truth files.
+`packing/` mixes source templates/manifests with generated package outputs. Keep edits confined to source-of-truth files.
 
 ## STRUCTURE
 ```text
-packaging/
+packing/
 ├── deb/DEBIAN/control                # template metadata (source-of-truth)
 ├── pacman/PKGBUILD*                  # template/build scripts (source-of-truth)
 ├── pacman/select_pkgbuild.sh         # architecture selector
@@ -40,4 +40,4 @@ packaging/
 
 ---
 > Source: [Hope2333/opencode-termux](https://github.com/Hope2333/opencode-termux) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
