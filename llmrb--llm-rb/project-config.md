@@ -69,7 +69,7 @@ A subclass declares its defaults with
 Each key is a
 class-level accessor: `name`, `description`, `model`, `tools`,
 `skills`, `instructions`, `stream`, `tracer`, `concurrency`,
-`schema`, `confirm`, `path`, `tool_budget`.
+`schema`, `confirm`, `path`, `tool_budget`, `retry_budget`.
 Keyword arguments in the constructor override these defaults.
 
 ```ruby
@@ -143,11 +143,9 @@ agent.talk "Hello world"
 A direct instance is the right choice for quick experiments, one-shot
 tasks, or when defining a class would be overkill. It is also
 the right choice when the agent's configuration is determined at
-runtime and a class hierarchy adds unnecessary complexity.
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [llmrb/llm.rb](https://github.com/llmrb/llm.rb) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
