@@ -22,119 +22,143 @@ limitations under the License.
 
 # AGENTS.md
 
-> E2E (Playwright) conventions for `zeppelin-web-angular/e2e/`. A scoped companion
-> to the repository-root AGENTS.md, loaded only when working under `e2e/`.
-> See [AGENTS.md specification](https://github.com/agentsmd/agents.md).
+> Scoped guidance for work under `docs/`. This file complements the
+> repository-root `AGENTS.md`.
 
-Config: `zeppelin-web-angular/playwright.config.js` (Angular UI) and
-`playwright.classic.config.js` (legacy classic UI), sharing `playwright.shared.js`.
-This document is the shared source of truth for E2E conventions; Codex and
-agents.md-native tools read it directly.
-Claude Code / Gemini users can symlink `CLAUDE.md` / `GEMINI.md` to it locally
-(both gitignored, personal, not committed).
+## Scope And Ownership
 
-## Tooling: Use e2e-skills
+- `docs/` is the source for Apache Zeppelin's versioned product documentation.
+- The main `zeppelin.apache.org` website is maintained in
+  `apache/zeppelin-site`; its homepage does not need to use the same generator
+  as these versioned docs.
+- Markdown, layouts, includes, and assets in this directory are built here.
+  The generated site is written to `docs/_site/`.
+- `docs/_site/` is generated and gitignored. Never edit or commit it.
 
-Generate, review, and debug with [e2e-skills](https://github.com/voidmatcha/e2e-skills)
-instead of ad-hoc prompts. It encodes the rules below and adds a deterministic
-silent-pass scanner.
+## Build Model
+
+The current build is:
+
+```text
+docs sources + docs/_config.yml
+  -> Jekyll from docs/Gemfile.lock
+  -> docs/_site/
+  -> zeppelin-site/docs/<version>/ during a separate publication step
+```
+
+- `Gemfile` declares Jekyll and its documentation build dependencies.
+- `Gemfile.lock` pins the actual Ruby dependency versions. The Docker commands
+  use `bundle exec` so the pinned Jekyll version is used.
+- `_config.yml` supplies `ZEPPELIN_VERSION` and `JB.BASE_PATH`.
+- `_includes/JB/setup` applies `JB.BASE_PATH` only for a safe build. Therefore
+  a publication build must include `--safe`.
+- `Rakefile` contains legacy Jekyll-Bootstrap helpers. It is not the primary
+  build entry point; use the Docker commands below.
+- The Maven build does not generate this site.
+- Docker is the supported build environment. Do not install or run Ruby,
+  Bundler, or Jekyll directly on the host.
+
+## Preview And Build
+
+Preview with Docker:
 
 ```bash
-npx skills add voidmatcha/e2e-skills -g --all   # or -a <agent>
+cd docs
+docker run --rm -it \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/usr/local/bundle \
+  -e BUNDLE_FROZEN=true \
+  -v "$PWD:/docs" \
+  -w /docs \
+  -p '4000:4000' \
+  ruby:4.0.6 \
+  bash -lc "bundle install && bundle exec jekyll serve --watch --host 0.0.0.0"
 ```
 
-| Task | Skill |
-| --- | --- |
-| Generate new Playwright coverage | `playwright-test-generator` |
-| Review specs for silent-pass smells | `e2e-reviewer` |
-| Debug a failed Playwright report | `playwright-debugger` |
-| Deterministic local scan | `bash skills/e2e-reviewer/scripts/scan.sh e2e/` |
+Open `http://localhost:4000`. The preview intentionally runs without
+`--safe`, so links are rooted at `/` instead of the production version path.
+The container uses the current user's UID and GID so generated files remain
+owned by that user on the host. The Ruby image's writable gem directory is
+also used as the container home for that user.
 
-Always run `e2e-reviewer` on generated specs. It catches always-passing
-assertions (`toBeDefined()`, `not.toBeNull()`) that pass while the feature is broken.
+Build the publication artifact with Docker:
 
-## Layout
-
-- Specs: `e2e/tests/<area>/<feature>.spec.ts` (areas: `authentication`, `home`,
-  `login`, `notebook`, `share`, `theme`, `workspace`).
-- Page Objects (POM), split by role:
-  - `e2e/models/<name>.ts`: locators + primitive actions (click, fill, navigate, simple state checks).
-  - `e2e/models/<name>.util.ts`: workflows, composite verification, scenario helpers.
-- Shared helpers: `e2e/utils.ts`.
-
-## Style
-
-- English only. No unnecessary comments.
-- BDD via `test.step('Given/When/Then …', …)`, as in existing specs.
-- One `test.describe` per feature; construct the POM in `beforeEach`.
-
-## Locators
-
-Prefer user-facing, in this order:
-
-1. `getByRole('button' | 'link' | 'textbox', { name })`, `getByLabel`, `getByText`.
-2. Last resort: `data-testid` (attribute selector) when a role/label is unavailable
-   and a CSS chain would be brittle.
-3. Forbidden: raw CSS chains and XPath.
-
-## Assertions
-
-- Web-first, auto-waiting assertions only: `toBeVisible`, `toHaveURL`,
-  `toHaveText`, `toHaveCount`.
-- No `waitForTimeout`. When waiting on a count, use `toHaveCount`.
-- No one-shot boolean checks (`expect(await el.isVisible())`) and no
-  always-true assertions (`toBeDefined`, `not.toBeNull`).
-
-## Readiness & Auth
-
-- After navigation, wait with `waitForZeppelinReady(page)` from `e2e/utils.ts`
-  (not fixed sleeps).
-- Auth is programmatic: the `setup` project logs in once and writes
-  `playwright/.auth/user.json`; browser projects consume it via `storageState`.
-  Do not add per-test login races. For logged-out scenarios use a fresh context.
-
-## Coverage Annotation (Required)
-
-Every `describe` must declare the page/component it exercises so coverage is
-attributed:
-
-```ts
-import { addPageAnnotationBeforeEach, PAGES } from '../../utils';
-
-test.describe('Home Page - Core Elements', () => {
-  addPageAnnotationBeforeEach(PAGES.WORKSPACE.HOME);
-  // …
-});
+```bash
+cd docs
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/usr/local/bundle \
+  -e BUNDLE_FROZEN=true \
+  -v "$PWD:/docs" \
+  -w /docs \
+  ruby:4.0.6 \
+  bash -lc "bundle install && bundle exec jekyll build --safe"
 ```
 
-Use an existing key from the `PAGES` object in `e2e/utils.ts`; add a new one
-there if the page is missing. `PAGES` is also the coverage-instrumentation set
-(`getCoverageTransformPaths`), so it defines the coverage denominator. Purely
-structural / non-page components (lifecycle hooks, shared UI primitives like the
-spinner or resize handle) are intentionally omitted from `PAGES`. They are
-exercised transitively and are not counted.
+The output must be under `_site/`, and generated links and assets must use the
+`JB.BASE_PATH` configured in `_config.yml`.
 
-## Running
+When `Gemfile` changes, update `Gemfile.lock` inside Docker:
 
-- Node: `nvm use` (pinned in `.nvmrc`, currently 22.21.1).
-- Dev server: `npm run start` at `http://localhost:4200` (Playwright reuses a
-  running one via `webServer.reuseExistingServer`).
+```bash
+cd docs
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/usr/local/bundle \
+  -v "$PWD:/docs" \
+  -w /docs \
+  ruby:4.0.6 \
+  bundle lock --update
+```
 
-| Command | Purpose |
-| --- | --- |
-| `npm run e2e` | Full suite |
-| `npm run e2e:fast` | Chromium only (fast) |
-| `npm run e2e:classic` | Classic `/classic` UI suite against `:8080` (needs `-Pweb-classic`) |
-| `npm run e2e:ui` | Playwright Test UI |
-| `npm run e2e:headed` | Headed run |
-| `npm run e2e:debug` | Step-by-step debugger |
-| `npm run e2e:report` | Open last HTML report |
-| `npm run e2e:report:classic` | Open last classic HTML report |
-| `npm run e2e:ci` | CI mode (`CI=true`, baseURL `:8080`), main then classic suite |
-| `npm run e2e:codegen` | Record against `:4200` |
+Run the publication build after updating the lockfile.
+
+## Authoring Conventions
+
+- Preserve the ASF license header in every new source file.
+- Follow the front matter used by nearby pages:
+
+  ```yaml
+  ---
+  layout: page
+  title: "Page title"
+  description: "Short description"
+  group: section/subsection
+  ---
+  ```
+
+- Include `{% include JB/setup %}` before page content when following the
+  existing page layout.
+- Prefix internal site links and assets with `{{BASE_PATH}}` when an absolute
+  site path is needed. Production docs are hosted below `/docs/<version>/`,
+  not at the domain root.
+- Update `_includes/themes/zeppelin/_navigation.html` when a page must appear
+  in the global documentation navigation.
+- Keep filenames, headings, and link targets stable unless the task explicitly
+  includes redirects or link migration.
+- Check the corresponding source code or configuration template when
+  documenting runtime behavior. Do not infer current behavior from an older
+  documentation page.
+
+## Version Handling
+
+- `ZEPPELIN_VERSION` and `JB.BASE_PATH` in `_config.yml` must identify the same
+  version.
+- `dev/change_zeppelin_version.sh` updates both values as part of a repository
+  version change. Do not change them for an ordinary documentation edit.
+- Before producing release docs, verify that `JB.BASE_PATH` is exactly
+  `/docs/<release-version>`.
+
+## Publication Boundary
+
+- Building this directory does not publish the website.
+- The generated `_site/` tree is copied into
+  `apache/zeppelin-site/docs/<version>/` by separate release/site work.
+- The `zeppelin-site` repository owns the homepage, ASF staging/publishing,
+  and the mapping or redirect for `/docs/latest/`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apache/zeppelin](https://github.com/apache/zeppelin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
