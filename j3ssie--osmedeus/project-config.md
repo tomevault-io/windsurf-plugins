@@ -1,136 +1,63 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Agent-focused reference for the Osmedeus Dashboard codebase.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Agent-focused reference for the Osmedeus Dashboard codebase.
 
-## Build and Test Commands
+## Commands
 
 ```bash
-# Build
-make build              # Build to bin/osmedeus
-make build-all          # Cross-platform builds (linux, darwin, windows)
-
-# Test
-make test-unit          # Fast unit tests (no external dependencies)
-make test-integration   # Integration tests (requires Docker)
-make test-e2e           # E2E CLI tests (requires binary build)
-make test-e2e-ssh       # SSH E2E tests (module & step level SSH runner)
-make test-e2e-api       # API E2E tests (all endpoints with Redis + seeded DB)
-make test-e2e-cloud     # Cloud E2E tests (cloud CLI commands)
-make test-sudo          # Sudo-aware E2E tests (requires interactive sudo prompt)
-make test-cloud         # Cloud integration tests (internal cloud package)
-make test-distributed   # Distributed run e2e tests (requires Docker for Redis)
-make test-docker        # Docker runner tests
-make test-ssh           # SSH runner unit tests (starts test SSH container)
-make test-canary-all    # Canary tests: real scans in Docker (30-60min)
-make test-canary-repo   # Canary: SAST scan on juice-shop (~25min)
-make test-canary-domain # Canary: domain recon on hackerone.com (~20min)
-make test-canary-ip     # Canary: CIDR scan on IP list (~25min)
-make test-canary-general # Canary: domain-list-recon on hackerone.com subdomains (~40min)
-go test -v ./internal/functions/...  # Run tests for specific package
-go test -v -run TestName ./...       # Run single test by name
-
-# Development
-make fmt                # Format code
-make lint               # Run golangci-lint
-make tidy               # go mod tidy
-make run                # Build and run
-
-# Installation
-make install            # Install to $GOBIN (or $GOPATH/bin)
-make swagger            # Generate Swagger documentation
-
-# Docker Toolbox
-make docker-toolbox       # Build toolbox image (all tools pre-installed)
-make docker-toolbox-run   # Start toolbox container
-make docker-toolbox-shell # Enter toolbox container shell
-
-# Docker Canary (real-world scan testing)
-make canary-up            # Build & start canary container
-make canary-down          # Stop & cleanup canary container
-
-# UI
-make update-ui          # Update embedded UI from dashboard build
+bun install          # Install dependencies
+bun dev              # Start dev server with Turbopack (http://localhost:3000)
+bun run build        # Production build
+bun run lint         # Run ESLint
 ```
 
-## Architecture Overview
+## Architecture
 
-Osmedeus is a workflow engine for security automation. It executes YAML-defined workflows with support for multiple execution environments.
+**Tech Stack**: Next.js 16 (App Router), React 19, Tailwind CSS v4, TypeScript, Shadcn UI (new-york)
 
-### Layered Architecture
+**Key Directories**:
+- `app/(auth)/` & `app/(dashboard)/` - Next.js routes
+- `components/` - React components (Shadcn in `ui/`, feature-specific subdirs, reusable in `shared/`)
+- `lib/api/` - API calls (mock data from `lib/mock/`)
+- `lib/types/` - TypeScript interfaces (api.ts, workflow.ts, scan.ts, asset.ts, event.ts, schedule.ts)
+- `providers/` - Context providers (auth, theme)
 
-```
-CLI/API (pkg/cli, pkg/server)
-         ↓
-Executor (internal/executor) - coordinates workflow execution
-         ↓
-StepDispatcher - routes to: BashExecutor, FunctionExecutor, ForeachExecutor, ParallelExecutor, RemoteBashExecutor, HTTPExecutor, LLMExecutor, AgentExecutor, ACPExecutor
-         ↓
-Runner (internal/runner) - executes commands via: HostRunner, DockerRunner, SSHRunner
-```
+**Core Features**:
+- Auth: Mock via localStorage (`osmedeus_session`); any 4+ char password
+- Workflow Editor: React Flow (@xyflow/react) + Dagre auto-layout at `components/workflow-editor/`
+- API Layer: Abstracted in `lib/api/` with `PaginatedResponse<T>` contract
 
-### Core Packages
+## Code Style
 
-| Package | Purpose |
-|---------|---------|
-| `internal/core` | Type definitions: Workflow, Step, Trigger, RunnerConfig, ExecutionContext |
-| `internal/parser` | YAML parsing, validation, and caching (Loader) |
-| `internal/executor` | Workflow execution engine with step dispatching |
-| `internal/runner` | Execution environments implementing Runner interface |
-| `internal/template` | `{{Variable}}` interpolation engine |
-| `internal/functions` | Utility functions via Goja JavaScript VM |
-| `internal/scheduler` | Cron, event, and file-watch triggers (fsnotify-based) |
-| `internal/database` | SQLite/PostgreSQL via Bun ORM |
-| `pkg/cli` | Cobra CLI commands |
-| `pkg/server` | Fiber REST API |
-| `internal/snapshot` | Workspace export/import as compressed ZIP archives |
-| `internal/installer` | Binary installation (direct-fetch and Nix modes) |
-| `internal/state` | Run state export for debugging and sharing |
-| `internal/updater` | Self-update functionality via GitHub releases |
-| `internal/cloud` | Cloud infrastructure provisioning (DigitalOcean, AWS, GCP, Linode, Azure) |
+**Imports**: Use `@/*` path alias (e.g., `@/lib/utils`, `@/components/ui/button`). Order: React/Next → external libs → local imports.
 
-### Key Types
+**Components**: Functional with TypeScript, use `cn()` for conditional classes, `React.ComponentProps<"element">` for spread props pattern (see card.tsx).
 
-```go
-WorkflowKind: "module" | "flow"  // module = single unit, flow = orchestrates modules
-StepType: "bash" | "function" | "parallel-steps" | "foreach" | "remote-bash" | "http" | "llm" | "agent" | "agent-acp"
-RunnerType: "host" | "docker" | "ssh"
-TriggerType: "cron" | "event" | "watch" | "manual"
-```
+**Types**: Strict mode enabled; centralize domain types in `lib/types/`; use Zod for validation (react-hook-form integration).
 
-### Decision Routing
+**Naming**: PascalCase for components/types, camelCase for functions/variables, SCREAMING_SNAKE_CASE for constants.
 
-Steps support conditional branching via `decision` field with switch/case syntax:
-```yaml
-decision:
-  switch: "{{variable}}"
-  cases:
-    "value1": { goto: step-a }
-    "value2": { goto: step-b }
-  default: { goto: fallback }
-```
-Use `goto: _end` to terminate workflow.
+**Formatting**: ESLint (next/core-web-vitals + next/typescript), no Prettier—use ESLint auto-fix. Shadcn components use `data-slot` attributes.
 
-### Workflow Execution Flow
+**Error Handling**: Use `ErrorState` component in `components/shared/error-state.tsx`; leverage sonner for toast notifications.
 
-1. CLI parses args ▷ loads config from `~/osmedeus-base/osm-settings.yaml`
-2. Parser loads YAML workflow, validates, caches in Loader
-3. Executor initializes context with built-in variables (`{{Target}}`, `{{Output}}`, etc.)
-4. StepDispatcher routes each step to appropriate executor
-5. Runner executes commands, captures output
-6. Exports propagate to subsequent steps
+**CSS**: Tailwind v4 with CSS variables in `app/globals.css`; theme switching via `next-themes`.
 
-### Template System
+<!-- BEGIN:nextjs-agent-rules -->
 
-- `{{Variable}}` - standard template variables (Target, Output, threads, etc.)
-- `[[variable]]` - foreach loop variables (to avoid conflicts)
+# This is NOT the Next.js you know
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
 
 ---
 > Source: [j3ssie/osmedeus](https://github.com/j3ssie/osmedeus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
