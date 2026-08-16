@@ -1,124 +1,53 @@
 ---
 trigger: always_on
-description: This file applies to the entire repository. Keep changes scoped, preserve
+description: > 仅服务本 skill 已迁入的行动指南。安全门控、危险操作确认、`--format json` 等已在本 skill 的 `SKILL.md` 中定义，此处不重复。
 ---
 
-# Repository Agent Guide
+# 业务域通用规范
 
-This file applies to the entire repository. Keep changes scoped, preserve
-unrelated work, and use `gofmt` for every modified Go file.
+> 仅服务本 skill 已迁入的行动指南。安全门控、危险操作确认、`--format json` 等已在本 skill 的 `SKILL.md` 中定义，此处不重复。
 
-## Build and test
+## 批量查询规范
 
-- Build: `go build ./cmd`
-- Full test suite: `DWS_PACKAGE_VERSION=0.0.0-test go test ./...`
-- Generate Schema assets: `go generate ./internal/cli`
-- Check generated drift: `./scripts/policy/check-generated-drift.sh`
-- Check the Schema contract: `./scripts/policy/check-schema-catalog.sh`
+| # | 规范 |
+|---|------|
+| 1 | **并行查详情**：拿到多个 ID 后，用 `&` 合并到同一条 Shell 命令并行执行 + `wait`，**严禁逐条串行** |
+| 2 | **翻页**：分页接口须拉全直至无更多 |
+| 3 | **优先批量 API**：有批量接口则用批量；无则按 #1 并行 |
+| 4 | **群消息**：必须先 `chat search --query` 得 `openConversationId`，再 `chat message list --group <openConversationId> --time "<yyyy-MM-dd HH:mm:ss>" --direction older`；多群同条命令并行 |
+| 5 | **列表少轮次**：带条件搜索/列表 → 一次采全详情；**禁止**无新参数时重复同一 `list` / `search` |
 
-Generated Schema JSON is committed. Change its source inputs and generators,
-then regenerate; do not hand-edit generated Catalog or Agent metadata files.
-`internal/cli/schema_command_registry.json` is different: it is a reviewed
-`CommandRegistry` source, not a generated snapshot. It is the single reviewed
-source of stable canonical identity,
-primary paths, aliases, and navigation. Edit it only when reviewed exposure,
-identity, primary path, or aliases change; parameter, Skill, and metadata-only
-changes must not rewrite it mechanically.
+## 多源并行采集（公共模式）
 
-## Agent Schema contract
+> recipe 引用方式：`按「多源并行采集」执行（关键词=<X>，时间=<Y>至<Z>）`。
 
-The Schema data flow is one way:
+- 同条 Shell：`&` 并行 + `wait`；分页须采全。
+- 只保留与主题相关的数据，无关丢弃。
+- 有批量详情接口优先；否则并行拉详情（见上表 #1）。
+- 具体采哪些产品列表由对应 **行动指南 recipe** 与当前产品参考决定；不要引入本文档未覆盖的产品路线。
 
-```text
-1. app.NewRootCommand()
-   └─ builds the real Cobra command tree and flags
+## 字段术语与 ID 传递
 
-2. schema_command_registry.json
-   + schema_hints/metadata/<product>.json tool parameters (+ cli_path)
-   └─ forms EffectiveCommandRegistry
-      └─ binds exactly to real Cobra leaves and aliases
+> list 返回 JSON 后，必须提取下表字段传给后续命令。**禁止用其他字段替代。**
 
-3. Parameter resolution
-   Cobra flags
-   + schema_parameter_bindings.json
-   + metadata tool parameters
-   └─ produces ParameterSpec and constraints
+| 字段 | 来源 | 传递给 |
+|------|------|--------|
+| `taskUuid` | `minutes list` | `minutes get summary/info/batch --id(s)` |
+| `userId` | `aisearch person` / `contact user search` / `contact dept list-members` | `contact user get --ids`、`todo --executors`、`calendar --users` |
+| `deptId` | `contact dept search` | `contact dept list-members --ids <deptId1,deptId2...>`；多子部门时对每个子部门分别 `dept search` 取 id |
+| `nodeId` | `drive search` / `wiki node search` | `doc read/update --node`、`drive copy/move/rename/delete --node` |
+| `nodeId` | `wiki node list` 中的 folder 类型节点 / `wiki node create --type folder` | `wiki node list --folder`、`wiki node create --folder`、`drive upload --folder`、`drive copy/move --folder` |
+| `eventId` | `calendar event list` | `calendar event get/update --id` |
+| `processInstanceId` | `oa approval list-*` | `oa approval detail/approve --instance-id` |
+| `openConversationId` | `chat search` | `chat message list/send --group` |
+| `todoTaskId` | `todo task list` | `todo task update/done --task-id` |
+| `reportId` | `report inbox list` / `report outbox list` | `report entry get/stats --report-id` |
+| `baseId` / `tableId` | `aitable base search` | `aitable record query --base-id --table-id` |
+| `dentryUuid` | `drive list` / `drive mkdir` | `drive info/download/copy/move/rename/delete --node`、`drive list/mkdir/upload/copy/move --folder` |
+| `dentryId` | `drive info` 的数字字段 | 仅用于 `chat message send --dentry-id` |
 
-4. Agent and interface semantics
-   schema_hints/selection/<product>.json   (selection prose)
-   + schema_hints/metadata/<product>.json  (safety/interface/runtime_gate)
-   + pinned MCP metadata
-   └─ resolves Agent metadata by source precedence
-      Markdown is evidence only; it is not concatenated into final prose
-
-5. One typed hub
-   BoundCommandRegistry
-   + ParameterSpec
-   + Agent metadata
-   + Interface metadata
-   └─ resolves every command exactly once into ToolSpec
-      └─ aggregates SchemaRegistry + SchemaIndex
-
-6. One-way publication
-   SchemaRegistry
-   └─ internal/cli/schema_catalog.json
-      └─ dws schema list/product/group/leaf/--all
-```
-
-Parameter overlays from metadata are merged into `EffectiveCommandRegistry`
-*before* Cobra binding; after that point there is no second identity source and
-no identity precedence winner. The binder must reject a missing/non-runnable
-Cobra path, an alias collision, and any native identity annotation that
-disagrees with the effective registry. A missing native identity annotation is
-allowed because annotations are implementation-side assertions, not identity
-fallbacks.
-
-The assembler resolves every bound command exactly once into one `ToolSpec`.
-Build-time gates and the snapshot serializer consume that source-resolved typed
-registry/index. Runtime projections and delivery gates consume the typed
-registry/index returned by the production snapshot loader. Neither path may
-reopen annotations, merge source records, or use a previous Catalog or other
-generated JSON as a source. `schema_catalog.json` is output-only in the
-generation graph. The production loader decoding the embedded published
-snapshot is a delivery boundary, not source resolution; it must never create or
-repair a Cobra command, flag, registry entry, or later Catalog generation.
-
-This split is architecturally isomorphic to Lark's typed metadata registry,
-navigation catalog, and schema renderer. DWS intentionally preserves its
-existing flat JSON wire contract for compatibility; do not treat architectural
-alignment as permission to make an unversioned wire-format change.
-
-The reviewed `CommandRegistry` is the sole source of stable command identity
-and navigation. The executable Cobra tree remains the source of truth for
-whether a CLI path exists, is runnable, and which flags it accepts. Schema
-coverage is bidirectional:
-
-1. Every final `SchemaRegistry` tool, including its serialized Catalog
-   projection, must resolve to an executable Cobra command.
-2. Every public runnable Cobra leaf must either resolve to Schema or appear as
-   an exact, reviewed exclusion with a non-empty reason in
-   `internal/cli/schema_command_exclusions.json`.
-
-Do not use prefix or wildcard exclusions: they can silently hide future
-commands. Remove an exclusion when its command enters Schema; stale, invalid,
-or duplicate exclusions must fail generation and CI.
-
-When adding or changing an Agent-visible command, review all relevant inputs:
-
-- `internal/cli/schema_command_registry.json` for the reviewed
-  `CommandRegistry`: canonical identity, primary CLI path, aliases, and stable
-  navigation. It is the identity source and is not a generated artifact.
-- `internal/cli/schema_command_registry.schema.json` is its closed,
-  machine-readable editing contract. Preserve the local `$schema` reference;
-  unknown fields, invalid visibility values, stale paths, and collisions fail
-  Go validation and policy.
-- `internal/cli/schema_hints/metadata/<product>.json` for safety, interface,
-  `runtime_gate`, and optional parameter overlays (`parameters` / `cli_path`).
-- `internal/cli/schema_hints/selection/<product>.json` for reviewed Agent
-  selection prose (`agent_summary`, `use_when`, `avoid_when`, `examples`).
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**ID 边界硬约束**：`dentryId` 通常是纯数字，只表示聊天文件消息需要的钉盘条目数字 ID；它不是父目录 ID。遇到 `drive --node/--folder`、`doc --node`、`wiki node --folder` 时，只能使用 `dentryUuid` / `nodeId` / 文档 URL。若当前上下文只有数字型 `dentryId`，必须先重新 `drive list` / `drive search` / `wiki node list` 获取正确 ID，不能把该数字直接代入后续命令。
 
 ---
 > Source: [DingTalk-Real-AI/dingtalk-workspace-cli](https://github.com/DingTalk-Real-AI/dingtalk-workspace-cli) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
