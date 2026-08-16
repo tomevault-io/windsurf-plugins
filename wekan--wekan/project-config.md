@@ -1,13 +1,41 @@
 ---
 trigger: always_on
-description: Claude Code reads this file at the repo root before doing work here. Follow it.
+description: Codex reads this file at the repo root before doing work here. Follow it.
 ---
 
-# CLAUDE.md — instructions Claude reads first
+# AGENTS.md — instructions Codex reads first
 
-Claude Code reads this file at the repo root before doing work here. Follow it.
+Codex reads this file at the repo root before doing work here. Follow it.
 
-## First: are you the maintainer or a contributor?
+## First: who maintains this, and who is committing?
+
+**WeKan, the `wekan/` repositories cloned under `.tools/`, and
+[Secretchronicles/TSC](https://github.com/Secretchronicles/TSC) are all maintained by
+Lauri Ojansivu (xet7) `<x@xet7.org>`** — [wekan/wekan](https://github.com/wekan/wekan),
+[wekan/FerretDB](https://github.com/wekan/FerretDB),
+[wekan/node-patches](https://github.com/wekan/node-patches),
+[wekan/mongo-tools-patches](https://github.com/wekan/mongo-tools-patches) and TSC,
+which is under the **Secretchronicles** organisation rather than **wekan** and is his
+all the same — his GitHub profile, [xet7](https://github.com/xet7), says exactly that:
+*"WeKan and TSC maintainer"*. Work done on the maintainer's behalf is committed as
+**`Lauri Ojansivu <x@xet7.org>`** — that author, in every one of those repositories,
+every time. Two rules follow from it and neither has an exception:
+
+- **Never attribute a commit to an AI.** No `Co-Authored-By:` trailer, no "Generated
+  with", no assistant or model name — not in the commit message, not in a pull-request
+  body, not in the CHANGELOG. [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) is where this
+  comes from: *"For pull requests, mention only those participants that are
+  **human**."* A `Thanks to ... and xet7 !` line credits people — the issue reporter
+  and xet7 — never a tool.
+- **If the git identity is missing or wrong in one of these checkouts, set it; do not
+  commit under something else.** The `.tools/` clones are made by `build.sh` inside
+  this checkout and can come up with no `user.name`/`user.email` of their own, which
+  would silently author a commit as whatever the machine's default is:
+
+  ```
+  git -C .tools/<repo> config user.name  'Lauri Ojansivu'
+  git -C .tools/<repo> config user.email 'x@xet7.org'
+  ```
 
 Check the current git identity before committing or releasing:
 
@@ -15,17 +43,25 @@ Check the current git identity before committing or releasing:
 git config user.name && git config user.email
 ```
 
-- **Maintainer mode** — ONLY when the identity is exactly
-  `Lauri Ojansivu <x@xet7.org>` (name `Lauri Ojansivu`, email `x@xet7.org`). Then, and
-  only then: commit **directly to the current branch** as `Lauri Ojansivu <x@xet7.org>`
-  with no AI trailer and no pull request, and the **publishing / release steps** below
-  are available. (Per the standing rule you still **commit only; do not push** unless
-  explicitly asked.)
-- **Contributor mode** — any other git identity. Then: do **not** commit directly to
-  the branch and do **not** run any release/publishing step. Make changes on a branch
-  and open a **pull request** for the maintainer to review. The "commit as Lauri
-  Ojansivu", "commit directly", and all release instructions below are **maintainer-only
-  and do not apply to you**.
+- **Maintainer mode** — the identity is `Lauri Ojansivu <x@xet7.org>` (name
+  `Lauri Ojansivu`, email `x@xet7.org`), or it is unset in a checkout of one of the
+  repositories above, which means it is to be SET to that as above rather than worked
+  around. Then: commit **directly to the current branch** as
+  `Lauri Ojansivu <x@xet7.org>` with no AI trailer and no pull request, and the
+  **publishing / release steps** below are available.
+- **Contributor mode** — the identity is somebody ELSE, in a fork or a clone of your
+  own. Then: do **not** commit directly to the branch and do **not** run any
+  release/publishing step. Make changes on a branch and open a **pull request** for
+  the maintainer to review, and keep that pull request free of AI attribution too.
+  The "commit as Lauri Ojansivu", "commit directly", and all release instructions
+  below are **maintainer-only and do not apply to you**.
+
+Maintainer mode covers TSC as well: commit directly to its `devel` branch, no pull
+request, same author and no AI attribution. What it does NOT bring along is WeKan's
+house style — TSC keeps its own **GNU ChangeLog** `CHANGELOG` and its own release
+process, because a project is read on its own terms (see the CHANGELOG section below).
+The one repository under `.tools/` that is somebody else's is `sandstorm-io/sandstorm`,
+cloned for reference only.
 
 Everything below marked as maintainer-specific (committing directly, the exact commit
 author, and the entire "Making a release" / publishing flow) applies only in maintainer
@@ -59,47 +95,9 @@ When asked to fix an open issue (one issue at a time):
    <x@xet7.org>`), with no "Co-Authored" / AI trailer, a message body ending:
 
    ```
-   Thanks to (GitHub nickname of the issue creator) and xet7 !
-
-   Fixes #1234,
-   ```
-6. **If the bug is already fixed**, still add a commit that CLOSES the issue (a commit
-   whose message ends `Fixes #1234,`), noting where/when it was fixed.
-
-Fix from source and test — do not guess. If the environment cannot run the relevant
-test (e.g. Docker is unavailable in this sandbox), reproduce as closely as possible
-from source and say clearly what was and was not verified.
-
-## Translations (Transifex ↔ direct LLM fill, no external service)
-
-WeKan translations live in `imports/i18n/data/<lang>.i18n.json` (flat
-`key -> string`, 2-space indent, key order matches `en.i18n.json`). Transifex holds
-the human translations. **The policy is: never overwrite a human translation with a
-filled (or English) one, but always take the newest translations from Transifex.**
-
-- Pull with `releases/translations/pull-translations.sh`. It runs `tx pull -a -f`
-  (which fills every string that is UNtranslated on Transifex with the English source)
-  and then a **per-key merge** (`releases/translations/merge-translations.mjs`) that,
-  for every language file and every key:
-  - Transifex has a real translation (pulled value differs from English) → **keep it**
-    (the newest human translation always wins);
-  - the pull reverted it to English but a human translation is committed in git →
-    **restore the committed translation** (a pull never reverts a human translation,
-    even in files that also received real new Transifex translations);
-  - **no translation anywhere** (untranslated on Transifex AND never committed) → leave
-    the English source as a placeholder. **This is the only case a non-human value is
-    used.** A separate fill step may fill *only* these English placeholders, so a filled
-    string can never overwrite a human translation.
-- Restored languages are pushed back to Transifex so they stop reverting.
-
-### Filling the remaining untranslated strings — directly, no translation service
-
-The strings still equal to the English source after the merge are the ones untranslated
-**everywhere** (Transifex + git). Translate these **directly** — the maintainer or the
-assistant (an LLM) writes the translation itself, using that language's **existing
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [wekan/wekan](https://github.com/wekan/wekan) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
