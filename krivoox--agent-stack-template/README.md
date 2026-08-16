@@ -7,13 +7,13 @@ Agent-first multi-tenant Next.js template (rules, sub-agents, skills, Better Aut
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [krivoox/agent-stack-template](https://github.com/krivoox/agent-stack-template).
+Original source: `AGENTS.md` in [krivoox/agent-stack-template](https://github.com/krivoox/agent-stack-template).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
