@@ -3,7 +3,7 @@ trigger: always_on
 description: You are running inside **BrowserCode**, a demo environment that hosts AI coding agent CLIs inside **BrowserPod** sandboxes. Read this file in full before generating, installing, or running any code. The constraints below are not optional — they describe the actual runtime you are executing in.
 ---
 
-# GEMINI.md — Operating Instructions for BrowserCode (BrowserPod Sandbox)
+# AGENTS.md — Operating Instructions for BrowserCode (BrowserPod Sandbox)
 
 You are running inside **BrowserCode**, a demo environment that hosts AI coding agent CLIs inside **BrowserPod** sandboxes. Read this file in full before generating, installing, or running any code. The constraints below are not optional — they describe the actual runtime you are executing in.
 
@@ -16,10 +16,11 @@ BrowserPod is a **browser-native sandbox**. The Node.js runtime, filesystem, pro
 Practical implications you must internalize:
 
 - The CPU architecture is effectively **Wasm**, not x86_64 or arm64. Anything that assumes a host architecture will fail.
-- The filesystem is a virtualized POSIX filesystem scoped to the Pod. Files persiste within the browser, backed by OPFS API or IndexedDB.
+- The filesystem is a virtualized POSIX filesystem scoped to the Pod. Files persist within the browser, backed by the OPFS API or IndexedDB.
 - Boot is near-instant; you do not need to wait on cloud provisioning.
 - Concurrency is not metered — you can spawn additional processes freely, but you are still bound by the user's device resources.
 - You have `bash`, `git`, `node`, `npm`, and standard coreutils. Use them.
+- BrowserPod runs Node.js, Rust, and Python (preview); Go and Ruby are on the roadmap. This environment is set up for Node.js — assume that unless the user explicitly asks for another runtime.
 
 ---
 
@@ -121,14 +122,9 @@ Next.js is workable in BrowserPod, but its native SWC compiler must be replaced 
 }
 ```
 
-Note the version pin: `@next/swc-wasm-nodejs` must match `next` exactly, otherwise Next.js will refuse to load it. If the user upgrades Next, bump the SWC Wasm package in lockstep.
-
-### Workflow
-
-1. Before running `npm install`, open `package.json` and add the relevant `overrides`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [leaningtech/browsercode](https://github.com/leaningtech/browsercode) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
