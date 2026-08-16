@@ -39,6 +39,33 @@ If the project was just initialized or is missing high-level structure (Plans, M
 2. **Scaffold the Roadmap**: Create a `plan` node (e.g., "Project Roadmap") and add `milestone` nodes representing key target phases, connecting them using `part_of` edges.
 3. **Scaffold Architecture**: Create `decision` nodes representing core technical choices (e.g., choice of databases, frameworks) and link them to the milestones/tasks using `decided_in` edges.
 
+## Visual Memory (vision-memory-mcp)
+
+This project utilizes `vision-memory-mcp` to cache visual states, record layout transitions, provide element grounding, and avoid repetitive LLM vision calls.
+
+### 1. Mandatory Workflow & Priority
+1. **Orient**: Call `get_session_context` to align your visual state context at the start of work.
+2. **Search**: Call `recall_memory` (text/image search) before recreating duplicate UI state paths.
+3. **Ingest/Verify**: ALWAYS call `analyze_screenshot` before querying any front-end vision models.
+   - **Cache Hit (`is_known: true`)**: Do NOT use vision models; read the returned `description` as context and use `grounded_elements` (selectors, coordinates) for action target selection.
+   - **Cache Miss (`is_known: false`)**: Query your vision model, then run `analyze_screenshot` with both the image and description to seed the cache.
+4. **Action Target Execution**: Use `predict_next_action` to retrieve `grounded_target` handles (`target_selector`, `target_coords`) for deterministic UI clicks and typing.
+5. **Transitions**: Call `record_outcome` after every click/type/scroll action to construct navigation paths.
+6. **Privacy & Cleanup**: Call `forget_state` to purge sensitive or secret states from storage.
+
+### 2. Tool Reference Summary (22 Core MCP Tools)
+* `analyze_screenshot`: Ingest screenshot, lookup cache, return layout description and grounded elements.
+* `recall_memory`: Search visual memory by description query or base64 image query.
+* `record_outcome`: Save UI action execution outcomes and transitions between states.
+* `get_navigation_paths`: Find path between states using BFS navigation graph.
+* `compare_states`: Compare two visual states structurally and vector-semantically.
+* `get_session_context`: Fetch recent states, frequent states, and transitions.
+* `predict_next_action`: Predict best next UI action and target coordinates based on transition success rates.
+* `batch_analyze_screenshots`: Process multiple screenshots in a single batch call.
+* `set_visual_spec` / `verify_visual_spec` / `get_visual_diff`: UI compliance testing and mockup verification.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
 ---
 > Source: [putervision/spc](https://github.com/putervision/spc) — distributed by [TomeVault](https://tomevault.io).
 <!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
