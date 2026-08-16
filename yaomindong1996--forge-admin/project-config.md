@@ -1,159 +1,74 @@
 ---
 trigger: always_on
-description: > High-signal guidance for OpenCode sessions working on this repository
+description: 本文件为 Claude Code（claude.ai/code）在本仓库中开发时提供指导。
 ---
 
-# AGENTS.md
-> High-signal guidance for OpenCode sessions working on this repository
+# CLAUDE.md
 
-## Project Overview
-Forge Admin is a Vue3 + Spring Boot enterprise admin framework with microkernel plugin architecture:
-- **Backend**: Java 17 + Spring Boot 3 + MyBatis-Plus + Sa-Token
-- **Frontend**: Vue 3 + Naive UI + Vite + UnoCSS
-- Core features: RBAC, multi-tenant, code generation, flow engine, message center
+本文件为 Claude Code（claude.ai/code）在本仓库中开发时提供指导。
 
-## Directory Structure
-```
-forge/                          # Backend root
-├── forge-admin/                # Main application entry
-├── forge-framework/            # Core framework
-│   ├── forge-plugin-parent/    # Plugins (system/generator/job/message/flow)
-│   └── forge-starter-parent/   # Starters (auth/cache/config/crypto etc.)
-forge-admin-ui/                 # Frontend project
-code-copilot/                   # AI coding assistant rules & change management
-.opencode/                      # OpenCode configuration & rules
-```
+## 仓库概述
 
-## Environment Requirements
-- JDK 17+
-- Node.js 18+
-- pnpm 8+
-- MySQL 8.0+
-- Redis 6.0+
+Forge Admin 是一套企业级中后台框架：前端 **Vue 3 + Naive UI**，后端 **Java 17 + Spring Boot 3** 微内核插件化架构。内置 RBAC + 多租户 + 数据权限、AI 代码生成、Flowable 工作流、AI 大屏报表、H5/uni-app 移动端，以及较新的 **统一能力开放平台（capability）** 与 **企业微信（WeCom）协作** 能力。
 
-## Common Commands
+后端位于 **`forge-server/`**（不是 `forge/` —— README.md 与 AGENTS.md 仍用过时的 `forge/` 路径；其中 AGENTS.md 第 16 行写了 `forge-server/`，但下方完整模块树、启动命令、配置路径仍全是 `forge/`，前后矛盾）。前端共**三个端**：`forge-admin-ui/`（管理端，dev :3000）、`forge-report-ui/`（AI 大屏设计器，dev :3021）、`forge-h5-ui/`（uni-app 移动端 H5，dev :3001）。文档：`forge-docs/`（VitePress）。各端位置、端口、代理细节见下方"常用命令 → 前端"。
 
-### 渐进式开发流程（推荐）
-> 遵循 No Spec No Code 原则，使用 `/` 命令触发渐进式开发流程
-- `/spec-init` - 初始化项目上下文
-- `/propose <需求描述>` - 创建变更提案
-- `/apply <变更名>` - 执行编码
-- `/fix <变更名>` - Review后修正
-- `/review <变更名>` - 两阶段审查
-- `/test <变更名>` - 生成测试
-- `/archive <变更名>` - 归档沉淀
+## 常用命令
 
-> 变更产物统一存放在 `code-copilot/changes/[变更名]/` 目录下
-
-#### Backend
+### 后端（`forge-server/`）
 ```bash
-# Build entire project
-cd forge && mvn clean install
-
-# Run admin service
-cd forge/forge-admin && mvn spring-boot:run
-
-# Run flow service (optional)
-cd forge/forge-flow && mvn spring-boot:run
+cd forge-server && mvn clean install -DskipTests   # 全量构建（快速）
+cd forge-server && mvn test -P enable-tests        # 运行测试（默认跳过测试！）
+cd forge-server/forge-admin-server && mvn spring-boot:run        # 主后台服务，端口 8580
+cd forge-server/forge-report-server && mvn spring-boot:run       # 大屏服务，端口 8581
+cd forge-server/forge-app-server && mvn spring-boot:run          # App 接口服务，端口 8583
+cd forge-server/forge-flow/forge-flow-server && mvn spring-boot:run  # 独立流程服务，端口 8081
 ```
-> Service runs on `http://localhost:8080` by default
+Maven Profile（默认 `dev`）：`local`、`dev`、`prod`。测试执行受 `enable-tests` Profile 门控 —— 直接 `mvn test` 会跳过测试。构建需要 Java 17、MySQL 8+、Redis 6+。登录账号：`admin` / `123456`。
 
-#### Frontend
-```bash
-# Install dependencies
-cd forge-admin-ui && pnpm install
+**后端各服务端口与前端代理的对应关系**：`forge-admin-server`(8580) ↔ 管理端 `/dev-api`、`forge-app-server`(8583) ↔ H5 `/dev-api`、`forge-report-server`(8581) ↔ 大屏 `/forge-report-api`、`forge-flow-server`(8081) ↔ 管理端与 H5 的 `/api/flow`。`forge-business`、`forge-flow-client` 为业务/客户端模块，非独立服务。
 
-# Start dev server
-pnpm dev
+本地配置：把 `forge-server/forge-admin-server/src/main/resources/application-dev.example.yml` 复制为 `application-dev.yml`（已 gitignore），填入 MySQL、Redis、AI 供应商等配置。
 
-# Build for production
-pnpm build
+### 前端（三个端）
 
-# Lint & fix
-pnpm lint:fix
-```
-> Dev server runs on `http://localhost:5173` by default, default credentials: admin/123456
+| 端 | 目录 | 技术栈 | 配置文件 | dev 端口 | dev 访问地址 | dev 命令 |
+|----|------|--------|----------|----------|--------------|----------|
+| **管理端** | `forge-admin-ui/` | Vue 3 + Naive UI + Vite | `vite.config.js` + `.env.development` | `3000`（`VITE_HTTP_PORT`） | `http://localhost:3000/` | `pnpm dev` |
+| **大屏设计器** | `forge-report-ui/` | Vue 3 + Vite（TS） | `vite.config.ts` | `3021`（硬编码） | `http://localhost:3021/forge-report` | `npm run dev` |
+| **H5 移动端** | `forge-h5-ui/` | uni-app 3 + Vue 3 | `vite.config.js` + `.env.development` | `3001`（`VITE_HTTP_PORT`） | `http://localhost:3001/` | `pnpm dev:h5` |
 
-## Key Conventions (Follow These Strictly)
-### 1. 渐进式Spec规范
-- No Spec No Code：没有确认的Spec不准写代码
-- Spec包含完整的背景、现状分析、功能点、业务规则、数据/接口变更、风险、测试策略
-- 所有待澄清问题解决后才能进入/apply阶段
-- Spec与代码冲突时，以Spec为准，先修Spec再改代码
+**管理端 `forge-admin-ui`**：接口前缀 `/dev-api`。代理规则（`vite.config.js`）：
+- `/dev-api/api/flow`、`/dev-api/api/workspace` → 流程服务 `8081`
+- 其余 `/dev-api` → 主后台服务 `http://127.0.0.1:8580/`
+- `/ws` → WebSocket 转发到主后台服务
 
-### 2. Code Generation
-- Use built-in `forge-plugin-generator` for CRUD modules, do not write boilerplate manually
-- Frontend CRUD pages use `AiCrudPage` component (see `.opencode/instructions/code-rules.md` for usage)
+**大屏设计器 `forge-report-ui`**：接口前缀 `/forge-report-api` → `http://localhost:8581`（`vite.config.ts`）；另有 `/llm` 直连阿里百炼 OpenAI 兼容接口的 SSE 代理（禁用上游 gzip 避免缓冲流式响应）。
 
-### 3. Backend APIs
-- Follow REST conventions: `GET /page` (list), `GET /{id}` (detail), `POST /` (create), `PUT /` (update), `DELETE /{id}` (delete)
-- Return unified `RespInfo.success(data)` / `RespInfo.error(msg)`
-- Use `@ApiDecrypt`/`@ApiEncrypt` annotations for sensitive interfaces
-- **SQL 编写规范**：查询类 SQL 必须写在 Mapper XML 中，禁止在 Service 层使用 `LambdaQueryWrapper` 构建查询条件。原因：
-  1. XML 中的 SQL 可被数据权限拦截器（`DataScopeInterceptor`）按 mapperMethod 精确匹配和改写
-  2. XML SQL 更易于审查、优化和维护，复杂条件（如虚拟组织 ALL 后缀判断）在 XML 中表达更清晰
-  3. 便于后续扩展（加字段、加条件、加索引提示等）无需改 Java 代码
-- 仅以下场景允许使用 `LambdaQueryWrapper`：单表简单 CRUD（selectById、insert、updateById、deleteById 等 MyBatis-Plus 内置方法）
+**H5 `forge-h5-ui`**：接口前缀 `/dev-api`。代理规则（`vite.config.js` + `.env.development`）：
+- `VITE_HTTP_PROXY_TARGET=http://127.0.0.1:8583/`（**app-server**，不是 8580）
+- `VITE_FLOW_PROXY_TARGET=http://127.0.0.1:8081/`
+- `/dev-api/api/flow`、`/dev-api/ai/business/flow` → flow-server（8081），其余 `/dev-api` → app-server（8583）
 
-### 4. Database
-- All business tables must include base fields: `id`, `tenant_id`, `create_by`, `create_time`, `create_dept`, `update_by`, `update_time`
-- Use `utf8mb4` charset, `InnoDB` engine
-- Create indexes for frequently queried fields, follow leftmost prefix rule for composite indexes
-- Never commit database credentials to repo (local configs are in `.gitignore`)
-- **租户ID规则**：SQL初始化数据中，业务数据（字典、配置等需被租户查询到的数据）的 `tenant_id` 必须设为 `1`（默认租户），**不能设为 `0`**。原因是项目的 `TenantLineInnerInterceptor` 会自动在所有查询中追加 `WHERE tenant_id = <当前登录用户租户ID>`，`tenant_id=0` 的数据对非零租户用户不可见。`sys_resource`（菜单/权限）表不在租户拦截范围内，其 `tenant_id` 保持 `0` 即可
+改各端网络行为前，先读对应项目的 `vite.config.*` 与 `.env*`。要求 `Node >= 20.19`、`pnpm >= 8`。构建：管理端 `pnpm build`（`NODE_OPTIONS=--max-old-space-size=40961`）、大屏 `npm run build`、H5 `pnpm build:h5`；测试仅管理端有（`pnpm test`，Vitest）。
 
-### 5. Frontend
-- API calls use `request` utility from `@/utils/request`
-- Encrypted API calls use `postEncrypt` from `@/utils/encrypt-request`
-- Use UnoCSS for styling, avoid unnecessary custom CSS
-- Follow existing component patterns, use Naive UI components where possible
+### 数据库 / Flyway
+Flyway 迁移只在 **`forge-admin-server` 启动时**执行（`forge-report-server` 单独启动不会执行）。扫描位置默认 `filesystem:./db/migration,filesystem:../db/migration,filesystem:forge-server/db/migration`；可用 `FORGE_FLYWAY_LOCATIONS` / `FORGE_FLYWAY_ENABLED` 覆盖。
 
-## Important Gotchas
-- **First time setup**: Copy `application-dev.example.yml` to `application-dev.yml` in backend modules and configure local database/Redis
-- Frontend: Copy `.env.example` to `.env.local` for local environment config
-- No Spec No Code: Always refer to requirements specs first before writing code, follow code-copilot workflow for changes
-- Never push to master branch directly, use feature branches
-- All code must compile and pass existing tests before commit
+- `forge-server/db/migration/` — 版本化迁移脚本 `V<版本>__<小写蛇形描述>.sql`（版本必须大于 `1.0.0`、单调递增；已执行脚本禁止修改 —— 修正时新增下一个版本脚本）。
+- `forge-server/db/seed/required/R__*.sql` — 系统必需初始化数据；`forge-server/db/seed/demo/D__*.sql` — 演示数据（默认不导入）；`forge-server/db/seed/optional/O__*.sql` — 可选模块数据。
+- SQL 必须幂等或有防重复保护（`CREATE TABLE IF NOT EXISTS`、`INSERT ... SELECT ... WHERE NOT EXISTS`、新增列/索引前查 `information_schema`）。业务内置数据 `tenant_id` 必须为 `1`（禁止 `0`）。`sys_resource` / `sys_role_resource` 等权限资源脚本必须做 `NOT EXISTS` 防重复。
 
-## Reusable Components
+## 架构
 
-### RegionTreeSelect — 行政区划树选择组件
+### 后端分层
+`forge-server/` 是 Maven 多模块工程，分三层：
 
-**路径**: `forge-admin-ui/src/components/RegionTreeSelect.vue`
+1. **`forge-framework/forge-starter-parent/`** — 23 个技术 Starter（纯技术能力，无业务逻辑）：`forge-starter-core`（统一响应 `RespInfo` 位于 `.../starter/core/domain/RespInfo.java`，全局异常 `GlobalExceptionHandler` 位于 `.../starter/core/exception/`，以及 `@ApiEncrypt`/`@ApiDecrypt`/`@OperationLog` 注解）、`forge-starter-web`（Undertow 嵌入式服务器）、`forge-starter-auth`（Sa-Token）、`forge-starter-orm`（MyBatis-Plus + 动态数据源）、`forge-starter-tenant`（租户拦截，追加 `WHERE tenant_id = ?`）、`forge-starter-datascope`（`DataScopeInterceptor` 位于 `.../datascope/handler/DataScopeInterceptor.java`，配置前缀 `forge.datascope`，`enabled` 默认 `true`）、`forge-starter-crypto`（API 加解密）、`forge-starter-excel`、`forge-starter-file`、`forge-starter-log`（操作日志）、`forge-starter-idempotent`（`@Idempotent`）、`forge-starter-cache`、`forge-starter-config`、`forge-starter-trans`、`forge-starter-social`、`forge-starter-websocket`、`forge-starter-message`、`forge-starter-job`、`forge-starter-api-config`、`forge-starter-openapi-security`、`forge-starter-outbound`、`forge-starter-collaboration`、`forge-starter-id`。
 
-**功能**: 一次性加载指定 rootCode 下的完整区划树（含虚拟组织），虚拟组织节点不可选中，支持数据权限控制。
-
-**用法**:
-```vue
-<!-- 基本用法（默认内蒙150000，启用数据权限） -->
-<RegionTreeSelect v-model="form.regionCode" />
-
-<!-- 自定义参数 -->
-<RegionTreeSelect v-model="form.regionCode" root-code="150000" :data-right="true" />
-```
-
-**在 searchSchema 中使用**（搜索表单中的区划筛选）:
-```javascript
-{
-  field: 'regionCode',
-  label: '行政区划',
-  type: 'treeSelect',
-  props: { placeholder: '请选择行政区划', clearable: true, filterable: true },
-  options: () => regionOptions.value,  // 需要页面调用 loadRegionOptions 加载
-}
-```
-
-**Props**:
-| Prop | Type | Default | 说明 |
-|------|------|---------|------|
-| modelValue | String/Number | undefined | 绑定值（区划编码） |
-| rootCode | String | '150000' | 根区域编码 |
-| dataRight | Boolean | true | 是否启用数据权限过滤 |
-| placeholder | String | '请选择行政区划' | 占位文本 |
-| clearable | Boolean | true | 是否可清除 |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yaomindong1996/forge-admin](https://github.com/yaomindong1996/forge-admin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
