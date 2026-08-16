@@ -1,167 +1,138 @@
 ---
 trigger: always_on
-description: Burger API is a **Bun.js-exclusive framework** - it only works with Bun.js and cannot run on Node.js or other JavaScript runtimes. This is a modern, high-performance API framework built specifically for Bun.js that provides file-based routing, middleware architecture, Zod-based validation, automatic OpenAPI generation, and wildcard routing capabilities.
+description: These rules apply to every task in this project unless explicitly overridden.
 ---
 
-# Burger API - Bun.js Framework Cursor Rules
+# AGENTS.md — BurgerAPI Project Rules
+
+These rules apply to every task in this project unless explicitly overridden.
+Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
 
 ## Project Overview
 
-Burger API is a **Bun.js-exclusive framework** - it only works with Bun.js and cannot run on Node.js or other JavaScript runtimes. This is a modern, high-performance API framework built specifically for Bun.js that provides file-based routing, middleware architecture, Zod-based validation, automatic OpenAPI generation, and wildcard routing capabilities.
+BurgerAPI is a **Bun.js-exclusive** API framework — it only works with Bun.js and cannot run on Node.js/Deno. Built by Isfhan Ahmed, it provides file-based routing, middleware architecture, Zod v4 validation, automatic OpenAPI 3.0 generation, and Swagger UI.
 
-## Bun.js Exclusivity
+**Tech:** Bun >= 1.3.0, TypeScript (ESM), Zod ^4.0.17
+**Packages:** `burger-api` (core framework), `@burger-api/cli` (CLI tool)
+**Ecosystem:** Production-ready middleware in `ecosystem/middlewares/`
+**Status:** Pre-1.0 (v0.9.7), active development
+**Homepage:** https://burger-api.com
 
-### Critical Requirements
-
--   **ONLY works with Bun.js**: This framework cannot run on Node.js, Deno, or browsers
--   **Bun.js runtime required**: All development and deployment must use Bun.js
--   **Bun.js version**: Ensure you are using Bun.js Latest version for optimal performance
--   **Bun-specific APIs**: Leverages Bun's native HTTP server, file system, and performance features
--   **No Node.js compatibility**: Cannot use Node.js-specific modules or APIs
-
-### Bun.js Setup
+## Essential Commands
 
 ```bash
-# Install Bun.js (required)
-curl -fsSL https://bun.sh/install | bash
-
-# Install dependencies
-bun install
-
-# Run development server
-bun run dev
-
-# Build project
-bun run build
-
-# Run tests
-bun test
+bun install              # Install all workspace dependencies
+bun run typecheck        # Typecheck the burger-api framework
+bun run test:all         # Full test suite (framework + CLI + typecheck)
+bun run test:framework   # Framework tests only
+bun run build            # Build burger-api framework
+bun run dev              # Run burger-api dev server
+bun test                 # Run tests in current package
 ```
 
-## Architecture & Design Patterns
+## Architecture
 
-### Core Principles
+- `packages/burger-api/` — Core framework (`Burger` class, `ApiRouter`, `PageRouter`, middleware pipeline, OpenAPI generator, Swagger UI)
+- `packages/cli/` — CLI tool (create, add, build, build:exec, serve)
+- `ecosystem/middlewares/` — 10 production-ready middleware (CORS, Rate Limiter, Logger, JWT Auth, etc.)
+- Uses **Bun's native `routes` API** for static route dispatch (not a catch-all fetch handler)
+- **Trie-based router** with 3-tier priority: static > dynamic (`:param`) > wildcard (`*`)
+- **AOT route discovery** in production builds — CLI scans routes at build time, no runtime filesystem access
 
--   **Bun.js native**: Built specifically for Bun's performance characteristics
--   **File-based routing**: Routes automatically discovered from directory structure
--   **Wildcard routing**: Support for `[...]` wildcard routes that match multiple path segments
--   **Middleware-first**: Global and route-specific middleware support
--   **Type safety**: Full TypeScript support with Zod validation
--   **Performance**: Optimized for Bun.js with pre-computed route handlers
--   **OpenAPI integration**: Automatic documentation generation
--   **Ecosystem middleware**: Production-ready middleware collection in `ecosystem/middlewares/` directory - in progress
+## Rule 1 — Think Before Coding
 
-### Key Components
+State assumptions explicitly. If uncertain, ask rather than guess.
+Present multiple interpretations when ambiguity exists.
+Push back when a simpler approach exists. Stop when confused. Name what's unclear.
 
--   `Burger` class: Main framework entry point
--   `ApiRouter`: Handles API route discovery and matching using Bun's file system
--   `PageRouter`: Handles static page routing
--   `Server`: Bun.js server wrapper leveraging `Bun.serve`
--   Middleware system: Request/response processing pipeline
--   Ecosystem: Production-ready middleware collection in `ecosystem/middlewares/` directory - in progress
+## Rule 2 — Simplicity First
 
-## Bun.js-Specific Development
+Minimum code that solves the problem. Nothing speculative.
+No features beyond what was asked. No abstractions for single-use code.
+Test: would a senior engineer say this is overcomplicated? If yes, simplify.
 
-### Package Management
+## Rule 3 — Surgical Changes
 
--   **Use Bun exclusively**: Never use npm, yarn, or pnpm
--   **Install dependencies**: `bun add <package>`
--   **Development dependencies**: `bun add -d <package>`
--   **Lock file**: Use `bun.lockb` (not package-lock.json or yarn.lock)
--   **Scripts**: Reference with `bun run <script-name>`
+Touch only what you must. Clean up only your own mess.
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor what isn't broken. Match existing style.
 
-### HTTP Server Implementation
+## Rule 4 — Goal-Driven Execution
 
--   **Use Bun.serve**: Leverage Bun's native HTTP server capabilities
--   **Native fetch API**: Bun provides native fetch implementation
--   **WebSocket support**: Built-in WebSocket handling
--   **Performance**: Native performance without external frameworks
+Define success criteria. Loop until verified.
+Don't follow steps. Define success and iterate.
+Strong success criteria let you loop independently.
 
-```typescript
-// Burger API uses Bun.serve internally
-const server = Bun.serve({
-    port: 3000,
-    fetch(req) {
-        // Route handling logic
-    },
-});
-```
+## Rule 5 — Use the Model Only for Judgment Calls
 
-### File System Operations
+Use me for: classification, drafting, summarization, extraction.
+Do NOT use me for: routing, retries, deterministic transforms.
+If code can answer, code answers.
 
--   **Bun's file system APIs**: Use Bun's optimized file operations
--   **Route discovery**: Leverages Bun's fast file system scanning
--   **Static file serving**: Native static file handling
--   **Hot reloading**: Bun's development server capabilities
+## Rule 6 — Read Before You Write
 
-## Code Style & Conventions
+Before adding code, read exports, immediate callers, shared utilities.
+"Looks orthogonal" is dangerous. If unsure why code is structured a way, ask.
+Key files to read first: `packages/burger-api/src/index.ts`, `core/api-router.ts`, `types/index.ts`.
 
-### File Naming
+## Rule 7 — Surface Conflicts, Don't Average Them
 
--   API routes: `route.ts` files in directory structure
--   Dynamic routes: Use `[paramName]` folder naming
--   Wildcard routes: Use `[...]` folder naming for matching multiple segments
--   Grouping: Use `(groupName)` for route organization
--   Static pages: HTML files in page directory
+If two patterns contradict, pick one (more recent / more tested). Explain why. Flag the other for cleanup.
+Don't blend conflicting patterns.
 
-### Import Organization
+## Rule 8 — Tests Verify Intent, Not Just Behavior
 
-```typescript
-// Import stuff from core
-import { Server } from '@core/server.js';
-import { ApiRouter } from '@core/api-router.js';
+Tests must encode WHY behavior matters, not just WHAT it does.
+A test that can't fail when business logic changes is wrong.
+When changing route/path logic, run `bun run test:route-sync` from root.
 
-// Import utils
-import { collectRoutes } from '@utils';
+## Rule 9 — Checkpoint After Every Significant Step
 
-// Import types
-import type { ServerOptions, Middleware } from '@burgerTypes';
-```
+Summarize what was done, what's verified, what's left.
+Don't continue from a state you can't describe back.
+If you lose track, stop and restate.
 
-### Type Definitions
+## Rule 10 — Match the Codebase's Conventions, Even If You Disagree
 
--   Use `BurgerRequest<T>` for typed requests with validation
--   Use `RequestHandler` for route handlers
--   Use `Middleware` for middleware functions
--   Use `BurgerNext` for middleware return types
--   Access wildcard parameters via `req.wildcardParams`
+Conformance > taste inside the codebase.
+If you genuinely think a convention is harmful, surface it. Don't fork silently.
 
-## Route Structure & Patterns
+## Rule 11 — Fail Loud
 
-### Basic Route Template
+"Completed" is wrong if anything was skipped silently.
+"Tests pass" is wrong if any were skipped.
+Default to surfacing uncertainty, not hiding it.
 
+## Rule 12 — Bun First
+
+Everything is built exclusively for Bun.js. Never introduce Node.js dependencies or Node-specific APIs.
+Use `Bun.serve`, `Bun.write`, `Bun.file`, `Bun.spawn` over Node alternatives.
+Package management: `bun add`, not npm/yarn/pnpm.
+
+## Code Conventions
+
+### File Naming & Routing
+- API routes: `route.ts` — exported HTTP method handlers (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`)
+- Dynamic routes: `[paramName]/route.ts` — access via `req.params.paramName`
+- Wildcard routes: `[...]/route.ts` — access via `req.wildcardParams`
+- Route groups: `(groupName)/route.ts` — doesn't affect URL path
+- Static pages: `.tsx` or `.html` in page directory
+
+### Route Template
 ```typescript
 // OpenAPI Metadata
-export const openapi = {
-    get: {
-        summary: 'Get Resource',
-        description: 'Description of the endpoint',
-        tags: ['Resource'],
-        operationId: 'getResource',
-    },
-};
+export const openapi = { get: { summary: '...', tags: ['...'], operationId: '...' } };
 
-// Validation Schemas
-export const schema = {
-    get: {
-        query: z.object({
-            search: z.string().optional(),
-        }),
-    },
-    post: {
-        body: z.object({
-            name: z.string().min(1, 'Name is required'),
-            price: z.number().positive('Price must be positive'),
-        }),
-    },
-};
+// Validation Schemas (Zod v4)
+export const schema = { get: { query: z.object({ ... }) }, post: { body: z.object({ ... }) } };
 
 // Route-Specific Middleware
-export const middleware: Middleware[] = [
-    (req: BurgerRequest): BurgerNext => {
+export const middleware: Middleware[] = [ ... ];
+
+// HTTP Method Handlers
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Isfhan/burger-api](https://github.com/Isfhan/burger-api) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
