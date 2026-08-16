@@ -1,80 +1,47 @@
 ---
 trigger: always_on
-description: Large monorepo (55 packages, 200+ e2e fixtures) managed with Lerna-lite and Yarn 4 (Berry, `node-modules` linker, not PnP). TypeScript everywhere, compiled with Webpack per package. Node engines `^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0`.
+description: - `SourceMapSupport#install(sourceMaps, options?)` — replaces `Error.prepareStackTrace` in the current realm so every `error.stack` is rendered against the original sources. `jest-runner` holds one instance per worker and installs once per test file. `{suppressWarnings: true}` turns off the broken-map warning.
 ---
 
-# Jest Repository — Coding Agent Instructions
+# `@jest/source-map` — agent notes
 
-Large monorepo (55 packages, 200+ e2e fixtures) managed with Lerna-lite and Yarn 4 (Berry, `node-modules` linker, not PnP). TypeScript everywhere, compiled with Webpack per package. Node engines `^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0`.
+## What's public
 
-## Setup
+- `SourceMapSupport#install(sourceMaps, options?)` — replaces `Error.prepareStackTrace` in the current realm so every `error.stack` is rendered against the original sources. `jest-runner` holds one instance per worker and installs once per test file. `{suppressWarnings: true}` turns off the broken-map warning.
+- `SourceMapSupport#getCallsite(level, sourceMaps?)` — one remapped `CallSite`, used by `jest-jasmine2` for `--testLocationInResults`.
+- `getCallsite(level, sourceMaps?)` — deprecated free-function alias of the method, kept for compatibility. Self-contained: it carries its own module-level registry cache and dies together with it.
 
-```bash
-corepack enable
-yarn install        # ~45 s. Python is required (node-gyp).
-yarn build:js       # ~5 s. Run this before tests — they import from build/, not src/.
-```
+`SourceMapCache` / `mapSourcePosition(cache, position)` are the map loader behind both, and are internal — they are not exported from `src/index.ts`.
 
-Tests transform on the fly via `babel-jest`, but their `import {x} from '../'` resolves to each package's `build/`. `yarn build:js` is required after every checkout. Full `yarn build` (`build:js && build:ts && bundle:ts`) is 3–5 min and only needed when working on type declarations or API Extractor output.
+## Module layout
 
-Iterative: `yarn watch` (webpack), `yarn watch:ts` (declarations). Clean: `yarn build-clean`; full reset: `yarn clean-all`.
+`SourceMapCache.ts` (the loader and `mapSourcePosition`), `SourceMapSupport.ts` and `getCallsite.ts` have no Node imports — an `eslint.config.mjs` block bans `node:` and `graceful-fs` imports in them. Everything platform-specific — `graceful-fs`, `pathToFileURL`/`fileURLToPath`, `Buffer` — lives behind the `SourceMapFileReader` interface in `types.ts`, implemented once by `nodeFileReader.ts`. A `SourceMapSupport` instance wires the reader in and holds all the formatter state — active cache, per-registry cache reuse, warning bookkeeping — rather than the module.
 
-## Testing
+There is no browser reader today. The seam exists so adding one is a new file rather than a rewrite.
 
-```bash
-yarn jest <path>                  # specific file or directory
-yarn jest-runtime-vm-modules      # jest-runtime with --experimental-vm-modules (ESM tests)
-yarn workspace <name> test        # one package
-yarn jest-coverage                # with coverage
-yarn jest-jasmine-ci              # CI mode with jasmine2 runner
-yarn test-leak                    # detectLeaks across jest-mock/jest-diff/pretty-format
-yarn test-types                   # tstyche (type-level tests in __typetests__/)
-yarn test-ts                      # TypeScript-config integration tests (separate config)
-yarn test-ci-partial:parallel --max-workers <N> --shard=<M>/<N>   # CI-mode sharded
-```
+`sourceMaps` is the `SourceMapRegistry` (`Map<generatedPath, sourceMapPath>`) that `jest-runtime` builds while transforming; reach it via `runtime.getSourceMaps()`.
 
-- Default runner is `jest-circus` (`JEST_JASMINE=1` swaps to `jest-jasmine2`, kept for compat). Default timeout 70 s.
-- Configs: `jest.config.mjs` (main), `jest.config.ci.mjs` (CI reporters), `jest.config.ts.mjs` (the `test-ts` integration).
-- New test files are `.ts` (some legacy `.js` remain).
-- Each `__tests__/` directory under packages covered by `yarn typecheck:tests` has its own `tsconfig.json` extending `tsconfig.test.json`. Add `"node"` to its `types` array when using Node globals like `Console`/`Stats`/`__dirname`.
-- **`yarn typecheck:tests` is gated in CI** — must exit 0. Adding a new package's tests means appending it to the glob in `package.json`.
-- **Type tests for `expect` matchers belong in `packages/jest-types/__typetests__/expect/`**, not in `packages/expect/__typetests__/`. The `jest-types` suite tests the public `@jest/globals` surface (what users import); `packages/expect/__typetests__/` covers internal `expect`-package concerns only (e.g. `MatcherFunction`, `JestExpect` shape). When adding type tests for matcher signatures, add them to `jest-types`.
-- **E2E tests (`e2e/__tests__/`) can't use `jest.mock`/`jest.fn`** — ESLint enforces this. Use fixture files instead.
-- Some e2e tests need Mercurial: `brew install hg`.
-- **Docblock pragmas** in test files: `@jest-environment <name>` overrides the test environment; `@jest-environment-options {"key": value}` merges into `testEnvironmentOptions`. Both are extracted by `jest-runner` and apply only to that file.
+## Why this package exists
 
-To run an e2e fixture manually:
+Jest ran on `source-map-support` until #16327. Upstream's `0.5.14` changed a frame's function name to come from the **caller's** mapped position, which is the spec-correct reading and makes Jest's output worse, so the dependency sat pinned at `0.5.13` for years while going unmaintained. `@cspotcode/source-map-support` forked after that change and carries it too.
 
-```bash
-cd e2e/<test-directory>
-node ../../packages/jest-cli/bin/jest.js --no-cache
-```
+Node's own support is not an alternative: `--enable-source-maps` and `module.setSourceMapsSupport()` do not cover code compiled through `vm` (verified on Node 26 for `runInContext`, `runInThisContext` and `new vm.Script()`, with and without a `//# sourceURL` comment), and there is no public API to register a map for a filename — which is exactly what serving maps out of the registry needs.
 
-CI runs the test matrix with `nick-fields/retry` (10-min timeout, up to 3 retries on flake) across Ubuntu/macOS/Windows × Node 18/20/22/24/25. If a test is consistently failing locally but green in CI, suspect a retry-masked flake.
+`SourceMapSupport.ts` is therefore a trimmed port of `source-map-support@0.5.13` onto `@jridgewell/trace-mapping`. Dropped along the way: XHR-based file retrieval, `hookRequire`, the uncaught-exception shim, the retrieve-handler stacks, and the `headerLength = 62` line-1 column fudge (fixed upstream for Node ≥ 10.16).
 
-### Test gotchas worth memorizing
+## Non-obvious details
 
-- **Snapshot updates with ANSI colors**: many snapshots contain chalk-rendered ANSI escape sequences. Always update snapshots with `FORCE_COLOR=1 yarn jest <path> -u` so the color output is preserved. Running without `FORCE_COLOR=1` strips the sequences and produces wrong snapshots.
-- **Windows CI on path-shaped assertions**: when comparing against a value built via `path.join`/`path.dirname`/`path.basename`, build the expected value with `path.join` too. Hardcoded POSIX strings (`'/path/to/x'`) fail on Windows.
-- **Throwing-getter regression on `globalThis` scans**: iterating `Object.keys(scope)` and reading `scope[key]` crashes if a user installed a throwing getter. Use `'key' in scope` (the `has` trap, not `get`) as the gate.
-- **ESM helpers from `@jest/test-utils`**: `testWithVmEsm` (Node 18+ with `--experimental-vm-modules`), `testWithLinkedSyntheticModule` (Node 22.21+/24.8+, gates on `linkRequests`), and `testWithSyncEsm` (Node 24.9+, gates on `hasAsyncGraph`). `yarn jest packages/jest-runtime` does **not** include the ESM suite — use `yarn jest-runtime-vm-modules`.
+**The naming policy is deliberately not spec-correct.** A frame's name is `mappedName(the frame's own position) || v8FunctionName()`. The map's `name` at a call-site position is the identifier being _called_ there, not the enclosing function, so each frame ends up annotated with the call on its line — `at Object.toBeTruthy (assertionCount.test.js:12:17)`, `at Object.setTimeout (inside.js:9:3)`. That reads better in a test failure than the enclosing function's name, which is usually `Object.<anonymous>`. `SourceMapSupport.test.ts` pins these shapes; treat a change there as a product decision, not a bug fix.
 
-## Linting
+**`callSiteToString` decides the exact text of every non-native frame.** It is V8's own `CallSite#toString` copied by way of `source-map-support`, and every frame with a filename goes through it — including the arithmetic that suppresses `[as method]` when `functionName === methodName` (both sides evaluate to `-1`). Rewriting it in "cleaner" JavaScript is how you silently change hundreds of e2e snapshots.
 
-Lint changed files after every edit:
+**The error header keeps its trailing separator.** `Error: ` with an empty message, not `Error`. `failureDetailsProperty` snapshots that.
 
-```bash
-yarn eslint --cache --fix <files>
-```
+**Install happens in the host realm only.** A `prepareStackTrace` installed outside a `vm` context still runs for errors created inside it, so `jest-runner` no longer loads this package into the sandbox. A sandbox install also breaks: the webpack build requires dependencies lazily on first use, and the first stack is often formatted after the test finished, when `jest-runtime` refuses to load new modules.
 
-Full lint (`yarn lint`) before pushing. ESLint 9.x flat config (`eslint.config.mjs`), with a local plugin at `.eslintplugin/index.mjs` providing `local/no-restricted-types-eventually`, `local/prefer-rest-params-eventually`, `local/prefer-spread-eventually`. Markdown code blocks are linted too.
-
-### Hard rules (CI fails)
-
-- **`graceful-fs`, never `fs`/`node:fs`** — both are banned by `no-restricted-imports`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jestjs/jest](https://github.com/jestjs/jest) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
