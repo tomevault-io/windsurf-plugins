@@ -3,7 +3,7 @@ trigger: always_on
 description: This document is designed to help AI Agents better understand and modify the Jumble project.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 This document is designed to help AI Agents better understand and modify the Jumble project.
 
@@ -121,7 +121,7 @@ Service files located in `src/services/` encapsulate business logic:
 - `note-stats.service.ts` - Note statistics storage and retrieval (likes, zaps, reposts)
 - `poll-results.service.ts` - Poll results storage and retrieval
 - `post-editor-cache.service.ts` - Caching post editor content to prevent data loss
-- `web.push.service.ts` - Web metadata fetching for link previews
+- `web.service.ts` - Web metadata fetching for link previews (via the link preview metadata service, see `LINK_PREVIEW_SERVER` in `src/constants.ts`, overridable with `VITE_LINK_PREVIEW_SERVER`)
 
 ### Providers Architecture
 
@@ -144,11 +144,9 @@ And some Providers are placed in `PageManager.tsx` because they need to use the 
 
 - Route configuration in `src/routes/primary.tsx` and `src/routes/secondary.tsx`
 - Using `PageManager.tsx` to manage page navigation, rendering, and state. Normally, you don't need to modify this file.
-- Primary pages (left column) use key-based navigation
-- Secondary pages (right column) use path-based navigation with stack support
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [CodyTseng/jumble](https://github.com/CodyTseng/jumble) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-31 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
