@@ -60,5 +60,5 @@ docker/                 Container images and local service orchestration
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [Thinking-Sound-Lab/Invook-Email-](https://github.com/Thinking-Sound-Lab/Invook-Email-) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+> Source: [Thinking-Sound-Lab/Invook-Email](https://github.com/Thinking-Sound-Lab/Invook-Email) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-17 -->
