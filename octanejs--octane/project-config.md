@@ -1,7 +1,8 @@
 ---
 trigger: always_on
-description: Octane is Dominic Gannaway's successor to Inferno: a React-shaped UI framework
+description: Octane project overview and development guidelines
 ---
+
 
 # Octane
 
