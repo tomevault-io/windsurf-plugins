@@ -7,11 +7,11 @@ A copy-paste component library, RTL-first for Persian interfaces.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [persianlabs/ui](https://github.com/persianlabs/ui).
+Original source: `AGENTS.md` in [persianlabs/ui](https://github.com/persianlabs/ui).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
