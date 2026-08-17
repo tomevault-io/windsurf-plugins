@@ -7,11 +7,11 @@ Scalable, Observable and Governed AI SDLC Platform.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [theam/facility](https://github.com/theam/facility).
+Original source: `CLAUDE.md` in [theam/facility](https://github.com/theam/facility).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
