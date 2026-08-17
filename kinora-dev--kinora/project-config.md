@@ -1,9 +1,7 @@
 ---
 trigger: always_on
-description: @~/.claude/stack/web-saas.md
+description: Guidance for agents in this repo. Shared stack conventions are imported above; everything below is kinora-specific and overrides the profile where they differ.
 ---
-
-@~/.claude/stack/web-saas.md
 
 # kinora
 
@@ -82,5 +80,5 @@ A test result travels: **Playwright run -> reporter or CLI -> `@kinora/core` nor
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [Kinora-dev/kinora](https://github.com/Kinora-dev/kinora) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
+> Source: [kinora-dev/kinora](https://github.com/kinora-dev/kinora) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-17 -->
