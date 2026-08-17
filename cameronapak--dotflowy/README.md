@@ -7,11 +7,11 @@ Dotflowy is the OSS Workflowy alternative. Free up your mind. Get your thoughts 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [cameronapak/dotflowy](https://github.com/cameronapak/dotflowy).
+Original source: `CLAUDE.md` in [cameronapak/dotflowy](https://github.com/cameronapak/dotflowy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
