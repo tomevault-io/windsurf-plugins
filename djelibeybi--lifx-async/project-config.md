@@ -167,4 +167,4 @@ gh workflow run docs.yml
 
 ---
 > Source: [Djelibeybi/lifx-async](https://github.com/Djelibeybi/lifx-async) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-18 -->
