@@ -7,11 +7,11 @@ AI-assisted Skyrim modding environment for Claude Code. SE/AE/VR — ESP tools, 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [WingedGuardian/skyrimvr-claude-toolkit](https://github.com/WingedGuardian/skyrimvr-claude-toolkit).
+Original source: `AGENTS.md` in [WingedGuardian/skyrimvr-claude-toolkit](https://github.com/WingedGuardian/skyrimvr-claude-toolkit).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
