@@ -7,11 +7,11 @@ Open-source online uniform shop for Australian schools and P&C committees
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [qiaohaojie/uniform_order](https://github.com/qiaohaojie/uniform_order).
+Original source: `AGENTS.md` in [qiaohaojie/uniform_order](https://github.com/qiaohaojie/uniform_order).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
