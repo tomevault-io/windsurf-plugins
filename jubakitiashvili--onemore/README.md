@@ -7,12 +7,12 @@ Apple HIG Design Intelligence — generates Apple-quality UI across all platform
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [JubaKitiashvili/onemore](https://github.com/JubaKitiashvili/onemore).
+Original source: `copilot-instructions.md` in [JubaKitiashvili/onemore](https://github.com/JubaKitiashvili/onemore).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
