@@ -7,11 +7,11 @@ mnml is a quiet, native-feeling Obsidian theme built on Minimal.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [linuz90/obsidian-mnml](https://github.com/linuz90/obsidian-mnml).
+Original source: `AGENTS.md` in [linuz90/obsidian-mnml](https://github.com/linuz90/obsidian-mnml).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
