@@ -1,107 +1,128 @@
 ---
 trigger: always_on
-description: Tool orchestration — parallel reads, right tool for the job, schema-first MCP, subagents, no fabricated output
+description: This file is for **AI coding agents** (Cursor, Claude Code, Copilot, etc.) wiring RankMySEO into an application.
 ---
 
+# AGENTS.md — RankMySEO integrator guide
 
-# Cursor tools discipline
+This file is for **AI coding agents** (Cursor, Claude Code, Copilot, etc.) wiring RankMySEO into an application.
 
-Tools are how you turn intent into evidence. Use them the way a senior engineer uses a debugger: deliberately, in the right order, and never as a substitute for reading.
+## Package decision tree
 
-## Pick the right tool
-
-| Job | Right tool | Wrong tool |
-| --- | --- | --- |
-| Read a file | structured file reader | `cat`, `head`, `tail` in shell |
-| Find files by name | glob | `find`, `ls -R` |
-| Search code by content | ripgrep / grep tool | `grep` in shell, full-file scans |
-| Edit a file | structured edit tool | `sed`, `awk`, heredoc redirects |
-| Run a command | shell | file tools |
-| Hit an MCP server | the MCP tool, after reading its schema | guessing parameters |
-| Heavy codebase search | built-in **Explore** subagent or parallel grep — parent keeps summary only | reading dozens of files sequentially in parent |
-| Long or noisy shell output | built-in **Bash** subagent or background shell | pasting full logs into the user message |
-| UI / browser verification | built-in **Browser** subagent; cite snapshot or screenshot evidence | "looks fine in the diff" |
-| Specialist isolated work | Task / subagent with full prompt + return shape | vague "help me with this" delegation |
-
-Using the wrong tool wastes the user's tokens and produces worse results.
-
-## Parallelize independent work
-
-Run **independent** discovery in parallel: multiple file reads, unrelated searches, web lookups that don't depend on each other. Send them in one batch, not sequentially.
-
-Serialize only when there's a real dependency: read schema → call tool with those params; find the file → edit it.
-
-For **independent subagent tracks**, batch Task calls in one message so they run in parallel. See [composer-orchestration](composer-orchestration.mdc) for when to delegate.
-
-## Investigate progressively
-
-Don't read megabytes when you need kilobytes. The default order:
-
-1. **Orient** — list directory or glob the relevant area.
-2. **Find** — search by symbol, identifier, or error message.
-3. **Read** — open the specific file or function the search pointed to.
-4. **Read more** — only when the first read leaves a real question open.
-
-Re-reading the same files repeatedly is a signal you're guessing, not investigating.
-
-## MCP and plugin tools
-
-MCP surfaces change. Treat each one as untrusted-by-default until you've inspected it.
-
-1. **Read the schema** before calling. Parameters, required fields, return shape.
-2. **Auth deliberately** — only when a call fails for auth reasons; don't preemptively re-auth.
-3. **Don't promise capabilities** that aren't in the live schema. Tool names and shapes drift across versions.
-4. **Fallback gracefully** — if the MCP isn't available or fails, fall back to web docs or honest "blocked".
-
-## Shell usage
-
-- Prefer non-interactive flags (`-y`, `--no-input`, `CI=1`) so commands don't hang.
-- Use the project's own scripts (`package.json`, `Makefile`, `justfile`) before reinventing equivalents.
-- **Background** long-running processes; don't block the conversation on a 10-minute build.
-- Tell the user how to check background output (terminal session, subagent output path).
-- Quote paths with spaces. Don't pipe through unsafe shell substitution.
-- Never run destructive commands (`rm -rf`, `git push --force`, DB drops) without explicit confirmation.
-
-### Git commands
-
-See [composer-core](composer-core.mdc) § Git remote safety. Default: **never push unprompted**.
-
-| Allowed without extra ask | Requires explicit user ask in **this** turn |
+| Goal | Install |
 | --- | --- |
-| `git status`, `git diff`, `git log`, `git add`, `git commit` (when user asked to commit) | `git push`, `git push -u`, `git push --force`, `git push --tags` |
-| `gh pr view`, `gh pr checks`, read-only `gh` | Any command whose primary effect is updating `origin` |
+| API-only backend (Hono) | `@rankmyseo/core`, `@rankmyseo/storage`, `@rankmyseo/server-hono`, `hono` |
+| API-only backend (Express) | `@rankmyseo/core`, `@rankmyseo/storage`, `@rankmyseo/server-express`, `express` |
+| API-only backend (Next App Router) | `@rankmyseo/core`, `@rankmyseo/storage`, `@rankmyseo/server-next` |
+| API-only backend (Nitro / Nuxt) | `@rankmyseo/core`, `@rankmyseo/storage`, `@rankmyseo/server-nitro`, `h3` |
+| SvelteKit / Astro (native Request/Response) | `@rankmyseo/core`, `@rankmyseo/storage`, `@rankmyseo/server` — see `examples/` |
+| Postgres via Prisma | add `@rankmyseo/storage-prisma` (+ `@prisma/client`, `prisma`) instead of / beside Drizzle |
+| Postgres via Kysely | add `@rankmyseo/storage-kysely` |
+| + Headless React hooks | add `@rankmyseo/react`, `react` |
+| + Headless Vue 3 composables | add `@rankmyseo/vue`, `vue` |
+| + Headless Svelte stores | add `@rankmyseo/svelte`, `svelte` |
+| + Framework-neutral HTTP client | add `@rankmyseo/client` (Astro/vanilla / custom adapters) |
+| + Browser page collector | add `@rankmyseo/collector` |
+| + Prebuilt dashboard widgets | add `@rankmyseo/ui`, `react-dom` |
+| + CLI (`init`, `migrate`, `schedule`, `doctor`) | add `@rankmyseo/cli` (dev) or use `rankmyseo` meta installer |
+| + AI chat tools / MCP | add `@rankmyseo/agent`, configure `agentModel` on the server handler |
+| + SEO regression CI gate | add `@rankmyseo/cli` (+ `@rankmyseo/scanner`), configure `regression` in config |
+| Full stack shortcut | `npx rankmyseo install --yes --preset recommended` |
 
-**Anti-pattern:** Chaining `&& git push` at the end of "fix CI" or "create PR" scripts when the user did not say push.
+The **recommended** preset installs: `@rankmyseo/core`, `@rankmyseo/storage`, `@rankmyseo/server-hono`, `@rankmyseo/react`, `@rankmyseo/cli` (+ peers `hono`, `react`).
 
-## Background work and subagents
+## Support matrix
 
-- Use **background** subagents or shells when the parent can make progress elsewhere; label assumptions until results return.
-- **Stopping the parent stops child subagents** — avoid aborting mid-flight without noting impact.
-- Subagent prompts need full context (subagents don't see chat history). See orchestration rule.
+| Surface | Status |
+| --- | --- |
+| Node.js ≥ 20 full stack | Yes |
+| Edge / Cloudflare Workers (full stack) | **No** |
+| Adapters: Hono, Express, Next, Nitro | Yes |
+| SvelteKit / Astro via `@rankmyseo/server` `createHandler` | Yes (`examples/`) |
+| React UI widgets (`@rankmyseo/ui`) | Yes |
+| Vue / Svelte headless | Yes |
+| Vue / Svelte UI widgets | Deferred |
+| Storage: sqlite / postgres / prisma / kysely | Yes |
+| MySQL | No |
+| SEO regression CLI | Yes — see [SEO Regression wiki](https://github.com/madebyaris/rankmyseo/wiki/SEO-Regression) |
 
-## Sandbox and network
+Docs reference app (dogfoods `@rankmyseo/client`): `pnpm --filter @rankmyseo/docs dev`.
 
-- Prefer project scripts over ad-hoc installs when the sandbox allows.
-- If a command fails for **network or permission** limits, report **blocked** with what allowlist or credential is needed — don't retry the same failing call indefinitely.
-- Respect `sandbox.json` / org egress policy when documented.
+## CLI commands (real binary names)
 
-## Web retrieval
+| User-facing | Direct CLI binary |
+| --- | --- |
+| `npx rankmyseo init` | `npx rankmyseo-cli init` |
+| `npx rankmyseo migrate` | `npx rankmyseo-cli migrate` |
+| `npx rankmyseo schedule` | `npx rankmyseo-cli schedule` |
+| `npx rankmyseo doctor` | `npx rankmyseo-cli doctor` |
+| `npx rankmyseo regression check` | `npx rankmyseo-cli regression check` |
 
-When you need facts beyond the codebase:
+Do **not** use `npx @rankmyseo/cli` — that is not a valid binary name.
 
-- Prefer **primary** sources: official docs, RFCs, vendor pages, repo changelogs.
-- Use the current date in queries when freshness matters; flag stale pages.
-- For high-stakes claims (security, compliance, vendor behavior), corroborate with a second independent source.
-- Cite what you actually opened. Don't list links you didn't read.
+Global flags: `--json` (machine-readable output), `--version`.
 
-## Never fabricate tool output
+## Environment variables
 
-This is the one inviolable rule of tool use.
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Your server bootstrap | LLM for `POST /agent/chat` (bring your own provider wiring) |
+| `DATABASE_URL` / `RANKMYSEO_DATABASE_URL` | `rankmyseo-mcp` bin | SQLite/Postgres URL for MCP stdio server |
+| `TENANT_ID` / `RANKMYSEO_TENANT_ID` | MCP bin | Default tenant scope |
+| `PROJECT_ID` / `RANKMYSEO_PROJECT_ID` | MCP bin | Default project scope |
+| `RANKMYSEO_MCP_ALLOW_MUTATIONS` | MCP bin | Set to `1` to register mutating MCP tools (read-only by default) |
 
-- If a tool fails, say it failed.
-- If a tool times out, say it timed out.
-- If you ran a command and it printed nothing useful, say so.
-- Don't invent plausible-looking output to fill a gap.
+RankMySEO does not read OpenAI keys internally — you pass a `LanguageModel` to `createHandler` / `createRankMySeoApp`.
+
+## HTTP scope headers
+
+Most API routes require:
+
+```
+x-tenant-id: <tenant>
+x-project-id: <project>
+```
+
+**These headers select scope — they do not authenticate.** Pass `authorize(request, scope)` to `createHandler` / `createRankMySeoApp` to validate the caller. Return a `Response` to deny.
+
+Mount under a subpath with `basePath: "/api/rankmyseo"` on `createHandler` / `createRankMySeoApp` (Node.js ≥ 20; full stack is not edge/Workers compatible).
+
+**Exempt routes** (no scope headers required; default config tenant/project is used):
+
+- `GET /sitemap.xml`
+- `GET /llms.txt`
+
+**Special case:**
+
+- `GET /` — scope headers optional; uses config defaults unless headers are provided
+
+Disabled features:
+
+- `POST /collect`, `/blog/*` → **403** when feature off
+- `GET /sitemap.xml`, `/llms.txt` → **404** when feature off
+
+## Minimal Hono + agent snippet
+
+```ts
+import { defineConfig } from "@rankmyseo/core";
+import { createStore } from "@rankmyseo/storage";
+import { createRankMySeoApp } from "@rankmyseo/server-hono";
+import { openai } from "@ai-sdk/openai";
+
+const store = createStore("sqlite://./data/rankmyseo.sqlite");
+
+await store.projects.create({
+  id: "project-1",
+  tenantId: "tenant-a",
+  name: "My Site",
+  domain: "example.com",
+});
+
+const config = defineConfig({
+  databaseUrl: "sqlite://./data/rankmyseo.sqlite",
+  tenantId: "tenant-a",
+  projectId: "project-1",
+  dataSources: [{ provider: "fixture", default: true }],
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
