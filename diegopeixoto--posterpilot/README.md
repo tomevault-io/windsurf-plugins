@@ -7,11 +7,11 @@ PosterPilot is a self-hosted artwork manager for Plex, Jellyfin, and Emby. It sc
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [diegopeixoto/posterpilot](https://github.com/diegopeixoto/posterpilot).
+Original source: `AGENTS.md` in [diegopeixoto/posterpilot](https://github.com/diegopeixoto/posterpilot).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
