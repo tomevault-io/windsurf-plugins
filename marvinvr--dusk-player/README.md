@@ -7,11 +7,11 @@ Modern iOS Native Plex Client
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [marvinvr/dusk-player](https://github.com/marvinvr/dusk-player).
+Original source: `CLAUDE.md` in [marvinvr/dusk-player](https://github.com/marvinvr/dusk-player).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
