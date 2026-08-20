@@ -7,11 +7,11 @@ Open-source agentic video editing skills — an AI-powered alternative to Opus C
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [WhiteTowerAI/cut-as-code](https://github.com/WhiteTowerAI/cut-as-code).
+Original source: `AGENTS.md` in [WhiteTowerAI/cut-as-code](https://github.com/WhiteTowerAI/cut-as-code).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
