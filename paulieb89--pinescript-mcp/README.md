@@ -7,11 +7,11 @@ Pine Script v6 MCP server — documentation lookup and function validation.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [paulieb89/pinescript-mcp](https://github.com/paulieb89/pinescript-mcp).
+Original source: `AGENTS.md` in [paulieb89/pinescript-mcp](https://github.com/paulieb89/pinescript-mcp).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
