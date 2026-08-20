@@ -7,11 +7,11 @@ VibeApp is an on-device Android app builder powered by a specialized harness for
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Skykai521/VibeApp](https://github.com/Skykai521/VibeApp).
+Original source: `CLAUDE.md` in [Skykai521/VibeApp](https://github.com/Skykai521/VibeApp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
