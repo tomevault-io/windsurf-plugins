@@ -1,74 +1,46 @@
 ---
 trigger: always_on
-description: Senior and principal-level reasoning for ambiguous, high-stakes, or architectural work — infer the real intent, reason then re-evaluate, weigh tradeoffs and one-way doors, and push back honestly
+description: Version-pinned framework and coding best practices from primary docs and corroborated senior guidance — use for unfamiliar stacks, migrations, architecture reviews, or when style improvement needs evidence
 ---
 
 
-# Composer reasoning
+# Composer senior practices
 
-Use on ambiguous, high-stakes, architectural, or multi-option work — anywhere the cost of thinking wrong exceeds the cost of thinking twice. This rule **deepens** the always-on gate in [composer-core](composer-core.mdc) § Understand the real ask and § Reason, then re-evaluate the reasoning; it does not add mandatory steps or slow trivial work. For trivial edits, skip it; core is enough.
+Load the [senior-practices skill](../skills/senior-practices/SKILL.md) when you need **current**, **version-matched** guidance — not training-data defaults.
 
-Companion rules: [clarify-first](clarify-first.mdc) (when to ask), [composer-verification](composer-verification.mdc) (proof after), [composer-orchestration](composer-orchestration.mdc) (plan mode), [composer-debugging](composer-debugging.mdc) (reproduce before theorizing).
+## When to use
 
-## Infer the real ask
+- Unfamiliar framework, library, or language feature in the repo.
+- User asks for "best practice", "modern approach", or "how should we…"
+- Upgrade, migration, or new pattern introduction.
+- Architecture or code review where recommendations need citations.
+- Style governance decision: is local style wrong enough to improve? (see [composer-coding-excellence](composer-coding-excellence.mdc) § Style governance)
 
-The literal request is a proxy for an outcome. A senior engineer solves the outcome, not the wording.
+## When not to use
 
-- **Read the cues.** Possessives and definite articles ("*the* migration", "*our* auth flow") assume shared context — pin down which thing before acting. Past-tense references ("you suggested", "we decided") point at history you should reconcile, not invent.
-- **Follow the thread.** The latest message inherits the conversation arc — follow-ups usually refine or steer work in progress, not start a new task. Default to continuing unless the user clearly changes direction ("actually, new task:", "forget that", "start over").
-- **Watch for the X-Y problem.** They ask how to do Y because they think it solves X. If Y is awkward, surface X: "You asked to parse this with regex — if the goal is extracting fields from JSON, the parser is safer. Want that instead?"
-- **Don't re-ask answered questions.** When the user already gave detailed constraints, they did the narrowing. Proceed and **state assumptions inline** rather than second-guessing them.
-- **Match the altitude.** A one-line question wants an answer, not a design doc. An architecture request wants options and a recommendation, not a snippet.
+- Trivial edits where the file's existing pattern is clear.
+- Pure codebase archaeology (use Explore subagent / grep instead).
+- Deep multi-vendor research (use [composer-deep-research](composer-deep-research.mdc) / deep-research skill).
 
-```text
-GOOD
-User: "Make the dashboard load faster."
-→ Infer: which surface is slow, and is "faster" perceived or measured?
-→ "The slow part is the N+1 on /metrics (evidence: 1.8s, 40 queries).
-   I'll batch it; that targets the measured cost. If you meant perceived
-   load (skeletons/streaming), say so — different fix."
+## Source tiers
 
-BAD
-User: "Make the dashboard load faster."
-→ Add a spinner and call it done. (Patched the symptom, not the ask.)
-```
+| Tier | Examples | Use for |
+| --- | --- | --- |
+| **T1 — Primary** | Official docs, RFCs, release notes, security advisories | Defaults, APIs, deprecations |
+| **T2 — Maintainer / platform** | Framework team blogs, platform engineering guides (version-matched) | Patterns endorsed by platform owners |
+| **T3 — Corroborated senior** | Widely cited talks/posts **only when** aligned with T1/T2 or reproducible | Tradeoffs, operational wisdom |
+| **Reject** | Random tutorials, outdated Stack Overflow, unversioned "best practices" | Do not cite as authority |
 
-## Reason, then re-evaluate the reasoning
+## Contract with style governance
 
-First-draft thinking is a hypothesis, not a verdict. Run a second, adversarial pass on your own plan before you commit to it.
+Recommendations must reconcile with **this repo**: existing libs, ADRs, lint config, and [composer-coding-excellence](composer-coding-excellence.mdc) minimal-diff rules.
 
-1. **Draft** the approach in one or two sentences.
-2. **Critique it** against the checklist below.
-3. **Revise** — or accept it and say why it survives.
-4. **Decide**, then act.
+- **Apply now** — safe within the current task scope.
+- **Follow-up plan** — style or tech-debt slice; do not drive-by refactor.
 
-| Self-critique prompt | What it catches |
-| --- | --- |
-| What am I assuming that I haven't verified? | Phantom APIs, guessed schemas, unread callers |
-| What would a senior reviewer flag first? | Blind spots you've normalized |
-| What's the simplest thing that could work? | Over-engineering, speculative abstraction |
-| How does this fail, and who notices? | Missing error/edge handling |
-| If I'm wrong, how expensive is the undo? | One-way doors disguised as quick wins |
+Never mass-fix unrelated modules based on external guidance alone.
 
-Make the loop **visible and brief** when it matters — a sentence of "I considered X but chose Y because Z" beats silent confidence. Do not narrate a private chain-of-thought; externalize the *decision and its because*, not a monologue.
-
-**Calibrate, don't spiral.** The loop scales with blast radius: one quick pass for a moderate change, a real second pass for a one-way door. A single critique pass is the norm; re-deriving the same plan three times is analysis paralysis, not rigor. If two passes don't converge, you're missing evidence — go get it (read the code, run the command) instead of thinking harder.
-
-## Principal-level judgment
-
-Seniority is mostly judgment about consequences. Weigh these before recommending:
-
-- **Tradeoffs, explicitly.** Every choice spends something — latency, complexity, flexibility, time. Name what each option costs, not just what it gives.
-- **Second-order effects.** "And then what?" A cache adds an invalidation problem. A new dependency adds a supply-chain and upgrade burden. A clever abstraction adds a comprehension tax on the next reader.
-- **Reversibility (one-way vs two-way doors).** Cheap-to-undo decisions deserve speed; hard-to-undo ones (data migrations, public API shapes, auth models, persisted formats) deserve the slow second pass.
-- **Cost of being wrong.** Match rigor to consequence. A throwaway script and a billing path do not get the same scrutiny.
-- **The next engineer.** Optimize for the person who reads this in six months with no context — usually that's a future version of the user. Boring and obvious beats clever and surprising.
-
-**Zoom out before you commit.** Senior judgment weighs the change; principal judgment weighs the system and the org around it:
-
-- **Build vs buy vs adopt.** Is this worth owning? Prefer an existing library, platform primitive, or internal tool over net-new code you maintain forever. Invent only when the difference is real and load-bearing.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+See [reference.md](../skills/senior-practices/reference.md) for the compact checklist.
 
 ---
 > Source: [madebyaris/rankmyseo](https://github.com/madebyaris/rankmyseo) — distributed by [TomeVault](https://tomevault.io).
