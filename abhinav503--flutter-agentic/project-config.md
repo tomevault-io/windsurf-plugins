@@ -1,170 +1,83 @@
 ---
 trigger: always_on
-description: Apply when user asks to scaffold, create, or add a new feature.
+description: Apply when the user asks to change the application ID, bundle identifier, package name, or app ID on Android or iOS.
 ---
 
 
-If the feature name was not provided, ask:
-"What is the feature name? (e.g. `products`, `auth`, `settings`)"
+If the new application ID was not provided, ask:
+"What is the new application ID? Use reverse-domain notation, e.g. `com.company.appname`"
 
-`{Feature}` = PascalCase · `{feature}` = snake_case · `{Action}` = PascalCase verb · `{action}` = snake_case verb (e.g. `GetProducts` / `get_products`)
+> **Monorepo note:** application IDs are per app. All paths below are relative to the target app folder `apps/{app}/` (e.g. `apps/doc_scanner/android/app/build.gradle.kts`). Run verification commands from inside that app folder.
 
-Scaffold only — do NOT create entity, model, or use case files.
-BLoCs are never registered in GetIt.
-Imports: core types -> `package:core/core/...`; app-level di/constants -> `package:{app}/...`; same-feature files -> relative. Never the old single-app `package:flutter_agentic/...`.
-Run `make gen` and `make analyze` at the end before reporting done.
+Derive the old application ID from the `applicationId` field in `apps/{app}/android/app/build.gradle.kts`.
 
 ---
 
-## 1. Folder tree
+## Android
+
+### 1. `android/app/build.gradle.kts`
+
+Update both occurrences:
+
+```kotlin
+namespace = "{NEW_ID}"
+applicationId = "{NEW_ID}"
+```
+
+### 2. `MainActivity.kt` — package declaration and directory
+
+The file lives at `android/app/src/main/kotlin/{OLD_ID_AS_PATH}/MainActivity.kt`
+(`{OLD_ID_AS_PATH}` = old ID with `.` replaced by `/`).
+
+Steps:
+1. Create `android/app/src/main/kotlin/{NEW_ID_AS_PATH}/`
+2. Write `MainActivity.kt` with `package {NEW_ID}` as the first line.
+3. Delete the old directory tree.
+
+### 3. Verify no remaining references
 
 ```bash
-mkdir -p apps/{app}/lib/feature/{feature}/data/data_source
-mkdir -p apps/{app}/lib/feature/{feature}/data/models
-mkdir -p apps/{app}/lib/feature/{feature}/data/repository_impl
-mkdir -p apps/{app}/lib/feature/{feature}/domain/entities
-mkdir -p apps/{app}/lib/feature/{feature}/domain/repository
-mkdir -p apps/{app}/lib/feature/{feature}/domain/usecase
-mkdir -p apps/{app}/lib/feature/{feature}/presentation/bloc
-mkdir -p apps/{app}/lib/feature/{feature}/presentation/view
-mkdir -p apps/{app}/lib/feature/{feature}/presentation/widgets
+grep -r "{OLD_ID}" android/ --include="*.kt" --include="*.java" --include="*.xml" --include="*.gradle" --include="*.kts"
 ```
 
-## 2. Domain — repository interface
+Any hits must also be updated.
 
-`apps/{app}/lib/feature/{feature}/domain/repository/{feature}_repository.dart`
-```dart
-abstract interface class {Feature}Repository {}
+---
+
+## iOS
+
+Update every `PRODUCT_BUNDLE_IDENTIFIER` line in `ios/Runner.xcodeproj/project.pbxproj`:
+
+| Target | Value |
+|---|---|
+| Runner (3 entries: Debug, Release, Profile) | `{NEW_ID}` |
+| RunnerTests (3 entries) | `{NEW_ID}.RunnerTests` |
+
+Do a find-and-replace across the whole file — 6 lines total.
+
+Verify:
+```bash
+grep "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj
 ```
 
-## 3. Data — remote data source
+### If the user prefers Xcode
 
-`{feature}_remote_data_source.dart`
-```dart
-abstract interface class {Feature}RemoteDataSource {}
+1. Open `ios/Runner.xcworkspace` in Xcode.
+2. Select the **Runner** project → **Runner** target → **General** tab.
+3. Update **Bundle Identifier** to `{NEW_ID}`.
+4. Repeat for **RunnerTests** target (`{NEW_ID}.RunnerTests`).
+
+> **Note:** If Push Notifications, Sign in with Apple, or other capabilities are registered against the old bundle ID in the Apple Developer portal, create a new App ID there and re-download provisioning profiles. Xcode handles this automatically with automatic signing enabled.
+
+---
+
+## After Both Platforms
+
+```bash
+flutter analyze
 ```
 
-`{feature}_remote_data_source_impl.dart`
-```dart
-import '{feature}_remote_data_source.dart';
-
-// const no-arg; reaches the network via HttpService.instance (from core),
-// e.g. HttpService.instance.get<Map<String, dynamic>>(ApiConstants.someUrl).
-class {Feature}RemoteDataSourceImpl implements {Feature}RemoteDataSource {
-  const {Feature}RemoteDataSourceImpl();
-}
-```
-
-## 4. Data — repository impl
-
-`apps/{app}/lib/feature/{feature}/data/repository_impl/{feature}_repository_impl.dart`
-```dart
-import 'package:core/core/base/base_repository.dart';
-import '../../domain/repository/{feature}_repository.dart';
-import '../data_source/{feature}_remote_data_source.dart';
-
-class {Feature}RepositoryImpl with BaseRepository implements {Feature}Repository {
-  final {Feature}RemoteDataSource _dataSource;
-  const {Feature}RepositoryImpl(this._dataSource);
-}
-```
-
-## 5. Presentation — BLoC
-
-`{feature}_event.dart`
-```dart
-part of '{feature}_bloc.dart';
-
-@freezed
-sealed class {Feature}Event with _${Feature}Event {
-  const factory {Feature}Event.started() = {Feature}Started; // auto-dispatched on creation
-}
-```
-
-`{feature}_state.dart`
-```dart
-part of '{feature}_bloc.dart';
-
-@freezed
-sealed class {Feature}State with _${Feature}State {
-  const factory {Feature}State.loading()                        = {Feature}Loading;
-  const factory {Feature}State.loaded()                         = {Feature}Loaded;
-  const factory {Feature}State.error({required String message}) = {Feature}Error;
-}
-```
-
-`{feature}_bloc.dart`
-```dart
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part '{feature}_bloc.freezed.dart';
-part '{feature}_event.dart';
-part '{feature}_state.dart';
-
-class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> {
-  {Feature}Bloc() : super(const {Feature}State.loading()) {
-    on<{Feature}Started>(_onStarted);
-  }
-
-  Future<void> _onStarted({Feature}Started event, Emitter<{Feature}State> emit) async {
-    // TODO: inject use case, call it, fold the Either
-    emit(const {Feature}State.loaded());
-  }
-}
-```
-
-## 6. Presentation — page
-
-`apps/{app}/lib/feature/{feature}/presentation/view/{feature}_page.dart`
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:core/core/base/base_page.dart';
-import 'package:{app}/constants/value_const.dart';
-import 'package:{app}/di/injection_container.dart';
-import 'package:core/core/ui/atoms/top_bar.dart';
-import '../bloc/{feature}_bloc.dart';
-import '{feature}_screen.dart';
-
-class {Feature}Page extends BasePage {
-  const {Feature}Page({super.key});
-  @override
-  State<{Feature}Page> createState() => _{Feature}PageState();
-}
-
-class _{Feature}PageState extends BasePageState<{Feature}Page> {
-  @override
-  PreferredSizeWidget buildAppBar(BuildContext context) =>
-      AppTopBar.primary(title: ValueConst.{feature}AppBarTitle);
-
-  // BLoC scoped to the screen; cascade dispatches started immediately
-  @override
-  Widget buildBody(BuildContext context) => BlocProvider(
-    create: (_) => {Feature}Bloc({action}UseCase: sl())..add(const {Feature}Event.started()),
-    child: const {Feature}Screen(),
-  );
-}
-```
-
-> If the AppBar also reads the BLoC, move the provider into `buildBlocProviders` instead.
-
-## 7. Presentation — screen
-
-`apps/{app}/lib/feature/{feature}/presentation/view/{feature}_screen.dart`
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:core/core/base/base_screen.dart';
-import 'package:core/core/ui/atoms/loading_indicator.dart';
-import 'package:core/core/ui/molecules/error_view.dart';
-import '../bloc/{feature}_bloc.dart';
-
-class {Feature}Screen extends BaseScreen {
-  const {Feature}Screen({super.key});
-  @override
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Zero warnings required before reporting done.
 
 ---
 > Source: [abhinav503/flutter-agentic](https://github.com/abhinav503/flutter-agentic) — distributed by [TomeVault](https://tomevault.io).
