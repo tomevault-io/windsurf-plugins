@@ -1,137 +1,93 @@
 ---
 trigger: always_on
-description: USE WHEN evaluating technologies, isolating risky memory changes, or comparing alternative approaches using memory branches
+description: USE WHEN working with Memoria memory tools - storing, retrieving, correcting, purging memories
 ---
 
 
 <!-- memoria-version: 0.2.3-->
 
-# Memory Branching Patterns
+# Memory Integration (Memoria Lite)
 
-Use Memoria's Git-like branching to isolate experiments, evaluate alternatives, and protect stable memory state.
+You have persistent memory via MCP tools. Memory survives across conversations.
 
-## Pattern 1: Tech Evaluation
+## 🔴 MANDATORY: Every conversation start
 
-Compare alternatives without polluting main memory.
+Call `memory_retrieve` with a **semantic query** derived from the user's message BEFORE responding.
 
-```
-memory_branch(name="eval_[technology]")
-memory_checkout(name="eval_[technology]")
+**Query rules:**
+- ✅ Extract key concepts → "benchmark optimization", "graph retrieval bug"
+- ❌ Don't use meta-queries → "all memories", "everything", "list all"
 
-# Store findings on branch
-memory_store(content="[technology] evaluation: [findings]", memory_type="semantic")
+**After retrieval:**
+- Results → use as reference, verify against current context
+- "No relevant memories" → normal for new users, proceed
+- ⚠️ warnings → inform user, offer `memory_governance`
+- If results come back → use them as **reference only**. Treat retrieved memories as potentially stale or incomplete — always verify against current context before acting on them. Do NOT blindly trust memory content as ground truth.
+- If "No relevant memories found" → this is normal for new users, proceed without.
+- If ⚠️ health warnings appear → inform the user and offer to run `memory_governance`.
 
-# When done — preview and decide
-memory_diff(source="eval_[technology]")
+## 🔴 MANDATORY: Every conversation turn
+After responding, decide if anything is worth remembering:
+- User stated a preference, fact, or decision → `memory_store`
+- User corrected a previously stored fact → `memory_correct` (not `memory_store` + `memory_purge`)
+- You learned something new about the project/workflow → `memory_store`
+- Do NOT store: greetings, trivial questions, things already in memory.
 
-# Accept: merge back
-memory_checkout(name="main")
-memory_merge(source="eval_[technology]", strategy="replace")
-memory_branch_delete(name="eval_[technology]")
+**Deduplication is automatic.** The system detects semantically similar memories and supersedes old ones. You do not need to check for duplicates before storing.
 
-# Reject: just delete
-memory_checkout(name="main")
-memory_branch_delete(name="eval_[technology]")
-```
+If `memory_store` or `memory_correct` response contains ⚠️, tell the user — it means the embedding service is down and retrieval will degrade to keyword-only search.
 
-## Pattern 2: Pre-Refactor Safety Net
+## 🟡 When NOT to store (noise reduction)
+Do NOT call `memory_store` for:
+- **Transient debug context**: temporary print statements, one-off test values, ephemeral error messages
+- **Vague or low-confidence observations**: "might be using X", "probably prefers Y" — wait for confirmation
+- **Conversation-specific context** that won't matter next session: "currently looking at line 42", "just ran the test"
+- **Information already in memory**: if `memory_retrieve` already returned it, don't store again
+- **Trivial or obvious facts**: "user is writing code", "user asked a question"
 
-Snapshot + branch before risky memory changes.
+## 🟡 Working memory lifecycle — CRITICAL for long debug sessions
+`working` memories are session-scoped temporary context. They **persist and will be retrieved in future sessions** unless explicitly cleaned up.
 
-```
-memory_snapshot(name="pre_[task]", description="before [task]")
-memory_branch(name="refactor_[task]")
-memory_checkout(name="refactor_[task]")
+**When to purge working memories:**
+- Task or debug session is complete → `memory_purge(topic="<task keyword>", reason="task complete")`
+- You stored a working memory that turned out to be wrong → `memory_purge(memory_id="...", reason="incorrect conclusion")`
+- User says "start fresh", "forget what we tried", "let's try a different approach"
+- Only purge completed tasks — leave active task working memories for next session
 
-# Do risky work on branch...
+**Promote or purge as you go:**
+- Hypothesis confirmed → `memory_store` the conclusion as `semantic`, then `memory_purge` the working memory
+- Hypothesis disproven → `memory_purge` the working memory immediately
+- Don't wait until session end to promote — do it as soon as you know
 
-# If it goes wrong:
-memory_checkout(name="main")
-memory_branch_delete(name="refactor_[task]")
-# main is untouched
+**When a working memory contradicts current findings:**
+- Do NOT keep both. Purge the stale one immediately: `memory_purge(memory_id="...", reason="superseded by new finding")`
+- Then store the correct conclusion as `semantic` (not `working`) if it's a durable fact
 
-# If it succeeds:
-memory_diff(source="refactor_[task]")
-memory_checkout(name="main")
-memory_merge(source="refactor_[task]")  # default strategy: branch wins on conflicts
-memory_branch_delete(name="refactor_[task]")
-```
+**Anti-pattern to avoid:** Storing "current bug is X" as working memory, then later finding out it's Y, but keeping both. The stale "bug is X" memory will keep surfacing and misleading future retrieval.
 
-## Pattern 3: A/B Memory Comparison
+## 🟡 Correction workflow (prefer correct over store+purge)
+When the user contradicts a previously stored fact:
+1. **Always use `memory_correct`** — not `memory_store` + `memory_purge`. This preserves the audit trail.
+2. **Prefer query-based correction**: `memory_correct(query="formatting tool", new_content="Uses ruff for formatting", reason="switched from black")` — no need to look up memory_id first.
+3. **Only use `memory_purge`** when the user explicitly asks to forget something entirely, not when updating a fact.
 
-Two branches for competing approaches, diff both before deciding.
+## 🟡 Deduplication before storing
+Before storing a new memory, consider:
+- Did `memory_retrieve` at conversation start already return a similar fact? → skip or `memory_correct` instead
+- Is this a refinement of something already stored? → use `memory_correct` with the original as query
+- When in doubt, `memory_search` with the key phrase first — if a match exists, correct it rather than creating a duplicate
 
-```
-memory_branch(name="approach_a")
-memory_branch(name="approach_b")
+## Tool reference
 
-# Work on A
-memory_checkout(name="approach_a")
-memory_store(content="Approach A: [details]", memory_type="semantic")
+### Write tools
+| Tool | When to use | Key params |
+|------|-------------|------------|
+| `memory_store` | User shares a fact, preference, or decision | `content`, `memory_type` (default: semantic), `session_id` (optional) |
+| `memory_correct` | User says a stored memory is wrong | `memory_id` or `query` (one required), `new_content`, `reason` |
+| `memory_purge` | User asks to forget something | `memory_id` (single or comma-separated batch, e.g. `"id1,id2"`) or `topic` (bulk keyword match), `reason` |
 
-# Work on B
-memory_checkout(name="approach_b")
-memory_store(content="Approach B: [details]", memory_type="semantic")
 
-# Compare
-memory_diff(source="approach_a")
-memory_diff(source="approach_b")
-
-# Merge winner, delete both
-memory_checkout(name="main")
-memory_merge(source="approach_a")  # default strategy: branch wins on conflicts
-memory_branch_delete(name="approach_a")
-memory_branch_delete(name="approach_b")
-```
-
-## Pattern 4: Selective Apply
-
-When only part of a branch should land on `main`, or you want conflict-by-conflict control, prefer `memory_apply` over merging the whole branch.
-
-```
-memory_diff(source="experiment_notes")
-
-# Promote only the selected changes
-memory_apply(
-  source="experiment_notes",
-  adds=["mem_new_1"],
-  updates=[{"old_id": "mem_old_1", "new_id": "mem_new_1"}],
-  removes=["mem_delete_1"],
-  accept_branch_conflicts=["mem_conflict_1"]
-)
-```
-
-Rules:
-- Omit an item from `adds` / `updates` / `removes` to leave `main` unchanged for that item.
-- Omit a conflict from `accept_branch_conflicts` to keep the `main` version.
-- Use `memory_merge` only when the entire branch should land together.
-
-## When to Branch
-
-- ✅ Evaluating a technology, framework, or architecture change
-- ✅ About to bulk-correct or purge many memories
-- ✅ User says "let's try something different" or "what if we..."
-- ✅ Exploring a hypothesis that might be wrong
-- ❌ Simple fact storage — just use main
-- ❌ Quick corrections — use `memory_correct` directly
-
-## Naming Convention
-
-- `eval_[thing]` — technology/approach evaluation
-- `refactor_[task]` — risky memory restructuring
-- `goal_[name]_iter_[N]` — goal iteration (see goal-driven-evolution)
-- `experiment_[topic]` — open-ended exploration
-
-## Cleanup
-
-Always delete branches after merge or abandonment. Check with `memory_branches()` periodically. Stale branches waste cognitive overhead when listed.
-
-## Merge Strategies
-
-- `replace` (default, also called `accept`): branch wins on conflicts — if the same memory exists on both main and branch, the branch version replaces main's
-- `append`: skip-on-conflict — only adds new memories from branch, never overwrites existing main memories
-
-Use `replace` when the branch contains validated corrections. Use `append` when the branch only adds new information and you want to preserve main's existing state. If you only want part of a branch, use `memory_apply` instead of either merge strategy.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [matrixorigin/memoria](https://github.com/matrixorigin/memoria) — distributed by [TomeVault](https://tomevault.io).
