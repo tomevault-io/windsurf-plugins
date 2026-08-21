@@ -7,11 +7,11 @@ Kun Visual Novel infrastructures, oauth service, image service, moderation servi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [KunMoe/kun-galgame-infra](https://github.com/KunMoe/kun-galgame-infra).
+Original source: `AGENTS.md` in [KunMoe/kun-galgame-infra](https://github.com/KunMoe/kun-galgame-infra).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
