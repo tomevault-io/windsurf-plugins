@@ -1,40 +1,41 @@
 ---
 trigger: always_on
-description: Orchestrator/executor split - this agent drafts task books and dispatches them to the local `grok` CLI as executor; only critical, error-prone steps are executed directly
+description: 1. **No background gradients in any UI, ever.** Never use gradient backgrounds in UI design (`bg-gradient-*`, `from-*/via-*/to-*`, `linear-gradient()`, `radial-gradient()`, `conic-gradient()`, etc.); use solid colors from the project's palette.
 ---
 
+# Project Guidelines
 
-# Grok-as-executor dispatch mode
+## 铁律 (Iron Rules — non-negotiable; these override every other guideline in this file)
 
-The agent in this session is the **orchestrator** (task-book author + acceptor). Implementation and investigation work is dispatched to the locally installed `grok` CLI (Grok Build) as the **executor subagent**. Do NOT use Cursor's built-in Task subagents for execution work; use `grok`.
+1. **No background gradients in any UI, ever.** Never use gradient backgrounds in UI design (`bg-gradient-*`, `from-*/via-*/to-*`, `linear-gradient()`, `radial-gradient()`, `conic-gradient()`, etc.); use solid colors from the project's palette.
+2. **Prefer KunUI components; do not modify KunUI itself.** When adding or changing frontend UI, reach for a KunUI component (`@kungal/ui-*`) first — do not hand-roll a native/custom component unless there is genuinely no KunUI equivalent for what you need. If KunUI appears to have a bug or is missing a feature, **do not edit KunUI's code** (it is a shared upstream library) — report it to the user directly instead, and let them decide how to proceed.
 
-## How to dispatch
 
-1. Write a self-contained task book to `/tmp/<task-slug>.md`, then run from the repo root, in the background:
+## Core Engineering Principles
 
-```bash
-grok --prompt-file /tmp/<task-slug>.md --output-format plain --max-turns 200 \
-  > /tmp/<task-slug>-report.md 2>/tmp/<task-slug>-stderr.log
-```
+> Shared baseline across all KUN Galgame repositories. Defaults, not dogma — apply judgment.
 
-2. Headless default permissions allow file reads and read-only shell without approval; write control rides on the task book's discipline section plus your post-run checks. For risky tasks add `--permission-mode` / `--sandbox`.
-3. Never run two grok dispatches concurrently on overlapping paths — one writer per path. Sequential dispatches only.
+1. All commit messages must be written entirely in English.
+2. Comments are governed by the **Comments** section below — the default is none, and what survives is written in English.
+3. Keep each source file under ~500 lines where practical; once a file grows past ~300 lines, consider splitting it (a guideline, not a hard rule).
+4. Write every frontend function as an arrow function; compose/merge class names with `cn` wherever practical.
+5. Deliberately balance elegant modularity against necessary duplication — choose per case instead of always favoring either.
+6. Constantly verify that frontend and backend agree on the data: field shapes and response formats must match what each side expects.
+7. After every change, watch for unintended side effects elsewhere.
+8. If a change requires running a migration, tell the user explicitly at the end — which command, and against which database.
+9. Always seek the most modern, elegant solution that fits the project's current state; consult the latest official docs and resources online when useful.
+10. Never let the pursuit of elegance or modularity make the code complex or hard to follow, and don't write over-defensive code.
+11. A Nuxt page — and any component used as a page/route root — must have a **single real root element**: never `display: contents` (generates no box, so the transition can't attach) and never a leading comment / whitespace / sibling at the template root (a comment is itself a root node). Either trips Nuxt's "does not have a single root node" warning and drops the page-transition enter animation (the page appears without animating). Keep explanatory comments *inside* the root element.
+12. Reserve the scrollbar gutter globally — `html { scrollbar-gutter: stable }`, with an `overflow-y: scroll` `@supports` fallback — so the document width is constant across routes. Otherwise navigating from a scrolling page to a height-locked one (no scrollbar) removes the classic scrollbar's ~15px and the centered layout shifts sideways: a "teleport" at the tail of the page transition. This is a browser layout fact, not a transition bug. Use single-edge `stable` (`both-edges` is buggy in Chrome); it's a harmless no-op under overlay scrollbars (macOS/iOS).
+13. **One task = one session, and every path has exactly one writer.** Parallel work is allowed only when the user assigns non-overlapping writable paths or system domains. Never rewrite shared Git state a peer may be standing on: on a shared checkout, no branch switch, reset, rebase, merge, cherry-pick, clean, stash or prune. Before editing, record the branch, HEAD, verified `origin/main`, dirty paths and your owned paths, and preserve every foreign change; commit with explicit paths (`git commit -- <paths>`), never `add -A` and never a repository-wide commit. An isolated worktree is the safer default for a long wave — base it explicitly on `origin/main`, not on a local branch that may be holding someone's unpushed work.
+14. **Every DB-backed track gets its own test database.** Use the track-specific `TEST_DATABASE_DSN` placed in that session's process environment; if none is assigned, self-provision a throwaway one with `scripts/ephemeral-test-db.sh create <slug>` and drop it with the same script when the session's DB work ends (`sweep` clears leftovers from dead sessions). Never discover or fall back to a DSN from `.env`, and never put a password in a DSN or print one — the ephemeral script's DSN is credential-free by design (auth rides `~/.pgpass`). Give concurrently running services unique ports, and never stop a process whose owner is unknown. Keep `GOMAXPROCS=8` and run DB integration suites with `-count=1 -p 1`. `kun_catalog` is always read-only; `kun_catalog_rehearsal` belongs only to the explicitly assigned rehearsal/aggregation track and is never a general test target.
 
-## Task book requirements (what makes executors perform well)
+## Comments
 
-- **Write it in English** — executors follow English task books more reliably.
-- Self-contained: the executor sees nothing of this conversation. State repo path, branch, HEAD, where the code lives, and every relevant prior decision inline.
-- Explicit scope AND out-of-scope lists; named acceptance criteria (test names, commands with expected output); a required report structure.
-- All design adjudications are made by the orchestrator in the task book — never delegate an open design decision to the executor. If mechanics genuinely depend on code details, state the invariant to enforce plus the precedent to follow, and require the executor to report the chosen mechanics for acceptance.
-- A discipline section: writable paths (exact), forbidden operations (git add/commit/checkout/reset/stash, DB access unless a DSN is explicitly provided, starting services), and "report, don't work around" for anything unexpected.
+**Default: none.** Code that can be understood by reading it gets no comment. Most code is that code.
 
-## What the orchestrator never delegates
 
-- Task-book adjudications and scope calls.
-- Git commits (explicit paths only), pushes, PRs, and anything touching shared git state.
-- Database provisioning (`scripts/ephemeral-test-db.sh create <slug>`; pass the DSN into the grok dispatch env; `drop` it when done) and all migrations.
-- Cross-repo docs sync (`../kungal-docs` `docs:sync --write` + `docs:audit`) and production operations.
-- Final acceptance: after every dispatch run `git status --porcelain` (only expected paths changed), spot-check the report's highest-stakes claims against the code, and independently re-run the tests/gates for write tasks. Trust the report's structure, verify its conclusions.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [KunMoe/kun-galgame-infra](https://github.com/KunMoe/kun-galgame-infra) — distributed by [TomeVault](https://tomevault.io).
