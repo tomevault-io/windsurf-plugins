@@ -1,0 +1,62 @@
+---
+trigger: always_on
+description: Session memory for SQL Editor — FoxScript spine + notebook cells (main ≥0.1.100)
+---
+
+
+# SQL Editor agent memory (main ≥ 0.1.100)
+
+Base: `main` · Feature merge: PR #121 (`feat/sql-editor-data-peek-and-sql-bridge`) · Blank-page harden: PR #120
+
+## Product context
+FoxSchema = schema diff/migration + SQL Editor. Destinations checklist, Schema explorer, Monaco, code cells (`-- @js` / `-- @ts` / `-- @node` / `-- @nodets`), table blueprint, bookmarks/samples.
+
+## FoxScript (language spine)
+- **Language id**: prefer Monaco `foxscript` (legacy alias `foxschema-sql` still registered). Both share one Monarch fence tokenizer.
+- **AST**: `packages/core/.../foxscript-ast.ts` — `parseFoxScript` / `compileFoxScriptPlan` compose `splitSqlStatements` + `checkStatement` (no second scanner).
+- **Web cache**: `apps/web/.../sql-splitter.ts` LRU-wraps `parseFoxScript` (same idea as split cache). IDE paths must import from the web facade, not `@foxschema/core` directly.
+- **One-parse decorate**: `SqlEditorPane` parses once per tick and passes the doc into markers + virtual docs; glyphs use `doc.blocks[].status`.
+- **Virtual docs**: update models in place (`setValue`) — do not dispose/recreate on every keystroke.
+- **Markers**: `foxscriptDiagnostics.ts` → `setModelMarkers` (missing `@end`, missing `return`, incomplete SQL).
+- **Semantic tokens**: `foxscriptSemanticTokens.ts` — table/column names from `schemaCache` in SQL blocks only; call `refreshFoxscriptSemanticTokens` when cache changes.
+- **Execution**: still maps to existing `execute` / statement text. Do **not** replace the runner with a plan interpreter unless behavior-preserving. Deferred: `@python`, “never execute raw source”.
+- **Monarch flag**: module-local ready flag only — never write onto Monaco ESM exports.
+
+## New in 0.1.100+ (learn these)
+
+### Notebook-style cells (Monaco + strip)
+- **One Monaco buffer** still; `splitSqlStatements` defines cells.
+- **Cell banding** in Monaco: `.fox-cell-band-sql` / `.fox-cell-band-code` + left edge.
+- **Statement strip**: Jupyter-like `In [n]:`, kind badge, per-cell **▶** → `execute({ statementIndices: [i] })`.
+- Toolbar Run still uses strip checkboxes / selection; per-cell Play ignores both.
+- Results labels: `Out [n]: …` (`sql-result-stmt-${i}` in side-by-side; By cred stacks Out grids vertically per credential).
+- Password / Safe-mode confirm preserve `statementIndices` on resume.
+
+### 1. Data peek (Cmd/Ctrl-click + result FK)
+- **UI**: `DataPeekPanel.tsx` — modal grids; Esc closes. Each panel: WHERE / ORDER BY / LIMIT (debounced auto-apply + blur/Enter/Apply) + drag resize + arrange grip. Mounted from `SqlEditorView` (not only Schema).
+- **Index fragmentation (Edit table)**: `dialect-index-fragmentation.ts` + `POST /schema/index-fragmentation`; shown on `TableBlueprintModal` index rows. **Every dialect** has a default probe (`query: true`) — physical where available, otherwise estimated / catalog listing (null %). Custom SELECT fallback (`index_name`, `fragmentation_percent`). Defrag SQL via wrench (REBUILD / REORG / OPTIMIZE / REINDEX / VACUUM by dialect).
+- **Utilities → Index Management**: SQL Editor left sidebar **Utilities** section → `IndexManagementModal` (not toolbar). Credential dropdown, indexes grouped by table, filter table/%, `POST /schema/index-fragmentation-batch`, defragment selected or filtered via `executeSql`.
+- **Edit index inline**: `TableBlueprintModal` opens the index form under the selected existing/pending index (or an Add-index row) and scrolls it into view — not a form stuck at the section bottom.
+- **Clone Table (archive & recreate)**: Utilities sidebar + Schema **Clone** → `CloneTableModal`. SQL in `generateCloneTableSql` / `nextArchiveTableName` / `generateRenameTableSql` (`tableBlueprintSql.ts`): rename live → `name_N`, free schema-unique index/FK names on archive when needed, `CREATE TABLE` empty live twin, optional indexes + outbound FKs. Inbound FKs stay on archive (warned in UI).
+- **Triggers**:
+  - Schema explorer Cmd/Ctrl-click TABLE / VIEW / MQT → `openDataPeek`.
+  - Editor result FK cell (rust underline) → `openDataPeekFromFk` (`ResultsPanel` / `foreignKeyLinksForSql`).
+- **Queries**: `tablePreview.ts` — `buildTablePreview`, `buildForeignKeyDrilldown`, `composePeekSql`, `foreignKeyLinksFor` / `foreignKeyLinksForSql` / `tablesFromSql`.
+- **Drill**: FK cell → `drillDataPeek` stacks panels (`drillKey` siblings); use **row index**.
+- **Store**: `dataPeek` / `openDataPeek` / `openDataPeekFromFk` / `drillDataPeek` / `updateDataPeekFilters` / `pageDataPeekEntry` / `reorderDataPeekEntries` / `setDataPeekPanelHeight` / close APIs.
+- **FK color**: `--fox-grid-link` rust `#9a3412` + solid underline.
+- Match drilled table names both qualified and bare against schema cache.
+
+### 2. Node `sql` bridge (`-- @node` / `-- @nodets`)
+**Design**: worker has **no DB handle**. Cell calls `sql\`...\``; worker renders to `{ text, params }` and posts `cell-query` to the API parent; parent runs SQL and replies `cell-query-result`.
+
+| Piece | Role |
+| --- | --- |
+| `packages/core/.../sql-template.ts` | `sqlTag`, `renderSqlQuery`, placeholders (`$n` / `?` / `:n`), `sql.id` / `sql.values` / `sql.list` / `sql.raw` |
+| `code-cell-bridge.ts` | Message protocol + `MAX_CELL_QUERY_ROWS` (10_000) |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [tedious-code/foxschema](https://github.com/tedious-code/foxschema) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-20 -->
