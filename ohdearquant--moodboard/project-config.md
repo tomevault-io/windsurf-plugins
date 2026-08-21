@@ -1,0 +1,101 @@
+---
+trigger: always_on
+description: Instructions for coding agents (and new human contributors) working in this repository.
+---
+
+# Agent guide
+
+Instructions for coding agents (and new human contributors) working in this repository.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) carries the full build and test detail; this file is the
+short contract an agent must not break. If the two ever disagree, one of them is stale, and
+the fix is a pull request that makes them agree, not a silent local interpretation.
+
+## What this repository is
+
+Two artifacts, joined by a file. A Python engine under `moodboard/` builds a reference board
+from images, ranks candidates against it, and writes a closed JSON report. A TypeScript/React
+viewer under `viewer/` renders that report as one self-contained offline HTML file. The report
+is the only boundary between them ([ADR-0001](docs/adr/0001-engine-and-viewer-split.md)); the
+viewer never recomputes a score and never fetches anything at runtime.
+
+## Rules that bind every change
+
+1. **A claim lands in the README only after the artifact that reproduces it lands in the
+   repository.** This is the project's standing rule. Do not write "supports", "validated",
+   or a number into any document without the test, fixture, or recorded run that produces it.
+
+2. **Recorded measurements are immutable** ([ADR-0009](docs/adr/0009-measurement-and-evaluation-contract.md)).
+   A published value is bound to the revision that produced it. If the code changes, produce a
+   new measurement under the new revision; never edit an existing one to match.
+
+3. **Keep the numbers meaning what they mean.** Conformal p-values are board-relative
+   exchangeability statements, not aesthetic quality and not an approval probability.
+   Retrieval cosine is a retrieval similarity in `[-1, 1]`, never a substitute for the
+   conformal score. Preference-replay outputs are model snapshots on frozen probes, not human
+   preference. Do not collapse these into one number, in code or in prose.
+
+4. **Abstention is a first-class output, not an error path**
+   ([ADR-0004](docs/adr/0004-abstention.md)). When the engine cannot score, it says so in the
+   report. Do not convert an abstention into a default value to make a test pass.
+
+5. **Fail-closed stays fail-closed.** The Khive/Lattice path rejects malformed, partial,
+   drifting, non-finite, wrongly dimensioned, or non-unit results. Report readers refuse
+   unknown schema versions before interpreting content. Resource ceilings (report file size,
+   ingest byte budgets, pixel bounds) reject rather than truncate. A change that turns any
+   refusal into a warning or a fallback needs its own decision record, not a code review nit.
+
+6. **Frozen policy is frozen.** `build` writes the complete scoring policy into the board
+   artifact; `rank` consumes the stored policy. Editing `eval/thresholds.json` must never
+   move an existing board's scores. Do not add a path that lets it.
+
+## Build and test
+
+Engine (offline, no network, no model weights):
+
+```bash
+uv sync --locked
+uv run pytest -q -rA
+uv run ruff check .
+```
+
+Viewer:
+
+```bash
+npm --prefix viewer ci
+npm --prefix viewer run test:ci
+```
+
+CI runs the lint job and the full pytest suite on Python 3.11 and 3.13, rebuilds the viewer
+from locked inputs, and fails if the committed `viewer/dist-static` is not byte-identical to
+the fresh build. So: **if your change affects viewer output, run `npm --prefix viewer run
+build` and commit the resulting `viewer/dist-static` changes in the same pull request.**
+
+Real-integration tests (`tests/test_khive_real.py`) are opt-in via the environment gates
+documented in `CONTRIBUTING.md`. The ordinary suite uses a fake executable; never make an
+ordinary test depend on a real `kkernel`, a model checkpoint, or the network.
+
+## Generated files: regenerate, never hand-edit
+
+| Path | Regenerate with |
+|---|---|
+| `viewer/src/generated/report-validators.mjs` | `npm --prefix viewer run validators:write` |
+| `viewer/src/generated/report-validators.d.mts` | edited alongside the generator; `validators:write` does not emit it |
+| `viewer/src/generated/pixel-rag-bridge.json` | `npm --prefix viewer run pixel-rag:write -- --input <artifact.json> --manifest <manifest.json> --write src/generated/pixel-rag-bridge.json` (full form: `docs/pixel-rag.md`) |
+| `viewer/src/generated/preference-replay-bridge.json` | `npm --prefix viewer run preference-replay:write -- --input <replay.json> --features <features.json> --write src/generated/preference-replay-bridge.json` (full form: `docs/demo-preference.md`) |
+| `viewer/src/generated/firefly-bridge.json` | `uv run python eval/showcase_firefly_projection.py --write <fresh path>` — needs recorded-run inputs; see note below |
+| `viewer/dist-static/` | `npm --prefix viewer run build` |
+| `moodboard/viewer_dist/` | staged by the viewer build; never edited directly |
+
+The viewer build (`npm --prefix viewer run build`, which CI runs) verifies
+`report-validators.mjs`, the Firefly bridge, and the preference-replay bridge through their
+`*:check` scripts, and CI separately rejects any drift in `viewer/dist-static`. Two artifacts
+are not check-gated today: `pixel-rag-bridge.json` has a `pixel-rag:check` script that nothing
+invokes, and `report-validators.d.mts` has no drift check at all — hand edits there are
+unprotected, so verify those two yourself.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ohdearquant/moodboard](https://github.com/ohdearquant/moodboard) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-20 -->
