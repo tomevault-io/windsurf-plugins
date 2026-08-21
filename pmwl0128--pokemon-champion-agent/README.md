@@ -7,11 +7,11 @@ Pokémon Champions Agent Skills set for battle dex, metagame data, exact damage/
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [pmwl0128/pokemon_champion_agent](https://github.com/pmwl0128/pokemon_champion_agent).
+Original source: `AGENTS.md` in [pmwl0128/pokemon_champion_agent](https://github.com/pmwl0128/pokemon_champion_agent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
