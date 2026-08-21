@@ -1,70 +1,168 @@
 ---
 trigger: always_on
-description: Read before writing or modifying any code:
+description: Apply when user asks to scaffold, create, or add a new feature.
 ---
 
-# FlutterAgentic — GitHub Copilot Instructions
 
-## Documentation Index
+If the feature name was not provided, ask:
+"What is the feature name? (e.g. `products`, `auth`, `settings`)"
 
-Read before writing or modifying any code:
-- `docs/reference/architecture.md` — core folder map, layer patterns, naming, DI, error flow, design system, testing
-- `docs/explanation/end-goal.md` — project vision and guiding principles
+`{Feature}` = PascalCase · `{feature}` = snake_case · `{Action}` = PascalCase verb · `{action}` = snake_case verb (e.g. `GetProducts` / `get_products`)
 
-Read on demand:
-- `docs/how-to/contributing.md` — contributor workflow and git hooks
-- `docs/how-to/add-feature-template.md` — full folder tree, empty class skeletons, DI wiring, and forbidden-pattern checklist for scaffolding a new feature
-- `docs/how-to/add-usecase.md` — create a use case class and register it in `injection_container.dart`
-- `docs/how-to/design-screen-state.md` — business-logic naming for events and states, retry context rules, screen rendering pattern; use the jokes feature as the reference
-- `docs/how-to/review-code.md` — when asked to review, audit, or check generated code; run through the full checklist and report ✅/❌ per section
-- `docs/how-to/change-app-id.md` — when asked to change the application ID or bundle identifier; covers Android (`build.gradle.kts` + `MainActivity.kt` package path) and iOS (`project.pbxproj`), with Xcode manual steps and provisioning notes
-- `docs/how-to/rename-app.md` — when asked to rename the app; covers display name, package name, and all files that reference the old name
-- `docs/how-to/connect-firebase.md` — when connecting an app to Firebase; covers checking/installing the Firebase + FlutterFire CLIs, running `flutterfire configure`, per-app `firebase_core`, `main.dart` init, Android Gradle plugin, iOS deployment target (15.0+), and the Xcode `GoogleService-Info.plist` registration check
-- `docs/explanation/ai-agents.md` — per-agent install and usage
-- **Release workflow** — when asked to do a release, follow these steps interactively; ask for confirmation at each step before proceeding:
-  1. Load `GH_TOKEN` from the git-ignored root `.env` (`set -a && . ./.env && set +a`) — release auth is explicit because the repo uses multiple GitHub accounts — then check `gh auth status` reports `(GH_TOKEN)`. Source `.env` in every shell that runs `gh`. If `.env` lacks a token, create a fine-grained PAT (Contents: Read and write) at https://github.com/settings/personal-access-tokens/new and add `GH_TOKEN=…`. Stop if not ready. If `gh auth status` reports the token as invalid, confirm the shell has network access before replacing it — in a sandboxed agent environment, blocked network access can surface as an auth failure; re-run with network permission and `.env` sourced first.
-  2. Get current branch (`git branch --show-current`). Confirm release branch with user.
-  3. Compare to main: `git log main..{BRANCH} --oneline` + `git diff main..{BRANCH} --stat`. Show commits.
-  4. Read version (`grep "^version:" pubspec.yaml`). Propose bump: Major = breaking; Minor = feat: or new component/skill; Patch = fix/chore/docs. Wait for confirmation.
-  5. Edit `pubspec.yaml` with confirmed version.
-  6. Create `docs/releases/v{VERSION}.md` from `docs/releases/_template.md`. Two sections: **Features** (what developers gain) and **Agent Context Improvements** (what agents gain). Plain language, one sentence per bullet, no duplicates. Show draft and wait for confirmation.
-  7. Commit: `git add pubspec.yaml docs/releases/v{VERSION}.md && git commit -m "chore: release v{VERSION}" && git push`
-  8. Merge: `git checkout main && git pull origin main && git merge --no-ff {BRANCH} -m "chore: merge {BRANCH} into main for v{VERSION}" && git push origin main`
-  9. Tag and release: `git tag v{VERSION} && git push origin v{VERSION}` then `gh release create v{VERSION} --title "v{VERSION} — {TITLE}" --notes-file docs/releases/v{VERSION}.md --target main`. Report URL.
-  10. Ask to delete release branch. If yes: `git branch -d {BRANCH} && git push origin --delete {BRANCH}`
-- `docs/tutorials/solid-principles.md` — how SOLID principles are applied across all layers; useful when designing new classes or reviewing layer boundaries
-- `docs/tutorials/design-patterns-and-concepts.md` — design patterns used in this codebase (Singleton, Repository, DTO, Either, Sealed Classes, Strategy, and more)
+Scaffold only — do NOT create entity, model, or use case files.
+BLoCs are never registered in GetIt.
+Imports: core types -> `package:core/core/...`; app-level di/constants -> `package:{app}/...`; same-feature files -> relative. Never the old single-app `package:flutter_agentic/...`.
+Run `make gen` and `make analyze` at the end before reporting done.
 
 ---
 
-## Monorepo Layout
+## 1. Folder tree
 
-Dart pub-workspace monorepo: one shared `core` package consumed by multiple Flutter apps.
-
-```
-packages/core/   shared toolbelt → import 'package:core/core/…'   (no app-specific code)
-apps/jokes/      demo app          apps/doc_scanner/  request/response app
-apps/ai_chat/    streaming app
-```
-
-One `flutter pub get` at the repo root resolves all packages; editing `core` is live in any running app. Each app owns its `main.dart`, `app.dart`, `di/injection_container.dart`, `constants/` (`ValueConst`/`ApiConstants`), and `feature/home/`; `core` holds only `CoreConst`. Run `make` targets from the repo root; run an app from its folder (`apps/<app>`).
-
----
-
-## Architecture
-
-Feature-first Clean Architecture. Three layers per feature, strict dependency rule:
-
-```
-presentation  →  domain  ←  data
+```bash
+mkdir -p apps/{app}/lib/feature/{feature}/data/data_source
+mkdir -p apps/{app}/lib/feature/{feature}/data/models
+mkdir -p apps/{app}/lib/feature/{feature}/data/repository_impl
+mkdir -p apps/{app}/lib/feature/{feature}/domain/entities
+mkdir -p apps/{app}/lib/feature/{feature}/domain/repository
+mkdir -p apps/{app}/lib/feature/{feature}/domain/usecase
+mkdir -p apps/{app}/lib/feature/{feature}/presentation/bloc
+mkdir -p apps/{app}/lib/feature/{feature}/presentation/view
+mkdir -p apps/{app}/lib/feature/{feature}/presentation/widgets
 ```
 
-- `domain/` — zero imports from Flutter, Dio, or BLoC
-- `data/` — zero imports from BLoC or UI packages
-- `presentation/` — zero imports from Dio
+## 2. Domain — repository interface
 
-State: `flutter_bloc` with `@freezed` sealed events/states — always use exhaustive `switch` in builders, never `if (state is X)`.
+`apps/{app}/lib/feature/{feature}/domain/repository/{feature}_repository.dart`
+```dart
+abstract interface class {Feature}Repository {}
+```
 
+## 3. Data — remote data source
+
+`{feature}_remote_data_source.dart`
+```dart
+abstract interface class {Feature}RemoteDataSource {}
+```
+
+`{feature}_remote_data_source_impl.dart`
+```dart
+import '{feature}_remote_data_source.dart';
+
+// const no-arg; reaches the network via HttpService.instance (from core),
+// e.g. HttpService.instance.get<Map<String, dynamic>>(ApiConstants.someUrl).
+class {Feature}RemoteDataSourceImpl implements {Feature}RemoteDataSource {
+  const {Feature}RemoteDataSourceImpl();
+}
+```
+
+## 4. Data — repository impl
+
+`apps/{app}/lib/feature/{feature}/data/repository_impl/{feature}_repository_impl.dart`
+```dart
+import 'package:core/core/base/base_repository.dart';
+import '../../domain/repository/{feature}_repository.dart';
+import '../data_source/{feature}_remote_data_source.dart';
+
+class {Feature}RepositoryImpl with BaseRepository implements {Feature}Repository {
+  final {Feature}RemoteDataSource _dataSource;
+  const {Feature}RepositoryImpl(this._dataSource);
+}
+```
+
+## 5. Presentation — BLoC
+
+`{feature}_event.dart`
+```dart
+part of '{feature}_bloc.dart';
+
+@freezed
+sealed class {Feature}Event with _${Feature}Event {
+  const factory {Feature}Event.started() = {Feature}Started; // auto-dispatched on creation
+}
+```
+
+`{feature}_state.dart`
+```dart
+part of '{feature}_bloc.dart';
+
+@freezed
+sealed class {Feature}State with _${Feature}State {
+  const factory {Feature}State.loading()                        = {Feature}Loading;
+  const factory {Feature}State.loaded()                         = {Feature}Loaded;
+  const factory {Feature}State.error({required String message}) = {Feature}Error;
+}
+```
+
+`{feature}_bloc.dart`
+```dart
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part '{feature}_bloc.freezed.dart';
+part '{feature}_event.dart';
+part '{feature}_state.dart';
+
+class {Feature}Bloc extends Bloc<{Feature}Event, {Feature}State> {
+  {Feature}Bloc() : super(const {Feature}State.loading()) {
+    on<{Feature}Started>(_onStarted);
+  }
+
+  Future<void> _onStarted({Feature}Started event, Emitter<{Feature}State> emit) async {
+    // TODO: inject use case, call it, fold the Either
+    emit(const {Feature}State.loaded());
+  }
+}
+```
+
+## 6. Presentation — page
+
+`apps/{app}/lib/feature/{feature}/presentation/view/{feature}_page.dart`
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:core/core/base/base_page.dart';
+import 'package:{app}/constants/value_const.dart';
+import 'package:{app}/di/injection_container.dart';
+import 'package:core/core/ui/atoms/top_bar.dart';
+import '../bloc/{feature}_bloc.dart';
+import '{feature}_screen.dart';
+
+class {Feature}Page extends BasePage {
+  const {Feature}Page({super.key});
+  @override
+  State<{Feature}Page> createState() => _{Feature}PageState();
+}
+
+class _{Feature}PageState extends BasePageState<{Feature}Page> {
+  @override
+  PreferredSizeWidget buildAppBar(BuildContext context) =>
+      AppTopBar.primary(title: ValueConst.{feature}AppBarTitle);
+
+  // BLoC scoped to the screen; cascade dispatches started immediately
+  @override
+  Widget buildBody(BuildContext context) => BlocProvider(
+    create: (_) => {Feature}Bloc({action}UseCase: sl())..add(const {Feature}Event.started()),
+    child: const {Feature}Screen(),
+  );
+}
+```
+
+> If the AppBar also reads the BLoC, move the provider into `buildBlocProviders` instead.
+
+## 7. Presentation — screen
+
+`apps/{app}/lib/feature/{feature}/presentation/view/{feature}_screen.dart`
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:core/core/base/base_screen.dart';
+import 'package:core/core/ui/atoms/loading_indicator.dart';
+import 'package:core/core/ui/molecules/error_view.dart';
+import '../bloc/{feature}_bloc.dart';
+
+class {Feature}Screen extends BaseScreen {
+  const {Feature}Screen({super.key});
+  @override
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
