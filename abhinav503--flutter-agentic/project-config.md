@@ -1,0 +1,73 @@
+---
+trigger: always_on
+description: Read before writing or modifying any code:
+---
+
+# FlutterAgentic — GitHub Copilot Instructions
+
+## Documentation Index
+
+Read before writing or modifying any code:
+- `docs/reference/architecture.md` — core folder map, layer patterns, naming, DI, error flow, design system, testing
+- `docs/explanation/end-goal.md` — project vision and guiding principles
+
+Read on demand:
+- `docs/how-to/contributing.md` — contributor workflow and git hooks
+- `docs/how-to/add-feature-template.md` — full folder tree, empty class skeletons, DI wiring, and forbidden-pattern checklist for scaffolding a new feature
+- `docs/how-to/add-usecase.md` — create a use case class and register it in `injection_container.dart`
+- `docs/how-to/design-screen-state.md` — business-logic naming for events and states, retry context rules, screen rendering pattern; use the jokes feature as the reference
+- `docs/how-to/review-code.md` — when asked to review, audit, or check generated code; run through the full checklist and report ✅/❌ per section
+- `docs/how-to/change-app-id.md` — when asked to change the application ID or bundle identifier; covers Android (`build.gradle.kts` + `MainActivity.kt` package path) and iOS (`project.pbxproj`), with Xcode manual steps and provisioning notes
+- `docs/how-to/rename-app.md` — when asked to rename the app; covers display name, package name, and all files that reference the old name
+- `docs/how-to/connect-firebase.md` — when connecting an app to Firebase; covers checking/installing the Firebase + FlutterFire CLIs, running `flutterfire configure`, per-app `firebase_core`, `main.dart` init, Android Gradle plugin, iOS deployment target (15.0+), and the Xcode `GoogleService-Info.plist` registration check
+- `docs/explanation/ai-agents.md` — per-agent install and usage
+- **Release workflow** — when asked to do a release, follow these steps interactively; ask for confirmation at each step before proceeding:
+  1. Load `GH_TOKEN` from the git-ignored root `.env` (`set -a && . ./.env && set +a`) — release auth is explicit because the repo uses multiple GitHub accounts — then check `gh auth status` reports `(GH_TOKEN)`. Source `.env` in every shell that runs `gh`. If `.env` lacks a token, create a fine-grained PAT (Contents: Read and write) at https://github.com/settings/personal-access-tokens/new and add `GH_TOKEN=…`. Stop if not ready. If `gh auth status` reports the token as invalid, confirm the shell has network access before replacing it — in a sandboxed agent environment, blocked network access can surface as an auth failure; re-run with network permission and `.env` sourced first.
+  2. Get current branch (`git branch --show-current`). Confirm release branch with user.
+  3. Compare to main: `git log main..{BRANCH} --oneline` + `git diff main..{BRANCH} --stat`. Show commits.
+  4. Read version (`grep "^version:" pubspec.yaml`). Propose bump: Major = breaking; Minor = feat: or new component/skill; Patch = fix/chore/docs. Wait for confirmation.
+  5. Edit `pubspec.yaml` with confirmed version.
+  6. Create `docs/releases/v{VERSION}.md` from `docs/releases/_template.md`. Two sections: **Features** (what developers gain) and **Agent Context Improvements** (what agents gain). Plain language, one sentence per bullet, no duplicates. Show draft and wait for confirmation.
+  7. Commit: `git add pubspec.yaml docs/releases/v{VERSION}.md && git commit -m "chore: release v{VERSION}" && git push`
+  8. Merge: `git checkout main && git pull origin main && git merge --no-ff {BRANCH} -m "chore: merge {BRANCH} into main for v{VERSION}" && git push origin main`
+  9. Tag and release: `git tag v{VERSION} && git push origin v{VERSION}` then `gh release create v{VERSION} --title "v{VERSION} — {TITLE}" --notes-file docs/releases/v{VERSION}.md --target main`. Report URL.
+  10. Ask to delete release branch. If yes: `git branch -d {BRANCH} && git push origin --delete {BRANCH}`
+- `docs/tutorials/solid-principles.md` — how SOLID principles are applied across all layers; useful when designing new classes or reviewing layer boundaries
+- `docs/tutorials/design-patterns-and-concepts.md` — design patterns used in this codebase (Singleton, Repository, DTO, Either, Sealed Classes, Strategy, and more)
+
+---
+
+## Monorepo Layout
+
+Dart pub-workspace monorepo: one shared `core` package consumed by multiple Flutter apps.
+
+```
+packages/core/   shared toolbelt → import 'package:core/core/…'   (no app-specific code)
+apps/jokes/      demo app          apps/doc_scanner/  request/response app
+apps/ai_chat/    streaming app
+```
+
+One `flutter pub get` at the repo root resolves all packages; editing `core` is live in any running app. Each app owns its `main.dart`, `app.dart`, `di/injection_container.dart`, `constants/` (`ValueConst`/`ApiConstants`), and `feature/home/`; `core` holds only `CoreConst`. Run `make` targets from the repo root; run an app from its folder (`apps/<app>`).
+
+---
+
+## Architecture
+
+Feature-first Clean Architecture. Three layers per feature, strict dependency rule:
+
+```
+presentation  →  domain  ←  data
+```
+
+- `domain/` — zero imports from Flutter, Dio, or BLoC
+- `data/` — zero imports from BLoC or UI packages
+- `presentation/` — zero imports from Dio
+
+State: `flutter_bloc` with `@freezed` sealed events/states — always use exhaustive `switch` in builders, never `if (state is X)`.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [abhinav503/flutter-agentic](https://github.com/abhinav503/flutter-agentic) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-21 -->
