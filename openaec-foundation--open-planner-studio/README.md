@@ -7,11 +7,11 @@ Open Source Project Planner
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [OpenAEC-Foundation/open-planner-studio](https://github.com/OpenAEC-Foundation/open-planner-studio).
+Original source: `AGENTS.md` in [OpenAEC-Foundation/open-planner-studio](https://github.com/OpenAEC-Foundation/open-planner-studio).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
