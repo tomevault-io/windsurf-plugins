@@ -1,150 +1,133 @@
 ---
 trigger: always_on
-description: SynapseML is an open-source library providing scalable machine learning pipelines
+description: Use this file for repository-wide rules. Human contributors should start with
 ---
 
-# SynapseML Copilot Instructions
+# SynapseML agent guide
 
-SynapseML is an open-source library providing scalable machine learning pipelines
-for Apache Spark. It wraps algorithms (LightGBM, VW, Azure AI Services, ONNX, OpenCV)
-as SparkML-compatible `PipelineStage`s with auto-generated Python bindings.
+Use this file for repository-wide rules. Human contributors should start with
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Architecture
+## Start here
 
-### Module Map
+1. Resolve the target branch (the PR base, not merely the checked-out feature
+   branch), then use the
+   [branch context skill](.github/skills/synapseml-branches/SKILL.md).
+2. Read versions from [build.sbt](build.sbt) and
+   [environment.yml](environment.yml). Do not copy version numbers into this
+   shared guide.
+3. Use the narrowest relevant repository skill:
+   [Scala changes](.github/skills/scala-code/SKILL.md),
+   [local setup](.github/skills/synapseml-local-setup/SKILL.md), and
+   [code review](.github/skills/code-review/SKILL.md).
+4. For requests to make one or more issues or PRs "5/5", "200% ready", or
+   merge-ready, use the
+   [SynapseML PR loop](.github/skills/synapseml-pr-loop/SKILL.md).
 
-| Module | Directory | Purpose |
-|--------|-----------|---------|
-| **core** | `core/` | Foundational transformers, featurizers, IO, codegen, automl, causal inference |
-| **cognitive** | `cognitive/` | Azure AI Services wrappers (OpenAI, Vision, Speech, Text, etc.) |
-| **lightgbm** | `lightgbm/` | LightGBM classifier/regressor/ranker for Spark |
-| **vw** | `vw/` | Vowpal Wabbit integration |
-| **deep-learning** | `deep-learning/` | ONNX Runtime inference |
-| **opencv** | `opencv/` | Image transformations via OpenCV |
+## Non-negotiable rules
 
-All modules depend on `core`. `deep-learning` also depends on `opencv`.
+- Never edit `target/`; generated files are overwritten.
+- Never commit or print credentials, keys, connection strings, or `.env` files.
+- Do not add RDD-based implementations. Use DataFrame/Dataset APIs so code works
+  with Spark Connect and managed Spark modes.
+- Do not rebase or force-push shared port branches.
+- Do not add a hand-written `__init__.py` merely to re-export generated classes;
+  a stale `__all__` can hide public APIs.
+- Keep existing public JVM signatures and serialized parameter shapes unless a
+  breaking change is explicitly approved.
 
-### Directory Layout (same pattern in every module)
+Ask before changing [pipeline.yaml](pipeline.yaml), workflows under
+[`.github/workflows/`](.github/workflows/), release tooling, or dependency
+pins. These changes affect every branch and require CI evidence.
 
+## Branch model
+
+| Branch | Use it for |
+| --- | --- |
+| `master` | Ordinary features, fixes, and repository-wide changes |
+| `spark<version>` port branches | Differences required specifically by that Spark port |
+
+Run `git branch -r` to see which port branches currently exist; this guide does
+not name them, so that adding one does not require editing a file that must stay
+identical on every branch.
+
+Land cross-version changes on `master`; port branches receive them by merging
+`master`. When resolving a port-branch merge:
+
+- keep the branch side only for version-driven differences;
+- take the `master` side for ordinary fixes;
+- combine both when each changed the same file for a different reason.
+
+Reachability is not proof that a sync preserved content. Compare the merge base,
+`master`, and the port branch for every conflicted file, and verify that
+`master` additions remain present.
+
+`AGENTS.md` and [CONTRIBUTING.md](CONTRIBUTING.md) must stay identical across
+branches, so neither may name a Spark, Scala, Java, or Python version, or a path
+containing one. Put branch-only facts in the
+[branch context skill](.github/skills/synapseml-branches/SKILL.md). Every other
+document — [README.md](README.md), the website, and module docs — is free to be
+branch- and version-specific, because nothing requires those to match across
+branches.
+
+## Repository map
+
+| Module | Path | Purpose |
+| --- | --- | --- |
+| Core | [`core/`](core/) | SparkML foundations, IO, codegen, AutoML, causal and exploratory tools |
+| Cognitive | [`cognitive/`](cognitive/) | Azure AI and OpenAI service stages |
+| LightGBM | [`lightgbm/`](lightgbm/) | Distributed classifier, regressor, and ranker |
+| Vowpal Wabbit | [`vw/`](vw/) | VW integration |
+| Deep learning | [`deep-learning/`](deep-learning/) | ONNX Runtime inference |
+| OpenCV | [`opencv/`](opencv/) | Image transformations |
+
+All modules depend on `core`; `deep-learning` also depends on `opencv`.
+
+Each module follows `src/main/scala`, optional hand-written
+`src/main/python`, and `src/test/{scala,python}`. Follow nearby code before
+introducing a new pattern.
+
+## Scala-first API and code generation
+
+Public SparkML behavior belongs in Scala. Classes mixing in
+[`Wrappable`](core/src/main/scala/com/microsoft/azure/synapse/ml/codegen/Wrappable.scala)
+generate Python wrappers under
+`target/scala-*/generated/src/python/synapse/ml/`.
+
+For a new or changed stage, verify:
+
+- companion object extends `DefaultParamsReadable[Stage]`;
+- class accepts `uid: String` and has a random-UID no-arg constructor;
+- `Wrappable` is present when a Python wrapper is required;
+- [`SynapseMLLogging`](core/src/main/scala/com/microsoft/azure/synapse/ml/logging/SynapseMLLogging.scala)
+  is mixed in, `logClass(...)` is called, and `fit`/`transform` is logged;
+- `copy(extra)` preserves parameters, normally through `defaultCopy(extra)`;
+- `transformSchema` matches runtime output;
+- save/load and generated wrapper behavior are tested.
+
+Hand-written Python may extend a generated `_ClassName` wrapper when JVM
+delegation needs a Python convenience method. Do not move core behavior into
+Python.
+
+## Validation
+
+Use the smallest command that proves the change, then expand when the affected
+surface requires it. Run SBT with the JDK selected by the
+[local setup skill](.github/skills/synapseml-local-setup/SKILL.md), not the
+machine default.
+
+```bash
+sbt <module>/compile
+sbt <module>/Test/compile
+sbt "<module>/testOnly fully.qualified.Suite"
+sbt <module>/scalastyle <module>/Test/scalastyle
+sbt codegen
+black --check --extend-exclude 'docs/' .
 ```
-{module}/
-├── src/
-│   ├── main/
-│   │   ├── scala/com/microsoft/azure/synapse/ml/{package}/
-│   │   │   ├── MyTransformer.scala          ← primary source code
-│   │   │   └── MyTransformerParams.scala    ← parameter traits (optional)
-│   │   └── python/synapse/ml/{package}/
-│   │       └── MyTransformer.py             ← hand-written Python (if needed)
-│   └── test/
-│       ├── scala/com/microsoft/azure/synapse/ml/{package}/
-│       │   └── MyTransformerSuite.scala     ← ScalaTest tests
-│       └── python/synapsemltest/{package}/
-│           └── test_my_transformer.py       ← Python tests
-└── target/
-    └── scala-2.12/generated/src/python/     ← AUTO-GENERATED (never edit)
-```
-
-## Critical: The Code Generation Pipeline
-
-**SynapseML auto-generates Python wrappers from Scala code.** This is the most
-important thing to understand.
-
-### How It Works
-
-1. A Scala class mixes in the `Wrappable` trait
-2. Running `sbt codegen` calls `makePyFile()` which generates a Python class
-3. Generated files go to `target/scala-2.12/generated/src/python/synapse/ml/`
-4. Generated files use underscore prefix: `_ClassName.py`
-5. Hand-written Python in `src/main/python/` can extend the generated class
-
-### What This Means for You
-
-- **To add or change a feature**: Edit the **Scala** code. The Python wrapper
-  regenerates automatically.
-- **Never edit files in `target/`**: They are overwritten on every build.
-- **Hand-written Python** (`src/main/python/`) is only for cases where the
-  generated wrapper needs manual overrides or additional logic.
-
-### Example: Generated vs Hand-Written Python
-
-Generated (DO NOT EDIT): `target/.../synapse/ml/isolationforest/_IsolationForestModel.py`
-
-Hand-written override (OK to edit): `core/src/main/python/synapse/ml/isolationforest/IsolationForestModel.py`
-```python
-from synapse.ml.isolationforest._IsolationForestModel import _IsolationForestModel
-
-class IsolationForestModel(_IsolationForestModel):
-    def getInnerModel(self):
-        return self._java_obj.getInnerModel()
-```
-
-## Scala Patterns
-
-### Transformer/Estimator Pattern
-
-Every SynapseML stage follows this pattern:
-
-```scala
-// Copyright (C) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License. See LICENSE in project root for information.
-
-package com.microsoft.azure.synapse.ml.stages
-
-import com.microsoft.azure.synapse.ml.codegen.Wrappable
-import com.microsoft.azure.synapse.ml.logging.{FeatureNames, SynapseMLLogging}
-import org.apache.spark.ml.Transformer
-import org.apache.spark.ml.param._
-import org.apache.spark.ml.util._
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Dataset}
-
-object DropColumns extends DefaultParamsReadable[DropColumns]
-
-class DropColumns(val uid: String)
-    extends Transformer with Wrappable with DefaultParamsWritable with SynapseMLLogging {
-  logClass(FeatureNames.Core)
-
-  def this() = this(Identifiable.randomUID("DropColumns"))
-
-  val cols: StringArrayParam =
-    new StringArrayParam(this, "cols", "Comma separated list of column names")
-
-  def getCols: Array[String] = $(cols)
-  def setCols(value: Array[String]): this.type = set(cols, value)
-
-  override def transform(dataset: Dataset[_]): DataFrame = {
-    logTransform[DataFrame]({
-      dataset.toDF().drop(getCols: _*)
-    }, dataset.columns.length)
-  }
-
-  def transformSchema(schema: StructType): StructType = {
-    val droppedCols = getCols.toSet
-    StructType(schema.fields.filter(f => !droppedCols(f.name)))
-  }
-
-  def copy(extra: ParamMap): DropColumns = defaultCopy(extra)
-}
-```
-
-### Key Conventions
-
-- **Companion object**: Always add `extends DefaultParamsReadable[ClassName]`
-  for model serialization.
-- **`Wrappable` trait**: Required for Python code generation. Without it, no
-  Python wrapper is created.
-- **`SynapseMLLogging` trait**: Required on all transformers/estimators. Call
-  `logClass(FeatureNames.X)` in the constructor and wrap `transform`/`fit`
-  with `logTransform`/`logFit`.
-- **Parameter traits**: For complex stages, define params in a separate trait
-  (e.g., `trait MyParams extends Wrappable with HasInputCol`) and mix it into
-  the class. This is the SynapseML composition pattern.
-- **`uid` parameter**: Every stage must accept `uid: String` and provide a
-  no-arg constructor that generates a random UID.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/SynapseML](https://github.com/microsoft/SynapseML) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
