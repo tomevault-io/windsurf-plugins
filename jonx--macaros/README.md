@@ -7,11 +7,11 @@ Macaros packages AROS, the open-source AmigaOS-compatible operating system, as a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jonx/Macaros](https://github.com/jonx/Macaros).
+Original source: `CLAUDE.md` in [jonx/Macaros](https://github.com/jonx/Macaros).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
