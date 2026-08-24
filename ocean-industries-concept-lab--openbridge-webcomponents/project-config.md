@@ -1,93 +1,102 @@
 ---
 trigger: always_on
-description: generates a box (`observeInnerBox()` in radial-frame.ts observes the
+description: <!-- GENERATED FILE — DO NOT EDIT.
 ---
 
 
-# GitHub Copilot Custom Instructions
+<!-- GENERATED FILE — DO NOT EDIT.
+     Source: docs/agents/instrument-indicators.md
+     Regenerate: npm run agents:sync -w packages/openbridge-webcomponents -->
 
-## Path-Specific Instructions for Watch & Radial Instruments
+# Instrument Indicators
 
-These instructions apply to the circular/radial watch-based instrument system, including the core `obc-watch` renderer and all navigation instruments that use it.
+Seventeen compact glyphs that convey one value at a glance, sized for strips,
+lists and tiles rather than for a full instrument panel.
 
-> **⚠️ IMPORTANT: Interconnected Components**
->
-> All components in this system are **tightly interconnected** and share the same rendering core:
->
-> - `watch.ts` ↔ `instrument-radial.ts` ↔ `compass.ts` ↔ `heading.ts` ↔ `rudder.ts` ↔ `wind.ts` ↔ `speed-gauge.ts` ↔ `gauge-radial.ts` ↔ `azimuth-thruster.ts` ↔ `roll.ts` ↔ `rot-sector.ts`
->
-> **When implementing a new feature or changing existing behavior:**
->
-> 1. **All rendering logic should live in `watch.ts`** - it is the single source of truth for circular instrument rendering
-> 2. Changes to `watch.ts` affect ALL instruments that use it
-> 3. If adding a new visual element, add it to `watch.ts` as a configurable option, not to individual instruments
-> 4. Navigation instruments are thin wrappers that configure `obc-watch` and add domain-specific overlays
-> 5. `instrument-radial.ts` is a reusable building block that wraps `obc-watch` for generic gauge use cases
->
-> **Before completing any change, verify:**
->
-> - [ ] `watch.ts` has the core rendering logic
-> - [ ] Helper modules (`tickmark.ts`, `advice.ts`, `label.ts`, etc.) are updated if needed
-> - [ ] All consuming instruments still render correctly
-> - [ ] ViewBox coordination is maintained across layers
-> - [ ] Responsive scaling works at different sizes
+The family boundary is **not** a code construct — it comes from the Storybook
+`Indicators/` group, which is the curated product taxonomy. Note
+`propulsion-tunnel-thruster` belongs here despite its name; the taxonomy's
+judgement wins over the naming.
 
-## Architecture Overview
+## They redraw; they do not wrap
 
-The watch-based instrument system follows a **core renderer + thin wrapper** pattern:
+This is the single most important fact, and the one that most invites a wrong
+assumption. An indicator is **not** a shrunken instance of its full-size
+counterpart:
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              watch.ts (obc-watch)                               │
-│                    (Core SVG renderer - ALL logic lives here)                   │
-│                                                                                 │
-│  Renders:                                                                       │
-│  • Circular rings (single/double/doubleThin/triple)                            │
-│  • Setpoint indicator (triangle marker)                                        │
-│  • Tickmarks (primary, secondary, main, textOnly)                              │
-│  • Advices (caution/alert zones with patterns)                                 │
-│  • Bar areas (filled arc segments)                                             │
-│  • Needles (short bar indicators)                                              │
-│  • Labels (N, E, S, W compass labels)                                          │
-│  • Vessel images                                                               │
-│  • Wind/current indicators                                                     │
-│  • North arrow, crosshair, starboard/port indicators                           │
-│                                                                                 │
-│  Imports helper modules:                                                        │
-│  • tickmark.ts - tickmark rendering & positioning                              │
-│  • advice.ts - advice/caution zone rendering                                   │
-│  • label.ts - compass label rendering                                          │
-│  • vessel.ts - vessel image SVGs                                               │
-│  • environment.ts - wind/current symbols                                       │
-│  • setpoint.ts - setpoint indicator rendering                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                    ┌───────────────────┼───────────────────┐
-                    │                   │                   │
-                    ▼                   ▼                   ▼
-    ┌───────────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐
-    │  instrument-radial.ts │ │  compass.ts     │ │  Other instruments:         │
-    │  (Generic building    │ │  heading.ts     │ │  rudder.ts, wind.ts,       │
-    │   block for gauges)   │ │  (Full-featured │ │  speed-gauge.ts, roll.ts,  │
-    │                       │ │   compasses)    │ │  azimuth-thruster.ts, etc. │
-    └───────────┬───────────┘ └────────┬────────┘ └──────────────┬──────────────┘
-                │                      │                         │
-                ▼                      │                         │
-    ┌───────────────────────┐          │                         │
-    │  gauge-radial.ts      │          │                         │
-    │  rot-sector.ts        │          │                         │
-    │  (Thin wrappers)      │          │                         │
-    └───────────────────────┘          │                         │
-                                       ▼                         ▼
-                              ┌─────────────────────────────────────────────────┐
-                              │  All instruments use <obc-watch> + overlay SVG  │
-                              │  with matched viewBox for layer alignment       │
-                              └─────────────────────────────────────────────────┘
+- None extends a shared base class — all extend `LitElement` directly.
+- None composes `obc-instrument-field`.
+- None renders the full instrument. `obc-rot-indicator` imports
+  `RateOfTurnController` from `../rate-of-turn/` — the **domain logic** — and
+  then draws its own SVG. It does not render `<obc-rate-of-turn>`.
+
+So the shared contract is a **convention**, not an inheritance hierarchy.
+Changing a full instrument does not change its indicator, and vice versa. Ten
+pairs share a base name (`compass`, `gauge-radial`, `gauge-trend`, `heading`,
+`heave`, `main-engine`, `pitch`, `roll`, `rudder`, `wind`), and keeping them
+visually consistent is a manual obligation.
+
+When a value-to-angle or value-to-state mapping already exists as a controller
+on the full instrument, **import the controller** rather than reimplementing the
+maths. That is the one thing that should be shared.
+
+## The canvas convention
+
+Most indicators draw on a **48 × 48** canvas via a local `VIEW_SIZE` constant.
+Two deviate deliberately — `pitch-indicator` and `roll-indicator` declare
+`VIEW_SIZE = 36` for their inner scale, with the outer frame still at 48.
+
+Hosts size themselves from the design token, not from px:
+
+```css
+:host {
+  width: var(--global-size-spacing-touch-target-min);
+  height: var(--global-size-spacing-touch-target-min);
+}
 ```
 
+Use the token so indicators scale with the ancestor
+`.obc-component-size-*` class. A hard-coded 48px host breaks the medium / large
+/ xl size variants.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Not every member is SVG: `obc-gauge-bar-indicator` is CSS-driven via `styleMap`,
+with no inline SVG at all. Do not assume an SVG template when editing.
+
+## Choosing an indicator over a full instrument
+
+Indicators deliberately omit scale context — tickmarks, labels, setpoints. Each
+component's JSDoc names its full-size counterpart for when that context is
+needed (for example `obc-gauge-bar-indicator` points at `obc-gauge-vertical` /
+`obc-gauge-horizontal`). Preserve those pointers when editing: they are how a
+consumer decides which to reach for.
+
+## Traps
+
+**Directory name ≠ file name for `main-engine-indicator`.** Its files are
+`propulsion-main-engine-indicator.{ts,css,stories.ts}`. A path built by
+convention from the directory name will not resolve.
+
+**Property-level deprecations are live.** Several components carry `@deprecated`
+on individual properties while the class itself is `@stable` — for example
+`obc-rot-indicator`'s legacy rate property in favour of
+`rateOfTurnDegreesPerMinute`, and `obc-wind-indicator`'s in favour of
+`currentWindFromDirection`. When touching these, migrate rather than extend the
+deprecated path, and leave the tag in place until the property is removed.
+
+**Wind icon buckets are generated.** `obc-wind-indicator` selects a glyph by
+snapping a knots value to a bucket through the helpers in
+`watch/environment.ts`. Those icons come from Figma, so a family rename there
+propagates here — see
+[IMPLEMENTATION_GUIDELINES.md § Icons](../../IMPLEMENTATION_GUIDELINES.md#-icons),
+which uses wind as its worked example.
+
+## Related
+
+- [`watch-radial-instruments.md`](../../docs/agents/watch-radial-instruments.md) — the full-size
+  radial counterparts and the shared `obc-watch` renderer.
+- [`instruments-misc.md`](../../docs/agents/instruments-misc.md) — the remaining `Instruments/`
+  members.
 
 ---
 > Source: [Ocean-Industries-Concept-Lab/openbridge-webcomponents](https://github.com/Ocean-Industries-Concept-Lab/openbridge-webcomponents) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
