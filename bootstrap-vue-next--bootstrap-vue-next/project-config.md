@@ -1,80 +1,146 @@
 ---
 trigger: always_on
-description: Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+description: > Purpose: adapt generic Vue/Nuxt app rules to this repository's monorepo structure, where `packages/` contains publishable libraries and `apps/` contains local applications/documentation.
 ---
 
-# BootstrapVueNext Development Instructions
+# AI Agents for BootstrapVueNext Monorepo
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+> Purpose: adapt generic Vue/Nuxt app rules to this repository's monorepo structure, where `packages/` contains publishable libraries and `apps/` contains local applications/documentation.
 
-## Working Effectively
+## 1) Repository Intent (Read First)
 
-### Required Setup
+This repository is **not a single app**.
+It is a monorepo with two different categories of code:
 
-- Install Node.js 20.x or 22.x (engine requires >=22.0.0 but 20.x works with warnings)
-- Install pnpm globally: `npm install -g pnpm@10.13.1` (ONLY pnpm is allowed as package manager) Use the version specified in the packageManager field of the package.json file
-- Clone repository and open the **root** directory (not subdirectories like packages/bootstrap-vue-next)
+- `packages/` => publishable libraries/modules (public API stability, tree-shaking, SSR safety)
+- `apps/` => local applications for docs/demo/testing (VitePress docs app + playground app)
 
-### Bootstrap, Build, and Test the Repository
+Treat each area with different constraints.
 
-1. `pnpm install --ignore-scripts --frozen-lockfile` -- takes 2 seconds. Use `--ignore-scripts` to avoid docs build network issues.
-2. `pnpm --filter bootstrap-vue-next run build` -- takes 27 seconds. NEVER CANCEL. Set timeout to 60+ minutes.
-3. `pnpm --filter bootstrap-vue-next run test:unit:ci` -- takes 40 seconds. NEVER CANCEL. Set timeout to 60+ minutes.
-4. `pnpm --filter bootstrap-vue-next run test:lint` -- takes 12 seconds. NEVER CANCEL. Set timeout to 30+ minutes.
+## Skills
 
-### Build Individual Components
+All skills are located in `.agents/skills/*` and are resolved by name.
 
-- Bootstrap Vue Next core package: `pnpm --filter bootstrap-vue-next run build` -- 27 seconds
-- Nuxt package: `pnpm --filter @bootstrap-vue-next/nuxt run build` -- 25 seconds
-- Playground app: `pnpm --filter playground run build` -- 8 seconds
-- **NEVER** try to build docs app directly - it fails due to network connectivity (OpenCollective API)
+Load these skills for Vue/Nuxt tasks:
 
-### Development Servers
+- create-adaptable-composable
+- vue-best-practices
+- vue-debug-guides
+- vue-router-best-practices
+- vue-testing-best-practices
+- vitepress
 
-- Core package dev server: `pnpm --filter bootstrap-vue-next run dev` (runs on <http://localhost:5174>)
-- Playground app dev server: `pnpm --filter playground run dev` (runs on <http://localhost:5173>)
-- Docs dev server: `pnpm --filter docs run dev` (runs on <http://localhost:8000>)
-- All dev servers: `pnpm dev` (starts all development environments in parallel)
+Load these skills for any Vue/Nuxt task:
+- vue-best-practices (vuejs-ai/skills)
 
-### Exporting public files in the main bootstrap-vue-next package
+## 2) Directory Roles
 
-The library uses a custom export structure that must fit a specific pattern to ensure proper tree-shaking and module resolution. For the build process, as shown in the vite.config.ts file, it resolves the directories and files. The purpose of this is to allow for both high-level path imports, as well as more specific (and better tree-shaken) imports of individual components, composables, directives, and types. Ex: `import {BButton} from 'bootstrap-vue-next/components/button'` and `bootstrap-vue-next/components` are both valid, instead of `import {BButton} from 'bootstrap-vue-next'` which would import the entire package.
+### Library and module code (primary product)
 
-The rules of how this functions is that files that are publicly exported must be in their own directory, with an index.ts file that exports the relevant items. The resolution of this build process is in the vite.config.ts file. Then the package.json file uses the "exports" field to map the paths to the built files.
+- `packages/bootstrap-vue-next/`:
+  - Main Vue 3 component library (core product)
+  - Must preserve public API expectations
+  - Must be SSR-safe
+  - Must keep exports tree-shakable and structured
+- `packages/nuxt/`:
+  - Nuxt integration/module package
+  - Must behave like a reusable package, not app-only code
 
-If the file is intended to be public, it must follow this pattern. For example, if you are adding a new composable, it must be in its own directory under `src/composables/` with an index.ts file that exports the composable. Then you must add the relevant entry to the "exports" field in the package.json file. It must also be exported from the main `src/composables/index.ts` file. This ensures that the composable can be imported both from the high-level path and the specific path for best tree-shaking.
+### App code (supporting tooling and docs)
 
-Private files should exist in the root of the domain they are related to. For example, utility functions for composables should be in the `src/composables/` directory but not exported in an index.ts file. This keeps the public API clean and ensures that only intended files are accessible to users of the library.
+- `apps/docs/`:
+  - VitePress docs site
+  - Contains examples, docs data, rendering for documentation
+  - Not the distribution artifact for library consumers
+- `apps/playground/`:
+  - Example/test app for real-world consumer-style usage
+  - Used to validate integration scenarios
 
-**Consuming imports for tree-shaking**: When importing components, composables, or directives from bootstrap-vue-next in demo files, documentation, or user code, always use the specific paths for optimal tree-shaking:
+## 3) Global Coding Standards
 
-**Exception** for types, which can be imported from the root path without tree-shaking issues since they are removed at compile time. For example, `import type {BButtonProps} from 'bootstrap-vue-next'` is acceptable
+Apply these unless a package-specific rule is stricter.
 
-- Components:
-  <<< FRAGMENT ./demo/ImportExamples.ts#components{typescript}
-- Type-only imports:
-  <<< FRAGMENT ./demo/ImportExamples.ts#types{typescript}
-- Composables:
-  <<< FRAGMENT ./demo/ImportExamples.ts#composables{typescript}
-- Directives:
-  <<< FRAGMENT ./demo/ImportExamples.ts#directives{typescript}
+- Use Vue Composition API with `<script setup lang="ts">`
+- Prefer `ref` over `reactive`
+- Use `shallowRef` for large objects/arrays when deep tracking is unnecessary
+- Use `computed` for derived state
+- Use `async/await` in composables
+- Keep one responsibility per component
+- Use typed `defineProps`, typed `defineEmits`, and typed `defineSlots`
+- Avoid destructuring reactive objects in ways that break reactivity outside safe compiler contexts
+- TypeScript strict behavior expected; type props/emits/composable returns explicitly
 
-Avoid importing from the root package (`'bootstrap-vue-next'`) as this imports the entire library and defeats tree-shaking.
+## 4) Monorepo-Specific Rules (Critical)
 
-The fault of not properly following this structure will lead to build errors or improper module resolution.
+### 4.1 For `packages/bootstrap-vue-next` (core library)
 
-## Validation
+- Think like a **library maintainer**, not app developer.
+- Avoid implementation choices that leak unstable internals into public API.
+- Any public composable/component/directive/type export must follow existing export path conventions.
+- Preserve tree-shakable import paths.
+- For browser globals, use SSR-safe helpers (`getSafeWindow()`, `getSafeDocument()`) instead of direct `window`/`document` access. Always treating them as potentially unavailable.
+- If adding/changing component props/events/slots, update docs data files in `apps/docs/src/data/components/*.data.ts`.
 
-### Building documentation and checking doc files when adding new props
+### 4.2 For `packages/nuxt` (Nuxt module)
 
-When you add new props to the core packages' components, you must add those props in the .data.ts files from the documentation for that component. When you 
-add new props to the core packages' components, you must build the documentation to ensure no type-checking errors have occurred.
+- Treat as reusable package code.
+- Keep runtime/module boundaries clean.
+- Avoid app-local assumptions and app-only shortcuts.
+- Ensure changes are compatible with consumer Nuxt projects.
 
-### Always Validate Changes
+### 4.3 For `apps/docs` (VitePress docs app)
+
+- Docs examples should reflect correct consumer usage.
+- Prefer specific package subpath imports for runtime code examples to model tree-shaking behavior.
+- Use documented demo/fragment conventions for docs snippets (`DEMO`/`FRAGMENT`) where applicable.
+
+### 4.4 For `apps/playground` (consumer simulation app)
+
+- Use as integration validation surface.
+- Keep changes focused on demonstrating/validating package behavior.
+- Do not treat playground-specific patterns as library architecture decisions.
+
+## 5) Data Fetching and Nuxt Guidance
+
+- Use Nuxt auto-import conventions in Nuxt contexts.
+- Keep feature boundaries modular (layer-friendly organization) when working on Nuxt-oriented code.
+
+## 6) Testing and Validation Workflow
+
+Before marking work complete, run relevant checks for touched areas.
+
+Required for core library changes:
+
+- `pnpm --filter bootstrap-vue-next run test:lint`
+- `pnpm --filter bootstrap-vue-next run test:unit:ci`
+- `pnpm --filter bootstrap-vue-next run build`
+
+For type safety verification in Vue/Nuxt contexts, run workspace/package type checks (including `vue-tsc`) when applicable.
+
+## 7) Package Manager and Tooling Constraints
+
+- Use `pnpm` only.
+- Follow workspace filters (`--filter`) for targeted tasks.
+- Avoid docs production build assumptions when network-dependent tasks are known to fail.
+
+## 8) AI Change Safety Checklist
+
+When making any change, first identify target scope:
+
+1. Is this in `packages/` (library/module) or `apps/` (docs/playground app)?
+2. Is the change public API, internal implementation, docs content, or demo-only?
+3. Does it require export map/index updates?
+4. Does it require docs data (`*.data.ts`) updates?
+5. Does it require SSR-safety handling?
+6. Which filtered build/test/lint commands validate it?
+
+If scope is mixed (for example, library + docs), validate both sides before completion.
+
+## 9) Practical Decision Rule
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bootstrap-vue-next/bootstrap-vue-next](https://github.com/bootstrap-vue-next/bootstrap-vue-next) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
