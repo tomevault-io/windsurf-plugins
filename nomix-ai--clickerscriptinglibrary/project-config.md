@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: ClickerScriptingLibrary — iOS device automation via Nomix Clicker API
+description: iOS device automation via Nomix Clicker API. Scripts simulate touch input and use AI screen recognition to navigate apps.
 ---
-
 
 # ClickerScriptingLibrary
 
@@ -132,8 +131,6 @@ screen.contains(*keywords: str) -> bool
 ### Element
 
 ```python
-@dataclass(frozen=True)
-class Element:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
