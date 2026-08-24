@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Shin-woocheol/Shin-woocheol.github.io](https://github.com/Shin-woocheol/Shin-woocheol.github.io).
+Original source: `CLAUDE.md` in [Shin-woocheol/Shin-woocheol.github.io](https://github.com/Shin-woocheol/Shin-woocheol.github.io).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
