@@ -36,4 +36,4 @@ Pi-SmartRead is the Pi coding agent's code-intelligence extension — unified fi
 
 ---
 > Source: [rhinos0608/Pi-SmartRead](https://github.com/rhinos0608/Pi-SmartRead) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
