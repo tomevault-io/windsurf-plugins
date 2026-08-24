@@ -1,12 +1,11 @@
 ---
 trigger: always_on
-description: See [AGENTS.md](./AGENTS.md) for repository instructions — commit message
+description: See [AGENTS.md](../AGENTS.md) for repository instructions — commit message
 ---
 
-See [AGENTS.md](./AGENTS.md) for repository instructions — commit message
-conventions, test/lint commands, and PR scope guidance apply to Claude the
-same as any other agent.
+See [AGENTS.md](../AGENTS.md) for repository instructions — commit message
+conventions, test/lint commands, and PR scope guidance.
 
 ---
 > Source: [epignatelli/navix](https://github.com/epignatelli/navix) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
