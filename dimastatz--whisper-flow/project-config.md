@@ -1,0 +1,15 @@
+---
+trigger: always_on
+description: <!-- mermaid-ai-skills:start -->
+---
+
+<!-- mermaid-ai-skills:start -->
+## Mermaid Diagrams
+
+When the user asks to create, edit, or visualize a diagram, follow the
+instructions in `.github/instructions/mermaid.instructions.md`.
+<!-- mermaid-ai-skills:end -->
+
+---
+> Source: [dimastatz/whisper-flow](https://github.com/dimastatz/whisper-flow) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
