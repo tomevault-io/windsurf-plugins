@@ -1,62 +1,123 @@
 ---
 trigger: always_on
-description: Think in terms of consistency first, not isolated fixes.
+description: Read this before adding or changing any user-facing text in `apps/ui`.
 ---
 
 
-## Implementation direction
+# Translations (Lingui + Weblate)
 
-Think in terms of consistency first, not isolated fixes.
-Follow the UI direction set by PRs 2543, 2545, and 2549: stable hook APIs, direct callback-driven state updates, resilient shell-first loading, and no flashy spinner regressions.
-Prefer inline page feedback over toasts for normal settings saves, and keep behavior shared through `useSettingsFeedback.tsx`.
-Avoid layout shift: reserve space for late-loading UI, keep tab/card structure stable, and do not let placeholders change active state or move surrounding UI.
-Treat full `LoadingSpinner` as delayed, `SmallLoadingSpinner` as immediate, and validate with focused UI tests before broader refactors.
+Read this before adding or changing any user-facing text in `apps/ui`.
+Catalogs live in `apps/ui/src/locales/*.po` and are translated on
+[Weblate](https://hosted.weblate.org/engage/maintainerr/).
 
-Read [ARCHITECTURE.md](../../ARCHITECTURE.md) for the system architecture overview before changing cross-module boundaries.
+---
 
-## General
+## A translation must never change behavior
 
-When implementing against any external API or SDK (Plex, Jellyfin, TypeORM, etc.), read the official API documentation to confirm behaviour. Do not guess or assume - facts only, based on current documentation.
+Translate text the user reads, and nothing else. A string that is displayed
+*and* used for something else stops being display text: switching language then
+changes what the app does, and no test written in English can see it.
 
-### Workspace MCP servers
+Before wrapping a string, follow where the value goes. It must not reach:
 
-- Workspace MCP config lives in `.vscode/mcp.json` (VS Code), `.mcp.json` (Claude Code), and `.codex/config.toml` (Codex). Keep all three in sync.
-- `github` MCP: read-only - use for live GitHub context, never for writes.
-- `playwright` MCP: use for browser-driven UI validation. **Screenshots must be saved as `filename: ".playwright-mcp/<name>.png"`** - bare filenames land at the repo root (the `--output-dir` flag doesn't apply to explicit filenames).
-- **Browser:** the MCP uses the **system Chromium baked into the devbox image** (`/usr/bin/chromium`, via `--executable-path` + `--no-sandbox` because the container runs as root). It does **not** download a browser per-session - the per-session CDN download is blocked by the IPv4-only egress firewall (the CDN redirects to IPv6 hosts with no route). If `/usr/bin/chromium` is missing, the devbox image needs rebuilding (it's installed in `infra/Dockerfile.agents`).
-- **These stdio MCP servers only load when your AI client (VS Code, Claude Code, or Codex) is launched from inside devbox at `/workspace`** - `npx` (the server command) is only on PATH in the container, and the client must start at the repo root to pick up its mcp config. Launched on the bare host or from another directory, the `playwright`/`github` servers never register. Reload the editor / restart the client session after editing any mcp config.
+- **Anything persisted or sent to a server.** A default collection name built
+  from a translated word is stored on Plex in whatever language the form was
+  submitted in.
+- **Anything parsed or compared.** `startsWith`, `includes`, `===`, a `switch`,
+  `.toLowerCase()` - a prefix agreed between two functions must be a constant
+  they share, never a message.
+- **Any key or identifier.** Grouping keys, `Map`/`Set` members, TanStack Query
+  keys, React keys, DOM `id`/`name`. Key on the enum or id the label was
+  derived from, and translate only at the point of display.
+- **Any hook dependency array that guards work.** See below.
 
-### API documentation references
+Sorting a list by its displayed labels is fine - that is display order, and it
+is *meant* to follow the language.
 
-#### Media management services
+## Where a translation resolves
 
-- Sonarr: https://raw.githubusercontent.com/Sonarr/Sonarr/develop/src/Sonarr.Api.V3/openapi.json
-- Radarr: https://raw.githubusercontent.com/Radarr/Radarr/develop/src/Radarr.Api.V3/openapi.json
-- Tautulli: https://docs.tautulli.com/extending-tautulli/api-reference
+`useLingui()`'s `t` is a render-scoped value: it changes when the locale
+changes, which is exactly why a component re-renders in the new language. That
+also makes it a dependency.
 
-#### Request management services
+- **In render** - use the hook's `t`. The component re-renders on a language
+  switch and the text follows.
+- **In an effect, an async callback, or an event handler** - use `t` from
+  `@lingui/core/macro`, aliased as `globalT` when the file also uses the hook.
+  It resolves against the active locale when it runs, and it is not reactive,
+  so it stays out of the dependency array.
 
-- Seerr: https://docs.seerr.dev/
+When aliasing an existing file to `globalT`, rename the call sites by hand.
+A blind replace of ``t` `` also rewrites the `t` that ends a message
+(``t`Delete Soonest` `` becomes ``globalT`Delete SoonesglobalT` ``), which still
+compiles and still renders text. Diff the message strings against the previous
+revision afterwards.
 
-#### Media server services
+Putting the hook's `t` in an effect's dependencies makes that effect re-run on
+every language switch: re-fetching data, re-firing toasts, and in one case
+reloading a form and discarding the user's unsaved edits.
 
-- Plex (python-plexapi): https://python-plexapi.readthedocs.io/en/latest/index.html
-- Plex (OpenAPI): https://raw.githubusercontent.com/LukeHagar/plex-api-spec/refs/heads/main/src/pms-spec.yaml
-- Jellyfin: https://api.jellyfin.org/
+A component that renders translated text must consume the i18n context, or a
+language switch will not reach it. `I18nProvider` re-renders context consumers
+only - React reuses the untouched children subtree - so a component that calls
+core-macro `t` in its render path and never calls `useLingui()` keeps the
+language it first mounted with. Navigation hides this by remounting the page;
+anything mounted during the switch shows it.
 
-## Rules
+## Which macro
 
-1. DRY: avoid one-off logic or duplicated feedback/loading patterns.
-2. Follow repository copilot instructions and existing project conventions.
-3. Keep separation of concerns clear and maintenance burden low.
-4. Match existing codebase patterns and avoid regressions or unnecessary abstraction.
-5. UI components: favor reusable, consistent components and solid React patterns. Promote shared helpers and modals from `apps/ui/src/components/Common/` where they exist - for example use `SaveButton` and `TestingButton` instead of rolling custom save/test buttons.
-6. Media server abstraction: keep `modules/api/media-server/` server-agnostic. The interface (`media-server.interface.ts`), factory, controller, and shared utilities must never import or reference Plex/Jellyfin types directly. Use `supportsFeature()` for conditional behaviour - never branch on server type in the shared layer. All server-specific logic (constants, mappers, batch sizes, caching, SDK calls) belongs exclusively in `plex/` or `jellyfin/`. Mappers are type-conversion only - no business logic. Any new method added to the abstracted layer must be implemented by all media servers - partial support belongs behind `supportsFeature()`, not in the interface itself.
-7. Contracts package: any new DTOs or request/response shapes should be deliberate and minimal.
-8. Database/migrations: if persistence changes are needed, keep migrations safe, reversible, and edge-case aware. All migrations MUST be generated and run via TypeORM - never manually crafted SQL. You MUST always follow [typeorm_instructions.txt](../../typeorm_instructions.txt) for migration commands and workflow. A migration is NEVER considered working until it has been tested - run it end-to-end and verify the result before treating it as done.
-9. Rules/metadata systems: make sure any cache invalidation approach stays consistent with existing getter/provider patterns.
-10. Rule naming standards: preserve established rule `name` and `humanName` conventions for equivalent concepts across media servers. Do not rename user-facing rule labels to encode backend caveats; keep naming stable and document server-specific semantics in code comments and focused tests instead.
+| Where | Import | Use |
+| --- | --- | --- |
+| Inside a React component | `@lingui/react/macro` | `<Trans>` for JSX text, `` t` ` `` from `useLingui()` for attributes, toasts, handlers, `<Plural>` for counts |
+| Plain module (`utils/`, `api/`, helpers) | `@lingui/core/macro` | `` t` ` `` / `plural()` - resolves when the function runs |
+| A value held before render | `@lingui/core/macro` | `msg` descriptor, translated at the call site with `t(descriptor)` |
+
+Never call the runtime `i18n._()` directly - `useLingui()`'s `t` resolves a
+descriptor just as well and keeps the underscore API out of the codebase.
+
+## Module scope freezes a translation
+
+A `const` holding `` t` ` `` is evaluated once, at import, in whichever locale
+loaded first. Anything defined outside a render must be either a `msg`
+descriptor or a builder function called during render:
+
+```ts
+// wrong - frozen at import
+const OPTIONS = [{ value: 'movie', label: t`Movies` }]
+
+// right - resolved per render
+const buildOptions = () => [{ value: 'movie', label: t`Movies` }]
+```
+
+The same applies to **default parameter values**, which run before
+`useLingui()`. Resolve them in the body instead: `const label = props.label ?? t\`Save\``.
+
+## Placeholders
+
+- Give every placeholder a name. Hoist member expressions into a local, or use
+  the labelled form: `` t`Failed to reach ${{ serverName }}` ``. An unnamed
+  `{0}` tells a translator nothing. Keep the **whole** expression when you
+  hoist - `props.collection.title`, never `props.collection`.
+- **A single quote is an ICU escape character.** `'{name}'` renders the literal
+  text `{name}` and eats the quotes, silently dropping the value. Write a
+  literal apostrophe beside a placeholder as `''` (`&apos;&apos;` in JSX). A
+  lone apostrophe not touching a brace ("don't") is fine.
+- `<Plural one="... {name}">` does **not** bind `name`. Use `plural()` from the
+  core macro with the placeholder inside each choice instead.
+
+## Counted text
+
+Never build a plural by appending `s`. `${n} item${n === 1 ? '' : 's'}` is
+wrong in most languages - use `plural()` or `<Plural>` so translators can
+supply their own forms.
+
+## Whole sentences, not fragments
+
+A sentence split across several messages cannot be reordered by a translator.
+Keep inline markup and values inside one `<Trans>`. Where the original built a
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Maintainerr/Maintainerr](https://github.com/Maintainerr/Maintainerr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
