@@ -1,144 +1,86 @@
 ---
 trigger: always_on
-description: This document captures lessons learned, architectural insights, and debugging guidance for the Degenbot CLI Aave processing system.
+description: > **Read this first** when picking up this project. It distills the critical context that isn't obvious from reading the code alone.
 ---
 
-# Degenbot CLI - Agent Knowledge Base
+# AGENTS.md — Executor Project Context
 
-This document captures lessons learned, architectural insights, and debugging guidance for the Degenbot CLI Aave processing system.
+> **Read this first** when picking up this project. It distills the critical context that isn't obvious from reading the code alone.
 
-## Aave V3 Processing
+## What This Project Is
 
-### Interest Accrual - Critical Understanding
+An on-chain arbitrage executor for Uniswap V2/V3/V4, written in **Vyper 0.5.0a3** with the experimental Venom codegen backend. The primary contract (`cmd_executor.vy`) is a compact byte-stream VM that executes multi-hop swap paths across all three Uniswap protocol versions in a single atomic transaction.
 
-**Lesson:** Interest accrual Mint events are emitted for tracking purposes ONLY and do NOT increase the scaled balance.
+**No prefunding required** — the executor borrows all working capital atomically via V2/V3 flash swaps and V4 PoolManager `take()`. Can be deployed with zero balance.
 
-**Context:** When processing Aave V3 transactions, the aToken contract emits Mint events during interest accrual (e.g., before transfers, withdrawals). However, these events are purely informational - they do not actually mint tokens or change the user's scaled balance.
+## Quick Orientation
 
-**Contract Behavior (aToken rev_1.sol:2825-2855):**
-```solidity
-function _transfer(address sender, address recipient, uint256 amount, uint256 index) internal {
-    // Calculate interest accrued (tracks interest earned since last interaction)
-    uint256 senderBalanceIncrease = senderScaledBalance.rayMul(index) -
-        senderScaledBalance.rayMul(_userState[sender].additionalData);
-    
-    // Update the stored index ONLY - this is the ONLY state change for interest accrual
-    _userState[sender].additionalData = index.toUint128();
-    
-    // Transfer scaled balance
-    super._transfer(sender, recipient, amount.rayDiv(index).toUint128());
-    
-    // Emit Mint event for TRACKING ONLY - no actual _mint() is called!
-    // This event is emitted solely for off-chain tracking purposes.
-    if (senderBalanceIncrease > 0) {
-        emit Mint(_msgSender(), sender, senderBalanceIncrease, senderBalanceIncrease, index);
-    }
-}
+| Item | Location | Notes |
+|------|----------|-------|
+| Main contract | `contracts/cmd_executor.vy` | 1931 lines, **only file to optimize** |
+| Legacy contract | `contracts/tstore_executor.vy` | Older payload-queue executor, not the target |
+| Fake V2 pair | `contracts/fake_uniswap_v2_pair.vy` | K-invariant + configurable fee + 3 callback variants |
+| Fake V3 pool | `contracts/fake_uniswap_v3_pool.vy` | Balance-delta IIA check + 2 callback variants |
+| Fake V4 PM | `contracts/fake_uniswap_v4_pool_manager.vy` | exttload + ERC6909 + delta accounting |
+| Fake ERC20 | `contracts/fake_erc20.vy` | Standard mock with mint |
+| Fake WETH | `contracts/fake_weth.vy` | deposit/withdraw wrapping |
+| Test suite | `tests/` | ~276 tests, run with `uv run ape test tests/ -v -s` |
+| Benchmark | `tests/test_cmd_executor_three_hop_optimized.py` | 27 three-hop permutations — the gas benchmark |
+| Gas results | `.gas-results` | Written by test suite, consumed by `.auto/measure.sh` |
+| Autoresearch | `.auto/` | Config, logs, ideas from gas optimization sessions |
+
+## Build & Run
+
+```bash
+uv run ape test tests/ -v -s              # All tests
+uv run ape test tests/test_cmd_executor_*.py -v   # cmd_executor only
+uv run ape test tests/test_cmd_executor_three_hop_optimized.py -v -s  # Gas benchmark
 ```
 
-**Key Insight:**
-- Interest = `scaledBalance * (newIndex - oldIndex) / RAY`
-- The user's **scaled balance** does not change
-- The user's **effective balance** increases because the index increased
-- Mint event `amount` field = interest in underlying units (for tracking)
+Uses **Foundry (Anvil)** for local test execution. `ape-config.yaml` sets Vyper 0.5.0a3, mainnet-fork default, and a custom test mnemonic (to avoid EIP-7702 delegation issues).
 
-**Implementation:**
-```python
-# In enrichment.py - INTEREST_ACCRUAL operations
-if operation.operation_type.name == "INTEREST_ACCRUAL":
-    raw_amount = scaled_event.amount  # Interest in underlying units
-    scaled_amount = 0  # NO balance change - event is tracking-only
-```
+Sequential runs (`-j1`) if xdist races appear. The test suite uses Hypothesis for fuzz testing — `.hypothesis/` contains cached examples.
 
-**Issue Reference:** `debug/aave/0004 - Interest Accrual Scaling Error in Enrichment.md`
+## Contract Architecture: cmd_executor
 
----
+### Core Flow
 
-### Pool Versions and Scaling
+1. **`execute(commands: Bytes[MAX_COMMANDS_LENGTH], config: uint256 = 0)`** — Owner-only entry point. `config` is packed: `(expected_value << 32) | (bribe_recipient_idx << 24) | (bribe_bips << 8) | check_mode` (low byte = mode: 0=skip, 1=WETH+ETH, 2=ERC6909 WETH; bits 8-23 = bribe bips; bits 24-31 = bribe recipient address table index; bits 32-255 = expected value). Calls `_preprocess()` unconditionally (parses SET_ADDRESS until `0xFF` or first non-preprocessing opcode), then iterates `_execute_command_at()` until the stream is exhausted.
 
-**Lesson:** Pool revisions and token revisions are independent versioning systems that affect different aspects of amount handling.
+2. **`_execute_command_at(data, offset) → uint256`** — Reads a 1-byte opcode, dispatches to one of 26 `_cmd_*` internal functions via two-level dispatch (high nibble first, then exact match). Returns the offset of the next command.
 
-**Context:** Two separate versioned systems exist:
+3. **Callback handlers** — `uniswapV2Call`, `hook`, `pancakeCall` (V2), `uniswapV3SwapCallback`, `pancakeV3SwapCallback` (V3), `unlockCallback` (V4) — each processes commands from the callback data by iterating `_execute_command_at()` until the stream is exhausted.
 
-1. **Pool Revisions** (affects how amounts are passed between contracts):
-   - **Pool revisions 1-8:** The Pool contract passes unscaled amounts (underlying units) to the token contract
-   - **Pool revision 9+:** The Pool contract pre-calculates scaled amounts before calling the token contract
+### Why Function Extraction Matters
 
-2. **Token Revisions** (affects rounding math behavior and processor selection):
-   - **Token revisions 1-3:** Uses `HalfUpRoundingMath` - standard `ray_div` with half-up rounding
-   - **Token revision 4+:** Uses `ExplicitRoundingMath` - explicit floor/ceil rounding
+The 26 `_cmd_*` functions are extracted from a monolithic dispatch loop. This is **critical for Venom's liveness analysis**: Venom uses monotonic alloca allocation, and `ConcretizeMemLocPass` reclaims memory only when liveness proves two allocas are mutually exclusive. In a monolithic function, all handlers' variables are reachable → no sharing. With extraction, each `_cmd_*` is a separate invoke → Venom can overlap their memory regions.
 
-**Python Implementation:**
-The enrichment layer handles both systems independently:
-1. Pool revision determines if raw amounts need scaling before processing (for pool rev 9+)
-2. Token revision determines which processor and rounding math to use via factories
+**Result**: Highest memory address dropped from 22,976 to 8,544 (−62.8%). This makes Venom beat the default codegen on all paths.
 
-**Processor mapping (by token revision):**
-```python
-# TokenProcessorFactory.COLLATERAL_PROCESSORS
-{
-    1: CollateralV1Processor,  # HalfUpRoundingMath
-    2: CollateralV1Processor,  # Same as rev 1
-    3: CollateralV3Processor,  # HalfUpRoundingMath
-    4: CollateralV4Processor,  # ExplicitRoundingMath
-    5: CollateralV5Processor,  # ExplicitRoundingMath
-}
+### Command Encoding (Compact Binary)
 
-# TokenProcessorFactory.DEBT_PROCESSORS
-{
-    1: DebtV1Processor,
-    2: DebtV1Processor,  # Same as rev 1
-    3: DebtV3Processor,
-    4: DebtV4Processor,
-    5: DebtV5Processor,
-}
+Commands use 1-byte opcodes + tightly-packed fields (no ABI encoding). Key field sizes:
+- **Amounts**: `uint96` (max 7.9×10²⁸, 12 bytes) — covers all practical token amounts
+- **V4 fee**: `uint16` (500/3000/10000 fit, 2 bytes)
+- **V4 tick_spacing**: `int16` (10/60/200 fit, 2 bytes)
+- **Indices**: `uint8` (1 byte) — refer to address table or sentinel values
+- **V2 fee**: `uint16` inline per-swap (2 bytes)
 
-# TokenProcessorFactory.GHO_DEBT_PROCESSORS
-{
-    1: GhoV1Processor,  # No discount
-    2: GhoV2Processor,  # Discount support
-    3: GhoV2Processor,   # Same as rev 2
-    4: GhoV4Processor,  # Discount deprecated
-    5: GhoV5Processor,  # Explicit rounding
-    6: GhoV5Processor,   # Same as rev 5
-}
-```
+### Sentinel Address System (CRITICAL — biggest gas win: −67,786 gas)
 
-**TokenMath mapping (by pool version):**
-```python
-# TokenMathFactory._TOKEN_MATH
-{
-    1: HalfUpRoundingMath,   # Pool revs 1-3
-    2: HalfUpRoundingMath,
-    3: HalfUpRoundingMath,
-    4: ExplicitRoundingMath, # Pool revs 4-10
-    5: ExplicitRoundingMath,
-    6: ExplicitRoundingMath,
-    7: ExplicitRoundingMath,
-    8: ExplicitRoundingMath,
-    9: ExplicitRoundingMath,
-    10: ExplicitRoundingMath,
-}
-# Use get_token_math_for_token_revision(revision) to map token revision → pool version
-```
+Address indices `0xFC`–`0xFF` resolve to the **4 protocol-role sentinels** without TLOAD or SET_ADDRESS:
 
-**Key Point:** Token revision determines both the processor and rounding math. Pool and token revisions typically move together but are technically independent. Use `TokenProcessorFactory` to get the correct processor and `TokenMathFactory` for math operations.
+| Index | Sentinel | Resolves To |
+|-------|----------|-------------|
+| `0xFC` | `V4_PM_SENTINEL` | `POOL_MANAGER_ADDR` (immutable) |
+| `0xFD` | `V4_SELF_SENTINEL` | `self` (executor address) |
+| `0xFE` | `V4_WETH_SENTINEL` | `WETH_ADDR` (immutable) |
+| `0xFF` | `V4_NATIVE_SENTINEL` | `NATIVE_ADDRESS` / no-hooks indicator |
 
----
-
-### Math Library Architecture
-
-**Lesson:** Four levels of abstraction separate concerns: primitives, math libraries, processors, and enrichment.
-
-**Architecture:**
-
-The Aave module uses a layered architecture:
-
-1. **`wad_ray_math.py`** - Low-level primitives
-   - `ray_mul`, `ray_div` - Half-up rounding
+**Only protocol roles are sentinels — no path-specific tokens are baked into the contract.**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [BowTiedDevil/degenbot](https://github.com/BowTiedDevil/degenbot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
