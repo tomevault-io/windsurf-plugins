@@ -3,7 +3,7 @@ trigger: always_on
 description: Two halves of one pipeline (merged from the retired private `flip-omop-db` repo, FLIP#834):
 ---
 
-# CLAUDE.md — trust/omop-db
+# AGENTS.md — trust/omop-db
 
 ## What this directory is
 
@@ -82,4 +82,4 @@ cp .env.build.example .env.build    # once, before any build-pipeline target
 
 ---
 > Source: [londonaicentre/FLIP](https://github.com/londonaicentre/FLIP) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
