@@ -1,149 +1,98 @@
 ---
 trigger: always_on
-description: External integration rules — providers, idempotency, bulkhead, observability
+description: > Authoritative project instructions for Claude (and any LLM assistant) working in a codebase that has adopted the **vibecodex** standard. These rules OVERRIDE any default behavior. Follow them exactly. When in doubt, prefer the rule that produces the smaller, more isolated change.
 ---
 
+# CLAUDE.md — vibecodex
 
-# External Integration Rules
+> Authoritative project instructions for Claude (and any LLM assistant) working in a codebase that has adopted the **vibecodex** standard. These rules OVERRIDE any default behavior. Follow them exactly. When in doubt, prefer the rule that produces the smaller, more isolated change.
 
-Every external boundary in this codebase is shaped by 5 rules. Apply them every time you add or modify an integration.
+## Project Purpose
 
-## 1. Anti-Corruption Layer (ACL): provider returns `GenerateResult | ProviderError`
+This is a **production FastAPI service**. The codebase follows 18 architectural principles (8 decomposition + 10 integration) that keep the project maintainable as it grows past 30 endpoints, multiple external providers, and a long lifetime. Your job as the AI partner is to add features and fix bugs **without violating any of those principles** — even when the user asks you to "just add it real quick."
 
-Provider adapters MUST translate vendor responses into our domain types. Never return `dict`, never let the vendor's field names cross the boundary.
+If a quick fix would violate a rule, you say so and propose the right shape. You never silently take the shortcut.
+
+---
+
+## Architecture (MANDATORY)
+
+The codebase has exactly four layers. Imports flow **only downward**:
+
+```
+Router  → Service → Repository (via Protocol) → ORM/HTTP/S3
+                ↘ Provider (via ACL) → external API
+```
+
+| Layer            | Lives in                       | What it does                                         | What it CANNOT import                                  |
+| ---------------- | ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------ |
+| **Router**       | `app/routers/`                 | HTTP only: parse request, call service, format reply | `sqlalchemy`, `httpx`, business logic                  |
+| **Service**      | `app/services/`                | Business rules, domain orchestration                 | `sqlalchemy`, `httpx`, `boto3`, FastAPI `Request`      |
+| **Repository**   | `app/repositories/`            | Data access (SQL, S3, Redis)                         | other services, FastAPI                                |
+| **Provider**     | `app/providers/<vendor>/`     | External API adapter, returns ACL types              | services, repositories, FastAPI                        |
+| **Schema**       | `app/schemas/`                 | Pydantic request/response models                     | services, repositories                                  |
+| **Models**       | `app/models/`                  | SQLAlchemy ORM                                       | services, providers                                    |
+| **Core**         | `app/core/`                    | Config, deps, logging, http clients                  | services, routers (avoid cycles)                       |
+
+**Dependency Inversion via `typing.Protocol`** — services never depend on a concrete repository. They accept an interface:
 
 ```python
-# app/providers/_types.py
-from dataclasses import dataclass
+# repositories/protocols.py
+from typing import Protocol
 from decimal import Decimal
+from app.domain.wallet import Wallet, LedgerEntry
 
-@dataclass(frozen=True)
-class GenerateResult:
-    url: str
-    cost_usd: Decimal
-    latency_ms: int
-    provider_request_id: str
-
-class ProviderError(Exception):
-    def __init__(self, message: str, *, retryable: bool, code: str | None = None):
-        super().__init__(message); self.retryable = retryable; self.code = code
-
-class ProviderTimeout(ProviderError):
-    def __init__(self, message: str): super().__init__(message, retryable=True, code="timeout")
-
-class ProviderQuotaExceeded(ProviderError):
-    def __init__(self, message: str): super().__init__(message, retryable=False, code="quota")
-
-class ProviderInvalidRequest(ProviderError):
-    def __init__(self, message: str): super().__init__(message, retryable=False, code="invalid_request")
+class WalletRepoProtocol(Protocol):
+    async def get(self, user_id: str) -> Wallet: ...
+    async def lock(self, user_id: str): ...  # async ctx mgr, FOR UPDATE
+    async def persist(self, wallet: Wallet, entry: LedgerEntry) -> None: ...
 ```
 
 ```python
-# ✅ GOOD — adapter maps to ACL
-class FalImageAdapter:
-    def __init__(self, client: FalClient): self._c = client
-
-    async def generate(self, req: ImageRequest) -> GenerateResult | ProviderError:
-        try:
-            data = await self._c.request("/v1/image", req.model_dump())
-        except httpx.TimeoutException as e:
-            return ProviderTimeout(str(e))
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
-                return ProviderQuotaExceeded(e.response.text)
-            return ProviderError(e.response.text, retryable=False, code=str(e.response.status_code))
-        return GenerateResult(
-            url=data["images"][0]["url"],
-            cost_usd=Decimal(str(data["billing"]["cost_usd"])),
-            latency_ms=int(data["meta"]["latency_ms"]),
-            provider_request_id=data["request_id"],
-        )
+# services/wallet/user.py
+class WalletUserService:
+    def __init__(self, repo: WalletRepoProtocol):
+        self._repo = repo
 ```
 
 ```python
-# ❌ BAD — leaking the vendor response shape
-async def generate(self, req: dict) -> dict:
-    return await self._c.request("/v1/image", req)
+# core/deps.py
+def get_wallet_service(db: Session = Depends(get_db)) -> WalletUserService:
+    return WalletUserService(repo=SQLAlchemyWalletRepo(db))
 ```
 
-## 2. Per-Provider Bulkhead: one `httpx.AsyncClient` per provider
-
-Each external provider has its own `httpx.AsyncClient` instance, with its own `Limits` and `timeout`. Defined ONCE in `app/core/http.py`.
-
 ```python
-# app/core/http.py
-import httpx
-from app.core.config import settings
-
-FAL_HTTP = httpx.AsyncClient(
-    base_url=settings.FAL_BASE_URL,
-    timeout=httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0),
-    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-    headers={"Authorization": f"Key {settings.FAL_API_KEY}"},
-)
-
-OPENAI_HTTP = httpx.AsyncClient(
-    base_url="https://api.openai.com/v1",
-    timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
-    limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
-    headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
-)
-```
-
-**Rationale:** if Fal is hung, its 20 connections fill up — but OpenAI's 50 are untouched. A single global client with `max_connections=100` would let one slow provider freeze every integration.
-
-```python
-# ❌ BAD
-HTTP = httpx.AsyncClient()  # shared across all providers — no bulkhead
-```
-
-## 3. Idempotency Keys
-
-Every side-effect operation accepts an idempotency key (UUID v4). For external API calls:
-
-- If the provider supports an `Idempotency-Key` header, forward it.
-- If not, persist `(user_id, key) → provider_request_id` in `provider_logs`. Look up before retrying.
-
-```python
-class FalImageAdapter:
-    async def generate(self, req: ImageRequest, *, idempotency_key: UUID) -> GenerateResult | ProviderError:
-        existing = await self._logs.find(user_id=req.user_id, key=idempotency_key)
-        if existing is not None:
-            return GenerateResult(**existing.cached_result)
-
-        result_or_err = await self._call(req, header_key=str(idempotency_key))
-
-        if isinstance(result_or_err, GenerateResult):
-            await self._logs.persist(
-                user_id=req.user_id, key=idempotency_key,
-                provider_request_id=result_or_err.provider_request_id,
-                cached_result=result_or_err.__dict__,
-            )
-        return result_or_err
-```
-
-Routers accept the key from a header:
-
-```python
-@router.post("/generate/image", response_model=GenerateResponse)
-async def generate_image(
-    req: GenerateRequest,
+# routers/wallet.py
+@router.get("/wallet/me", response_model=WalletResponse)
+async def get_wallet(
     user_id: str = Depends(get_current_user_id),
-    idempotency_key: UUID = Header(default_factory=uuid4, alias="Idempotency-Key"),
-    svc: ImageGenerationService = Depends(get_image_generation_service),
-) -> GenerateResponse:
-    return GenerateResponse.from_domain(await svc.generate(user_id, req, idempotency_key))
+    svc: WalletUserService = Depends(get_wallet_service),
+) -> WalletResponse:
+    return WalletResponse.from_domain(await svc.get_for(user_id))
 ```
 
-## 4. Observability Context (`contextvars`)
+---
 
-Use `contextvars.ContextVar` to thread `provider`, `user_id`, `request_id` through async call stacks. The JSON formatter reads them automatically.
+## The 18 Principles as Actionable Rules
 
-```python
-# app/core/logging.py
-import contextvars, json, logging
+### Part A — Safe Decomposition
 
-provider_var   = contextvars.ContextVar[str | None]("provider", default=None)
+**Rule A1 — Folder, not file, when a domain splits by type.**
+If `routers/X.py` is acquiring multiple disjoint sub-domains (e.g. image / video / audio), convert to package `routers/X/{a.py, b.py, c.py, __init__.py}`. `__init__.py` re-exports a combined `router`. `main.py` doesn't change.
+
+**Rule A2 — Static data lives in `app/data/` (or a `registry.py` next to its domain).**
+Pricing tables, model registries, prompt templates, country lists. Never inline a 60-line dict at the top of a service file.
+
+**Rule A3 — Auth and schemas don't live in the router file.**
+Auth deps go to `core/<domain>_auth.py`. Pydantic schemas go to `schemas/<domain>/*.py`. Routers stay thin.
+
+**Rule A4 — One file per provider format.**
+A vendor that exposes `image` and `video` APIs becomes `providers/<vendor>/{image.py, video.py, _client.py}`. Shared HTTP plumbing lives in `_client.py`.
+
+**Rule A5 — Worker handlers are NOT in the router.**
+HTTP enqueue/list/cancel stays in `routers/tasks.py`. Background processing logic lives in `services/task_handlers/<format>.py` and is invoked by your queue worker, not by FastAPI.
+
+**Rule A6 — User-API ≠ Admin-API in the same service file.**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
