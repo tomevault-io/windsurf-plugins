@@ -1,35 +1,103 @@
 ---
 trigger: always_on
-description: FastAPI server for langalpha — REST + SSE APIs for PTC-agent workflow execution, conversation/thread management, and workspaces. Endpoints live under `/api/v1/threads/*` and `/api/v1/workspaces/*` (discover the current set from the routers in `app/`).
+description: Electron shell around the hosted web app. It is a **remote-URL wrapper**: the package
 ---
 
-# langalpha server
+# langalpha desktop
 
-FastAPI server for langalpha — REST + SSE APIs for PTC-agent workflow execution, conversation/thread management, and workspaces. Endpoints live under `/api/v1/threads/*` and `/api/v1/workspaces/*` (discover the current set from the routers in `app/`).
+Electron shell around the hosted web app. It is a **remote-URL wrapper**: the package
+contains Electron, `src/`, two local pages and an entry URL, and nothing else. No web
+bundle ships with it, so a web deploy never needs a desktop release. The two local
+pages are the ones that have to work when the network does not: the OSS server picker
+and the outage screen.
 
-> Single source of truth for AI coding agents in `src/server/`. `CLAUDE.md` imports this via `@AGENTS.md`; Codex/Cursor read it directly. Edit here, not there.
+> Single source of truth for AI coding agents in `desktop/`. Edit here.
 
-## Layering (put code in the right tier)
+## Why Electron, not Tauri
 
-`app/` = route definitions + request orchestration (no raw SQL — DB access goes through services) · `handlers/` = per-request logic (chat streaming, workflow control, the error funnel) · `services/` = business logic + process singletons (session/workspace managers, `persistence/` DB services) · `database/` = raw-SQL query + pool layer · `models/` = Pydantic request/response · `dependencies/` = FastAPI `Depends` gates (auth + request admission).
+Both were built and measured. On macOS the performance is comparable, so speed is not
+what decided it: what is left is a straight trade of package size and idle memory, where
+Tauri wins outright, against engine control and shell cost, where Electron does.
 
-Inside those tiers, the run machinery groups into **domain namespaces**: `app/threads/` (thread routes), `handlers/chat/` (the flash/PTC run generators, request prep, stream readers), `services/runs/` (the run lifecycle: admission → coordinator → executor → finalization → recovery, plus SSE production/transport), `services/report_back/` (flash + subagent report-back hooks), and `database/runs/` (run-ledger SQL: lifecycle, outbox, subagent runs). The namespaces live *inside* the horizontal contract — they never invert it (`services/**` must not import `handlers/**`; enforced by `tests/unit/server/test_import_layering.py`).
+**Engine control is worth more here than it would be in a bundled app.** This wrapper
+carries no web bundle, so under Tauri the rendering engine becomes whatever the user's
+OS ships. WebView2 on Windows is Chromium and fine; macOS pins to that machine's
+WKWebView and Linux to WebKitGTK, for a payload that deploys weekly and cannot be
+version-matched to any of them. Electron puts one Chromium inside the package and moves
+it on our schedule. For an app that shipped its own bundle this argument would be much
+weaker, because engine and payload would be tested as a pair.
 
-## Landmines (non-obvious)
+**The window chrome is the same point in miniature.** `-webkit-app-region` is a Chromium
+property and the whole contract is built on it, five call sites in `web/` plus
+`titleBarStyle`. Tauri's `data-tauri-drag-region` would put shell-specific markup into
+`web/` for every browser user to download, and put a JS handler back in front of a
+decision that is now pure CSS.
 
-- **Two separate async psycopg3 pools, opened/closed in the `app/setup.py` lifespan** — the LangGraph checkpointer (workflow state; the LangGraph Store shares it) and the conversation-history (app-data) pool. Don't reuse one for the other.
-- **Mid-flight reconnection is Redis-only, not the checkpoint.** Live events are buffered in a per-run Redis **Stream** `workflow:stream:{thread_id}:{run_id}` (XADD + `MAXLEN` trim, 24h TTL, 150k-event cap). `GET /api/v1/threads/{id}/messages/stream` XREAD-BLOCK-replays the buffer then tails live; `last_event_id` is a resume cursor (resumes at seq N+1), not post-hoc dedup. An abandoned running workflow is reaped after ~6h; a completed workflow's reconnect returns `410` once its task-info key expires.
-- **Historical replay is projected from the LangGraph checkpoint, not from stored SSE events** (re-homed in #315). `GET /api/v1/threads/{id}/messages/replay` (`source=auto`) rebuilds the transcript from checkpoint state via `CheckpointHistoryReader` + a pure projector (`services/history/`), falling back to persisted `conversation_responses.sse_events` only when checkpoint coverage is missing (that column is still dual-written every turn, but it's now the transitional fallback). **So the durable replay contract is the checkpoint state schema: `messages` (a `DeltaChannel`) + the `ui` channel** (`langgraph.graph.ui`; an id-keyed upsert accumulator of compact, non-rederivable records — image-URL maps, `model_fallback` notices).
-- **What silently breaks replay of already-stored checkpoints:** renaming a `ui`-record's `name`/`props`, or emitting one without a stable pre-stamped `id` (the reducer upserts by id — keep the projector's field whitelists in sync); putting rederivable or bulk data in graph state (the projector rebuilds artifacts from tool-call *args* + message `additional_kwargs`, and >32KB widget data must be a content-addressed `data_ref`, not inlined); or adding a chat-wire SSE type without a checkpoint- or table-sourced home — `tests/unit/server/services/history/test_event_ledger.py` fails CI until every type is classified, so build the replay source before you emit.
-- **Error funnel (`handlers/chat/error_handling.py`, `classify_error()`):** recoverable errors (DB/connection drop, timeout, network, API 5xx/429) emit a `retry` SSE event (`auto_retry`; thread → `interrupted`, and the client/gateway re-submits) up to 3× (`get_max_workflow_retries`), then convert to a terminal `error`. Non-recoverable *code bugs* (`AttributeError`/`NameError`/`TypeError`/`ImportError`/`SyntaxError`/`KeyError`) fail immediately with a stable `error` payload. Don't add ad-hoc try/except that swallows this path.
-- **Cancelled ≠ disconnected:** an explicit cancel stops the workflow; a client disconnect lets it keep running in the background (`LocalRunExecutor` keeps executing; the run's `in_progress` ledger row is the durable record), and a reconnect resumes the live stream.
-- **`steer_only: true`** on `POST .../messages` only steers an in-flight workflow; if none is running it's rejected with an admission-conflict `error` event (`error_type="admission_conflict"`, `code="not_running"`) — it never starts a new turn.
+**The shell is cheap because it is JavaScript.** Roughly 2000 lines of URL classification
+and window policy, with a suite in plain `node --test` over an `electron` stub and no
+runtime needed. In Rust that is a toolchain in CI and on every self-hoster's machine, to
+host logic that mostly decides whether a URL is ours.
 
-## Config
+This is the right call for this stage, not a permanent one. The thing that would move it
+is the desktop app shipping its own bundle: engine and payload recouple, the argument
+above loses most of its force, and ~90 MB of package and the idle memory become the
+whole story.
 
+## Commands
+
+```bash
+pnpm start                       # run the shell from source (oss defaults → localhost:5173)
+pnpm test                        # node:test; pure logic only, no Electron runtime needed
+pnpm run preview                 # the shell against a web build that has not deployed yet
+pnpm run build                   # unpacked build into dist/<edition>/, fastest way to check packaging
+pnpm run dist                    # real installers (dmg + zip on macOS)
+
+DESKTOP_EDITION=saas \
+DESKTOP_APP_ORIGIN=https://…  \
+DESKTOP_PLATFORM_ORIGIN=https://… pnpm run dist  # a saas package
+```
+
+**`pnpm run preview` is how you see a change before it deploys.** A remote-URL shell
+loads whatever is *live*, so every frame decision it makes is a reaction to the deployed
+bundle rather than to the source in front of you: that is how the window buttons ended up
+on the app's own logo, and it is where the console's second window was caught before it
+reached anyone. It builds `web/`, serves it on loopback with the api streamed through to
+a running stack, and launches the shell against it. `--web-env <file>` builds the
+frontend the way another environment builds it and `--platform <origin>` runs the saas
+edition, which together make a hosted preview a matter of pointing at a local pair:
+
+```bash
+# the console, in the layout production actually runs: at an origin root, not
+# under /account/. Its dev default is the legacy same-host layout, and a console
+# reachable only at a path prefix is one this shell cannot address, since it
+# classifies by origin and nothing else.
+VITE_ACCOUNT_PREFIX= VITE_BASE=/ VITE_APP_URL=http://localhost:5399 \
+VITE_PLATFORM_URL=http://localhost:5178 VITE_COOKIE_DOMAIN=localhost \
+pnpm dev --port 5178 --strictPort          # in the console's own web/
+
+VITE_APP_ENTRY_PATH=/ VITE_PLATFORM_URL=http://localhost:5178 \
+pnpm run preview -- --host localhost --web-env ../../web/.env \
+  --platform http://localhost:5178 --backend http://127.0.0.1:8000
+```
+
+`--host localhost` rather than the loopback literal is deliberate: cookies ignore
+port, so a console on the same hostname shares a session with the preview the way
+the two subdomains share one in production.
+
+It keeps a user-data dir of its own, which is not tidiness: sharing the installed app's
+would teach the *installed* app that its frontend reserves the window-button strip when
+the build it actually loads may not, which is the bug it exists to catch.
+
+**Say `pnpm run`, not `pnpm`, for anything that builds.** `pnpm <name>` falls back
+to a script only when pnpm has no command of that name, and the failure when it
+does is silent: this used to be `pnpm pack`, which quietly built a **tarball**
+instead, left the previous artifact in the output tree, and exited 0. A verification run
+against that stale artifact is what caught it.
+
+**The `postinstall` line is load-bearing.** Electron 42 removed the package's own
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ginlix-ai/LangAlpha](https://github.com/ginlix-ai/LangAlpha) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
