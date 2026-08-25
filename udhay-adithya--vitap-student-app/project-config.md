@@ -1,183 +1,108 @@
 ---
 trigger: always_on
-description: VITAP Student App is a Flutter mobile application for VIT-AP University students. It scrapes the VTOP student portal using a Rust library (via Flutter-Rust Bridge) and presents data — attendance, timetable, marks, exam schedule, profile — in a native app experience.
+description: An independent (not university-affiliated) Flutter app that reads a student's own
 ---
 
-# Copilot Instructions
+# VIT-AP Student App — working notes
 
-## Project Overview
+An independent (not university-affiliated) Flutter app that reads a student's own
+VTOP data using their own credentials. Built by Udhay Adithya.
 
-VITAP Student App is a Flutter mobile application for VIT-AP University students. It scrapes the VTOP student portal using a Rust library (via Flutter-Rust Bridge) and presents data — attendance, timetable, marks, exam schedule, profile — in a native app experience.
+## Stack
 
-## Build, Test, and Lint Commands
+- **Flutter + Riverpod.** Most providers use `riverpod_annotation` codegen; a few
+  are plain (`bottom_nav_provider.dart`, `schedule_clock.dart`). Both are fine.
+- **All VTOP data goes through the Rust bridge** (`lib_vtop` via FRB). `http` is
+  used only for the weather API and `announcements.json`. So a VTOP bug is a Rust
+  bug — see `docs/vtop_frontend_handoff.md`.
+- **ObjectBox** for persisted domain data, **SharedPreferences** for throwaway
+  local state (dismissed announcements, engagement counters). Adding a property
+  to an ObjectBox entity is a schema migration on a shipping app — don't do it
+  for state that doesn't deserve one.
+- Codegen: `dart run build_runner build --delete-conflicting-outputs`
 
-```bash
-# Install dependencies
-flutter pub get
+## How to work here
 
-# Run the app (build Rust first on initial setup)
-cd rust && cargo build --release && cd ..
-flutter run
+**Discuss UI changes before implementing them.** The established rhythm is:
+read the actual code, describe what's wrong and why, propose, get a decision,
+then build. Skipping to code on a design task is not wanted.
 
-# Lint / static analysis
-flutter analyze
+**Extract rules into pure, tested functions.** Anything with a real rule in it —
+deadlines, version gates, due dates, prompt eligibility — lives in a plain
+function with an injectable `now`, not inside a widget. See
+`outing_rules.dart`, `assignment_schedule.dart`, `semantic_version.dart`,
+`review_prompt_policy.dart`. Regression tests carry a comment saying what bug
+they lock down.
 
-# Run all Flutter tests
-flutter test
+**Verify with `flutter analyze` and `flutter test`.** There is no Android device
+attached in most sessions, so device verification usually can't happen — say so
+plainly rather than implying something was seen working.
 
-# Run a single Flutter test file
-flutter test test/widget_test.dart
+**Commits:** conventional, lowercase, single line, no body, no attribution.
+`feat: add persistent update card to account page`
 
-# Regenerate all code (ObjectBox, Riverpod, JSON, Freezed)
-dart run build_runner build --delete-conflicting-outputs
+## Design system
 
-# Watch mode for code generation during development
-dart run build_runner watch
+Established across the home, login, biometric, outing, assignment and account
+screens. Follow it rather than inventing per-screen treatments.
 
-# Regenerate Flutter-Rust bridge bindings (run from project root)
-flutter_rust_bridge_codegen generate
+- **Every colour comes from `ColorScheme`.** No `Colors.red/green/blue/orange` —
+  they sit off the seeded cream/olive palette in light mode and glare in dark.
+  Status maps to `primary` / `tertiary` / `error`, containers for fills.
+- **One saturated element per screen.** If everything is loud, nothing is.
+- **Radii:** 28 hero cards, 20 cards and sheets' inner blocks, 16 strips and
+  inputs, stadium/999 for pills and primary buttons.
+- **Inputs:** `appInputDecoration()` is the single treatment — filled, radius 16,
+  floating label. Don't hand-roll `InputDecoration`.
+- **Home page rhythm:** `SectionHeader.gapAbove` (28), `gapBelow` (12),
+  `gutter` (16). Sections supply no top padding of their own, and no widget
+  carries its own horizontal gutter.
+- **Bespoke card treatments per surface, not global `CardTheme`** — theming
+  cards globally repaints every card in the app.
+- `StyledSheet` is this app's replacement for centre dialogs.
+- Prefer `ListTile` over a hand-rolled `Row` in a fixed-height `SizedBox`; the
+  latter is how rows end up top-aligned instead of centred.
 
-# Rust: format, lint, test
-cd rust
-cargo fmt
-cargo clippy
-cargo test
-cargo test test_function_name   # single Rust test
-```
+## Things that will bite you
 
-## Architecture
+**VTOP demands an OTP per session.** `executeWithRetry` throws
+`VtopError_LoginOtpRequired`, pauses, and shows a global sheet. **Never fetch on
+page open** — it can demand an OTP for a page someone only glanced at. Biometric
+and attendance both fetch on an explicit tap for this reason, and neither has
+pull-to-refresh. This cost a 1-star review before the OTP sheet explained itself.
 
-### Flutter layer (`lib/`)
+**The weekend outing form is only served Tue–Sat.** Outside that VTOP returns the
+page with student fields stripped, and the Rust parser reports
+`RegistrationParsingError` — mapped to a friendly message in
+`outing_remote_repository.dart` only, since that variant means something else at
+login.
 
-**Feature-based structure** — each feature lives in `lib/features/<feature>/` with four mandatory sub-layers. All cross-feature shared code lives in `lib/core/`.
+**Timetable rows arrive in VTOP's order, not chronological.** Sort before
+displaying. Empty grid cells arrive as `"-"`; `parseClassTime` returns null
+rather than throwing.
 
-Current features: `auth`, `attendance`, `timetable`, `course_page`, `digital_assignment`, `home`, `onboarding`, `account`, `vtop_webview`.
+**`announcements.json` is hand-edited and pushed with no validation.** Parsing is
+deliberately lenient — one bad entry is skipped, unknown enums fall back, bad
+dates become null. Keep it that way. See
+`docs/announcements/ANNOUNCEMENT_SYSTEM_DOCS.md`.
 
----
+**Upgrader:** both `UpgradeAlert` and `UpgradeCard` check `versionInfo != null`
+*before* consulting `debugDisplayAlways`, so a failed store lookup can't be
+forced open with a debug flag. One shared `appUpgrader` instance is used by both
+surfaces — two instances means two store lookups and unshared "Later" state.
 
-### Feature sub-layer guide
+**The For You feed is cached, on purpose.** The home tab is torn down and rebuilt
+on every tab switch, so an auto-disposed provider turned each one into a fetch of
+a list that changes a few times a month. `ForYouViewModel` is `keepAlive`, and
+`ForYouRepository` reads through a SharedPreferences cache with a 6h TTL and
+`If-None-Match` revalidation. Don't make it fetch on build again. Contract and
+required response headers: `docs/for_you/FOR_YOU_FEED_DOCS.md`.
 
-Follow this pattern **exactly** when creating a new feature. Every layer has a corresponding `.g.dart` generated companion; always run `build_runner` after changes.
-
-#### `repository/`
-
-One file per data source. Repositories are the only layer that calls VTOP (via Rust) or external HTTP APIs. They always return `Either<Failure, T>`.
-
-**Pattern for VTOP-backed repositories:**
-```dart
-part 'my_remote_repository.g.dart';
-
-@riverpod
-MyRemoteRepository myRemoteRepository(Ref ref) {
-  final vtopService = serviceLocator<VtopClientService>();
-  return MyRemoteRepository(vtopService);
-}
-
-class MyRemoteRepository {
-  final VtopClientService vtopService;
-  MyRemoteRepository(this.vtopService);
-
-  Future<Either<Failure, MyModel>> fetchData({
-    required String registrationNumber,
-    required String password,
-    required String semSubId,
-  }) async {
-    try {
-      final credentials = Credentials(
-        registrationNumber: registrationNumber,
-        password: password,
-        semSubId: semSubId,
-      );
-      final result = await vtopService.executeWithRetry(
-        credentials: credentials,
-        operation: (client) => vtop.fetchMyData(client: client, semesterId: semSubId),
-      );
-      return Right(myModelFromJson(result));
-    } on SocketException {
-      return Left(Failure('No internet connection'));
-    } on VtopError catch (rustError) {
-      final msg = await VtopException.getFailureMessage(rustError);
-      return Left(Failure(msg));
-    } on FormatException catch (e) {
-      debugPrint('JSON parsing failed: ${e.toString()}');
-      return Left(Failure('Invalid response format from server'));
-    } catch (e) {
-      debugPrint('Error: ${e.toString()}');
-      return Left(Failure('An unexpected error occurred. Please try again.'));
-    }
-  }
-}
-```
-
-**Pattern for REST HTTP repositories** (e.g., For You feed):
-```dart
-@riverpod
-MyRepository myRepository(Ref ref) {
-  final client = serviceLocator<http.Client>();
-  return MyRepository(client);
-}
-
-class MyRepository {
-  final http.Client _client;
-  MyRepository(this._client);
-
-  Future<Either<Failure, MyModel>> fetchData() async {
-    try {
-      final response = await _client.get(Uri.parse('$_baseUrl/endpoint'), headers: _headers);
-      if (response.statusCode == 200) {
-        return Right(MyModel.fromJson(json.decode(response.body) as Map<String, dynamic>));
-      }
-      return Left(Failure('Request failed: ${response.statusCode}'));
-    } catch (e) {
-      return Left(Failure('Failed: ${e.toString()}'));
-    }
-  }
-}
-```
-
-#### `model/`
-
-Models used exclusively within a feature (not shared across features). If a model needs to be shared, it belongs in `lib/core/models/`.
-
-There are two kinds of models:
-
-**ObjectBox entity** (persisted locally — used for data that is part of the `User` aggregate):
-```dart
-part 'my_model.g.dart';
-
-@Entity()
-@JsonSerializable()
-class MyModel {
-  @Id()
-  int? id;
-
-  @JsonKey(name: 'field_name')
-  final String fieldName;
-
-  MyModel({this.id, required this.fieldName});
-
-  factory MyModel.fromJson(Map<String, dynamic> json) => _$MyModelFromJson(json);
-  Map<String, dynamic> toJson() => _$MyModelToJson(this);
-}
-```
-
-**JSON-only model** (transient — not persisted, used for API response parsing):
-```dart
-part 'my_detail.g.dart';
-
-List<MyDetail> myDetailFromJson(String str) =>
-    List<MyDetail>.from((json.decode(str) as List).map((x) => MyDetail.fromJson(x as Map<String, dynamic>)));
-
-@JsonSerializable()
-class MyDetail {
-  @JsonKey(name: 'field_name')
-  final String fieldName;
-
-  MyDetail({required this.fieldName});
-
+**`AppConstants.forYouItemTypes` must match the API's `type` enum.** They drifted
+once — the app offered `'events'` and `'other'` while the API validated against
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Udhay-Adithya/vitap_student_app](https://github.com/Udhay-Adithya/vitap_student_app) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
