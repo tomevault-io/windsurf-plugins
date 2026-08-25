@@ -1,51 +1,49 @@
 ---
 trigger: always_on
-description: HAR harness workflow — read before change, verify before done
+description: Guide for coding agents working on **this repository** (`@osfactory/har` — the CLI and MCP control plane).
 ---
 
+# HAR — Agent Development Guide
 
-# HAR Harness Workflow
+Guide for coding agents working on **this repository** (`@osfactory/har` — the CLI and MCP control plane).
 
-This repository uses a `.har/` agent harness. Follow this on every change.
+For setup, testing fixtures, and PR workflow, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-The harness is **how you run the project**, not only how you verify it. Launch a
-slot for live apps, browsers, and screenshots — never hand-roll docker/dev-server
-startup. If a harness command fails, fix the harness or surface the failure.
+This repo **dogfoods HAR** — `.har/` at the repo root defines how coding agents validate changes here.
 
-## Before making changes
+<!-- har:agent-environment:start -->
+## HAR / agent environment
+
+The harness is **how you run this project**, not only how you verify it. This
+root harness is the **CLI profile** (no runtime server). Launch a slot to get an
+isolated worktree with toolchain paths; never hand-roll setup. To see Mission
+Control or the docs site live, launch `control/.har/` or `docs/.har/` instead.
+
+If a harness command fails, fix the harness (or report the failure) — do not quietly
+fall back to ad-hoc commands.
+
+### Before making changes
 
 1. On the **main checkout**, switch to the intended base (usually `main`) — launch
    creates a worktree from that HEAD.
 2. **Launch first** — MCP `har_launch_environment` / `har env launch 1`. Use the
-   returned **work dir** for ALL edits (never the main checkout). Path looks like
-   `~/worktrees/<base>-<sha4>-har-agent-<id>-<rand4>` (see `.har/slots/agent-<id>.json`).
-   **Bind tracker work** when the task names an issue or ticket — short `--work-id`
-   (e.g. `widget-123`) plus `--work-source` / `--work-url` / `--work-title`. Skip for ad-hoc work.
-3. Read `AGENTS.md`, `.har/README.md`, `.har/stages.json`, then
-   `.har/CLAUDE.agent.md` (slot URLs / definition of done).
+   returned **work dir** for ALL edits (never the main checkout).
+   **Bind tracker work** when the task names a durable issue or ticket (GitHub,
+   Linear, etc.): pass a short repo-scoped `--work-id` / `workUnitId` (e.g.
+   `widget-123`), `--work-source` / `source`, `--work-url` / `sourceUrl`, and
+   `--work-title` / `title` when known. Skip binding for ad-hoc work with no
+   tracker identity.
+3. Read [`.har/README.md`](.har/README.md), [`.har/stages.json`](.har/stages.json), then
+   [`.har/CLAUDE.agent.md`](.har/CLAUDE.agent.md) (slot URLs / definition of done).
 4. Hot-reload usually applies; if not, `./.har/agent-cli.sh <id> restart` (no-op on
    cli/ios profiles without managed processes).
 
 **Occupied slots always block.** Run `complete` / `teardown`, then `launch`. Resume
 failed/starting launches with `--resume` / `recover`. Prefer a free slot (2+) over
-sharing slot 1 across unrelated chats. Check `har_get_status` / `har env status`
-first. Commit early — teardown keeps the branch, not uncommitted work. Gitignored
-paths are ephemeral. With telemetry on, Mission Control derives session purpose from
-the first captured user prompt.
+sharing slot 1 across unrelated chats. Check `har_get_status` / `har env status` first.
+Commit early — teardown keeps the branch, not uncommitted work.
 
-## Harnesses in this repo
-
-Pick the harness that owns the files you are changing. See `AGENTS.md`.
-
-| Path | Runs | Use when changing |
-|------|------|-------------------|
-| `.har/` | `@osfactory/har` (typecheck, build, unit tests, lint) | `src/`, `packages/`, `tests/` |
-| `control/.har/` | Mission Control (Next.js + SQLite, browser-e2e) | `control/` |
-| `docs/.har/` | Docs / marketing site (Astro + Playwright screenshots) | `docs/` |
-
-Run harness commands from the directory that owns the harness (e.g. `cd docs`).
-
-## After making changes
+### After making changes
 
 Prefer MCP → CLI → shell. Quick verify for the loop; **full verify before done**.
 
@@ -55,28 +53,52 @@ Prefer MCP → CLI → shell. Quick verify for the loop; **full verify before do
 - Shell: `./.har/verify.sh 1`, `./.har/verify.sh 1 --full`, `./.har/teardown.sh 1`
 
 Commit in the session worktree. Run JSON stays in the main checkout `.har/runs/`.
-UI changes with Playwright: update specs under `tests/` (full verify includes browser-e2e).
 
-## Definition of done
+### Definition of done
 
 - Full verify passes; edits only in the session worktree; tests cover new behavior;
   changes committed; show preview URLs; then **session handoff** (below).
 
-## Session handoff (required)
+### Session handoff (required)
 
 After full verify and commit, stop. Include summary, session branch
 (`.har/slots/agent-<id>.json`), and preview URLs. Wait — never autonomously
-complete, teardown, push, or open a PR. **Default (1 is the default):** when
-`gh`/GitHub MCP is available, recommend **Complete + open a PR** — push → open
-PR → `har env complete` / `har_complete_environment` (branch kept). Still needs
-approval. Alternatives: **Complete only**, or **Something else**. Without PR
-tooling, recommend **Complete only** and give the session branch for a manual push.
+complete, teardown, push, or open a PR. **Default:** when `gh`/GitHub MCP is available,
+recommend **Complete + open a PR** (still needs approval). Alternatives: **Complete only**,
+or **Something else**. Without PR tooling, recommend **Complete only** and give the
+session branch for a manual push.
 
-## Commit gate
+### Commit gate
 
 Full verify records a tree hash under `.har/validations/`. With `har hooks install`,
 commits must match a passing full verify. Re-verify after any edit; `git add -A`.
 Do not bypass (`--no-verify`, `HAR_SKIP_GATE=1`).
+
+### Cursor IDE
+
+If `.cursor/rules/har-workflow.mdc` exists, the same harness workflow is injected into
+every Cursor agent session automatically. Run `har env init` or `har env maintain` to
+create or refresh it.
+<!-- har:agent-environment:end -->
+
+## Harnesses in this repo
+
+This is a monorepo with **three harnesses** — pick the one that owns the files you are changing:
+
+| Path | Profile | Runs | Use when changing | Docs |
+|------|---------|------|-------------------|------|
+| `.har/` | cli | `@osfactory/har` (typecheck, build, unit tests, lint) | `src/`, `packages/`, `tests/` | [.har/README.md](.har/README.md) |
+| `control/.har/` | default | Mission Control (Next.js + SQLite, browser-e2e) | `control/` | [control/.har/README.md](control/.har/README.md) |
+| `docs/.har/` | default | Docs / marketing site (Astro + Playwright screenshots) | `docs/` | [docs/.har/README.md](docs/.har/README.md) |
+
+Run harness commands from the directory that owns the harness (e.g. `cd docs && har env launch 1`). See [control/AGENTS.md](control/AGENTS.md) and [docs/AGENTS.md](docs/AGENTS.md) for project guides.
+
+**The harness is how you run each project** — to see Mission Control or the docs site live (manual testing, browser, screenshots), launch the matching slot; never hand-roll docker/dev-server startup. If a harness command fails, fix the harness or report it — don't silently fall back to ad-hoc commands.
+
+Docs UI work: use `docs/.har/` so full verify produces before/after screenshots under `docs/.har/artifacts/browser-e2e/screenshots/`. The root CLI harness may still run docs contract checks (`drift` / build) when changing product surfaces that the docs describe — that does not replace launching the docs harness for landing-page or Starlight UI changes.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [os-factory/har](https://github.com/os-factory/har) — distributed by [TomeVault](https://tomevault.io).
