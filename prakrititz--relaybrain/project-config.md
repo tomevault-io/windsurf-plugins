@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Relay coordination — room context, locks, /relay ask
+description: <!-- BEGIN:relay-os -->
 ---
-
 
 <!-- BEGIN:relay-os -->
 # Relay (auto-installed)
