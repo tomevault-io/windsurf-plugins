@@ -7,13 +7,13 @@ AI-powered security auditing for web and mobile applications. Built for vibe cod
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [eticmedya/Vibesecurity](https://github.com/eticmedya/Vibesecurity).
+Original source: `CLAUDE.md` in [eticmedya/Vibesecurity](https://github.com/eticmedya/Vibesecurity).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
