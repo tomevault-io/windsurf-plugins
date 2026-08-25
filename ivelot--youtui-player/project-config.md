@@ -83,4 +83,4 @@ Three internal packages:
 
 ---
 > Source: [IvelOt/youtui-player](https://github.com/IvelOt/youtui-player) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
