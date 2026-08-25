@@ -1,0 +1,107 @@
+---
+trigger: always_on
+description: > 纯路由文件。**不承担 domain 知识 / 工程铁律**——那些归 SKILL.md 或项目 CLAUDE.md。
+---
+
+# PCB-Agent-Teams 工作区 — 指南针
+
+> 纯路由文件。**不承担 domain 知识 / 工程铁律**——那些归 SKILL.md 或项目 CLAUDE.md。
+
+## FIRST-RUN GATE
+
+`USER.md` 缺失 = 新 clone 未配置 → 先跑 `setup` skill，**别开工**（不 init / 不选品 / 不画图）。
+`USER.md` 存在 → 忽略本节，正常路由。（no USER.md → run `setup` first; otherwise ignore this section.）
+
+## 目录速览
+
+```text
+PCB-Agent-Teams/
+├── CLAUDE.md             ← 本文件
+├── README.md             ← 对外文档 **英文版**（source of truth）
+├── README.zh-CN.md       ← 对外文档 **中文版**（与 README.md 一一对应，必须同步）
+├── USER.md               ← 在手硬件、所属地、能力、偏好（必读；不入 git，从 USER.md.example 复制）
+├── assets/               ← README 用图（进 git）；README 引图只能从这里引
+├── docs/                 ← 本地稿，**.gitignore 不发布**（宣传稿 / 板照）；对外内容写 README，别写这
+├── lib_external/         ← 共享元件库（CONVENTIONS.md）
+├── lib_cache/sources/    ← 外部库只读 cache（pre-filter 池，不被项目引用）
+├── .venv/                ← Python 3.12（禁 3.13/3.14）
+├── .env                  ← 分销商 API key（不入 git）
+├── .claude/
+│   ├── references/       ← 工作区级元协议（按需读）
+│   │   └── protocols.md  ← USER 维护 / 计划先行 / sub-agent 分工 / 监控 / Phase 编号
+│   └── skills/           ← 10 个正式 skill + `setup`（首次配置引导，配完自动失效）
+└── Projects/<name>/      ← 项目骨架（用 project-init 生成）
+```
+
+## 资源路由
+
+| 场景 | 去哪 |
+| --- | --- |
+| 用户在手硬件 / 焊接能力 / 所属地 / 偏好 | `USER.md` |
+| 跨项目电气铁律（电源域、差分链等） | `.claude/skills/circuit-design/references/electrical_invariants.md` |
+| 日本选品规则、JP 替代库表 | `.claude/skills/component-selecting-JP/references/jp_vendor_priority.md` |
+| 中国选品规则、国产替代表（零 key 链路） | `.claude/skills/component-selecting-CN/references/cn_vendor_priority.md` |
+| API rate limit / DK / Mouser | `.claude/skills/component-selecting-JP/references/api_rate_limits.md` |
+| BOM 三类文件生命周期 | `.claude/skills/component-preparing/references/bom_lifecycle.md` |
+| 工作区元协议（计划先行 / sub-agent 分工 / 监控） | `.claude/references/protocols.md` |
+| 项目专属设计意图、BOM、参数（**static** compass） | `Projects/<name>/CLAUDE.md` |
+| 项目 **live 进度** / artifact 索引 / change log / 回退记录 | `Projects/<name>/STATUS.md` |
+| 项目骨架模板（CLAUDE.md 9 章节 + STATUS.md dashboard） | `.claude/skills/project-init/templates/` |
+| 共享库写入规则 | `lib_external/CONVENTIONS.md` |
+
+## 运行环境：只认 Claude Code
+
+skill 全部在 `.claude/skills/<name>/SKILL.md`，靠 Claude Code 自动发现 + `/<name>` 调用；本文件也靠
+Claude Code 自动加载。**没有为其它 agent 做任何适配**——换 agent 需要改的机制见 `README.md` §Using
+another agent。可用 skill = 下表 + 非 phase 的 `setup`（见上面 first-run gate），别自己编。
+
+## 阶段 × skill 一表（核心路由）
+
+> **每个 skill 都是工具盒，不是必经流水线。** 任一阶段都可以：用 skill / 手工做 / 跳过让 user 自己接手。skill 内部 multi-step 也可在中途人工审核（render / DRC / 仿真），不满意就回退或改方向，再决定要不要推进下一步。
+
+| 工作区 Phase | skill | 入口 | 产出 |
+| --- | --- | --- | --- |
+| 0 骨架 | `project-init` | `scripts/init_project.py` | 项目目录 + `CLAUDE.md`（决策快照模板）+ `STATUS.md`（live dashboard）+ `.gitignore` |
+| 1 拓扑讨论 | `circuit-design` | Skill 工具 | 拓扑 + 锚点件 + 项目 CLAUDE.md 9 章节 |
+| 2 选品 gate | `component-selecting-JP` *(按 locale 路由，见下表)* | `scripts/component_select.py` | shortlist JSON（不写 evidence、不下 datasheet） |
+| 2.5 落资产 + BOM gate | `component-preparing` | `accept_shortlist.py` / `distributor_query.py` / `inject_mpn_props.py` / `check_readiness.py` 等 | datasheet PDF + lib_external/components.* + evidence JSON + docs/bom.md + **`.bom_readiness.json` sentinel + 采购 BOM CSV** |
+| 3 sch 源码 + 生成 | `draw-schematic` | LLM 写 `.py` → `pipeline.py` | circuit-synth 源码 → `.kicad_sch` + ERC clean + L2/L3 视觉验证（生成 gate） |
+| 3.5 sch 检查 gate | `check-schematic` | `analyze_schematic.py` + `simulate_subcircuits.py` | sch analyzer JSON + SPICE 仿真 + design review |
+| 4 pcb 生成 | `draw-pcb` | `pipeline.py` | `.kicad_pcb` 区域分区 + GND zone + DRC + 视觉 PDF；**可选 Phase E** 自动布线 → `_routed.kicad_pcb` + refill GND + 二次 DRC（也可跳过 skill，由用户在 KiCad GUI 手布） |
+| 4.5 pcb 检查 gate（含跨域） | `check-pcb` | `analyze_pcb.py --full` + `analyze_emc.py` + `analyze_thermal.py` + `cross_analysis.py` | pcb analyzer JSON + EMC + thermal + cross-ref + parasitic SPICE |
+| 5 出货 umbrella | `release` *(吞并原 kidoc / kicad fab-export / fab)* | `scripts/build_release.py`（前置：校验 4 轴偏好 sentinel） | `release/<ts>/` + Gerber/CPL/生产 BOM + 文档 PDF（HDD/CE/Design Review/ICD/Manufacturing）+ distributor CSV + JLCPCB vs PCBWay 决策 + ORDER_GUIDE.md + `release_<ts>.zip` |
+
+**两类 BOM 别混**：
+
+- **采购 BOM**（component-preparing 写）→ distributor 下单买料
+- **生产 BOM / CPL**（release/scripts/export_gerbers.py 写）→ fab 厂贴片装配
+- 详见 `.claude/skills/component-preparing/references/bom_lifecycle.md`
+
+## Locale 路由（按 USER.md §0 所属地）
+
+`component-selecting` 是 phase 名，具体 skill 由 `USER.md §0` locale 决定：
+
+| USER.md §0 所属地 | 选品 skill | vendor 链路 | 状态 |
+| --- | --- | --- | --- |
+| 日本 | `component-selecting-JP` | DigiKey JP + Mouser JP + LCSC（API + JPY） | ✅ 已实现 |
+| 中国大陆 | `component-selecting-CN` | LCSC jlcsearch（免 key）+ jlcparts 分片 + EasyEDA library | ✅ 已实现（零 key） |
+| 美国 | `component-selecting-US` | DigiKey US + Mouser US（API + USD） | ⛔ 未实现 |
+| 其他 | （待建） | — | ⛔ 未实现 |
+
+**当前规则**：USER.md §0 = 日本 → `component-selecting-JP`；= 中国大陆 → `component-selecting-CN`（零 key，共享引擎在 JP skill scripts/）。
+其余 locale **不要静默 fallback**——告诉用户对应 locale 的 skill 还没实现，让 user 决定（手工选品 / 临时改 locale / 或先建对应 skill）。
+
+> Phase 2.5 资产抓取（datasheet + library + evidence）由 `component-preparing` 接手，不在 component-selecting 范围。
+
+## 工作区基础设施
+
+| 资源 | 路径 |
+| --- | --- |
+| Python venv | `.venv/`（Python 3.12） |
+| KiCad CLI | `/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli`（v10） |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Zane456/PCB-Agent-Teams](https://github.com/Zane456/PCB-Agent-Teams) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-22 -->
