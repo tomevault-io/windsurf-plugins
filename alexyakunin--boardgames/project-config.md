@@ -118,4 +118,4 @@ user can correct course if needed. A short "I picked X because Y; flag if
 
 ---
 > Source: [alexyakunin/BoardGames](https://github.com/alexyakunin/BoardGames) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
