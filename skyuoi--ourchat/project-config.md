@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with the **web-panel** portion of this repository.
+description: This file provides guidance to AI coding agents (Claude Code, opencode, etc.) when working with the **web-panel** portion of this repository.
 ---
 
-# CLAUDE.md - Web Panel
+# AGENTS.md - Web Panel
 
-This file provides guidance to Claude Code (claude.ai/code) when working with the **web-panel** portion of this repository.
+This file provides guidance to AI coding agents (Claude Code, opencode, etc.) when working with the **web-panel** portion of this repository.
 
 ## Overview
 
@@ -169,10 +169,9 @@ npm run type-check  # Uses vue-tsc for .vue file type checking
 ### Communication Protocol
 The web-panel uses **gRPC-Web** to communicate with the Rust backend. The protocol is configured via:
 
-1. **Proxy Setup**: `vite.config.ts` proxies `/backend` requests to `http://localhost:7777`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SkyUOI/OurChat](https://github.com/SkyUOI/OurChat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
