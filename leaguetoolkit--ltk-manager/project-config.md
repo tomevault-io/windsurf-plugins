@@ -1,118 +1,110 @@
 ---
 trigger: always_on
-description: Conventions for everything under `src/`. Repo-wide guidance lives in the root `CLAUDE.md`.
+description: Rules for **authoring the stylesheets**. How to _consume_ tokens from a component
 ---
 
-# Frontend (React + TypeScript) - `src/`
+# Design tokens - `src/styles/`
 
-Conventions for everything under `src/`. Repo-wide guidance lives in the root `CLAUDE.md`.
+Rules for **authoring the stylesheets**. How to _consume_ tokens from a component
+lives in `src/CLAUDE.md`, which loads for all frontend work. This file loads only when
+you are in here.
 
-## JSX Conditional Rendering
+## What each file owns
 
-**Avoid ternary operators in JSX.** Use early returns or `{condition && <Component />}` instead.
+| File             | Owns                                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `global.css`     | Every value: palette, brand pair, state colors, surfaces, scales, glass tiers, gradients                                   |
+| `tailwind.css`   | Nothing of its own - the entry point, the font imports, and a `@theme` block aliasing `global.css` into Tailwind utilities |
+| `animations.css` | Keyframes and the stagger utility                                                                                          |
 
-```tsx
-// Good - early return
-if (isLoading) return <LoadingState />;
-if (error) return <ErrorState error={error} />;
-return <Content />;
+`tailwind.css` is the single CSS entry point, imported in `main.tsx`. Keep the section
+banner comments in `global.css` and add to the right section rather than appending to
+the end.
 
-// Good - single-line conditional
-{
-  hasItems && <ItemList items={items} />;
-}
+The theme is shared with the [LTK Wiki](https://github.com/LeagueToolkit/wiki) and the
+LoL Meta Wiki. Their `custom.css` is what to diff against when the brand moves.
 
-// Bad - ternary in JSX
-{
-  isLoading ? <LoadingState /> : error ? <ErrorState /> : <Content />;
-}
+## Comments name their tokens and stop
+
+A comment on a token group says _what the group is_, in one line:
+
+```css
+/* The logo colors. */
+/* State colors, for components that derive their look from state. */
+/* Colors for mod category pills. */
 ```
 
-## Import Conventions
+That is the whole budget. **Never write, in CSS:**
 
-**Always import from barrel exports, never from subdirectories.** This keeps import paths stable and encapsulates internal structure.
+- **the values** - they are on the very next line
+- **which components or pages consume a token** - that belongs in `src/CLAUDE.md`, and the
+  list goes stale the moment a component changes
+- **contrast measurements, or the reasoning behind a chosen value** - stale on the next tweak
+- **what a token is _not_**, or how another project in the ecosystem does it differently
 
-- **Global components:** import from `@/components`, not `@/components/Button`, `@/components/Toast`, etc.
-- **Modules:** import from `@/modules/{module}`, not `@/modules/{module}/components` or `@/modules/{module}/api`.
+A comment earns more than one line only for a mechanical fact a reader cannot recover
+from the code: declaration order a minifier would break, or which of two competing
+blocks wins. `global.css` has exactly two of those. Match that bar.
 
-```ts
-// Good
-import { Button, IconButton, useToast } from "@/components";
-import { ModCard, useInstalledMods } from "@/modules/library";
+If a rule feels worth writing next to a token, it belongs in `src/CLAUDE.md` instead.
 
-// Bad - reaches into internals
-import { Button } from "@/components/Button";
-import { useToast } from "@/components/Toast";
-import { ModCard } from "@/modules/library/components";
-```
+## Adding a token
 
-## State Consumption - Hooks Over Prop Drilling
+Numbered scales are the convention:
 
-**Consume global state (hooks, queries, stores) directly in the component that needs it.** Do not drill Zustand state, TanStack Query data, or mutation callbacks through intermediate components as props.
+| Category   | Pattern            | Example                            |
+| ---------- | ------------------ | ---------------------------------- |
+| Spacing    | `--space-{NNN}`    | `--space-004` → 18px (NNN × 4.5px) |
+| Radius     | `--radius-{NNN}`   | `--radius-003` → 9px               |
+| Icon sizes | `--icon-{NNN}`     | `--icon-003` → 12px                |
+| Shadows    | `--shadow-{name}`  | `--shadow-sm`, `--shadow-glass`    |
+| Z-index    | `--z-{name}`       | `--z-modal`, `--z-toast`           |
+| Duration   | `--duration-{NNN}` | `--duration-004` → 200ms           |
+| Easing     | `--ease-{name}`    | `--ease-spring`                    |
 
-- Patcher status → call `usePatcherStatus()` in the component that checks it
-- Mod toggle/uninstall → call `useToggleMod()` / `useUninstallMod()` in `ModCard`, not passed from a parent
-- Folder toggle → call `useFolderToggle()` in `FolderRow`/`FolderCard`, not received as a prop
+A new token is defined in `global.css` and aliased in the `@theme` block, or Tailwind
+cannot see it. Color tokens carrying an LTK value are `--ltk-*`, and the app's own scales
+are unprefixed (`--surface-*`, `--accent-*`).
 
-TanStack Query deduplicates identical queries, so multiple components calling the same hook is efficient and correct.
+**No `@apply`.** Reference the custom properties directly:
+`background-color: var(--surface-900)`.
 
-**Exception:** Props are appropriate for coordinating parent-owned UI state (e.g., `onViewDetails` that opens a sibling dialog, `onReorder` where reorder target varies by context).
+## Theme mechanics
 
-## Tauri Event Listening
+Dark is the bare `:root`. Light overrides land in a `[data-theme="light"]` block, set by
+`useTheme`. A color that flips is defined once and aliased - never as a pair of literals
+in two places. Rung numbers encode **role, not luminance**, so both scales invert
+wholesale between the themes.
 
-For backend-to-frontend events (e.g., overlay progress), use `listen<T>()` from `@tauri-apps/api/event` in a `useEffect` with cleanup via `unlisten()`. See `modules/patcher/api/useOverlayProgress.ts` for the pattern.
+Elevation is dark-first: `--shadow-*` carries depths tuned for the dark theme and the
+light block softens them, because those depths read as smudges on a near-white surface.
 
-## Routing
+Zoom is `--zoom-scale` on `<html>` and reaches the interface three ways. `--space-*` and
+`--icon-*` carry the scale in their own `calc()`, because they are authored in px. Type
+rides the root font size, which is what every `rem` in the app resolves against. Nothing
+else moves - not `--radius-*`, `--shadow-*`, `--z-*`, or colors.
 
-TanStack Router with file-based routing in `src/routes/`. Route tree is auto-generated in `routeTree.gen.ts`. The root route (`__root.tsx`) checks setup status and redirects to `/settings` on first run.
+A length authored in px is therefore a length that will not zoom. That is right for a
+radius and wrong for anything sized against text, so **write type in `rem`**, never
+`text-[13px]`. The rows a virtualizer measures itself are the one place px is
+unavoidable, and those go through `useZoomedPx`.
 
-## Component Library (`src/components/`)
+`[data-corners]` is the one exception, and it is the only thing allowed to move
+`--radius-*`. It is a setting of its own rather than a side effect of density, and it
+leaves `--radius-006` alone because a pill is geometry.
 
-**ALWAYS use reusable components from `@/components` instead of native HTML or raw base-ui imports.** Module code should never import from `@base-ui-components/react` directly - all base-ui primitives must be wrapped in `src/components/` first. See `src/components/index.ts` for what is already wrapped.
+## Surfaces are one hue with fixed curves
 
-When adding a new base-ui component:
+`--surface-{50..950}` is `oklch()` over a per-rung lightness and chroma, sharing a single
+`--surface-hue` that `useTheme` sets from the accent. Both themes spell out their own
+curves and read the same hue, so a rung keeps its contrast whatever the accent is.
 
-1. Create wrapper in `src/components/NewComponent.tsx`
-2. Export from `src/components/index.ts`
-3. Import in modules via `@/components`, never from `@base-ui-components/react` directly
-
-## Form System (`src/lib/form/`)
-
-Uses `@tanstack/react-form` with Zod validation via `useAppForm()`. Field components are pre-registered on `form.AppField` / `form.AppForm` and integrate with the wrapped `@/components` primitives.
-
-## Dependency Constraints
-
-- `zustand` - client-side state only. Never use it for server state - that is TanStack Query's job.
-- `framer-motion` - Layout animations for DnD (`AnimatePresence` on `DragDropOverlay` only). Tree-shake to ≤30KB gzipped.
-
-## Icons
-
-All icons come from `@phosphor-icons/react`, imported by PascalCase name. Standard spinner is
-`<SpinnerGap className="animate-spin" />`.
-
-`lucide-react` is still installed because most of the app still imports it, and it stays until those
-call sites are converted. **Write no new lucide imports** - a file being touched for something else
-is a fine moment to convert the icons in it.
-
-Phosphor names things by shape rather than by role, so the lucide name is rarely the phosphor name:
-`ChevronDown` is `CaretDown`, `Search` is `MagnifyingGlass`, `Settings` is `Gear`, `Trash2` is
-`Trash`, `Loader2` is `SpinnerGap`. Look the name up rather than guessing.
-
-Phosphor's `regular` weight is lighter than lucide's 2px stroke, so a converted icon reads thinner
-beside one that has not been converted yet. Pass `weight="bold"` where an icon carries an action -
-buttons, toolbar controls - and leave `regular` for decorative and section-header icons.
-
-Riot's own marks are the exception, since neither icon set carries them. They live as inline-SVG
-components in `src/components/icons/`, lifted from the League and Riot Client asset sets:
-`LeagueIcon`, `RiotIcon`, `TftIcon`, and the cosmetics family `MaskIcon` / `ThreeMasksIcon` /
-`EvolutionIcon`. That folder has its own barrel, re-exported by `src/components/index.ts` - call
-sites still import from `@/components`.
-
-Keep the path data untouched, and change only what stops it behaving like an icon: swap the client's
-hardcoded fill (League gold `#C89B3C`, parchment `#F0E6D2`) for `currentColor`, drop any wrapping
+Every chroma is written `calc(<authored> * var(--surface-tint))`, the scale the Appearance
+panel's Surface tint slider sets, so one control moves the whole ramp between the authored
+tint and a plain grey. Lightness never takes the scale - contrast has to hold at every
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [LeagueToolkit/ltk-manager](https://github.com/LeagueToolkit/ltk-manager) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
