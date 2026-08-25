@@ -7,11 +7,11 @@ Observe, debug, and understand running BEAM systems
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [software-mansion/voyager](https://github.com/software-mansion/voyager).
+Original source: `AGENTS.md` in [software-mansion/voyager](https://github.com/software-mansion/voyager).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
