@@ -1,0 +1,118 @@
+---
+trigger: always_on
+description: Project brief for Claude Code. Read this fully before editing anything.
+---
+
+# CLAUDE.md — Aegis: RallyPower (folder: Aegis_RallyPower)
+
+Project brief for Claude Code. Read this fully before editing anything.
+
+## What this is
+
+**Aegis: RallyPower** (part of the Aegis addon series, like Aegis_SBR).
+Naming rules: the install folder and TOC are **`Aegis_RallyPower`**; our code
+namespace, globals, frame names, and saved variables use the **`AegisRP`**
+prefix (`AegisRP_Settings`, `AegisRP.Assign`, …); Core files are
+`Core/Aegis_*.lua`. The embedded PallyPower engine keeps its own
+`PallyPower_*`/`PP_*` names and the `PLPWR` addon-message prefix (locked
+byte-compat with stock PallyPower); our sync channel prefix stays `RPCX`.
+It extends
+the PallyPower paladin buff addon to **all nine
+classes** — a unified raid buff/utility coordinator for **Turtle WoW 1.18.1**,
+which is a **1.12.1 client (Lua 5.0)** with the **SuperWoW** and **VanillaFixes**
+client mods. It is a fork of PallyPowerTW; the **visual and functional gold
+standard is PallyPower 3.3.5 (WotLK)** — reference source:
+`github.com/AznamirWoW/PallyPower` (clone it; `PallyPower_Wrath.xml` +
+`PallyPowerValues.lua` are the spec for frames, colors, dimensions).
+
+Current version: **0.14.0**. See `CHANGELOG.md` for the full history and
+`docs/` for the design documents and interactive HTML concepts.
+
+## Hard environment rules (violating these bricks the addon)
+
+**Lua 5.0, not 5.1.** Never use:
+- `#` length operator → use `table.getn(t)`
+- `string.gmatch` → use `string.gfind`
+- `select(...)` → does not exist
+- numeric `%` modulo → use `math.mod`
+- varargs beyond the implicit `arg` table
+
+**1.12 widget API:**
+- Frame handlers receive **implicit globals**: `this`, `event`, `arg1`… —
+  there is no `self`/`event` parameter.
+- **Definition order matters**: a `local function` must be defined before any
+  reference, or forward-declared (`local Foo` … later `Foo = function() end`).
+- No `C_Timer`, no secure templates, **no combat lockdown** (casting from code
+  is legal in combat — a genuine advantage over retail).
+- Timers/tickers = `OnUpdate` with an accumulator on `arg1`.
+
+**SuperWoW** (detected via `SUPERWOW_VERSION`) — always guard and always keep a
+bare-1.12 fallback:
+- `UnitBuff(unit, i)` additionally returns the aura **spell id** (3rd return);
+  `UnitDebuff` returns it 4th.
+- `CastSpellByName(spell, unit)` casts directly at the unit (no target dance).
+- Buff/debuff **ids are learned at runtime** from the icon seed — never
+  hard-code aura ids (Turtle's may differ from Vanilla).
+
+**Turtle deltas:** blessing durations are forced (10 min normal / 30 min
+greater). Totem/sting/curse durations use Vanilla defaults at the top of each
+class module — verify on-realm and edit there if Turtle differs. Spell-name
+matching is exact; if a Turtle rename breaks a lookup, fix the name string.
+
+## Verification workflow (mandatory)
+
+After **every** edit:
+
+```
+python3 scripts/verify.py
+```
+
+Checks structural balance and Lua 5.1-isms across `Core/` + `Classes/` +
+`PallyPower/`. The vendored engine is scanned as a tripwire — it should stay
+untouched, and a failure there means something edited it. There
+is no standalone Lua here; the real test is in-game — errors print to chat
+(the Core wraps risky paths in `pcall` and prints `AegisRP error: …`).
+Use `/rpc test` (test mode) to exercise everything on an under-levelled
+character: all options appear (unlearned marked `*`), clicks simulate casts
+and start real timers.
+
+## Architecture map
+
+Load order (`Aegis_RallyPower.toc`):
+```
+Locale\*                       localization
+PallyPower\*                   the ORIGINAL PallyPower engine (see below)
+Core\Aegis_Core.lua     class-independent coverage engine + class-buff strip
+Core\Aegis_Strip.lua    shared strip engine + helpers
+Classes\Class_*.lua            one module per class
+Core\Aegis_Options.lua  the tabbed options frame
+Core\Aegis_Popout.lua   loads LAST (legacy hover handler + paladin test graft)
+```
+
+**Every non-paladin class is now a strip.** There is one visual family: the
+100×34 paladin-template button, stacked in a movable titled strip (drag dot,
+scale grip, saved position). Priest/Mage/Druid render the **class-buff strip**
+(`AegisRP.BuildClassBuffs`, one button per raid class, with the player
+pop-out on hover); Warrior/Shaman/Hunter/Warlock/Rogue render their own
+self-contained strips. No bespoke grid bar exists anymore.
+
+**Paladin = the legacy engine, wrapped not rewritten (locked decision).**
+`PallyPower\PallyPower.lua/.xml` run unmodified; `PallyPower.xml` loads its lua
+via a relative `<Script>` (they must stay in the same folder). The player
+pop-out (`Core\Aegis_Popout.lua`) grafts onto its buff bar by replacing
+`PallyPowerBuffButton_OnEnter`, reading the engine's own per-button data
+(`btn.have/need/range/dead`, `LastCastPlayer`) and casting through its
+spellbook tables (`AllPallys`, `GetNormalBlessings`). The pop-out rows are an
+exact replica of the WotLK `PallyPowerPopupTemplate` (100×34, Smooth skin +
+Blizzard Tooltip border, official colors: Good `0,0.7,0` / NeedAll `1,0,0` /
+Special `0,0,1`, all 0.5 alpha).
+
+**Class-buff classes** (Priest, Mage, Druid): declare
+`M = AegisRP:NewClass("TOKEN"); M.buffs = { {name, group, icons, ids?,
+pet, dur, gdur, selfcast}, ... }` (+ optional `M.utility`), plus
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Torchlite-bit/Aegis_RallyPower](https://github.com/Torchlite-bit/Aegis_RallyPower) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-25 -->
