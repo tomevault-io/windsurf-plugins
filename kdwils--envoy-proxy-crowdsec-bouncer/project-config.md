@@ -1,161 +1,75 @@
 ---
 trigger: always_on
-description: Handles real client IP extraction from headers and trusted proxies:
+description: Guidance for agents working in this repository. Module: `github.com/kdwils/envoy-proxy-bouncer` (Go 1.26).
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for agents working in this repository. Module: `github.com/kdwils/envoy-proxy-bouncer` (Go 1.26).
 
 ## Project Overview
 
-Envoy Proxy CrowdSec Bouncer is a security proxy service written in Go that integrates Envoy Gateway's external authorization with CrowdSec's threat intelligence and remediation capabilities. It provides WAF inspection, IP-based bouncing, and CAPTCHA challenges for suspicious traffic.
+Envoy ext_authz service that bounces malicious traffic using CrowdSec: streamed IP decisions (ban/captcha), AppSec WAF inspection, and CAPTCHA challenges (reCAPTCHA v2, Cloudflare Turnstile).
 
-## Development Commands
+### Package Layout
 
-### Building & Running
+- `bouncer/` — `Bouncer` type with the core `Check` hot path: `ParseCheckRequest`, `ExtractRealIP`, decision-cache / CAPTCHA / WAF orchestration, and the `WAF`, `DecisionCache`, `CaptchaService` interfaces.
+- `bouncer/components/` — concrete components: decision cache, AppSec WAF client, CAPTCHA service with reCAPTCHA and Turnstile providers, HTTP client interface.
+- `server/` — `ServeDual` runs three listeners from config: gRPC ext_authz (`envoy.service.auth.v3.Authorization/Check`, reflection + health service registered) on `:8080`, HTTP CAPTCHA verify endpoints with per-IP rate limiting on `:8081`, and Prometheus `/metrics` on `:9090`. Service interfaces (`Bouncer`, `TemplateStore`, `Notifier`) live in `server/services.go`.
+- `pkg/cache/` — generic in-memory cache with TTL cleanup used by the decision cache and CAPTCHA sessions.
+- `pkg/crowdsec/` — CrowdSec LAPI client (TLS, cert auth) and metrics reporting service.
+- `config/` — config structs and validation only. **Defaults are not here** (see Config wiring).
+- `template/` — HTML template store (`RenderDenied`, `RenderCaptcha`) for ban/captcha pages.
+- `webhook/`, `recorder/`, `logger/` — webhook notifier, Prometheus recorder, `slog` helpers.
+- `cmd/` — cobra CLI (`serve`, `bounce`, `version`).
+- `version/` — `Version` is `go:embed`ded from `version/version.txt`; bump that file to change the version.
+- `tests/functional/` — testcontainers-based functional tests behind the `functional` build tag.
+
+## Commands
+
 ```bash
-go build -o envoy-proxy-bouncer main.go  # Build the binary
-./envoy-proxy-bouncer serve               # Start the bouncer server
+go build -o envoy-proxy-bouncer .                          # Build the binary
+go test -race ./...                                        # Unit tests (skips functional-tagged code)
+go test -tags functional -timeout 30m ./tests/functional   # Functional tests (needs Docker; 30m timeout matters — the default 10m kills the image matrix)
+go test -bench=. -benchmem -run=^$ ./...                   # Benchmarks
+go generate ./...                                          # Regenerate mocks — requires mockgen on PATH (go install go.uber.org/mock/mockgen@latest)
+go vet ./... && gofmt -l .                                 # Lint + format check
 ```
 
-### Code Generation
-```bash
-go generate ./...           # Generate mocks and other generated code
-```
+Single package / single test: `go test -race ./bouncer -run TestBouncer_Check/specific_case`.
 
-### Testing
-```bash
-go test ./...               # Run all tests
-go test -v ./remediation/   # Run specific package tests with verbose output
-go test -race ./...         # Run tests with race detection
-go test -cover ./...        # Run tests with coverage
-go test -tags functional ./tests/... -v  # Run functional tests
-```
+## Config wiring
 
-### Linting & Type Checking
-```bash
-go fmt ./...                # Format code
-go vet ./...                # Vet code for issues
-```
+- Defaults and viper wiring live in `config/config.go` — `config.GetViper(cfgFile)` returns a ready-to-use `*viper.Viper` with the env prefix (`ENVOY_BOUNCER_`), key replacer (`.`→`_`), AutomaticEnv, optional config file, and all defaults. When adding a config key, add the struct field in `config/` **and** the default in `config/defaults.go`, or the zero value silently applies.
+- Env vars: prefix `ENVOY_BOUNCER_` with `.`→`_` mapping (e.g. `ENVOY_BOUNCER_BOUNCER_APIKEY`... verify exact key form against the replacer in `config/config.go`); `--config` flag accepts a yaml/json file.
+- User-facing docs for config/captcha/webhooks/templates live in `docs/` — update them when changing behavior.
 
-### Development Workflow
-1. Make requested changes
-2. Run `go fmt ./...` to format the code
-3. Run `go test ./...` to run tests
-4. Fix any errors
-5. Repeat
+## Mocks
 
-### Kubernetes Deployment
-```bash
-helm install envoy-proxy-bouncer ./charts/envoy-proxy-bouncer  # Install chart
-helm upgrade envoy-proxy-bouncer ./charts/envoy-proxy-bouncer  # Upgrade chart
-```
+Mocks are generated with mockgen into `<pkg>/mocks/` via `//go:generate` directives next to each interface (`bouncer`, `bouncer/components`, `server`, `webhook`, `pkg/crowdsec`). After changing an interface, run `go generate ./...` and commit the regenerated mocks.
 
-## Architecture Overview
+## Release / CI facts
 
-### Core Components
+- Push to `main` publishes a `ghcr.io/.../envoy-proxy-bouncer:sha-<sha>` image. Tagging `v*.*.*` re-tags that image, publishes the Helm chart, and runs goreleaser (skipped for `-rc` tags).
+- Functional test workflow runs only on non-main pushes that touch Go files.
+- Helm chart in `charts/envoy-proxy-bouncer`: `values.schema.json` (helm-values-schema-json, driven by `# @schema` comments in `values.yaml`) and chart `README.md` (helm-docs) are generated — regenerate both when editing `values.yaml`. Charts publish only from merged PRs whose branch starts with `charts/`.
 
-**Main Entry Point**: `main.go` → `cmd/root.go` using Cobra for CLI commands
+## Code Style
 
-**gRPC/HTTP Server**: `server/server.go` provides dual-mode server
-- gRPC server implementing Envoy's external authorization service
-- HTTP server for CAPTCHA verification endpoints when enabled
-- Configurable ports (gRPC default 8080, HTTP default 8081)
+- No comments unless asked.
+- Never `else` — use early returns, or set a default value and override it conditionally.
 
-**Remediation Engine**: `remediation/remediator.go` orchestrates security checks
-- Coordinates between Bouncer, WAF, and CAPTCHA components
-- Sequential processing: Bouncer → WAF → CAPTCHA (only if WAF triggers it)
-- Parses Envoy CheckRequest and extracts real client IP
+## Testing Rules
 
-**Security Components**:
-- `remediation/components/bouncer.go` - CrowdSec integration for IP-based decisions
-- `remediation/components/waf.go` - Web Application Firewall inspection
-- `remediation/components/captcha.go` - CAPTCHA challenge management
+- Use `t.Context()` for test contexts — never `context.Background()`. It is canceled when the test finishes, so it cannot leak goroutines past the test.
 
-### Configuration Management
+### Test structure
 
-Uses Viper with hierarchy: CLI flags → ENV vars (ENVOY_BOUNCER_*) → config file → defaults
-
-Key config sections defined in `cmd/root.go:initConfig()`:
-- Server ports (gRPC and HTTP)
-- Bouncer settings (CrowdSec API key, LAPI URL, ticker interval)
-- WAF settings (AppSec URL, API key)
-- CAPTCHA settings (provider, site key, secret key, hostname)
-- Trusted proxies for IP extraction
-
-### Remediation Flow
-
-1. **Bouncer Check**: Query CrowdSec for IP-based ban decisions
-2. **WAF Inspection**: Send request to AppSec for analysis (if bouncer allows)
-3. **CAPTCHA Challenge**: Present challenge if WAF returns "captcha" action
-4. **Response Generation**: Convert decisions to appropriate Envoy responses
-
-### External Integrations
-
-**CrowdSec Integration**:
-- Stream bouncer for real-time decision updates
-- Metrics reporting for processed/bounced requests
-- Live bouncer for on-demand IP checks
-
-**WAF Integration**:
-- AppSec API for request inspection
-- Supports custom WAF backends
-
-**CAPTCHA Providers**:
-- reCAPTCHA v2 support
-- Cloudflare Turnstile support
-- Session management with secure tokens
-
-### IP Extraction Logic
-
-Handles real client IP extraction from headers and trusted proxies:
-- Checks `X-Forwarded-For` header (case-insensitive)
-- Falls back to `X-Real-IP` header
-- Respects trusted proxy configuration
-- Validates IP format before use
-
-### Generated Code
-
-The project uses code generation for mocks:
-- `//go:generate mockgen` directives for interfaces
-- Mock files in `mocks/` folders next to components
-- Separate mocks for different interface types
-
-Run `go generate ./...` to regenerate all mocks.
-
-### Key Patterns
-
-**Interface-based Design**: All components use interfaces (Bouncer, WAF, Captcha)
-**Dependency Injection**: Components injected into Remediator constructor
-**Context Propagation**: All operations use context.Context for cancellation and logging
-**Structured Logging**: Uses slog with context-aware logging via `logger` package
-
-### Testing Strategy
-
-The project uses `gomock` library for mocking and `testify` for assertions.
-
-**Component Testing**: Each security component has dedicated test files with mocks
-
-**Mock Setup Example**:
-```go
-ctrl := gomock.NewController(t)
-defer ctrl.Finish()
-
-mb := remediationmocks.NewMockBouncer(ctrl)
-mw := remediationmocks.NewMockWAF(ctrl)
-mc := servermocks.NewMockCaptcha(ctrl)  // Note: server mocks for Captcha interface
-
-r := Remediator{Bouncer: mb, WAF: mw, CaptchaService: mc}
-
-mb.EXPECT().Bounce(gomock.Any(), "1.2.3.4", gomock.Any()).Return(false, nil)
-mw.EXPECT().Inspect(gomock.Any(), gomock.AssignableToTypeOf(components.AppSecRequest{})).Return(components.WAFResponse{Action: "captcha"}, nil)
-```
-
-**Test Assertions - Use testify/assert and testify/require**:
+- **Tests go in the file they test** — `recaptcha.go` is tested by `recaptcha_test.go`, never by a shared/merged test file covering multiple sources.
+- **Never write mocks in test files** — mocks are generated from interfaces (`go generate ./...`, go.uber.org/mock). Every mock used in a test comes from the generated packages (`bouncer/mocks`, `bouncer/components/mocks`, etc.); never hand-roll a mock, fake, stub, or `gomock.Matcher`. Capture and assert captured request arguments inline with `gomock.Any()` + `.Do(...)`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kdwils/envoy-proxy-crowdsec-bouncer](https://github.com/kdwils/envoy-proxy-crowdsec-bouncer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
