@@ -7,12 +7,12 @@ SDK for SoftwareONE python extensions
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [softwareone-platform/mpt-extension-sdk](https://github.com/softwareone-platform/mpt-extension-sdk).
+Original source: `AGENTS.md` in [softwareone-platform/mpt-extension-sdk](https://github.com/softwareone-platform/mpt-extension-sdk).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
