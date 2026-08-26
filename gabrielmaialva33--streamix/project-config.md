@@ -1,70 +1,115 @@
 ---
 trigger: always_on
-description: Streamix is a Phoenix-based web application designed to manage and stream IPTV content. It allows users to register, manage IPTV providers, and synchronize/view channels from those providers.
+description: Central instructions for coding agents working on **Streamix**. `CLAUDE.md` and `GEMINI.md` import this file with
 ---
 
-# Streamix Project Context (AGY Optimized)
+# AGENTS.md
 
-## Overview
-Streamix is a Phoenix-based web application designed to manage and stream IPTV content. It allows users to register, manage IPTV providers, and synchronize/view channels from those providers.
+Central instructions for coding agents working on **Streamix**. `CLAUDE.md` and `GEMINI.md` import this file with
+`@AGENTS.md`, so update this document only.
 
-## Tech Stack
-*   **Language:** Elixir (~> 1.15)
-*   **Framework:** Phoenix (~> 1.8.2)
-*   **Database:** PostgreSQL (via Ecto SQL)
-*   **Frontend:** Phoenix LiveView (~> 1.1.0), Tailwind CSS (~> 0.3)
-*   **HTTP Client:** Req (~> 0.5)
-*   **Authentication:** Custom implementation using `bcrypt_elixir` (standard `phx.gen.auth` pattern)
+> Principle: this file only captures repo-specific rules. When a rule is not listed here, follow standard
+> Elixir / Phoenix 1.8 / LiveView 1.2 conventions and the detailed guidance in
+> [`docs/phoenix-guidelines.md`](docs/phoenix-guidelines.md).
 
-## Architecture
-The application follows the standard Phoenix umbrella-less structure:
+## Project Overview
 
-### Core Logic (`lib/streamix/`)
-*   **Accounts:** Handles user registration, session management, and authentication.
-*   **Iptv:** The core domain context.
-    *   `Provider`: Represents an external IPTV service (Xtream Codes API mostly supported via `get.php` and `player_api.php`).
-    *   `Channel`: Represents individual TV channels/streams synced from a provider.
-    *   `Client`: Uses `Req` to communicate with IPTV providers (fetches playlists and account info).
-    *   `Parser`: (Implied) Handles parsing of M3U/JSON responses from providers.
+Streamix is a Phoenix + LiveView streaming platform that aggregates multiple Xtream Codes providers into a single web
+application and REST API. The current tree includes:
 
-### Web Interface (`lib/streamix_web/`)
-*   **Controllers:** Standard controllers for Auth (`UserRegistration`, `UserSession`) and Pages (`PageController`).
-*   **LiveView:** The interactive UI is built with LiveView.
-*   **Router:** Defined in `lib/streamix_web/router.ex`.
+- password-based authentication and role-based access
+- personal providers plus optional system-wide global provider
+- optional GIndex ingestion for Google Drive-backed catalogs
+- live channels, movies, series, episodes, favorites, history, and watch progress
+- AI-assisted semantic search and recommendations when embeddings + Qdrant are configured
+- watch parties with synchronized playback, presence, and room chat
+- subscription plans, premium access gates, and an admin panel
+- signed stream URLs, a Phoenix stream proxy, and a live stream multiplexer
+- PWA assets, offline metadata sync hooks, and a mobile / TV-facing REST API
 
-## Development Workflow
+The application release version is sourced from the root `VERSION` file (currently `0.0.100`) and consumed by
+`mix.exs`. Historical release tags go through `v1.5.0`; do not infer feature availability by comparing those two
+version lines. Prefer the current tree and git history.
+
+This repository is the Phoenix backend + web UI. The older in-repo TV app was extracted to a separate repository, so
+do not document or modify an in-tree Tizen app here.
+
+## Stack
+
+- Elixir `~> 1.20`
+- OTP 29
+- Phoenix `~> 1.8.2`
+- Phoenix LiveView `~> 1.2.0`
+- Ecto SQL `~> 3.14`
+- TimescaleDB on PostgreSQL 17 with `pg_trgm`
+- Redis 8
+- Qdrant (optional, for semantic search)
+- RabbitMQ 4 + Broadway (optional)
+- Oban 2.23
+- Req + Finch
+- Tailwind CSS v4
+- esbuild
+- npm 12-managed frontend packages in `assets/`
+
+## Local Setup
+
 ```bash
-mix setup        # Setup dependencies and DB
-mix phx.server   # Start server
-mix test         # Run test suite
+docker compose up -d
+cp .env.example .env
+cd assets && npm ci && cd ..
+mix setup
+mix phx.server
 ```
 
-# 🚀 Google Antigravity (AGY) System Rules
+Important local setup facts:
 
-These rules are optimized for the **Agent Manager (Mission Control)** and **Gemini 3 Pro** orchestration.
+- `mix setup` runs `ecto.setup`, seeds, and asset builds.
+- `priv/repo/seeds.exs` requires `ADMIN_PASSWORD`.
+- provider credential encryption requires `PROVIDER_ENCRYPTION_KEY`.
+- `assets/node_modules` is ignored, so local JS dependencies require `npm ci`.
+- if `TEST_DATABASE_URL` is not set, test config derives it from `DATABASE_URL`.
 
-## 1. Multi-Agent Orchestration (Mission Control)
-- **Parallel Workflows**: Agents should work in parallel when possible (e.g., one agent writing tests while another refactors code).
-- **Background Execution**: Long-running tasks (like full sync simulations) should be run via the Agent Manager in the background.
+## Common Commands
 
-## 2. Visual Artifacts & Verification
-- **Browser-in-the-Loop**: Use the AGY browser agent to verify UI changes in LiveView.
-- **Verification**: Always take a screenshot/video of the UI after visual changes to provide "Visual Artifacts" for verification.
+| Command                        | Purpose                                                      |
+|--------------------------------|--------------------------------------------------------------|
+| `mix setup`                    | deps, DB setup, seeds, asset setup/build                     |
+| `mix phx.server`               | run the web app                                              |
+| `iex -S mix phx.server`        | run with IEx                                                 |
+| `mix test`                     | full test suite                                              |
+| `mix test path/to/test.exs`    | targeted test file                                           |
+| `mix test path/to/test.exs:42` | targeted test by line                                        |
+| `mix precommit`                | compile warnings-as-errors, deps.unlock, format, credo, test |
+| `mix quality`                  | compile, credo, test, dialyzer                               |
+| `mix ecto.migrate`             | run migrations                                               |
+| `mix ecto.reset`               | drop, create, migrate, seed                                  |
+| `mix assets.build`             | build CSS + JS                                               |
+| `mix assets.deploy`            | minify and digest assets                                     |
+| `cd assets && npm ci`          | install frontend dependencies                                |
 
-## 3. Coding Conventions
-- **Idiomatic Elixir**: Use pipes `|>`, pattern matching, and function components.
-- **Client Safety**: All external calls MUST go through `Streamix.Iptv.Client`.
-- **Changesets**: Validate all DB interactions using Ecto Changesets.
+## Dependency Currency
 
-## 4. Safety & Redaction
-- **Redact Sensitive Info**: Always use `redact: true` for passwords and tokens in schemas.
-- **Logs**: Never log raw responses from IPTV providers.
+- Track the latest stable releases for Hex, npm, Docker / Compose, and GitHub Actions. Dependabot checks all four
+  ecosystems daily through `.github/dependabot.yml`.
+- Keep GitHub Actions pinned to immutable commit SHAs and retain the release tag in a comment.
+- A stateful infrastructure major (PostgreSQL, TimescaleDB, Redis, RabbitMQ, Qdrant) still requires a rehearsed data
+  migration and rollback; "latest" never means replacing a production data format blindly.
 
-## 5. Agent Behavior
-- **Concise Reporting**: Focus on the code and the "why".
-- **Verification First**: Run `mix test` and check UI artifacts before declaring a task complete.
+## Project Structure
+
+```text
+lib/streamix/
+├── access/                   # Permissions, role_permissions, user_permissions
+├── accounts/                 # Users, roles, auth tokens, IP tracking
+├── ai/                       # Embeddings, Gemini, NVIDIA, Qdrant, recommendations
+├── billing/                  # Plans, subscriptions, premium access rules
+├── cache/                    # L1 ConCache and L2 Redis implementations
+├── ecto/                     # Shared Ecto types
+├── gindex/                   # GIndex transport, parsing, matching, quota, and sync
+├── iptv/                     # Canonical catalog, providers, EPG, engagement, and streaming
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/gabrielmaialva33)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/gabrielmaialva33)
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [gabrielmaialva33/streamix](https://github.com/gabrielmaialva33/streamix) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-26 -->
