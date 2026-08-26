@@ -1,202 +1,83 @@
 ---
 trigger: always_on
-description: **Project**: AI Platform Engineering
+description: Protect the user's live working tree during branch/PR work; verify a current base, preserve uncommitted edits, and isolate risky work in a worktree
 ---
 
-# AI Platform Engineering Development Rules
 
-## Repository Information
+# Safe Git: Protect the User's Working Tree
 
-**Project**: AI Platform Engineering
-**Type**: Python Backend for AI Agents & Multi-Agent System
-**Language**: Python 3.11+
-**Framework**: LangGraph, LangChain, A2A Protocol
-**Package Manager**: uv
-**Testing**: pytest
+The user's checked-out branch and working tree are theirs. Before doing any
+branch/PR work, make sure you will not lose their edits or churn thousands of
+files. The failure that motivated this rule was switching branches across a
+**stale local `main` (37 commits behind `origin/main`)**, which rewrote ~3,800
+`docs/` files in the user's tree.
 
-## Docker Compose First Install
+## Always (universal — applies to every repo and agent)
 
-When changing `docker-compose.yaml`, `docker-compose.dev.yaml`, `.env.example`,
-release image tags, Compose profiles, Keycloak/OpenFGA/RAG defaults, or
-first-launch UX, follow `.claude/skills/docker-compose-first-install/SKILL.md`.
-The plain OSS path must work from `.env.example` with:
+- **Never assume local `main` is current.** Run `git fetch origin <base>` and
+  branch from the *remote* ref (`origin/main`), not the local one.
+- **Preserve uncommitted work.** Run `git status` before any git command. If the
+  tree is dirty, do not switch/reset/checkout over those edits — commit, stash
+  *with the user's awareness*, or isolate in a worktree instead.
+- **Never push to a shared branch.** Push only to feature branches; never
+  `push`/`--force` to `origin/main` (or any protected branch).
+- **Never rewrite shared history** (`reset --hard`, force-push) on a branch
+  others may have pulled.
+- **Branch naming:** use the `prebuild/` prefix when the branch should trigger CI
+  Docker image builds (see `AGENTS.md`).
+
+## Prefer an isolated worktree when the work is risky or parallel
+
+Reach for a throwaway worktree when you need to *experiment*, run work *in
+parallel* with the user's current branch, or when the tree is dirty and you must
+not disturb it:
 
 ```bash
-mcp-servers,caipe-ui-prod,rbac,caipe-supervisor,dynamic-agents,rag,caipe-mongodb,web_ingestor
+git fetch origin main
+git worktree add /tmp/caipe-<task> origin/main -b prebuild/<feat-branch>
+cd /tmp/caipe-<task>          # do edits, commits, pushes here
+# when done:
+cd -                          # user's repo, untouched
+git worktree remove /tmp/caipe-<task>
 ```
 
-Do not add Slack/Webex bots to that default all-in-one path.
+Worktree caveats to handle (don't assume the worktree "just works"):
 
-## Git Commit Standards
+- **Untracked-but-essential files don't come along.** Gitignored config such as
+  `.env` is absent in a fresh worktree — copy or symlink what the task needs.
+- **Virtualenvs are not shared.** Per `CLAUDE.md`, each worktree (and each
+  subpackage: RAG ingestors/server, MCP agents) needs its own
+  `uv venv --python python3.13 --clear .venv && uv sync`.
+- `/tmp` is cleared on reboot and duplicates large caches — fine for short tasks,
+  not for long-lived state.
 
-### Conventional Commits (REQUIRED)
+## A plain feature branch is acceptable when the base is current and the tree is clean
 
-All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+If `git status` is clean and your base is up to date with `origin`, branching in
+the user's repo is normal git flow and is fine:
 
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-#### Commit Types
-
-- **feat**: A new feature
-  ```
-  feat: add ArgoCD MCP pagination support
-  feat(supervisor): implement TODO-based execution plan
-  feat(agent): add OOM protection for large queries
-  ```
-
-- **fix**: A bug fix
-  ```
-  fix: resolve A2A artifact streaming race condition
-  fix(argocd): handle 819 applications without OOM
-  fix(streaming): prevent duplicate artifact warnings
-  ```
-
-- **docs**: Documentation only changes
-  ```
-  docs: add ADR for OOM protection strategy
-  docs(adr): document MCP pagination implementation
-  ```
-
-- **perf**: Performance improvements
-  ```
-  perf(argocd): optimize pagination for large datasets
-  perf(mcp): reduce memory usage in list operations
-  ```
-
-- **refactor**: Code change that neither fixes a bug nor adds a feature
-  ```
-  refactor(agent): simplify context window management
-  ```
-
-- **test**: Adding missing tests or correcting existing tests
-  ```
-  test: add integration tests for pagination
-  ```
-
-- **build**: Changes to build system or dependencies
-  ```
-  build: update langchain to v0.2.0
-  build(docker): optimize multi-agent containers
-  ```
-
-- **ci**: Changes to CI configuration files and scripts
-  ```
-  ci: add GitHub Actions for integration tests
-  ```
-
-- **chore**: Other changes that don't modify src or test files
-  ```
-  chore: update .gitignore
-  ```
-
-#### Breaking Changes
-
-Breaking changes MUST be indicated with `!` after the type/scope:
-
-```
-feat!: change A2A artifact format
-
-BREAKING CHANGE: Artifact names must now use explicit types
-(tool_notification_start, execution_plan_update, etc.)
-```
-
-### Developer Certificate of Origin (DCO) - REQUIRED
-
-Every commit MUST include a DCO sign-off:
-
-```
-Signed-off-by: Your Name <your.email@example.com>
-```
-
-#### How to Sign Off
-
-**Option 1: Command Line (Recommended)**
 ```bash
-git commit -s -m "feat: add new feature"
+git fetch origin main
+git switch -c prebuild/<feat-branch> origin/main
 ```
 
-**Option 2: Configure Git to always sign off**
-```bash
-git config --global format.signoff true
-```
+The point of this rule is **not** "never branch" — it is "never destroy the
+user's uncommitted work or branch from a stale base."
 
-#### DCO Meaning
+## If you only need to *read* another branch/commit
 
-By signing off, you certify that:
-- You wrote the code or have the right to submit it
-- You understand the code will be distributed under the project's license
-- You agree to the Developer Certificate of Origin v1.1
+Use `git show <ref>:<path>`, `git diff <ref>`, or `git log <ref>` — these never
+touch the working tree. Switch to an edit workflow (branch or worktree) only when
+you need to build, edit, or commit.
 
-### Complete Commit Example
+## Enforcement
 
-```
-feat(argocd): implement MCP pagination for list operations
+Prose rules are advisory. For a hard gate, this repo ships a
+`beforeShellExecution` hook (`.cursor/hooks/guard-git-branch-ops.sh`) that pauses
+for confirmation on branch/history-mutating git commands while letting read-only
+git through. See `.cursor/hooks.json`.
 
-Added strict pagination to all ArgoCD MCP list operations to prevent
-OOM issues caused by large responses (e.g., 819 applications).
-
-Changes:
-- Added page and page_size parameters (default 20, max 100)
-- Implemented pagination metadata in responses
-- Added safety limits for search operations
-- Updated agent prompts to handle paginated results
-
-Prevents memory exhaustion from loading entire datasets.
-
-Closes #789
-
-Signed-off-by: Your Name <your.email@example.com>
-```
-
-## Documentation: Spec Kit vs ADRs
-
-This project uses **two complementary documentation systems**:
-
-| System | Location | Purpose | Lifecycle |
-|--------|----------|---------|-----------|
-| **Spec Kit** | `.specify/specs/` | Planning & tracking active work | Living document, updated as work progresses |
-| **ADRs** | `docs/docs/changes/` | Decision rationale for posterity | Immutable once decision is made |
-
-### When to Use Spec Kit (Primary)
-
-**Spec Kit is the PRIMARY documentation for most changes.**
-
-✅ **Create a Spec for:**
-- New features (agents, MCP tools, UI features)
-- Bug fixes with implementation phases
-- Performance improvements
-- Multi-agent orchestration changes
-- Any work with acceptance criteria to track
-
-Specs track: WHAT we're building, HOW we're building it, STATUS of each phase
-
-### When to Use ADRs (Significant Decisions Only)
-
-**ADRs are for significant architectural decisions that need permanent historical record.**
-
-✅ **Create an ADR ONLY when:**
-- The decision has **lasting architectural impact**
-- Multiple alternatives were considered with **significant tradeoffs**
-- Future developers will ask **"why did we do it this way?"**
-- The decision affects **multiple components or teams**
-
-Examples requiring ADRs:
-- Choosing A2A protocol over alternatives
-- Adopting counter-based vs event-based streaming
-- Selecting pagination strategy for OOM protection
-
-❌ **Don't create ADR for:**
-- Standard bug fixes (use Spec Kit instead)
-- Minor optimizations
-- Dependency updates
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+See the `using-git-worktrees` skill for the full isolation procedure.
 
 ---
 > Source: [caipe-io/ai-platform-engineering](https://github.com/caipe-io/ai-platform-engineering) — distributed by [TomeVault](https://tomevault.io).
