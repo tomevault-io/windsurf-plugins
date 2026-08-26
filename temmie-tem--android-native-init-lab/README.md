@@ -7,11 +7,11 @@ Custom static /init (PID 1) and minimal native Linux userspace on Android vendor
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Temmie-Tem/android-native-init-lab](https://github.com/Temmie-Tem/android-native-init-lab).
+Original source: `AGENTS.md` in [Temmie-Tem/android-native-init-lab](https://github.com/Temmie-Tem/android-native-init-lab).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
