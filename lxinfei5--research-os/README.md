@@ -7,11 +7,11 @@ Research capability for coding agents: multi-source corroboration, active discov
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lxinfei5/research-os](https://github.com/lxinfei5/research-os).
+Original source: `AGENTS.md` in [lxinfei5/research-os](https://github.com/lxinfei5/research-os).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
