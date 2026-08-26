@@ -7,11 +7,11 @@ Ein kostenloses, quelloffenes Gastronomie-Kassensystem (mPOS) für Vereine und g
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [nicograef/jotti](https://github.com/nicograef/jotti).
+Original source: `CLAUDE.md` in [nicograef/jotti](https://github.com/nicograef/jotti).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
