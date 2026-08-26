@@ -1,9 +1,12 @@
 ---
 trigger: always_on
-description: When performing edits - always check docstring and keep them up-to-date with :param:, :raises:, :return: etc.
+description: Font Awesome Pro Icons Required - Every action button/link needs an icon; if not specified, you shall propose 3 options
 ---
 
-When performing edits - always check docstring and keep them up-to-date with :param:, :raises:, :return: etc.
+Font Awesome Pro Icons Required - Every action button/link needs an icon; if not specified, you shall propose 3 options
+Bootstrap Tooltips Required - Every button needs hover text that:
+Explains the action for active buttons
+Explains why it's disabled and how to enable it for disabled buttons
 
 ---
 > Source: [FeatureFactory-io/mimir](https://github.com/FeatureFactory-io/mimir) — distributed by [TomeVault](https://tomevault.io).
