@@ -1,88 +1,106 @@
 ---
 trigger: always_on
-description: TanStack Router: Setup and Architecture
+description: Ultracite Rules - AI-Ready Formatter and Linter
 ---
 
-# Overview
 
-**TanStack Router is a router for building React and Solid applications**. Some of its features include:
+# Project Context
+Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
 
-- 100% inferred TypeScript support
-- Typesafe navigation
-- Nested Routing and layout routes (with pathless layouts)
-- Built-in Route Loaders w/ SWR Caching
-- Designed for client-side data caches (TanStack Query, SWR, etc.)
-- Automatic route prefetching
-- Asynchronous route elements and error boundaries
-- File-based Route Generation
-- Typesafe JSON-first Search Params state management APIs
-- Path and Search Parameter Schema Validation
-- Search Param Navigation APIs
-- Custom Search Param parser/serializer support
-- Search param middleware
-- Route matching/loading middleware
+## Key Principles
+- Zero configuration required
+- Subsecond performance
+- Maximum type safety
+- AI-friendly code generation
 
-To get started quickly, head to the next page. For a more lengthy explanation, buckle up while I bring you up to speed!
+## Before Writing Code
+1. Analyze existing patterns in the codebase
+2. Consider edge cases and error scenarios
+3. Follow the rules below strictly
+4. Validate accessibility requirements
 
-## "A Fork in the Route"
+## Rules
 
-Using a router to build applications is widely regarded as a must-have and is usually one of the first choices you’ll make in your tech stack.
+### Accessibility (a11y)
+- Don't use `accessKey` attribute on any HTML element.
+- Don't set `aria-hidden="true"` on focusable elements.
+- Don't add ARIA roles, states, and properties to elements that don't support them.
+- Don't use distracting elements like `<marquee>` or `<blink>`.
+- Only use the `scope` prop on `<th>` elements.
+- Don't assign non-interactive ARIA roles to interactive HTML elements.
+- Make sure label elements have text content and are associated with an input.
+- Don't assign interactive ARIA roles to non-interactive HTML elements.
+- Don't assign `tabIndex` to non-interactive HTML elements.
+- Don't use positive integers for `tabIndex` property.
+- Don't include "image", "picture", or "photo" in img alt prop.
+- Don't use explicit role property that's the same as the implicit/default role.
+- Make static elements with click handlers use a valid role attribute.
+- Always include a `title` element for SVG elements.
+- Give all elements requiring alt text meaningful information for screen readers.
+- Make sure anchors have content that's accessible to screen readers.
+- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
+- Include all required ARIA attributes for elements with ARIA roles.
+- Make sure ARIA properties are valid for the element's supported roles.
+- Always include a `type` attribute for button elements.
+- Make elements with interactive roles and handlers focusable.
+- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
+- Always include a `lang` attribute on the html element.
+- Always include a `title` attribute for iframe elements.
+- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
+- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
+- Include caption tracks for audio and video elements.
+- Use semantic elements instead of role attributes in JSX.
+- Make sure all anchors are valid and navigable.
+- Ensure all ARIA properties (`aria-*`) are valid.
+- Use valid, non-abstract ARIA roles for elements with ARIA roles.
+- Use valid ARIA state and property values.
+- Use valid values for the `autocomplete` attribute on input elements.
+- Use correct ISO language/country codes for the `lang` attribute.
 
-[//]: # 'WhyChooseTanStackRouter'
-
-**So, why should you choose TanStack Router over another router?**
-
-To answer this question, we need to look at the other options in the space. There are many if you look hard enough, but in my experience, only a couple are worth exploring seriously:
-
-- **Next.js** - Widely regarded as the de facto framework for starting a new React project, it’s laser focused on performance, workflow, and bleeding edge technology. Its APIs and abstractions are powerful, but can sometimes come across as non-standard. Its extremely fast growth and adoption in the industry has resulted in a featured packed experience, but not at the expense of feeling overwhelming and sometimes bloated.
-- **Remix / React Router** - A full-stack framework based on the historically successful React Router offers a similarly powerful developer and user experience, with APIs and vision based firmly on web standards like Request/Response and a focus on running anywhere JS can run. Many of its APIs and abstractions are wonderfully designed and were inspiration for more than a few TanStack Router APIs. That said, its rigid design, bolted-on type safety and sometimes strict over-adherence to platform APIs can leave some developers wanting more.
-
-Both of these frameworks (and their routers) are great, and I can personally attest that both are very good solutions for building React applications. My experience has also taught me that these solutions could also be much better, especially around the actual routing APIs that are available to developers to make their apps faster, easier, and more enjoyable to work with.
-
-It's probably no surprise at this point that picking a router is so important that it is often tied 1-to-1 with your choice of framework, since most frameworks rely on a specific router.
-
-[//]: # 'WhyChooseTanStackRouter'
-
-**Does this mean that TanStack Router is a framework?**
-
-TanStack Router itself is not a "framework" in the traditional sense, since it doesn't address a few other common full-stack concerns. However TanStack Router has been designed to be upgradable to a full-stack framework when used in conjunction with other tools that address bundling, deployments, and server-side-specific functionality. This is why we are currently developing [TanStack Start](https://tanstack.com/start), a full-stack framework that is built on top of TanStack Router and Vite.
-
-For a deeper dive on the history of TanStack Router, feel free to read [TanStack Router's History](../decisions-on-dx.md#tanstack-routers-origin-story).
-
-## Why TanStack Router?
-
-TanStack Router delivers on the same fundamental expectations as other routers that you’ve come to expect:
-
-- Nested routes, layout routes, grouped routes
-- File-based Routing
-- Parallel data loading
-- Prefetching
-- URL Path Params
-- Error Boundaries and Handling
-- SSR
-- Route Masking
-
-And it also delivers some new features that raise the bar:
-
-- 100% inferred TypeScript support
-- Typesafe navigation
-- Built-in SWR Caching for loaders
-- Designed for client-side data caches (TanStack Query, SWR, etc.)
-- Typesafe JSON-first Search Params state management APIs
-- Path and Search Parameter Schema Validation
-- Search Parameter Navigation APIs
-- Custom Search Param parser/serializer support
-- Search param middleware
-- Inherited Route Context
-- Mixed file-based and code-based routing
-
-Let’s dive into some of the more important ones in more detail!
-
-## 100% Inferred TypeScript Support
-
-Everything these days is written “in Typescript” or at the very least offers type definitions that are veneered over runtime functionality, but too few packages in the ecosystem actually design their APIs with TypeScript in mind. So while I’m pleased that your router is auto-completing your option fields and catching a few property/method typos here and there, there is much more to be had.
-
-- TanStack Router is fully aware of all of your routes and their configuration at any given point in your code. This includes the path, path params, search params, context, and any other configuration you’ve provided. Ultimately this means that you can navigate to any route in your app with 100% type safety and confidence that your link or navigate call will succeed.
+### Code Complexity and Quality
+- Don't use consecutive spaces in regular expression literals.
+- Don't use the `arguments` object.
+- Don't use primitive type aliases or misleading types.
+- Don't use the comma operator.
+- Don't use empty type parameters in type aliases and interfaces.
+- Don't write functions that exceed a given Cognitive Complexity score.
+- Don't nest describe() blocks too deeply in test files.
+- Don't use unnecessary boolean casts.
+- Don't use unnecessary callbacks with flatMap.
+- Use for...of statements instead of Array.forEach.
+- Don't create classes that only have static members (like a static namespace).
+- Don't use this and super in static contexts.
+- Don't use unnecessary catch clauses.
+- Don't use unnecessary constructors.
+- Don't use unnecessary continue statements.
+- Don't export empty modules that don't change anything.
+- Don't use unnecessary escape sequences in regular expression literals.
+- Don't use unnecessary fragments.
+- Don't use unnecessary labels.
+- Don't use unnecessary nested block statements.
+- Don't rename imports, exports, and destructured assignments to the same name.
+- Don't use unnecessary string or template literal concatenation.
+- Don't use String.raw in template literals when there are no escape sequences.
+- Don't use useless case statements in switch statements.
+- Don't use ternary operators when simpler alternatives exist.
+- Don't use useless `this` aliasing.
+- Don't use any or unknown as type constraints.
+- Don't initialize variables to undefined.
+- Don't use the void operators (they're not familiar).
+- Use arrow functions instead of function expressions.
+- Use Date.now() to get milliseconds since the Unix Epoch.
+- Use .flatMap() instead of map().flat() when possible.
+- Use literal property access instead of computed property access.
+- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
+- Use concise optional chaining instead of chained logical expressions.
+- Use regular expression literals instead of the RegExp constructor when possible.
+- Don't use number literal object member names that aren't base 10 or use underscore separators.
+- Remove redundant terms from logical expressions.
+- Use while loops instead of for loops when you don't need initializer and update expressions.
+- Don't pass children as props.
+- Don't reassign const variables.
+- Don't use constant expressions in conditions.
+- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
