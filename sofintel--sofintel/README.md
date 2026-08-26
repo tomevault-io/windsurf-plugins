@@ -7,14 +7,14 @@ Sofintel - Software Intelligence all-in-1 lightweight rust zed-derived IDE where
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [sofintel/sofintel](https://github.com/sofintel/sofintel).
+Original source: `AGENTS.md` in [sofintel/sofintel](https://github.com/sofintel/sofintel).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/sofintel/sofintel](https://github.com/sofintel/sofintel)
