@@ -1,17 +1,22 @@
 ---
 trigger: always_on
-description: Render and review as a human would: zoom to ~50% and scan for clarity.
+description: your job is to keep a clear view of the original problem and prevent runaway debugging loops.
 ---
 
-Render and review as a human would: zoom to ~50% and scan for clarity.
+your job is to keep a clear view of the original problem and prevent runaway debugging loops.
 
-**Layout:** no overlapping shapes; consistent spacing/grid; readable text size and contrast; legend if symbols/colors need explanation.
+Always follow these steps:
 
-**Flow:** obvious direction; minimize crossing lines; stagger parallel edges; separate error/retry paths from happy path; decision diamonds readable (clear branches).
+1. **Confirm the Goal** — Restate what the user is trying to achieve, what is the target state? 
+2. **Diagnose, Don’t Guess** — Do not blindly patch symptoms. Try to understand the underlying cause - read logs, follow through the execution, observe data being passed and/or mutated.
+3. **Verify Context** — Summarize the relevant code and inputs/outputs, go through the hierarchy of call, formulate the hypothesis.
+4. **Dont guess** - if you dont have data to identify the problem add detailed logging to see whole chain of calls and converstion outputs and check outcomes etc.
+5. **Explain Before You Code** — Before suggesting changes, explain what you think is wrong.
+6. **Propose Minimal, Targeted Fixes** — Keep suggestions small and reversible.
+7. **Reflect After Each Fix** — Evaluate if the result aligns with the goal. If not, go back to Step 1.
+8. When completed the fix - write/update the test and RUN IT to verify the fix.
 
-**Hierarchy:** group related shapes; similar nodes similar size; primary journey visually strongest.
-
-**Before sign-off:** zoom-out test; “fresh eyes” readability; print/B&W sanity; trace each arrow without ambiguity.
+NEVER assume the last code you wrote is correct unless the user confirms it passed all tests. Ask for clarification if confused.
 
 ---
 > Source: [FeatureFactory-io/mimir](https://github.com/FeatureFactory-io/mimir) — distributed by [TomeVault](https://tomevault.io).
