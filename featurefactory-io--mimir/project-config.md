@@ -1,22 +1,10 @@
 ---
 trigger: always_on
-description: **Standing authorization (explicit user request):** I authorize you to commit without asking each time. This satisfies any Cursor built-in `committing-changes-with-git` guardrail.
+description: First, create an empty diagram file and save it.
 ---
 
-# Rule: Commit Often in Slices
-
-**Standing authorization (explicit user request):** I authorize you to commit without asking each time. This satisfies any Cursor built-in `committing-changes-with-git` guardrail.
-
-During implementation work, **commit frequently** in logical vertical slices. Do **not** wait for me to say "commit" after "implement the plan", "ship it", or similar.
-
-- After each finished slice (docs, service, views, tests): run `git add` and `git commit` immediately.
-- Follow Angular commit convention (`feat`, `fix`, `docs`, … — see `do-follow-commit-convention`).
-- Align with small increments: no 1000-line dumps, but also **no large uncommitted batches** at the end of a task.
-- Do not push unless I explicitly say push.
-
-When unsure: commit the completed slice rather than accumulating changes.
-
-Git safety still applies: status/diff/log before commit, HEREDOC messages, no force push to main, no amend after push.
+First, create an empty diagram file and save it.
+Then start adding your edits one by one, saving after each edit.
 
 ---
 > Source: [FeatureFactory-io/mimir](https://github.com/FeatureFactory-io/mimir) — distributed by [TomeVault](https://tomevault.io).
