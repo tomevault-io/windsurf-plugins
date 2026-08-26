@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: TSRX monorepo overview and development guidelines
+description: TSRX (TypeScript Render Extensions) is a framework-neutral language for authoring
 ---
-
 
 # TSRX Project Guide for AI Agents
 
