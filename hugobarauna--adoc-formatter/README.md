@@ -7,11 +7,11 @@ Source-preserving AsciiDoc formatter written in Elixir
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hugobarauna/adoc_formatter](https://github.com/hugobarauna/adoc_formatter).
+Original source: `AGENTS.md` in [hugobarauna/adoc_formatter](https://github.com/hugobarauna/adoc_formatter).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
