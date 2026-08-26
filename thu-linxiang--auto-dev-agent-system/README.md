@@ -7,11 +7,11 @@ A file-based, validator-gated CodeBuddy harness that turns PRDs into traceable n
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [THU-linxiang/auto-dev-agent-system](https://github.com/THU-linxiang/auto-dev-agent-system).
+Original source: `AGENTS.md` in [THU-linxiang/auto-dev-agent-system](https://github.com/THU-linxiang/auto-dev-agent-system).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
