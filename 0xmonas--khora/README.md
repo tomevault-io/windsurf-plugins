@@ -7,11 +7,11 @@ On-chain AI agent generator on Shape. Create, mint, and register AI agents with 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [0xmonas/Khora](https://github.com/0xmonas/Khora).
+Original source: `AGENTS.md` in [0xmonas/Khora](https://github.com/0xmonas/Khora).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
