@@ -1,68 +1,139 @@
 ---
 trigger: always_on
-description: Rules for Ent ORM schema best practices
+description: This project is a personal assistant AI agent. It's designed to conduct research, help write emails, documents, and other content. It's also designed to be extensible via MCP to support integrations with external services to enable additional agent capabilities.
 ---
 
-# Ent ORM Best Practices
+# General Project Guidelines
 
-This document outlines our best practices for using Ent as the ORM layer in this project.
+## Project Overview
+This project is a personal assistant AI agent. It's designed to conduct research, help write emails, documents, and other content. It's also designed to be extensible via MCP to support integrations with external services to enable additional agent capabilities. 
 
-## Schema Structure
+## Project Structure
+The project follows standard Go project layout conventions:
+- `cmd/` - Main applications for this project
+  - `api-server/` - Backend API server for the personal assistant
+- `internal/` - Library code that can be used by other applications
+  - `datastore/` - Database access layer using Ent ORM
+  - `models/` - Data structures shared across the application
+  - `server/` - Main startup logic for API server
+  - `handlers/` - API endpoint handlers for API server
+  - `database/` - Database connection and configuration utilities
+- `ent/` - Auto-generated Ent ORM code for database entities
 
-- All entity schemas should implement the `ent.Schema` interface
-- Always include descriptive comments for each schema type
-- Implement the four main methods for each schema:
-  - `Fields()`: Define all fields of the entity
-  - `Edges()`: Define relationships to other entities
-  - `Indexes()`: Define database indexes for query optimization
-  - `Mixin()`: Include shared behaviors like timestamps
+## Development Best Practices
 
-## Primary Keys
+### Go Coding Standards
+1. **Idiomatic Go**: Follow the Go proverbs and standard conventions
+   - Use proper error handling (no panics in production code)
+   - Embrace interfaces for dependency inversion
+   - Prefer composition over inheritance
+   - Use meaningful variable names (`i` for indexes, `err` for errors)
 
-- Use UUID v4 as the primary key for all entities
-- Always set UUIDs to be immutable and auto-generated:
-```go
-field.UUID("id", uuid.UUID{}).
-    Default(uuid.New).
-    Immutable()
-```
+2. **Code Organization**:
+   - Keep functions small and focused on a single responsibility
+   - Group related functions in packages with clear boundaries
+   - Use interfaces to define behavior at package boundaries
+   - Extract complex logic into well-named helper functions immediately
+   - Avoid deeply nested loops and conditionals (aim for cyclomatic complexity < 10)
+   - Use early returns to reduce nesting levels
 
-## Field Validation
+3. **Error Handling**:
+   - Always check errors, never use `_` to ignore errors without justification
+   - Return errors rather than using panic
+   - Use custom error types or error wrapping for context
+   - Use `fmt.Errorf()` with `%w` for wrapping errors
 
-- Add appropriate validation to all fields:
-  - Use `NotEmpty()` for required string fields
-  - Use `Positive()` or `NonNegative()` for numeric fields that should be ≥ 0
-  - Use `Range()` for fields with specific bounds (e.g., percentages)
-- Mark optional fields with `Optional()` and provide sensible defaults with `Default()`
+4. **Concurrency**:
+   - Use channels and goroutines appropriately
+   - Always ensure proper goroutine termination
+   - Use context for cancellation and timeouts
+   - Use sync primitives (Mutex, WaitGroup) when appropriate
 
-## Indexes
+5. **Function Design and Complexity Management**:
+   - Write small, focused functions from the start (avoid large monolithic functions)
+   - When a function grows beyond ~50 lines, consider extracting helper functions
+   - Use helper functions to make code self-documenting through clear naming
+   - Avoid nesting more than 3 levels deep - extract nested logic into separate functions
+   - Use early returns to reduce nesting and improve readability
+   - Replace complex `if-else` chains with `switch` statements or lookup tables
+   
+   ```go
+   // Good: Clear, focused functions with minimal nesting
+   func handleRequest(req Request) error {
+       if !req.Valid {
+           return ErrInvalidRequest
+       }
+       
+       for _, item := range req.Items {
+           if err := processItem(item); err != nil {
+               return err
+           }
+       }
+       return nil
+   }
+   
+   func processItem(item Item) error {
+       switch item.Type {
+       case "A":
+           return processTypeA(item)
+       case "B":
+           return processTypeB(item)
+       default:
+           return ErrUnknownType
+       }
+   }
+   ```
 
-- Create indexes for fields commonly used in queries
-- Use composite indexes for fields frequently queried together
-- Always index foreign key fields and fields used for filtering
+6. **Data Structure Design for Maintainability**:
+   - Design structures that are self-contained and capture all needed data at creation
+   - Avoid parallel arrays or slices that must stay synchronized by index
+   - When processing data, capture all context needed for downstream operations
+   - Prefer structures that eliminate the need for data merging or complex lookups
+   
+   ```go
+   // Good: Self-contained structure with all needed data
+   type ProcessingResult struct {
+       ID        string  // Captured at creation
+       ToolName  string  // Captured at creation
+       ToolInput string  // Captured at creation
+       Output    string
+       Error     error
+   }
+   
+   func executeAndCapture(toolCall ToolCall) ProcessingResult {
+       var result string
+       var err error
+       // ... execution logic ...
+       
+       return ProcessingResult{
+           ID:        toolCall.ID,
+           ToolName:  toolCall.Name,
+           ToolInput: toolCall.Arguments,
+           Output:    result,
+           Error:     err,
+       }
+   }
+   
+   // No merging needed - all data is in one place
+   func convertToModels(results []ProcessingResult) []*Model {
+       models := make([]*Model, len(results))
+       for i, result := range results {
+           models[i] = &Model{
+               Name:   result.ToolName,
+               Input:  result.ToolInput,
+               Output: result.Output,
+               Error:  result.Error,
+           }
+       }
+       return models
+   }
+   ```
 
-## Time Tracking
+7. **Designing for Testability**:
+   - Avoid tight coupling to third-party SDK types that are difficult to construct in tests
+   - Create intermediate data structures that capture only the data you need
 
-- Use the `TimeMixin` for all entities to track creation and update times
-- Always include the TimeMixin in your schema's `Mixin()` method:
-```go
-func (YourEntity) Mixin() []ent.Mixin {
-    return []ent.Mixin{
-        TimeMixin{},
-    }
-}
-```
-
-## Edge Relationships
-
-- Define clear and meaningful relationships between entities when applicable
-- Document the cardinality and purpose of each relationship
-
-## Code Style
-
-- Use descriptive field and edge names
-- Follow Go naming conventions for schema types (PascalCase)
-- Keep field definitions clean and aligned for readability
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [theimaginaryfoundation/what-iff](https://github.com/theimaginaryfoundation/what-iff) — distributed by [TomeVault](https://tomevault.io).
