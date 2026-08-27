@@ -1,17 +1,17 @@
 ---
 trigger: always_on
-description: Jest coverage and authorizer test expectations.
+description: Secrets, Cognito env, and fail-closed auth.
 ---
 
 
-# Testing
+# Security
 
-Read `docs/TESTING.md`.
+Read `docs/SECURITY.md`.
 
-- Keep ≥80% coverage on branches, functions, lines, statements.
-- Mock `jose`; do not call live Cognito in unit tests.
-- Do not delete tests to greenwash coverage.
-- Cover Bearer parsing, verify failures, token_use, scope, success policy.
+- No hardcoded secrets or JWTs in source.
+- Cognito IDs via env / CI / DefinePlugin only.
+- Do not log full tokens.
+- Auth failures must deny (throw `Unauthorized`).
 
 ---
 > Source: [jessemull/100-letters-project-authorizer](https://github.com/jessemull/100-letters-project-authorizer) — distributed by [TomeVault](https://tomevault.io).
