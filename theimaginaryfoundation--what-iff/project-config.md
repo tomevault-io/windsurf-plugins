@@ -1,188 +1,75 @@
 ---
 trigger: always_on
-description: The API server is a RESTful service built with Go, using the Gorilla Mux router for routing and Ent for database operations. The server follows a modular design with clear separation of concerns and dependency injection patterns.
+description: - Don't create entire files in one forward pass. Iterate.
 ---
 
-# API Server Design and Structure
+# Repository Guidelines
 
-## Overview
+## General Guidelines
+- Don't create entire files in one forward pass. Iterate.
 
-The API server is a RESTful service built with Go, using the Gorilla Mux router for routing and Ent for database operations. The server follows a modular design with clear separation of concerns and dependency injection patterns.
+## Project Structure & Module Organization
+- Backend (Go): `cmd/api-server/main.go`; additional binaries in `cmd/` (e.g. `generate-test-conversations`). Application code in `internal/{handlers,server,auth,agent,datastore,providers,middleware,...}`.
+- Data layer: Ent ORM generated code in `ent/`; edit schemas in `ent/schema` and run `make generate` (do not edit generated files in `ent/` directly).
+- Frontend (Angular): `web/app/`.
+- Docs: `docs/`, `ARCHITECTURE.md`, `openapi.yaml`, `scripts/`.
 
-## Server Initialization
+## Build, Test, and Development Commands
+- `make help` — list tasks.
+- `make run` — run API locally (reads `.env`); `make run-mock` — same but with the in-process mock LLM (no provider keys/egress; ADR 0x018).
+- Local stack helpers: `make check-env`, `make db-up`/`db-down` (Postgres+pgvector in Docker), `make web` (Angular dev server), `make dev-up`/`dev-down` (background API), `make local-superuser` (interactive local admin), `make mock-e2e` (hermetic backend E2E, local/on-demand).
+- `make fmt` / `make fmt-fix` — check/fix Go formatting.
+- `make vet` — static analysis; `make test` — run Go tests; `make build` — verify the build (cross-compiles a throwaway `linux/amd64` binary; the `bootstrap` output name is a legacy artifact of the retired Lambda target).
+- `make tidy` — check `go.mod`/`go.sum` are tidy; `make test-short` — tests without verbose output.
+- `make generate` — regenerate Ent code after schema changes.
+- `make pre-commit` — run all pre-commit checks (`fmt vet tidy test build check-no-local-models`). CI runs the same formatting/vet/tidy/build checks but regenerates Ent code first and uses `make test-ci` (mock LLM, dummy keys, race detector) as its test gate; the frontend is validated by its own `frontend-pr-validation` workflow. Passing locally is a strong signal, not a guarantee.
+- Frontend: `cd web/app && npm install && npm start`.
+- Docker stack: `docker compose up --build`.
+- **CI stays on `make` wherever a target exists.** A workflow step must not
+  inline a raw command that duplicates a Makefile target (e.g. `go generate
+  ./ent` instead of `make generate`) — call the target instead, so the
+  Makefile stays the single source of truth for what the check actually runs
+  and a developer can reproduce a CI failure locally with the same command.
+  Exceptions: bare toolchain/cache steps with no repo-specific behavior
+  (`go mod download`, `npm ci`), and CI-only bootstrapping that has no local
+  dev equivalent (e.g. e2e workflows building and backgrounding a throwaway
+  API binary with container-specific ports/env, which `make run`/`make
+  dev-up` aren't shaped for). When adding a new CI step, check `make help`
+  first; if the step's logic belongs in a target, add one rather than
+  inlining it.
 
-The API server is initialized in `cmd/api-server/main.go`. It follows these steps:
+## Coding Style & Naming Conventions
+- `.editorconfig` enforced.
+  - Go: tabs, `gofmt` required; packages lowercase (no underscores); exported identifiers `CamelCase`.
+  - JS/TS/JSON/YAML: 2-space indent; Prettier configured in the web app.
+- Keep handlers thin; business logic in services/datastore. Avoid editing files under `ent/` manually.
+- API changes must update `openapi.yaml` and related docs.
 
-1. Load environment variables
-2. Initialize logger
-3. Connect to database
-4. Create and configure server
-5. Start server and handle graceful shutdown
+## Testing Guidelines
+- Backend: Go `testing` with table-driven tests when appropriate. Files end with `_test.go`; test funcs `TestXxx`. Run `go test ./...` or `make test`.
+- Frontend: `cd web/app && npm test`. Runs on Vitest via the `@angular/build:unit-test` builder (jsdom); Karma and Jasmine are gone.
+- Frontend coverage: `make web-unit-coverage` / `make admin-unit-coverage` run the same suites with V8 coverage and rewrite the lcov `SF:` paths to repo-root-relative so Codecov's components match. `make lcov-summary LCOV=<path>` prints a total.
+- Frontend E2E: Playwright suite in `web/app/e2e/` (`poms/`,
+  `fixtures/`, `sdk/`, `tests/{functional,journeys,visual,a11y}`) — run via
+  `npm run e2e`/`e2e:mock-llm`/`e2e:local-llm`/`e2e:mock-llm:visual`
+  (see `e2e/README.md` for prerequisites). Full guidance: the
+  `playwright-e2e` Claude Code skill and `web/app/e2e/README.md`.
+- Prefer unit tests with mocks over hitting external services. Cover handlers, services, and critical utils.
 
-```go
-func main() {
-    // Load environment variables
-    if err := godotenv.Load(envFile); err != nil {
-        log.Printf("Warning: Error loading .env file: %v", err)
-    }
+## Commit & Pull Request Guidelines
+- Conventional Commits (seen in history): `feat:`, `fix:`, `docs:`, `ci:`, etc.
+  - Example: `feat(auth): implement JIT user provisioning`.
+- Before pushing: `make pre-commit` (or `make install-hooks` once to auto-run checks).
+- **If you touched `openapi.yaml`, regenerate the e2e SDK and commit it** — `cd web/app && npm run sdk:generate`. The spec is a frontend build input, so a backend-only PR that skips this fails `frontend-pr-validation`. Rationale and gotchas in the [architecture summary](docs/ARCHITECTURE_SUMMARY.md).
+- PRs: clear description, linked issues, focused diff, tests added/updated, docs updated (README/ARCHITECTURE/OpenAPI). Include screenshots for UI changes.
 
-    // Initialize logger
-    logger, err := zap.NewProduction()
-    if err != nil {
-        log.Fatalf("Failed to initialize logger: %v", err)
-    }
-    defer logger.Sync()
+## Architecture & package docs
 
-    // Initialize database connection
-    client, err := database.NewClient(logger)
-    if err != nil {
-        logger.Fatal("Failed to connect to database", zap.Error(err))
-    }
-    defer client.Close()
+Read these before reasoning about structure, module relationships, or any
+change spanning multiple files — they are the source of truth this file
+deliberately does not duplicate:
 
-    // Create server config
-    config := server.NewConfig()
-
-    // Create and configure server
-    srv := server.NewServer(config, logger, client)
-
-    // Run server in a goroutine
-    go func() {
-        if err := srv.Start(); err != nil {
-            logger.Fatal("Server failed", zap.Error(err))
-        }
-    }()
-
-    // Handle graceful shutdown
-    c := make(chan os.Signal, 1)
-    signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-    sig := <-c
-    
-    ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-    defer cancel()
-    
-    if err := srv.Shutdown(ctx); err != nil {
-        logger.Fatal("Server forced to shutdown", zap.Error(err))
-    }
-}
-```
-
-## Server Configuration
-
-Server configuration is managed through the `Config` struct in `internal/server/config.go`. It loads settings from environment variables with sensible defaults.
-
-```go
-type Config struct {
-    Host          string
-    Port          string
-    ReadTimeout   time.Duration
-    WriteTimeout  time.Duration
-    IdleTimeout   time.Duration
-    RunMigrations bool
-}
-
-func NewConfig() *Config {
-    port := os.Getenv("SERVER_PORT")
-    if port == "" {
-        port = "8080"
-    }
-
-    host := os.Getenv("SERVER_HOST")
-    if host == "" {
-        host = "localhost"
-    }
-
-    return &Config{
-        Host:          host,
-        Port:          port,
-        ReadTimeout:   15 * time.Second,
-        WriteTimeout:  15 * time.Second,
-        IdleTimeout:   60 * time.Second,
-        RunMigrations: false,
-    }
-}
-```
-
-## Server Structure
-
-The server is structured around a central `Server` struct in `internal/server/server.go` which encapsulates:
-
-- Configuration
-- Logger
-- Router
-- HTTP server
-- Database client
-
-```go
-type Server struct {
-    config *Config
-    logger *zap.Logger
-    router *mux.Router
-    server *http.Server
-    db     *ent.Client
-}
-
-func NewServer(config *Config, logger *zap.Logger, db *ent.Client) *Server {
-    s := &Server{
-        config: config,
-        logger: logger,
-        router: mux.NewRouter(),
-        db:     db,
-    }
-
-    s.setupMiddleware()
-    s.setupRoutes()
-
-    s.server = &http.Server{
-        Addr:         fmt.Sprintf("%s:%s", config.Host, config.Port),
-        Handler:      s.router,
-        WriteTimeout: config.WriteTimeout,
-        ReadTimeout:  config.ReadTimeout,
-        IdleTimeout:  config.IdleTimeout,
-    }
-
-    return s
-}
-```
-
-## Provider Pattern
-
-We use the provider pattern to decouple handlers from data access implementations. Our approach has evolved to use composite provider interfaces for handlers that need access to multiple entity types.
-
-### Entity-Specific Provider Interfaces
-
-Each entity has its own provider interface in the `internal/providers/` directory:
-
-```go
-// ContentBriefProvider defines the interface for content brief data operations
-type ContentBriefProvider interface {
-    CreateContentBrief(ctx context.Context, userID uuid.UUID, contentBrief models.ContentBrief) (*models.ContentBrief, error)
-    ListContentBriefs(ctx context.Context, userID uuid.UUID, pageNum, pageSize int, filters models.ContentBriefFilters) (*models.PaginatedResponse, error)
-    GetContentBrief(ctx context.Context, userID, id uuid.UUID) (*models.ContentBrief, error)
-    UpdateContentBrief(ctx context.Context, userID uuid.UUID, contentBrief models.ContentBrief) (*models.ContentBrief, error)
-    DeleteContentBrief(ctx context.Context, userID, id uuid.UUID) error
-}
-```
-
-### Composite Provider Interfaces
-
-For handlers that need access to multiple entity types, we define composite interfaces that extend multiple entity provider interfaces:
-
-```go
-// ProjectBriefQuestionIdeaJobProvider combines multiple provider interfaces
-type ProjectBriefQuestionIdeaJobProvider interface {
-    providers.ProjectProvider
-    providers.ContentIdeaProvider
-    providers.ContentBriefProvider
-    providers.InterviewQuestionProvider
-    providers.JobProvider
-}
-```
-
-This approach simplifies handler constructors and avoids large parameter lists.
-
-### Generator Interfaces
-
+- **`docs/ARCHITECTURE_SUMMARY.md`** — start here. System architecture: purpose,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
