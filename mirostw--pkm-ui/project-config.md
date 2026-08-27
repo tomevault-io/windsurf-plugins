@@ -1,14 +1,12 @@
 ---
 trigger: always_on
-description: - after writing new code please always call `bun check` to identify remaining type errors and lints.
+description: - use `bun add` instead of `npm install`
 ---
 
 
 # Your rule content
 
-- after writing new code please always call `bun check` to identify remaining type errors and lints.
-- then go on to fix them and call `bun check` again until they are resolved
-- avoid type-casting, using type any and ignore-comments if there isn't a very good reason for it.
+- use `bun add` instead of `npm install`
 
 ---
 > Source: [MiroStW/pkm-ui](https://github.com/MiroStW/pkm-ui) — distributed by [TomeVault](https://tomevault.io).
