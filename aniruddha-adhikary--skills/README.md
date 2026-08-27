@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [aniruddha-adhikary/skills](https://github.com/aniruddha-adhikary/skills).
+Original source: `AGENTS.md` in [aniruddha-adhikary/skills](https://github.com/aniruddha-adhikary/skills).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
