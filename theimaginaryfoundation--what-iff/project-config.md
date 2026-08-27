@@ -1,75 +1,182 @@
 ---
 trigger: always_on
-description: - Don't create entire files in one forward pass. Iterate.
+description: The Personal Assistant UI is built with Angular and follows modern best practices for scalable frontend applications. It interfaces with the Personal Assistant API to provide a user-friendly interface for content creation and management.
 ---
 
-# Repository Guidelines
+# Personal Assistant UI Guidelines
 
-## General Guidelines
-- Don't create entire files in one forward pass. Iterate.
+## Project Overview
+The Personal Assistant UI is built with Angular and follows modern best practices for scalable frontend applications. It interfaces with the Personal Assistant API to provide a user-friendly interface for content creation and management.
 
-## Project Structure & Module Organization
-- Backend (Go): `cmd/api-server/main.go`; additional binaries in `cmd/` (e.g. `generate-test-conversations`). Application code in `internal/{handlers,server,auth,agent,datastore,providers,middleware,...}`.
-- Data layer: Ent ORM generated code in `ent/`; edit schemas in `ent/schema` and run `make generate` (do not edit generated files in `ent/` directly).
-- Frontend (Angular): `web/app/`.
-- Docs: `docs/`, `ARCHITECTURE.md`, `openapi.yaml`, `scripts/`.
+## Project Structure
 
-## Build, Test, and Development Commands
-- `make help` — list tasks.
-- `make run` — run API locally (reads `.env`); `make run-mock` — same but with the in-process mock LLM (no provider keys/egress; ADR 0x018).
-- Local stack helpers: `make check-env`, `make db-up`/`db-down` (Postgres+pgvector in Docker), `make web` (Angular dev server), `make dev-up`/`dev-down` (background API), `make local-superuser` (interactive local admin), `make mock-e2e` (hermetic backend E2E, local/on-demand).
-- `make fmt` / `make fmt-fix` — check/fix Go formatting.
-- `make vet` — static analysis; `make test` — run Go tests; `make build` — verify the build (cross-compiles a throwaway `linux/amd64` binary; the `bootstrap` output name is a legacy artifact of the retired Lambda target).
-- `make tidy` — check `go.mod`/`go.sum` are tidy; `make test-short` — tests without verbose output.
-- `make generate` — regenerate Ent code after schema changes.
-- `make pre-commit` — run all pre-commit checks (`fmt vet tidy test build check-no-local-models`). CI runs the same formatting/vet/tidy/build checks but regenerates Ent code first and uses `make test-ci` (mock LLM, dummy keys, race detector) as its test gate; the frontend is validated by its own `frontend-pr-validation` workflow. Passing locally is a strong signal, not a guarantee.
-- Frontend: `cd web/app && npm install && npm start`.
-- Docker stack: `docker compose up --build`.
-- **CI stays on `make` wherever a target exists.** A workflow step must not
-  inline a raw command that duplicates a Makefile target (e.g. `go generate
-  ./ent` instead of `make generate`) — call the target instead, so the
-  Makefile stays the single source of truth for what the check actually runs
-  and a developer can reproduce a CI failure locally with the same command.
-  Exceptions: bare toolchain/cache steps with no repo-specific behavior
-  (`go mod download`, `npm ci`), and CI-only bootstrapping that has no local
-  dev equivalent (e.g. e2e workflows building and backgrounding a throwaway
-  API binary with container-specific ports/env, which `make run`/`make
-  dev-up` aren't shaped for). When adding a new CI step, check `make help`
-  first; if the step's logic belongs in a target, add one rather than
-  inlining it.
+```
+src/
+├── app/
+│   ├── core/                   # Core modules, services, and components
+│   │   ├── components/         # Shared components (navbar, layout)
+│   │   ├── guards/             # Route guards
+│   │   ├── interceptors/       # HTTP interceptors
+│   │   ├── models/             # Data models
+│   │   └── services/           # Core services
+│   ├── features/               # Feature modules
+│   │   ├── auth/               # Authentication feature
+│   │   │   └── components/     # Login, register, profile components
+│   │   └── dashboard/          # Dashboard feature
+│   ├── app.ts                  # Root component
+│   ├── app.html                # Root component template
+│   ├── app.scss                # Root component styles
+│   ├── app.routes.ts           # Application routes
+│   └── app.config.ts           # Application configuration
+├── assets/                     # Static assets
+└── environments/               # Environment configuration
+```
 
-## Coding Style & Naming Conventions
-- `.editorconfig` enforced.
-  - Go: tabs, `gofmt` required; packages lowercase (no underscores); exported identifiers `CamelCase`.
-  - JS/TS/JSON/YAML: 2-space indent; Prettier configured in the web app.
-- Keep handlers thin; business logic in services/datastore. Avoid editing files under `ent/` manually.
-- API changes must update `openapi.yaml` and related docs.
+## Code Organization Guidelines
 
-## Testing Guidelines
-- Backend: Go `testing` with table-driven tests when appropriate. Files end with `_test.go`; test funcs `TestXxx`. Run `go test ./...` or `make test`.
-- Frontend: `cd web/app && npm test`. Runs on Vitest via the `@angular/build:unit-test` builder (jsdom); Karma and Jasmine are gone.
-- Frontend coverage: `make web-unit-coverage` / `make admin-unit-coverage` run the same suites with V8 coverage and rewrite the lcov `SF:` paths to repo-root-relative so Codecov's components match. `make lcov-summary LCOV=<path>` prints a total.
-- Frontend E2E: Playwright suite in `web/app/e2e/` (`poms/`,
-  `fixtures/`, `sdk/`, `tests/{functional,journeys,visual,a11y}`) — run via
-  `npm run e2e`/`e2e:mock-llm`/`e2e:local-llm`/`e2e:mock-llm:visual`
-  (see `e2e/README.md` for prerequisites). Full guidance: the
-  `playwright-e2e` Claude Code skill and `web/app/e2e/README.md`.
-- Prefer unit tests with mocks over hitting external services. Cover handlers, services, and critical utils.
+### Component Structure
+Components must be split into separate files for TypeScript, HTML, and SCSS:
 
-## Commit & Pull Request Guidelines
-- Conventional Commits (seen in history): `feat:`, `fix:`, `docs:`, `ci:`, etc.
-  - Example: `feat(auth): implement JIT user provisioning`.
-- Before pushing: `make pre-commit` (or `make install-hooks` once to auto-run checks).
-- **If you touched `openapi.yaml`, regenerate the e2e SDK and commit it** — `cd web/app && npm run sdk:generate`. The spec is a frontend build input, so a backend-only PR that skips this fails `frontend-pr-validation`. Rationale and gotchas in the [architecture summary](docs/ARCHITECTURE_SUMMARY.md).
-- PRs: clear description, linked issues, focused diff, tests added/updated, docs updated (README/ARCHITECTURE/OpenAPI). Include screenshots for UI changes.
+```
+component-name/
+├── component-name.component.ts
+├── component-name.component.html
+├── component-name.component.scss
+└── component-name.component.spec.ts
+```
 
-## Architecture & package docs
+### Component Definition
+All components should be standalone and use the following structure:
 
-Read these before reasoning about structure, module relationships, or any
-change spanning multiple files — they are the source of truth this file
-deliberately does not duplicate:
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 
-- **`docs/ARCHITECTURE_SUMMARY.md`** — start here. System architecture: purpose,
+@Component({
+  selector: 'app-example',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './example.component.html',
+  styleUrls: ['./example.component.scss']
+})
+export class ExampleComponent implements OnInit {
+  // Component properties
+  
+  constructor() {}
+  
+  ngOnInit(): void {
+    // Initialization logic
+  }
+  
+  // Component methods
+}
+```
+
+### File Naming Conventions
+- Use kebab-case for file names: `user-profile.component.ts`
+- Use camelCase for TypeScript variables, properties, and methods
+- Use PascalCase for class names: `UserProfileComponent`
+- Use kebab-case for selectors: `<app-user-profile>`
+
+## Styling Guidelines
+
+### SCSS Structure
+- Use SCSS for all styling
+- Component-specific styles should be in the component's `.scss` file
+- Global styles should be in `src/styles.scss`
+- Use Tailwind CSS utility classes for common styling needs
+- Use the `:host` selector to style the component's host element
+- Use BEM methodology for custom CSS classes
+
+### Tailwind CSS
+Tailwind CSS is used for utility-first styling. Flowbite components are available for more complex UI elements.
+
+Example:
+```html
+<div class="flex items-center justify-between p-4 bg-white rounded-md shadow-sm">
+  <h2 class="text-lg font-semibold text-gray-800">Title</h2>
+  <button class="px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700">
+    Action
+  </button>
+</div>
+```
+
+## Service Guidelines
+
+### Service Structure
+Services should be organized in the appropriate directory based on their scope:
+- Core services in `src/app/core/services/`
+- Feature-specific services in `src/app/features/[feature]/services/`
+
+### Service Definition
+```typescript
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '@environments/environment';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ExampleService {
+  private http = inject(HttpClient);
+  private apiUrl = `${environment.apiUrl}/examples`;
+  
+  getAll(): Observable<Example[]> {
+    return this.http.get<Example[]>(this.apiUrl);
+  }
+  
+  getById(id: string): Observable<Example> {
+    return this.http.get<Example>(`${this.apiUrl}/${id}`);
+  }
+  
+  create(example: Example): Observable<Example> {
+    return this.http.post<Example>(this.apiUrl, example);
+  }
+  
+  update(id: string, example: Example): Observable<Example> {
+    return this.http.put<Example>(`${this.apiUrl}/${id}`, example);
+  }
+  
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+}
+```
+
+## Model Guidelines
+
+### Model Definition
+Models should be defined as TypeScript interfaces in `src/app/core/models/` or in feature-specific `models` directories.
+
+```typescript
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+## Routing Guidelines
+
+### Route Definition
+Routes should be defined in `app.routes.ts` for main routes and in feature-specific modules for feature routes.
+
+```typescript
+import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
+
+export const routes: Routes = [
+  {
+    path: '',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
+  {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
