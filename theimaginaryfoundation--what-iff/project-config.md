@@ -1,174 +1,68 @@
 ---
 trigger: always_on
-description: Rules for persistent datastore logic
+description: Rules for Ent ORM schema best practices
 ---
 
-# Datastore Implementation Guidelines
+# Ent ORM Best Practices
 
-## Overview
-Our datastore layer uses [Ent](mdc:https:/entgo.io) as the ORM and follows consistent patterns for data access. This document outlines the key patterns and best practices to follow when working with the datastore package.
+This document outlines our best practices for using Ent as the ORM layer in this project.
 
-## General Architecture
+## Schema Structure
 
-- **Package**: All datastore code lives in the `internal/datastore` package
-- **Models**: We use models from the `internal/models` package for input/output, never exposing Ent types directly
-- **Client**: The datastore uses an Ent client for database operations
-- **Logging**: We use `zap.Logger` for structured logging throughout the datastore
+- All entity schemas should implement the `ent.Schema` interface
+- Always include descriptive comments for each schema type
+- Implement the four main methods for each schema:
+  - `Fields()`: Define all fields of the entity
+  - `Edges()`: Define relationships to other entities
+  - `Indexes()`: Define database indexes for query optimization
+  - `Mixin()`: Include shared behaviors like timestamps
 
+## Primary Keys
+
+- Use UUID v4 as the primary key for all entities
+- Always set UUIDs to be immutable and auto-generated:
 ```go
-// Base Datastore struct
-type Datastore struct {
-    dbClient *ent.Client
-    logger   *zap.Logger
-}
+field.UUID("id", uuid.UUID{}).
+    Default(uuid.New).
+    Immutable()
+```
 
-func NewDatastore(dbClient *ent.Client, logger *zap.Logger) *Datastore {
-    return &Datastore{
-        dbClient: dbClient,
-        logger:   logger,
+## Field Validation
+
+- Add appropriate validation to all fields:
+  - Use `NotEmpty()` for required string fields
+  - Use `Positive()` or `NonNegative()` for numeric fields that should be ≥ 0
+  - Use `Range()` for fields with specific bounds (e.g., percentages)
+- Mark optional fields with `Optional()` and provide sensible defaults with `Default()`
+
+## Indexes
+
+- Create indexes for fields commonly used in queries
+- Use composite indexes for fields frequently queried together
+- Always index foreign key fields and fields used for filtering
+
+## Time Tracking
+
+- Use the `TimeMixin` for all entities to track creation and update times
+- Always include the TimeMixin in your schema's `Mixin()` method:
+```go
+func (YourEntity) Mixin() []ent.Mixin {
+    return []ent.Mixin{
+        TimeMixin{},
     }
 }
 ```
 
-## File Organization
+## Edge Relationships
 
-Each entity type should have its own file in the datastore package. For example:
-- `content_idea.go` - Content idea based on trending news and posts related to a niche
-- `content_brief.go` - A content development brief including SEO plan
-- `interview_question.go` - An interview question and the user's response for content development
+- Define clear and meaningful relationships between entities when applicable
+- Document the cardinality and purpose of each relationship
 
-## Standard Methods
+## Code Style
 
-Each entity type should implement the following standard methods:
-
-1. **Model Conversion Function**: Convert from Ent type to model type
-```go
-// Convert from Ent entity to model
-func toContentIdeaModel(e *ent.ContentIdea) *models.ContentIdea {
-    return &models.ContentIdea{
-        ID:        e.ID,
-        ProjectID: e.Edges.Project.ID,
-        Title:     e.Title,
-        Summary:   e.Summary,
-        SourceURL: e.SourceURL,
-        Approved:  e.Approved,
-        CreatedAt: e.CreatedAt,
-        UpdatedAt: e.UpdatedAt,
-    }
-}
-```
-
-2. **Create Method**: Single entity creation with transaction and authorization
-```go
-func (d *Datastore) CreateContentIdea(ctx context.Context, userID uuid.UUID, contentIdea models.ContentIdea) (*models.ContentIdea, error) {
-    // Start transaction
-    tx, err := d.dbClient.Tx(ctx)
-    if err != nil {
-        d.logger.Error("failed to start transaction", zap.Error(err))
-        return nil, err
-    }
-
-    // Rollback in case of error
-    defer func() {
-        if v := recover(); v != nil {
-            tx.Rollback()
-            panic(v)
-        }
-    }()
-
-    // Check if project exists and belongs to the user
-    projectExists, err := tx.Project.Query().
-        Where(
-            project.ID(contentIdea.ProjectID),
-            project.HasOwnerWith(
-                user.ID(userID),
-            ),
-        ).
-        Exist(ctx)
-
-    if err != nil {
-        d.logger.Error("failed to query project", zap.Error(err))
-        if rerr := tx.Rollback(); rerr != nil {
-            d.logger.Error("failed to rollback transaction", zap.Error(rerr))
-        }
-        return nil, err
-    }
-
-    if !projectExists {
-        d.logger.Error("project not found or user not authorized",
-            zap.String("project_id", contentIdea.ProjectID.String()),
-            zap.String("user_id", userID.String()))
-        if rerr := tx.Rollback(); rerr != nil {
-            d.logger.Error("failed to rollback transaction", zap.Error(rerr))
-        }
-        return nil, ErrProjectNotFound
-    }
-
-    // Create entity
-    entContentIdea, err := tx.ContentIdea.Create().
-        SetTitle(contentIdea.Title).
-        SetSummary(contentIdea.Summary).
-        SetSourceURL(contentIdea.SourceURL).
-        SetApproved(contentIdea.Approved).
-        SetProjectID(contentIdea.ProjectID).
-        Save(ctx)
-        
-    if err != nil {
-        d.logger.Error("failed to create content idea", zap.Error(err))
-        if rerr := tx.Rollback(); rerr != nil {
-            d.logger.Error("failed to rollback transaction", zap.Error(rerr))
-        }
-        return nil, err
-    }
-    
-    // Load relationships needed for model conversion
-    entContentIdea, err = tx.ContentIdea.Query().
-        Where(contentidea.ID(entContentIdea.ID)).
-        WithProject().
-        Only(ctx)
-
-    if err != nil {
-        d.logger.Error("failed to load project relationship", zap.Error(err))
-        if rerr := tx.Rollback(); rerr != nil {
-            d.logger.Error("failed to rollback transaction", zap.Error(rerr))
-        }
-        return nil, err
-    }
-    
-    // Commit transaction
-    if err := tx.Commit(); err != nil {
-        d.logger.Error("failed to commit transaction", zap.Error(err))
-        return nil, err
-    }
-    
-    // Return model
-    return toContentIdeaModel(entContentIdea), nil
-}
-```
-
-3. **Query Methods**: Methods to retrieve data with flexible filtering and pagination
-```go
-func (d *Datastore) ListContentIdeas(ctx context.Context, userID uuid.UUID, pageNum, pageSize int, filters models.ContentIdeaFilters) (*models.PaginatedResponse, error) {
-    // Start transaction
-    tx, err := d.dbClient.Tx(ctx)
-    if err != nil {
-        d.logger.Error("failed to start transaction", zap.Error(err))
-        return nil, err
-    }
-
-    // Rollback in case of error
-    defer func() {
-        if v := recover(); v != nil {
-            tx.Rollback()
-            panic(v)
-        }
-    }()
-
-    // Build query with user authorization
-    query := tx.ContentIdea.Query().
-        Where(
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Use descriptive field and edge names
+- Follow Go naming conventions for schema types (PascalCase)
+- Keep field definitions clean and aligned for readability
 
 ---
 > Source: [theimaginaryfoundation/what-iff](https://github.com/theimaginaryfoundation/what-iff) — distributed by [TomeVault](https://tomevault.io).
