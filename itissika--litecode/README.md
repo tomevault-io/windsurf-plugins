@@ -7,11 +7,11 @@ A coding agent framework obsessively optimized for runtime lightness
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [itissika/litecode](https://github.com/itissika/litecode).
+Original source: `AGENTS.md` in [itissika/litecode](https://github.com/itissika/litecode).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
