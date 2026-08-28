@@ -7,11 +7,11 @@ Platforma do obslugi konkursow dotacyjnych OCWIP: ogloszenie naboru, skladanie w
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ootLabs/OCWIP-grant-competitions](https://github.com/ootLabs/OCWIP-grant-competitions).
+Original source: `AGENTS.md` in [ootLabs/OCWIP-grant-competitions](https://github.com/ootLabs/OCWIP-grant-competitions).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
