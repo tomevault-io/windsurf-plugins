@@ -7,11 +7,11 @@ Drain Kubernetes nodes without dropping a single replica — even for replicas:1
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [rogeeoh/soft-drain](https://github.com/rogeeoh/soft-drain).
+Original source: `AGENTS.md` in [rogeeoh/soft-drain](https://github.com/rogeeoh/soft-drain).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
