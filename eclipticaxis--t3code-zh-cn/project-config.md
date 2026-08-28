@@ -1,76 +1,72 @@
 ---
 trigger: always_on
-description: Cursor Cloud environment setup and run notes for T3 Code (Cursor-specific; not for other editors/CI)
+description: T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
 ---
 
+# T3 Code
 
-# Cursor Cloud specific instructions
+T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
 
-These notes apply only to Cursor Cloud agents (kept out of the shared `AGENTS.md` since T3 Code is
-developed in many places). They cover the pre-provisioned VM environment and non-obvious run caveats.
+You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
 
-## Toolchain
+## What makes T3 Code special?
 
-Pre-installed and wired into login shells (`~/.bashrc`/`~/.profile`): Node 24 (via nvm), the global
-`vp` (Vite+) CLI, and its bundled pnpm. `vp` is the package manager + task runner for this repo
-(`vp i`, `vp check`, `vp run typecheck`, `vp test`, `vp run --filter <pkg> <script>`).
+We have over 200,000 users who love T3 Code. It's important we maintain the things they love as we continue to iterate on the product. Here's a brief list of the things we can never compromise on.
 
-- Node gotcha: the base image also ships an older Node on `/exec-daemon` that wins on `PATH` in
-  non-login shells. Run commands in a login shell (`bash -lc '...'`) or prepend
-  `$HOME/.nvm/versions/node/v24.13.1/bin` so Node 24 (`engines.node: ^24.13.1`) is used.
-- `vp check` also runs the formatter (not just lint); markdown edits must be formatter-clean. Run
-  `vp check --fix` before committing.
+### 1. Open at the core
 
-## Running the web app
+T3 Code is truly open. We share our roadmap, we share how we think about things, and of course we share all our code. A large number of our users run forks. We work in the open, and should strive to stay that way.
 
-- `npm run dev` (from repo root) starts contracts (watch), web (Vite, port 5733), and the server
-  (`node --watch`, port 13773) together, auto-wiring `VITE_HTTP_URL`/`VITE_WS_URL`. Use
-  `npm run dev:server` / `npm run dev:web` for one side. If base ports are taken it auto-offsets to
-  the next free pair, so read the actual ports from stdout. Avoid production `build`/`start` in dev.
-- Auth/pairing: the server is unauthenticated by default and prints a pairing URL to stdout on startup
-  (e.g. `http://localhost:5733/pair#token=XXXX`). Open that URL in the browser to pair before the web
-  UI can talk to the server. Server state (SQLite, auth, projects) lives under `~/.t3`
-  (`T3CODE_HOME`); multiple `npm run dev` instances bind different ports but share that same DB.
-- Agent providers are external CLIs (`codex`, `claude`, `cursor-agent`, `opencode`) probed on `PATH`.
-  Without one installed the UI loads but no agent can run. Claude Code
-  (`npm i -g @anthropic-ai/claude-code`) works headlessly using `ANTHROPIC_API_KEY` from the
-  environment (the server forwards `process.env` to the child; no interactive `claude auth login`
-  needed). Provider probing runs at startup and refreshes roughly every 5 minutes — restart the dev
-  server to pick up a newly installed provider CLI immediately.
+### 2. Performance without compromise
 
-## Android native builds (apps/mobile)
+Lots of apps have gotten bogged down with bad tech decisions and "slop". We have not, and we're proud of the performance of T3 Code. We regularly audit for performance regressions, often caused by sending too much data over websockets, css animations causing gpu spikes, lists being hard to render, and more. Make sure all changes are considerate of performance impact.
 
-The Android toolchain is pre-installed and wired into login shells: OpenJDK 17
-(`JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64`; the base image's default `java` is 21, so builds must
-use `JAVA_HOME`), and the Android SDK at `$HOME/Android/Sdk` (`ANDROID_HOME`/`ANDROID_SDK_ROOT`) with
-platform-tools, `platforms;android-36`, `build-tools;36.0.0`, `ndk;27.1.12297006`, and `cmake;3.22.1`.
-Gradle auto-downloads any additional pinned SDK packages on demand.
+### 3. Remote ready
 
-- Generate the native project first: from `apps/mobile`,
-  `EXPO_NO_GIT_STATUS=1 APP_VARIANT=development npx expo prebuild --clean --platform android`
-  (the `android/` folder is generated, not committed). RN 0.85 defaults: compileSdk/targetSdk 36,
-  minSdk 24, NDK `27.1.12297006` (see `react-native/gradle/libs.versions.toml`).
-- Build with Gradle from `apps/mobile/android`, e.g. `./gradlew :app:assembleDebug`. First build is
-  slow (Kotlin + C++/NDK codegen). Limit ABIs to speed things up, e.g.
-  `-PreactNativeArchitectures=arm64-v8a`. Verified working end-to-end on a native module:
-  `./gradlew :react-native-worklets:assembleDebug` compiles Kotlin + C++ and emits an AAR + `.so`s.
-- No emulator: this VM has no `/dev/kvm` (nested virtualization), so a hardware-accelerated Android
-  emulator will not run. Use a physical device (`adb`) or EAS cloud builds (`vp run eas:android:*`) to
-  actually run the app. The full IDE GUI is unnecessary here — the SDK/NDK/Gradle toolchain that
-  Android Studio bundles is what is installed.
-- Known blocker for the full-app `:app:assembleDebug` (pre-existing, app-level — not the environment):
-  `:react-native-screens:compileDebugKotlin` fails because `patches/react-native-screens@4.25.2.patch`
-  adds new codegen props (`subtitle`, `largeSubtitle`, `navigationItemStyle`,
-  `headerCenterBarButtonItems`, `headerToolbarItems`) to the JS spec + iOS native code but includes no
-  Android Kotlin setters, so the generated `ScreenStackHeaderConfigManagerInterface` is unimplemented.
-  The mobile README documents only iOS for local builds and routes Android through EAS. Fixing local
-  Android app builds requires an app/patch change (add the Android Kotlin setters), which is out of
-  scope for environment setup.
+The architecture of T3 Code's websocket layer (npx t3) enables a lot of awesome remote features. These have become core to the product. Whether users are connecting directly over their local network, using Tailscale, or leaning in fully with T3 Connect (our tunnel solution, also in this repo), we need to make sure new features are properly supported.
 
-## Known flaky tests (unrelated to setup)
+### 4. Multi-surface
 
-- `apps/server/src/git/GitManager.test.ts` (cross-repo PR metadata, can time out at 12s).
-- `apps/server/src/provider/Layers/ProviderRegistry.test.ts` (codex binaryPath re-probe ordering).
+T3 Code has 3 key app surfaces: **web**, **desktop**, and **mobile**.
+
+**Web** is kind of two surfaces, as we have the public facing "app.t3.codes" as well as locally hosting the web app through the `npx t3` command. Both need to be supported by all new features where reasonable.
+
+**Desktop** is the main surface most users install first. It's a full Electron app that bundles the server runner as well. The desktop app can also be used as the host server, allowing remote connections from app.t3.codes or the mobile app.
+
+**Mobile** is a React Native app for both iOS and Android, available on the App Store and Google Play. The mobile app allows for connecting to any T3 Code server to control work remotely.
+
+## A note from Theo
+
+I like ambitious ideas, simple systems, and software that feels obvious. Do not preserve complexity just because it already exists. Do not introduce machinery because it looks architecturally impressive. Understand the real constraint, then fight for the smallest model that makes the correct behavior unsurprising.
+
+Channel both "measure twice, cut once" and "yagni". Fight scope creep. Try to honor the dev's intent in both a minimal and realistic fashion.
+
+The rest of this document is meant to help you navigate the codebase and make changes effectively. Think of these instructions less as "hard rules", more as "good defaults". The developer's preferences should be able to override anything here.
+
+Of note: Most T3 Code contributions will come from T3 Code itself, often controlled remotely. This means you should be careful about accessing data, killing dev servers, and other things that may damage the T3 Code instance that the contributor is using.
+
+## A small glossary
+
+We need to be on the same page with terminology. When communicating, use this language:
+
+- **you** means the agent reading this file and changing T3 Code.
+- **we, us, and maintainers** mean Theo, Julius and the people building T3 Code. These are who you are talking to now.
+- **user** means the person using T3 Code to direct coding agents.
+- **agent** means the coding agent a user runs inside T3 Code. Depending on context, that may also include you.
+- **provider** means the agent runtime or harness T3 Code talks to, such as Codex, Claude, Cursor, or OpenCode.
+- **client** means the web, desktop, or mobile UI.
+- **environment** means one running T3 server and the machine, filesystem, provider credentials, and state it owns.
+- **project** means an environment-local workspace record rooted at a directory.
+- **thread** means the durable conversation and work history for a project.
+- **turn** means one user-to-agent cycle, including follow-up work such as checkpointing.
+- **T3 home** means the base data directory. Runtime state normally lives below its userdata directory.
+
+## The three ways to hurt yourself
+
+1. **Killing by pattern.** Never `pkill -f`, `pgrep | kill`, or `kill` a PID you found by matching a name, path, or worktree string. Your own agent process has this worktree's path in its argv, and this machine runs several other dev servers at once. Kill only a PID you captured at spawn, or the owner of your port from `ss -H -ltnp` after confirming `/proc/<pid>/cwd` is your worktree.
+2. **Writing to the live install.** `~/.t3/userdata` is the developer's real T3 Code database, in use while you work. Reading it and copying from it are fine, and a good way to get real test data (see Test data). Never start a server against it, never open it read-write, never clean it up.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [EclipticAxis/t3code-zh-CN](https://github.com/EclipticAxis/t3code-zh-CN) — distributed by [TomeVault](https://tomevault.io).
