@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Money, dates, Server Actions, ledger, and investment invariants
+description: Dashboard, component, accessibility, and privacy UI rules
 ---
 
 
-Follow the canonical rule in @.claude/rules/financial-domain.md.
+Follow the canonical rule in @.claude/rules/frontend.md.
 
 ---
 > Source: [kevin-aoun/LocalFi](https://github.com/kevin-aoun/LocalFi) — distributed by [TomeVault](https://tomevault.io).
