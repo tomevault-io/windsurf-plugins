@@ -7,11 +7,11 @@ Build the next big thing. Full-stack apps in minutes — auth, billing, security
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hyperformant/vibecarbon](https://github.com/hyperformant/vibecarbon).
+Original source: `AGENTS.md` in [hyperformant/vibecarbon](https://github.com/hyperformant/vibecarbon).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
