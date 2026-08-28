@@ -7,11 +7,11 @@ Event Storming Big Picture (DDD/BPMN/C4/UML) de escritorio, con IA local por def
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [raalzate/processflow-architect](https://github.com/raalzate/processflow-architect).
+Original source: `AGENTS.md` in [raalzate/processflow-architect](https://github.com/raalzate/processflow-architect).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
