@@ -7,11 +7,11 @@ Local-first AI coding agent & decoupled runtime in Rust. Zero-vendor lock-in, se
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [milisp/keke-agent](https://github.com/milisp/keke-agent).
+Original source: `AGENTS.md` in [milisp/keke-agent](https://github.com/milisp/keke-agent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
