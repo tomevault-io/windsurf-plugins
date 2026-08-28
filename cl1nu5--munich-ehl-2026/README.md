@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [CL1nu5/munich-ehl-2026](https://github.com/CL1nu5/munich-ehl-2026).
+Original source: `AGENTS.md` in [CL1nu5/munich-ehl-2026](https://github.com/CL1nu5/munich-ehl-2026).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
