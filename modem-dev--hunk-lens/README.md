@@ -7,11 +7,11 @@ Keep the current split-diff line in view while reviewing with Hunk.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [modem-dev/hunk-lens](https://github.com/modem-dev/hunk-lens).
+Original source: `AGENTS.md` in [modem-dev/hunk-lens](https://github.com/modem-dev/hunk-lens).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
