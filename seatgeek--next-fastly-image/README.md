@@ -7,11 +7,11 @@ A stateless, zero-dependency loader that lets next/image delegate image transfor
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [seatgeek/next-fastly-image](https://github.com/seatgeek/next-fastly-image).
+Original source: `AGENTS.md` in [seatgeek/next-fastly-image](https://github.com/seatgeek/next-fastly-image).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
