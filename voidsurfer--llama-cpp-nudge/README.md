@@ -7,11 +7,11 @@ llama.cpp fork: Strix Halo Vulkan (Nathanw1014) + multi-point reasoning-budget n
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [voidsurfer/llama.cpp-nudge](https://github.com/voidsurfer/llama.cpp-nudge).
+Original source: `AGENTS.md` in [voidsurfer/llama.cpp-nudge](https://github.com/voidsurfer/llama.cpp-nudge).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
