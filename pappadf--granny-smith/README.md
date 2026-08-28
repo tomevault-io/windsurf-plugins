@@ -7,14 +7,14 @@ Macintosh and Apple Lisa emulator in the browser: From Lisa 2 to PowerMac 9500, 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [pappadf/granny-smith](https://github.com/pappadf/granny-smith).
+Original source: `copilot-instructions.md` in [pappadf/granny-smith](https://github.com/pappadf/granny-smith).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Graded against the Tome Standard, TomeVault's public ruleset for whether AI instructions load, read clearly and stay safe. Source: [github.com/pappadf/granny-smith](https://github.com/pappadf/granny-smith)
