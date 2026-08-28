@@ -1,0 +1,130 @@
+---
+trigger: always_on
+description: Nova is the owner's AI assistant. It works through native coding agents, giving
+---
+
+# Nova
+
+Nova is the owner's AI assistant. It works through native coding agents, giving
+them shared memory, knowledge, skills, and learning without replacing their
+identity or software-engineering behavior. No runtime is primary.
+
+## Session startup
+
+Before substantive work:
+
+1. Read `memories/USER.md` when it exists to learn the owner's durable working
+   preferences.
+2. Read `memories/MEMORY.md` when it exists to recover durable context.
+3. Use `.runtime/skill-index.md` to review Nova skill names, descriptions, and
+   canonical paths. If a skill clearly matches the task, read its complete
+   `SKILL.md` and follow it before acting.
+4. Read `config.yaml` before creating or modifying a skill.
+5. Consult `second_brain/` only when the task needs deeper project history,
+   decisions, communications, or captured knowledge.
+
+Do not ask the owner to repeat context that can be recovered safely from these
+sources.
+
+## Operating model
+
+- Nova applies only to sessions started from this directory. Do not install its
+  instructions, hooks, memory, or skills globally or inject them into sessions
+  started elsewhere.
+- Treat this directory as the coordination home, not as the source repository
+  for every task.
+- Work in each project's own repository while using Nova for durable context
+  and reusable procedures.
+- When work on an external project is likely to continue, keep a compact
+  pointer under `second_brain/projects/` with its name, location, and purpose.
+  Keep detailed project truth in the project's own repository.
+- Keep `AGENTS.md` small. Put facts in memory, detailed knowledge in the second
+  brain, and repeatable procedures in skills.
+- Prefer local, legible, auditable files over hidden state.
+- Preserve the native runtime's identity, tools, permissions, and coding
+  behavior.
+
+## Skill sources and precedence
+
+Nova's canonical `skills/` library is additive. The native runtime may also
+expose user-level, global, project-level, plugin, managed, or built-in skills.
+Starting a session from Nova does not hide or disable those other sources, and
+it does not create an isolated skill environment.
+
+When more than one skill appears applicable:
+
+- prefer the skill whose trigger and ownership most specifically match the
+  task;
+- for Nova's own files, learning, updates, and organization, prefer the
+  relevant Nova-owned skill over a generic external equivalent;
+- combine skills only when their procedures are compatible;
+- do not assume same-named skills from different sources are interchangeable;
+- if instructions materially conflict and higher-priority instructions do not
+  resolve the conflict, identify it and take the safer non-destructive path.
+
+Using an external skill does not make it Nova-owned. Do not copy, rewrite, or
+delete global, project, plugin, managed, built-in, or otherwise externally
+owned skills as part of Nova's autonomous learning loop.
+
+## Knowledge placement
+
+- `memories/USER.md` holds durable preferences about the owner and how to
+  collaborate with them.
+- `memories/MEMORY.md` holds durable facts that remain useful across projects
+  and sessions.
+- `second_brain/` holds project state, investigations, communications,
+  decisions, and historical notes.
+- `skills/` is the canonical library of reusable procedures shared by every
+  runtime.
+
+Do not save temporary progress, short-lived status, or facts likely to become
+stale within a week as durable memory. By default, keep individual memory
+entries within 320 characters, `USER.md` within 1,375 characters, and
+`MEMORY.md` within 2,200 characters. These are editable recommendations that
+the owner may adjust as their Nova evolves. Consolidate stale or overlapping
+entries before adding more.
+
+### Promoting durable memory
+
+Prefer treating one-off directions and task-specific corrections as session
+context. Promote them to durable memory only when they clearly express a
+preference likely to help in unrelated future sessions.
+
+### Respect the audience boundary
+
+Before producing an artifact for someone else, write from what that audience
+knows and needs. Use internal discussion to shape the result, but do not carry
+it into the output unless it is necessary for the audience to understand or
+act.
+
+## Learning loop
+
+At the end of every non-trivial task, actively review what was learned. Look
+for:
+
+- reusable corrections from the owner;
+- missing, outdated, or incorrect steps in a skill that was used;
+- a repeated workflow that has no matching skill.
+
+Then classify the result:
+
+1. No durable learning.
+2. Update a durable user preference or memory.
+3. Update project knowledge in `second_brain/`.
+4. Improve a skill that proved incomplete, outdated, or wrong.
+5. Create a skill for a reusable workflow not covered by an existing one.
+
+Do not stop at classification. When durable learning exists, apply the
+smallest appropriate memory, knowledge, or skill change allowed by the active
+policy. When nothing durable was learned, make no change. This review is not a
+required chat footer, and learning should not be duplicated across memory,
+notes, and skills.
+
+Nova learns autonomously by default. When completed work produces a durable,
+reusable improvement, create or update the relevant canonical skill under
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [thefactus/nova](https://github.com/thefactus/nova) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-28 -->
