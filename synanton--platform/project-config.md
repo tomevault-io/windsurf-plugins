@@ -1,122 +1,180 @@
 ---
 trigger: always_on
-description: Java code generation standards and testing guidelines for hexagonal architecture - Synanton platform
+description: Protobuf and gRPC design standards for the Synanton platform - SPI contracts, field validation with protoc-gen-validate, naming conventions, and versioning rules
 ---
 
 
-# Java Generation Rules
+# Synanton Proto / gRPC Rules
 
 ## Role
 
-You are a senior developer, obsessed with clean and fully tested code.
+You are a senior platform engineer working on the Synanton knowledge platform. You design and maintain gRPC service contracts that are used by multiple modules and external connector authors.
 
-## Code Structure
+## Design Reference
 
-Use hexagonal architecture packages pattern. The project structure follows this pattern:
+The authoritative SPI contracts are defined in `docs/architecture/synanton-design-1.19.md` Part IV (§28–§34). Any proto change must align with the design document.
+
+## Package Structure
+
+All Synanton proto files live under:
 
 ```
-src/
-├── adapter/
-│   ├── in/           # Entry points (incoming adapters)
-│   │   ├── grpc/     # gRPC controllers/endpoints
-│   │   ├── rest/     # REST controllers
-│   │   ├── schedule/ # @Scheduled (and Shedlock) triggers - delegate to domain use cases only
-│   │   └── ...       # Other entry point adapters (e.g. kafka, messaging)
-│   └── out/          # Outgoing adapters (external resources)
-│       ├── database/ # Database repositories implementations
-│       ├── client/   # External service clients
-│       └── ...       # Other outgoing adapters
-├── domain/           # Core business logic
-│   ├── service/      # Domain services
-│   ├── model/        # Domain models/entities
-│   └── [UseCase classes directly here, e.g., GetAllTemplatesUseCase.java]
-└── config/           # Configuration classes and files
+java/<module>/src/main/proto/
+  synanton/<module>/v1/
+    <entity>_service.proto
+    <entity>.proto
+rust/<module>/proto/
+  synanton/<module>/v1/
+    <entity>_service.proto
 ```
 
-**Adapter package:**
-- **`adapter/in/`**: Contains all entry points for the application. These are adapters that receive external requests (gRPC endpoints, REST controllers, Kafka listeners, scheduled jobs under `schedule/` that only invoke use cases).
-- **`adapter/out/`**: Contains all outgoing adapters that interact with external resources (database repository implementations, external API clients, Kafka publishers).
-
-**Domain package:**
-- Contains all business logic, services, use cases (directly in domain package, not in subfolder), and domain models. This is the core of the application and must not depend on adapters.
-
-**Config package:**
-- Contains Spring configuration classes, bean definitions, and other configuration files.
-
-## Build System
-
-**Synanton uses Gradle with Kotlin DSL** (`build.gradle.kts`). The wrapper is `./gradlew`.
-
-Key build commands:
-```bash
-./gradlew compileJava          # compile before making changes
-./gradlew test                 # run all tests
-./gradlew :java:<module>:test  # run tests for a specific module
-./gradlew :java:<module>:bootRun  # start a specific service
-./gradlew build                # full build (compile + test + package)
+Package naming:
+```protobuf
+package synanton.<module>.v1;
 ```
 
-**Module layout** (multi-module Gradle build):
-- `java/<module>/build.gradle.kts` - module build file
-- `settings.gradle.kts` - lists all modules
-- `build.gradle.kts` - root build file with shared config
+Examples:
+- `package synanton.synquest.v1;`
+- `package synanton.relix.v1;`
+- `package synanton.synapt.v1;`
 
-Use `./gradlew dependencies --configuration compileClasspath` to inspect the dependency tree for a module.
+## File Naming
 
-## Guidelines
+- gRPC service definitions: `<entity>_service.proto`
+- Message-only files: `<entity>.proto`
+- Never duplicate the module name in the file name within its directory:
+  - ✅ `relix/v1/graph_connector_service.proto`
+  - ❌ `relix/v1/relix_graph_connector_service.proto`
 
-When generating Java code:
-- Make minimum change possible to complete the task
-- Create multi-char variable names (no single-char variable names)
-- When generating POJOs, use Lombok annotations to avoid boilerplate getters/setters/constructors
-- Prefer `@RequiredArgsConstructor` (Lombok) for dependency injection and `final` field initialization whenever it fits; avoid hand-written constructors that only assign fields
-- Use `rows.getFirst()` instead of `rows.get(0)` where possible
-- Use `@Accessors(chain = true)` from `lombok.experimental.Accessors` on domain classes for fluent construction
-- Repository classes should return domain objects, not protobuf objects
-- Use case classes should return domain objects; protobuf conversion happens in the gRPC adapter layer
-- Protobuf class fields cannot be null - no need for null checks on them
-- Annotate every field and method parameter that may be `null` with `@Nullable` (`import org.jspecify.annotations.Nullable`); unannotated reference types are treated as non-null. Skip protobuf fields and test code.
+## Versioning
 
-**Configuration defaults (Spring Boot):**
-- Do not put tunable defaults in Java: no `@Value("${key:DEFAULT}")`, no literal config fallbacks.
-- Put defaults in `application.yml` (including per-profile files) and in test `application.yml` when tests require the property.
-- Inject resolved values only: `@Value("${key}")` or `@ConfigurationProperties` backed by YAML.
+- Versions follow `v1`, `v2` (no alpha/beta in Synanton).
+- Within a version, backward compatibility must be maintained.
+- Breaking changes require a new version (`v2/`).
+- Do not reuse proto message types across versions - copy into the new version directory.
 
-**Code Style:**
-- Respect checkstyle rules in `/checkstyle.xml`
-- Maximum line length: 120 characters (as configured in checkstyle.xml)
-- Prefer multi-line builder pattern over one-liners for readability
+## Field Naming
 
-```java
-// Instead of this:
-AssistantsOutProto.Error.newBuilder().setCode(failure.message()).setMessage(failure.message()).build();
+- `lower_snake_case` for all message fields.
+- Timestamps: use `google.protobuf.Timestamp` with `_at` suffix (`created_at`, `updated_at`, `expires_at`).
+- Durations: use `google.protobuf.Duration` (never `int64` for durations).
+- IDs: `<entity>_id` for foreign keys; `id` for the entity's own primary key within the entity message.
+- Status/state enums: `SCREAMING_SNAKE_CASE`; always reserve `STATUS_UNSPECIFIED = 0`.
+- Repeated fields: plural noun matching the domain term (`entity_ids`, `chunk_ids`, not `items`).
 
-// Do this:
-AssistantsOutProto.Error.newBuilder()
-    .setCode(failure.message())
-    .setMessage(failure.message())
-    .build();
+## SPI-Specific Conventions (§28–§34)
+
+### Relix Graph Connector SPI (§28)
+
+```protobuf
+service GraphConnectorService {
+  rpc Connect(ConnectRequest) returns (ConnectResponse);
+  rpc MutateGraph(MutationRequest) returns (MutationResponse);
+  rpc QueryGraph(GraphQueryRequest) returns (GraphQueryResponse);
+  rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+}
 ```
 
-**Comments and Javadoc:**
-- Do not edit or remove existing comments/Javadoc unless they are wrong or contradict the new code
-- Add Javadoc on public classes, methods, and fields that form the module API
-- Add brief comments only for non-obvious logic (invariants, external system contracts, multi-step algorithms)
-- Do not restate the code; do not document volatile implementation details unless required for safety or a stable contract
-- Prefer stable "why/what" wording over step-by-step narration
+- `tenant_id` must be present on every request message.
+- Idempotency keys on mutation operations must be `string idempotency_key` with PGV `min_len: 1, max_len: 256`.
 
-**Logging:**
-- Use `@Slf4j` annotation with log methods instead of `System.out.print`
-- No need to check logging level before logging
+### Content Adapter SPI (§29)
 
-```java
-// Instead of this:
-if (log.isDebugEnabled()) {
-    log.debug("IDs to process: {}", ids);
+```protobuf
+service ContentAdapterService {
+  rpc Discover(DiscoverRequest) returns (stream DiscoverResponse);
+  rpc Fetch(FetchRequest) returns (FetchResponse);
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (Capabilities);
+}
+```
+
+### Long-Running Task Framework (§34)
+
+Use `JobHandle` for any operation exceeding 1 second:
+
+```protobuf
+message JobHandle {
+  string job_id = 1 [(validate.string).uuid = true];
+  string tenant_id = 2 [(validate.string).pattern = "^[a-zA-Z0-9_-]{1,64}$"];
+  google.protobuf.Timestamp started_at = 3;
+}
+```
+
+## Validation with protoc-gen-validate (PGV)
+
+**All public SPI fields must have PGV annotations.** This is mandatory per design §28–§32 (v1.18 hardening).
+
+```protobuf
+import "validate/validate.proto";
+
+message SearchRequest {
+  string tenant_id = 1 [(validate.rules).string = {
+    pattern: "^[a-zA-Z0-9_-]{1,64}$"
+  }];
+  string query_text = 2 [(validate.rules).string.max_len = 10000];
+  int32 top_k = 3 [(validate.rules).int32 = {gte: 1, lte: 1000}];
+}
+```
+
+**PGV rule guidelines:**
+- `tenant_id`: always `pattern: "^[a-zA-Z0-9_-]{1,64}$"`
+- UUIDs: `(validate.rules).string.uuid = true`
+- Required strings: `(validate.rules).string.min_len = 1`
+- Bounded strings: `(validate.rules).string.max_len = <N>`
+- Non-empty repeated: `(validate.rules).repeated.min_items = 1`
+- Positive integers: `(validate.rules).int32.gt = 0` or `gte: 1`
+
+**ServerInterceptor:** The `ValidatingServerInterceptor` (registered in each module's gRPC server config) runs `Validator.check()` on every incoming message and returns `INVALID_ARGUMENT` on failure. Never manually validate protobuf fields for null - they are never null.
+
+## Sensitive Fields
+
+Annotate with `(sensitive) = true` any field that must not be logged:
+
+```protobuf
+import "synanton/common/v1/annotations.proto";
+
+message AuthRequest {
+  string token = 1 [(synanton.sensitive) = true];
+}
+```
+
+## Standard Patterns
+
+### Module Capability Descriptor (§33)
+
+Every module must expose:
+
+```protobuf
+service ModuleService {
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (ModuleCapabilities);
 }
 
-// Do this:
-log.debug("IDs to process: {}", ids);
+message ModuleCapabilities {
+  string module_id = 1;
+  string version = 2;
+  repeated string supported_features = 3;
+}
+```
+
+### Pagination
+
+Use cursor-based pagination for list operations:
+
+```protobuf
+message ListRequest {
+  string tenant_id = 1 [(validate.rules).string.min_len = 1];
+  int32 page_size = 2 [(validate.rules).int32 = {gte: 1, lte: 1000}];
+  string page_token = 3 [(validate.rules).string.max_len = 2000];
+}
+
+message ListResponse {
+  repeated <Entity> items = 1;
+  string next_page_token = 2;
+}
+```
+
+### Error Detail
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
