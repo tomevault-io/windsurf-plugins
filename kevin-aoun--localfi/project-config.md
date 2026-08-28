@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Dashboard, component, accessibility, and privacy UI rules
+description: Persistence, database safety, and migration rules
 ---
 
 
-Follow the canonical rule in @.claude/rules/frontend.md.
+Follow the canonical rule in @.claude/rules/persistence.md.
 
 ---
 > Source: [kevin-aoun/LocalFi](https://github.com/kevin-aoun/LocalFi) — distributed by [TomeVault](https://tomevault.io).
