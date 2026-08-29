@@ -7,11 +7,11 @@ Titanium 保单域：作为保险合同核心，管理投保、承保、签发�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [chisss/titanium-policy](https://github.com/chisss/titanium-policy).
+Original source: `CLAUDE.md` in [chisss/titanium-policy](https://github.com/chisss/titanium-policy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
