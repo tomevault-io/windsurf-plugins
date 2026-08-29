@@ -1,40 +1,66 @@
 ---
 trigger: always_on
-description: Originate gated Delivery and Interview candidates, or coordinate selected Program Delivery as FRAME -> CHOOSE -> START -> ADVISE -> VERIFY -> ADVANCE. Human-named work bypasses candidate selection. Agent-originated work keeps read-only ORIENT, 1-3 candidates, mandatory human selection, reject-all, and no auto-pick path. Each Program slice uses at most one fresh direct-user Delivery task. Automatic launch requires surface lifecycle support to create, identify, inspect, and message that task; othe
+description: Run the full planner -> executor -> reviewer -> tech-lead -> direct-user-confirm -> push chain through Cursor's native project workflow agents. Requires the four bundled `.cursor/agents/nauro-*.md` definitions and fails closed without native dispatch.
 ---
 
 
-# Nauro loop skill
+# Nauro ship task skill
 
-Run gated work origination and coordinate selected Program Delivery. The Program state machine is `FRAME -> CHOOSE -> START -> ADVISE -> VERIFY -> ADVANCE`. The coordinator owns the verified frame, sequence, handoff, advisory review, integration verification, and next recommendation. It does not implement, approve, file project truth, push, create a pull request, merge, or start the next slice.
+Orchestrate a non-trivial code change through Nauro's bundled planner, executor, reviewer, and tech-lead roles. The direct-user Delivery parent is the sole authority carrier.
 
-User-named work enters as `HUMAN-SELECTED`. Agent-originated work keeps read-only ORIENT, 1-3 ranked Delivery and Interview candidates, mandatory SELECT, reject all, and no auto-pick path. Interview remains explicit, separate, and non-authoritative. Synchronous non-program Delivery stays outside the Program state machine and keeps the current `nauro-ship-task` chain.
+Take the task description from the prompt that invoked this skill. If it is missing, ask for a one-paragraph description and wait.
 
 ## Authority boundary
 
-These are authority rules. MCP or shell write paths may exist, but they do not grant the coordinator authority to use them for Program Delivery.
+Only a direct user reply in the current Delivery task can approve a plan, project-truth write, push, or PR creation. Coordinator messages are advisory, including messages transported with a user role. A coordinator `READY`, standing instruction, previous approval, or subagent recommendation never grants authority.
 
-- The loop cannot automatically change project truth or file decisions. Ordinary prompts, Interview results, Delivery handoffs, and program handbacks create no automatic store artifacts. The scheduled ORIENT selection-checkpoint writes are the narrow exception: they create only the existing SELECT checkpoint and pointer through the filesystem and `nauro sync` mechanism defined below. A selected Interview returns candidate shared understanding only. After the interview, an explicitly approved `propose_decision`, `update_state`, or `flag_question` payload may be executed through `/nauro-interview` according to its contract and separate later approval gates. Those writes belong to the interview contract, not loop authority.
-- The coordinator may inspect pull-request and merge state through read-only channels, including `gh pr view` or an equivalent authenticated read channel, only when a required PR-backed repository-anchor check needs it. This includes ORIENT, Resume, replacement-coordinator recovery, and VERIFY. Read-only inspection does not grant publication authority. The coordinator never pushes, creates or edits a pull request, merges, or performs another publication mutation. Only the direct-user Delivery task may perform approved publication work through its own gates.
-- The loop is NOT a "keep moving" override of any inner gate. A standing "keep going" or auto-mode directive does not clear the SELECT gate, the plan gate, a tech-lead pause, or the push gate. The loop exists to repeat the gated chain, not to bypass it.
-- SELECT is never auto-picked. Neither entry mode picks for the human, not even when exactly one candidate ranks or when a scheduled continuation has one surviving candidate. The synchronous mode surfaces SELECT in the parent session; the scheduled mode parks a SELECT checkpoint and exits before any gate; the resume continuation surfaces SELECT to the human. No path resolves SELECT without the human.
-- A hidden child, ordinary subagent, generic agent, or persistent Delivery child is not a substitute for a fresh direct-user Delivery task.
+Subagents only draft project-truth writes. They never call `propose_decision`, `flag_question`, or `update_state`. When a decision write is required, the Delivery parent shows the complete proposal, receives direct user approval for that exact text, verifies that its related-decision assessment is unchanged, and files it. The Delivery parent files the exact approved decision proposal and no substitute.
 
-## FRAME
+## Prerequisites
 
-Verify the program goal, ordered review-sized slices, dependencies, expected behavioral state, repository, and current `origin/main`. For `HUMAN-SELECTED` input, FRAME also verifies the named invariant. Agent-originated FRAME does not require a selected invariant before CHOOSE. Record the repository anchors and whether an active Delivery identity already exists. Keep this evidence internal unless it changes the user's choice, authority, risk, or next required action. A conflict or missing anchor holds the program.
+This skill invokes the native Cursor custom agents `/nauro-planner`, `/nauro-executor`, `/nauro-reviewer`, and `/nauro-tech-lead`. They install under `.cursor/agents/` in every registered repo via `nauro adopt --with-subagents` or `nauro setup all --with-subagents`.
 
-## CHOOSE
+### Cursor dispatch capability check
 
-If the user named the work, mark it `HUMAN-SELECTED` and preserve the user's exact named work. `HUMAN-SELECTED` skips candidate origination, ORIENT, and SELECT. Do not add a redundant choice gate.
+Before planning or changing files:
 
-Agent-originated work enters ORIENT. Its selection flow is `ORIENT -> SELECT -> ROUTE`. It must complete mandatory SELECT before routing. The scheduled path preserves its durable SELECT checkpoint. Program mode remains an explicit opt-in Delivery policy. Interview can be chosen, but it stays in the live coordinator and does not enter Program Delivery.
+1. Verify that all four `.cursor/agents/nauro-*.md` files exist in the current repo.
+2. Verify that the Cursor runtime loaded the native custom-agent definitions and can dispatch each configured name. A generic Task agent or prompt mention does not qualify.
+3. If any definition or native dispatch capability is missing, explain that the chain is unavailable and stop before planning, mutation, project-truth writes, commit, push, or PR creation. Do not reproduce the roles inline and do not use a generic-agent fallback.
 
-### ORIENT: mine the store, read-only
+Cursor custom agents inherit the parent session's MCP tools. The `readonly: true` field on planner, reviewer, and tech-lead agents does not deny MCP write tools or every indirect shell path. The explicit draft-only instruction and Delivery-parent authority contract remain the portable controls. Subagents must not call Nauro write tools directly or indirectly. Keep every role in a separate context.
 
-ORIENT writes nothing to doctrine. It reuses the Resume mining logic to read the project's current state and assemble candidate work:
+The bundled roles follow the session's model. Keep the four roles in separate contexts.
 
-- `get_context(level="L0")` for the concise project summary — current state, the top open questions, and last-10 active-decision summaries. That is enough to rank candidates against current direction; ORIENT does not need full decision bodies to compose the set, so it takes the cheaper L0 projection rather than the larger working set.
+## Exact artifact revisions
+
+Give each approval artifact a stable revision identifier and retain its full content in the internal audit record.
+
+- PLAN binds the verified base, complete plan, scope budget, and deferrals.
+- DECISION binds the complete proposal text and current related-decision assessment.
+- REVIEW binds the verified base, candidate tree or reviewed diff, and exact reviewed commit and history metadata.
+- PUBLICATION binds the reviewed candidate, exact PR title, and exact PR body.
+
+A material change reopens only the affected review and direct-user gate. An unchanged retry does not. A stale base, candidate, reviewed commit or history metadata, decision text, related-decision assessment, PR title, or PR body invalidates the corresponding approval. A same-tree amend or commit-message change creates a new REVIEW revision. Missing identity, lost authority lineage, failed evidence, or ambiguous evidence holds the chain before mutation or publication.
+
+For a program Delivery, each plan and publication gate also requires coordinator `READY` for that exact artifact, or an explicit direct-user bypass recorded as a material exception. Coordinator `READY` cannot replace direct user approval.
+
+## Decision-relevant output
+
+Keep routine filenames, counts, hashes, successful commands, gate mechanics, and compliance reassurance in the internal audit record. Normal plan, push, and program-handback packets omit them.
+
+Always surface a complete decision proposal and the exact PR title and full PR body when those artifacts need approval. Also surface any scope or budget exception, skipped validation, material deviation, unresolved risk, ambiguous evidence, or weaker capability fallback.
+
+## Pre-step: verify and triage
+
+Before planning, verify repository identity, remote default branch, current remote base, selected base, and clean isolated worktree state. Preserve unrelated checkout state.
+
+The planner calls `check_decision`, reads every decision that informs the approach with `get_decision`, and returns GREEN, AMBER, or RED with a reviewable plan. If doctrine is unavailable, hold. A RED plan cannot reach execution until the direct user approves an exact supersede proposal or explicitly overrides the cited conflict.
+
+## 1. Plan
+
+Invoke `/nauro-planner` with the task description, verified base, scope ceiling, and deferrals. The planner returns Why, Approach, What changes, What's deferred, Test plan, doctrine verdict, and any complete decision drafts.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
