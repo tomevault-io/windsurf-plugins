@@ -1,0 +1,121 @@
+---
+trigger: always_on
+description: The open-source Firebase alternative on Cloudflare. Every project gets its own
+---
+
+# Cloudflarebase
+
+The open-source Firebase alternative on Cloudflare. Every project gets its own
+Durable Objects, so one tenant's data is physically separate from the next —
+isolation by architecture, not by a `WHERE` clause.
+
+This file is the map. Each agent carries its own `AGENTS.md` with the details
+that only matter inside it. Read that one before changing an agent.
+
+## Repository shape
+
+Six separate npm projects, separate Wrangler configs, separate generated `Env`
+types.
+
+| Path             | Worker          | Durable Objects                                    |
+| ---------------- | --------------- | -------------------------------------------------- |
+| `/`              | `cloudflarebase` | none — SvelteKit console + marketing, D1 registry   |
+| `agents/auth`    | `auth-agent`    | `AuthAgent`                                          |
+| `agents/db`      | `db-agent`      | `DbAgent` `DbCollection` `DbTable` `DbGateway` `DbView` |
+| `agents/storage` | `storage-agent` | `StorageAgent` `StorageBucket`                       |
+| `agents/hosting` | `hosting-agent` | `HostingAgent` (+ an outbound worker)                |
+| `cli`            | none            | `@cloudflarebase/cli`, runs on a consumer's machine  |
+
+**Never import runtime code or generated Worker types across those
+boundaries.** Shared DTOs are deliberately copied — `src/lib/agents.ts` mirrors
+the agents' exported types, and `agents/storage/src/access.ts` is a copy of the
+db agent's gate. Change one side, change the other in the same commit.
+
+The one exception is `cloudflarebase.agent.json`: the app imports each manifest
+**directly** from `agents/<name>/`, because the console guard is generated from
+its `routes` block and a stale copy would silently open or close the wrong
+surface. The CLI keeps its own schema copy and reads manifests from the
+installed package instead.
+
+Installation-wide state — the project registry — is D1 on the dashboard Worker
+(`src/lib/server/db/schema.ts`), never an agent. Per-project state lives in that
+project's Durable Objects.
+
+## The agent contract
+
+Each agent package ships a `cloudflarebase.agent.json` declaring what it is and
+what the platform must do to host it: worker name, DO classes and their scope,
+bindings, secrets, vars, the route table, the console proxy prefix, permission
+keys, and its sidebar pages.
+
+That manifest is the **single declaration**. It drives four things at once:
+
+1. the console guard's public/operator classification (`src/hooks.server.ts`),
+2. the REST proxy and dispatch (`src/lib/agent-registry.ts`),
+3. the sidebar and the delete fan-out,
+4. the CLI's `add` command, which merges the wrangler fragment.
+
+A new primitive is its own npm project shipping a manifest, plus one entry in
+[src/lib/agent-registry.ts](src/lib/agent-registry.ts) and one in
+[cli/src/lib/agents.ts](cli/src/lib/agents.ts).
+
+**An agent is a package, not a product boundary.** A console page may name its
+own sidebar `section`, so a feature can live where an operator looks for it
+rather than under whichever agent happens to store it — Remote Config is served
+by the db agent and sits in a section of its own.
+
+## Access control is two layers, and both must hold
+
+**Layer 1 — the console guard** (`src/hooks.server.ts`). Every external request
+to an agent arrives through here: the agent workers have `workers_dev` and
+`preview_urls` false and no route of their own. `classifyAccess` splits
+project-scoped surfaces into public product API and operator console, asking
+each manifest's route table. Undeclared routes and unknown agents fail closed to
+operator.
+
+**Layer 2 — the agent's own `src/route-access.ts`.** The published package gets
+mounted on a consumer's *public* Worker, where no console guard exists. So each
+agent re-enforces its own route table and closes the operator plane unless
+`EXPOSE_OPERATOR_API=true`. `ROUTES` there mirrors the manifest and a unit test
+fails if the two disagree.
+
+Because both default to operator, drift can only ever close something that
+should be open — a loud, testable failure — never open something that should be
+closed. The refusal is the ordinary 404 byte for byte, so a closed surface is
+not enumerable.
+
+Service keys (`cfbs_`) are an **authentication** change, not an authorization
+one: they are verified in the console guard and travel to the agent over a
+service binding the console already authorized. No agent ever sees the bearer.
+
+## Commands
+
+```bash
+npm run dev      # auth :8788, db :8789, hosting :8790, storage :8791, web :5173
+npm run check    # svelte-check
+npm run lint     # prettier + eslint
+npm test         # full Playwright suite against real workerd
+```
+
+All three checks run in CI and all three must pass. The e2e suite boots a
+production-mirroring stack — the built SvelteKit worker on `:8797` plus the four
+agents on `:8798`–`:8801`, real service bindings, real DO SQLite. It is the
+check that actually catches things.
+
+Each agent is its own TypeScript project with its own unit tests:
+
+```bash
+cd agents/db && npx tsc --noEmit && npm run test:unit
+```
+
+## Conventions
+
+- **Validation is zod, everywhere.** Route inputs and anything crossing a
+  service binding get parsed, not cast. The OpenAPI document is generated from
+  those same schemas.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [cloudflarebase/cloudflarebase](https://github.com/cloudflarebase/cloudflarebase) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-28 -->
