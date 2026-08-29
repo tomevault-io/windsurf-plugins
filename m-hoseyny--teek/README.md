@@ -7,11 +7,11 @@ OpenSource Alternative for OpusClips, free, self-hosted. Create your own viral c
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [m-hoseyny/teek](https://github.com/m-hoseyny/teek).
+Original source: `AGENTS.md` in [m-hoseyny/teek](https://github.com/m-hoseyny/teek).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
