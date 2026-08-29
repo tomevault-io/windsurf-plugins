@@ -7,11 +7,11 @@ The brain is a git repo. Memories are markdown files with YAML   front-matter, c
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [donatienmigue/TeamBrain](https://github.com/donatienmigue/TeamBrain).
+Original source: `AGENTS.md` in [donatienmigue/TeamBrain](https://github.com/donatienmigue/TeamBrain).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
