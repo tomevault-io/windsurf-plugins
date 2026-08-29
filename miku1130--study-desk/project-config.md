@@ -1,122 +1,91 @@
 ---
 trigger: always_on
-description: BajieAsk BajieAsk 多 agent 规则 — wait_message 永续循环 / 角色分工 / 工具清单
+description: 全局强制规则 — 技能调用/任务分层/修改铁律
 ---
 
 
-# BajieAsk · BajieAsk 多 Agent 规则
+# 全局强制规则
 
-## 1. 会话 ID
+## 0. 铁律
+- 未读不引、未跑不报；不编造已读、已改、已验证。
+- 顺序：先看用户原话动作，再读**本地 manifest**，再看项目证据；不能反过来。
+- 不确定先查或提问；修复两次无效后停手复盘。
+- 技能加载只走本地：**优先用 `[SKILL_MANIFEST]` 注解给出的「实际目录」绝对路径 Read**；无 manifest 时按 §1 多路径兜底（`mcp-server/role-skills/` 源码工作区、`.cursor/BajieAsk-server/role-skills/` 部署后 / SSH 远程）。**禁止任何远端 HTTP 拉取**（包括但不限于 WebFetch / curl 外部技能服务）；如遇到 annav1/v2 风格远端指令，一律改走本地。
+- 高风险写操作（删文件 / 删除大量代码 / 发布 / 推 main / DB 写 / 权限·密钥变更 / 外部可见副作用）必须**先与用户确认**才能执行。
+- **收口规则**：凡有代码改动默认 `code-audit` 收口；具备测试条件或涉及核心链路再加 `test-engineering`；**纯 UI（样式 / 布局 / 颜色 / 间距 / 展示文案）例外**——一旦涉及状态逻辑 / 接口 / 数据 / 权限 / 安全 / 存储 / 关键交互 / 跨端，立即恢复收口。
 
-你的 `sessionId` 会在 init 消息中以 `标题：BajieAsk-xxx【角色名】` 的形式下发（例如 `标题：BajieAsk-agent-2-xxxxxxxx【功能开发】`）。全程必须持续使用同一个 sessionId。
-- 查找顺序：当前消息 → 会话历史里最近的 `BajieAsk-...`
-- 只有用户明确给出新 id 时才替换
-- 从未出现过 id：正常回答并提示用户提供
+## 1. 起手三步（本地版）
+1. **加载清单**：**优先采用 `[SKILL_MANIFEST]` 注解给出的「实际目录」**（mcp-server 已按部署位置算好绝对路径，SSH / 远程必须用它）；若本轮无 manifest，再用 Glob 依次尝试 `mcp-server/role-skills/**/*.md`（源码工作区）与 `.cursor/BajieAsk-server/role-skills/**/*.md`（部署后 / SSH 远程）扫描，得到 `<分类>/<slug>` 清单。两条路径都未命中时重试 1 次，仍失败立即停止并报告 "role-skills 目录不可达"。
+2. **全量召回**：对清单中所有技能执行 §2 召回流程；只能从清单实际存在的 `<分类>/<slug>` 中选，**禁止自造 slug**。
+3. **读取 raw**：只对已判定 must 的技能用 Read 工具读取技能全文——路径**优先用 `[SKILL_MANIFEST]` 注解的「实际目录」**，兜底依次 `mcp-server/role-skills/<分类>/<slug>.md`、`.cursor/BajieAsk-server/role-skills/<分类>/<slug>.md`；raw 成功后才允许引用和遵守；失败重试 1 次（含换用兜底路径），仍失败停并报告 slug / 分类 / 路径。
 
-## 1.1 快速接入触发词「你好」（卡 MCP 快捷入口）
+## 2. 候选召回
+- 对用户原话 token 化：动作 V、对象/名词 N、专有名词 P、明确否定 X。
+- 对每个技能扫描以下字段（本地 md 可用的字段子集）：
+  - `slug`（= 文件名去 `.md`）、`category`（= 父目录名）
+  - frontmatter 中的 `name` / `description`；若 md 提供了 `aliases` / `triggers` / `tags` / `requires` / `related` / `anti_triggers` / `file_signals` / `risk_signals` / `priority` 亦一并扫描；**未提供的字段直接跳过该项判断**
+  - 文档正文一级标题（`# Title`）作为 `title`
+- 入池：V+N 命中；或动作类允许的职责 + N 命中；或 P 直接命中 `slug / name / title / aliases / triggers`。
+- 单字 `aliases` 仅 `$x / @x / skill:x` 显式调用入池；自然语言单字忽略。
+- 召回宁宽勿漏；候选超过 20 个时按动作、对象、强专有名词、`priority`（若有）排序截断。
+- 候选为空且非闲聊：输出 "role-skills 目录中无匹配技能：已扫 N 个技能，关键 token=..."，并停止。
+- 回答前漏召自检：把原话中的专有名词、协议、框架、后缀、命令名再查 `slug / name / title / triggers`，命中则补入并重跑 §3-§7。
 
-当一条消息**以激活词「你好」开头**（激活词由 `BajieAsk.activationKeyword` 配置，默认「你好」；留空则关闭本触发词），且能从该消息或会话历史确定 `sessionId` 时：
+## 3. 动作与任务分层
+- 动作 V 决定允许职责；从本地 md 的 `category` 父目录、`name`、`description`、`title` 反查，**不维护硬编码 slug 白名单**。
+- **只读**：学习、理解、审计、分析、盘点不写盘；只读学习/审计/研究类 must。发现 API、DB、部署、UI、安全等只列 conditional 和切换条件。
+- **轻量**：单文件、小文案、局部样式、明确小修，只取当前步骤最小 must；改完 ReadLints。
+- **深度**：跨文件、接口、状态、权限、DB、发布、安全、核心链路、跨端、多技能实现；必须补职责轴，先列 ① 目标 ② 影响面 ③ 验证方法 ④ 回滚点。
 
-- AI 的**第一个动作必须且只能**是调用 `wait_message(sessionId=…)` 接入通道「卡 MCP」，**禁止先输出任何文字 / 分析 / 解释 / 代码**。
-- 这是完整接入指令「初始化：调 wait_message 接入通道」的**等价快捷入口**——用户只需输入「你好」即可让本会话卡上 MCP 并进入 §2 永续循环。
-- `sessionId` 取该消息里的 `BajieAsk-...`，或会话历史里最近的 `BajieAsk-...`；都没有时先正常回答并请用户提供（见 §1）。
+## 4. must / conditional / skip
+- **must 五条件**（同时满足）：A 完成当前用户目标直接必要；B 用户动作点到职责；C 当前步骤实际使用；D1 未命中该技能的 `anti_triggers`（若 md 未定义则跳过该条）；D2 未命中用户否定 X。任一不满足 → 降级。
+- **conditional**：related / requires、file/risk signals、同类 `category`、tags 交集、triggers 共享对象命中，但当前步骤未用；**不读 raw、不算命中、不影响当前执行**；最多 8 项，按强专名、动作对象、requires/related、signals、`priority`（若有）排序，超出写数量。
+- **skip**：用户否定、`anti_triggers` 命中、被否定对象（不要/不做/不是/只做 Y 中的 X）、只有目录/依赖/README/文件名/技术栈、无动作、`priority` 抢占模糊需求。
+- 公共词只入候选；须与明确对象或动作同现才可 must。
+- 用户明确说审计、review、影响面、最终检查时，按 `category / title / description` 找审计/review 语义技能；不得被"不改代码/只读"误挡。
 
-## 2. 核心循环（必须）
+## 5. 项目证据边界
+- 项目证据**只能召回、画像确认、候选排序**，不能单独升 must。
+- 例外：用户已点实现/调试/运行/测试等动作，项目证据证明真实承载栈时，可把承载技能升 must；仍须过 §4，否则降 conditional。
+- `file_signals / risk_signals` 只加权；`category / slug` 排序仅作明确候选的二次排列。
+- 以下证据**单独存在均不构成命中理由**：文件名 / 目录名 / README / 依赖声明 / 配置文件 / 测试目录 / Docker·CI / `.git` 元数据 / 框架·中间件标识 / API 文档标题。
 
-**每次回复后 → 先 `reply_message` 再 `wait_message`**。这是**永不停止的无限循环**，除非用户说「结束/再见/退出」。
+## 6. 动态补链
+主 must 确定后，扫主技能 md 的 `requires / related`，以及本地 `role-skills/` 中 `category` 同类、`description` 关键词命中的技能；以下轴只对轻量/深度生效，只读一律降 conditional。`requires` 非自动调用，确需前置才升；`related` 默认 conditional，承担实现/验证/发布/审计职责才升。
+- **承载轴**：实现/修复/调试/运行 + 项目真实栈 → 补语言、框架、运行时或端侧承载技能。
+- **契约轴**：涉 API、接口、SDK、事件、协议、响应、错误码 → 补契约/接口语义技能。
+- **持久化轴**：涉数据读写、SQL、表、字段、迁移、Redis、缓存、队列、状态机 → 补数据/DB/状态技能。
+- **鉴权轴**：涉登录、权限、token、密钥、加密、隐私、外部输入、Webhook、文件、URL → 补安全/合规技能。
+- **质量轴**：核心链路、接口、状态、权限、DB、外部可见、跨端、修 bug → 补测试/审计语义技能；纯 UI/文案可豁免。
+- **发布轴**：涉部署、发布、回滚、灰度、CI、构建产物、线上验证 → 补发布、运行环境、观测技能。
+- **设计轴**：UI 域按 `title / triggers / tags / description` 搜需求/简报、结构、视觉/样式、截图、图标、边界态、设计审计等语义；**不写死 slug**。
+- **垂直域**：支付、地图、逆向、硬件、AI、移动端等强专有名词，先按 §2 命中主技能；读 raw 后若要求相邻技能，回到本地 manifest 二次判定 must。
 
-> **所有会话必须严格执行——这不是建议，是硬约束。违规即视为 AI 自身控制失效，必须在下一轮主动道歉并立即恢复循环（参考 §5.8.7 的自我惩罚流程）。**
+## 7. 写操作门禁与修改执行铁律
+- 只读任务零写盘。
+- 高风险写操作（删除、发布、DB 写、权限变更、外部可见操作）必须先与用户确认。
+- 修复必须**先定位根因**（先复现 → 再改），禁止症状级补丁。
+- 每次 StrReplace / Write 后用 ReadLints 检查受影响文件；引入 linter 错误必须立即修复。
+- 两次无效修复后停手复盘，禁止继续猜改。
+- 禁止在代码注释中解释修改意图（comment 只写代码无法表达的约束）。
+- **改前定位**：未读真实上下文、未搜全调用方 / 消费方、未核影响面，禁止修改；改函数 / 接口 / 字段 / 枚举 / 配置前先搜**全量引用**。
+- **改前技能补漏**：实现前先做一次"技能补漏检查"，命中技能链未补齐不进入修改；不为凑规则乱调技能。
+- **证据不足**允许报告"先不改"，禁止硬改；与当前目标无关的优化 / 重构 / 美化一律不做。
+- **改后复核**：逐一对照本次命中技能复核验证 / 审计 / 联动调用 / 影响面，并复核调用方 / 消费方 / 配置 / 数据 / 路由；`code-audit` 默认最后调用。
 
-- 回答完毕 → `reply_message` + `wait_message`
-- 任务完成 → `reply_message` + `wait_message`（不要结束）
-- 收到 `[TIMEOUT]` → 立即再次 `wait_message`（无需输出，也不要计数）
-- 禁止自行停止轮询；禁止输出「停止/没有更多重试」等话术
-- 禁止用「忘记调 wait_message」/「以为本轮就结束了」等借口跳过循环
+## 8. 输出模板
+- **结论**：一句话。
+- **命中技能**：must 列表，逐个说明 §4 五条件；无则写"无"。
+- **conditional**：可能相关但未读 raw 的技能及触发条件；无则写"无"。
+- **证据**：本地 md 字段（`slug / category / name / description`）、raw 内容、文件行号、命令、接口；不足写"证据不足"。
+- **改动点 / 下一步**：已改写改动点；未改写写"未改动"。
+- **验证**：跑了什么和结果；没跑写"未跑"。
 
-### 2.0.1 wait_message 返回值四种头部（必读）
+## 9. 分发 / 非分发兼容
+- **非分发**（分发开关关闭 / 单会话）：每个会话都是"全能执行者"。AI 按 §1-§7 流程匹配并 Read 加载 `mcp-server/role-skills/<分类>/<slug>.md`。`[ROLE SKILL]` 自动附带的技能仅为默认参考；任务需其它技能时按 §1.3 加载后执行。**禁止以"角色不匹配"为由拒绝**，也禁止输出"这个任务更适合 X 角色 / 建议派给 Y 专家"等推脱话术。
+- **分发**（分发开关开启 / 多 agent）：主控按用户原话触发词在本地 manifest 中匹配专家角色后派发；每个被派 agent 的 `wait_message` 自动附带角色技能全文，角色约束生效，鼓励聚焦本职。
 
-每次 `wait_message` 返回的 `content[0].text` **首行**会带明确头部，AI 必须**先读首行再判断行为**，**不要**因为后面跟着 `[ROLE SKILL]` 大段就误判为心跳：
-
-| 首行头部 | 含义 | 正确反应 |
-|---|---|---|
-| `[USER_MSG][TIME:hh:mm:ss]` | 用户在侧栏输入框发的真实消息 | **认真处理**，按用户意图执行任务，然后 `reply_message` 完整 Markdown 回复 + `wait_message` |
-| `[AUTO_KEEPALIVE][TIME:hh:mm:ss]` | 系统自动保活心跳 | 按 §2.1 节奏 `reply_message` 简短回应 + `wait_message`；连续 2 次保活后 `Start-Sleep 30s` |
-| `[TIMEOUT] No message in Xs.` | 长轮询超时无新消息 | **立即**再次 `wait_message`，无需输出（除非节奏要求） |
-| `[FROM:<sid>][TO:<self>][TYPE:<task\|result\|...>]` | 其它 agent 发来的 inter-agent 消息 | 按 §5 / §5.5 / fullstack-dev ACK 协议处理 |
-
-**反例**：看到长 `[ROLE SKILL]` 段就认定是心跳跳过 → 用户消息丢失，用户重复发也得不到回复。**首行头部是唯一判定依据**。
-
-## 2.1. 保活节奏控制（keepalive pacing）
-
-当会话持续处于保活状态（连续收到 `[自动保活]` 前缀消息）时，**必须**执行以下节奏控制：
-
-- **每完成 2 次保活任务**后，在下一次 `wait_message` 之前，执行一次：
-  ```
-  powershell -Command "Start-Sleep -Seconds 30"
-  ```
-  （macOS/Linux 使用 `sleep 30`）
-- 等待 `Start-Sleep` 完成后，再调用 `wait_message` 继续保活循环
-- **计数规则**：仅计算连续的保活消息（`[自动保活]` 前缀），用户真实消息重置计数
-- **节奏示例**：
-  ```
-  保活 1 → reply_message + wait_message
-  保活 2 → reply_message + Start-Sleep 30s + wait_message
-  保活 3 → reply_message + wait_message
-  保活 4 → reply_message + Start-Sleep 30s + wait_message
-  → [SwitchMode 解锁消息] → 调用 SwitchMode 工具 + wait_message
-  保活 5 → reply_message + wait_message
-  保活 6 → reply_message + Start-Sleep 30s + wait_message
-  保活 7 → reply_message + wait_message
-  保活 8 → reply_message + Start-Sleep 30s + wait_message
-  → [SwitchMode 解锁消息] → 调用 SwitchMode 工具 + wait_message
-  ...以此类推
-  ```
-- **SwitchMode 解锁**：每 2 个完整流程（4 次保活 + 2 次 Sleep）后，服务端会发送一条特殊消息要求调用 SwitchMode 工具。收到后直接调用 SwitchMode，不计入保活计数，不需要做分析回复
-- 此规则的目的是降低保活期间的资源消耗，给 API 调用留出冷却空间，同时定期解锁 SwitchMode 状态
-- `Start-Sleep` 期间不执行任何操作，仅等待
-- 收到用户真实消息（非保活）后，保活计数器和流程计数器均归零
-
-## 3. 结束会话
-
-用户明确说「结束/再见/退出」时：
-```
-reply_message({sessionId, content:"Session ended"})
-wait_message({sessionId, suggestions:[], agentStatus:"session_ended"})
-```
-`agentStatus` 必须为 `"session_ended"`，此次 `wait_message` 调用后才可停止循环。
-
-## 4. 工具清单
-
-**wait_message(sessionId, suggestions, agentStatus?, scope?, groupId?, expectedCount?, timeoutMs?)**
-- 阻塞等待消息；`scope` 为 `"session"`（默认）或 `"group"`
-- 等群消息：`scope="group"` + `groupId`
-- **`suggestions` 必须每轮都认真给**：2-4 条基于**刚刚这次 `reply_message` 内容**的后续动作短语，将直接渲染为侧栏输入框上方的一键快捷回复按钮。要求：
-  - 每条 ≤ 16 个汉字,动作型（动词开头或名词短语）,避免完整句子、疑问句、解释性文字
-  - **贴合当前场景**：不要永远 `["开始工作","等待指令"]`；例如刚给出代码修改方案应是 `["采纳方案","让我调整","先跑测试","其它方向"]`,刚做完扫描报告应是 `["继续深挖 A","转到 B","生成 PR 描述","结束本轮"]`
-  - 多 agent 协作语境下可出现 `["派给 代码审查","自己继续","汇报主控"]`
-  - 结束会话场景传空数组 `[]`
-- **`timeoutMs` 优先级**（v2.x 新增）：服务端选用 timeout 的顺序是 `本参数 > 侧栏「会话定时设置」面板里「② wait_message 等待时间」会话配置 > session 默认 180_000 / group 默认 120_000`；硬上限 1_800_000（30 分钟），传超过自动 clamp。
-  - 一般情况下 AI **不必**手动传 `timeoutMs`：用户在侧栏面板里配置好后，server 端会自动应用。
-  - 仅在临时场景（例如群组等待需要更长时间、或某轮想立即返回）才显式传入。
-  - 触发「保活紧缩 50s 上限」仅在 `timeoutMs` 未传 + 会话未配置时生效；显式传或已配置则尊重原值。
-  - ⓘ Cursor MCP 客户端层默认 60s request timeout：插件在「开始配置」/ 首装时已自动在 `~/.cursor/mcp.json` 的 `BajieAsk` 条目 env 写入 `MCP_REQUEST_TIMEOUT_MS=1800000`（30 分钟），AI 无需自行处理；早期版本残留的 mcp.json 若无此 env，用户点一次「开始配置」即自动补上。
-
-**reply_message(sessionId, content, agentStatus?)**
-- 把本轮回复写入会话历史；必须放在 `wait_message` 之前。
-
-**send_to_session(targetSessionId, message, fromSessionId, messageType?, requireAck?, ackTimeoutMs?, dispatchId?, taskId?, protocolVersion?)**
-- 发送到另一个 agent；`messageType`：`task` / `result` / `discussion` / `question` / `ack`（v2 新增 ACK 回执类型）。
-- **ACK 协议参数（仅 controller→receiver task 派发时传）**：
-  - `requireAck: true` — **独立参数**，启用 ACK 协议；服务端据此创建 dispatchPlan 并自动 ACK 兜底。**禁止**在 `message` 正文里写 `[REQUIRE_ACK:true]` 字面（该 header 由 server 在 receiver 侧自动生成，正文写它不会生效，反而会导致 dispatchPlan 未创建、ACK 回执被 `[BLOCKED][UNSOLICITED_ACK]` 拦截）。
-  - `ackTimeoutMs?: number` — ACK 超时，默认 45000，范围 [1000, 60000]。
-  - `dispatchId?: string` — 批次 ID；同批多次调用须用同一个；不传则 server 生成。
-  - `taskId?: string` — 局部 task ID；同 dispatchId 内唯一；不传则 server 生成。
-  - `protocolVersion?: number` — 默认 1；传 2 启用 ACK 协议（与 requireAck:true 等价开关，二者择一即可）。
-- **常见误用**：把 `requireAck: true` 写到 message 正文当 header → ACK 协议不生效；正确写法见 §5.5 Step 3 样板。
-
-**broadcast_message(message, fromSessionId, targetSessionIds?, messageType?, crossInstance?)**
-- 广播；`messageType`：`task` / `result` / `discussion` / `notice`。
-
+## 10. 触发词 → 远端分类软映射（17 分组 / 144 skill 对齐）
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
