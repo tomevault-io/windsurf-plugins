@@ -1,0 +1,85 @@
+---
+trigger: always_on
+description: - This repository contains a Home Assistant custom integration for Vaillant heat pumps.
+---
+
+# Vaillant eBUS Project
+
+## Scope
+
+- This repository contains a Home Assistant custom integration for Vaillant heat pumps.
+- The integration connects directly to the local ebusd TCP interface on port `8888`; it does not use MQTT or cloud services.
+- Registers and devices are discovered from ebusd at runtime. The project is intended as a drop-in replacement for `mypyllant-component`.
+
+## Architecture
+
+- `custom_components/vaillant_ebus/coordinator.py` owns connection lifecycle, discovery, polling, caching, and runtime register definitions.
+- `custom_components/vaillant_ebus/backend/ebus_service.py` provides the ebusd transport and handles register reads and writes (writes are verified by read-back).
+- `backend/entity_factory.py` maps the discovered graph to Home Assistant entity descriptions.
+- `backend/mapping.py` contains register metadata such as names, icons, units, and limits.
+- Platform modules in `custom_components/vaillant_ebus/` expose the generated entities to Home Assistant.
+
+## Discovery And Entities
+
+- The discovery graph is the source of truth for entity existence. Do not hardcode device types, circuit lists, or register lists in entity platforms.
+- `REGISTER_MAP` supplies metadata and enabled defaults. It must not cause `EntityFactoryService` to create entities that are absent from the discovery graph.
+- The coordinator may explicitly read enabled `REGISTER_MAP` entries as a fallback and must regenerate entity descriptions when that adds registers.
+- `CIRCUIT_NAMES` is the only place for hardcoded circuit-to-label descriptions used by the Home Assistant UI.
+- Values such as `-`, `no data stored`, and `empty` represent unavailable ebusd data. They must not be exposed as normal sensor values.
+- Keep filtering for unsupported circuits, secondary zones, broadcast registers, and no-data devices consistent with the existing discovery and entity-factory logic. Do not create virtual entities for unsupported hardware.
+
+## Runtime-Defined Registers
+
+Some supported registers are not returned by ebusd `find` and must be defined or probed at runtime. `ctlv2.z1RoomHumidity` and `hmu.SourceTempInput` are confirmed examples, not an exhaustive list. `SourceTempInput`'s layout is verified upstream on brine units (john30/ebusd-configuration PR #565); on air/water units the B51A reply is a 3-byte stub, so the read fails and the register correctly stays unavailable.
+
+When functionality is missing, inspect the raw `find` output, discovery dump, ebusd metadata, and unmapped registers before adding a one-off implementation. Test each candidate directly against ebusd, confirm its message format and read-back value, and add only registers supported by the connected hardware.
+
+Keep all runtime definitions in `VaillantCoordinator._define_custom_registers()` and execute them after connecting to ebusd and before discovery. Use one data-driven collection for additional definitions instead of separate register-specific code paths.
+
+The confirmed `z1RoomHumidity` definition is:
+
+```text
+r5,ctlv2,z1RoomHumidity,z1RoomHumidity,31,15,B524,020003002800,value,,IGN:4,,,,value,,EXP,,%,z1 Room Humidity
+```
+
+Use `EbusService.define_register()` for runtime definitions. Do not replace them with CSV uploads or an addon `--configpath` override.
+
+When changing `_fallback_read()`, preserve entity regeneration after newly readable registers are added.
+
+## Climate Compatibility
+
+Climate behavior must follow the corresponding `mypyllant` implementation.
+
+- In `day` / manual mode, `async_set_temperature` writes `Z1DayTemp` directly.
+- In time-controlled modes, it uses quick veto with `Z1QuickVetoTemp` and `Z1QuickVetoDuration`.
+- If quick veto is already active in a time-controlled mode, update its temperature without writing a new duration.
+- Preset mapping, HVAC modes, and climate services should remain aligned with `mypyllant`.
+
+## ebusd Safety
+
+- Never modify, upload, or delete ebusd addon CSV files.
+- Never set the ebusd addon `--configpath`.
+- Before changing integration code for a register write, test the register directly against ebusd over TCP or HTTP, verify a `done` response, and read the value back.
+- Treat registers that return `ERR: element not found` or `no data stored` as unsupported or temporarily unavailable; do not fabricate values or entities.
+
+## Discovering Registers Absent From CSV
+
+The installed ebusd CSV files only cover what `find` returns. The bus carries more
+telegrams; capture them with `grab` and mine the unknown ones for new registers.
+
+- Live grab: `grab` → wait N seconds → `grab result all` → `grab stop`. Do **not**
+  use `grab -m ...` (invalid syntax). A grab that runs while the user changes a
+  setting in the myVaillant app shows the write telegram that carries the new
+  register (app → cloud → NETX2 → bus).
+- Unknown telegrams have no register label after the count: `.../ 09410111... = 3`.
+  Labeled ones look like `... = 19: hmu SetMode`. Parse them with
+  `backend/grab_parser.py` (`parse_grab_lines`, `unknown_telegrams`).
+- Dumps capture them as `unknown_telegrams` (and `labeled_telegrams`) next to the
+  raw `grab` lines. When a dump exists, prefer mining its `unknown_telegrams` over
+  a fresh grab.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [MarkBovee/vaillant-ebus](https://github.com/MarkBovee/vaillant-ebus) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-08-28 -->
