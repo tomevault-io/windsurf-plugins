@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+This file provides guidance to Codex (Codex.ai/code) when working with code in this
 repository.
 
 ## Project Overview
@@ -18,6 +18,37 @@ structures from a YAML specification. Published on PyPI as `lifx-async` (`pip in
 **Runtime Dependencies**: Zero - completely dependency-free!
 **Async Framework**: Python's built-in `asyncio` (no external async library required)
 **Test Isolation**: lifx-emulator-core runs embedded in-process for fast, cross-platform testing
+
+## Privacy and Hardware Identifiers
+
+- Never commit personally identifiable information or live infrastructure identifiers. This
+  includes real device serials or MAC addresses, IP addresses, local hostnames, account names and
+  raw hardware-discovery output.
+- Committed evidence must replace every live serial and address with a stable, format-preserving
+  pseudonym from the operator's private mapping. Keep that mapping outside this repository; never
+  copy it into source, planning artefacts, logs, prompts, reports or agent memory.
+- When a check must establish that evidence came from an approved physical device, validate the raw
+  result locally against the external mapping first. Commit only the pseudonymised artefact and
+  retain the identity assertion as operator-controlled evidence outside the repository.
+- Raw probe output may exist transiently in the local terminal or an ignored temporary file, but it
+  must be sanitised before being copied into any tracked file. Tools such as
+  `scripts/ipv6_thread_probe.py` may emit live identifiers, so treat their output as private by
+  default.
+- Tests and documentation must use clearly synthetic identifiers and non-live example addresses.
+  Preserve stable aliases across related artefacts so evidence remains correlatable without
+  revealing the underlying device or network.
+- Before staging hardware or network evidence, inspect the staged diff for serials, MAC addresses,
+  IP addresses, hostnames and other PII. If a raw identifier reaches a local commit, amend or rewrite
+  it before any push; a later redaction commit is insufficient because the identifier remains in
+  history.
+
+## Git Commits
+
+- Use Conventional Commit messages.
+- Do not use GSD phase or plan metadata as a Conventional Commit scope. Scopes such as `10`,
+  `phase-10` and `10-07` describe planning bookkeeping rather than a repository component. Omit the
+  scope when no stable repository-specific scope applies.
+- Always use `git commit -S -s` so every commit is GPG-signed and carries the developer sign-off.
 
 ## Essential Commands
 
@@ -70,7 +101,7 @@ uv run ruff format .
 # Lint with auto-fix
 uv run ruff check . --fix
 
-# Type check (Pyright, standard mode)
+# Type check (strict Pyright validation)
 uv run pyright
 ```
 
@@ -89,18 +120,6 @@ uv run python -m lifx.protocol.generator
 # Regenerate Python product registry
 uv run python -m lifx.products.generator
 ```
-
-### Theme Data Update
-
-```bash
-# Source: data/themes.jsonl (committed; no network, no device required)
-# Regenerate the theme data module
-uv run scripts/generate_theme_data.py
-```
-
-The generator lives in `scripts/`, not the package: its input sits outside `src/` and is
-deliberately not shipped in the wheel. CI regenerates and diffs `src/lifx/theme/data.py`
-on every change to `data/**`.
 
 ### Documentation
 
@@ -136,30 +155,6 @@ gh workflow run docs.yml
 
 2. **Network Layer** (`src/lifx/network/`)
 
-   - `transport.py`: UDP transport using asyncio
-   - `discovery.py`: Device discovery via broadcast with `DiscoveredDevice` dataclass
-   - `connection.py`: Device connection with retry logic and lazy opening
-   - `message.py`: Message building and parsing with `MessageBuilder`
-   - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
-     - `discovery.py`: Per-call service-record assembly and supported device construction.
-       Each sweep sends an initial DNS-SD PTR service query, may retransmit that PTR query
-       once at one second and once at three seconds within the caller's deadline, and
-       assembles valid legacy-unicast replies during the quiet window. When a valid SRV
-       target still lacks a usable address, it conditionally sends bounded A/AAAA follow-ups:
-       one successful send, or no more than two failed attempts, for each of at most 64
-       targets
-     - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
-     - `transport.py`: `MdnsTransport` sends IPv4 multicast queries from an ephemeral port and
-       receives only direct legacy-unicast replies; it does not join the multicast group or
-       receive unsolicited announcements
-     - `types.py`: Internal service-record model; record cache state belongs to one discovery
-       call and is never reused
-   - Lazy connection opening (auto-opens on first request)
-
-3. **Device Layer** (`src/lifx/devices/`)
-
-   - `base.py`: Base `Device` class with common operations: `from_ip()`, label, power, version, info
-   - `light.py`: `Light` class (color control, effects: pulse, breathe, waveforms)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
