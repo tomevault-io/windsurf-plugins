@@ -1,65 +1,88 @@
 ---
 trigger: always_on
-description: Run the full planner -> executor -> reviewer -> tech-lead -> direct-user-confirm -> push chain through Cursor's native project workflow agents. Requires the four bundled `.cursor/agents/nauro-*.md` definitions and fails closed without native dispatch.
+description: Nauro is a versioned project context system for AI coding agents. This is a `uv` workspace monorepo with two packages:
 ---
 
+# CLAUDE.md — Nauro (monorepo)
 
-# Nauro ship task skill
+@AGENTS.md
 
-Orchestrate a non-trivial code change through Nauro's bundled planner, executor, reviewer, and tech-lead roles. The direct-user Delivery parent is the sole authority carrier.
+Nauro is a versioned project context system for AI coding agents. This is a `uv` workspace monorepo with two packages:
 
-Take the task description from the prompt that invoked this skill. If it is missing, ask for a one-paragraph description and wait.
+| Package | Path | Python | Purpose |
+|---|---|---|---|
+| `nauro` | `packages/nauro/` | 3.10+ | CLI + local MCP server (stdio). Reads/writes `~/.nauro/projects/` |
+| `nauro-core` | `packages/nauro-core/` | 3.10+ | Shared pure-Python logic: parsing, validation, context assembly, constants. No I/O; compute-only deps. |
 
-## Authority boundary
+Each package has its own `pyproject.toml` and test suite; `packages/nauro/` also carries a package-level `CLAUDE.md` (nauro-core does not). The remote MCP server (`mcp-server/`) lives in a separate private repository.
 
-Only a direct user reply in the current Delivery task can approve a plan, project-truth write, push, or PR creation. Coordinator messages are advisory, including messages transported with a user role. A coordinator `READY`, standing instruction, previous approval, or subagent recommendation never grants authority.
+## The one architectural fact that matters
 
-Subagents only draft project-truth writes. They never call `propose_decision`, `flag_question`, or `update_state`. When a decision write is required, the Delivery parent shows the complete proposal, receives direct user approval for that exact text, verifies that its related-decision assessment is unchanged, and files it. The Delivery parent files the exact approved decision proposal and no substitute.
+The project store lives at `~/.nauro/projects/<project-id>/` — **not** inside any repo. This is the core design decision. A per-repo store would break cross-repo context, which is the problem Nauro exists to solve. The registry at `~/.nauro/registry.json` is keyed by project id (ULID); each entry carries the project name as metadata plus one or more associated repo paths on the machine.
 
-## Prerequisites
+```
+~/.nauro/
+  registry.json                  # id-keyed entries: name, mode, repo paths
+  projects/
+    <project-id>/
+      project.md                 # stable: goals, non-goals, users, constraints
+      state_current.md           # volatile: current sprint, blockers, recent completions
+      state_history.md           # append-only history of completed work
+      stack.md                   # tech choices with rationale and rejected alternatives
+      open-questions.md          # append-only unresolved threads
+      decisions/
+        001-title.md             # one file per decision, sequential, immutable
+      snapshots/
+        v001.json                # full store capture at a point in time
+```
 
-This skill invokes the native Cursor custom agents `/nauro-planner`, `/nauro-executor`, `/nauro-reviewer`, and `/nauro-tech-lead`. They install under `.cursor/agents/` in every registered repo via `nauro adopt --with-subagents` or `nauro setup all --with-subagents`.
+All files are freeform markdown. No database. No JSON for content — JSON only for `registry.json` and snapshots.
 
-### Cursor dispatch capability check
+## Cross-package architecture
 
-Before planning or changing files:
+```
+~/.nauro/projects/<id>/          Local store (flat markdown + JSON snapshots)
+        │
+        ├── nauro CLI              reads/writes directly
+        ├── local MCP (stdio)      reads/writes directly, spawned by Claude Code
+        │
+        └── nauro sync ──────►  S3 bucket (remote storage)
+                                     │
+                                     └── remote MCP (Lambda, separate repo) reads/writes via S3
+```
 
-1. Verify that all four `.cursor/agents/nauro-*.md` files exist in the current repo.
-2. Verify that the Cursor runtime loaded the native custom-agent definitions and can dispatch each configured name. A generic Task agent or prompt mention does not qualify.
-3. If any definition or native dispatch capability is missing, explain that the chain is unavailable and stop before planning, mutation, project-truth writes, commit, push, or PR creation. Do not reproduce the roles inline and do not use a generic-agent fallback.
+## Config and credentials
 
-Cursor custom agents inherit the parent session's MCP tools. The `readonly: true` field on planner, reviewer, and tech-lead agents does not deny MCP write tools or every indirect shell path. The explicit draft-only instruction and Delivery-parent authority contract remain the portable controls. Subagents must not call Nauro write tools directly or indirectly. Keep every role in a separate context.
+User config lives at `~/.nauro/config.json` (written by `nauro auth login` and other feature-specific commands; inspect with `nauro config get/list/unset`, which resolve top-level keys only):
+- `auth` object — credentials from `nauro auth login`, nested under one top-level `auth` key (so inspect with `nauro config get auth`, not a dotted path): `access_token` is the Auth0 bearer sent to the presign sync endpoints; `refresh_token` mints a fresh access token when the bearer expires; `sub` is the raw JWT subject id (identity; the block also persists `sanitized_sub` and `user_id`)
+- Auth0 domain, client ID, API URL, and audience ship as defaults in `nauro/auth.py`; env vars (`NAURO_AUTH0_*`, `NAURO_API_URL`) or config keys override (domain + client_id must be set as a pair)
+- `NAURO_HOME` env var overrides `~/.nauro/` for testing
 
-The bundled roles follow the session's model. Keep the four roles in separate contexts.
+## Stack
 
-## Exact artifact revisions
+- CLI: Python 3.10+, Typer
+- MCP server: local stdio transport (FastMCP), spawned by the MCP client
+- Storage: flat markdown + JSON snapshots
+- Templating: f-strings and Python string templates — no Jinja2
 
-Give each approval artifact a stable revision identifier and retain its full content in the internal audit record.
+## CLI commands
 
-- PLAN binds the verified base, complete plan, scope budget, and deferrals.
-- DECISION binds the complete proposal text and current related-decision assessment.
-- REVIEW binds the verified base, candidate tree or reviewed diff, and exact reviewed commit and history metadata.
-- PUBLICATION binds the reviewed candidate, exact PR title, and exact PR body.
+Principal commands (run `nauro --help` for the full surface):
 
-A material change reopens only the affected review and direct-user gate. An unchanged retry does not. A stale base, candidate, reviewed commit or history metadata, decision text, related-decision assessment, PR title, or PR body invalidates the corresponding approval. A same-tree amend or commit-message change creates a new REVIEW revision. Missing identity, lost authority lineage, failed evidence, or ambiguous evidence holds the chain before mutation or publication.
-
-For a program Delivery, each plan and publication gate also requires coordinator `READY` for that exact artifact, or an explicit direct-user bypass recorded as a material exception. Coordinator `READY` cannot replace direct user approval.
-
-## Decision-relevant output
-
-Keep routine filenames, counts, hashes, successful commands, gate mechanics, and compliance reassurance in the internal audit record. Normal plan, push, and program-handback packets omit them.
-
-Always surface a complete decision proposal and the exact PR title and full PR body when those artifacts need approval. Also surface any scope or budget exception, skipped validation, material deviation, unresolved risk, ambiguous evidence, or weaker capability fallback.
-
-## Pre-step: verify and triage
-
-Before planning, verify repository identity, remote default branch, current remote base, selected base, and clean isolated worktree state. Preserve unrelated checkout state.
-
-The planner calls `check_decision`, reads every decision that informs the approach with `get_decision`, and returns GREEN, AMBER, or RED with a reviewable plan. If doctrine is unavailable, hold. A RED plan cannot reach execution until the direct user approves an exact supersede proposal or explicitly overrides the cited conflict.
-
-## 1. Plan
-
-Invoke `/nauro-planner` with the task description, verified base, scope ceiling, and deferrals. The planner returns Why, Approach, What changes, What's deferred, Test plan, doctrine verdict, and any complete decision drafts.
+- `nauro init <name>` — register a new project in `~/.nauro/`, scaffold the store, associate repo paths
+- `nauro adopt` — adopt an existing repo: register it, wire MCP across surfaces, install the `/nauro-adopt` skill (`--with-skills` / `--with-subagents` add the opt-in skills and bundled subagents)
+- `nauro attach <project_id>` — associate the current repo with an existing cloud project
+- `nauro link` — promote a local-only project to cloud
+- `nauro note <text>` — append a decision (default) or question (if text ends with `?` or `--question` flag)
+- `nauro sync` — capture a snapshot, regenerate `AGENTS.md` in all associated repos
+- `nauro log` — list recent snapshots with metadata
+- `nauro status` — capability table for the current project (active surfaces, absolute store path)
+- `nauro doctor` — report deterministic store-integrity defects (unparseable decision files, dangling or cyclic supersession refs, status contradictions) plus repairable supersede backref orphans; report-only, always exits 0
+- `nauro repair` — flip the single unambiguous supersede backref orphan after interactive confirmation; every other shape is reported with guidance and left alone
+- `nauro graph` — render the decision graph to one self-contained HTML file in the store directory and open it
+- `nauro serve` — start the local MCP server (stdio transport)
+- `nauro import --memory-bank <path>` — migrate a Cline/Roo Code Memory Bank
+- `nauro import --adr <path>` — migrate Architecture Decision Records
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
