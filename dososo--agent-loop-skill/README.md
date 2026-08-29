@@ -7,11 +7,11 @@ A skill for long-running AI agent loops with contracts, traces, restarts, scorin
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [dososo/agent-loop-skill](https://github.com/dososo/agent-loop-skill).
+Original source: `AGENTS.md` in [dososo/agent-loop-skill](https://github.com/dososo/agent-loop-skill).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
