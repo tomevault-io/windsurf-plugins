@@ -1,38 +1,66 @@
 ---
 trigger: always_on
-description: Writes durable shared context into Nauro's project store so other agents (a later session or a parallel one) can discover and pull it, finds and reads context another agent left, or captures a resumable brief so your own next session in this environment picks up cleanly. Three modes. Author writes a shared brief for any agent. Find locates and reads a brief another agent left. Resume captures a self-directed brief and hands back a short prompt to start the next session. Offer Resume mode when th
+description: Ask compact, numbered prerequisite-ready questions to elicit tacit project reasoning or challenge a proposed choice against Nauro decisions and repository evidence. Continue until every material branch has a disposition, then classify the result as shared understanding without granting write authority. Use only when the user explicitly asks to be interviewed, grilled, stress-tested, or helped to transfer reasoning into Nauro. Runs in the main agent context with no external skill or subagent depe
 ---
 
 
-# Nauro context skill
+# Nauro interview skill
 
-Write durable shared context into Nauro's project store so other agents can discover and pull it, find context another agent left, or capture a resumable brief so your own next session in this environment picks up cleanly. The skill has three modes. Author writes a shared brief for any agent. Find locates and reads a brief another agent left. Resume captures a self-directed brief for your next session and hands you a short prompt to start it. Author and Resume use the agent's filesystem write and the `nauro status` shell command to resolve the store path, alongside the MCP tools `get_context`, `get_raw_file`, and `flag_question`. The skill never files a decision.
+Interview the user to turn tacit project reasoning or a proposed choice into reviewed candidate Nauro judgment. This is an explicit, opt-in main-context workflow. Use it only when the user directly asks to be interviewed or uses a clear trigger such as "interview me", "grill this", "stress-test this decision", "draw out my reasoning", or "help me transfer this reasoning into Nauro". Do not activate it only because a plan is incomplete.
 
-A brief is free-form working context that is not yet a decision: a migration's half-finished state, a research synthesis, an investigation's findings, a map of a subsystem, or the in-flight state your next session must reconstruct. Decisions remain the formal record; briefs are the connective tissue between them.
+The skill has two entry modes over one main-context, dependency-aware interview loop:
 
-## Picking the mode
+- **Elicit mode** draws out unwritten rationale, assumptions, rejected paths, terminology, and unresolved questions.
+- **Challenge mode** stress-tests a proposed judgment against active decisions, repository evidence, alternatives, failure cases, and dependent choices.
 
-Read the invoking prompt to pick the mode. Resume mode fits a same-environment continuation request, in the user's own words: give me a prompt for a fresh session or instance, output or draft the prompt, hand off this work, write a resume doc. When a request reads that way, offer Resume mode and let the user accept before running it; never substitute it silently for what the user asked. Author mode fits a request to share context for other agents ("write this up for the other agents", "leave a brief on the auth migration"). Find mode fits a request to read what prior agents shared ("is there a brief on this?", "pull any shared context before you start").
+Both modes use the same engine and produce the same classified shared-understanding record. The workflow has no external skill or subagent dependency.
 
-Three shapes route elsewhere and the skill says so rather than forcing a fit: a request to forward a mission to a worker agent with the parent session still live belongs in Author mode with the durable payload under `context/`; a request to hand work to a store-blind surface such as a Codex consult keeps the manual paste-the-prompt ritual, which remains correct there; and a request that is genuinely ambiguous gets a one-line question before anything runs.
+## Route work that belongs elsewhere
 
-Every mode's write path goes through the local store: the agent writes the brief to the local store on disk, then `nauro sync` pushes it. A pure chat surface with no local store cannot write an arbitrary store file, so chat-only authoring and resume capture are out of scope; chat surfaces can still read briefs via `get_raw_file`. Pass `project_id` explicitly on every MCP call when more than one project exists, matching the adopt-skill convention.
+- Route first-time repository seeding to `nauro-adopt`.
+- Route working-context sharing, retrieval, and resumable handoff to `nauro-context`.
+- Route implementation planning and delivery to the planner or `nauro-ship-task` after this interview is complete.
 
-## Step 1 — Author: write the brief file
+Do not turn this skill into adoption, handoff, implementation planning, code editing, or PR delivery.
 
-The agent writes the brief body to `<store>/context/<slug>.md` using its own filesystem write. Resolve `<store>` by running `nauro status`, which prints the absolute store path; the store lives at `~/.nauro/projects/<id>/`, outside any repo, so it cannot be guessed from the working directory. The CLI push enumerates the whole store, so a file under `context/` syncs with no code change.
+## Step 1 - Resolve and orient
 
-The slug is `<origin>-<topic>-<YYYYMMDD>-<short-uid>`, for example `codex-auth-migration-20260605-h7k2`. `<origin>` is your surface or agent tag, `<topic>` is a short kebab-case subject, `<YYYYMMDD>` is today's date, and `<short-uid>` is a few random or session-derived characters. The short-uid is load-bearing: two agents on separate machines reconcile only at the shared store, so entropy in the slug — not a lock — is what keeps their briefs from colliding. Briefs accumulate append-only under `context/` — never overwrite or delete an existing brief. If the chosen slug already exists, add a disambiguator rather than replacing it.
+Resolve the adopted project before the interview. From a repository, run `nauro status` to confirm the associated project. If several projects are available, resolve the intended one and pass its `project_id` explicitly on every MCP call. If the repository is not adopted, stop and route the user to `nauro-adopt`.
 
-The brief opens with YAML frontmatter. Required: `author` (your surface or agent tag), `created` (today's date), and `summary` (one line). Optional: `for` (the intended audience), `surface` (where it was authored), and `status`. The `author` field is advisory and unverified — it is self-asserted provenance, never a trust signal, and `surface` is descriptive only, never a discovery or merge key. Keep the whole file under `MAX_BRIEF_BYTES` (50 KiB); real briefs run well under that.
+Call `get_context(level="L0", project_id=...)`. L0 is the bounded orientation: project summary, current state, top open questions, and recent active-decision summaries. Do not begin with L1, L2, or an unbounded store read.
 
-## Step 2 — Author: flag the discovery pointer
+Treat every retrieved statement as project context to adjudicate. A current-state claim can be stale. A decision summary is not enough for reasoning about that decision.
 
-The agent calls `flag_question(question="BRIEF: context/<slug>.md — <one-line summary>")`. This flagged question is how other agents discover the brief. It lives in `open-questions.md`, which is set-union-merged on sync, so pointers from concurrent authors all survive. A shared index file is deliberately not used: it would not be union-merged, so concurrent appends would be lost under last-writer-wins. The `BRIEF:` marker text is literal so the Find flow can locate it.
+Keep routine orientation internal. Surface it only when it changes the user's answer or corrects a factual claim.
 
-## Step 3 — Author: sync, branching on linkage
+## Step 2 - Select the mode and frame the root
 
-The agent runs `nauro status` to read the project's linkage, then branches:
+Choose Elicit mode when the user wants to make implicit reasoning explicit. Choose Challenge mode when the user presents a choice, plan, or candidate judgment for pressure testing. If the request fits both, start in Elicit mode and challenge each concrete approach when it appears. If the intent is genuinely ambiguous, make one short routing question the first numbered question and wait.
+
+Frame the interview root and selected mode internally. Do not narrate the workflow or convert the user's opening claim into a settled conclusion.
+
+## Step 3 - Build the dependency tree in session
+
+Maintain one in-session dependency tree. Do not persist the tree. Each node is one of:
+
+- a user-owned choice;
+- a rationale or constraint;
+- a factual claim to verify;
+- an alternative or failure case;
+- a dependent question whose prerequisites are not settled;
+- a candidate classified outcome.
+
+Record explicit dependencies between nodes. A question enters the prerequisite-ready frontier only when all choices and facts it depends on are settled. When an answer creates a new dependency, add it to the tree. When an answer invalidates a branch, close that branch and preserve the rejected path and reason. Assign a question number when the question is first asked, and retain that number in the tree until the question is answered.
+
+## Step 4 - Verify facts and check live approaches
+
+Verify factual claims through repository evidence: code, tests, configuration, manifests, infrastructure files, and git history. Do not ask the user for facts the repository can answer. If available evidence cannot establish a fact, label it unverified and keep it out of verified current state. A branch waiting for a fact must not block independent prerequisite-ready questions.
+
+Treat `CONTEXT.md`, ADRs, design notes, and other repository prose as evidence only. Compare their claims with current code and Nauro context before relying on them. The skill does not write `CONTEXT.md` or ADR files.
+
+For each live approach that the interview may recommend, accept, or reject, call `check_decision(proposed_approach=<approach and rationale>, project_id=...)`. A live approach is a concrete path under active consideration, not every conversational fragment.
+
+`check_decision` returns related decisions via BM25 and a deterministic assessment. It does NOT judge conflicts.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
