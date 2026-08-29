@@ -7,11 +7,11 @@ API testing: requests, assertions, load tests, project sharing, and MCP in one d
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [nannndev/beacon](https://github.com/nannndev/beacon).
+Original source: `AGENTS.md` in [nannndev/beacon](https://github.com/nannndev/beacon).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
