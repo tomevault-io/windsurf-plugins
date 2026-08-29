@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [zstarczali/VisualAssembler](https://github.com/zstarczali/VisualAssembler).
+Original source: `AGENTS.md` in [zstarczali/VisualAssembler](https://github.com/zstarczali/VisualAssembler).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
