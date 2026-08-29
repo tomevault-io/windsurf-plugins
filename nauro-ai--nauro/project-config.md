@@ -1,46 +1,38 @@
 ---
 trigger: always_on
-description: Seeds Nauro's project store from an existing repo. Use after `nauro adopt` has run locally. On filesystem-capable surfaces, reads docs (README, manifests, ADRs, Memory-Bank) for rationale and inspects code, config, tests, lockfiles, and recent git history for evidence, then surfaces targeted probes that turn evidence into rationale. On chat surfaces, operates on pasted content against an already-adopted project.
+description: Writes durable shared context into Nauro's project store so other agents (a later session or a parallel one) can discover and pull it, finds and reads context another agent left, or captures a resumable brief so your own next session in this environment picks up cleanly. Three modes. Author writes a shared brief for any agent. Find locates and reads a brief another agent left. Resume captures a self-directed brief and hands back a short prompt to start the next session. Offer Resume mode when th
 ---
 
 
-# Nauro adopt skill
+# Nauro context skill
 
-The agent helps the user seed Nauro with context from the current repo. Before this skill runs, the user has run `nauro adopt` from the repo root, which created the project, wired MCP across surfaces, and installed this skill into the agent's surface directory. The agent's job here is to seed the Nauro store via MCP write tools: docs supply the rationale for documented decisions, code and config and tests and manifests and recent git history supply evidence, and the user supplies the "why" via targeted probes when only evidence is present. Do not invent rationale. Record only what was actually decided, with the reasoning that supports it.
+Write durable shared context into Nauro's project store so other agents can discover and pull it, find context another agent left, or capture a resumable brief so your own next session in this environment picks up cleanly. The skill has three modes. Author writes a shared brief for any agent. Find locates and reads a brief another agent left. Resume captures a self-directed brief for your next session and hands you a short prompt to start it. Author and Resume use the agent's filesystem write and the `nauro status` shell command to resolve the store path, alongside the MCP tools `get_context`, `get_raw_file`, and `flag_question`. The skill never files a decision.
 
-## Surface modes
+A brief is free-form working context that is not yet a decision: a migration's half-finished state, a research synthesis, an investigation's findings, a map of a subsystem, or the in-flight state your next session must reconstruct. Decisions remain the formal record; briefs are the connective tissue between them.
 
-The agent's behaviour depends on whether the surface can read the repo directly.
+## Picking the mode
 
-- **Filesystem-capable surfaces** (Claude Code, Cursor, Codex CLI). The agent runs Step 0 and Steps 1–11 in full. Step 0 is an optional rapid first pass that files only the decisions carrying two verifiable citations; Docs are read for rationale in Step 3; code, config, tests, manifests, and recent git history are inspected for evidence in Step 4; targeted probes in Step 6b turn evidence into rationale by asking the user.
-- **Chat surfaces** (Claude.ai, Perplexity). The agent has no shell. It operates only on content the user pastes into the chat (Step 3b), and only against an already-adopted project (verified in Step 3b). Step 0 is filesystem-only and is skipped on chat surfaces, exactly as Steps 1, 2, and 4 are; the Step 6b probes are likewise unavailable, and the agent does not ask the user to paste code in lieu of running shell commands. The skill skips from Step 3b directly to Step 5.
+Read the invoking prompt to pick the mode. Resume mode fits a same-environment continuation request, in the user's own words: give me a prompt for a fresh session or instance, output or draft the prompt, hand off this work, write a resume doc. When a request reads that way, offer Resume mode and let the user accept before running it; never substitute it silently for what the user asked. Author mode fits a request to share context for other agents ("write this up for the other agents", "leave a brief on the auth migration"). Find mode fits a request to read what prior agents shared ("is there a brief on this?", "pull any shared context before you start").
 
-## Step 0 — Rapid Cited Seed
+Three shapes route elsewhere and the skill says so rather than forcing a fit: a request to forward a mission to a worker agent with the parent session still live belongs in Author mode with the durable payload under `context/`; a request to hand work to a store-blind surface such as a Codex consult keeps the manual paste-the-prompt ritual, which remains correct there; and a request that is genuinely ambiguous gets a one-line question before anything runs.
 
-Filesystem-capable surfaces only; skipped on chat surfaces exactly as Steps 1, 2, and 4 are. Step 0 is a fast first pass that files only the decisions whose rationale and rejected alternative are each a verbatim span the agent can point at by `file:line`. It reads **no new surface** — only the same Step 3 doc set (README; manifests; CONTRIBUTING / ARCHITECTURE / DESIGN / CLAUDE.md / AGENTS.md; the ADR dirs; the Memory-Bank files). Steps 1–11 still run afterward as the deep follow-up; Step 0 never replaces them or lowers their bar. A thin or empty Step 0 is a correct outcome — disciplined refusal, not a missed number.
+Every mode's write path goes through the local store: the agent writes the brief to the local store on disk, then `nauro sync` pushes it. A pure chat surface with no local store cannot write an arbitrary store file, so chat-only authoring and resume capture are out of scope; chat surfaces can still read briefs via `get_raw_file`. Pass `project_id` explicitly on every MCP call when more than one project exists, matching the adopt-skill convention.
 
-### Step 0.1 — Draft cited cards
+## Step 1 — Author: write the brief file
 
-The agent reads the Step 3 doc set and drafts decision **cards**. A card qualifies for the batch **only** when the agent can quote **two** verifiable spans from those docs:
+The agent writes the brief body to `<store>/context/<slug>.md` using its own filesystem write. Resolve `<store>` by running `nauro status`, which prints the absolute store path; the store lives at `~/.nauro/projects/<id>/`, outside any repo, so it cannot be guessed from the working directory. The CLI push enumerates the whole store, so a file under `context/` syncs with no code change.
 
-1. a **rationale** span — the documented "why" for the choice, and
-2. a **named rejected-alternative** span — a *distinct* option the source names and sets aside. The grammatical inverse of the choice ("we did not not-do X") is **not** a rejected alternative; the span must name a real second option (e.g. "Memcached", "a monolith", "the embedded adapter"). A deferred or conditional option the source holds open ("this may become valid later", "revisit after v2") is held open, not rejected — it does not satisfy the second span.
+The slug is `<origin>-<topic>-<YYYYMMDD>-<short-uid>`, for example `codex-auth-migration-20260605-h7k2`. `<origin>` is your surface or agent tag, `<topic>` is a short kebab-case subject, `<YYYYMMDD>` is today's date, and `<short-uid>` is a few random or session-derived characters. The short-uid is load-bearing: two agents on separate machines reconcile only at the shared store, so entropy in the slug — not a lock — is what keeps their briefs from colliding. Briefs accumulate append-only under `context/` — never overwrite or delete an existing brief. If the chosen slug already exists, add a disambiguator rather than replacing it.
 
-Each span is quoted with its `file:line`. There is **no quota**: file as many cards as carry two honest spans — even one, even zero. Never pad to a number, never weaken a span to reach a count.
+The brief opens with YAML frontmatter. Required: `author` (your surface or agent tag), `created` (today's date), and `summary` (one line). Optional: `for` (the intended audience), `surface` (where it was authored), and `status`. The `author` field is advisory and unverified — it is self-asserted provenance, never a trust signal, and `surface` is descriptive only, never a discovery or merge key. Keep the whole file under `MAX_BRIEF_BYTES` (50 KiB); real briefs run well under that.
 
-The agent does not compose rationale. Every character of a card's rationale is either a span quoted from a doc or text the user types. The agent never writes a "why" of its own, never paraphrases prose into a rationale the source did not state, and never infers a rejected alternative the source did not name.
+## Step 2 — Author: flag the discovery pointer
 
-Per card, the agent prepares:
+The agent calls `flag_question(question="BRIEF: context/<slug>.md — <one-line summary>")`. This flagged question is how other agents discover the brief. It lives in `open-questions.md`, which is set-union-merged on sync, so pointers from concurrent authors all survive. A shared index file is deliberately not used: it would not be union-merged, so concurrent appends would be lost under last-writer-wins. The `BRIEF:` marker text is literal so the Find flow can locate it.
 
-- **Title** (≤60 chars) and a one-line summary (≤140 chars).
-- **Rationale span (read-only)**, shown with its `file:line`. This is source text the agent surfaces; it is not an editable field.
-- **Rejected-alternative span (read-only)**, the named option plus its `file:line`.
-- **An empty "your why" field**, separate from the read-only spans, left blank for the user to fill or edit. The agent never pre-fills this field with the source span or with anything else — a human-supplied or human-edited "why" lives only here, never folded into the read-only span.
-- **Confidence** — `high` only when the source carries a literal ADR `Status: Accepted`; otherwise `medium`. Tone, emphasis, or a confident-sounding paragraph never promote to `high`.
+## Step 3 — Author: sync, branching on linkage
 
-### Step 0.2: Pre-check and classify each card
-
-Before presenting the batch, the agent runs Step 7 steps 1–3 for each card: call `check_decision(proposed_approach=<title plus the one-line summary>, project_id=...)` **once per card**, triage the inline headers, read in full the decisions that bear on the card, classify the operation, and prepare the complete operation-specific proposal. Annotate each card with the related decisions and assessment from the pre-pass. Doing this up front lets the batch show the exact proposed write and any overlap before confirmation.
+The agent runs `nauro status` to read the project's linkage, then branches:
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
