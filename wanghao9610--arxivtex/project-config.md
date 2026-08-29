@@ -3,6 +3,8 @@ trigger: always_on
 description: Behavioral guidelines for reliable scientific writing and LaTeX editing.
 ---
 
+# Agent Instructions
+
 Behavioral guidelines for reliable scientific writing and LaTeX editing.
 
 **Tradeoff:** These guidelines prioritize scientific accuracy, author intent, and minimal changes over speed or stylistic ambition. For trivial edits, use judgment.
@@ -95,8 +97,6 @@ If a language improvement could change the technical interpretation, flag it for
 - Introduce abbreviations once and use them consistently.
 - Avoid varying terminology merely for style.
 - Match the tone and conventions of the existing manuscript unless the user asks for a broader rewrite.
-- Do not imitate the wording of another paper too closely.
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
