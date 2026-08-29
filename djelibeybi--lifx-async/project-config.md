@@ -141,30 +141,28 @@ gh workflow run docs.yml
    - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
    - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
-     - `discovery.py`: `discover_lifx_services()` and `discover_devices_mdns()`
+     - `discovery.py`: Per-call service-record assembly and supported device construction.
+       Each sweep sends an initial DNS-SD PTR service query, may retransmit that PTR query
+       once at one second and once at three seconds within the caller's deadline, and
+       assembles valid legacy-unicast replies during the quiet window. When a valid SRV
+       target still lacks a usable address, it conditionally sends bounded A/AAAA follow-ups:
+       one successful send, or no more than two failed attempts, for each of at most 64
+       targets
      - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
-     - `transport.py`: `MdnsTransport` class for multicast UDP
-     - `types.py`: `LifxServiceRecord` dataclass
+     - `transport.py`: `MdnsTransport` sends IPv4 multicast queries from an ephemeral port and
+       receives only direct legacy-unicast replies; it does not join the multicast group or
+       receive unsolicited announcements
+     - `types.py`: Internal service-record model; record cache state belongs to one discovery
+       call and is never reused
    - Lazy connection opening (auto-opens on first request)
 
 3. **Device Layer** (`src/lifx/devices/`)
 
    - `base.py`: Base `Device` class with common operations: `from_ip()`, label, power, version, info
    - `light.py`: `Light` class (color control, effects: pulse, breathe, waveforms)
-   - `hev.py`: `HevLight` class (Light with HEV anti-bacterial cleaning cycle control)
-   - `infrared.py`: `InfraredLight` class (Light with infrared LED control for night vision)
-   - `multizone.py`: `MultiZoneLight` for strips/beams (zone-based color control)
-   - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
-   - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
-   - State caching with configurable TTL to reduce network traffic
-
-4. **High-Level API** (`src/lifx/api.py`)
-
-   - `discover()`: Async generator yielding devices via UDP broadcast
-   - `discover_mdns()`: Async generator yielding devices via mDNS (faster, single query)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Djelibeybi/lifx-async](https://github.com/Djelibeybi/lifx-async) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-29 -->
