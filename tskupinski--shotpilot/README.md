@@ -7,11 +7,11 @@ Agent-first pipeline from raw drone footage to a finished film: OpenCV motion an
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [tskupinski/shotpilot](https://github.com/tskupinski/shotpilot).
+Original source: `AGENTS.md` in [tskupinski/shotpilot](https://github.com/tskupinski/shotpilot).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
