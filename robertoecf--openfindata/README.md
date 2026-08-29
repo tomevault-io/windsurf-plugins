@@ -7,11 +7,11 @@ Dados Financeiros Abertos — infraestrutura open source para dados financeiros 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [robertoecf/OpenFinData](https://github.com/robertoecf/OpenFinData).
+Original source: `AGENTS.md` in [robertoecf/OpenFinData](https://github.com/robertoecf/OpenFinData).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
