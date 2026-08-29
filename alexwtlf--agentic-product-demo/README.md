@@ -7,11 +7,11 @@ Create polished product demo videos with AI coding agents and Remotion. The UI i
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Alexwtlf/agentic-product-demo](https://github.com/Alexwtlf/agentic-product-demo).
+Original source: `AGENTS.md` in [Alexwtlf/agentic-product-demo](https://github.com/Alexwtlf/agentic-product-demo).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
