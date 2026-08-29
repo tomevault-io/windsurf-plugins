@@ -7,11 +7,11 @@ A university coursework, quiz, and grading platform that runs entirely on GitHub
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [tjakoen/github-native-course-platform](https://github.com/tjakoen/github-native-course-platform).
+Original source: `AGENTS.md` in [tjakoen/github-native-course-platform](https://github.com/tjakoen/github-native-course-platform).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
