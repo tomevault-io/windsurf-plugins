@@ -7,11 +7,11 @@ Automate Open 3D Engine with AI — an MCP server for editor control, project & 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [nickschuetz/o3de-mcp](https://github.com/nickschuetz/o3de-mcp).
+Original source: `AGENTS.md` in [nickschuetz/o3de-mcp](https://github.com/nickschuetz/o3de-mcp).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
