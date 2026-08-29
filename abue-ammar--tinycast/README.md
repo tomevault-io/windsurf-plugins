@@ -7,11 +7,11 @@ Tinycast — a tiny, fully native macOS launcher, hotkeys, and clipboard history
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [abue-ammar/tinycast](https://github.com/abue-ammar/tinycast).
+Original source: `AGENTS.md` in [abue-ammar/tinycast](https://github.com/abue-ammar/tinycast).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
