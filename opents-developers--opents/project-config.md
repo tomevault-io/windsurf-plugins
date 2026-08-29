@@ -1,10 +1,9 @@
 ---
 trigger: always_on
-description: OpenTS repository instructions
+description: Follow the repository-wide `AGENTS.md` and any more specific `AGENTS.md` that
 ---
 
-
-# Project instructions
+# GitHub Copilot instructions
 
 Follow the repository-wide `AGENTS.md` and any more specific `AGENTS.md` that
 applies to the files being suggested or changed.
