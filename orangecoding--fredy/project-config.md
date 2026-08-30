@@ -1,11 +1,12 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The guide for any coding agent working in this repository. `CLAUDE.md` points here; keep this file
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+The guide for any coding agent working in this repository. `CLAUDE.md` points here; keep this file
+as the single copy so the two cannot drift.
 
 ## Project Overview
 
@@ -64,7 +65,7 @@ scheduler (every N minutes) or manual trigger via POST /api/jobs/:id/run
       6. provider.fetchDetails()           # optional enrichment
       7. geocodeAddress()                  # optional lat/lng
       8. storeListings()
-      9. similarityCache.checkAndAddEntry() # cross-provider dedup
+      9. similarityCache.checkAndAddEntry() # cross-provider dedup (exact hash, then fingerprint)
       10. _filterBySpecs() + _filterByArea()
       11. notify.send()                    # fan-out to all adapters
 ```
@@ -72,50 +73,41 @@ scheduler (every N minutes) or manual trigger via POST /api/jobs/:id/run
 ### Plugin systems
 
 **Providers** (`lib/provider/*.js`) - each module exports:
-- `metaInformation` - `{ id, name, baseUrl }`
-- `config` - `ProviderConfig` with `requiredFieldNames`, `crawlContainer`, `crawlFields`, `sortByDateParam`, `normalize()`, `filter()`, optional `getListings()`, `fetchDetails()`, `activeTester()`
-- `init(sourceConfig, blacklist)` - called before each job run; providers are **stateful modules** holding mutable `url` and `appliedBlackList` at module scope
+- `metaInformation` - `{ id, name, baseUrl }`, plus an optional `countries` (ISO 3166-1 alpha-2,
+  lowercase). Absent means `['de']`, which is why no shipped provider declares it and why adding the
+  field changed no existing installation. Resolved in `lib/services/providers/`: `countries.js` is
+  the pure half (the default, normalisation, union) and is all the Nominatim client imports, since
+  `providerCountries.js` reaches for the job storage and would drag SQLite in behind it. The
+  geocoder searches within the resolved countries; the map's `maxBounds` is the union of their
+  boxes from `ui/src/components/map/countryBounds.js`. Where no provider exists to ask - home
+  addresses, the listings map, the listing detail - the answer is the union across the jobs the user
+  can see, and where the job form is open it is the providers ticked in it
+- `config` - the **static** `ProviderConfig` template: `requiredFieldNames`, `crawlContainer`, `crawlFields`, `sortByDateParam`, `normalize()`, optional `getListings()`, `fetchDetails()`, `activeTester()`. `url` is `null` here and there is no bound `filter`.
+- `createConfig(sourceConfig, blacklist)` - returns a **fresh** `ProviderConfig` per job run: the template plus this run's `url`, `enabled`, and a `filter` closed over this run's blacklist.
+
+Providers are **stateless**. Nothing run-specific may live at module scope: two jobs can execute
+concurrently (a manual run started while the scheduler is working), and shared mutable state let
+the second job overwrite the first one's URL and blacklist mid-run, storing listings under the
+wrong job. The same rule is why the Cheerio parser builds its document inside `parse()` instead of
+keeping a module-level `$`.
 
 **Notification adapters** (`lib/notification/adapter/*.js`) - each exports:
 - `config` - `{ id, name, description, fields }` (drives the UI form)
 - `send({ serviceName, newListings, notificationConfig, jobKey, baseUrl })`
 - Loaded dynamically at startup via `fs.readdirSync`
 
-### Key services
+Field definitions carry two optional flags that the UI and the API read declaratively, so neither
+needs per-adapter code:
+- `secret: true` - a credential. Never serialised to anyone who may not edit the channel, and
+  masked in the form. Every token, password, API key and webhook URL must carry it.
+- `target: true` - the one field naming the destination. Drives the "Destination" column.
 
-| Service | Location | Notes |
-|---|---|---|
-| Event bus | `lib/services/events/event-bus.js` | Plain `EventEmitter`; events: `jobs:runAll`, `jobs:runOne`, `jobs:status` |
-| SSE broker | `lib/services/sse/sse-broker.js` | Per-userId `Set<ServerResponse>`; heartbeat every 25s; pushes job status to UI |
-| Similarity cache | `lib/services/similarity-check/` | In-memory SHA-256 Set; refreshes hourly; cross-provider dedup by title+price+address |
-| SqliteConnection | `lib/services/storage/SqliteConnection.js` | Singleton, WAL mode; `execute()`, `query()`, `withTransaction()` |
-| Migrations | `lib/services/storage/migrations/` | Numbered JS files each exporting `up(db)`; checksum-tracked in `schema_migrations` |
-| Extractor | `lib/services/extractor/` | Orchestrates Puppeteer + Cheerio; shared browser instance per job |
+An adapter *configuration* is separate from the adapter itself: it is a row in `configured_adapter`
+("a notification channel" in the UI) that many jobs can reference.
 
-### Frontend
-
-- React 19 SPA, Vite build → `ui/public/` (served as static by backend)
-- State: Zustand single store with per-domain slices
-- UI library: `@douyinfe/semi-ui`
-- Map: MapLibre GL + `@mapbox/mapbox-gl-draw` + `@turf/boolean-point-in-polygon` for GeoJSON polygon filters
-- In dev: Vite proxies `/api` to `:9998`
-
-### MCP server
-
-Two transports:
-1. **stdio** (`lib/mcp/stdio.js`) - for Claude Desktop/LM Studio; opens its own DB connection (main process need not be running)
-2. **HTTP** (`/api/mcp`) - authenticated via Bearer token (`mcp_token` column in `users` table)
-
-Tools: `list_jobs`, `get_job`, `list_listings`, `get_listing`, `get_current_date_time`. Responses are Markdown via `lib/mcp/mcpNormalizer.js`.
-
-## Key Conventions
-
-- **ESM only** - `import`/`export` everywhere, no CommonJS
-- **JSDoc typedefs** (no TypeScript) in `lib/types/` - `listing.js`, `job.js`, `filter.js`, `providerConfig.js`
-- **Copyright header** required on all `.js` files - enforced by `lint-staged` pre-commit hook via `copyright.js`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [orangecoding/fredy](https://github.com/orangecoding/fredy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
