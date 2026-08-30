@@ -1,9 +1,11 @@
 ---
 trigger: always_on
-description: Before making changes, load the most relevant skill and follow it as the primary source of detailed guidance:
+description: This is the canonical repository guidance for all coding agents.
 ---
 
-# Copilot Instructions for Counterfact
+# Agent Instructions for Counterfact
+
+This is the canonical repository guidance for all coding agents.
 
 ## Skill-first workflow
 
@@ -16,6 +18,10 @@ Before making changes, load the most relevant skill and follow it as the primary
 - `.github/skills/counterfact-repo-basics/SKILL.md`
 
 Keep this file focused on cross-cutting rules that are not already covered by those skills.
+
+## Isolated change workspaces
+
+When implementing a new set of changes, create and use a dedicated branch in a separate Git worktree. Keep the original checkout available for integration work rather than making the changes there.
 
 ## Manual acceptance tests
 
@@ -78,4 +84,4 @@ Do not create GitHub issues directly. Propose issues via Markdown files under `.
 
 ---
 > Source: [counterfact/api-simulator](https://github.com/counterfact/api-simulator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
