@@ -7,11 +7,11 @@ AI-assisted coding setup that helps you spend less time re-explaining context, a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [MichelKerkmeester/skilled-harness__spec-driven-agent-loops](https://github.com/MichelKerkmeester/skilled-harness__spec-driven-agent-loops).
+Original source: `AGENTS.md` in [MichelKerkmeester/skilled-harness__spec-driven-agent-loops](https://github.com/MichelKerkmeester/skilled-harness__spec-driven-agent-loops).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
