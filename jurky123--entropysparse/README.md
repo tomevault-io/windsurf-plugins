@@ -7,11 +7,11 @@ SparseAttn for DiT video-gen with entropy-guided radius
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jurky123/EntropySparse](https://github.com/jurky123/EntropySparse).
+Original source: `CLAUDE.md` in [jurky123/EntropySparse](https://github.com/jurky123/EntropySparse).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
