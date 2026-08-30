@@ -1,43 +1,54 @@
 ---
 trigger: always_on
-description: CodeGraph MCP usage guide — when to use which tool
+description: VibePet is a Swift Package targeting macOS 14 with Swift tools 6.0. Core reusable, UI-independent code lives in `VibePetCore/`, organized by concern: `Bridge/`, `Adapters/`, `Install/`, `Persistence/`, `Geometry/`, and `Pet/`. Executable targets are split into `VibePetApp/`, `VibePetHooks/`, and `VibePetSetup/`. Tests live under `Tests/` (`VibePetCoreTests/`, `VibePetAppTests/`, `VibePetSetupTests/`, `E2E/`); shared core helpers are under `Tests/VibePetCoreTests/Support/`. Long-lived product doc
 ---
 
-<!-- CODEGRAPH_START -->
-## CodeGraph
+# Repository Guidelines
 
-This project has a CodeGraph MCP server (`codegraph_*` tools) configured. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
+## Project Structure & Module Organization
 
-### When to prefer codegraph over native search
+VibePet is a Swift Package targeting macOS 14 with Swift tools 6.0. Core reusable, UI-independent code lives in `VibePetCore/`, organized by concern: `Bridge/`, `Adapters/`, `Install/`, `Persistence/`, `Geometry/`, and `Pet/`. Executable targets are split into `VibePetApp/`, `VibePetHooks/`, and `VibePetSetup/`. Tests live under `Tests/` (`VibePetCoreTests/`, `VibePetAppTests/`, `VibePetSetupTests/`, `E2E/`); shared core helpers are under `Tests/VibePetCoreTests/Support/`. Long-lived product docs are in `docs/` (`VibePet-PRD.md`), current-version design in `docs/superpowers/specs/`, archived docs in `docs/archive/`; OpenSpec requirements and archived changes are in `openspec/`.
 
-Use codegraph for **structural** questions — what calls what, what would break, where is X defined, what is X's signature. Use native grep/read only for **literal text** queries (string contents, comments, log messages) or after you already have a specific file open.
+## where to 
 
-| Question | Tool |
-|---|---|
-| "Where is X defined?" / "Find symbol named X" | `codegraph_search` |
-| "What calls function Y?" | `codegraph_callers` |
-| "What does Y call?" | `codegraph_callees` |
-| "How does X reach/become Y? / trace the flow from X to Y" | `codegraph_trace` (one call = the whole path, incl. callback/React/JSX dynamic hops) |
-| "What would break if I changed Z?" | `codegraph_impact` |
-| "Show me Y's signature / source / docstring" | `codegraph_node` |
-| "Give me focused context for a task/area" | `codegraph_context` |
-| "See several related symbols' source at once" | `codegraph_explore` |
-| "What files exist under path/" | `codegraph_files` |
-| "Is the index healthy?" | `codegraph_status` |
+## Build, Test, and Development Commands
 
-### Rules of thumb
+- `swift build` builds all library and executable targets.
+- `swift test` runs the `VibePetCoreTests` XCTest suite.
+- `swift run VibePetApp` launches the app executable.
+- `swift run VibePetSetup` runs local setup behavior.
+- `swift run VibePetHooks` runs the hook bridge helper.
 
-- **Answer directly — don't delegate exploration.** For "how does X work" / architecture questions, answer with 2-3 codegraph calls: `codegraph_context` first, then ONE `codegraph_explore` for the source of the symbols it surfaces. For a specific **flow** ("how does X reach Y") start with `codegraph_trace` from→to — one call returns the whole path with dynamic hops bridged — then ONE `codegraph_explore` for the bodies; don't rebuild the path with `codegraph_search` + `codegraph_callers`. Codegraph IS the pre-built index, so spawning a separate file-reading sub-task/agent — or running a grep + read loop — repeats work codegraph already did and costs more for the same answer.
-- **Trust codegraph results.** They come from a full AST parse. Do NOT re-verify them with grep — that's slower, less accurate, and wastes context.
-- **Don't grep first** when looking up a symbol by name. `codegraph_search` is faster and returns kind + location + signature in one call.
-- **Don't chain `codegraph_search` + `codegraph_node`** when you just want context — `codegraph_context` is one call.
-- **Don't loop `codegraph_node` over many symbols** — one `codegraph_explore` call returns several symbols' source grouped in a single capped call, while each separate node/Read call re-reads the whole context and costs far more.
-- **Index lag**: the file watcher debounces ~500ms behind writes; don't re-query immediately after editing a file in the same turn.
+Use `swift package describe --type json` when you need to confirm target membership or products.
 
-### If `.codegraph/` doesn't exist
+## Coding Style & Naming Conventions
 
-The MCP server returns "not initialized." Ask the user: *"I notice this project doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build the index?"*
-<!-- CODEGRAPH_END -->
+Use idiomatic Swift with 4-space indentation, `UpperCamelCase` for types, and `lowerCamelCase` for properties, functions, and enum cases. Keep source files focused around one primary type or feature area. Public model types should remain explicit about protocol conformances such as `Codable`, `Equatable`, and `Sendable` when they cross package or bridge boundaries. No repository SwiftLint or SwiftFormat configuration is currently present, so rely on SwiftPM compilation and local consistency.
+
+## Testing Guidelines
+
+Tests use XCTest and should be added under the matching `Tests/` target (`VibePetCoreTests/`, `VibePetAppTests/`, `VibePetSetupTests/`, or `E2E/`) with filenames ending in `Tests.swift`. Follow the existing `test...` method naming pattern, for example `testApprovalContentRoundTrips`. Prefer deterministic fixtures (e.g. `Tests/Fixtures/claude/`) over ad hoc local files. Run `swift test` before submitting changes that affect core logic, bridge serialization, adapters, the installer, persistence, or fail-open paths. Verify installer/config-writer logic by unit tests only — never real install smoke tests, since writes hit the real `~/.codex` / `~/.claude` even with `$HOME` overridden. An intermittent SIGPIPE (signal 13) during a full `swift test` run is not a regression; re-run or use `--filter`.
+
+## Commit & Pull Request Guidelines
+
+Recent history uses short, imperative summaries, sometimes with conventional prefixes such as `feat:`. Keep the first line focused on intent. Include context in the body when behavior, architecture, or requirements change, and use project decision trailers where useful, especially `Constraint:`, `Rejected:`, `Tested:`, and `Not-tested:`. Pull requests should summarize the change, link related OpenSpec items or issues, list verification performed, and include screenshots or recordings for visible app changes.
+
+## Security & Configuration Tips
+
+Do not commit generated build output, private local paths, credentials, or personal fixture data. Keep `.build/` and local tool caches out of reviews. When changing bridge or hook behavior, document any new socket, file-system, or command-execution assumptions in code and tests.
+
+## Reset / First Launch State Cleanup
+
+To make VibePet behave like a fresh first launch, clear the app's persisted state and managed integration footprint:
+
+- Quit VibePet first so `bridge.sock` and in-memory session state are gone.
+- Run `swift run VibePetSetup uninstall all` when possible before deleting state. This removes VibePet-managed Claude Code and Codex hook entries while preserving user hooks and config.
+- Delete the entire `~/Library/Application Support/VibePet/` directory. This resets onboarding (`hasCompletedOnboarding`), selected pet, pet position, decision timeout, imported pets, session socket, install manifest/backups, and the stable `bin/VibePetHooks` copy.
+- On next launch, VibePet should recreate `~/Library/Application Support/VibePet/` from defaults and show onboarding as if no prior app state existed.
+- If uninstall cannot run before the directory is deleted, manually remove only hook entries that reference `~/Library/Application Support/VibePet/bin/VibePetHooks` from `~/.claude/settings.json`, and only Codex hook groups marked `statusMessage: "Managed by VibePet"` or referencing that same binary from `~/.codex/hooks.json`.
+- In `~/.codex/config.toml`, remove VibePet-managed `[features]` `hooks = true` / `codex_hooks = true` only when no other Codex hooks remain. Do not delete unrelated Codex settings.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [caichuanwang/VibePet](https://github.com/caichuanwang/VibePet) — distributed by [TomeVault](https://tomevault.io).
