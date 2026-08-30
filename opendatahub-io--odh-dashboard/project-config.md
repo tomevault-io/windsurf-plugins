@@ -1,117 +1,175 @@
 ---
 trigger: always_on
-description: This document provides guidance for AI agents working on the Open Data Hub (ODH) Dashboard monorepo.
+description: This document provides guidance for AI agents and developers working on mod-arch-starter projects.
 ---
 
-# AGENTS.md - ODH Dashboard
+# AGENTS.md - Modular Architecture Starter
 
-This document provides guidance for AI agents working on the Open Data Hub (ODH) Dashboard monorepo.
+This document provides guidance for AI agents and developers working on mod-arch-starter projects.
+This is a **starter template** for building modular architecture applications with a React frontend
+and Go backend-for-frontend (BFF).
 
-## Repository Overview
+## Mandatory Development Flow
 
-ODH Dashboard is a **monorepo** containing the main dashboard application and multiple feature packages. It provides the web UI for Red Hat OpenShift AI (RHOAI) and Open Data Hub.
+**CRITICAL: Never skip or reorder these stages. A PR that implements UI before the API contract will
+be rejected.**
 
-## Repository Structure
+### 1. Contract First
+
+Describe every capability in `bff/openapi/src/` (see [`data-registry.yaml`](bff/openapi/src/data-registry.yaml)
+for this module's own contract). All request/response objects must be documented before coding.
+
+### 2. BFF Stub Second
+
+Add handlers and mock-returning services in `bff/internal/api` and `bff/internal/mocks` that satisfy
+the new contract. Wire them in `bff/cmd/main.go` and expose feature flags/env vars as needed.
+
+### 3. Frontend Third
+
+Build UI routes inside `frontend/src/app` only after the stub endpoints respond with realistic
+shapes. Consume generated types instead of duplicating schemas.
+
+### 4. Production BFF Last
+
+Replace mocks with Kubernetes-aware logic (repositories, clients, RBAC) before shipping. Verify the
+BFF against a real cluster or the manifests in `manifests/`.
+
+---
+
+## Project Structure
 
 ```text
-odh-dashboard/
-├── frontend/                    # Main dashboard frontend application
-│   └── src/
-│       └── __mocks__/          # Shared mock data (@odh-dashboard/internal/__mocks__)
-├── backend/                     # Main dashboard backend (Node.js/Express)
-│   └── src/
-├── dashboard-operator/          # Dashboard Module Controller (Go, controller-runtime)
-│   ├── api/v1alpha1/           # CRD types (Dashboard kind)
-│   ├── cmd/manager/            # Controller entry point
-│   ├── internal/controller/    # Reconciler, actions, support utilities
-│   └── config/                 # Generated CRD, RBAC, manager manifests
-├── distributions/               # Independently-deployable dashboard variants
-│   ├── base/                    # Shared app shell library (not deployed on its own)
-│   ├── core-bff/                # Full Go BFF + React frontend (has BFF)
-│   └── rhaii/                   # RHAII-specific distribution (frontend-only)
-├── packages/                    # Feature packages
-│   ├── cypress/                # Cypress test framework and shared tests
-│   ├── gen-ai/                 # Gen AI / LLM features (has BFF)
-│   ├── maas/                   # Mod Arch starter (has BFF)
-│   ├── model-registry/         # Model Registry UI (has BFF)
-│   ├── model-serving/          # Model Serving UI
-│   └── ...                     # Other packages
-├── .github/                    # GitHub workflows and templates
-├── .tekton/                    # Tekton CI/CD pipelines
-└── docs/                       # Documentation
+mod-arch-starter/
+├── bff/                         # Go Backend-for-Frontend
+│   ├── cmd/
+│   │   └── main.go              # Application entrypoint and wiring
+│   ├── openapi/
+│   │   └── src/
+│   │       ├── data-registry.yaml      # BFF's own OpenAPI spec (contract-first)
+│   │       └── data-registry-api.yaml  # Vendored upstream Data Registry API contract
+│   ├── internal/
+│   │   ├── api/                 # HTTP handlers
+│   │   ├── config/              # Configuration management
+│   │   ├── constants/           # Shared constants
+│   │   ├── helpers/             # Utility functions (k8s helpers)
+│   │   ├── integrations/        # External service integrations
+│   │   ├── mocks/               # Mock data and stub implementations
+│   │   ├── models/              # DTOs and data models
+│   │   └── repositories/        # Data access layer
+│   ├── static/                  # Static assets served by BFF
+│   ├── Makefile                 # Build and run commands
+│   ├── go.mod                   # Go module definition
+│   └── README.md                # BFF documentation
+├── frontend/                    # React Frontend
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── App.tsx          # Root application component
+│   │   │   ├── AppRoutes.tsx    # Route definitions
+│   │   │   ├── api/             # API client wrappers
+│   │   │   ├── context/         # React context providers
+│   │   │   ├── hooks/           # Custom React hooks
+│   │   │   ├── pages/           # Page components
+│   │   │   ├── standalone/      # Standalone mode components
+│   │   │   └── utilities/       # Frontend utilities
+│   │   ├── __mocks__/           # Jest mocks
+│   │   ├── __tests__/           # Test files
+│   │   └── images/              # Image assets
+│   ├── config/
+│   │   ├── webpack.common.js    # Shared webpack config
+│   │   ├── webpack.dev.js       # Development webpack config
+│   │   ├── webpack.prod.js      # Production webpack config
+│   │   └── moduleFederation.js  # Module Federation config
+│   ├── docs/                    # Frontend documentation
+│   ├── package.json             # NPM dependencies and scripts
+│   └── README.md                # Frontend documentation
+├── manifests/                   # Kubernetes manifests
+│   ├── base/                    # Base Kustomize resources
+│   └── overlays/                # Environment-specific overlays
+├── docs/                        # Project documentation
+│   ├── install.md               # Installation guide
+│   ├── local-deployment-guide.md
+│   ├── local-deployment-guide-ui.md
+│   └── kubeflow-development-guide.md
+├── scripts/                     # Utility scripts
+├── Dockerfile                   # Container image build
+├── Makefile                     # Root-level make commands
+└── README.md                    # Project overview
 ```
+
+---
 
 ## Development Requirements
 
+### Frontend
+
 - **Node.js**: >= 22.0.0
-- **npm**: >= 10.0.0
-- **Go**: >= 1.26 (for packages with BFF), >= 1.25 (for dashboard-operator)
+- **npm**: >= 10.8.2
 
-## Key Technologies
+### BFF
 
-| Technology    | Purpose                                    |
-| ------------- | ------------------------------------------ |
-| React 18      | Frontend framework                         |
-| TypeScript    | Type safety                                |
-| PatternFly v6 | Primary UI component library (RHOAI/ODH)   |
-| Material UI   | Secondary UI library (Kubeflow mode)       |
-| Webpack       | Build tooling with Module Federation       |
-| Cypress       | E2E and component testing                  |
-| Jest          | Unit testing                               |
-| Turbo         | Monorepo task runner                       |
+- **Go**: >= 1.24.3
 
-## Common Commands
+---
+
+## Quick Start Commands
+
+### Development Environment
 
 ```bash
-# Install dependencies
-npm install
+# Install frontend dependencies
+make dev-install-dependencies
 
-# Start development server (main dashboard)
-npm run dev
+# Start both BFF and frontend in development mode (mocked)
+make dev-start
 
-# Build all packages
-npm run build
-
-# Run tests
-npm run test
-
-# Lint all packages
-npm run lint
-npm run lint:fix
-
-# Type checking
-npm run type-check
+# Or start them separately:
+make dev-bff         # BFF on port 4000 with mocks
+make dev-frontend    # Frontend dev server
 ```
 
-## Documentation
+### Deployment Modes
 
-**[BOOKMARKS.md](BOOKMARKS.md)** indexes key documentation for frontend areas, the backend, and packages. Review relevant docs for the area you are working on before starting a task.
+```bash
+# Standalone mode (default for local development)
+make dev-start
 
-**[Multi-Agent Workflows](docs/multi-agent-workflows.md)** covers running parallel agent sessions locally (git worktrees, Agent Teams, terminal layout) and remotely (Ambient platform).
+# Kubeflow mode (connects to real cluster)
+make dev-start-kubeflow
 
-## Package-Specific Guidelines
+# Federated mode (micro-frontend with PatternFly theme)
+make dev-start-federated
+```
 
-Some packages have their own AGENTS.md with package-specific guidance. Check the package directory for its own AGENTS.md file.
+### Building
 
-## Specialized Agent Rules
+```bash
+# Build everything
+make build
 
-Before performing certain tasks, read and follow the corresponding specialized rules.
+# Build frontend only
+make frontend-build
 
-Rules live in `.claude/rules/`. Read the relevant rule file before starting the task.
+# Build BFF only
+make bff-build
 
-| Rule                        | File                          | Trigger                                                                        |
-| --------------------------- | ----------------------------- | ------------------------------------------------------------------------------ |
-| **Architecture**            | `architecture.md`             | When making structural changes, adding packages, modifying package boundaries, or working on distributions |
-| **BFF Go**                  | `bff-go.md`                   | When working on Go BFF code in `packages/*/bff/` or `distributions/core-bff/bff/` |
-| **Contract Tests**          | `contract-tests.md`           | When working on contract tests or BFF API validation                           |
-| **Conventions**             | `conventions.md`              | When writing or reviewing TypeScript, React, or backend code                   |
-| **CSS & PatternFly**        | `css-patternfly.md`           | When writing or modifying styles, SCSS, or PatternFly components               |
-| **Distributions**           | `distributions.md`            | When working on code in `distributions/`                                       |
-| **Cypress E2E Tests**       | `cypress-e2e.md`              | When creating or modifying E2E tests, Robot Framework migrations               |
-| **Cypress Mock Tests**      | `cypress-mock.md`             | When creating or modifying mock/component tests                                |
+# Docker builds
+make docker-build              # Kubeflow mode
+make docker-build-standalone   # Standalone mode
+make docker-build-federated    # Federated mode
+```
+
+### Testing
+
+```bash
+# Frontend tests (lint + type-check + unit + cypress)
+cd frontend && npm run test
+
+# BFF tests
+cd bff && make lint && make test
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [opendatahub-io/odh-dashboard](https://github.com/opendatahub-io/odh-dashboard) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
