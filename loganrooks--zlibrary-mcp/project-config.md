@@ -1,125 +1,109 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The working contract for any coding agent in this repo — Codex, Claude Code, or
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+The working contract for any coding agent in this repo — Codex, Claude Code, or
+otherwise. It is the single canonical copy; `CLAUDE.md` imports this file rather than
+restating it, so there is nothing here to drift out of sync with a second version.
 
-## Destructive Operations Policy
+## What this is
 
-**MANDATORY before any destructive git operation** (`git filter-repo`, `git rm`, `git reset --hard`, force-push, history rewriting, bulk file deletion/archival):
+A Model Context Protocol server that finds books, downloads them, and turns them into
+files a RAG pipeline can use. Node.js/TypeScript MCP layer (`src/`) over a Python bridge
+(`lib/`) that does the Z-Library API work and document processing.
 
-1. **Dependency audit**: Search the entire codebase for references to affected files/paths (`grep -r`, check imports, configs, test fixtures, scripts)
-2. **Present findings**: Show the user what depends on the targets and what will break
-3. **Get explicit approval**: Do NOT proceed until the user confirms after seeing the dependency analysis
-4. **One step at a time**: Never chain destructive operations — commit and verify between each
+`VISION.md` states the seven invariants and the non-goals. Read it before proposing
+anything architectural — it is short, and it is the document that says what this project
+refuses to become.
 
-This applies equally to "cleanup" tasks. A file that looks stale may be a test fixture, a script input, or referenced by documentation that matters. Always check before removing.
+## Setup and commands
 
-## GSD Model Profile
+Prerequisites: Node 22+, Python 3.10+, and [uv](https://docs.astral.sh/uv/). The Python
+side uses **uv, never pip**.
 
-**IMPORTANT:** Before spawning any GSD subagent, read `.planning/config.json` and use the `model_profile` value to select the correct model. Never hardcode or assume the profile.
+```bash
+npm install          # Node deps
+uv sync              # Python deps into .venv/ (or: bash setup-uv.sh)
+npm run build        # tsc + validates that every Python bridge file exists
+```
 
-| Agent | quality | balanced | budget |
-|-------|---------|----------|--------|
-| gsd-phase-researcher | opus | sonnet | haiku |
-| gsd-planner | opus | opus | sonnet |
-| gsd-plan-checker | sonnet | sonnet | haiku |
-| gsd-executor | opus | sonnet | sonnet |
+| What | Command |
+|---|---|
+| Node tests | `node --experimental-vm-modules node_modules/jest/bin/jest.js` |
+| Python tests | `uv run pytest -m "not slow and not integration and not performance" --benchmark-disable -rs` |
+| Full Python suite | `uv run pytest -rs` |
+| Lint | `npx eslint src/` and `npx prettier --check src/` |
+| Health / drift check | `npm run doctor` |
+| Release-record audit | `npm run audit:release` |
 
-## 🚀 Quick Start for Claude Code
+**`npm test` does not run pytest.** It runs Jest with coverage. The two suites are
+separate and a green `npm test` says nothing about the Python side — which is where most
+of the actual logic lives.
 
-**Essential Reading Order**:
-1. `.claude/PROJECT_CONTEXT.md` - Complete project understanding (mission, domain)
-2. `.claude/ROADMAP.md` - **Strategic plan** (1-3 weeks, current priorities)
-3. `.claude/ARCHITECTURE.md` - **System structure** (components, design decisions, status)
-4. `ISSUES.md` - Known problems and priorities (at project root)
-5. `.claude/IMPLEMENTATION_ROADMAP.md` - Concrete action plan and fixes
-6. `.claude/PATTERNS.md` - Code patterns to follow
-7. `.claude/RAG_QUALITY_FRAMEWORK.md` - Quality verification for RAG pipeline
-8. `.claude/TDD_WORKFLOW.md` - Rigorous real-world testing process
-9. `.claude/DEBUGGING.md` - Troubleshooting guide
-10. `.claude/VERSION_CONTROL.md` - Git workflow and best practices
-11. `.claude/CI_CD.md` - CI/CD strategy and implementation
-12. `.claude/MCP_SERVERS.md` - Development tools setup
-13. `.claude/META_LEARNING.md` - Lessons learned and insights
+**Five real-PDF tests do not run in CI** (issue #85): the repo exceeded its Git LFS
+budget, so CI checks out with `lfs: false` and guards in `__tests__/python/conftest.py`
+skip those tests with a stated reason. Locally, `git lfs pull` hydrates them. Do **not**
+run `git lfs install` — it writes hooks that conflict with the repo's Husky-managed
+`core.hooksPath`.
 
-**Session Resumption** (for AI assistants):
-- **Start**: Use `/sc:load` to restore context from Serena memory
-- **Orient**: Review ROADMAP.md (strategic direction) → ARCHITECTURE.md (system state)
-- **Work**: Follow TDD_WORKFLOW.md for RAG features, PATTERNS.md for code
-- **End**: Use `/sc:save` to preserve session state in Serena memory
+## Invariants that break silently
 
-## Project Overview
+These are the ones where a plausible-looking change passes every test and breaks
+production.
 
-Z-Library MCP (Model Context Protocol) server that enables AI assistants to search, download, and process books from Z-Library. The project uses a Node.js/TypeScript frontend with a Python bridge backend for document processing.
+1. **stdout is the protocol channel.** Under the stdio transport stdout carries JSON-RPC
+   and nothing else. Use `logger` from `src/lib/logger.ts`, which writes to stderr. A
+   single `console.log` in `src/` disconnects strict MCP clients.
+   `__tests__/stdio-purity.test.js` fails the build if one appears — do not weaken it.
+2. **Files, not payloads.** Tools return paths to artifacts on disk, never raw document
+   text through the context window. This is invariant 1 in `VISION.md`, not a style
+   preference.
+3. **Python scripts live in `lib/`, not `dist/`.** The build does not copy them. Runtime
+   resolution walks `dist/lib/` → `dist/` → project root → `lib/`. Use the helpers in
+   `src/lib/paths.ts` (`getPythonScriptPath`, `getPythonLibDirectory`) rather than
+   hand-rolling a relative path. Rationale: [ADR-004](docs/adr/ADR-004-Python-Bridge-Path-Resolution.md).
+4. **Unit tests mock every third-party call**, so the suite stays green after real
+   integrations break. Upstream drift is caught by `.github/workflows/upstream-check.yml`
+   and `npm run doctor` — not by the tests. Green tests are not evidence the world hasn't
+   moved (invariant 6).
+5. **The root `pyproject.toml` sets `package = false`.** Without it, the repo's `src/`
+   directory flips setuptools to src-layout discovery while the published npm package
+   (which ships no `src/`) falls back to flat-layout and refuses to build, breaking
+   `uv sync` for every npm-installed user. Do not remove it.
 
 ## Architecture
 
-### Dual-Language Design
-- **Node.js/TypeScript Layer** (`src/`): MCP server implementation handling tool registration and client communication
-- **Python Bridge** (`lib/python_bridge.py`, `lib/rag_processing.py`): Handles Z-Library API interaction and document processing (EPUB, TXT, PDF)
-- **Vendored Z-Library Fork** (`zlibrary/`): Modified fork of sertraline/zlibrary with custom download logic
+- `src/index.ts` — MCP server entry point and tool definitions
+- `src/lib/zlibrary-api.ts` — bridge to Python via PythonShell
+- `src/lib/venv-manager.ts` — uv environment lifecycle
+- `lib/python_bridge.py` — core Z-Library operations
+- `lib/rag_processing.py` — EPUB/TXT/PDF processing
+- `lib/sources/` — source adapters
+- `zlibrary/` — vendored fork of sertraline/zlibrary with custom download logic
 
-### Key Components
-- `src/index.ts`: MCP server entry point with tool definitions
-- `src/lib/zlibrary-api.ts`: Bridge between Node.js and Python via PythonShell
-- `src/lib/venv-manager.ts`: Manages Python virtual environment lifecycle
-- `lib/python_bridge.py`: Core Python logic for Z-Library operations
-- `lib/rag_processing.py`: Document processing for RAG workflows
+Two behavioural decisions that are easy to reverse by accident:
 
-### Data Flow
-1. MCP client → Node.js server (tool request)
-2. Node.js → Python bridge (via PythonShell)
-3. Python → Z-Library API or document processing
-4. Results flow back through the same chain
+- **Downloads start from a search result, and there is no direct-from-ID path.**
+  `download_book_to_file` takes the `bookDetails` object a search returned.
+  `lib/python_bridge.py::download_book` then routes multi-source results through
+  `SourceRouter` and Z-Library results through `EAPIClient.download_file`, whose link
+  comes from the JSON EAPI. **Neither path scrapes a book detail page** — the
+  detail-page scraping described in [ADR-002](docs/adr/ADR-002-Download-Workflow-Redesign.md)
+  predates the Phase 7 EAPI migration and no longer exists in the code. The part of
+  ADR-002 that still holds is the search-result-first workflow, not the mechanism.
+- **`get_book_by_id` is deprecated** as unreliable ([ADR-003](docs/adr/ADR-003-Book-ID-Lookup-Deprecation.md)).
+  Find books with `search_books`.
 
-### Path Resolution Strategy
-
-**Design Decision**: Python scripts remain in source `lib/` directory (not copied to `dist/`)
-
-**Runtime Path Logic**:
-```typescript
-// From dist/lib/python-bridge.js at runtime:
-const scriptPath = path.resolve(__dirname, '..', '..', 'lib', 'python_bridge.py');
-
-// Navigation: dist/lib/ → dist/ → project_root/ → lib/python_bridge.py
-```
-
-**Path Helper Module** (Recommended for new code):
-```typescript
-import { getPythonScriptPath, getPythonLibDirectory } from './lib/paths.js';
-
-const scriptPath = getPythonScriptPath('python_bridge.py');
-// Returns: /project/lib/python_bridge.py
-
-const libDir = getPythonLibDirectory();
-// Returns: /project/lib
-```
-
-**Benefits**:
-- ✅ Single source of truth (Python scripts in `lib/`)
-- ✅ No build process changes needed
-- ✅ No file duplication
-- ✅ Development-friendly (edit Python directly)
-
-**Validation**: Build automatically validates all Python files exist (`npm run build`)
-
-**Documentation**: See [ADR-004](docs/adr/ADR-004-Python-Bridge-Path-Resolution.md) for complete rationale and [DEPLOYMENT.md](docs/DEPLOYMENT.md) for edge cases.
-
-## Development Commands
-
-### Setup (v2.0.0 - UV-based)
-```bash
-# Prerequisites: Install UV (one-time)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Initial setup (UV creates .venv and installs all dependencies)
+The full tool list lives in `README.md` and is checked against the code by
+`scripts/validate-readme-tools.sh` in CI — add a tool, update the README in the same
+commit or `docs-check` fails. Retry, timeout, and circuit-breaker tuning is in
+[docs/RETRY_CONFIGURATION.md](docs/RETRY_CONFIGURATION.md); the implementations are
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [loganrooks/zlibrary-mcp](https://github.com/loganrooks/zlibrary-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
