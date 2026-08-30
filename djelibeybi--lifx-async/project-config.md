@@ -56,10 +56,21 @@ uv run pytest --cov=lifx --cov-report=html
 # Verbose output
 uv run --frozen pytest -v
 
-# Run with emulator integration tests (requires lifx-emulator on PATH)
-# Tests marked with @pytest.mark.emulator will be skipped if emulator is not available
+# Run with emulator integration tests (lifx-emulator-core is a required dev dependency)
+# Use --disable-emulator to skip the normal embedded-emulator suite explicitly
 uv run pytest
 ```
+
+Pytest retries each test once, with no delay, only when it raises the exact
+`LifxTimeoutError`, `LifxConnectionError`, or `LifxNetworkError` type. Assertion
+failures and all other exceptions fail immediately. The suite-wide 60-second
+timeout covers two complete default 16-second request attempts; emulator tests
+receive a 120-second timeout. The targeted IPv6 emulator lookup retains two
+retries with a one-second delay on Windows because its socket and scheduler
+window can outlast one immediate retry. That targeted override also admits the
+assertion-shaped no-response result. It is applied during collection only on
+Windows; elsewhere the test keeps the global one immediate network retry and
+ordinary assertion failures still fail immediately.
 
 ### Code Quality
 
@@ -137,7 +148,7 @@ gh workflow run docs.yml
 2. **Network Layer** (`src/lifx/network/`)
 
    - `transport.py`: UDP transport using asyncio
-   - `discovery.py`: Device discovery via broadcast with `DiscoveredDevice` dataclass
+   - `discovery.py`: Device discovery via IPv4 broadcast or targeted IPv4/IPv6 datagrams with `DiscoveredDevice` dataclass
    - `connection.py`: Device connection with retry logic and lazy opening
    - `message.py`: Message building and parsing with `MessageBuilder`
    - `mdns/`: mDNS/DNS-SD discovery module (zero-dependency, stdlib only)
@@ -146,23 +157,9 @@ gh workflow run docs.yml
        once at one second and once at three seconds within the caller's deadline, and
        assembles valid legacy-unicast replies during the quiet window. When a valid SRV
        target still lacks a usable address, it conditionally sends bounded A/AAAA follow-ups:
-       one successful send, or no more than two failed attempts, for each of at most 64
-       targets
-     - `dns.py`: DNS wire format parser for PTR, SRV, A, TXT records
-     - `transport.py`: `MdnsTransport` sends IPv4 multicast queries from an ephemeral port and
-       receives only direct legacy-unicast replies; it does not join the multicast group or
-       receive unsolicited announcements
-     - `types.py`: Internal service-record model; record cache state belongs to one discovery
-       call and is never reused
-   - Lazy connection opening (auto-opens on first request)
-
-3. **Device Layer** (`src/lifx/devices/`)
-
-   - `base.py`: Base `Device` class with common operations: `from_ip()`, label, power, version, info
-   - `light.py`: `Light` class (color control, effects: pulse, breathe, waveforms)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Djelibeybi/lifx-async](https://github.com/Djelibeybi/lifx-async) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
