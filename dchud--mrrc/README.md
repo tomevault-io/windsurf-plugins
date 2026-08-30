@@ -7,11 +7,11 @@ Experimental port of pymarc to Rust using only coding agents
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [dchud/mrrc](https://github.com/dchud/mrrc).
+Original source: `AGENTS.md` in [dchud/mrrc](https://github.com/dchud/mrrc).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
