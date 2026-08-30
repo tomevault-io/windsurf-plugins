@@ -1,109 +1,105 @@
 ---
 trigger: always_on
-description: Quick reference for NVCF (NVIDIA Cloud Functions) in this repository.
+description: Instance and Cluster Management Service (ICMS) is a two-module OSS/self-hosted
 ---
 
-# AGENTS.md - Guide for AI Coding Agents
+# AGENTS.md - Instance Cluster Management
 
-Quick reference for NVCF (NVIDIA Cloud Functions) in this repository.
+Instance and Cluster Management Service (ICMS) is a two-module OSS/self-hosted
+Java service in the root `nvcf` Bazel module. It is not a nested Bazel module
+and does not own a `MODULE.bazel`, lockfile, `.bazelrc`, `.bazelversion`, or
+third-party dependency hub.
 
-## Repo Layout
+The monorepo copy is Bazel-only and contains no project POMs. Bazel consumes
+nv-boot through direct source labels and produces the executable application
+jar. Keep any Maven build support in the independent source repository. Do not
+restore project POMs or add Maven build instructions here.
 
-This repo is an umbrella layout: upstream services appear as ordinary directories (synthetic imports), arranged under `src/`, `deploy/`, `infra/`, and `migrations/` according to `imports.yaml`. Goal: over time, land and maintain code here natively; synthetic imports are a bridge while sources still live in separate GitLab projects. Tooling lives under `tools/` and `tests/`.
+## Layout
 
-Use `python3`, not `python`, when Python is needed. Use the nearest nested `AGENTS.md` for subtree-specific guidance.
+- `icms-core/`: service library, REST controllers, Cassandra repositories, and
+  scheduled tasks.
+- `icms-service/`: Spring Boot application and executable `app.jar`.
+- `local_env/`: Docker Compose bundle for Cassandra, LocalStack, NATS, and
+  Vault. Both modules symlink it as `local_env`.
+- `//rules/java`: shared Java, test, and Spring Boot rules.
 
-Useful pointers:
-- `tools/AGENTS.md` for repo tooling
-- `.cursor/skills/add-synthetic-import/SKILL.md` for synthetic imports
-- `.cursor/skills/documentation-style/SKILL.md` for docs style
-- `.cursor/skills/` for root dev-skill symlink fanout
-- `ai-tooling/user/skills/` and `ai-tooling/dev/skills/` for public skills
-- `nvidia-internal/user/skills/` and `nvidia-internal/dev/skills/` for private skills
+## Build and test
 
-If a referenced skill is outdated, update it before finishing.
+Run commands from the monorepo root:
 
-## Writing AGENTS.md Files
+```bash
+export BAZEL_OUTPUT_USER_ROOT="${TMPDIR:-/tmp}/nvcf-bazel-cache"
 
-Every subtree that an agent may work in should have its own `AGENTS.md` with build commands, test commands, code style, and any subtree-specific conventions. Keep each file under 400 lines; split into separate docs or skills when it grows past that.
+bazel --output_user_root="${BAZEL_OUTPUT_USER_ROOT}" \
+  build //src/control-plane-services/instance-cluster-management/...
 
-`AGENTS.md` is the source of truth for agent guidance. Cursor and Codex read `AGENTS.md` directly. Claude Code reads `CLAUDE.md`, so every directory that has an `AGENTS.md` also has a sibling `CLAUDE.md` that is a regular file containing the single line `@AGENTS.md`. That import line tells Claude Code to load the adjacent `AGENTS.md`, so all three tools end up on the same content. When creating a new `AGENTS.md`, create the companion `CLAUDE.md` in the same commit: `printf '@AGENTS.md\n' > CLAUDE.md`. Do not use a symlink, and never put unique content in `CLAUDE.md`.
-
-## Skills
-
-Skills are reusable, on-demand agent instructions for specific workflows. They follow the [Agent Skills specification](https://agentskills.io/specification) and are compatible with the [Vercel Skills CLI](https://github.com/vercel-labs/skills). Skills are invoked when relevant, not auto-applied (auto-applied guidance belongs in rules, not skills).
-
-### Skill structure
-
-Each skill is a directory named to match its `name` frontmatter field, containing at minimum a `SKILL.md`. Names must be lowercase with hyphens only, no leading/trailing/consecutive hyphens.
-
-```
-skill-name/
-    SKILL.md              # Required (under 500 lines)
-    README.md             # Optional: overview and usage
-    examples.md           # Optional: detailed examples
-    references/           # Optional: reference docs
-    scripts/              # Optional: helper scripts
-    assets/               # Optional: images, diagrams
+bazel --output_user_root="${BAZEL_OUTPUT_USER_ROOT}" \
+  test //src/control-plane-services/instance-cluster-management/... \
+  --cache_test_results=no \
+  --test_output=errors
 ```
 
-### SKILL.md frontmatter
+The test targets start Cassandra and NATS through Testcontainers and Docker
+Compose. They are tagged `requires-docker` and run in the GitHub `docker-host`
+lane. Running them locally also needs `--test_env=PATH` so Testcontainers can
+find the host `docker compose` CLI, and `--test_env=HOME` so Docker Desktop can
+discover CLI plugins.
 
-```yaml
----
-name: skill-name
-description: >-
-  What the skill does and when to use it.
-  Include trigger keywords for discoverability.
-version: "1.0.0"
-tags:
-  - nvcf
-  - relevant-tag
-tools:
-  - Shell
-  - Read
----
+`icms-core:test_fixtures` publishes the core test sources so
+`icms-service:tests` can reuse them. Update both when test fixtures change.
+
+See `BAZEL.md` for coverage output paths and the Docker image build.
+
+## Dependencies
+
+The root `MODULE.bazel` and `maven_install.json` own `@nv_third_party_deps`.
+BUILD targets declare compile and runtime edges. A coordinate being available in
+the shared hub does not put it on this service's classpath. Use direct labels
+for co-located nv-boot targets, for example:
+
+```text
+//src/libraries/java/nv-boot-parent/nv-boot-starter-core:nv_boot_starter_core
 ```
 
-The `description` must say both what the skill does (actions it enables) and when to use it (trigger phrases, keywords). This is how agents decide whether to invoke the skill.
+After changing a root Java dependency input, repin from the monorepo root and
+regenerate the dependency rollup:
 
-### Where skills live
+```bash
+REPIN=1 bazel run @nv_third_party_deps//:pin
+GITHUB_TOKEN="$(gh auth token)" go run -C tools/collect-dependencies .
+```
 
-Skills are split by visibility and audience:
+The collector needs `go`, `cargo`, and `helm` on `PATH`. Without `cargo` or
+`helm` it silently moves unrelated Rust crates and Helm charts into the
+`Unresolved` section of `dependencies.md`.
 
-- `ai-tooling/user/skills/`: public user-facing NVCF skills.
-- `ai-tooling/dev/skills/`: public developer workflow skills.
-- `nvidia-internal/user/skills/`: private user-facing NVCF skills.
-- `nvidia-internal/dev/skills/`: private developer, release-engineering, and monorepo-maintenance skills.
-- `.cursor/skills/`: root dev-skill fanout only. Each entry is a symlink to a public dev source under `ai-tooling/dev/skills/` or a private dev source under `nvidia-internal/dev/skills/`.
+Do not hand-edit `maven_install.json` or `MODULE.bazel.lock`.
 
-Cross-tool symlinks make root dev skills available to all agents:
-- `.cursor/skills/<name>` -> symlink to the dev skill source directory.
-- `.codex/skills/<name>` -> symlink to the same dev skill source directory.
-- `.claude/skills/<name>` -> symlink to the same dev skill source directory.
+## NOTICE
 
-When adding a skill:
-1. Decide visibility (`ai-tooling` public or `nvidia-internal` private) and audience (`user/skills` or `dev/skills`).
-2. Create the `SKILL.md` with valid frontmatter.
-3. For root-wide dev skills, create matching `.cursor/skills/<name>`, `.codex/skills/<name>`, and `.claude/skills/<name>` symlinks to the same source directory.
-4. Update the relevant public or private skills table.
+Generate and check the runtime-derived component NOTICE with:
 
-### Public skills
+```bash
+bazel run //src/control-plane-services/instance-cluster-management:generate_notice -- \
+  --update-metadata --write
+bazel test //src/control-plane-services/instance-cluster-management:notice_check_test
+bazel build //src/control-plane-services/instance-cluster-management:osrb_dependency_delta
+```
 
-| Skill | Location | Purpose |
-|-------|----------|---------|
-| `documentation-style` | `ai-tooling/dev/skills/` | NVCF documentation conventions (no bold, no emojis, no em-dash) |
-| `nvcf-explore-stack` | `ai-tooling/dev/skills/` | Navigate the self-hosted stack topology and dependency graph |
-| `nvcf-self-managed-cli` | `ai-tooling/user/skills/` | Install, operate, and manage self-managed NVCF through `nvcf-cli` |
-| `nvcf-self-managed-installation` | `ai-tooling/user/skills/` | Install and deploy the self-managed NVCF stack |
+Do not run a standalone Maven NOTICE generator in this subtree.
 
-Private skill inventory lives in `nvidia-internal/AGENTS.md`.
+## Java style
 
-## Commit Messages
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Keep Java lines at or below 100 characters where practical. Extract helpers or
+  constants instead of leaving long inline expressions.
+- Use private static final constants for repeated error and log messages.
+- Use `StringUtils.isBlank(...)` for null-or-blank string validation.
+- Read test resources through `ClassPathResource.getInputStream()`, never
+  `getFile()`. Resources live inside jars under Bazel, so `getFile()` fails.
+- In tests, import frequently used nested classes and use `var` for obvious
+  local variables when it keeps lines short.
 
 ---
 > Source: [NVIDIA/nvcf](https://github.com/NVIDIA/nvcf) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
