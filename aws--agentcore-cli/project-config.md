@@ -1,66 +1,102 @@
 ---
 trigger: always_on
-description: This directory contains **manually maintained** TypeScript type definitions optimized for LLM consumption.
+description: This project contains configuration and infrastructure for an Amazon Bedrock AgentCore application.
 ---
 
-# LLM-Compacted Schema Maintenance
+# AgentCore Project
 
-This directory contains **manually maintained** TypeScript type definitions optimized for LLM consumption.
+This project contains configuration and infrastructure for an Amazon Bedrock AgentCore application.
 
-## How It Works
+The `agentcore/` directory is a declarative model of the project. The `agentcore/cdk/` subdirectory uses the
+`@aws/agentcore-cdk` L3 constructs to deploy the configuration to AWS.
 
-1. The CLI embeds these `.ts` files as text at build time (via Bun's text import)
-2. During `init`, they're written to the user's `agentcore/.llm-context/` directory
-3. AI coding assistants read these files when editing AgentCore JSON configs
+## Mental Model
 
-## Keeping In Sync With Zod Schemas
+The project uses a **flat resource model**. Agents, memories, credentials, gateways, evaluators, and policies are
+independent top-level arrays in `agentcore.json`. There is no binding between resources in the schema — each resource is
+provisioned independently. Agents discover memories and credentials at runtime via environment variables or SDK calls.
+Tags defined in `agentcore.json` flow through to deployed CloudFormation resources.
 
-When Zod schemas in `schemas/` are updated, manually update the corresponding file here:
+## Critical Invariants
 
-| Compacted File   | Zod Source Files                               |
-| ---------------- | ---------------------------------------------- |
-| `agentcore.ts`   | `schemas/agentcore-project.ts`                 |
-| `agent-env.ts`   | `schemas/agent-env.ts`, `schemas/primitives/*` |
-| `mcp.ts`         | `schemas/mcp.ts`, `schemas/mcp-defs.ts`        |
-| `aws-targets.ts` | `schemas/aws-targets.ts`                       |
+1. **Schema-First Authority:** The `.json` files are the source of truth. Do not modify agent behavior by editing
+   generated CDK code in `cdk/`.
+2. **Resource Identity:** The `name` field determines the CloudFormation Logical ID.
+   - **Renaming** a resource will **destroy and recreate** it.
+   - **Modifying** other fields will update the resource **in-place**.
+3. **Schema Validation:** Run `agentcore validate` before deploying configuration changes.
+4. **Resource Removal:** Use `agentcore remove` to remove resources. Run `agentcore deploy` after removal to tear down
+   deployed infrastructure.
+5. **Invocation Input:** Validate runtime payloads and require text prompts to be strings. If a Strands app accepts a
+   caller-supplied message history, normalize the history tail with `strip_trailing_tool_use()` before invocation.
 
-## Critical: Enum and Regex Accuracy
+## Directory Structure
 
-**Every enum (union type) and regex pattern MUST be exactly correct.**
-
-On every update:
-
-1. **Re-verify ALL union types** match the Zod enum values exactly
-2. **Re-verify ALL regex patterns** match the Zod regex constraints exactly
-3. **Re-verify ALL min/max values** match the Zod constraints exactly
-
-Incorrect enums or regex will cause agents to generate invalid JSON that fails validation.
-
-## Update Checklist
-
-- [ ] Add new fields to the relevant interface
-- [ ] Add validation constraint comments (`@regex`, `@min`, `@max`)
-- [ ] **Re-check ALL enum union types match Zod source exactly**
-- [ ] **Re-check ALL regex patterns match Zod source exactly**
-- [ ] Keep each file self-contained (duplicate shared types if needed)
-
-## Format Guidelines
-
-### Constraint Comments
-
-```typescript
-name: string; // @regex ^[a-zA-Z][a-zA-Z0-9]{0,63}$ @max 48
-eventExpiryDuration: number; // @min 7 @max 365 (days)
-targets: Target[]; // @min 1 - at least one required
+```
+myProject/
+├── AGENTS.md               # This file — AI coding assistant context
+├── agentcore/
+│   ├── agentcore.json      # Main project config (AgentCoreProjectSpec)
+│   ├── aws-targets.json    # Deployment targets (account + region)
+│   ├── .env.local          # Secrets — API keys (gitignored)
+│   └── cdk/                # AWS CDK project (@aws/agentcore-cdk L3 constructs)
+├── app/                    # Agent application code
+└── evaluators/             # Custom evaluator code (if any)
 ```
 
-### File Structure
+## Configuration Reference
 
-1. Header with JSON file reference and read-only notice
-2. Root schema interface at top
-3. Component types below
-4. Enums as union types (`type Foo = 'A' | 'B'`)
+- **AgentCoreProjectSpec**: Root config with runtimes, memories, knowledge bases, credentials, evaluators, online evals
+  and insights, gateways, policy engines, config bundles, A/B tests, harness registrations, datasets, and payment
+  managers
+- **AgentEnvSpec**: Agent configuration (build type, entrypoint, code location, runtime version, network mode)
+- **Memory**: Memory resource with strategies (SEMANTIC, SUMMARIZATION, USER_PREFERENCE, EPISODIC) and expiry
+- **Credential**: API key or OAuth credential provider
+- **AgentCoreGateway**: MCP gateway with targets (Lambda, MCP server, OpenAPI, Smithy, API Gateway, web-search,
+  knowledge-base)
+- **Evaluator**: LLM-as-a-Judge or code-based evaluator
+- **OnlineEvalConfig**: Continuous evaluation pipeline bound to an agent
+- **OnlineInsightsConfig** _[preview]_: Continuous failure-pattern analysis bound to an agent
+- **KnowledgeBase**: Managed Bedrock Knowledge Base auto-wired to a gateway
+- **Harness**: Declarative agent — runtime + tools + skills + memory + observability without writing agent code
+- **PolicyEngine** + **Policy**: Cedar policy engine with form-based guardrails (Bedrock content filters, prompt-attack,
+  sensitive-info) or raw Cedar policies
+- **PaymentManager** + **PaymentConnector**: x402-protocol payment orchestration with provider credentials (CoinbaseCDP,
+  StripePrivy)
+- **ConfigBundle**: Versioned runtime configuration as a separately-deployable resource
+- **Dataset**: Curated session dataset for batch evaluation and recommendation runs
+- **RuntimeEndpoint**: Named endpoint (e.g. `PROMPT_V1`) targeting a specific runtime version
+
+### Common Enum Values
+
+- **BuildType**: `'CodeZip'` | `'Container'`
+- **NetworkMode**: `'PUBLIC'` | `'VPC'`
+- **RuntimeVersion**: `'PYTHON_3_10'` | `'PYTHON_3_11'` | `'PYTHON_3_12'` | `'PYTHON_3_13'` | `'PYTHON_3_14'` |
+  `'NODE_18'` | `'NODE_20'` | `'NODE_22'`
+- **MemoryStrategyType**: `'SEMANTIC'` | `'SUMMARIZATION'` | `'USER_PREFERENCE'` | `'EPISODIC'`
+- **GatewayTargetType**: `'lambda'` | `'mcpServer'` | `'openApiSchema'` | `'smithyModel'` | `'apiGateway'` |
+  `'lambdaFunctionArn'` | `'connector'` (web-search, bedrock-knowledge-bases)
+- **ModelProvider**: `'Bedrock'` | `'Gemini'` | `'OpenAI'` | `'Anthropic'`
+- **PaymentProvider**: `'CoinbaseCDP'` | `'StripePrivy'`
+- **PolicyEnforcementMode**: `'ACTIVE'` | `'PASSIVE'`
+- **GuardrailContentFilter**: `'VIOLENCE'` | `'HATE'` | `'SEXUAL'` | `'MISCONDUCT'` | `'INSULTS'`
+
+### Build Types
+
+- **CodeZip**: Python source packaged as a zip and deployed directly to AgentCore Runtime.
+- **Container**: Docker image built in CodeBuild (ARM64), pushed to a per-agent ECR repository. Requires a `Dockerfile`
+  in the agent's `codeLocation` directory. For local development (`agentcore dev`), the container is built and run
+  locally with volume-mounted hot-reload.
+
+### Supported Frameworks (for template agents)
+
+- **Strands** — Bedrock, Anthropic, OpenAI, Gemini
+- **LangChain/LangGraph** — Bedrock, Anthropic, OpenAI, Gemini
+- **GoogleADK** — Gemini
+- **OpenAI Agents** — OpenAI
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aws/agentcore-cli](https://github.com/aws/agentcore-cli) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
