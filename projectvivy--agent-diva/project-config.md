@@ -1,109 +1,53 @@
 ---
 trigger: always_on
-description: This repository is a Rust workspace. Crates are organized by responsibility:
+description: `agent-diva-providers` holds the LLM provider trait, registry, catalog service, factory, and concrete clients used by the agent loop and report generator. It also contains the Groq-based voice transcription service.
 ---
 
-# Repository Guidelines
+# agent-diva-providers
 
-## Project Structure & Module Organization
+## OVERVIEW
 
-This repository is a Rust workspace. Crates are organized by responsibility:
+`agent-diva-providers` holds the LLM provider trait, registry, catalog service, factory, and concrete clients used by the agent loop and report generator. It also contains the Groq-based voice transcription service.
 
-- `agent-diva-core`: shared config, memory/session, cron, heartbeat, and event bus foundations.
-- `agent-diva-agent`: agent loop, context assembly, skill/subagent flow.
-- `agent-diva-providers`: LLM/transcription provider abstractions and implementations.
-- `agent-diva-channels`: channel adapters (Slack, Discord, Telegram, Email, QQ, etc.).
-- `agent-diva-tools`: built-in tools (filesystem, shell, web, cron, spawn).
-- `agent-diva-neuron`: supporting types/helpers used heavily by the desktop GUI.
-- `agent-diva-manager`: default local gateway and HTTP control plane for **`agent-diva-cli`** (hard dependency; no `nano` feature in CLI).
-- `agent-diva-nano`: **template-line** local gateway stack in **`external/agent-diva-nano/`** (nested workspace; `cd external && cargo build -p agent-diva-nano`); not a root workspace member.
-- `agent-diva-cli`: user-facing CLI entrypoint (`agent-diva` binary).
-- `agent-diva-service`: Windows service wrapper.
-- `agent-diva-gui`: optional Tauri desktop app (separate from default CLI `cargo` closure).
-- `agent-diva-migration`: migration utility from earlier versions.
+## WHERE TO LOOK
 
-Use each crate's `src/` for code; add crate-level integration tests under `tests/` when needed.
+| File / Module | Purpose |
+| --- | --- |
+| `src/lib.rs` | Primary exports: `LLMProvider`, `DynamicProvider`, `ProviderRegistry`, `ProviderCatalogService`, `build_llm_provider`, `OpenAiCompatibleClient`, `OllamaProvider`. |
+| `src/base.rs` | Trait, message/response types, `ToolChoiceMode`, streaming UTF-8 decoder, and model capability helpers. |
+| `src/registry.rs` / `src/providers.yaml` | Built-in provider specs and keyword/name lookup. |
+| `src/factory.rs` | `build_llm_provider` switches on `ApiType` and wraps the matching client. |
+| `src/openai_compatible.rs` | OpenAI-compatible HTTP client, chat, streaming, tool parsing, cache control, retry integration. |
+| `src/ollama.rs` | Local Ollama client. |
+| `src/anthropic.rs` | Native Anthropic client. |
+| `src/catalog.rs` / `src/discovery.rs` | Provider/model catalog views and runtime model discovery. |
+| `src/report_narrative.rs` | `LlmReportNarrativeGenerator` for LLM-backed report summaries. |
+| `src/transcription.rs` | Groq Whisper `TranscriptionService`. |
+| `src/retry.rs` | Shared retry and rate-limit helpers. |
+| `tests/` | Integration tests for Ollama tools, streaming, and retry behavior. |
+| `examples/` | SiliconFlow chat/TTS/ASR and MiniMax TTS samples. |
 
-**Common workspace conventions:**
+## CONVENTIONS
 
-- Keep cross-cutting domain types in `agent-diva-core`.
-- Keep provider/channel-specific code isolated in their dedicated crates.
-- Prefer adding small modules over large monolithic files.
-- Place examples and fixtures under the owning crate when practical.
+- New providers implement `LLMProvider` and are wired through `build_llm_provider`. Add registry metadata in `providers.yaml`.
+- Use `ApiType::Openai` for OpenAI-compatible endpoints and `ApiType::Anthropic` for native Anthropic.
+- Model capability checks live in `base.rs`; keep them conservative and add new models explicitly.
+- Retry and rate-limit handling stay inside the provider client or `retry.rs`, not callers.
+- Transcription uses `TranscriptionService` in `transcription.rs`.
+- Report narrative generation uses `LlmReportNarrativeGenerator` in `report_narrative.rs`.
 
-## Getting Started
+## ANTI-PATTERNS
 
-- Install Rust stable (via `rustup`) and ensure `cargo`, `rustfmt`, and `clippy` are available.
-- Install `just` and run commands from the workspace root.
-- Copy and configure local environment files if required by a crate or channel.
-- Verify toolchain and project health with `just fmt-check && just check && just test`.
+- Do not rewrite raw model IDs at the provider layer. Native endpoints, e.g. DeepSeek `https://api.deepseek.com/v1`, must send `deepseek-chat`, not `deepseek/deepseek-chat`.
+- Only true gateways or aggregators, e.g. OpenRouter, use prefixed model IDs such as `anthropic/claude-sonnet-4`.
+- Do not add gateway prefixes inside `resolve_model` or generic request builders.
+- Do not rely on tests that only check internal strings. Assert the final outbound JSON `model` field.
 
-## Development Guide
-If users request references to projects such as openclaw, nanobot, or shannon, prioritize reviewing the contents under the .workspace directory. Analyze the architectures of these sibling projects and propose a development approach suitable for the agent-diva architecture.
+## NOTES
 
-## Build, Test, and Development Commands
-
-Prefer `just` recipes from the workspace root:
-
-- `just build` / `just build-release`: build all crates (debug/release).
-- `just test`: run `cargo test --all`.
-- `just check`: run clippy with warnings denied.
-- `just fmt` and `just fmt-check`: format or verify formatting.
-- `just ci`: run formatting, lint, and tests (CI-equivalent gate).
-- `just run -- <args>`: run `agent-diva-cli`.
-- `just migrate -- <args>`: run migration CLI.
-
-**Useful direct cargo invocations:**
-
-- `cargo test -p <crate>`: run tests for a single crate.
-- `cargo test <test_name>`: run a specific test by name.
-- `cargo run -p agent-diva-cli -- <args>`: run CLI without `just`.
-
-## Coding Style & Naming Conventions
-
-Use Rust 2021 conventions and keep `rustfmt` output authoritative (`rustfmt.toml` is checked in). Use:
-
-- `snake_case` for modules/functions/files,
-- `PascalCase` for structs/enums/traits,
-- `SCREAMING_SNAKE_CASE` for constants.
-
-Keep public APIs documented with `///`; use `//!` for module overviews when helpful. Run `cargo clippy --all -- -D warnings` before opening a PR.
-
-**Additional style guidance:**
-
-- Favor small, composable functions and explicit types at API boundaries.
-- Avoid `unwrap`/`expect` in non-test code; propagate or map errors with context.
-- Keep async boundaries clear; avoid blocking calls inside async paths.
-- Preserve backward compatibility for public interfaces unless a breaking change is intentional and documented.
-
-## Provider Model-ID Safety Rule (Critical)
-
-When calling a provider's native OpenAI-compatible endpoint (e.g., DeepSeek `https://api.deepseek.com/v1`), always send the provider's raw model ID (e.g., `deepseek-chat`) — **do not auto-add LiteLLM prefixes** (e.g., do *not* rewrite to `deepseek/deepseek-chat`).  
-Only apply `provider/model` prefix rewriting when routing through a true LiteLLM-style gateway or aggregator.
-
-**Implementation checklist for provider routing changes:**
-
-- Verify whether the endpoint is native-provider or LiteLLM-compatible gateway.
-- Add/adjust tests that assert final outbound `model` value.
-- Confirm config migration paths do not silently rewrite model IDs incorrectly.
-- Document behavior in crate-level docs or README when introducing new providers.
-
-## Testing Guidelines
-
-Write focused unit tests near the code with `#[cfg(test)]`. Add integration tests in crate `tests/` folders for cross-module behavior. Run `cargo test --all` locally before pushing. Use workspace test utilities (`tokio-test`, `tempfile`, `wiremock`, `mockito`) where appropriate.
-
-**Test quality expectations:**
-
-- Cover both success paths and representative failure paths.
-- Validate serialization/config parsing for new config fields.
-- Prefer deterministic tests; avoid external network calls in unit/integration tests.
-- For async behavior, include timeout-aware assertions to avoid hanging CI.
-
-## Configuration, Secrets, and Safety
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Examples for SiliconFlow and MiniMax live under `examples/`. They are starting points for provider-specific API exploration, not production integration tests.
+- `ProviderSpec.gateway_prefix` is descriptive only. Routing code must not derive outbound prefixes from it.
 
 ---
 > Source: [ProjectViVy/agent-diva](https://github.com/ProjectViVy/agent-diva) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
