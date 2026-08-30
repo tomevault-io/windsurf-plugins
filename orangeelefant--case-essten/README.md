@@ -7,11 +7,11 @@ Webraketen case study — essten
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [orangeelefant/case-essten](https://github.com/orangeelefant/case-essten).
+Original source: `AGENTS.md` in [orangeelefant/case-essten](https://github.com/orangeelefant/case-essten).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
