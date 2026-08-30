@@ -1,96 +1,97 @@
 ---
 trigger: always_on
-description: Operational guide for Claude Code (and any AI/agent) working in this repository.
+description: Provider-neutral entry point for **any** AI coding agent or automated contributor
 ---
 
-# CLAUDE.md — working in RNAlysis
+# AGENTS.md — working in RNAlysis with an AI agent
 
-Operational guide for Claude Code (and any AI/agent) working in this repository.
-Read this first. Deeper material lives in [`.claude/context.md`](.claude/context.md),
-[`.claude/workflows.md`](.claude/workflows.md), and [`.claude/design-philosophy.md`](.claude/design-philosophy.md).
+Provider-neutral entry point for **any** AI coding agent or automated contributor
+(Claude, Cursor, Aider, GitHub Copilot, Codex, Windsurf, Gemini, custom bots, …) working in
+this repository. It follows the [agents.md](https://agents.md) convention.
 
-> **Not using Claude Code?** This guide applies to you too. [`AGENTS.md`](AGENTS.md) is the
-> provider-neutral entry point for any AI agent or automated contributor — it distills the
-> non-negotiable rules and points back here for the full detail. `CLAUDE.md` (this file) is the
-> canonical, complete version; keep the two in sync when you change the rules.
+**The full working guide is [`CLAUDE.md`](CLAUDE.md).** Despite the name it is written for
+*all* agents, not only Claude Code — it holds the complete repository map, the API↔GUI
+reflection contract, the command list, the style rules, and the known gotchas. Read it. Deeper
+material lives in [`.claude/context.md`](.claude/context.md),
+[`.claude/workflows.md`](.claude/workflows.md), and
+[`.claude/design-philosophy.md`](.claude/design-philosophy.md). Human contributors should also
+read [`CONTRIBUTING.rst`](CONTRIBUTING.rst).
+
+What follows is the short version: the one architectural idea you must understand before
+changing anything, and the non-negotiable rules. If you read nothing else here, read this — but
+prefer reading `CLAUDE.md` in full.
 
 ---
 
 ## What RNAlysis is
 
-RNAlysis is desktop software that lets biologists analyze RNA-sequencing data —
-from raw FASTQ through filtering, normalization, differential expression, clustering,
-and enrichment — **without writing a single line of code**. It ships both a PyQt6
-graphical app and a programmatic Python API, and it targets scientists with **zero
-programming experience**. Correctness and reproducibility are non-negotiable
-(see [design-philosophy](.claude/design-philosophy.md)).
+Desktop software that lets biologists analyze RNA-sequencing data — from raw FASTQ through
+filtering, normalization, differential expression, clustering, and enrichment — **without
+writing any code**. It ships a PyQt6 graphical app and a programmatic Python API, and targets
+scientists with **zero programming experience**. Correctness and reproducibility are
+non-negotiable.
 
 ---
 
-## The one thing to understand first: the API↔GUI reflection contract
+## The one idea to understand first: the API↔GUI reflection contract
 
-**The programmatic API is the source of truth. The GUI is generated from it by reflection.**
-Internalize this before changing anything, because it explains most of the conventions.
+**The programmatic Python API is the source of truth. The GUI is generated from it by
+reflection.** When you add a public method to a `Filter`/`FeatureSet` subclass (or a public
+function in `fastq`/`enrichment`), the GUI **auto-discovers and renders it** — you do not write
+Qt code for it. What drives that rendering:
 
-When you add a public method to a `Filter`/`FeatureSet` subclass (or a public function in
-`fastq`/`enrichment`), the GUI **automatically discovers and renders it** — you do not write
-Qt code for it. Three things drive that rendering:
+- **Type annotations are load-bearing UI.** Each parameter's annotation maps to a specific Qt
+  widget (e.g. `bool` → toggle, `Fraction` → 0–1 slider, `Color` → color picker,
+  `Literal[...]` → combo box, `Optional[T]` → a checkbox that enables a `T` widget). The custom
+  types live in `rnalysis/utils/param_typing.py`. **Choosing the right annotation is how you
+  design the GUI.**
+- **Docstrings are load-bearing help text.** The reST `:param x: ...` lines become the
+  per-parameter tooltips; keep that format.
+- **`@readable_name('…')`** sets the human-readable button/window label.
 
-1. **Discovery** — `gui.py::get_all_actions()` calls `dir()` on the object and keeps every
-   public (non-`_`) callable not listed in that widget's `EXCLUDED_FUNCS`. Methods are sorted
-   into GUI tabs by **name heuristics**: contains `normalize` → *Normalize*; contains `filter`
-   or `split` → *Filter*; membership in `SUMMARY_FUNCS`/`CLUSTERING_FUNCS`/`GENERAL_FUNCS` →
-   those tabs; otherwise → *Visualize*.
-
-2. **Parameter widgets** — `gui_widgets.py::param_to_widget()` maps each parameter's **type
-   annotation** to a specific Qt widget. **Type annotations are load-bearing UI.** Examples:
-   - `bool` → toggle switch · `int` → spin box · `PositiveInt`/`NonNegativeInt`/`NegativeInt` → range-bounded spin box
-   - `Fraction` → 0–1 slider/spin · `Color` → color picker · `ColorList` → multi-color picker · `ColorMap` → colormap combo
-   - `ColumnName`/`ColumnNames`/`GroupedColumns` → table-column pickers
-   - `Literal['a','b']` → combo box · `Union[..., Literal[...]]` → combo box with an "other…" field
-   - `Union[T, None]` (i.e. `Optional[T]`) → a checkbox that enables/disables a `T` widget
-   - `Sequence[str]` → gene-set combo box
-   These custom types live in [`rnalysis/utils/param_typing.py`](rnalysis/utils/param_typing.py).
-   **Choosing the right annotation is how you design the GUI.**
-
-3. **Labels & help text** — the `@readable_name('Human readable label')` decorator
-   (`utils/generic.py`) sets the button/window title; the reStructuredText `:param x: ...`
-   docstring lines become the per-parameter help/tooltips. A public method **without**
-   `@readable_name` still appears (using its function name), so hide internals with a leading
-   underscore or an `EXCLUDED_FUNCS`/`EXCLUDED_PARAMS` entry.
-
-**Consequence:** a rename, a signature change, or a changed/loosened type annotation on a
-public API method silently changes the GUI. Treat any such change as *risky* (see rules below).
-And because you can't *see* that silent change in a code diff, **any change that is visible in a
-GUI dialog must ship with a screenshot on the PR** (rule 9) — rebuild the dialog straight from the
-API with `packaging/capture_gui_dialog.py` (the `gui-screenshots` skill wraps the full workflow).
+**Consequence:** renaming a public method, changing its signature, or loosening a type
+annotation silently changes the GUI (and possibly serialized parameters). Treat any such change
+as *risky*. The full contract — discovery heuristics, the complete annotation→widget table, and
+how to hide internals — is in [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
-## Repository map
+## Non-negotiable rules
 
-```
-rnalysis/
-  __init__.py            # version, settings keys, FROZEN_ENV flag
-  general.py             # misc top-level helpers (parsing IDs, saving tables, settings paths)
-  filtering.py           # PUBLIC API — Filter, CountFilter, DESeqFilter, FoldChangeFilter, Pipeline
-  enrichment.py          # PUBLIC API — FeatureSet, RankedSet (GO/KEGG/user enrichment, set ops)
-  fastq.py               # PUBLIC API — adapter trimming, alignment, counting pipelines (wrap CLI tools)
-  utils/                 # IMPLEMENTATION (not user-facing)
-    io.py                # web services (async aiohttp + rate-limit + cache), subprocess, R runner
-    enrichment_runner.py # enrichment statistics engines
-    clustering.py        # clustering algorithms
-    differential_expression.py  # builds/executes R scripts for DESeq2 & limma-voom
-    feature_counting.py  # featureCounts (Rsubread) bridge
-    genome_annotation.py # GTF/GFF parsing & gene-length logic
-    ontology.py          # GO/KEGG DAG handling
-    param_typing.py      # custom annotation types that drive GUI widgets  ← load-bearing
-    generic.py           # readable_name, GenericPipeline, parallel helpers, misc
-    parsing.py, validation.py, settings.py, installs.py
-  gui/                   # PyQt6 app — reflects the API; you rarely add per-function code here
+Hard invariants. Do not violate them without explicit sign-off from a maintainer.
+
+1. **Test-driven development, always.** Write a failing test first, make it pass, then refactor.
+   New code must be covered. Run the *relevant* `tests/test_*.py` module(s) before calling
+   anything done, and state plainly what you could **not** run (paths needing R, network,
+   kallisto/bowtie2, or a Qt display).
+2. **Branch model: feature branch → `development` → `master`.** `development` is the long-lived
+   integration branch; `master` is stable/released and only receives `development` at a version
+   release. **Never commit directly to `master` or `development`.** Cut a feature/fix branch off
+   `development` and open your PR **into `development`**.
+3. **Plan first for risky changes.** If a change touches a public API signature, the API→GUI
+   reflection contract, or a serialized format (Pipeline YAML / session file / exported
+   parameters), propose a short plan and wait for approval before coding. Small localized fixes:
+   just do it (TDD) and show the diff.
+4. **Back-compat of serialized artifacts is a hard invariant.** Old Pipeline YAMLs, saved
+   sessions, and exported parameter files **must keep loading** in new versions. Breaking this
+   is a bug — flag it loudly.
+5. **Results must reproduce across versions.** A given analysis with given parameters must
+   produce the same output. If a change alters numerical output, it must be intentional,
+   justified, and called out in `HISTORY.rst`.
+6. **Every new function needs reasonable defaults.** Assume a non-programmer, non-bioinformatician
+   user; defaults should produce a sensible, correct analysis out of the box.
+7. **Cross-platform or it doesn't ship.** Must work on Windows, macOS, and Linux, both
+   run-from-source **and** frozen (PyInstaller). Mind the multiprocessing/frozen split described
+   in `CLAUDE.md`.
+8. **Independent review before done.** At PR time, have an agent or reviewer with clean context
+   — not the one that wrote the change — review the diff, and address the findings.
+9. **Visible GUI changes ship with screenshots.** Because the GUI is reflected from the API, a
+   change to a public `Filter`/`FeatureSet`/`fastq`/`enrichment` function that is **visible in a
+   dialog** (a new/renamed/removed parameter, a changed type annotation, a new/edited
+   `@readable_name`, or edited `:param:` help text) must include a screenshot of the affected
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GuyTeichman/RNAlysis](https://github.com/GuyTeichman/RNAlysis) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-30 -->
