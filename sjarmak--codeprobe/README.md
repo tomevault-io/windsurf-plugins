@@ -7,11 +7,11 @@ Turn a repository's merged pull requests into coding-agent evaluations, then mea
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sjarmak/codeprobe](https://github.com/sjarmak/codeprobe).
+Original source: `CLAUDE.md` in [sjarmak/codeprobe](https://github.com/sjarmak/codeprobe).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
