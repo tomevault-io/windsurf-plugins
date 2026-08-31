@@ -1,72 +1,99 @@
 ---
 trigger: always_on
-description: > Imported from Kevin's wiki and the Dedalus design language. These rules are non-negotiable when writing or reviewing Sigil code.
+description: > Adapted from [tasteskill.dev](https://www.tasteskill.dev/) for Sigil's token-driven architecture.
 ---
 
-# Sigil Design System — Enforced Rules
+# Taste Enforcement — Anti-Slop Frontend Rules
 
-> Imported from Kevin's wiki and the Dedalus design language. These rules are non-negotiable when writing or reviewing Sigil code.
+> Adapted from [tasteskill.dev](https://www.tasteskill.dev/) for Sigil's token-driven architecture.
+> These rules override default LLM biases that produce generic, forgettable frontends.
+> Cross-reference with `sigil-design-system.mdc` for token consumption rules.
 >
-> **Full references:** [style/design.md](../../style/design.md) (motion guide) | [style/ux-principles.md](../../style/ux-principles.md) (product UX) | [style/style.md](../../style/style.md) (engineering philosophy) | [skills/sigil-polish/](../../skills/sigil-polish/SKILL.md) (interface polish skill with typography, surfaces, animations, performance deep-dives)
+> **Available taste skills** (user-level at `~/.cursor/skills/taste-*/SKILL.md`):
+> - `taste-core` — general anti-slop default
+> - `taste-gpt` — GPT/Codex stricter variant
+> - `taste-image-to-code` — image-first then implement
+> - `taste-redesign` — audit existing UI
+> - `taste-soft` — premium calm/expensive
+> - `taste-output` — output completeness
+> - `taste-minimalist` — editorial monochrome
+> - `taste-brutalist` — Swiss/CRT/terminal
+> - `taste-stitch` — Google Stitch DESIGN.md
+> - `taste-imagegen-web` — web reference images
+> - `taste-imagegen-mobile` — mobile screen images
+> - `taste-brandkit` — brand-kit overview images
 >
-> **Anti-slop enforcement:** Also read [taste-enforcement.mdc](./taste-enforcement.mdc) for banned AI visual patterns, variance dials, content quality rules, performance guardrails, and output completeness requirements. The [taste-skills-index.mdc](./taste-skills-index.mdc) catalogs the 12 user-level taste skills (taste-core, taste-soft, taste-minimalist, taste-brutalist, etc.) that auto-trigger based on task description.
->
-> **Companion rule files (imported from wiki):**
-> - [css-ui-enforcement.mdc](./css-ui-enforcement.mdc) — Tailwind + `cn()` first, `globals.css` only, scrollbars, hit areas, no `style`+`className` soup
-> - [react-conventions.mdc](./react-conventions.mdc) — Hooks, linting (Ultracite/oxlint), architecture-policy ESLint rules, Vercel 69 rules, RSC safety
-> - [typescript-conventions.mdc](./typescript-conventions.mdc) — Types, error handling (`Result<T,E>`, Zod), console labels, tsgo, oxfmt
-> - [design-animation-rules.mdc](./design-animation-rules.mdc) — Animation frequency framework, easing flowchart, springs, clip-path, gestures, accessibility, Sonner principles
-> - [frontier-stack.mdc](./frontier-stack.mdc) — Default animation/3D/rendering stack, decision matrix, json-render for generative UI
-> - [dashboard-design.mdc](./dashboard-design.mdc) — Dashboard design system (14px base, stat cards, charts, sidebar, empty states, 6-rule cheatsheet)
-> - [interface-micro-polish.mdc](./interface-micro-polish.mdc) — Dark 1px card shadow, image outlines, icon animation, staggered enters, softer exits
+> See [taste-skills-index.mdc](./taste-skills-index.mdc) for the full selection guide.
 
-## Custom Preset Rule (MANDATORY — Enforced Before All Other Rules)
+## Variance Baseline
 
-**Every custom preset MUST populate ALL 33 token categories and ALL ~519 fields.**
+These dials drive all downstream decisions. Adjust per-prompt when the user specifies a different mood.
 
-- The canonical template is `packages/presets/src/_template.ts`.
-- When creating a custom preset: copy `_template.ts` or spread it as a base. Change values, never delete fields.
-- No partial presets. If a field exists in `_template.ts`, it must exist in your preset.
-- The 33 required categories: `colors`, `typography`, `spacing`, `layout`, `sigil`, `radius`, `shadows`, `motion`, `borders`, `buttons`, `cards`, `headings`, `navigation`, `backgrounds`, `code`, `inputs`, `cursor`, `scrollbar`, `alignment`, `sections`, `dividers`, `gridVisuals`, `focus`, `overlays`, `dataViz`, `media`, `controls`, `componentSurfaces`, `hero`, `cta`, `footer`, `banner`, `pageRhythm`.
-- Read `skills/sigil-preset/SKILL.md` before creating any preset.
+| Dial | Default | Range | What It Controls |
+|------|:-------:|-------|-----------------|
+| DESIGN_VARIANCE | 8 | 1-10 | Layout asymmetry, grid complexity, whitespace distribution |
+| MOTION_INTENSITY | 6 | 1-10 | Animation density, spring physics, scroll effects |
+| VISUAL_DENSITY | 4 | 1-10 | Spacing tightness, card usage, data presentation |
 
-## Color Rules
+Interpret user requests dynamically: "make it airy" → VISUAL_DENSITY 2; "dashboard" → VISUAL_DENSITY 7-8; "cinematic" → MOTION_INTENSITY 8-9.
 
-- OKLCH for all authored palettes. Use `oklch(L C H)` — L=lightness (0-1), C=chroma (0-0.37), H=hue (0-360).
-- At most 3 active colors plus neutrals per preset.
-- Rich Black (oklch ~0.08) for dark mode page backgrounds, never pure #000000.
-- Five text hierarchy levels: `--s-text`, `--s-text-secondary`, `--s-text-muted`, `--s-text-subtle`, `--s-text-disabled`. Always use the right level.
-- Four border levels: `--s-border`, `--s-border-muted`, `--s-border-strong`, `--s-border-interactive`.
-- BANNED: Hardcoded hex colors in components. All colors must reference `var(--s-*)` tokens.
-- BANNED: Gradients with no material logic. Every gradient must have a reason (glow, light, depth, brand).
+## Banned Visual Patterns (Hard Failures)
 
-## Contrast Rules (WCAG AA)
+These patterns are the hallmark of generic AI output. Never produce them.
 
-All presets MUST pass WCAG 2.0 AA contrast requirements. Run `pnpm audit:contrast` before shipping any preset change.
+### Layout
+- **Centered hero + blur blobs** when DESIGN_VARIANCE > 4. Use split-screen, left-aligned, or asymmetric whitespace.
+- **3 equal cards in a row** for feature sections. Use 2-column zig-zag, asymmetric bento, or horizontal scroll.
+- **`h-screen`** for full-height sections. Always use `min-h-[100dvh]`.
+- **Flexbox percentage math** (`w-[calc(33%-1rem)]`). Use CSS Grid.
+- **Complex layouts without mobile fallback.** Levels 4-10 variance MUST collapse to single-column below `md:`.
 
-| Pair | Minimum Ratio | WCAG Category |
-|------|:---:|---|
-| Normal text on background/surface | 4.5:1 | AA normal text |
-| Large text (>= 18pt) on background | 3:1 | AA large text |
-| UI components (borders, icons, form controls) on background | 3:1 | AA UI components |
-| Button text (`primary-contrast`) on `primary` | 4.5:1 | AA normal text |
-| Status colors (success/warning/error/info) on background | 3:1 | AA UI components |
+### Color & Surface
+- **"AI Purple/Blue" aesthetic.** No purple button glows, no neon gradients. Use the active preset's `--s-primary`.
+- **Pure `#000000`** for backgrounds or text. Sigil uses rich black via `var(--s-background)`.
+- **Oversaturated accents.** Desaturate to blend with the preset's neutral scale.
+- **Gradients with no material logic.** Every gradient needs a reason: glow, light source, depth, brand.
+- **Glassmorphism on white** without functional justification.
+- **Neon/outer glows** via default `box-shadow`. Use inner borders or tinted `var(--s-shadow-*)` tokens.
+- **Excessive gradient text** on large headers.
 
-Rules:
-- `text-muted` on `background` must have >= 4.5:1 contrast ratio in BOTH light and dark modes.
-- `text-subtle` is decorative/large text — >= 3:1 minimum.
-- `border` and `border-strong` on `background` must have >= 3:1 for visibility.
-- When `primary` is light (L > 0.55 in OKLCH), `primary-contrast` MUST be black (`oklch(0 0 0)` or `#000000`).
-- When `primary` is dark (L <= 0.55), `primary-contrast` MUST be white (`oklch(1 0 0)` or `#ffffff`).
-- Never assume white text on colored backgrounds — always check the contrast ratio.
-- The audit script checks 30 color pairs per preset across both modes (930 checks total).
+### Typography
+- **Inter, Roboto, Open Sans** as primary typeface for a new visual language. Sigil uses the PP Pangram collection or preset-specific stacks.
+- **Oversized H1s** that scream instead of communicating hierarchy. Control with weight and color via `var(--s-heading-*)` tokens.
+- **Serif fonts on dashboards/software UI.** Serif is for editorial/creative presets only.
+- **Too many font families.** Max: the triad (display + body + mono).
 
-## Typography Rules
+### Content (The "Jane Doe" Effect)
+- **Generic names:** "John Doe", "Jane Smith", "Sarah Chan", "Acme Corp" → invent realistic, contextual names.
+- **Generic avatars:** No SVG egg icons or Lucide user placeholders → use styled initials or specific photo placeholders.
+- **Fake round numbers:** `99.99%`, `50%`, `1234567` → use organic data (`47.2%`, `+1 (312) 847-1928`).
+- **Startup slop names:** "Nexus", "SmartFlow", "SynergyAI" → invent premium, contextual brand names.
+- **AI copywriting clichés:** "Elevate", "Seamless", "Unleash", "Next-Gen", "Game-changer", "Delve" → concrete verbs only.
+- **Lorem ipsum** in any visible UI.
+- **Emojis** in code, markup, headings, or alt text. Use Phosphor or Radix icons.
 
-- Font triad: display face for headlines only, body face for everything else, mono for code/labels/data.
-- Do not let all three compete equally in a single view.
-- `text-wrap: balance` on all short headings and marketing copy.
-- `-webkit-font-smoothing: antialiased` is set globally — never override to `auto`.
+### External Resources
+- **Unsplash links.** Use `https://picsum.photos/seed/{context}/W/H` or SVG placeholders.
+- **Generic Lucide/Feather/Heroicons.** Use `@phosphor-icons/react` (Bold/Fill weights) or `@radix-ui/react-icons`.
+- **Default shadcn/ui** without customization. All shadcn components MUST be restyled to match the active Sigil preset.
+
+## Required UI States
+
+LLMs default to the happy path. Every interactive component MUST include:
+
+| State | Implementation |
+|-------|---------------|
+| Loading | Skeletal loaders matching layout dimensions — no generic spinners |
+| Empty | Composed empty state explaining how to populate data |
+| Error | Clear inline error reporting with `var(--s-error)` color |
+| Active/Pressed | `-translate-y-[1px]` or `scale-[0.98]` for tactile feedback |
+| Hover | Meaningful state change — not just opacity shift |
+
+## Creative Proactivity
+
+When MOTION_INTENSITY > 5, actively implement:
+
+- **Spring physics** for all interactive elements: `type: "spring", stiffness: 100, damping: 20`. No linear easing.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
