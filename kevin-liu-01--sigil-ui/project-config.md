@@ -1,106 +1,103 @@
 ---
 trigger: always_on
-description: > Imported from Kevin's wiki (`wiki/design/interface-micro-polish.md`).
+description: > Read this before writing any code in a Sigil project.
 ---
 
-# Interface Micro-Polish
+# Sigil UI — Agent Instructions
 
-> Imported from Kevin's wiki (`wiki/design/interface-micro-polish.md`).
-> Great interfaces improve because lots of tiny choices stop being wrong at the same time.
+> Read this before writing any code in a Sigil project.
 
-## Text Wrapping
+## The #1 Rule
 
-- `text-wrap: balance` for short headings, badges, marketing copy. Reduces orphaned words.
-- `text-wrap: pretty` for longer prose only when browser cost is acceptable.
-- Manual line breaks for hero headlines when composition matters most.
+**Edit the token spec. Not the components.**
 
-## Concentric Border Radius
+Sigil is a token-driven design system. Every visual property — colors, fonts, spacing, radius, shadows, motion, borders — flows from a central token spec through CSS custom properties into components. When you need to change how something looks, you change the tokens. The components update automatically.
 
-Nested surfaces must be mathematically related: **outer radius = inner radius + padding**.
+```
+WRONG — manually editing component styling:
+  open Button.tsx → find bg-indigo-600 → change to bg-emerald-600
+  open Card.tsx → find rounded-lg → change to rounded-none
+  open Input.tsx → find border-gray-300 → change to border-gray-500
+  (repeat for every component, miss some, drift, inconsistency)
 
-Example: outer 20px, padding 8px, inner 12px. Define radius pairs as tokens when nesting happens often. Check: cards with headers, inset panels, grouped buttons, avatars in frames.
-
-## Crispy Text Rendering
-
-Apply `antialiased` globally at the layout level (`<body className="font-sans antialiased">`). Do not use as a bandage for wrong font weight.
-
-## Tabular Numbers
-
-Any changing or comparative numeric UI: `font-variant-numeric: tabular-nums` (Tailwind: `tabular-nums`). Apply to counters, timers, KPIs, dashboard metrics, prices, dates that update. Prevents twitching when digits change.
-
-## Optical Alignment
-
-Pure geometry often looks wrong. Adjust icon padding slightly when needed. Fix the SVG itself when possible instead of stacking utility margins. Treat visual center as a perception problem, not box-model.
-
-## Shadows Instead of Borders
-
-When you want depth, subtle layered shadows beat hard borders:
-
-```css
-box-shadow:
-  0 0 0 1px rgb(0 0 0 / 0.06),
-  0 1px 2px -1px rgb(0 0 0 / 0.06),
-  0 2px 4px 0 rgb(0 0 0 / 0.04);
+RIGHT — editing the central token spec:
+ change --s-primary → every primary-colored element updates (buttons, links, focus rings, badges, gradients)
+ change --s-radius-md → every medium-radius element updates (cards, inputs, dropdowns, tooltips)
+ run "sigil preset anvil" → the ENTIRE visual identity changes in one command
 ```
 
-Transition `box-shadow` only on small components. Brutalist designs may still prefer borders.
+This is the fundamental insight. Agents that understand this build 10x faster because one token edit replaces dozens of component edits.
 
-## Dark UI Card Shadows (The 1px Rule)
+## How It Works
 
-The difference between good dark UI and great dark UI:
-
-```css
-box-shadow:
-  inset 0 1px 0 0 rgba(255, 255, 255, 0.02),  /* top edge catch-light */
-  0 0px 0 0 rgba(0, 0, 0, 0.25);               /* grounding shadow */
+```
+DESIGN.md (human/agent-editable markdown — all 33 categories, 519 tokens)
+ ↓ parseDesignMarkdown() / sigil design compile
+SigilTokens (TypeScript object, 519 configurable fields)
+ ↓ compileToCss() / compileToTailwind() / compileToW3CJson()
+CSS custom properties (--s-primary, --s-radius-md, --s-duration-fast, ...)
+Tailwind v4 @theme block
+W3C Design Tokens JSON
+ ↓ consumed by
+350+ Components (read var(--s-*), never hardcode values)
 ```
 
-- **Inner shadow:** white at 2% opacity, Y offset 1px, inset. Simulates light hitting the top edge. Invisible at a glance, but the card reads as physical.
-- **Drop shadow:** black at 25% opacity, Y offset 0px. Grounds the card symmetrically.
+Legacy path (still supported): `sigil.tokens.md` → `parseMarkdownTokens()` → 8 core groups.
 
-Apply to every card, panel, and elevated surface in dark mode. Safe to keep in both themes (invisible on light backgrounds).
+To change the visual output, edit the top of this chain — not the bottom.
 
-## Image and Media Outlines
+## Quick Reference: What to Edit for Common Tasks
 
-Low-opacity edge so media sits confidently:
+| Task | What to edit | Do NOT edit |
+|------|-------------|-------------|
+| Change primary color | Token CSS: `--s-primary: oklch(...)` | Component files |
+| Change fonts | Token CSS: `--s-font-display: "NewFont", ...` | Component files |
+| Change all border radius | Token CSS: `--s-radius-md: 12px` | Component files |
+| Change animation speed | Token CSS: `--s-duration-fast: 200ms` | Component files |
+| Change card hover effect | Preset: `cards.hover-effect: "glow"` | Card component file |
+| Change button press scale | Preset: `buttons.active-scale: "0.95"` | Button component file |
+| Change background pattern | Preset: `backgrounds.pattern: "dots"` | Layout files |
+| Change hero padding/layout | Token CSS: `--s-hero-padding-y: 120px` | Hero component files |
+| Change CTA layout | Token CSS: `--s-cta-layout: "split"` | CTA component files |
+| Change footer structure | Token CSS: `--s-footer-columns: 3` | Footer component files |
+| Change page density | Preset: `pageRhythm.density: "editorial"` | Section/layout files |
+| Complete visual overhaul | `npx @sigil-ui/cli preset <name>` | Any component files |
+| Targeted brand update | Edit `sigil.tokens.md` or token CSS | Scattered Tailwind classes |
 
-```css
-outline: 1px solid rgb(0 0 0 / 0.1);
-outline-offset: -1px;
+## Repository Structure
+
 ```
+packages/
+  tokens/           @sigil-ui/tokens     — Source of truth: types, defaults, compiler, markdown parser
+  presets/           @sigil-ui/presets    — 46 curated preset bundles (44 named + default + template, 519 tokens each)
+  components/        @sigil-ui/components — 350+ token-driven React components (read from tokens, don't hardcode)
+  primitives/        @sigil-ui/primitives — 40+ headless behavior primitives (Radix UI + Base UI)
+  cli/               @sigil-ui/cli       — CLI: init, add, preset, diff, doctor
+  create-sigil-app/                      — npx create-sigil-app bootstrapper
 
-Invert for dark mode. Apply to screenshots, product images, video frames, avatars on noisy backgrounds.
+apps/
+  web/               Product site + docs + sandbox (Fumadocs at /docs, drag-and-drop component canvas, live preset switching)
+  demos/             17 demos: 10 templates + 7 showcase clones (ai-saas, dashboard, portfolio, ecommerce, blog, agency, cli-tool, startup, dev-docs, playground, vercel-clone, linear-clone, vite-clone, viteplus-clone, dedalus-clone, oxide-clone, voidzero-clone)
 
-## Contextual Icon Animation
+style/               Design language and engineering philosophy (from Dedalus)
+  design.md          Design & animation guide: when to animate, speed, seven rules, enter/exit
+  ux-principles.md   Product UX rules: 100ms budget, three-click nav, visual design, interaction
+  style.md           Engineering philosophy: code quality, YAGNI, hard limits, React/TS rules
 
-When icons swap based on state (copy/check, mute/unmute, open/close), animate with opacity, scale, and slight blur. Keep amplitude small. Responsive, not theatrical.
+skills/              Agent skills for specific workflows
+  sigil-tokens/      Edit/extend tokens
+  sigil-preset/      Create/modify presets
+  sigil-component/   Create/modify components
+  sigil-layout/      Page layout with grid system
+  sigil-playbook/    Page composition (10 rules from Reticle design language)
+  sigil-migration/   Migrate from shadcn/ui
+  sigil-polish/      Interface polish: typography, surfaces, animations, performance (5 files)
+  sigil-design/      Generate, parse, and compile DESIGN.md
+  sigil-messaging/   Canonical positioning, copy, stats, naming, tone
+  sigil-audit/       Browser/static audits (scripts/audit-*.mjs against `next start`)
+  sigil-scene/       Scene file authoring convention (*.scene.tsx for animated blocks)
 
-## Interruptible Animations
-
-- **Transitions** for interactive state changes (dropdowns, popovers, drawers, toggles, hover) — they retarget cleanly.
-- **Keyframes** for staged one-shot sequences and decorative choreography.
-
-If a user reverses direction midway and the old animation keeps playing, it feels broken.
-
-## Staggered Enters
-
-Split large groups into semantic chunks. Stagger title, description, buttons. 60-100ms between sections. Tighter stagger for words than containers. Keep blur small and short-lived.
-
-## Softer Exits
-
-Exits have reduced travel distance compared to enters. Keep directional hint but soften it. Enter may use `calc(-100% - 4px)`; exit may use `-12px`. Asymmetry makes the interface feel calmer.
-
-## Quick Checklist
-
-- [ ] Headings use balanced wrapping
-- [ ] Numbers that update are tabular
-- [ ] Nested radii are concentric
-- [ ] Icons are optically aligned
-- [ ] Images have subtle edges when needed
-- [ ] Interactive animations can be interrupted
-- [ ] Enters are chunked and staggered
-- [ ] Exits are softer than enters
-- [ ] Dark mode cards have 1px inner shadow (white 2%) + drop shadow (black 25%)
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Kevin-Liu-01/Sigil-UI](https://github.com/Kevin-Liu-01/Sigil-UI) — distributed by [TomeVault](https://tomevault.io).
