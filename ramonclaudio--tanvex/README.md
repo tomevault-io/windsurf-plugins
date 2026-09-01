@@ -7,11 +7,11 @@ TanStack Start starter built with Convex, Better Auth, Tailwind v4 + shadcn/ui.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ramonclaudio/tanvex](https://github.com/ramonclaudio/tanvex).
+Original source: `AGENTS.md` in [ramonclaudio/tanvex](https://github.com/ramonclaudio/tanvex).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
