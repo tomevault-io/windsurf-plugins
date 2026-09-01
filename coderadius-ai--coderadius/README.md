@@ -7,11 +7,11 @@ Prevent cross-repo architectural breakage before merge. Architecture knowledge g
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [coderadius-ai/coderadius](https://github.com/coderadius-ai/coderadius).
+Original source: `AGENTS.md` in [coderadius-ai/coderadius](https://github.com/coderadius-ai/coderadius).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
