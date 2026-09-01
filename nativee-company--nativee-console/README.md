@@ -7,11 +7,11 @@ The developer console for managing projects, API keys, usage, analytics, billing
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Nativee-Company/nativee-console](https://github.com/Nativee-Company/nativee-console).
+Original source: `AGENTS.md` in [Nativee-Company/nativee-console](https://github.com/Nativee-Company/nativee-console).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
