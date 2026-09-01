@@ -7,11 +7,11 @@ Self-hosted dashboard that unifies 3D printers (Klipper, Marlin, Bambu Lab, Eleg
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [charlymigenes-ux/nopal](https://github.com/charlymigenes-ux/nopal).
+Original source: `AGENTS.md` in [charlymigenes-ux/nopal](https://github.com/charlymigenes-ux/nopal).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
