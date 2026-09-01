@@ -7,11 +7,11 @@ AI agent framework with Jupyter sandbox, data analysis, MCP tools, ACP protocol,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Raccoon-Office/Box-Agent](https://github.com/Raccoon-Office/Box-Agent).
+Original source: `CLAUDE.md` in [Raccoon-Office/Box-Agent](https://github.com/Raccoon-Office/Box-Agent).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
