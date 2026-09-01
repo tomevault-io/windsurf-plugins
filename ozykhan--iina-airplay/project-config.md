@@ -1,0 +1,96 @@
+---
+trigger: always_on
+description: A plugin that gets the file IINA is playing onto an Apple TV. Shipping: the
+---
+
+# IINA AirPlay plugin
+
+A plugin that gets the file IINA is playing onto an Apple TV. Shipping: the
+plugin (`plugin/`), the Go helper (`helper/`) and the packaging chain are all
+built, and `v0.2.0` is published and installs through IINA by repo slug. The
+throwaway prototype under `prototype/` is kept as the record of what de-risked
+the design, not as live code.
+
+## The shape of the thing
+
+IINA cannot AirPlay its own video output and never will be able to from a plugin:
+it renders through mpv into a Metal/OpenGL layer, and macOS only exposes AirPlay
+video sending through AVFoundation's external-playback path. So this plugin does a
+**handoff**, not a mirror: package the file into something an Apple TV accepts,
+serve it on the LAN, hand the URL to the TV, and leave IINA as the remote control.
+
+Read `docs/feasibility.md` before proposing architecture changes. It has the full
+reasoning and the source citations.
+
+## Facts already established — do not re-research these
+
+From reading the IINA source (`github.com/iina/iina`) and Apple's docs:
+
+- **The plugin API is JavaScript in a JSContext.** No native code loading, no
+  render pipeline access. Modules: `core`, `mpv`, `event`, `menu`, `overlay`,
+  `sidebar`, `standaloneWindow`, `playlist`, `input`, `http` (client only),
+  `ws` (a WebSocket *server*, not HTTP), `file`, `utils`, `preferences`.
+- **`utils.exec` runs arbitrary binaries** — absolute paths, or paths under
+  `@data/` and `@tmp/`. IINA `chmod 755`s anything it runs out of its own data
+  directory. Gated on the `file-system` permission in `Info.json`.
+- **`utils.exec` replaces the process environment.** It sets only `LC_ALL`, so
+  `PATH` is empty in anything you spawn. Every helper must rebuild `PATH` itself.
+  This bites silently — the symptom is "command not found" for a binary that is
+  obviously installed.
+- **A binary without `/` in its name is only looked up in IINA's own bundled
+  binaries directory**, not your `PATH`. Always pass an absolute or `@data/` path.
+- **IINA is not App Sandboxed.** `IINA.entitlements` carries only
+  `allow-unsigned-executable-memory` and `disable-library-validation`. A spawned
+  helper can bind a port and talk to the LAN.
+- **`NSAllowsArbitraryLoadsInWebContent` is set** in IINA's `Info.plist`, so plain
+  HTTP loads fine inside plugin WebViews. The whole WKWebView approach depends on
+  this.
+- **`standaloneWindow` is a `WKWebView`** built with a default
+  `WKWebViewConfiguration`, where `allowsAirPlayForMediaPlayback` defaults to
+  `true`. `loadFile(path)` is relative to the plugin root and **clears message
+  listeners**, so register `onMessage` handlers *after* calling it. Inside the page
+  the bridge is `iina.postMessage(name, data)` / `iina.onMessage(name, cb)`.
+- **The Apple TV pulls the stream itself.** Serve on `0.0.0.0` and advertise the
+  Mac's LAN IP; `127.0.0.1` will not work.
+- **Apple TV 4K accepts** H.264 and HEVC (Main / Main 10) in MP4/M4V/MOV/HLS,
+  Dolby Vision Profile 5, HDR10 / HDR10+ / HLG; audio AAC, AC-3, E-AC-3, Atmos,
+  ALAC, FLAC. Not MKV, not DTS/DTS-HD, not TrueHD, not PGS subtitles.
+- **IINA does not bundle an `ffmpeg` CLI**, only the `libav*` dylibs.
+- **Install and update are two different mechanisms**, and satisfying one does
+  not satisfy the other. Installing by slug reads
+  `api.github.com/repos/<ghRepo>/releases/latest` and takes the first asset
+  ending `.iinaplgz`. The update check reads
+  `raw.githubusercontent.com/<ghRepo>/master/Info.json` — the **repository root
+  of `master`**, never the release — and compares its `ghVersion` against **the
+  installed package's own**; only then does it fetch the asset. So the shipped
+  `.iinaplgz` and `master` must carry the same number, and the bump is merged to
+  `master` **last**, after the release is published — otherwise the beacon
+  advertises a version whose asset is not up yet and the update hands out the
+  previous release. This is why `Info.json` lives at the repo root and
+  `packaging/pack.sh` copies it into the package. IINA 1.4.4 folds a failed
+  fetch and "no newer version" into one branch (`JavascriptPlugin.swift`,
+  `checkForUpdates`), so a 404 there surfaces as **"No update found."** with no
+  error — `v0.2.0` shipped perfectly and still reached nobody. Bumping
+  `ghVersion` is necessary but not sufficient. The beacon is *branch state*, so
+  a manifest fix reaches existing users on a plain push to `master`, with no new
+  tag or rebuild. `plugin/Info.json` is a gitignored `make dev` symlink so IINA
+  can load the plugin directory — never commit it: `raw.githubusercontent.com`
+  serves a symlink's target path as text, not JSON. Full reasoning in
+  `docs/releasing.md`.
+
+## The design is settled — all prototype tests passed (2026-08-29, user-confirmed)
+
+WebKit's AirPlay picker works in the plugin's `standaloneWindow` **and** in the
+plugin's sidebar webview, and the packaged stream played on the user's TV both
+ways. So the real plugin is **JS + ffmpeg + a small HTTP server, no native code,
+and no extra window**: the cast UI lives in a sidebar tab (Info.json
+`"sidebarTab"`) with a hidden 1×1 px `<video>` and a button calling
+`webkitShowPlaybackTargetPicker()` — the picker requires a user gesture inside
+web content, so a native menu item cannot summon it directly.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ozykhan/iina-airplay](https://github.com/ozykhan/iina-airplay) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-01 -->
