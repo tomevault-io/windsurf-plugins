@@ -7,11 +7,11 @@ CAPI E2E testing framework — currently transitioning from CAPZ E2E to multi-pr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [stolostron/capi-tests](https://github.com/stolostron/capi-tests).
+Original source: `CLAUDE.md` in [stolostron/capi-tests](https://github.com/stolostron/capi-tests).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
