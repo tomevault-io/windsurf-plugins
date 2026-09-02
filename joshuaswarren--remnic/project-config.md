@@ -1,102 +1,74 @@
 ---
 trigger: always_on
-description: Remnic is a multi-platform memory system. Keep these boundaries intact on every change:
+description: Conventions and patterns used throughout the Remnic codebase. The repo is a pnpm + Turborepo workspace; the memory engine lives in `packages/remnic-core/`.
 ---
 
-# Remnic - Agent Guide
+# Development Conventions
 
-## Architecture Boundaries (Non-Negotiable)
+Conventions and patterns used throughout the Remnic codebase. The repo is a pnpm + Turborepo workspace; the memory engine lives in `packages/remnic-core/`.
 
-Remnic is a multi-platform memory system. Keep these boundaries intact on every change:
+## TypeScript
 
-1. `@remnic/core`, `@remnic/server`, and `@remnic/cli` own Remnic's core behavior.
-   Core memory semantics, storage, retrieval, extraction, governance, and standalone operation must live there.
-2. Core and standalone paths must not depend on OpenClaw, Hermes, or any future host.
-   Host integrations may consume core. Core must not reach back into host SDKs, config shapes, or runtime lifecycles.
-3. Platform-specific behavior belongs in platform adapters only.
-   OpenClaw-specific code belongs in `packages/plugin-openclaw` plus the current root `src/` compatibility wiring that still hosts OpenClaw runtime entrypoints today. Hermes-specific code belongs in `packages/plugin-hermes`. Keep host logic thin and translation-focused.
-4. Do not reinvent host-native features.
-   If OpenClaw, Hermes, or another platform already provides a runtime capability, plugin hook, command surface, or extension primitive, use that real upstream contract instead of recreating a parallel Remnic abstraction.
-5. Verify host behavior against current upstream source and docs before implementing it.
-   Issue text, old local docs, or remembered APIs are not enough for host-facing work.
+- **Strict mode** — `tsconfig.json` has `"strict": true`. All code must pass `tsc --noEmit` without errors.
+- **ESM only** — the package is `"type": "module"`. Use `import`/`export`; no `require()`.
+- **Explicit return types** — all exported functions must have explicit return type annotations.
+- **No `any`** — use `unknown` and narrow, or define a proper interface.
+- **Optional fields** — when building Zod schemas for the OpenAI Responses API, use `.optional().nullable()`, not just `.optional()`.
 
-## Upstream References
+## OpenAI Usage
 
-Use these as the canonical starting points for adapter work:
+- **Always use the Responses API** — never Chat Completions. See `packages/remnic-core/src/extraction.ts` for the pattern.
+- **Structured outputs** — use `zodTextFormat()` to get typed responses.
+- **Model references** — never hard-code model names; use `packages/remnic-core/src/model-registry.ts`.
+- **Token logging** — log total tokens and latency; never log user prompt content.
 
-- OpenClaw repository: <https://github.com/openclaw/openclaw>
-- OpenClaw plugin docs: <https://github.com/openclaw/openclaw/tree/main/docs/plugins>
-- OpenClaw SDK overview: <https://github.com/openclaw/openclaw/blob/main/docs/plugins/sdk-overview.md>
-- OpenClaw SDK entrypoints: <https://github.com/openclaw/openclaw/blob/main/docs/plugins/sdk-entrypoints.md>
-- Hermes Agent repository: <https://github.com/NousResearch/hermes-agent>
-- Hermes Agent docs/site: <https://hermes-agent.nousresearch.com>
+## File Organization
 
-## Adapter Implementation Rules
+- One logical unit per file where practical.
+- `packages/remnic-core/src/types.ts` is the single source of truth for shared interfaces (`PluginConfig`).
+- `packages/remnic-core/src/config.ts` owns all config parsing and defaults.
+- New subsystems must register their config properties in `openclaw.plugin.json:configSchema`.
 
-- Start from the host's current upstream contracts, then adapt Remnic core into them.
-- Reuse upstream platform primitives when they exist; only add Remnic-owned glue where the host does not already solve the problem.
-- Keep standalone and shared-core behavior testable without booting OpenClaw, Hermes, or another host.
-- If a change touches both core semantics and a host adapter, land the core contract first and make the adapter consume it second.
+## Memory Storage
 
-## Cleaner PR Workflow (Mandatory)
+- All memory files use markdown + YAML frontmatter.
+- IDs follow the format `{category}-{timestamp}-{4-char-random}`.
+- Status field must be one of: `active`, `superseded`, `expired`, `archived`.
+- Paths that contain user data (`facts/`, `entities/`, `profile.md`, etc.) must never be committed to git.
 
-These rules are the default workflow for all agents and contributors.
+## Testing
 
-1. Keep PR scope narrow.
-   - One subsystem group per PR whenever possible.
-   - If work spans multiple groups, split it before review. The default split for memory-heavy work is:
-     - schema/surface contract changes
-     - storage/serialization/cache changes
-     - retrieval/planner/freshness behavior changes
+- Tests live in `tests/` and use Node.js's built-in `node:test` runner.
+- Run with `npm test`, which builds `@remnic/core` and then runs the root `node:test` suite via `scripts/run-root-tests.mjs`. Individual packages carry their own tests too.
+- All tests must be deterministic — no network calls, no filesystem writes to real paths.
+- Use `tests/transfer-fixtures.ts` patterns for shared test data.
+- New subsystems require tests for: happy path, zero/empty input, and boundary conditions.
 
-2. Sync with `main` before the first serious review cycle.
-   - Rebase or merge `main` before requesting AI review.
-   - Do not let a PR drift for multiple review rounds and then merge `main` halfway through unless forced by a conflict.
+## Commit Style
 
-3. Batch review fixes by subsystem.
-   - Re-scan unresolved comments, fix the whole subsystem, run verification once, then push once.
-   - Avoid serial micro-pushes that only expose the next adjacent invariant.
+- Follow Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`.
+- Reference relevant invariant numbers from `AGENTS.md` when fixing guardrail violations.
+- Never commit personal data, API keys, or memory content (see `CLAUDE.md`).
 
-4. Run the local hardening gate before claiming review-clean.
-   - Always run `npm run preflight:quick`.
-   - If you touch `src/` or `packages/remnic-core/src/` `orchestrator.ts`, `storage.ts`, `intent.ts`, `memory-cache.ts`, `entity-retrieval.ts`, or `config.ts`, also run `npm run test:entity-hardening`.
-   - If Cursor CLI is available, run `npm run review:cursor` before requesting external AI review.
+## Adding a New Config Property
 
-5. Treat external AI review as stale unless it matches the current head.
-   - Do not call a PR clean if the latest positive AI verdict targets an older commit.
-   - A merge-ready PR needs green checks, zero unresolved review threads, and a fresh positive AI verdict on the current head.
+1. Add the property to `PluginConfig` in `packages/remnic-core/src/types.ts`, with its default in `packages/remnic-core/src/config.ts`.
+2. Add to `openclaw.plugin.json:configSchema` with type and description.
+3. Run `npm run check-config-contract` to verify alignment.
+4. Document in `docs/config-reference.md`.
 
-Reference workflow:
-`docs/ops/pr-review-hardening-playbook.md`
+## Scripts
 
-## Why Stateful PRs Churn (Read Before Touching Lifecycle Logic)
-
-PRs in retrieval, session identity, compaction, cache, or reset/end-of-session code
-often attract many review rounds for the same structural reason:
-
-1. The subsystem is stateful across multiple entrypoints.
-   - A local fix in one hook can break `before_reset`, `session_end`, compaction,
-     sparse metadata handling, remembered bindings, provider rebinding, or restart recovery.
-2. Reviewers probe different slices of the same state machine.
-   - One reviewer may catch provider detection drift.
-   - Another may catch lifecycle drain gaps.
-   - Another may catch stale-cache or replay behavior.
-   These are usually adjacent invariant misses, not unrelated bugs.
-3. Comment-by-comment patching makes churn worse.
-   - If you only fix the literal review comment, the next review round often finds
-     the neighboring invariant you did not model yet.
-
-Required response:
-
-1. Stop and model the full contract first.
-2. Write the scenario matrix before changing code.
-3. Patch the subsystem coherently once.
-4. Add tests for the failure class, not just the reported instance.
-5. Run the hardening gate before asking for another review.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| Script | Purpose |
+|--------|---------|
+| `npm run build` | Build `@remnic/core`, sync the OpenClaw plugin manifest, then bundle the root plugin with `tsup` |
+| `npm run check-types` | Type-check with `tsc --noEmit` (plus each package's own `check-types`) |
+| `npm run lint` | Lint with Biome (`biome check`) |
+| `npm test` | Build core, then run the root test suite |
+| `npm run preflight` | Full pre-PR gate (`scripts/pr-preflight.sh full`) |
+| `npm run preflight:quick` | Fast pre-PR gate (`scripts/pr-preflight.sh quick`) |
+| `npm run check-config-contract` | Verify config types match the plugin manifest schema |
 
 ---
 > Source: [joshuaswarren/remnic](https://github.com/joshuaswarren/remnic) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
