@@ -7,11 +7,11 @@ DeepSeek Harness plugin store, marketplace and hub — 11,000+ dsh plugins with 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [imsai-sh/dsh-1024store](https://github.com/imsai-sh/dsh-1024store).
+Original source: `AGENTS.md` in [imsai-sh/dsh-1024store](https://github.com/imsai-sh/dsh-1024store).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
