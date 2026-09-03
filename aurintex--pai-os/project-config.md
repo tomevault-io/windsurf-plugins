@@ -1,75 +1,61 @@
 ---
 trigger: always_on
-description: Guidelines for continuously improving Cursor rules based on emerging code patterns and best practices.
+description: > **Start here**: This file serves as the primary index for AI agents (Cursor, Windsurf, Copilot) to understand the paiOS project structure, conventions, and active tasks.
 ---
 
+# AI Agent Context Map
 
-- **Rule Improvement Triggers:**
-  - New code patterns not covered by existing rules
-  - Repeated similar implementations across files
-  - Common error patterns that could be prevented
-  - New libraries or tools being used consistently
-  - Emerging best practices in the codebase
+> **Start here**: This file serves as the primary index for AI agents (Cursor, Windsurf, Copilot) to understand the paiOS project structure, conventions, and active tasks.
 
-- **Analysis Process:**
-  - Compare new code with existing rules
-  - Identify patterns that should be standardized
-  - Look for references to external documentation
-  - Check for consistent error handling patterns
-  - Monitor test patterns and coverage
+## 1. Project Identity
+**paiOS** is an open-source operating system for Personal AI Hardware (paiBox, paiScribe).
+- **Core Principle**: Privacy-first, local-only inference.
+- **Architecture**: Hexagonal, Monorepo, Rust-based Engine.
 
-- **Rule Updates:**
-  - **Add New Rules When:**
-    - A new technology/pattern is used in 3+ files
-    - Common bugs could be prevented by a rule
-    - Code reviews repeatedly mention the same feedback
-    - New security or performance patterns emerge
+## 2. Critical Context Files
+Before writing code, **always** check these files for the latest standards:
 
-  - **Modify Existing Rules When:**
-    - Better examples exist in the codebase
-    - Additional edge cases are discovered
-    - Related rules have been updated
-    - Implementation details have changed
+| Topic | Source of Truth |
+|-------|-----------------|
+| **Architecture** | `docs/src/content/docs/architecture/adr/index.mdx` (ADRs) |
+| **Workspace & Build** | `docs/src/content/docs/architecture/workspace-and-build.mdx` (engine/ layout, feature flags, crates) |
+| **Coding Style** | `docs/src/content/docs/guides/contributing/standards.mdx` |
+| **Rust Style & Best Practices** | `docs/src/content/docs/guides/contributing/rust-style.mdx` (stack vs heap, generics vs `Box<dyn Trait>`, embedded) |
+| **Workflow** | `docs/src/content/docs/guides/contributing/workflow.mdx` |
+| **Glossary** | `docs/src/content/docs/glossary.mdx` (link here when using defined terms) |
+| **Task Status** | `.taskmaster/tasks/tasks.json` (via `task-master` CLI) |
 
-- **Example Pattern Recognition:**
-  ```typescript
-  // If you see repeated patterns like:
-  const data = await prisma.user.findMany({
-    select: { id: true, email: true },
-    where: { status: 'ACTIVE' }
-  });
-  
-  // Consider adding to [prisma.mdc](mdc:.cursor/rules/prisma.mdc):
-  // - Standard select fields
-  // - Common where conditions
-  // - Performance optimization patterns
-  ```
+## 3. Tool Usage Rules
+- **Search first**: Use `grep` / `glob` to find existing patterns before inventing new ones.
+- **No hallucinations**: If you need a library, check `Cargo.toml` or `package.json` first.
+- **Tests**: All new features require unit tests. Run `cargo test` (Rust) or `npm test` (JS/TS).
+- **GitHub issues**: When creating issues (e.g. via MCP or CLI), use **Conventional Commits** for the title: `type(scope): short description` (e.g. `feat(common): add config format detection`). See [Workflow](docs/src/content/docs/guides/contributing/workflow.mdx) for types, scope, and branch naming.
+- **Documentation**: When editing docs, link to the [Glossary](docs/src/content/docs/glossary.mdx) for terms that have an entry (e.g. IPC, gRPC, HITL, UDS). Use `[Term](/glossary/#letter)`.
+- **Rust code**: When writing or reviewing Rust in `engine/`, follow [Rust Style and Best Practices](docs/src/content/docs/guides/contributing/rust-style.mdx) (stack vs heap, generics vs `Box<dyn Trait>`, formatting).
+- **Rust formatting (CI parity)**: Before you commit or open a PR for Rust changes, run the same check as CI from the repo root: `cd engine && cargo fmt --all -- --check`. If it fails, run `cargo fmt --all` in `engine/` and re-check. Optional: install [pre-commit](https://pre-commit.com/) and run `pre-commit install` once so commits are blocked locally when fmt would fail (see `.pre-commit-config.yaml`). With the repo `.vscode/settings.json`, Rust files format on save when using rust-analyzer in Cursor/VS Code.
 
-- **Rule Quality Checks:**
-  - Rules should be actionable and specific
-  - Examples should come from actual code
-  - References should be up to date
-  - Patterns should be consistently enforced
+## 4. Architecture Summary
+- **Engine**: Rust daemon (`engine/`) running distinct threads for inference (NPU/CPU/GPU).
+- **IPC**: gRPC over Unix Domain Sockets.
+- **Docs**: Astro Starlight site (`docs/`).
 
-- **Continuous Improvement:**
-  - Monitor code review comments
-  - Track common development questions
-  - Update rules after major refactors
-  - Add links to relevant documentation
-  - Cross-reference related rules
+## 5. Active Focus
+Check the Task Master for the current priority:
+`task-master next`
 
-- **Rule Deprecation:**
-  - Mark outdated patterns as deprecated
-  - Remove rules that no longer apply
-  - Update references to deprecated rules
-  - Document migration paths for old patterns
+## 6. Cursor MCP (optional)
+The repo ships with **Taskmaster** in `.cursor/mcp.json` so contributors can try it without setup (“ah, this could be useful”). Task data stays local (see [ADR-007](docs/src/content/docs/architecture/adr/007-project-management-strategy.mdx) and [ADR-009](docs/src/content/docs/architecture/adr/009-ai-context-strategy.mdx)); GitHub issues remain the source of truth. For MCP AI features (parse-prd, expand, research, etc.), add at least one provider API key: replace the placeholder values in the `env` section of `.cursor/mcp.json` (e.g. `ANTHROPIC_API_KEY`, `PERPLEXITY_API_KEY`) with your keys. For CLI-only use, `.env` is enough. See [Task Master configuration](https://docs.task-master.dev/getting-started/quick-start/configuration-quick).
 
-- **Documentation Updates:**
-  - Keep examples synchronized with code
-  - Update references to external docs
-  - Maintain links between related rules
-  - Document breaking changes
-Follow [cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc) for proper rule formatting and structure.
+## 7. Excalidraw MCP (optional)
+**Not all contributors have this installed.** Architecture diagrams are `.excalidraw` files in `docs/public/images/Architecture/`. They can be edited in the browser (e.g. [Excalidraw](https://excalidraw.com)) or via the optional [yctimlin/mcp_excalidraw](https://github.com/yctimlin/mcp_excalidraw) MCP for AI-assisted read/edit/iterate.
+
+- **If you don’t use the MCP**: Edit `.excalidraw` files by opening them in Excalidraw or the VS Code Excalidraw extension. Docs embed from `docs/public/images/Architecture/`; no MCP required.
+- **If you use the MCP**: Clone the repo to a location of your choice, run `npm ci && npm run build`, then start the canvas (e.g. `HOST=0.0.0.0 PORT=3000 npm run canvas` in that clone). Add the server to `.cursor/mcp.json` with `command`/`args` pointing at your `dist/index.js` and `env.EXPRESS_SERVER_URL` set to your canvas URL (default `http://localhost:3000`). See the project README for Cursor config examples. Tools: `import_scene` (load file), `describe_scene` / `get_canvas_screenshot` (inspect), `export_scene` (save).
+- **When giving instructions**: Prefer “open/edit the `.excalidraw` file in Excalidraw” unless the user has confirmed they use the Excalidraw MCP.
+
+## Learned User Preferences
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aurintex/pai-os](https://github.com/aurintex/pai-os) — distributed by [TomeVault](https://tomevault.io).
