@@ -1,0 +1,62 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+Keelhaven is a privacy-first macOS menu-bar backup app (SwiftUI, macOS 14+) that wraps the [restic](https://restic.net) CLI. See `docs/ARCHITECTURE.md` for module boundaries, data flow, key v1 decisions and their upgrade paths — read it before structural changes.
+
+## Commands
+
+```bash
+# Prerequisites (once)
+brew install restic xcodegen        # restic ≥ 0.19 required
+
+# Core package: build + all tests (fast, no Xcode needed)
+swift test --package-path KeelhavenCore
+
+# Run a single test class or method
+swift test --package-path KeelhavenCore --filter SchedulePolicyTests
+swift test --package-path KeelhavenCore --filter ResticCommandTests/testBackupCommand
+
+# App: regenerate the Xcode project (required after editing project.yml,
+# and on fresh clones — the .xcodeproj is generated, never committed)
+xcodegen generate
+xcodebuild -project Keelhaven.xcodeproj -scheme Keelhaven build
+```
+
+There is no linter configured. CI (`.github/workflows/ci.yml`) runs the core tests with restic installed and **enforces 100% line coverage on KeelhavenCore** (llvm-cov gate). When adding core code, add the tests that cover it in the same PR or CI goes red. Check locally with:
+
+```bash
+swift test --package-path KeelhavenCore --enable-code-coverage
+BIN=$(swift build --package-path KeelhavenCore --show-bin-path)
+xcrun llvm-cov report "$BIN/KeelhavenCorePackageTests.xctest/Contents/MacOS/KeelhavenCorePackageTests" \
+  -instr-profile="$BIN/codecov/default.profdata" -ignore-filename-regex="Tests|\.build"
+```
+
+## Architecture in one paragraph
+
+Two layers with a hard boundary: **`KeelhavenCore/`** is a UI-free SwiftPM package holding everything unit-testable (models, restic process runner + JSON parsing, JSON-file persistence, Keychain protocol + impls, pure schedule math); **`Keelhaven/`** is the SwiftUI app target holding only views (`MenuBar/`, `Wizard/`) and thin service wrappers around system frameworks (`Services/`: scheduler timer, notifications, login item; `Support/`: restic discovery). All state flows through a single `@MainActor @Observable` root, `Keelhaven/AppState.swift`, which owns the services and serializes backups (one at a time, app-wide). Anything that can be tested without a UI belongs in KeelhavenCore, not the app target.
+
+## Website (`site/`)
+
+The public website + docs (VitePress, English at the root, Chinese mirror under `site/zh/` — keep the two in step when editing copy) live in `site/`. Preview locally with `npm --prefix site run dev`. On pushes to main that touch `site/**`, `.github/workflows/website.yml` builds the static output and force-pushes it to this repo's `gh-pages` branch, served by GitHub Pages at **https://keelhaven.app** — doc *sources* live in this repo under GPL-3.0-or-later (see `LICENSE`), and the rendered site keeps its own © shenxianpeng notice. Site changes are ignored by the expensive macOS CI. `docs/WEBSITE.md` documents the whole path from source to live domain.
+
+The custom domain hangs on one file: **`site/public/CNAME`**. The deploy force-pushes an orphan `gh-pages` branch, so every file that is not in the build output is deleted on each run — a CNAME set through the GitHub Pages UI, or added to the branch by hand, survives exactly until the next deploy. Keep it in `site/public/`, where both the workflow and `Scripts/deploy-site.sh` pick it up. `base` in `site/.vitepress/config.mts` is `'/'` for the same reason; Cloudflare is DNS-only in front of it (no proxy). The site loads exactly one third party — Google Analytics, added in `config.mts`'s `head` — and `site/privacy.md` discloses it; keep the two in sync if analytics ever changes.
+
+## Non-obvious rules
+
+- **restic parsing is fixture-driven.** All JSON parsing is written against real captured restic 0.19.1 output in `KeelhavenCore/Tests/KeelhavenCoreTests/Fixtures/` — not restic docs. When changing parsers or bumping the supported restic version, re-capture fixtures from the real binary and keep them unmodified. `ResticRunnerIntegrationTests` additionally runs the real restic binary end-to-end and self-skips when restic isn't installed; `ResticS3IntegrationTests` and `ResticSFTPIntegrationTests` do the same against a real S3 server (MinIO) and a real sshd, self-skipping when that backend isn't reachable. CI always runs all three — its setup steps fail loudly rather than let a suite skip silently. See CONTRIBUTING.md for running the network backends locally.
+- **Secrets never touch argv or disk.** Repository passwords / S3 keys live in the macOS Keychain (one entry per plan UUID) and reach restic only via the child process environment, which is a minimal clean environment — not the app's. Don't add code that logs, persists, or passes secrets as arguments.
+- **`Keelhaven.xcodeproj` and `Keelhaven/Info.plist` are generated** (gitignored). Edit `project.yml` instead, then run `xcodegen generate`. `project.yml` also has a post-build script that stamps the git commit into Info.plist for the About window — it must keep running after ProcessInfoPlistFile and before signing.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [shenxianpeng/keelhaven](https://github.com/shenxianpeng/keelhaven) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-03 -->
