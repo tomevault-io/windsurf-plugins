@@ -7,11 +7,11 @@ VPN клиент WINGS V для Linux/Windows с поддержкой Xray и VK
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [WINGS-N/WINGSV_DeX](https://github.com/WINGS-N/WINGSV_DeX).
+Original source: `CLAUDE.md` in [WINGS-N/WINGSV_DeX](https://github.com/WINGS-N/WINGSV_DeX).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
