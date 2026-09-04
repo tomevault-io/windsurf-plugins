@@ -7,13 +7,13 @@ Thompson-mode systems discipline for AI agents. Think first, build bottom-up, br
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [rajnandan1/ken](https://github.com/rajnandan1/ken).
+Original source: `AGENTS.md` in [rajnandan1/ken](https://github.com/rajnandan1/ken).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
