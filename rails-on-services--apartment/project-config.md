@@ -1,102 +1,154 @@
 ---
 trigger: always_on
-description: **Gem Name**: `ros-apartment`
+description: Provides base implementation and allows custom tenant resolution via Proc or subclass.
 ---
 
-# CLAUDE.md - Apartment
+# lib/apartment/elevators/ - Rack Middleware for Tenant Switching
 
-**Gem Name**: `ros-apartment`
-**Maintained by**: CampusESP
-**Active work**: v4 rewrite (phased, PR-per-sub-phase off `main`)
+This directory contains Rack middleware components ("elevators") that automatically detect and switch to the appropriate tenant based on incoming HTTP requests.
 
-## Design & Plan Documents
+## Purpose
 
-Planning artifacts live in `docs/` with no date prefixes (git handles temporal tracking):
+Elevators intercept incoming requests and establish tenant context **before** the application processes the request. This eliminates the need for manual tenant switching in controllers.
 
-- `docs/designs/<feature>.md` — Design specs (what and why). Living docs, one per feature, updated in place.
-- `docs/plans/<feature>/` — Implementation plans (how and in what order). Can have multiple files for phased plans.
+## Metaphor
 
-Do NOT use `docs/superpowers/specs/` or `docs/superpowers/plans/` — those are plugin defaults that we override with the paths above.
+Like a physical elevator taking you to different floors, these middleware components "elevate" your request to the correct tenant context.
 
-**Key documents:**
-- `docs/designs/apartment-v4.md` — v4 design spec
-- `docs/designs/v4-railtie-test-infra.md` — Railtie + test infrastructure design
-- `docs/designs/elevator-tenant-validation.md` — Elevator tenant validation + missing-tenant fail-safe (shipped; see Key Patterns)
-- `docs/plans/apartment-v4/phase-2-adapters.md` — Current phase plan (includes deferred review items)
+## File Structure
 
-## Where to Start
-
-1. **README.md** - Installation, basic usage, configuration options
-2. **docs/architecture.md** - Core design decisions and WHY they were made (v3)
-3. **docs/designs/apartment-v4.md** - v4 architecture and motivation
-4. **lib/apartment/CLAUDE.md** - Implementation file guide
-5. **spec/CLAUDE.md** - Test organization and patterns
-
-## Commands
-
-```bash
-# Unit tests (no database required)
-bundle exec rspec spec/unit/
-
-# Unit tests across Rails versions
-bundle exec appraisal install                              # first time only
-bundle exec appraisal rails-8.1-sqlite3 rspec spec/unit/   # single version
-bundle exec appraisal rspec spec/unit/                     # all versions
-
-# v4 integration tests (requires real databases)
-bundle exec appraisal rails-8.1-sqlite3 rspec spec/integration/v4/                        # SQLite
-DATABASE_ENGINE=postgresql bundle exec appraisal rails-8.1-postgresql rspec spec/integration/v4/  # PostgreSQL
-DATABASE_ENGINE=mysql bundle exec appraisal rails-8.1-mysql2 rspec spec/integration/v4/          # MySQL
-
-# Lint. Update the plugins first, or a green local run tells you nothing about CI:
-# no Gemfile.lock is committed, so CI resolves rubocop's plugins fresh while a local
-# checkout keeps whatever it last resolved. AllCops.NewCops is `enable`, so a cop
-# added in a plugin minor is enforced the moment it ships — CI fails on a commit that
-# linted clean locally. Deliberate: 247 cops are pending across the loaded plugins and
-# the alternative drops all of them.
-bundle update rubocop rubocop-rspec rubocop-rails rubocop-performance rubocop-rake rubocop-thread_safety
-bundle exec rubocop
-
-# Build gem
-gem build ros-apartment.gemspec
-
-# Coverage report (opt-in)
-COVERAGE=1 bundle exec rspec spec/unit/
-
-# Test profiling
-FPROF=1 bundle exec appraisal rails-8.1-sqlite3 rspec spec/integration/v4/
-EVENT_PROF=sql.active_record bundle exec appraisal rails-8.1-sqlite3 rspec spec/integration/v4/
-
-# Request lifecycle tests (requires PostgreSQL)
-DATABASE_ENGINE=postgresql bundle exec appraisal rails-8.1-postgresql rspec spec/integration/v4/request_lifecycle_spec.rb
-
-# RBAC integration tests (requires provisioned PG/MySQL roles; see docs/designs/v4-phase5.2-rbac-integration-tests.md)
-DATABASE_ENGINE=postgresql bundle exec appraisal rails-8.1-postgresql rspec spec/integration/v4/ --tag rbac
-DATABASE_ENGINE=mysql bundle exec appraisal rails-8.1-mysql2 rspec spec/integration/v4/ --tag rbac
+```
+elevators/
+├── generic.rb           # Base elevator with customizable logic
+├── subdomain.rb         # Switch based on subdomain (e.g., acme.example.com)
+├── first_subdomain.rb   # Switch based on first subdomain in chain
+├── domain.rb            # Switch based on domain (excluding www and TLD)
+├── host.rb              # Switch based on full hostname
+├── host_hash.rb         # Switch based on hostname -> tenant hash mapping
+└── header.rb            # Switch based on HTTP header (e.g., X-Tenant-Id)
 ```
 
-**CI matrix**: Ruby 3.3/3.4/4.0 × Rails 7.2/8.0/8.1/main × PG 16+18, MySQL 8.4, SQLite3. Rails main is a canary (`continue-on-error`). See `.github/workflows/ci.yml`.
+## How Elevators Work
 
-## Core Concepts
+### Rack Middleware Pattern
 
-**Multi-tenancy via database isolation**: One app, many customers, data fully separated.
-- **PostgreSQL (schemas)**: Namespaces in single DB. Fast (<1ms switch), scales to 100+ tenants.
-- **MySQL (databases)**: Separate DB per tenant. Complete isolation, slower switching.
-- **Elevators**: Rack middleware extracts tenant from request. Auto-inserted after `ActionDispatch::Callbacks` (before sessions/auth).
-- **Pinned models**: Global tables declared with `Apartment::Model` + `pin_tenant`. Bypasses tenant routing. Use `has_many :through`, not HABTM. Replaces `excluded_models` (deprecated in v4).
+All elevators are Rack middleware that intercept requests, extract tenant identifier, switch context, invoke next middleware, and ensure cleanup. See `generic.rb` for base implementation.
 
-See `docs/architecture.md` for v3 design decisions, `docs/adapters.md` for strategy trade-offs, `docs/elevators.md` for middleware rationale.
+### v4 Constructor Pattern
 
-## Key Patterns
+v4 elevators use constructor keyword args — no class-level mutable state. The Railtie auto-inserts the elevator after `ActionDispatch::Callbacks` when `config.elevator` is set, passing `elevator_options` as keyword args.
 
-- **Block-based switching**: Always prefer `switch(tenant) { ... }` over `switch!`. Ensure block guarantees cleanup on exceptions.
-- **Adapter pattern**: Abstract base class with database-specific subclasses. Unified API hides DB differences.
-- **Callbacks**: `ActiveSupport::Callbacks` on `:create` and `:switch` for logging/notification hooks.
-- **Dynamic tenant discovery**: `tenants_provider` is a callable (proc/lambda) that queries the database at runtime.
-- **Tenant name validation**: `TenantNameValidator` does pure in-memory format checks (no DB queries). Enforced in `AbstractAdapter#create` and `ConnectionHandling#connection_pool`. Engine-specific rules for PG identifiers, MySQL names, SQLite paths.
+For manual positioning (skipping `config.elevator`), options are passed at middleware insertion time:
+
+```ruby
+config.middleware.insert_before 'Warden::Manager', Apartment::Elevators::Subdomain, excluded_subdomains: %w[www api]
+config.middleware.insert_before 'Warden::Manager', Apartment::Elevators::Header, header: 'X-Tenant-Id'
+```
+
+This replaces the v3 pattern of setting class attributes (`Subdomain.excluded_subdomains = [...]`) after adding to the stack. Each instance carries its own config.
+
+### Request Lifecycle with Elevator
+
+HTTP Request -> Elevator extracts tenant -> Switch to tenant -> Application processes -> Automatic cleanup (ensure block) -> HTTP Response
+
+**See**: `Generic#call` method for middleware call pattern.
+
+## Generic Elevator - Base Class
+
+**Location**: `generic.rb`
+
+### Purpose
+
+Provides base implementation and allows custom tenant resolution via Proc or subclass.
+
+### Implementation
+
+Accepts optional Proc in initializer or expects `parse_tenant_name(request)` override in subclass. See `Generic` class implementation in `generic.rb`.
+
+### Usage Patterns
+
+**With Proc**: Pass Proc to Generic that extracts tenant from Rack::Request.
+
+**Via Subclass**: Inherit from Generic and override `parse_tenant_name`.
+
+**See**: `generic.rb` and README.md for usage examples.
+
+## Subdomain Elevator
+
+**Location**: `subdomain.rb`
+
+### Strategy
+
+Extract first subdomain from hostname.
+
+### Implementation
+
+Extracts subdomain via `PublicSuffix` and checks against `@excluded_subdomains` instance variable. Returns nil for excluded subdomains. See `Subdomain#parse_tenant_name` in `subdomain.rb`.
+
+### Configuration
+
+Pass `excluded_subdomains:` keyword arg when adding to middleware stack. See README.md for examples.
+
+### Behavior
+
+| Request URL                  | Subdomain | Excluded? | Tenant      |
+|------------------------------|-----------|-----------|-------------|
+| http://acme.example.com      | acme      | No        | acme        |
+| http://widgets.example.com   | widgets   | No        | widgets     |
+| http://www.example.com       | www       | Yes       | (default)   |
+| http://api.example.com       | api       | Yes       | (default)   |
+| http://example.com           | (empty)   | N/A       | (default)   |
+
+### Why PublicSuffix Dependency?
+
+**Rationale**: International domains require proper TLD parsing. Without PublicSuffix, `example.co.uk` would incorrectly parse `.uk` as the TLD rather than `.co.uk`, causing subdomain extraction to fail.
+
+**Trade-off**: Adds gem dependency, but necessary for international domain support.
+
+## FirstSubdomain Elevator
+
+**Location**: `first_subdomain.rb`
+
+### Strategy
+
+Extract **first** subdomain from chain (for nested subdomains).
+
+### Implementation
+
+Splits subdomain on `.` and takes first part. See `FirstSubdomain#parse_tenant_name` in `first_subdomain.rb`.
+
+### Configuration
+
+Pass `excluded_subdomains:` keyword arg when adding to middleware stack. See README.md for configuration.
+
+### Use Case
+
+Multi-level subdomain structures where tenant is always leftmost:
+- `{tenant}.api.example.com`
+- `{tenant}.app.example.com`
+- `{tenant}.staging.example.com`
+
+### Note
+
+In single-subdomain cases, `Subdomain` and `FirstSubdomain` behave identically. `FirstSubdomain` is relevant for nested structures where the tenant is always the leftmost label (e.g., `{tenant}.api.example.com`).
+
+## Domain Elevator
+
+**Location**: `domain.rb`
+
+### Strategy
+
+Use domain name (excluding 'www' and top-level domain) as tenant.
+
+### Implementation
+
+Extracts domain name excluding TLD and 'www' prefix. See `Domain#parse_tenant_name` in `domain.rb`.
+
+### Configuration
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rails-on-services/apartment](https://github.com/rails-on-services/apartment) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-04 -->
