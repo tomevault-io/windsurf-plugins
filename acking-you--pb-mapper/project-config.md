@@ -1,89 +1,119 @@
 ---
 trigger: always_on
-description: - One `pb-mapper` binary in `crates/pb-mapper-cli/src/bin/` with five role commands:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Repository Guidelines
+# CLAUDE.md
 
-## Architecture Overview
-- One `pb-mapper` binary in `crates/pb-mapper-cli/src/bin/` with five role commands:
-  - `server`: central router (default port 7666)
-  - `register`: registers local TCP/UDP services with the router
-  - `connect`: connects to a registered service and exposes a local port
-  - `status`: queries router IDs and registered keys
-  - `admin`: issues, lists, and revokes credentials; rotates the administrator key
-- Crates, bottom-up: `pb-mapper-core` (credentials, checksum, config, addressing)
-  → `pb-mapper-auth` (credential lifecycle and persistence) → `pb-mapper-protocol`
-  (framing and secure sessions) → `pb-mapper-server` and `pb-mapper-client`, which
-  are peers → `pb-mapper-cli`. `ui/native/pb_mapper_ffi` is the C ABI cdylib.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Structure & Modules
-- `crates/`: the Rust workspace; the root `Cargo.toml` is a virtual manifest
-  - `crates/pb-mapper-cli/src/bin/pb-mapper.rs`: unified CLI entry point
-  - `crates/pb-mapper-{core,auth,protocol,server,client,cli}`
-  - `crates/pb-mapper-testkit/`: test support only; nothing shipped depends on it
-  - `crates/pb-mapper-cli/tests/`: integration tests; no env setup required
-  - `crates/pb-mapper-cli/examples/`: runnable examples
-- `ui/`: Flutter UI; Rust bridge under `ui/native/*`
-- `docker/`, `services/`, `scripts/`: container, systemd, build/release
+## Project Overview
 
-## Build, Test, and Development Commands
-- Build (release): `make build-pb-mapper`
-- Cross-build (musl): `make build-pb-mapper-x86_64_musl`
-- Run server: `cargo run --bin pb-mapper -- server --port 7666`
-- Register service: `cargo run --bin pb-mapper -- register tcp --key k --addr 127.0.0.1:8080 --server host:7666`
-- Connect client: `cargo run --bin pb-mapper -- connect tcp --key k --addr 127.0.0.1:9090 --server host:7666`
-- Tests: `cargo test` (see Testing for env)
-- Docker (server): `make release-pb-mapper-docker-image`
-- UI (optional): `cd ui && flutter run`
-Notes: CI builds release artifacts on tags `vX.Y.Z` (see `.github/workflows/release.yml`).
+This is a Rust-based network tunneling/proxy system called `pb-mapper` that allows exposing local services to clients over a public network. The project enables users to access their home services (like file transfer servers) from anywhere by creating secure tunnels through a public server.
 
-## Coding Style & Naming Conventions
-- Edition is set once in `[workspace.package]`; the toolchain is pinned in
-  `rust-toolchain.toml`, which CI installs. Both are deliberately not repeated
-  here — a version in prose goes stale on the next upgrade.
-- Format: `cargo fmt --all` (4 spaces; import grouping per `rustfmt.toml`)
-- Lint: `cargo clippy --all-targets -- -D warnings`
-- Naming: modules/functions `snake_case`, types/traits `PascalCase`, consts `SCREAMING_SNAKE_CASE`
+The system uses one **pb-mapper** binary (`crates/pb-mapper-cli/src/bin/pb-mapper.rs`) with explicit role commands:
 
-## Testing Guidelines
-- Framework: `tokio` async + integration tests in `crates/pb-mapper-cli/tests/`
-- No test needs environment setup. `pb-mapper-testkit` stands up a complete
-  tunnel (`server` + `register` + `connect`), so any test file can build one
-  rather than a single file owning the harness: `TunnelHarness::start(transport,
-  need_codec)` for the common case, or `Relay` + `TunnelSpec` when a case needs
-  to issue, renew, or revoke a credential first. `test_delay.rs` covers the
-  transport/codec matrix and `temporary_credential_e2e.rs` the credential
-  lifecycle; each case picks its own loopback ports and owns its auth state
-  directory, so cases run concurrently and never collide with a live relay.
-  Prefer binding a socket and keeping it over `reserve_addr`, which has to drop
-  the socket before the real bind and so cannot rule out a race.
-- Sequence components with a readiness probe, not a sleep: poll the relay's
-  `Keys` status for a registration, and round-trip a payload through the tunnel
-  for forwarding. `Tunnel::start` does both before it returns.
-- A framed driver (`run_echo_delay`) needs a byte-transparent echo server; a
-  tagged tunnel (`TunnelSpec::echo_tag`, which is how a namespace-isolation
-  assertion avoids passing on a leak) needs the raw drivers instead.
-- Anything that sets the process credential takes
-  `pb_mapper_core::test_support::PROCESS_CREDENTIAL_TEST_LOCK` first — it is
-  process-global, and that includes indirect writers such as building a
-  `PbMapperState`.
-- Prefer new integration tests that need no external setup
+1. **`pb-mapper server`**: Central server that manages connections between local services and clients
+   - Runs on port 7666 by default
+   - Supports IPv4/IPv6 configuration
+   - Manages service registration and client subscription mappings
+   - Handles connection forwarding and keep-alive mechanisms
 
-## Commit & Pull Request Guidelines
-- Commits: short, imperative (e.g., "Fix localhost resolution panic", "add network perms", "change to StreamBuilder")
-- Before committing code changes, always run:
-  - `cargo fmt --all`
-  - `cargo clippy --all-targets -- -D warnings`
-  - If `deps/uni-stream` was touched, run the same two commands inside that submodule as well.
-- PRs include: summary, rationale, test steps/coverage, and doc/config updates when behavior changes
-- Link issues; attach screenshots/logs for UI or networking changes
+2. **`pb-mapper register`**: Registers local services with the central server
+   - Exposes local TCP/UDP services to the public server
+   - Supports encryption codec for secure communication
+   - Configurable via environment variables and command-line arguments
 
-## Security & Configuration Tips
-- Never commit secrets; use `.env` and document required variables
-- Helpful envs: `RUST_LOG=info`, `PB_MAPPER_SERVER=host:7666`, `PB_MAPPER_KEEP_ALIVE=ON`
-- Systemd: install the unified binary at `/usr/local/bin/pb-mapper`; role-specific units live in `services/`
+3. **`pb-mapper connect`**: Connects to registered services through the central server
+   - Subscribes to remote services and creates local listening endpoints
+   - Supports both TCP and UDP protocols
+
+4. **`pb-mapper status`**: Queries remote IDs and registered service keys
+
+5. **`pb-mapper admin`**: Administrator operations against a running server —
+   issuing, listing, and revoking temporary credentials, rotating the
+   administrator key, and listing services and connections
+
+6. **UI Module** (`ui/`): Flutter graphical interface
+   - Replaces all CLI functionality with a user-friendly GUI
+   - Calls into Rust through raw `dart:ffi` against the `pb-mapper-ffi` crate
+   - Provides comprehensive service management interface
+
+The system works by creating a bridge between local services and remote clients through a public server, enabling access to services behind NAT/firewalls.
+
+## Code Architecture
+
+### Project Structure
+
+The root `Cargo.toml` is a virtual manifest; every crate lives under `crates/`,
+except the FFI cdylib, which sits next to the Flutter code that loads it.
+
+```
+pb-mapper/
+├── crates/
+│   ├── pb-mapper-core/     # Bottom layer: checksum, config, conn_id, error,
+│   │                       # addr, codec, timeout, durable_file, DataLenType
+│   ├── pb-mapper-auth/     # Credential lifecycle, persistence, timing wheel
+│   ├── pb-mapper-protocol/ # Message framing, v2 secure sessions, forwarding
+│   ├── pb-mapper-server/   # Central relay server, plus the task manager
+│   ├── pb-mapper-client/   # Both tunnel ends: `register` and `connect`
+│   ├── pb-mapper-testkit/  # Test support: a complete e2e tunnel, for any test file
+│   └── pb-mapper-cli/      # The `pb-mapper` binary, integration tests, examples
+├── ui/                    # Flutter UI, talking to Rust over dart:ffi
+│   ├── lib/               # Flutter application code
+│   │   ├── l10n/          # ARB sources and generated AppLocalizations
+│   │   └── src/ffi/       # The Dart side of the FFI boundary
+│   ├── native/pb_mapper_ffi/  # C ABI crate (a workspace member)
+│   └── test/              # Widget tests
+├── docker/                # Docker deployment configuration
+└── services/              # Systemd service files
+```
+
+The dependency graph is a DAG, and the layering is what the crate split
+encodes:
+
+```
+pb-mapper-cli          pb-mapper-ffi
+      │                      │
+      └────┬─────────────────┤
+           ▼                 ▼
+    pb-mapper-server   pb-mapper-client   (peers: no reference either way)
+           └──────┬──────────┘
+                  ▼
+          pb-mapper-protocol
+                  ▼
+            pb-mapper-auth
+                  ▼
+            pb-mapper-core
+```
+
+Note that the binary is still named `pb-mapper`, discovered from
+`src/bin/pb-mapper.rs` inside `pb-mapper-cli`. The release workflows, both
+Dockerfiles, and the install scripts hardcode that name, and `cargo build --bin
+pb-mapper` resolves it from the workspace root regardless of the crate name.
+Likewise `pb-mapper-ffi` keeps its package name, because it determines the
+`libpb_mapper_ffi.{so,dylib,a}` / `pb_mapper_ffi.dll` filenames that the Dart
+loader, two CMakeLists, four xcconfigs, and the release-ui hash checks expect.
+
+### Core Modules
+
+#### Rust Backend (`crates/`)
+- **`pb-mapper-core/`**: The bottom layer; depends on no other crate here
+  - `checksum.rs`: The process credential, and the framing checksum over `datalen`
+  - `config.rs`: Environment configuration and address resolution entry points
+  - `conn_id.rs`: Connection ID types
+  - `error.rs`: The shared error type, plus the `snafu_error_*` macros
+  - `addr.rs`: Address resolution; custom DNS servers on the async path
+  - `codec.rs`: AES-256-GCM encrypt/decrypt
+  - `timeout.rs`: `RetryBackoff`
+  - `durable_file.rs`: Atomic replace and parent-directory fsync
+  - `test_support.rs`: `PROCESS_CREDENTIAL_TEST_LOCK`, shared across crates' tests
+  - `lib.rs`: `DataLenType`, which lives here so `checksum` and `error` can name it
+
+- **`pb-mapper-auth/`**: The credential subsystem, and the largest one
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [acking-you/pb-mapper](https://github.com/acking-you/pb-mapper) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-04 -->
