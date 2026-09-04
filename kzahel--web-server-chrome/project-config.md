@@ -1,88 +1,98 @@
 ---
 trigger: always_on
-description: Read and follow [`CLAUDE.md`](CLAUDE.md) for repository setup, validation, and
+description: Read [docs/vision.md](docs/vision.md) first for product intent. For current
 ---
 
-Read and follow [`CLAUDE.md`](CLAUDE.md) for repository setup, validation, and
-release commands.
+# 200 OK Web Server
 
-## Cross-version compatibility
+Read [docs/vision.md](docs/vision.md) first for product intent. For current
+architecture and implementation direction, read
+[docs/topics/desktop-runtime.md](docs/topics/desktop-runtime.md),
+[docs/topics/android-runtime.md](docs/topics/android-runtime.md),
+[docs/topics/ios-runtime.md](docs/topics/ios-runtime.md), and
+[docs/topics/chromeos-extension-launcher.md](docs/topics/chromeos-extension-launcher.md).
+For the accepted Play-free Linux product shape and user flow, also read
+[docs/topics/chromeos-crostini-launcher.md](docs/topics/chromeos-crostini-launcher.md).
+For the active final release gate and the split between agent-owned and
+maintainer/device checks, read
+[docs/tactical/009-release-confidence-closeout.md](docs/tactical/009-release-confidence-closeout.md)
+and
+[docs/tactical/011-extension-launcher-and-chromeos-network-readiness.md](docs/tactical/011-extension-launcher-and-chromeos-network-readiness.md).
+For the active desktop defect repair and the exact-public-artifact acceptance
+campaign, read
+[docs/tactical/015-desktop-production-validation.md](docs/tactical/015-desktop-production-validation.md)
+and follow
+[docs/runbooks/desktop-production-validation.md](docs/runbooks/desktop-production-validation.md).
+The scoped Play-free ChromeOS Linux fallback lives in
+[docs/tactical/012-chromeos-crostini-fallback.md](docs/tactical/012-chromeos-crostini-fallback.md).
+The active ChromeOS Linux product-completion plan lives in
+[docs/tactical/014-chromeos-crostini-product-completion.md](docs/tactical/014-chromeos-crostini-product-completion.md).
+The native iOS MVP is complete in
+[docs/tactical/016-native-swift-ios-app.md](docs/tactical/016-native-swift-ios-app.md);
+its separate store-readiness follow-up is
+[docs/tactical/017-ios-store-readiness.md](docs/tactical/017-ios-store-readiness.md).
+Cross-platform CI, shared HTTP conformance, product E2E, artifact validation,
+compatibility fixtures, and advisory testbed handoff are implemented in
+[docs/tactical/018-cross-platform-ci-and-test-confidence.md](docs/tactical/018-cross-platform-ci-and-test-confidence.md).
 
-For every feature or behavioral change, explicitly consider backward and
-forward compatibility between versions that users may run at the same time.
-Identify all independently released producers and consumers—including store
-apps, extensions, desktop/mobile apps, controllers, installers, update feeds,
-and services—and do not assume their deployments are atomic or ordered.
+## Quick Context
 
-When a change affects a shared protocol, API, persisted data, configuration,
-artifact, or update path:
+Lightweight web server app for every platform. Successor to "Web Server for
+Chrome" (200k+ users). The Android app, extension, ChromeOS Linux component,
+and signed Rust-native Tauri desktop `v0.1.6` have shipped.
 
-- Prefer additive changes, capability negotiation, and overlapping supported
-  version ranges over an exact-version cutover.
-- Plan a rollout in which old/new and new/old component combinations continue
-  to interoperate throughout store review, staged rollout, and delayed updates.
-- Add cross-version tests for each supported pairing, and make release checks
-  reject a new artifact when it has no compatibility overlap with a counterpart
-  that users can still receive or run.
-- Document the compatibility window, rollout order, fallback/error behavior,
-  and eventual removal plan for legacy support in the owning topic or tactical
-  document.
+Desktop `v0.1.6` passed its signing and public-asset gates but failed later
+three-OS functional acceptance: the settings surface is clipped on Windows and
+Linux, disabling background operation does not exit on last-window close, and
+Windows can become unrecoverably invisible with the tray hidden. It also lacks
+an exact-version round trip through the production Chrome Web Store extension.
+Do not describe it as production-accepted; Tactical 015 owns the repair and
+post-publication rerun.
 
-Do not intentionally strand a supported released component or require users to
-update independently distributed components in lockstep unless the maintainer
-has explicitly accepted the incompatibility and its user-visible consequences.
+A standalone native SwiftUI/Swift iOS app now exists and has passed its
+simulator, Release-hygiene, Files/bookmark, lifecycle, and external same-Wi-Fi
+acceptance gates on the attached physical phone through the project-neutral
+`~/code/ios-device-testbed` path. It is not released; Tactical 017 owns the
+separate App Store/TestFlight lane.
 
-## Documentation roles
+The old Transistor proof is not the current desktop architecture. Desktop
+keeps Tauri and its webview for control/configuration while a small Rust core
+owns HTTP execution on Windows, macOS, and Linux. Desktop `v0.1.6` adds the
+canonical in-app settings surface and optional tray visibility on every desktop
+platform; it also includes AppImage-first integration, Linux ARM64 artifacts,
+AppImage native-host repair, macOS Dock activation repair, and the package-aware
+updater policy. Android
+source uses a native Kotlin HTTP server, and the former unpublished
+Node/TypeScript CLI and engine have been retired. GitHub release
+`android-v0.2.1` contains the signed native-Kotlin APK/AAB with the physically
+accepted ChromeOS LAN-address correction. The maintainer reports the exact
+Android `v0.2.1` and extension `v0.1.4` candidates submitted to their stores;
+public `extension-v0.1.6` is the tested replacement candidate with the
+ChromeOS Linux controller and corrected peer-choice copy. Production may still
+serve earlier artifacts until review and rollout finish.
 
-Focused, living records of continuing concerns live under
-[`docs/topics/`](docs/topics/README.md). Before changing desktop, Android, or
-iOS runtime, release/signing, or legacy migration behavior, read the
-corresponding topic document. Update it when work changes the current state,
-accepted decision, evidence, gaps, or recommended next direction.
+## Architecture
 
-Bounded implementation plans and execution records live under
-[`docs/tactical/`](docs/tactical/README.md). Tactical filenames use
-zero-padded numeric prefixes such as `000-topic.md`, `001-next-topic.md`.
-Completed tacticals remain as execution records; continuing guidance belongs
-in topic or architecture documents.
+Current repository shape:
 
-Architecture and research documents own durable system shape, product history,
-or external facts. They must not silently override a newer accepted decision in
-a topic document. Mark historical proposals explicitly and link to the current
-topic.
+- `packages/ui` — shared React controls used by the desktop Tauri webview.
+- `android` — Compose app with a Kotlin HTTP/storage core and native Android
+  lifecycle, permission, background, wake, boot, and battery policy.
+- `ios` — independent SwiftUI controls, Swift HTTP/storage code, security-scoped
+  Files access, and an intentionally foreground-only lifecycle.
+- `desktop` — Tauri app with a Tauri-independent Rust HTTP core and a thin
+  React/Tauri command/event control layer.
+- `desktop/crostini` — independently released ChromeOS Linux
+  launcher/controller that reuses the Rust core.
+- `extension` — Published launcher/status surface.
 
-When a commit series implements a documented topic, normally reuse the topic
-filename slug in `Topic: <slug>` commit trailers. Register new topic strings in
-the root [`topics.md`](topics.md) log before reusing them across a series.
+Do not recreate the deleted generic TypeScript native-I/O architecture.
+Android and desktop own their Kotlin and Rust implementations respectively;
+keep the `desktop/core/src/main.rs` executable repository-only for development
+and smoke testing rather than packaging or versioning it as a separate CLI.
 
-## Current decision entry points
-
-- Desktop runtime: [`docs/topics/desktop-runtime.md`](docs/topics/desktop-runtime.md)
-- Android runtime: [`docs/topics/android-runtime.md`](docs/topics/android-runtime.md)
-- iOS runtime: [`docs/topics/ios-runtime.md`](docs/topics/ios-runtime.md)
-- ChromeOS extension launcher:
-  [`docs/topics/chromeos-extension-launcher.md`](docs/topics/chromeos-extension-launcher.md)
-- ChromeOS Crostini launcher/controller:
-  [`docs/topics/chromeos-crostini-launcher.md`](docs/topics/chromeos-crostini-launcher.md)
-- Desktop CI, signing, and releases:
-  [`docs/topics/desktop-release-readiness.md`](docs/topics/desktop-release-readiness.md)
-- Legacy Chrome App migration:
-  [`docs/topics/legacy-app-migration.md`](docs/topics/legacy-app-migration.md)
-- Active release confidence closeout:
-  [`docs/tactical/009-release-confidence-closeout.md`](docs/tactical/009-release-confidence-closeout.md)
-- Active desktop production repair and validation:
-  [`docs/tactical/015-desktop-production-validation.md`](docs/tactical/015-desktop-production-validation.md)
-- Completed native iOS implementation and physical-device validation:
-  [`docs/tactical/016-native-swift-ios-app.md`](docs/tactical/016-native-swift-ios-app.md)
-- Planned iOS store-readiness follow-up:
-  [`docs/tactical/017-ios-store-readiness.md`](docs/tactical/017-ios-store-readiness.md)
-- Completed cross-platform CI and test-confidence implementation:
-  [`docs/tactical/018-cross-platform-ci-and-test-confidence.md`](docs/tactical/018-cross-platform-ci-and-test-confidence.md)
-- Desktop post-publication production runbook:
-  [`docs/runbooks/desktop-production-validation.md`](docs/runbooks/desktop-production-validation.md)
-- Active ChromeOS launcher and network closeout:
-  [`docs/tactical/011-extension-launcher-and-chromeos-network-readiness.md`](docs/tactical/011-extension-launcher-and-chromeos-network-readiness.md)
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kzahel/web-server-chrome](https://github.com/kzahel/web-server-chrome) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-04 -->
