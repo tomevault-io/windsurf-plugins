@@ -1,197 +1,188 @@
 ---
 trigger: always_on
-description: Rules for coordinating multiple agents running simultaneously in Cursor 2.0
+description: Practical examples for using multiple agents in Cursor 2.0
 ---
 
 
-# 🤖 Multi-Agent Coordination (Cursor 2.0)
+# 🤖 Multi-Agent Usage Examples
 
-## Overview
+This file provides practical examples of how to use multiple agents simultaneously in your NEXUS v2 workspace.
 
-Cursor 2.0 supports **up to 8 agents running concurrently**. Each agent operates in its own isolated copy of the codebase using git worktrees or remote machines to prevent file conflicts.
+> **💡 See [Custom Commands Proposal](mdc:../custom-commands-proposal.md) for 10 tailored commands specific to your NEXUS v2 stack**
 
-## Multi-Agent Access
+## Quick Start: How to Use Multiple Agents
 
-To enable multiple agents:
-1. **Open Cursor 2.0** (requires latest version)
-2. **Multi-Agent Sidebar**: New sidebar interface for managing agents and plans
-3. **Activate Agents**: Use the agent management UI to spawn multiple agents
-4. **Assign Tasks**: Each agent can work on different parts of the codebase simultaneously
+### Step 1: Open Multi-Agent Interface
+- In Cursor 2.0, look for the **multi-agent sidebar** (new UI element)
+- This sidebar shows all active agents and their status
+- You can spawn new agents from this interface
 
-## Agent Role Scoping
+### Step 2: Assign Tasks with Scope Hints
 
-Define agent responsibilities using path patterns to prevent conflicts and ensure efficient parallel execution:
+When prompting agents, include scope information to route to the right agent:
 
-### 🎯 Service-Specific Agents
-
-```yaml
-Frontend_Agent:
-  scope: 
-    - path: "v2/frontend/**"
-    - path: "v2/shared/ui/**"
-  responsibilities:
-    - UI/UX improvements
-    - Frontend testing with Browser Agent
-    - React component development
-    - State management updates
-  tools_priority:
-    - Browser Agent (E2E testing)
-    - mcp_filesystem_* (config files)
-    - mcp_postgres_* (read-only data validation)
-
-Backend_Service_Agent:
-  scope:
-    - path: "v2/*_service/**"
-    - exclude: "v2/frontend/**"
-    - exclude: "v2/db_service/migrations/**"
-  responsibilities:
-    - Service implementation
-    - API endpoint development
-    - Business logic
-    - Integration testing
-  tools_priority:
-    - mcp_loki_* (service logs)
-    - mcp_postgres_* (data operations)
-    - mcp_repo-indexer_* (code patterns)
-
-Database_Agent:
-  scope:
-    - path: "v2/db_service/migrations/**"
-    - path: "v2/db_service/**"
-  responsibilities:
-    - Migration creation ONLY in v2/db_service/migrations/
-    - Schema changes
-    - Database optimization
-    - Query performance
-  tools_priority:
-    - mcp_postgres_* (schema operations)
-    - mcp_filesystem_* (migration files)
-  critical: "NEVER creates migrations outside v2/db_service/migrations/"
-
-Observability_Agent:
-  scope:
-    - path: "v2/observability_stack/**"
-    - path: "v2/*/grafana/**"
-    - path: "v2/*/prometheus/**"
-  responsibilities:
-    - Grafana dashboards
-    - Prometheus metrics
-    - Alert rules (remember: down -v before up -d!)
-    - Loki queries for RCA
-  tools_priority:
-    - mcp_loki_* (log investigation)
-    - mcp_filesystem_* (config files)
-    - mcp_config-indexer_* (alert configurations)
-
-Documentation_Agent:
-  scope:
-    - path: "v2/docs/**"
-    - path: "*.md"
-    - exclude: "v2/docs/plans/**" # Plans are temporary
-  responsibilities:
-    - Documentation updates (UPDATE existing, don't create new)
-    - RCA documents (ONE per incident)
-    - API documentation
-    - Architecture diagrams
-  tools_priority:
-    - mcp_docs-indexer_* (search existing docs)
-    - mcp_filesystem_* (doc files)
-  critical: "Minimize .md creation - update existing files"
-
-Testing_Agent:
-  scope:
-    - path: "**/tests/**"
-    - path: "**/test_*.py"
-    - path: "**/*.test.ts"
-    - path: "**/*.test.tsx"
-  responsibilities:
-    - TDD test creation
-    - Test refactoring
-    - Coverage improvements
-    - E2E test scenarios
-  tools_priority:
-    - Cursor Browser Agent (frontend E2E)
-    - mcp_terminal_* (pytest execution)
-    - mcp_postgres_* (test data validation)
-
-Infrastructure_Agent:
-  scope:
-    - path: "docker-compose*.yml"
-    - path: ".env*"
-    - path: "v2/**/Dockerfile*"
-    - path: "v2/**/requirements.txt"
-  responsibilities:
-    - Container orchestration
-    - Environment configuration
-    - Dependency management
-    - Build pipeline
-  tools_priority:
-    - mcp_config-indexer_* (Docker analysis)
-    - mcp_terminal_* (container commands)
-    - mcp_filesystem_* (config files)
+```
+Example 1: Frontend Agent
+"Improve the strategy configuration UI component [Frontend_Agent scope: v2/frontend/src/components/strategies/]"
 ```
 
-## Coordination Patterns
-
-### ✅ Parallel Safe Operations
-
-These can run simultaneously across agents:
-
-```yaml
-Safe_Parallel_Tasks:
-  - Different services (trade_engine + signal_engine)
-  - Frontend + Backend (different file paths)
-  - Documentation + Code (separate directories)
-  - Testing + Development (separate branches/worktrees)
-  - Multiple test files (no shared state)
+```
+Example 2: Backend Agent
+"Add new REST endpoint for position history [Backend_Service_Agent scope: v2/api_gateway/routes/]"
 ```
 
-### ⚠️ Requires Coordination
-
-These operations need explicit coordination:
-
-```yaml
-Coordinate_Before_Executing:
-  - Database migrations (only Database_Agent)
-  - Shared utility changes (coordinate via TODO or GitHub Issue)
-  - API contract changes (affects multiple services)
-  - Breaking changes to shared libraries
-  - Environment variable changes (.env files)
+```
+Example 3: Database Agent
+"Create migration for adding stop_loss column to positions table [Database_Agent scope: v2/db_service/migrations/]"
 ```
 
-### 🔴 Conflict Zones
-
-Prevent multiple agents from touching:
-
-```yaml
-Exclusive_Access_Required:
-  - v2/db_service/migrations/ (Database_Agent ONLY)
-  - docker-compose.v2.yml (Infrastructure_Agent coordination)
-  - Shared library files (v2/shared/** - coordinate first)
-  - Critical config files (.env, secrets)
+```
+Example 4: Testing Agent
+"Write integration tests for trade execution flow [Testing_Agent scope: v2/trade_engine/tests/]"
 ```
 
-## Communication Patterns
+## Real-World Examples
 
-### Agent-to-Agent Coordination
+### Example 1: Parallel Service Development
 
-```yaml
-Coordination_Methods:
-  1. GitHub_Issues:
-     - Create issue for shared work
-     - Agents check issues before starting
-     - Update issue with progress
-  
-  2. TODO_Lists:
-     - Use todo_write tool for multi-agent tasks
-     - Agents can check and update TODO status
-     - Clear task ownership in TODO items
-  
-  3. Path_Exclusion:
-     - Use exclude patterns in agent scopes
-     - Prevents accidental overlap
-  
-  4. Branch_Strategy:
+**Scenario**: You want to improve both signal_engine and trade_engine simultaneously.
+
+**Setup**:
+1. Create GitHub Issue #456: "Enhance signal processing and trade execution"
+2. Break into sub-tasks:
+   - Task A: Improve signal processing (signal_engine)
+   - Task B: Optimize trade execution (trade_engine)
+
+**Agent Prompts**:
+
+```
+Agent 1 (Backend_Service_Agent):
+"Implement improved signal filtering algorithm [Backend_Service_Agent scope: v2/signal_engine/]"
+```
+
+```
+Agent 2 (Backend_Service_Agent):
+"Optimize trade execution latency [Backend_Service_Agent scope: v2/trade_engine/]"
+```
+
+**Why this works**:
+- Different services = different file paths
+- No file conflicts (git worktrees isolate)
+- Both can run simultaneously
+
+### Example 2: Full-Stack Feature Development
+
+**Scenario**: Add new "Risk Dashboard" feature requiring frontend, backend, and database work.
+
+**Setup**:
+1. Create GitHub Issue #789: "Risk Dashboard Feature"
+2. Break into coordinated tasks:
+   - Database: Create risk_metrics table
+   - Backend: Add risk calculation API
+   - Frontend: Build dashboard UI
+   - Testing: E2E tests
+
+**Agent Prompts**:
+
+```
+Agent 1 (Database_Agent) - Run FIRST:
+"Create migration for risk_metrics table with columns: strategy_id, var_value, max_drawdown [Database_Agent scope: v2/db_service/migrations/]"
+```
+
+```
+Agent 2 (Backend_Service_Agent) - Run AFTER Agent 1:
+"Implement risk calculation API endpoint that queries risk_metrics table [Backend_Service_Agent scope: v2/api_gateway/]"
+```
+
+```
+Agent 3 (Frontend_Agent) - Run AFTER Agent 2:
+"Build Risk Dashboard component that displays risk metrics from API [Frontend_Agent scope: v2/frontend/src/pages/]"
+```
+
+```
+Agent 4 (Testing_Agent) - Run AFTER all:
+"Write E2E tests for Risk Dashboard feature [Testing_Agent scope: v2/frontend/tests/]"
+```
+
+**Coordination**:
+- Use GitHub Issue comments to track progress
+- Agents wait for dependencies (database → backend → frontend)
+- Final agent (Testing_Agent) validates integration
+
+### Example 3: Observability Improvements
+
+**Scenario**: Add Grafana dashboards and improve logging across services.
+
+**Setup**:
+1. Observability_Agent handles Grafana/Prometheus
+2. Backend_Service_Agent adds structured logging
+
+**Agent Prompts**:
+
+```
+Agent 1 (Observability_Agent):
+"Create Grafana dashboard for trade execution metrics [Observability_Agent scope: v2/observability_stack/grafana/]"
+```
+
+```
+Agent 2 (Backend_Service_Agent):
+"Add structured logging to trade_engine with correlation IDs [Backend_Service_Agent scope: v2/trade_engine/]"
+```
+
+**Why this works**:
+- Different paths (observability_stack vs service code)
+- No conflicts
+- Both improvements can be merged independently
+
+### Example 4: Bug Fix + Feature Development
+
+**Scenario**: Fix authentication bug while developing new feature.
+
+**Agent Prompts**:
+
+```
+Agent 1 (Backend_Service_Agent) - Bug Fix:
+"Fix JWT token expiration validation bug [Backend_Service_Agent scope: v2/auth_service/]"
+```
+
+```
+Agent 2 (Frontend_Agent) - New Feature:
+"Add strategy performance comparison chart [Frontend_Agent scope: v2/frontend/src/components/]"
+```
+
+**Why this works**:
+- Different services (auth_service vs frontend)
+- Different priorities (bug fix vs feature)
+- Can run simultaneously without conflicts
+
+## Conflict Avoidance Patterns
+
+### ❌ BAD: Conflicting Agents
+
+```
+Agent 1: "Update shared utility function [v2/shared/utils/]"
+Agent 2: "Refactor shared utility function [v2/shared/utils/]" 
+```
+
+**Problem**: Both agents modifying same files → conflicts
+
+### ✅ GOOD: Coordinated Update
+
+```
+Step 1: Create GitHub Issue #999: "Refactor shared utilities"
+Step 2: Assign to single agent OR coordinate via issue comments
+Step 3: One agent makes changes, others wait
+```
+
+### ✅ GOOD: Non-Conflicting Parallel
+
+```
+Agent 1: "Update trade_engine to use shared utils [v2/trade_engine/]"
+Agent 2: "Update signal_engine to use shared utils [v2/signal_engine/]"
+```
+
+**Why**: Different services, same shared dependency → no conflicts
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
