@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [zheng0000000000000-art/loop-control-dashboard](https://github.com/zheng0000000000000-art/loop-control-dashboard).
+Original source: `AGENTS.md` in [zheng0000000000000-art/loop-control-dashboard](https://github.com/zheng0000000000000-art/loop-control-dashboard).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
