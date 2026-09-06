@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Skill — desire-evaluator. Scores core human desire motivations (survival, status, belonging, control, curiosity) for an idea.
+description: Skill — distribution-analysis. Evaluates organic reach potential, paid feasibility, platform advantages, and creator economy fit.
 ---
 
 
-See [skills/desire-evaluator/SKILL.md](../../skills/desire-evaluator/SKILL.md) for full instructions and output schema.
+See [skills/distribution-analysis/SKILL.md](../../skills/distribution-analysis/SKILL.md) for full instructions and output schema.
 
 ---
 > Source: [Latifox/find-me-saas](https://github.com/Latifox/find-me-saas) — distributed by [TomeVault](https://tomevault.io).
