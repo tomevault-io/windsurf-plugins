@@ -1,12 +1,13 @@
 ---
 trigger: always_on
-description: Apply language-agnostic clean-code discipline to all code writing, editing, reviewing, testing, and refactoring, including file placement, single responsibility, and verified completion.
+description: These instructions guide GitHub Copilot Chat, Copilot code review, and the Copilot coding agent across this repository. In a project that installs this package, the managed block below is kept up to date by the installer; content outside the markers is never touched.
 ---
 
+# Repository-Wide Clean-Code Instructions
 
-# Clean Code
+These instructions guide GitHub Copilot Chat, Copilot code review, and the Copilot coding agent across this repository. In a project that installs this package, the managed block below is kept up to date by the installer; content outside the markers is never touched.
 
-Use these rules for every coding task in Windsurf. In a project that installs this package, the managed block below is kept up to date by the installer; content outside the markers is never touched.
+When `.github/skills/clean-code/SKILL.md` is present, treat it as the canonical detailed guidance and use this file as the repository-wide baseline.
 
 <!-- clean-code-skills:begin v3.2.0 -->
 ## Clean Code Rules (clean-code-skills)
@@ -55,8 +56,6 @@ These rules govern all code you write, edit, review, test, or refactor in this p
 - Functions do one thing at one abstraction level; comments explain why, never what or how, and stay short — a paragraph of comment is a design smell.
 - Errors are never swallowed; preserve causes and context; model expected alternate outcomes as values and reserve exceptions for genuine failures; keep secrets out of logs.
 - Tests are deterministic and behavior-focused. Never weaken, skip, or delete a failing test to get green, and never verify a business rule by driving the UI.
-- Verify that every API, function, option, and config key you reference actually exists in this codebase and its dependency versions — never trust memory.
-- Deduplicate only true duplication: copies that must always change together. Copies that change at different rates for different reasons are not duplicates.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
