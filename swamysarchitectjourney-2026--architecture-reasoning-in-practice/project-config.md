@@ -1,137 +1,98 @@
 ---
 trigger: always_on
-description: **Last Updated**: January 1, 2026
+description: enables: ["../advanced-content/"]
 ---
 
-# GitHub Copilot Instructions for Architecture Reasoning in Practice
+# Content Rules (Architecture Reasoning in Practice)
 
 **Version**: 2.0  
 **Last Updated**: January 1, 2026  
-**Repository**: `architecture-reasoning-in-practice`  
-**Critical Principle**: Update this file IMMEDIATELY when repository structure changes
-
-**Environment**: Windows 11, PowerShell  
-**Note**: All commands and scripts should use PowerShell syntax. File paths use Windows format.
+**Priority**: MANDATORY - All content creation must follow these rules without exception
 
 ---
 
-## 🎯 Repository Purpose
+## 📋 Rule Applicability
 
-**Architecture Reasoning in Practice** is a personal learning repository documenting hands-on practice in architectural reasoning across senior and staff-level technical roles.
+**IMPORTANT**: These rules apply differently based on content type:
 
-### What This Repository Provides
+### Practice Content (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`)
+- ✅ **File naming**: Descriptive names (e.g., `problem-framing.md`, `cqrs-selective-application.md`) - **NO numbering required** for content files
+- ✅ **Folder naming**: Folders use numbered prefixes (`01_reasoning-foundations/`, `02_answer-structuring/`) - **ALWAYS numbered**
+- ✅ **Line limits**: Recommended ≤150 lines (split, don't trim)
+- ✅ **YAML frontmatter**: Recommended for content files (all 5 metadata fields when content is added)
+- ✅ **Zero-copy policy**: Applies (content must be transformative)
+- ✅ **File references**: Must point to existing files
 
-- **Structured Thinking**: Systematic approaches to architectural problems
-- **Trade-off Analysis**: Frameworks for evaluating options and making informed decisions
-- **Clear Communication**: Techniques for articulating architectural decisions effectively
-- **Practice Scenarios**: Real-world problems and ambiguous situations for practice
-- **Decision-Making Frameworks**: Tools and methods for architectural judgment
+**Numbering Rules Summary**:
+- **Folders**: Always use numbered prefixes (`01_`, `02_`, etc.) - **NEVER use `00_`**
+- **Content files**: Use descriptive names without numbering (e.g., `decision-rationale-framing.md`)
+- **Split files**: When splitting content, use `-part1`, `-part2` suffixes (e.g., `topic-part1.md`, `topic-part2.md`) - no numbered prefix on content files
 
-### Target Audience
-
-- Swamy (personal learning journey)
-- Senior Software Engineers
-- Principal Software Engineers
-- Staff Engineers
-- Software Architects
-- Solution Architects
-- AI Architects
-- Engineering Managers
-- Principal Consultants
-
-### Business Value
-
-- Develops real-world architectural judgment
-- Enhances decision-making capability
-- Improves communication of architectural decisions
-- Practice for senior technical evaluation contexts and professional growth
+### Resources (`src/resources/` directory)
+- ✅ **File naming**: Logical names (`frameworks.md`, `reference-materials.md`, `tools.md`)
+- ✅ **Numbering**: NOT required (reference materials)
+- ⚠️ **YAML frontmatter**: NOT required
 
 ---
 
-## 🎯 Primary Directives
+## 🚫 Zero-Copy Policy (Non-Negotiable)
 
-### 1. Architecture Reasoning Content Rules (MANDATORY)
+**CRITICAL**: All content (case study documentation and educational content) must be transformative, not reformative.
 
-**All content creation must follow these rules, with applicability based on content type:**
+❌ **NEVER** copy text verbatim from books, articles, websites, videos, or third-party materials  
+❌ **NEVER** mirror a source's outline, section order, headings, or example sequence  
+❌ **NEVER** use "light paraphrasing" — must transform completely  
+✅ **ALWAYS** create diagrams in Mermaid-first style with ASCII fallback (never embed copyrighted figures)  
+✅ **ALWAYS** write fresh, minimal code from first principles  
+✅ Brief quotations allowed ONLY with quotation marks and source citation
 
-- **Practice Content** (`src/`): Organized by thinking modes (foundations, structuring, trade-offs, role perspectives, scenarios)
-- **Scenarios** (`src/05_evaluation-scenarios/`): Real-world architectural problems and decision-making exercises (reasoning practice, not answer keys)
-- **Resources** (`src/resources/`): Logical naming, frameworks and reference materials
+---
 
-See: `.cursor/rules/01_educational-content-rules.mdc` for complete details and applicability.
+## 🔄 Transformative Workflow (Required Every Time)
 
-### 2. Automation-First Approach
+**Step-by-step process for creating original educational content**:
 
-✅ **ALWAYS**: Create reusable PowerShell scripts for repetitive tasks  
-✅ **ALWAYS**: Use existing scripts in `tools/psscripts/` first  
-✅ **ALWAYS**: Enhance existing scripts rather than duplicating  
-❌ **NEVER**: Execute individual commands for tasks repeated 2+ times
+1. **Source Intake**: Skim for intent and big ideas; don't copy notes verbatim
+2. **Concept Map**: Create fresh outline with different sectioning tailored to Architecture Reasoning learning
+3. **Teach Differently**: Use new analogies, scenarios, examples, use-cases (avoid source examples)
+4. **Produce Original Artifacts**: Explanations, diagrams (Mermaid with ASCII fallback), minimal examples
+5. **Cross-Link**: Add references and connections across Architecture Reasoning thinking modes
+6. **Similarity Audit**: Ensure no sentences/structures resemble source
+7. **Zero-Copy Verification**: **MANDATORY** - Verify no verbatim text, especially in quotes and "Key Principle" sections
+8. **Optional References**: Add "References/Inspired by" links (no copied phrasing)
 
-**Decision Tree**:
+**Goal**: Create transformative educational content, not just reformative. Entirely new presentation, examples, and explanations that teach the same concepts through original methods.
 
-1. Check `tools/psscripts/` for existing script
-2. Enhance existing script if close match
-3. Create new `.ps1` for any repeated task
-4. Document with examples and parameters
+**⚠️ CRITICAL REMINDER**: Even "Key Principle" quotes and example structures must be completely transformed. Verbatim copying of ANY text from source material violates the zero-copy policy.
 
-**Available Automation** (tools/psscripts/):
+---
 
-- `Get-FileStats.ps1` - File statistics analysis
-- `Get-MarkdownSummary.ps1` - Markdown file analysis
-- `Get-RepoStats.ps1` - Repository overview
-- `Compare-DocFiles.ps1` - Compare multiple files
-- `Find-DuplicateContent.ps1` - Find duplicate headings
-- `Quick-HealthCheck.ps1` - Fast workspace health check
-- `Validate-FileReferences.ps1` - Validate file references in markdown
-- `Verify-ZeroCopy.ps1` - **Zero-copy policy verification** (checks for verbatim text from source material)
+## ⏱️ 25-Minute Learning Segments
 
-### 3. Update Verification Protocol (CRITICAL)
+**APPLICABILITY**: This rule applies to practice content files (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`).
 
-**After ANY structural change, IMMEDIATELY update**:
+**For Lab Documentation**: The 150-line limit is a **recommendation**, not a strict requirement. Lab files may exceed 150 lines if needed for comprehensive instructions.
 
-1. ✅ **`docs/01_repository-structure.md`** - **UPDATE THIS FIRST** (Single source of truth)
-2. ✅ `.github/copilot-instructions.md` - Reference to `docs/01_repository-structure.md` (THIS FILE)
-3. ✅ `README.md` - Reference to `docs/01_repository-structure.md`
-4. ✅ `.cursor/rules/02_repository-structure.mdc` - Reference to `docs/01_repository-structure.md`
-5. ✅ Relevant documentation files
+✅ **Modular content** designed for focused 25-minute sessions  
+✅ **Multi-Part Structure**: Complex topics split into Part 1, Part 2, ... Part N  
+✅ **One-Shot Learning**: Each segment complete and actionable within time limit  
+✅ **Target Length**: 150 lines of content maximum per response (educational content)
 
-**Self-Check Question**: "Did I update `docs/01_repository-structure.md` first?" - If no, STOP and do it NOW.
+### ⚠️ CRITICAL: Splitting vs. Trimming Policy
 
-### 4. File Naming Validation (CRITICAL)
+**APPLICABILITY**: This rule applies to practice content files (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`).
 
-**Before creating or committing ANY numbered file, validate naming**:
+**For Lab Documentation**: If lab files exceed 150 lines, consider splitting for better organization, but it's not mandatory.
 
-1. ✅ **Check for `00_` prefix**: **NEVER ALLOWED** - Use `01_` instead
-2. ✅ **Verify scope**: Rule applies to **ALL files** including:
-   - Practice content (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, etc.)
-   - Documentation files (`docs/`)
-   - Any numbered files anywhere in repository
-3. ✅ **Quick validation**: Run `Get-ChildItem -Recurse -Filter "*00_*"` to find violations
-4. ✅ **NO EXCEPTIONS**: `00_` is NEVER allowed, even for meta/documentation files
+**MANDATORY APPROACH** (Educational Content Only): When content exceeds 150 lines, **ALWAYS SPLIT** into multiple parts. **NEVER TRIM** or condense content.
 
-**Self-Check Question**: "Does this file use `00_` prefix?" - If yes, RENAME to `01_` or appropriate number.
+**Why Splitting is Required:**
+- ✅ **Preserves ALL educational content** - No loss of examples, explanations, or concepts
+- ✅ **Maintains learning value** - Each part remains complete and actionable
+- ✅ **Better learning experience** - Learners get comprehensive coverage across parts
+- ✅ **Follows 25-minute principle** - Each part fits within focused learning session
 
-### 5. Chain-of-Thought + ReAct + Reasoning
-
-**Apply systematic reasoning to every task using this framework**:
-
-#### Chain-of-Thought (CoT)
-
-Break down complex problems into logical steps:
-
-- **Decompose**: Split large tasks into smaller, manageable components
-- **Sequential Logic**: Show clear progression from problem → solution
-- **Explicit Reasoning**: Articulate WHY each step is necessary
-- **Intermediate Steps**: Don't jump to conclusions; show the work
-
-**Example**: "To consolidate docs, I need to: 1) Read all files, 2) Identify unique content, 3) Extract and merge, 4) Verify no loss, 5) Update references"
-
-#### ReAct (Reasoning + Acting)
-
-Interleave thinking with action in iterative cycles:
-
-1. **OBSERVE** 🔍
-   - Current state: What exists now?
+**Why Trimming is Prohibited:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
