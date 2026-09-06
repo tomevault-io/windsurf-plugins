@@ -1,0 +1,116 @@
+---
+trigger: always_on
+description: `aigverse` is a hybrid C++/Python library for logic synthesis: it wraps the EPFL Logic Synthesis Libraries
+---
+
+# aigverse
+
+`aigverse` is a hybrid C++/Python library for logic synthesis: it wraps the EPFL Logic Synthesis Libraries
+(mockturtle, kitty, lorina) with [nanobind](https://nanobind.readthedocs.io/) to expose And-Inverter Graph (AIG)
+construction, optimization, equivalence-checking, and I/O to Python.
+
+## Workflow
+
+For any larger piece of work — a GitHub issue, PR review feedback, or a task assigned directly — isolating it in a
+worktree, opening a PR, and cleaning up afterwards, see [WORKFLOW.md](WORKFLOW.md).
+
+## Commands
+
+### Lint & format (Python + C++ + CMake + docs, all via `prek`/pre-commit)
+
+```console
+uvx nox -s lint
+```
+
+Runs the full `prek` hook set (ruff, ty, clang-format, cmake-format, typos, etc.). To run a single hook or file
+directly instead: `uvx prek run --all-files` or `uvx prek run <hook-id> --files <path>`.
+
+### Clang-Tidy (C++ static analysis)
+
+```console
+uvx nox -s cpp-lint              # the C++ files that differ from origin/main — the slice the `🚨 Clang-Tidy` check lints
+uvx nox -s cpp-lint -- HEAD~3    # diff against that revision instead
+uvx nox -s cpp-lint -- --all     # every C++ file in the repo
+```
+
+Runs the same `cpp-linter` invocation `.github/workflows/cpp-linter.yml` runs, prints the findings, and fails on them.
+Not part of `lint`; it needs a CMake configure, so it costs minutes rather than seconds.
+
+### Python tests
+
+```console
+uvx nox -s tests              # all supported Python versions (3.10-3.14), builds the C++ extension first
+uvx nox -s tests-3.12         # a single Python version — much faster iteration
+uvx nox -s tests-3.12 -- test/algorithms/test_simulation.py   # a single file
+uvx nox -s tests-3.12 -- -m algorithms                        # a marker subset (see markers below)
+uvx nox -s minimums           # test against lowest-resolved dependency versions
+```
+
+If the project is already built and installed into an active venv, `pytest test/` (or a specific path) works
+directly without going through nox. Pytest markers: `networks`, `algorithms`, `io`, `generators`, `adapters`, `tts`
+(defined in `pyproject.toml`, mirrors `test/` subdirectory layout).
+
+### C++ bindings
+
+```console
+uvx nox -s stubs              # regenerate .pyi stubs after changing any bindings.cpp — required after C++ binding changes
+```
+
+For a raw CMake build/iteration loop outside of nox:
+
+```console
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+```
+
+### Docs
+
+```console
+uvx nox -s docs                    # build + serve locally (requires graphviz installed)
+uvx nox -s docs -- -b linkcheck    # check links instead of building HTML
+```
+
+### Code review
+
+- `cr --agent <file1> <file2> ...` — run only on large changes, only when a human explicitly asks for it.
+- Fetch review comments from an open PR via the CodeRabbit MCP tool.
+
+## Architecture
+
+**Five parallel binding modules.** The C++-to-Python surface is split into five independent compiled extensions,
+each with matching directories on both sides:
+
+| C++ (`src/aigverse/<module>/`) | Python stub (`python/aigverse/<module>.pyi`) | Tests (`test/<module>/`) |
+| ------------------------------ | -------------------------------------------- | ------------------------ |
+| `networks/`                    | `networks.pyi`                               | `test/networks/`         |
+| `algorithms/`                  | `algorithms.pyi`                             | `test/algorithms/`       |
+| `io/`                          | `io.pyi`                                     | `test/inout/`            |
+| `generators/`                  | `generators.pyi`                             | `test/generators/`       |
+| `utils/`                       | `utils.pyi`                                  | `test/truth_tables/`     |
+
+Each module directory has its own `CMakeLists.txt` calling `add_aigverse_python_binding(...)` (defined in
+`cmake/AddAigversePythonBinding.cmake`) and a `bindings.cpp` that registers the nanobind module. Adding or changing
+a bound function means editing the `.cpp` implementation _and_ its registration in `bindings.cpp`, then running
+`nox -s stubs` to regenerate the corresponding `.pyi` — never hand-edit `.pyi` files, they are fully generated.
+
+**Dependency vendoring.** mockturtle, kitty, and lorina are pulled in via CMake `FetchContent`
+(`cmake/ExternalDependencies.cmake`), pinned to a specific commit (`MOCKTURTLE_REV`) — not git submodules.
+
+**Lazy Python package.** `python/aigverse/__init__.py` lazily imports `networks`/`algorithms`/`io`/`generators`/
+`utils` via `__getattr__` so `import aigverse` doesn't eagerly load every compiled extension. `adapters` (optional
+ML interop, e.g. NetworkX conversion) is a separate pure-Python subpackage gated behind the `[adapters]` install
+extra — don't add hard dependencies there without the extra.
+
+**Versioning.** `python/aigverse/_version.py` is generated by `vcs-versioning` from git tags at build time; don't
+edit it directly.
+
+**Releasing.** Cutting a release means renaming `CHANGELOG.md`'s `[Unreleased]` section and publishing a GitHub
+Release — the tag is the version. The full procedure is in the `Releasing` section of `docs/DevelopmentGuide.md`;
+follow it rather than improvising one.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [marcelwa/aigverse](https://github.com/marcelwa/aigverse) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-06 -->
