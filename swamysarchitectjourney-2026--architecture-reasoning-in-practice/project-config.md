@@ -1,100 +1,143 @@
 ---
 trigger: always_on
-description: enables: ["../advanced-content/"]
+description: **Last Updated**: January 1, 2026
 ---
 
-# Content Rules (Architecture Reasoning in Practice)
+# Repository Structure & Context
 
-**Version**: 2.0  
-**Last Updated**: January 1, 2026  
-**Priority**: MANDATORY - All content creation must follow these rules without exception
-
----
-
-## 📋 Rule Applicability
-
-**IMPORTANT**: These rules apply differently based on content type:
-
-### Practice Content (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`)
-- ✅ **File naming**: Descriptive names (e.g., `problem-framing.md`, `cqrs-selective-application.md`) - **NO numbering required** for content files
-- ✅ **Folder naming**: Folders use numbered prefixes (`01_reasoning-foundations/`, `02_answer-structuring/`) - **ALWAYS numbered**
-- ✅ **Line limits**: Recommended ≤150 lines (split, don't trim)
-- ✅ **YAML frontmatter**: Recommended for content files (all 5 metadata fields when content is added)
-- ✅ **Zero-copy policy**: Applies (content must be transformative)
-- ✅ **File references**: Must point to existing files
-
-**Numbering Rules Summary**:
-- **Folders**: Always use numbered prefixes (`01_`, `02_`, etc.) - **NEVER use `00_`**
-- **Content files**: Use descriptive names without numbering (e.g., `decision-rationale-framing.md`)
-- **Split files**: When splitting content, use `-part1`, `-part2` suffixes (e.g., `topic-part1.md`, `topic-part2.md`) - no numbered prefix on content files
-
-### Resources (`src/resources/` directory)
-- ✅ **File naming**: Logical names (`frameworks.md`, `reference-materials.md`, `tools.md`)
-- ✅ **Numbering**: NOT required (reference materials)
-- ⚠️ **YAML frontmatter**: NOT required
+**Version**: 1.0  
+**Last Updated**: January 1, 2026
 
 ---
 
-## 🚫 Zero-Copy Policy (Non-Negotiable)
+## 🧭 Repository Context
 
-**CRITICAL**: All content (case study documentation and educational content) must be transformative, not reformative.
+**Architecture Reasoning in Practice** is a personal learning repository documenting hands-on practice in architectural reasoning across senior and staff-level technical roles. It provides:
 
-❌ **NEVER** copy text verbatim from books, articles, websites, videos, or third-party materials  
-❌ **NEVER** mirror a source's outline, section order, headings, or example sequence  
-❌ **NEVER** use "light paraphrasing" — must transform completely  
-✅ **ALWAYS** create diagrams in Mermaid-first style with ASCII fallback (never embed copyrighted figures)  
-✅ **ALWAYS** write fresh, minimal code from first principles  
-✅ Brief quotations allowed ONLY with quotation marks and source citation
+- Structured thinking approaches
+- Trade-off analysis frameworks
+- Clear communication of architectural decisions
+- Practice with ambiguous and open-ended scenarios
+
+**Target Audience**:
+
+- Swamy (personal learning journey)
+- Senior Software Engineers
+- Principal Software Engineers
+- Staff Engineers
+- Software Architects
+- Solution Architects
+- AI Architects
+- Engineering Managers
+- Principal Consultants
+
+**Purpose**: Develops real-world architectural judgment and decision-making capability through structured practice and analysis.
+
+### 🚨 CRITICAL: Repository Purpose
+
+**This repository (`architecture-reasoning-in-practice`) contains:**
+
+- ✅ **Practice Content**: Architectural reasoning scenarios and exercises
+- ✅ **Resources**: Frameworks, tools, and reference materials (`src/resources/`)
+- ✅ **Templates**: Standard templates for consistent content (`docs/templates/`)
+
+### 📋 Content Type Classifications
+
+**Practice Content** (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`):
+
+- Purpose: Educational learning materials for architectural reasoning
+- Structure: Each thinking mode has topic-specific markdown files
+- File Naming: Descriptive names (e.g., `problem-framing.md`, `top-down-communication.md`)
+
+**Resources** (`src/resources/`):
+
+- Purpose: Frameworks, tools, and reference materials
+- File Naming: Logical names (`frameworks.md`, `reference-materials.md`, `tools.md`)
 
 ---
 
-## 🔄 Transformative Workflow (Required Every Time)
+## 📁 Repository Structure
 
-**Step-by-step process for creating original educational content**:
+> **📋 Single Source of Truth**: The complete and up-to-date repository structure is maintained in [`docs/01_repository-structure.md`](../../docs/01_repository-structure.md). This file should be referenced for the authoritative structure. When the structure changes, update that file first, then update references here.
 
-1. **Source Intake**: Skim for intent and big ideas; don't copy notes verbatim
-2. **Concept Map**: Create fresh outline with different sectioning tailored to Architecture Reasoning learning
-3. **Teach Differently**: Use new analogies, scenarios, examples, use-cases (avoid source examples)
-4. **Produce Original Artifacts**: Explanations, diagrams (Mermaid with ASCII fallback), minimal examples
-5. **Cross-Link**: Add references and connections across Architecture Reasoning thinking modes
-6. **Similarity Audit**: Ensure no sentences/structures resemble source
-7. **Zero-Copy Verification**: **MANDATORY** - Verify no verbatim text, especially in quotes and "Key Principle" sections
-8. **Optional References**: Add "References/Inspired by" links (no copied phrasing)
+For the complete repository structure, see: **[docs/01_repository-structure.md](../../docs/01_repository-structure.md)**
 
-**Goal**: Create transformative educational content, not just reformative. Entirely new presentation, examples, and explanations that teach the same concepts through original methods.
+### Current Structure Overview (As of December 24, 2025)
 
-**⚠️ CRITICAL REMINDER**: Even "Key Principle" quotes and example structures must be completely transformed. Verbatim copying of ANY text from source material violates the zero-copy policy.
+**Note**: This is a summary. For the complete structure with all file names and details, refer to [`docs/01_repository-structure.md`](../../docs/01_repository-structure.md).
+
+**Quick Overview**:
+
+- `src/01_reasoning-foundations/` - Problem framing, clarification strategies, assumptions
+- `src/02_answer-structuring/` - Top-down communication, depth control, time-boxed reasoning
+- `src/03_tradeoff-articulation/` - Cost vs scale, simplicity vs flexibility, risk framing
+- `src/04_role-perspectives/` - How different roles think when solving the same problem
+- `src/05_evaluation-scenarios/` - Vague problems, conflicting requirements, legacy modernization
+- `src/resources/` - Frameworks, tools, and reference materials
+- `docs/templates/` - Scenario + pattern-note templates
+- `.github/workflows/` - CI checks (content compliance)
+
+## 📁 Directory Structure Details
+
+### Thinking Mode Directories
+
+**src/01_reasoning-foundations/** - Reasoning foundations
+
+- Problem framing
+- Clarification strategies
+- Assumptions and constraints
+
+**src/02_answer-structuring/** - Answer structuring
+
+- Top-down communication
+- Depth control
+- Time-boxed reasoning
+
+**src/03_tradeoff-articulation/** - Trade-off articulation
+
+- Cost vs scale
+- Simplicity vs flexibility
+- Risk and failure framing
+
+**src/04_role-perspectives/** - Role perspectives
+
+- Staff Engineer perspective
+- Principal Engineer perspective
+- Architect perspective
+- Engineering Manager perspective
+
+**src/05_evaluation-scenarios/** - Evaluation scenarios
+
+- Vague problems
+- Conflicting requirements
+- Legacy modernization
+
+### Supporting Directories
+
+**src/resources/** - Reference materials
+
+- Frameworks
+- Reference materials
+- Tools
+
+## 📞 Support & Escalation
+
+**Questions about reasoning foundations?** → Check `src/01_reasoning-foundations/`
+
+**Need answer structuring guidance?** → Check `src/02_answer-structuring/`
+
+**Looking for trade-off articulation?** → Check `src/03_tradeoff-articulation/`
+
+**Structure outdated?** → Update `docs/01_repository-structure.md` first, then update references in `.github/copilot-instructions.md` and `README.md`
 
 ---
 
-## ⏱️ 25-Minute Learning Segments
+## For More Information
 
-**APPLICABILITY**: This rule applies to practice content files (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`).
-
-**For Lab Documentation**: The 150-line limit is a **recommendation**, not a strict requirement. Lab files may exceed 150 lines if needed for comprehensive instructions.
-
-✅ **Modular content** designed for focused 25-minute sessions  
-✅ **Multi-Part Structure**: Complex topics split into Part 1, Part 2, ... Part N  
-✅ **One-Shot Learning**: Each segment complete and actionable within time limit  
-✅ **Target Length**: 150 lines of content maximum per response (educational content)
-
-### ⚠️ CRITICAL: Splitting vs. Trimming Policy
-
-**APPLICABILITY**: This rule applies to practice content files (`src/01_reasoning-foundations/`, `src/02_answer-structuring/`, `src/03_tradeoff-articulation/`, `src/04_role-perspectives/`, `src/05_evaluation-scenarios/`).
-
-**For Lab Documentation**: If lab files exceed 150 lines, consider splitting for better organization, but it's not mandatory.
-
-**MANDATORY APPROACH** (Educational Content Only): When content exceeds 150 lines, **ALWAYS SPLIT** into multiple parts. **NEVER TRIM** or condense content.
-
-**Why Splitting is Required:**
-- ✅ **Preserves ALL educational content** - No loss of examples, explanations, or concepts
-- ✅ **Maintains learning value** - Each part remains complete and actionable
-- ✅ **Better learning experience** - Learners get comprehensive coverage across parts
-- ✅ **Follows 25-minute principle** - Each part fits within focused learning session
-
-**Why Trimming is Prohibited:**
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Repository**: Check README.md for repository location
+- **Learning Path**: `README.md`
+- **Content Index**: See domain README files
+- **GitHub Copilot Instructions**: `.github/copilot-instructions.md`
 
 ---
 > Source: [SwamysArchitectJourney-2026/architecture-reasoning-in-practice](https://github.com/SwamysArchitectJourney-2026/architecture-reasoning-in-practice) — distributed by [TomeVault](https://tomevault.io).
