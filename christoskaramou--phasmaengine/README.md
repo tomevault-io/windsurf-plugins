@@ -5,7 +5,7 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [christoskaramou/PhasmaEngine](https://github.com/christoskaramou/PhasmaEngine).
+Original source: `` in [christoskaramou/PhasmaEngine](https://github.com/christoskaramou/PhasmaEngine).
 
 ## Also available for
 
@@ -13,6 +13,7 @@ Original source: `GEMINI.md` in [christoskaramou/PhasmaEngine](https://github.co
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/christoskaramou/PhasmaEngine](https://github.com/christoskaramou/PhasmaEngine)
