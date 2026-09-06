@@ -7,11 +7,11 @@ An autonomous pipeline that takes a plain English task description and produces 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Shaswat2001/robosmith](https://github.com/Shaswat2001/robosmith).
+Original source: `CLAUDE.md` in [Shaswat2001/robosmith](https://github.com/Shaswat2001/robosmith).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
