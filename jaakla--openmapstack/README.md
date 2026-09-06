@@ -7,11 +7,11 @@ AI-agent skill for reproducible, validated GIS analysis — from authoritative d
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [jaakla/openmapstack](https://github.com/jaakla/openmapstack).
+Original source: `AGENTS.md` in [jaakla/openmapstack](https://github.com/jaakla/openmapstack).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
