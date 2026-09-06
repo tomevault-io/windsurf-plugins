@@ -1,76 +1,83 @@
 ---
 trigger: always_on
-description: Onboarding + operating rules for anyone (AI or human) working in `tjakoen.github.io/`: the personal site
+description: How we build on this stack. The goal is one consistent, reusable, scalable way to do
 ---
 
-# CLAUDE.md — portfolio
 
-Onboarding + operating rules for anyone (AI or human) working in `tjakoen.github.io/`: the personal site
-(tjakoen.github.io), the home of all published content and the notes, and the canonical home of the
-personal standards (`/standards`, rendered through MILL from this repo's own `standards/` dir — since
-the 2026-07-09 fold-in, the same option-b move used for the layer docs; PANTRY resolves the same files
-out of this repo's package). Read this first. This is where most content work happens, so before
-writing anything in Tjakoen's name, read the standards below.
+How we build on this stack. The goal is one consistent, reusable, scalable way to do
+each thing — so new code (and new sessions) extend the grain instead of fighting it.
+When a rule and the surrounding code disagree, the surrounding code wins until this doc
+is updated; keep them in sync.
 
-> This file follows the `CLAUDE.starter.md` template from the published standards index
-> <https://tjakoen.github.io/standards>. The personal voice/badge standards it points to
-> are the source of truth for how anything published should read and look.
+> Companion docs: [`PHILOSOPHY.md`](https://github.com/tjakoen/tjakoen.github.io/blob/main/docs/PHILOSOPHY.md) (the why), [`ARCHITECTURE.md`](ARCHITECTURE.md)
+> (the substrate), [`GRAIN.md`](../../grain/docs/GRAIN.md) (the design system + AI layer),
+> [`AI-INTERFACE.md`](../../grain/docs/AI-INTERFACE.md) (the contract),
+> [`DESIGN-SYSTEM.md`](../../grain/docs/DESIGN-SYSTEM.md) (the visual identity), [`grain/README.md`](https://github.com/tjakoen/grain/blob/main/README.md) (usage).
 
-## What this is
+---
 
-`tjakoen.github.io/` is **the app + composition root** — it wires grain + batch + mill and runs the
-site — plus the content layer: the blog/notes, the résumé and showcase pages (`/`, `/grain`, `/batch`),
-and the standards. It uses MILL to render Markdown content into GRAIN pages — **MILL is built and
-live** (`/notes`, `/grain/docs`, `/batch/docs` render through it); content is authored as `.md`. It
-uses the stack; it does not build it. Pages are trailheads to the canonical docs, never forks of them.
+## 1. Layers & boundaries
 
-## What this is worked in
+Four concerns, one direction of dependency (each layer builds only on those below):
 
-The harness is **Nimbalyst**: sessions grouped into workstreams with their subagents, tabs and
-edited files visible together, per-action permission judged rather than blanket-approved, and
-`spawn_session` so a handoff opens the next session instead of being pasted into one. It matters to
-anyone working here for three practical reasons: uncommitted work is attributed **per session**, so a
-dirty tree is not automatically yours (LOOP §4b); a rendered change can be screenshotted and shown
-inline rather than described; and `.nimbalyst/` plus `nimbalyst-local/` are gitignored private
-working material, never site content. None of this is required by the standards, which state the
-capability and name the tool only as the example. See [`plans/nimbalyst-in-the-loop.md`](plans/nimbalyst-in-the-loop.md).
+```
+batch/   the no-build hypermedia substrate (render, http, assets, catalog, platform)
+   └─ grain/   the design system + optional AI-interaction layer (default theme lives here)
+        ├─ mill/       the Markdown→GRAIN CMS (a reusable layer above grain; built)
+        └─ tjakoen.github.io/  THE app + composition root — a custom BATCH+GRAIN site that uses
+                               MILL for content; holds domain components, routes, pages, server.ts
+   (project/   the AI-assistant product — PAUSED since 2026-07-05, a docs-only archive)
+```
 
-## Start here (reading order)
+**Hard rules (enforced by review; verified in the audit):**
+- `batch/` imports **nothing** from `grain/` (or the app). It's the substrate; it must extract cleanly.
+- `grain/` imports **nothing** from `batch/`. It depends only on the **`OpChannel` port**
+  (`grain/ai/contract.ts`) — never a concrete substrate. It ships its own default theme.
+- `tjakoen.github.io/` wires the graph. Cross-layer dependencies are declared as **constructor/factory
+  params**, and the **only place the layers meet is `tjakoen.github.io/server.ts`** (the composition root).
+- New design-system work goes **in `grain/` by default** (it's reusable). Only obviously
+  app-specific things (a one-off page layout, a domain component like `task-card`) live in the app
+  (`tjakoen.github.io/`). Test: *"would another product on GRAIN want this?"* → yes = grain, no = the app.
 
-The standards are installed here as **skills**. Invoke them, do not fetch them: `Skill(voice)`,
-`Skill(figures)`, `Skill(note-standard)`, `Skill(readme-standard)`, and the rest of the seventeen
-under `.claude/skills/`. The published URLs below are the human-readable copy of the same file and
-are there for a reader, not for a session: a web fetch to read a standard this repo already ships
-is a wasted round trip. The source of every one lives in this repo's `standards/` dir, so edits go
-there and then get regenerated into the gitignored, never-committed skills dir by running
-`bun cli.ts skills sync ../tjakoen.github.io` from the pantry repo. That package does name a pantry
-binary, but it is not installed on PATH here, so reach for it through bun rather than assuming the
-short command exists.
+A consuming product **re-skins by overriding token slots** in its own sheet linked after
+GRAIN's three (`variables.css` → `global.css` → `grain.css`) — never by editing components.
 
-1. [`PHILOSOPHY.md`](docs/PHILOSOPHY.md): the *why* beneath the whole stack. Read first.
-2. *Skill(intake)* ([published](https://tjakoen.github.io/standards/intake)): read it BEFORE
-   starting work on a pasted document, a forwarded brief or a handoff that runs longer than a
-   screen and wants something changed. It turns the blob into the lane, the scope cap, the hard
-   stops, the ask-triggers and a finish line by putting four questions to the owner, and it says
-   plainly when no brief is needed so it does not fire on a one-line ask.
-3. `Skill(voice)` ([published](https://tjakoen.github.io/standards/voice)): the writing standard
-   (voice, the machine-tells to avoid). Match it for any prose in his name.
-4. `Skill(figures)` ([published](https://tjakoen.github.io/standards/figures)): the figure standard,
-   the two tokenized inline-SVG scaffolds (data-viz + flow) and the no-mermaid-on-the-published-site
-   rule. Use it for any diagram or chart.
-5. `Skill(note-standard)` ([published](https://tjakoen.github.io/standards/note-standard)): how a
-   note/blog post is built (frontmatter, structure, the sign-off footer) + a reusable prompt to
-   draft one. Use it for any `content/notes/*.md`.
-6. `Skill(readme-standard)` ([published](https://tjakoen.github.io/standards/readme-standard)):
-   badges + README presentation, with a reusable prompt to run in any repo.
-7. `Skill(graph)` ([published](https://tjakoen.github.io/standards/graph)): read it before answering
-   any "where is X", "what calls Y" or "map this directory" question. This repo carries a live code
-   graph, rebuilt by a PostToolUse hook on every edit, so `graphify query <symbol>` answers those in
-   one call where a grep sweep costs many. Seed the query with a symbol the code actually contains:
-   a partial name returns a bare "No matching nodes found." and reads like a broken tool.
-8. [`CONTENT-BACKLOG.md`](docs/CONTENT-BACKLOG.md): what is written, what is in-flight, what is left.
-9. [`PLAN.md`](docs/architecture/PLAN.md) + [`FEATURES.md`](docs/architecture/FEATURES.md): the site's *how* and *what*.
-10. [`HACKING.md`](docs/HACKING.md): the route → source map + "which file do I open to change X" — the
+**What "no-build / native-first" governs (and what it doesn't).** The constraint is about the
+*product's runtime*, not the dev toolbox. It means exactly two things: (1) **no build step** — Bun
+runs the TypeScript directly, no bundler/transpiler between source and server; (2) **native-first**
+— the product ships (near-)zero framework JS to the browser (the `bun run audit` numbers are the
+proof). It does **not** mean "zero dependencies." Two things are always fair game and are **not**
+violations: **platform builtins** (`fs`, `path`, `node:fs/promises` — provided by Bun; batch reads
+files with them throughout) and **devDependencies** used by tooling that never ships to the client
+(`@playwright/test` drives the e2e tests, `bun run shots`, and `bun run audit` — it measures the
+product from the outside, it isn't part of it). The bar to defend is the `dependencies` block in
+`package.json`: keep third-party *runtime* deps at zero (today only `bun` itself). A dev tool
+importing playwright, or the substrate importing `fs`, is the stack working as intended.
+
+**Native-first is a *positive* rule, not just an absence of framework JS.** It means: **prefer the
+platform's own primitive over reimplementing it.** A `<dialog>` over a JS modal; `<details>` over a
+JS accordion; the **View Transitions API** over a JS page-animation lib; **plain `<a>` + CSS** over a
+JS tab/router; **native constraint validation** over JS form validators; the **Popover API** and
+**CSS anchor positioning** over a floating-UI library; **`:has()`** / **`:focus-within`** /
+**`color-mix()`** / **`@starting-style`** / **container queries** / scroll-driven animations over
+style-computing JS. The test when reaching for JS: *does a browser primitive already do this?* If
+yes, use it; only write JS when none does (in this stack the sole such case is the `/intent`
+dispatcher). GRAIN's running inventory of which primitives are in use is in
+[`grain/docs/GRAIN.md`](../../grain/docs/GRAIN.md) ("What GRAIN gives you"); page transitions are
+worked in [ARCHITECTURE §11.3](ARCHITECTURE.md).
+
+---
+
+## 2. TypeScript
+
+- **Factories, not classes**, for wiring: `createX(deps)` / `makeX(opts)` returning a small
+  object of closures (e.g. `createInteractionLayer`, `makeStubReasoner`, `createStream`).
+  Classes are reserved for **port implementations** (`InMemoryItemRepository implements
+  ItemRepository`), domain **error types** (`HttpError`), and plain **service aggregators**.
+- **Depend on interfaces, not implementations.** Every cross-layer seam is a named `interface`
+  (`OpChannel`, `Reasoner`, `ReasonTools`, `ItemRepository`, `Runtime`, `Stream`). Inject the
+  concrete thing at the composition root.
+- **Erasable TypeScript only** (`erasableSyntaxOnly` + `verbatimModuleSyntax`): no `enum`, no
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
