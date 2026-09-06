@@ -1,90 +1,53 @@
 ---
 trigger: always_on
-description: Guidance for any coding agent working in this repository. **This file is the
+description: The import above is the shared guidance — repository layout, commands,
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for any coding agent working in this repository. **This file is the
-shared source of truth** — everything an agent needs to work here is below,
-regardless of which harness it runs in.
+@AGENTS.md
 
-Harness-specific files complement it and must not restate it:
+The import above is the shared guidance — repository layout, commands,
+`pipeline.py` and `csms.py` architecture, conventions. **Read it first.** This
+file adds only what is specific to Claude Code, so anything you learn that holds
+for every agent belongs in `AGENTS.md`, not here.
 
-| File | Scope |
-| --- | --- |
-| `AGENTS.md` | Everything shared. Start here |
-| `CLAUDE.md` | Claude Code specifics only — it imports this file |
+## Skills
 
-Keep new project knowledge in this file. If a fact holds for every agent, it
-belongs here even when you discovered it in one harness.
+Two maintenance workflows are packaged as skills in `.claude/skills/`. Prefer
+them over improvising the steps — they encode decisions a plain re-run gets
+wrong:
 
-## What this repository is
+- **`add-project`** — add, list or feature a repo in the generated README
+  listing, including handling an "Add a link" issue. Covers making the repo
+  discoverable, `ingest → enrich → render`, pinning the category when the
+  classifier diverges, and closing the issue.
+- **`refresh-metadata`** — the periodic refresh of the listing's stars, forks
+  and dormancy signals, with no repo to add. It handles the cache-versus-TTL
+  decision (whether to clear `cache_github/` first).
 
-A curated "awesome list" of EV charging protocol tools (OCPP, OCPI, ISO 15118, OICP, eMI³, OIOI, Eichrecht). Two distinct deliverables live here:
+`.agents/skills/` holds harness-neutral copies of both. Edit one and port the
+change to the other.
 
-1. **`README.md`** — the published awesome list. Its prose (intro, Contents, `## Specifications`, `## Contributing`, `## Other Resources`) is hand-authored. The **project listing** inside `## Tools and Resources` — everything between the `<!-- BEGIN GENERATED PROJECTS -->` / `<!-- END GENERATED PROJECTS -->` markers — is **generated** by `python pipeline.py render --readme README.md` and injected in place. Do **not** hand-edit between those markers; edits are overwritten on the next render. To change what appears there, adjust the pipeline inputs (see Conventions) and re-render.
-2. **`pipeline.py`** — a discovery pipeline that scrapes GitHub for candidate repositories, scores them with quality signals, AI-classifies them, and renders the curated project listing that populates the README's `## Tools and Resources` block.
-3. **`csms.md` + `csms.py`** — a separate product-level catalogue of Charging Station Management Systems (see "csms.py" below). Independent of `pipeline.py`, which it only imports.
+## The default classifier is `claude`
 
-The repo also vendors protocol specifications as static assets under `ocpp/`, `ocpi/`, `oicp/`, `emi3/`, `eichrecht/` (PDFs, WSDLs, OCPP JSON schemas) — these are reference material linked from `README.md`.
+`enrich` shells out to the `claude` CLI unless `--classifier` says otherwise, so
+running `mise run enrich` from inside a Claude Code session spawns a **nested,
+non-interactive** `claude -p` per repo to classify. That is expected — but it
+means the run is billed per repo, and a session-level interrupt does not
+propagate to the child. Prefer `--classifier copilot` in CI, which is what
+`.github/workflows/refresh-metadata.yml` uses.
 
-## Commands
+The role and output contract for that backend live in
+`.claude/agents/repo-classifier.md`. `AGENTS.md` lists the three other places
+the same contract is duplicated — change one, change all of them.
 
-The project is managed with **mise** (`mise.toml`): it pins Python 3.11.16 and
-auto-creates/activates a `.venv` — no manual `source .venv/bin/activate`. Run
-`mise trust` once after cloning.
+## Repository-specific tool notes
 
-```bash
-mise install          # install the pinned Python
-mise run install      # (alias: mise run i) runtime deps into .venv
-mise run install-dev  # runtime + pytest; `install` alone keeps the CI data job lean
-#   A fresh .venv has no pytest — run this before `mise run test`, or the suite
-#   fails with "No module named pytest" and it looks like a broken environment.
-mise run test         # (alias: mise run t) pytest
-
-mise run ingest       # Stage 1 -> repos.csv   (wires --token via `gh auth token`)
-mise run enrich       # Stage 2 -> repos.enriched.csv
-
-# Or call the script directly (mise auto-activates .venv for commands run in-dir):
-python pipeline.py ingest --token <GITHUB_PAT> --out repos.csv
-python pipeline.py enrich --in repos.csv --out repos.enriched.csv --token <GITHUB_PAT>
-#   enrich flags: --limit N / --skip-forks / --skip-dormant / --refresh
-
-python pipeline.py render --readme README.md   # Stage 3 -> injects the curated
-#   Selection between the markers in README.md and writes the secondary
-#   legacy-projects.md (dormant + to-refine). Omit --readme to only write the latter.
-
-git show HEAD:classifications.csv | python pipeline.py check-classifications --base -
-#   CI guard, see "Guarding the classification cache" below.
-```
-
-`--token` is optional; without it GitHub's unauthenticated rate limits apply.
-`gh auth token` supplies one when the gh CLI is authenticated.
-
-`mise run test` (alias `t`) runs the pytest suite in `tests/`, which covers
-`csms.py` only: the controlled feature vocabulary, certificate derivation,
-product/company identity, merge precedence, table rendering, the curated-CSV
-validations and render determinism. It needs no network — the one GitHub call
-`merge` can make is monkeypatched — and it also validates the committed CSVs, so
-a bad curated row fails there as well as at render time. `tests/test_pipeline.py`
-covers `pipeline.py`'s classification layer — the CI guard, the "is there
-anything to classify" rule, the backends' failure contract and what `enrich`
-writes to the durable cache — with the backend and the README fetch stubbed, so
-it needs no network and spawns no LLM CLI. The rest of `pipeline.py` is
-untested; its pure functions can be exercised by importing `pipeline` and
-calling `build_repo_record` / `days_since_push` / `parse_categories` directly.
-
-Markdown is linted by `npx markdownlint-cli2` (config in
-`.markdownlint-cli2.jsonc`); `README.md` additionally by `npx awesome-lint`.
-
-## pipeline.py architecture
-
-A two-stage pipeline connected by a **CSV boundary** — ingestion (deterministic, GitHub-only) is deliberately separated from enrichment (the slow/flaky LLM step), so the CSV can be reviewed/curated in a spreadsheet and enrichment can be re-run without re-fetching.
-
-**Stage 1 — `ingest` → `repos.csv`** (`ingest`, `collect_candidates`, `build_repo_record`):
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- The pinned Python lives in mise's venv at `.venv/`. It has no `pip`; use
+  `uv pip install --python .venv/bin/python …` or the mise tasks.
+- `python` on `PATH` is not the project interpreter unless mise has activated
+  the directory. `.venv/bin/python` always is.
 
 ---
 > Source: [juherr/awesome-ev-charging](https://github.com/juherr/awesome-ev-charging) — distributed by [TomeVault](https://tomevault.io).
