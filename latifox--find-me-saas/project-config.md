@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Skill — competitor-mapper. Maps direct, indirect, and substitute competitors with positioning gaps.
+description: Skill — decision-memo. Writes a human-readable decision brief: verdict, score, top 3 strengths, top 3 risks, next step.
 ---
 
 
-See [skills/competitor-mapper/SKILL.md](../../skills/competitor-mapper/SKILL.md) for full instructions and output schema.
+See [skills/decision-memo/SKILL.md](../../skills/decision-memo/SKILL.md) for full instructions and output schema.
 
 ---
 > Source: [Latifox/find-me-saas](https://github.com/Latifox/find-me-saas) — distributed by [TomeVault](https://tomevault.io).
