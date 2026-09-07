@@ -1,135 +1,97 @@
 ---
 trigger: always_on
-description: Guidance to Claude Code (claude.ai/code) for this repo.
+description: This guide provides essential knowledge for AI coding agents working in the GrowERP codebase. It covers architecture, workflows, conventions, and integration points to maximize productivity and code quality.
 ---
 
-# CLAUDE.md
+# GrowERP AI Coding Agent Instructions
 
-Guidance to Claude Code (claude.ai/code) for this repo.
+This guide provides essential knowledge for AI coding agents working in the GrowERP codebase. It covers architecture, workflows, conventions, and integration points to maximize productivity and code quality.
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+## 🏛️ Big Picture Architecture
+GrowERP is an open-source, multi-platform ERP system designed to streamline business operations. It runs on Android, iOS, Web, Linux, and Windows, using Flutter for the frontend and Moqui for the backend. Comprehensive documentation and support are available at [https://www.growerp.com](https://www.growerp.com).
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+**Frontend Architecture** (Layered Building Blocks):
+  1. **Building Blocks** (`growerp_*`): Domain-specific packages (`growerp_core`, `growerp_models`, `growerp_user_company`, `growerp_catalog`, etc.) that implement business logic and can be composed into applications
+  2. **Applications**: Complete end-user apps (`admin`, `hotel`, `freelance`, `health`, `support`) built by composing building blocks
+  3. **Package Dependencies**: Strict hierarchy - `growerp_models` (lowest) → `growerp_core` → domain packages → applications
+  4. **State Management**: BLoC pattern (`flutter_bloc`) with centralized providers via `getCoreBlocProviders()` and domain-specific providers
 
-## 1. Think Before Coding
+**Backend Architecture** (Moqui Framework):
+  - **Components**: Located in `moqui/runtime/component/` - `growerp` (core business logic), `mantle-udm` (universal data model), `mantle-usl` (universal service library)
+  - **Multi-tenancy**: Built-in support for multi-company operations
+  - **Data Flow**: REST APIs between Flutter frontend and Moqui backend services
+  - **Integration**: Services defined in XML, entities in component definitions
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+## 🛠️ Developer Workflows
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+**Frontend (Melos Monorepo Management)**:
+  ```bash
+  dart pub global activate melos # one-time setup
+  melos clean && melos bootstrap  # reset dependencies
+  melos build                     # run build_runner on packages with build dependencies
+  melos l10n                      # generate localizations for all packages
+  melos watch                     # continuous build_runner watch
+  ```
 
-## 2. Simplicity First
+**Testing**:
+  - **Local**: `melos test` (runs integration tests in dependency order)
+  - **Headless CI**: `cd flutter && ./build_run_all_tests.sh` (Docker + Linux desktop + xvfb)
+  - **Package Order**: Tests run in dependency order as defined in `melos.yaml`
+  - **Test Structure**: Integration tests in `packages/*/example/integration_test/`
+  - **Backend URL**: Injected via `--dart-define=BACKEND_URL=http://moqui` (no sed patching)
 
-**Minimum code that solves the problem. Nothing speculative.**
+**Backend (Moqui Framework)** - All commands from `moqui/` directory:
+  ```bash
+  # Initial setup
+  ./gradlew build
+  java -jar moqui.war load types=seed,seed-initial,install no-run-es
+  
+  # Clean rebuild
+  ./gradlew cleandb
+  java -jar moqui.war load types=seed,seed-initial,install no-run-es
+  
+  # Start server
+  java -jar moqui.war no-run-es  # port 8080 by default
+  ```
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+## 📦 Project-Specific Conventions
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+**Package Architecture**:
+  - **Strict Dependency Hierarchy**: `growerp_models` → `growerp_core` → domain packages (`growerp_catalog`, `growerp_user_company`, etc.) → applications (`admin`, `hotel`, etc.)
+  - **Version Synchronization**: All `growerp_*` packages maintain synchronized versions (currently v1.9.0)
+  - **Publishing Order**: Models/Core first, then domain packages, finally applications
 
-## 3. Surgical Changes
+**State Management (BLoC Pattern)**:
+  - **Core Providers**: `getCoreBlocProviders()` in `growerp_core` sets up shared BLoCs (Auth, Chat, Theme, Locale, DataFetch, etc.)
+  - **Domain Providers**: Each domain package provides additional BLoCs via functions like `getUserCompanyBlocProviders()`
+  - **Message Pattern**: Use direct l10n keys with colon-delimited parameters (`'userAddSuccess:${user.name}'`) - see `QUICK_REFERENCE_BLOC_MESSAGES.md`
 
-**Touch only what you must. Clean up only your own mess.**
+**Development Patterns**:
+  - **Integration Testing**: Standardized setup in `example/integration_test/` with Docker emulator support
+  - **Localization**: `flutter gen-l10n` generates type-safe l10n methods from `.arb` files
+  - **Build Generation**: Uses `build_runner` for JSON serialization, Retrofit API clients, etc.
+  - **Configuration**: `global_configuration` package loads from `app_settings.json`
 
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
+## 🔗 Integration Points & External Dependencies
 
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
+**API Communication**:
+  - **REST Client**: Type-safe Retrofit client in `growerp_models` with Dio HTTP client
+  - **WebSocket**: Real-time chat/notifications via `WsClient` (`web_socket_channel`)
+  - **Authentication**: JWT tokens managed by `AuthBloc` across all requests
+  - **Error Handling**: Centralized Dio error parsing with user-friendly messages
 
-The test: Every changed line should trace directly to the user's request.
+**Key Integrations**:
+  - **Stripe**: Payment processing documented in `docs/Stripe_Payment_Processing_Documentation.md`
+  - **Chat System**: WebSocket-based real-time messaging with `growerp_chat` package
+  - **File Handling**: Image picker, file picker, PDF generation (`printing`, `pdf` packages)
+  - **Localization**: Built-in support for multiple locales including Buddhist Era calendars
 
-## 4. Goal-Driven Execution
+## 📚 Key Files & Directories
 
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
-## Architecture
-
-GrowERP: multi-platform ERP (Android, iOS, Web, Linux, Windows). Flutter frontend, Moqui backend. All comms via REST APIs.
-
-**Two Flutter package categories** (all under `flutter/packages/`):
-1. **Building blocks** (`growerp_*`) — domain-specific reusable packages (e.g., `growerp_core`, `growerp_models`, `growerp_catalog`). Lower-level packages are deps of higher-level ones; `growerp_models` is base.
-2. **Applications** — end-user apps composed from building blocks (e.g., `admin`, `hotel`, `freelance`).
-
-**State management**: BLoC (`flutter_bloc`) throughout. Each domain entity follows:
-```
-growerp_[domain]/lib/src/[entity]/
-├── blocs/        # [Entity]Bloc, [Entity]Event, [Entity]State
-├── views/        # [Entity]List, [Entity]Dialog
-├── widgets/      # [Entity]_list_styled_data.dart
-└── integration_test/  # [Entity]Test
-```
-
-**Code generation**: Data models use `freezed` + `json_serializable`. API clients use `retrofit`. Run `melos build` after changing annotated files.
-
-**Backend**: Moqui components in `moqui/runtime/component/`. `growerp` component (source at `backend/`) provides multi-company ERP. See `docs/Flutter_Moqui_REST_Backend_Interface.md` for REST API details.
-
-**Backend repo structure** — all on `growerp` branch of growerp forks:
-- `moqui/` → growerp/moqui-framework (submodule of growerp root)
-- `moqui/runtime/` → growerp/moqui-runtime (cloned by `setup-backend.sh`, not a submodule)
-- `moqui/runtime/component/mantle-udm/` → growerp/mantle-udm (submodule of moqui-runtime)
-- `moqui/runtime/component/mantle-usl/` → growerp/mantle-usl (submodule of moqui-runtime)
-- `moqui/runtime/component/moqui-fop/` → growerp/moqui-fop (submodule of moqui-runtime)
-
-Custom components tracked in growerp root, symlinked by `setup-backend.sh`:
-- `backend/` → symlinked as `moqui/runtime/component/growerp`
-- `pop-rest-store/` → symlinked as `moqui/runtime/component/PopRestStore`
-- `mantle-stripe/` → symlinked as `moqui/runtime/component/mantle-stripe`
-- `moqui-adk/` → symlinked as `moqui/runtime/component/moqui-adk`
-- `moqui-mcp/` → symlinked as `moqui/runtime/component/moqui-mcp`
-
-## Key Docs
-
-- `docs/GrowERP_Security_Model.md` — user groups, menu-driven access, REST authorization
-- `docs/GrowERP_Design_Patterns.md` — canonical patterns and naming conventions
-- `docs/GrowERP_Code_Templates.md` — ready-to-use code templates
-- `docs/GrowERP_AI_Instructions.md` — detailed AI development guidance
-- `docs/Building_Blocks_Development_Guide.md` — creating new building blocks
-- `docs/basic_explanation_of_the_frontend_REST_Backend_data_models.md` — data model integration
-
-## Flutter Commands
-
-All melos commands run from `flutter/`. Workspace defined in `flutter/pubspec.yaml`.
-
-```bash
-cd flutter
-
-# One-time setup
-dart pub global activate melos
-export PATH="$PATH":"$HOME/.pub-cache/bin"
-
-# Bootstrap (run after cloning or adding packages)
+**Critical Configuration**:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [growerp/growerp](https://github.com/growerp/growerp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-07 -->
