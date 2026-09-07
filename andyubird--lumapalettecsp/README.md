@@ -7,11 +7,11 @@ A Clip Studio Paint color picker that uses the OKLCH color space, this allows th
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [andyubird/LumaPaletteCSP](https://github.com/andyubird/LumaPaletteCSP).
+Original source: `AGENTS.md` in [andyubird/LumaPaletteCSP](https://github.com/andyubird/LumaPaletteCSP).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
