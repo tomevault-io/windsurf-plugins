@@ -53,5 +53,5 @@ description: - This repo contains a Flutter desktop app.
 - It should not be assumed to safely take over an unrelated terminal session started by a user.
 
 ---
-> Source: [w0fv1/vertree](https://github.com/w0fv1/vertree) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+> Source: [w0fv1/VerTree](https://github.com/w0fv1/VerTree) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-07 -->
