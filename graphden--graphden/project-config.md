@@ -1,89 +1,75 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The single rule for WHERE a function's property lives — in the graph (default), a DB column (only when the graph can't serve it), and NEVER a name/prefix. Apply when adding/using any per-function property, classification, or metadata (visibility, kind, secret, anonymity, org, etc.), or when touching name-based dispatch/classification.
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Function metadata & identity — where a property lives
 
-**How Graphden is built.** Graphden is developed by a human engineer who uses AI
-coding agents as an accelerator. The engineer sets the direction, owns the design
-decisions, and reviews every change before it lands. This file and the `dev/wtq/`
-workflow describe how that human-directed work is organized so one developer can
-move fast — they are not a claim that the software writes itself. AI involvement
-is deliberate and not hidden.
+Graphden's premise is **code = graph**, and PHILOSOPHY §3 requires that
+**behavior be visible in graph structure** (no magic, no context-dependent
+semantics). That fixes where a function's properties must live. This rule is the
+single conceptual key every metadata/classification decision follows.
 
-## Are you a pooled feature agent? (read before editing)
+## The rule (graph → field → never a name)
 
-Parallel feature work happens in **isolated git worktrees** behind a serialized
-merge queue (`dev/wtq/`). An agent's operating contract is delivered as its
-launch *message* — so `/clear` and context compaction **destroy it, while this
-file survives**. If you have no memory of a contract, re-orient here before you
-touch a single file.
+1. **Graph by default.** A function's SEMANTIC property is expressed in the
+   graph itself — as **inheritance from a marker/base fn** (`parent-ids`),
+   a **binding on a slot**, or the fn's **type**. It is then visible in
+   structure, inherited, and needs no new DB column. The canonical precedent is
+   **`secret`**: a fn is a secret because it inherits `:secret-leaf`
+   (`parent-ids: [secret-leaf]`) — there is no `secret?` column. Classify by the
+   graph relation (is `secret-leaf` in the parent closure, by **id**), never by
+   name.
+2. **A DB column only when the graph cannot serve it.** Add/keep a base-schema
+   column ONLY for:
+   - **Org-isolation enforced by RLS** — `org_id`. RLS operates on columns; the
+     graph cannot enforce tenant isolation.
+   - **Content-addressed identity / dedup the executor needs at O(1)** —
+     `anonymous-hash` (are these two inline shapes identical?), `name = nil`
+     (a local/unnamed fn). A parent-closure walk cannot answer these cheaply,
+     and they are the fn's OWN identity, not domain metadata.
+   - **VCS / lifecycle plumbing** — `branch-id`, `deleted-at`, `created-at`, the
+     version-plane columns.
+   A column that merely CACHES a structural fact (e.g. a type-kind) is allowed
+   as a denormalized cache, but must be documented as derived-from-structure,
+   never as the source of truth, and never a prefix.
+3. **Never a name or a name-part.** Names are per-namespace LABELS
+   (`docs/adr/ADR-identity-model.md`), not carriers of meaning. No code branches
+   on a literal fn/package name or a name prefix (`_`, `_anon-`, …) to determine
+   a property. Base-fn / seed *identity* may be resolved from its globally-unique
+   name to its **id** ONCE at boot and then used by id (this is the ADR's
+   name-keyed base-fn identity, e.g. resolving `secret-leaf` / `vault-get` → id);
+   that is identity resolution, not per-fn classification.
 
-**Am I a pooled agent?** Yes if either holds:
+## Verdict per current property (graph / column / fixed)
 
-- your working directory is under `graphden-wt/<name>/` (one worktree per agent), or
-- `git branch --show-current` prints `feature/<name>` and `bb wt list` shows `<name>` in the pool.
+| Property | Where it lives | Rationale |
+|---|---|---|
+| `secret` | **Graph** — inherit `:secret-leaf` | Already graph; the model to copy. Classify by id. |
+| package **visibility / public interface** | **Graph** — a marker/export construct (TBD shape), NOT a prefix or column | Semantic; enforceable + structure-visible. Supersedes the earlier "namespace structure (visual)" idea in the packages spec. |
+| anonymity — **composite-TYPE anon** (inline record shape) | **Column** — `name = nil` + `anonymous-hash` set (UNIQUE) | Content-dedup identity, O(1), hot path. Classify by the field. |
+| anonymity — **composed anon fn-def** (inline `{:parent …}` lift) | **Identity in the synthetic `_anon-<hash>` NAME**; `anonymous-hash = NULL` | The name IS the content-addressed use-site identity (the hash embeds shape+host+ns; two use-sites get distinct names — `records-test/anon-use-site-identity-includes-namespace`). ADR name→identity, not a domain property in a prefix. Recognize an anon by `(or anonymous-hash (starts-with? name "_anon-"))` — the name half is IDENTITY. |
+| local/unnamed fn | **Column** — `name = nil` | Identity representation; not a prefix (`_`-authoring syntax lowers to name=nil). |
+| `org_id` | **Column** (+ RLS) | Isolation; cannot be graph. |
+| type-kind (`role`) | **Column as derived-cache** of a structural fact (type-row = no impl + slots/refine) | Kept for classification speed; document as derived, never a prefix. |
+| service / app-route | **Separate rows keyed by fn-id** (kept) | Carry runtime desired-state / a routing table; not fn-intrinsic metadata (see the domain-router decision — a routing table above the graph). |
 
-If neither holds, you are in the **main checkout on `develop`** — you are *not*
-claimed, and the first rule below still binds you.
+## Name/prefix-hardcode audit + remediation status (2026-08-13)
 
-**Full contract: [dev/wtq/AGENT.md](dev/wtq/AGENT.md)** — read it before editing. The rules most
-often violated after a context loss:
+Audit of the whole tree for "property encoded in a name/prefix." The dangerous
+class (dispatch/identity/cache/classify by name) is otherwise clean + guarded
+(ADR-identity-model + `id_resolution_guard_test`).
 
-| Rule | Why it matters |
-|------|----------------|
-| **Claim before you edit** — `bb wt claim <name> "<summary>"`, then `cd` to the printed WORKTREE and work only there | Editing the main checkout on `develop` corrupts the shared baseline every other agent branches from |
-| **Stay in your worktree** — never `cd` into another agent's worktree, never edit `develop`, never touch another agent's branch | Agents change unrelated files in parallel; your view of the repo is your branch only |
-| **`bb ci` is your only local *test* command; `bb wt up` is your only live *instance*** | `bb rebuild` / `bb deploy` / `bb test-integration` / `bb test-e2e` / `bb coverage` drive the SHARED stack (`graphden-executor` on :9002) and the shared image tag that `bb test-e2e` boots — from a worktree they steal the demo and make another agent's suite test your binary. They belong to the landing gate, behind its lock. `bb wt up` gives you an isolated stack (own containers, volumes, image, ports) to see your change run |
-| **Finish the job yourself** — a complete, `bb lint`-green feature goes through `bb wt merge`, then `bb wt drop`, without asking | Neither step can lose work: the gate cannot advance `develop` on a red result, and `drop` refuses an unmerged branch. Asking to merge a finished feature is ceremony, and it stalls a serialized queue on a human's reply. (A full local `bb ci` before queueing is optional solo — the gate re-runs it on the merged result; go `bb ci`-green first only when `bb wt list` shows other claimed agents.) Stop and ask only when a real decision is yours and the answer changes what you build |
-
-**Recovering the contract and your place in it** — the branch, the worktree and
-the task spec all live on disk, so nothing but the *prompt* is lost with the
-context:
-
-```bash
-bb wt list             # every agent: branch, drift vs develop, last gate RESULT
-bb wt status           # same, plus the recent gate runs
-bb wt task <name>      # the task spec you were handed
-bb wt log <name>       # full transcript of your last gate run
-bb wt watch <name>     # follow a running gate: 60s ticks until RESULT, then print it
-bb wt bootstrap        # reprint the discussion-phase (nameless-agent) launch prompt
-bb wt kickoff <name>   # reprint the launch prompt for an already-claimed agent
-```
-
-## Design Principles (MUST READ)
-
-**Every change must improve at least one principle without violating others.**
-
-| # | Principle | Description |
-|---|-----------|-------------|
-| 1 | **Correctness first** | No feature justifies bugs. Comprehensive tests required. |
-| 2 | **Minimal entities** | Resist adding new entity types, fields, or edge types. Each addition increases complexity everywhere. |
-| 3 | **Explicit over implicit** | Behavior must be visible in graph structure. No magic, no context-dependent semantics. |
-| 4 | **DRY** | Never define the same thing twice. Use inheritance (parent-id) and result caching for reuse. |
-| 5 | **Expressiveness parity** | Can do everything classical languages can. No "sorry, you can't do that." |
-| 6 | **No unnecessary expressiveness** | Don't add features just because we can. |
-| 7 | **Locality of changes** | Changing one node shouldn't require changes elsewhere. |
-| 8 | **Incrementality** | Adding features shouldn't require rewriting existing ones. |
-
-**Before making changes, ask:**
-
-- Which principle does this improve?
-- Does it violate any other principle?
-- Is there a simpler way?
-
-See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for full rationale and module mapping.
-
-## Project Overview
-
-Graphden is a visual functional programming environment where functions and their compositions are stored as a graph in a database.
-
-**Key concepts:**
-
-- **Code = Graph in DB** — functions and arguments stored as entities
+**Correction (verified against the live DB, not theory).** An earlier pass tried
+to replace EVERY `_anon-` name check with an `:anonymous-hash`-field check on the
+premise that the field is the single anonymity marker. That premise is FALSE.
+`select` over `fn` shows two anonymity classes: composite-TYPE anons (name NULL,
+`anonymous_hash` set) AND composed anon fn-defs (`_anon-<hash>` name,
+`anonymous_hash` NULL — the majority). For the composed class the field is null,
+so a field-only check silently stops recognizing them. Those "fixes" were
+therefore REGRESSIONS (sync leftover-scan would flood with synthetic rows; the
+type-picker would leak `_anon-` candidates) and were **reverted**. See the two
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
