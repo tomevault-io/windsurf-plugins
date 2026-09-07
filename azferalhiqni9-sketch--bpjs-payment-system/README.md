@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [azferalhiqni9-sketch/bpjs_payment_system](https://github.com/azferalhiqni9-sketch/bpjs_payment_system).
+Original source: `AGENTS.md` in [azferalhiqni9-sketch/bpjs_payment_system](https://github.com/azferalhiqni9-sketch/bpjs_payment_system).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
