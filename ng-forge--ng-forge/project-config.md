@@ -1,91 +1,136 @@
 ---
 trigger: always_on
-description: <!-- nx configuration start-->
+description: Central state service — owns all form lifecycle state, field resolution, and event coordination.
 ---
 
-<!-- nx configuration start-->
-<!-- Leave the start & end comments to automatically receive updates. -->
+# @ng-forge/dynamic-forms — Core Library
 
-# General Guidelines for working with Nx
+## State Management Architecture
 
-- When running tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
-- You have access to the Nx MCP server and its tools, use them to help the user
-- When answering questions about the repository, use the `nx_workspace` tool first to gain an understanding of the workspace architecture where applicable.
-- When working in individual projects, use the `nx_project_details` mcp tool to analyze and understand the specific project structure and dependencies
-- For questions around nx configuration, best practices or if you're unsure, use the `nx_docs` tool to get relevant, up-to-date docs. Always use this instead of assuming things about nx configuration
-- If the user needs help with an Nx configuration or project graph error, use the `nx_workspace` tool to get any errors
+### FormStateManager (`state/form-state-manager.ts`)
 
-<!-- nx configuration end-->
+Central state service — owns all form lifecycle state, field resolution, and event coordination.
 
-# ng-forge Development Guidelines
+Key signals: `activeConfig`, `formSetup`, `entity` (bidirectional form value), `form` (Angular Signal Form), `resolvedFields` (ready-to-render), `formValue`, `valid`, `dirty`, `errors`, `submitting`.
 
-## Working Style
+### FormStateMachine (`state/form-state-machine.ts`)
 
-- **Spawn subagents if you believe the task is better to be divided**
-- **Never jump to implementation without explicit user approval.** When asked to analyze, plan, or investigate, stay in analysis mode until the user says to proceed with code changes
-- **Always scope changes precisely to what was requested.** Do not apply changes globally when they should be limited to a specific file, component, or example. When in doubt, ask
-- **When the user describes a design constraint or architectural principle, treat it as absolute.** Do not attempt to relax, work around, or make stated design principles optional
-- **Keep plans concise and correct on the first attempt.** Do not over-engineer solutions. If the user says the plan is too complex, simplify immediately rather than rewriting with similar complexity
-- **When adding workarounds like arbitrary delays or skipping tests, flag them as code smells** and propose a proper fix first. Only use workarounds as a last resort with explicit user approval
-- **When working with git operations, confirm the target branch, repo directory, and scope** before executing. Never run destructive git operations without confirmation
-
-## Quick Reference
-
-| Command                    | Description                                 |
-| -------------------------- | ------------------------------------------- |
-| `pnpm install`             | Install dependencies                        |
-| `nx test <project>`        | Unit tests (Vitest)                         |
-| `nx build <project>`       | Build library                               |
-| `nx lint <project>`        | ESLint                                      |
-| `nx e2e <project>`         | E2E tests locally (screenshots will differ) |
-| `pnpm serve:docs`          | Serve docs app for dev                      |
-| `pnpm e2e:material`        | E2E in Docker (screenshots match CI)        |
-| `pnpm e2e:material:update` | Update screenshots in Docker                |
-| `pnpm e2e:clean`           | Clean Docker E2E cache                      |
-| `pnpm build:libs`          | Build all 6 library packages                |
-| `pnpm test:ci`             | Run all tests with coverage                 |
-| `pnpm lint`                | Lint all projects                           |
-
-## Architecture
+Lifecycle state machine with RxJS-based sequential action processing (`concatMap`).
 
 ```
-ng-forge/
-├── packages/
-│   ├── dynamic-forms/               # Core library (@ng-forge/dynamic-forms)
-│   ├── dynamic-forms-material/      # Material UI adapter
-│   ├── dynamic-forms-bootstrap/     # Bootstrap UI adapter
-│   ├── dynamic-forms-primeng/       # PrimeNG UI adapter
-│   ├── dynamic-forms-ionic/         # Ionic UI adapter
-│   └── dynamic-form-mcp/           # MCP server for AI-assisted form generation
-├── apps/
-│   ├── docs/                        # Documentation app (SSR with Analog)
-│   └── examples/
-│       └── sandbox/                 # Unified example app (all 4 adapters + E2E specs)
-├── internal/
-│   ├── sandbox-harness/             # SandboxHarness, SandboxMountDirective, SANDBOX_FORM_CONFIG
-│   ├── sandbox-adapter-{material,bootstrap,primeng,ionic}/ # Adapter factory functions
-│   ├── examples-{material,bootstrap,primeng,ionic}/ # Field-type scenario components
-│   └── examples-shared-ui/          # ExampleScenarioComponent
-├── .claude/skills/                  # Custom Claude Code skills
-└── scripts/                         # CI/Docker/deployment helpers
+uninitialized → initializing → ready ⇄ transitioning (teardown → applying → restoring)
 ```
 
-**Dependency direction:** UI adapters depend on core. Core has zero knowledge of adapters. Adapters provide field components + mappers that plug into core's registry via `provideDynamicForm(...withMaterialFields())`.
+Side effects are scheduled via `SideEffectScheduler`:
 
-**Data flow:** `FormConfig` → `FormStateManager` (state machine + field resolution) → `ResolvedField[]` (component + injector + inputs signal) → `NgComponentOutlet` renders each field.
+- **Blocking** — `CaptureValue`, `CreateForm`
+- **Frame-boundary** — `WaitFrameBoundary` (teardown)
+- **After-render** — `RestoreValues`
 
-## Environment
+### Field Resolution Pipeline (`utils/resolve-field/resolve-field.ts`)
 
-- **Node.js**: `>=24.0.0`
-- **pnpm**: `>=10.0.0`
-- **Angular**: `~21.1.0`
-- **TypeScript**: `~5.9.2`
-- **Nx**: `22.4.5`
-- **Docs app**: AnalogJS (file-based routing, SSR pre-rendering). Route components use `default` exports. Be aware of Vite/Nx cache issues — suggest cache clearing (`nx reset`) when encountering ghost errors after config changes
+- `resolveField()` — async (RxJS Observable), loads component dynamically
+- `resolveFieldSync()` — sync fast path using cached components
+- `reconcileFields()` — preserves object identity for signal stability (same key + component + injector = unchanged)
+- `createFieldResolutionPipe()` — container component utility (used by page/group/row)
+- `renderReadyWhen` / `renderReady` — field types can declare mapped inputs that must exist before `ngComponentOutlet` instantiates the component (for example `field` for value-bearing adapter fields)
+
+### Provider Architecture (`providers/dynamic-form-di.ts`)
+
+`provideDynamicFormDI()` creates all component-level providers. The derivation orchestrator is lazy-loaded: `DERIVATION_RENDER_GATE` (`core/derivation/derivation-render-gate.ts`) dynamically imports and wires it only when `configHasDerivations()` is true, and holds `shouldRender` closed until it is wired (so derivation fields render already-derived). Configs without derivations never pull the orchestrator chunk.
+
+## File Structure
+
+### Field Components (per UI adapter library)
+
+```
+packages/dynamic-forms-{library}/src/lib/fields/{field-name}/
+├── {prefix}-{field-name}.component.ts       # Component
+├── {prefix}-{field-name}.component.spec.ts  # Unit tests
+├── {prefix}-{field-name}.type.ts            # Type definitions
+├── {prefix}-{field-name}.type-test.ts       # Type-safe compile tests
+└── index.ts                                 # Barrel export
+```
+
+| Library   | Prefix  | Example                    |
+| --------- | ------- | -------------------------- |
+| Material  | `Mat`   | `mat-input.component.ts`   |
+| Bootstrap | `Bs`    | `bs-input.component.ts`    |
+| PrimeNG   | `Prime` | `prime-input.component.ts` |
+| Ionic     | `Ionic` | `ionic-input.component.ts` |
+
+### Field Registration (per UI adapter)
+
+Fields are wired via `FieldTypeDefinition[]` in each adapter's config:
+
+1. Define `loadComponent` (dynamic import), `mapper`, `propsToMeta` in the field types array
+2. Expose via provider function (e.g., `withMaterialFields()`)
+3. Module augmentation extends `DynamicFormFieldRegistry` for type-safe autocomplete
+
+### Available Field Types
+
+**Value fields:** input, textarea, select, checkbox, radio, multi-checkbox, datepicker, toggle, slider
+
+**Control fields:** button, submit, next, previous, addArrayItem, prependArrayItem, insertArrayItem, removeArrayItem, popArrayItem, shiftArrayItem
+
+**Container fields:** array, group, page, row
+
+**Display fields:** hidden, text
+
+## Critical Gotchas
+
+### Reactive cycle trap
+
+Cannot call `mapFieldToInputs` inside a `computed` that IS `resolvedFields`. Mappers eagerly read `context.form` → `isFieldPipelineSettled` → `resolvedFields` → CYCLE. The `derivedFromDeferred` async pipeline avoids this via `toObservable`/`toSignal`.
+
+### Required mapped inputs for adapter fields
+
+Every `FieldTypeDefinition` declares `renderReadyWhen` explicitly at the registration site (resolver cascade: explicit on the registration → `valueHandling: 'exclude'` short-circuit to `[]` → fallback `['field']` + one-shot dev warning via `DynamicFormLogger`). Both built-in and adapter registrations spread one of two shared base constants per file:
+
+```typescript
+// In adapter config files (e.g., material-field-config.ts)
+const VALUE_FIELD_TYPES_BASE = {
+  renderReadyWhen: ['field'],
+} as const;
+
+const BUTTON_FIELD_TYPES_BASE = {
+  renderReadyWhen: [],
+  valueHandling: 'exclude',
+} as const;
+
+export const MATERIAL_FIELD_TYPES: FieldTypeDefinition[] = [
+  {
+    name: MatField.Input,
+    loadComponent: () => import('../fields/input/mat-input.component'),
+    mapper: valueFieldMapper,
+    ...VALUE_FIELD_TYPES_BASE,
+  },
+  {
+    name: MatField.Button,
+    loadComponent: () => import('../fields/button/mat-button.component'),
+    mapper: buttonFieldMapper,
+    ...BUTTON_FIELD_TYPES_BASE,
+  },
+  // ...
+];
+```
+
+Custom mappers that emit other required inputs should list them explicitly on the registration:
+
+```typescript
+{
+  name: 'my-field',
+  loadComponent: () => import('./my-field.component'),
+  mapper: myCustomMapper,
+  renderReadyWhen: ['field', 'allowedTypes'],
+}
+```
+
+### Addon support declaration
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ng-forge/ng-forge](https://github.com/ng-forge/ng-forge) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
