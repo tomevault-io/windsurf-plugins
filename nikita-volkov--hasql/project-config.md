@@ -1,114 +1,113 @@
 ---
 trigger: always_on
-description: Hasql is a fast PostgreSQL driver for Haskell with a flexible mapping API. It serves as the root of a granular ecosystem of composable libraries, each designed to perform specific tasks while staying simple. The project emphasizes modularity, type safety, and explicit error handling over exceptions.
+description: Instructions for coding agents working in this repo.
 ---
 
-# GitHub Copilot Instructions for Hasql
+# AGENTS.md
+
+Instructions for coding agents working in this repo.
+
+Companion documents:
+
+- [CONTEXT.md](CONTEXT.md) - glossary of the domain language (Statement, Params, OID cache, statement cache, …). Read it before naming anything; naming that contradicts the glossary is a defect.
+- <https://github.com/nikita-volkov/haskell-coding-standards> - the general Haskell design system this project follows (imports, exports, naming, errors, deriving, formatting, documentation, architecture patterns). This file records only what is *specific to hasql*; for anything general, defer to the standards repo.
 
 ## Project Overview
 
-Hasql is a fast PostgreSQL driver for Haskell with a flexible mapping API. It serves as the root of a granular ecosystem of composable libraries, each designed to perform specific tasks while staying simple. The project emphasizes modularity, type safety, and explicit error handling over exceptions.
-
-## Architecture & Design Philosophy
+Hasql is a fast PostgreSQL driver with a flexible mapping API. It is the root of a granular ecosystem of composable libraries, each staying simple and doing one thing. The project favours modularity, type safety, and explicit error handling over exceptions.
 
 ### Ecosystem Approach
-- **Modular Design**: Instead of a monolithic library, hasql follows an ecosystem approach with small, focused libraries
-- **Horizontal Scalability**: Users are encouraged to create extension libraries rather than contribute features to the core
-- **Composability**: Each library provides a simple API that can be combined with others
-- **Interchangeability**: Multiple libraries can solve the same problem with different approaches
+
+- **Modular design** - an ecosystem of small focused libraries rather than one monolith.
+- **Horizontal scalability** - users are encouraged to write extension libraries rather than grow the core.
+- **Composability** - each library exposes a simple API that combines with the others.
+- **Interchangeability** - several libraries may solve the same problem in different ways.
 
 ### Key Abstractions
-- **Connection**: Manages database connections with settings and prepared statement registries
-- **Session**: A batch of actions executed in a database connection context (ReaderT + ExceptT)
-- **Pipeline**: Composable abstraction for executing multiple queries efficiently
-- **Statement**: Specification of a single SQL query with parameter/result mapping
-- **Encoders**: DSL for declaring parameter encoders (Params, Value, NullableOrNot)
-- **Decoders**: DSL for declaring result decoders (Result, Row, Value, NullableOrNot)
+
+- **Connection** - manages a database connection, its settings, OID cache and statement cache.
+- **Session** - a batch of actions executed in a connection context. `Hasql.Engine.Contexts.Session` derives its instances `via (ExceptT SessionError (StateT ConnectionState IO))`.
+- **Pipeline** - composable abstraction for executing several queries in one round trip.
+- **Statement** - a single SQL query plus its parameter encoder and result decoder.
+- **Encoders** - DSL for declaring parameter encoders (Params, Value, NullableOrNot).
+- **Decoders** - DSL for declaring result decoders (Result, Row, Value, NullableOrNot).
+
+### Layers
+
+The codebase is layered along two axes: cabal components, and namespaces inside the `library` component. Allowed dependency edges:
+
+| Layer | May depend on |
+|---|---|
+| `platform` | — |
+| `to-be-resolved` | — |
+| `codecs-vocab` | `platform`, `to-be-resolved` |
+| `comms` | `platform` |
+| `connection-state` | `codecs-vocab`, `platform` |
+| `Hasql.Codecs.*` | `codecs-vocab`, `platform`, `to-be-resolved` |
+| `Hasql.Engine.*` | `Hasql.Codecs.*`, `codecs-vocab`, `comms`, `connection-state`, `platform`, `to-be-resolved` |
+
+`codecs-vocab`, `comms`, `connection-state`, `to-be-resolved` and `platform` are separate cabal components; `Hasql.Codecs.*` and `Hasql.Engine.*` are namespaces inside the `library` component. Namespaces not listed (`Hasql.Connection.*`, the top-level public modules) are deliberately left unconstrained.
+
+Cabal components:
+
+```mermaid
+flowchart BT
+  platform
+  to-be-resolved
+  codecs-vocab --> platform
+  codecs-vocab --> to-be-resolved
+  comms --> platform
+  connection-state --> codecs-vocab
+  connection-state --> platform
+  library --> codecs-vocab
+  library --> comms
+  library --> connection-state
+  library --> platform
+  library --> to-be-resolved
+```
+
+`Hasql.*` namespaces within the `library` component:
+
+```mermaid
+flowchart BT
+  Codecs --> codecs-vocab
+  Codecs --> platform
+  Codecs --> to-be-resolved
+  Engine --> Codecs
+  Engine --> codecs-vocab
+  Engine --> comms
+  Engine --> connection-state
+  Engine --> platform
+  Engine --> to-be-resolved
+```
+
+- `Platform/` - the custom prelude and shared primitives.
+- `Codecs/` - encoder and decoder DSLs.
+- `Comms/` - protocol round trips and result decoding, on top of the libpq binding.
+- `Engine/` - statement compilation, result/row decoding, and contexts (Session, Pipeline) that drive `connection-state`.
+- Top-level modules (`Hasql.Connection`, `Hasql.Session`, …) are the public API.
+
+Postgres itself is reached through the external [pqi](https://github.com/nikita-volkov/pqi) library, which abstracts over interchangeable adapters (`pqi-ffi`, `pqi-native`). Hasql does not carry its own libpq bindings - do not reintroduce any.
 
 ## Code Style & Conventions
 
 ### Language Extensions
-The project uses modern Haskell with these standard extensions:
-- `ApplicativeDo`, `Arrows`, `BangPatterns`, `BlockArguments`
-- `ConstraintKinds`, `DataKinds`, `DefaultSignatures`
-- `DeriveFoldable`, `DeriveFunctor`, `DeriveGeneric`
-- `DerivingVia`, `DuplicateRecordFields`, `FlexibleContexts`
-- `FlexibleInstances`, `FunctionalDependencies`, `GADTs`
-- `GeneralizedNewtypeDeriving`, `LambdaCase`, `LiberalTypeSynonyms`
-- `MultiParamTypeClasses`, `NoImplicitPrelude`, `NoMonomorphismRestriction`
-- `OverloadedStrings`, `QuasiQuotes`, `RankNTypes`, `RecordWildCards`
-- `ScopedTypeVariables`, `StrictData`, `TemplateHaskell`, `TupleSections`
-- `TypeApplications`, `TypeFamilies`, `TypeOperators`, `UndecidableInstances`
 
-### Import Conventions
-- **Qualified Imports**: Extensively used for clarity (e.g., `qualified as Encoders`, `qualified as Decoders`)
-- **Custom Prelude**: Uses `Platform.Prelude` instead of standard Prelude
+Defined once in the `common base` stanza of [hasql.cabal](hasql.cabal) and imported by every component. Consult that stanza rather than assuming; do not add a per-module `{-# LANGUAGE #-}` pragma for an extension that belongs in the shared list.
 
-### Naming Patterns
-- **Newtype Wrappers**: Extensive use for type safety (Session, Statement, Connection)
-- **DSL Style**: Encoders and Decoders use fluent DSL patterns
-- **Explicit Types**: Clear, descriptive type signatures with phantom types where necessary
+### Imports
 
-### Error Handling
-- **No Exceptions**: Explicit error handling using `Either` types
-- **Result Types**: All operations return explicit success/failure types
+- **Qualified imports** for everything except the module's own topic - e.g. `qualified as Encoders`, `qualified as Decoders`.
+- Qualify by the module's topic, not by an arbitrary abbreviation. Self-qualified form (`import Pqi.Ffi qualified`) is preferred where the name is already short.
+- **Custom prelude** - every library module imports `Hasql.Platform.Prelude`, never the standard `Prelude`. Outside the library the convention follows the layer under test: `library-tests`, `connection-state-tests`, `benchmarks` and `profiling` use plain `Prelude`.
 
-### Applicative syntax
-- Prefer `do` notation with `ApplicativeDo` for clarity in applicative contexts
+### Naming
 
-### Function application and chaining
-- Avoid using `$` for function application; prefer parentheses for clarity
-- When chaining functions instead of nesting parentheses, use the `.` operator and wrap the chain in parentheses to avoid the Ormolu formatter splitting such chains into multiple lines.
-  
-  E.g.,
-  ```haskell
-  (TextBuilder.toText . mconcat)
-    [ ... ]
-  ```
-- Use of the `&` operator is acceptable
-
-### Constructing Text
-- **Text Builders**: Use `TextBuilder` from the "text-builder" library for efficient text construction
-- **Concatenation**: Prefer `mconcat` over series of `(<>)`
-- Use `(TextBuilder.toText . mconcat)` for immediately converting to `Text`
-
-## Code Generation Guidelines
-
-When working with this codebase:
-
-1. **Use qualified imports** for all major modules to maintain clarity
-2. **Follow the newtype pattern** for type safety when introducing new abstractions
-3. **Maintain the Either-based error handling** - never throw exceptions
-4. **Use the custom Prelude** (`Platform.Prelude`) in all modules
-5. **Keep modules focused** - each module should have a single, clear responsibility
-6. **Follow the existing DSL patterns** when extending encoders/decoders
-
-## Build System
-
-- **Cabal**: Uses Cabal as the build system
-- **Multiple Components**: Library, test suites, benchmarks are separate components
-- **GHC Requirements**: Requires recent GHC with extensive language extension support
-
-## Extension Libraries
-
-When suggesting new functionality, consider whether it belongs in:
-- **hasql-th**: Template Haskell utilities and compile-time checking
-- **hasql-transaction**: STM-inspired transaction management
-- **hasql-dynamic-statements**: Dynamic statement generation
-- **hasql-cursor-query**: Cursor-based query abstractions
-- **hasql-implicits**: Implicit definitions and default codecs
-- Or a new focused extension library
-
-## Documentation Style
-
-- Use Haddock comments with `-- |` for module and function documentation
-- Include practical examples in documentation
-- Reference the broader ecosystem when relevant
-- Maintain clear separation between core functionality and extensions
-
+- **Newtype wrappers** are used extensively for type safety (Session, Statement, Connection). Prefer a newtype over a raw primitive whenever the value carries a domain meaning - a bare `Word32` that is really an OID, or an `Int32` that is really a row index, is a defect.
+- **DSL style** for encoders and decoders.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nikita-volkov/hasql](https://github.com/nikita-volkov/hasql) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
