@@ -1,131 +1,65 @@
 ---
 trigger: always_on
-description: Cookstyle is a code linting tool for Chef Infra cookbooks and InSpec profiles, providing style, syntax, logic, and security checks with autocorrection. It is powered by RuboCop and tailored for Chef ecosystem development.
+description: Instructions for AI coding agents working in this repository. Human contributors want [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) and [WRITING_RULES.md](WRITING_RULES.md), which this file points at rather than duplicating.
 ---
 
-# GitHub Copilot Instructions for cookstyle
+# AGENTS.md
 
----
+Instructions for AI coding agents working in this repository. Human contributors want [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) and [WRITING_RULES.md](WRITING_RULES.md), which this file points at rather than duplicating.
 
-## 1. Repository Analysis & Structure
+## What this project is
 
-### Project Purpose
-Cookstyle is a code linting tool for Chef Infra cookbooks and InSpec profiles, providing style, syntax, logic, and security checks with autocorrection. It is powered by RuboCop and tailored for Chef ecosystem development.
+Cookstyle is RuboCop with a vendored configuration and a set of Chef Infra and InSpec specific cops. Read [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for the architecture before making structural changes.
 
-### Folder Structure Diagram
+## Verify before you claim
 
-```
-/ (root)
-├── bin/                # Executable scripts (cookstyle, cookstyle-profile)
-├── config/             # Linting configuration files (chefstyle.yml, cookstyle.yml, default.yml)
-├── docs/               # Markdown documentation for cops and usage
-├── docs-chef-io/       # Go module for documentation site integration
-│   └── assets/cookstyle/ # YAML docs for individual cops
-├── habitat/            # Habitat packaging and test scripts
-│   └── tests/          # Habitat test scripts
-├── lib/                # Main Ruby source code (cookstyle, rubocop, cops, helpers)
-│   └── rubocop/
-│       ├── chef/       # Chef-specific cops and helpers
-│       ├── cop/        # Cop definitions
-│       └── monkey_patches/ # RuboCop monkey patches
-├── spec/               # RSpec unit tests (mirrors lib/ structure)
-│   └── shared/         # Shared test helpers
-├── tasks/              # Rake tasks for docs, profiling, spellcheck
-├── .expeditor/         # Expeditor build automation config
-├── .github/            # GitHub workflows, CODEOWNERS, and Copilot instructions
-├── CHANGELOG.md        # Changelog
-├── CODE_OF_CONDUCT.md  # Code of conduct
-├── CONTRIBUTING.md     # Contribution guide
-├── DEVELOPER_GUIDE.md  # Developer guide for maintainers
-├── Gemfile             # Ruby gem dependencies
-├── LICENSE             # Apache 2.0 license
-├── Rakefile            # Rake build/test tasks
-├── README.md           # Project overview and usage
-├── RELEASE_NOTES.md    # Release notes
-├── VERSION             # Current version
-├── WRITING_RULES.md    # Guide for writing new cops/rules
+```bash
+bundle exec rake
 ```
 
-### Languages, Frameworks, and Technologies
-- **Ruby** (primary, for linting engine, cops, and CLI)
-- **Go** (for docs-chef-io integration)
-- **RSpec** (unit testing)
-- **Rake** (build/test tasks)
-- **Habitat** (packaging)
-- **Expeditor** (build/release automation)
+That runs lint, the full spec suite, and config validation in a few seconds. Run it and read the output before reporting work as done. Individual pieces: `rake spec`, `rake style`, `rake validate_config`.
 
-### Modification Guidelines
-- **Safe to Modify:**
-  - `lib/`, `spec/`, `docs/`, `docs-chef-io/assets/cookstyle/`, `tasks/`, `bin/`, `config/cookstyle.yml`
-- **Prohibited/Generated:**
-  - `config/chefstyle.yml` (internal, do not edit unless core Chef dev)
-  - `config/default.yml` (do not edit unless updating RuboCop engine)
-  - `docs-chef-io/go.mod` (managed by docs site tooling)
-  - Any files in `vendor/` or `files/` (excluded by config)
-- **Never Modify:**
-  - LICENSE, CODE_OF_CONDUCT.md, unless updating legal/compliance
-  - .expeditor/config.yml, unless updating build automation
+This project does not measure test coverage — SimpleCov is not a dependency and no coverage report is produced. Do not report coverage percentages or treat a coverage threshold as a gate.
 
-### Code Generation Patterns
-- All cops must be defined in `config/cookstyle.yml` and have documentation in `docs/` and `docs-chef-io/assets/cookstyle/`.
-- Do not modify files in `config/chefstyle.yml` or `config/default.yml` unless you are a core maintainer.
+## Adding or changing a cop
 
----
+Follow [WRITING_RULES.md](WRITING_RULES.md). The parts most often gotten wrong:
 
-## 2. Development Workflow Integration
+- **Every cop needs an entry in `config/cookstyle.yml`.** `rake validate_config` fails otherwise.
+- **Every cop needs both a positive and a negative spec example.** `expect_offense` proves it fires; `expect_no_offenses` proves it doesn't fire on code it shouldn't touch. For an autocorrecting cop, a false positive rewrites a working cookbook.
+- **New cops use `severity: :refactor`.** This is deliberate — new rules must not fail existing builds.
+- **Set `RESTRICT_ON_SEND` and `Include`/`Exclude`.** Without them the cop runs against every method call in every file.
+- **Declare `minimum_target_chef_version`** if the corrected code needs a newer Chef Infra Client.
 
-### Jira Integration (atlassian-mcp-server)
-- When a Jira ID is provided, fetch issue details using the MCP server.
-- Read the story, analyze requirements, and plan implementation.
-- **Workflow Phases:**
-  - **Phase 1: Initial Setup & Analysis**
-    - Fetch Jira details, analyze repo, plan implementation.
-    - Prompt: "Jira story <ID> loaded. Analysis complete. Ready to plan implementation. Proceed?"
-  - **Phase 2: Implementation Phase**
-    - Implement code, update docs, follow repo structure.
-    - Prompt: "Implementation complete. Ready for testing phase. Proceed?"
-  - **Phase 3: Testing Phase**
-    - Create/extend unit tests, run tests, validate coverage.
-    - Prompt: "Testing complete. Ready for PR creation. Proceed?"
-  - **Phase 4: Pull Request Creation**
-    - Use GH CLI for all git operations, create PR, add labels.
-    - Prompt: "PR created. Ready for review. Proceed?"
-- **Approval Gates:**
-  - After each phase, summarize work, list next steps, and ask for confirmation before proceeding.
+## Don't hand-edit generated files
 
----
+- `docs-chef-io/assets/cookstyle/*.yml` — run `rake generate_cops_yml_documentation`
+- The cop count in `README.md` — run `rake update_readme_cop_count`
+- `CHANGELOG.md`, `RELEASE_NOTES.md`, `VERSION` — maintained by Expeditor
 
-## 3. Testing Requirements (**Critical - Hard Requirement**)
-- **MANDATORY:** All code changes must include comprehensive unit tests.
-- **Test Coverage:** >80% coverage is a **hard, non-negotiable requirement**. PRs below this threshold will be rejected.
-- **Framework:** Use RSpec for Ruby code. Place tests in `spec/` mirroring the `lib/` structure.
-- **Test Structure Example:**
-  ```ruby
-  # spec/rubocop/cop/chef/my_cop_spec.rb
-  require 'spec_helper'
-  describe RuboCop::Cop::Chef::MyCop do
-    it 'registers an offense for bad code' do
-      expect_offense(<<~RUBY)
-        ...
-      RUBY
-    end
-    it 'does not register an offense for good code' do
-      expect_no_offenses(<<~RUBY)
-        ...
-      RUBY
-    end
-  end
-  ```
-- **Coverage Verification:**
-  - Run: `bundle exec rake coverage`
-  - Ensure output shows >80% coverage.
-- **Test Both:**
-  - Positive and negative scenarios
-  - Edge cases and error conditions
-  - Use mocks for external dependencies
+## Don't change without a specific reason to
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `config/chefstyle.yml` and `config/default.yml`
+- `.expeditor/` release automation
+- `LICENSE`, `NOTICE`, `CODE_OF_CONDUCT.md`
+- `lib/rubocop/monkey_patches/` — these patch RuboCop internals and are pinned to an exact RuboCop version
+
+## Commits and pull requests
+
+**Every commit needs a DCO signoff or the build fails:**
+
+```bash
+git commit --signoff -m "Your message"
+```
+
+Branch from `main`, never commit to it directly. Label the PR — see the table in [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md#pull-requests) — since labels drive the changelog and release automation.
+
+Write commit messages and PR descriptions that explain why the change is needed and what was verified. Do not credit AI assistance in commit messages, PR descriptions, or code comments.
+
+## Scope
+
+Do what was asked. This is a widely deployed linter, so unrequested cop changes, severity changes, and config changes have a large blast radius. If you notice an unrelated problem, mention it rather than fixing it in the same change.
 
 ---
 > Source: [chef/cookstyle](https://github.com/chef/cookstyle) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
