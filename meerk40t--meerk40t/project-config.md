@@ -1,34 +1,65 @@
 ---
 trigger: always_on
-description: **Operating System**: Windows (PowerShell)
+description: This is the single source of truth for AI coding agents working on MeerK40t.
 ---
 
-# MeerK40t AI Coding Agent Instructions
+# AGENTS.md - MeerK40t Development Guide
 
-## Environment & Platform Context
+This is the single source of truth for AI coding agents working on MeerK40t.
+Other agent instruction files (`CLAUDE.md`, `.github/copilot-instructions.md`)
+point here and must not be treated as separate references.
 
-**Operating System**: Windows (PowerShell)
-- Use native PowerShell cmdlets (e.g., `Remove-Item` instead of `rm`, `Get-ChildItem` instead of `ls`, `Set-Location` instead of `cd`)
-- For Python testing, create script files rather than inline execution to avoid PowerShell quoting issues
-- When running tests, use: `python -m unittest discover test -v` (PowerShell-compatible)
+## Project Overview
 
-## Architecture Overview
+MeerK40t (pronounced "MeerKat") is an open-source laser cutting/engraving control software. It provides a highly extensible, plugin-based platform supporting multiple laser hardware types including K40 (Lihuiyu), GRBL, Ruida, Moshiboard, Newly, and galvo (Balor) lasers.
 
-MeerK40t is a plugin-based laser cutting software built around a **Kernel** ecosystem. The system uses a sophisticated plugin lifecycle system where functionality is dynamically loaded and registered.
+**License:** MIT
+**Python:** 3.6+
+**Platforms:** Windows, macOS, Linux, Raspberry Pi
+**Version:** defined as `APPLICATION_VERSION` in `meerk40t/main.py` (avoid hard-coding it here — check the source)
 
-### Core Architecture Pattern
-- **Kernel** (`meerk40t/kernel/`) - Central service bus providing signals, channels, settings, console commands
-- **Core** (`meerk40t/core/`) - MeerK40t-specific ecosystem requirements (elements tree, cutplan optimization, etc.)
-- **Device Drivers** (`meerk40t/{grbl,lihuiyu,ruida,moshi,newly,balormk}/`) - Hardware-specific laser control implementations
-- **GUI** (`meerk40t/gui/`) - wxPython-based interface with AUI docking framework
+See `NOTES.md` for current device stability status.
 
-### Critical Plugin Lifecycle
-All modules follow the plugin pattern with lifecycle hooks. The plugin function must be defined at module level:
+---
 
+## Quick Commands
+
+```bash
+# Install with all features
+pip install meerk40t[all]
+
+# Run application
+meerk40t                        # Installed console script (full GUI)
+python meerk40t.py              # From a source checkout
+python meerk40t.py --no-gui     # Console mode
+python meerk40t.py --simpleui   # Simplified interface
+
+# Run tests
+python -m unittest discover test -v
+pytest -v
+
+# Code quality
+flake8 meerk40t test
+black --check meerk40t test
+mypy meerk40t
+```
+
+---
+
+## Architecture
+
+### Plugin-Based System
+
+Everything is a plugin with lifecycle phases:
+```
+plugins → preregister → register → configure → boot → postboot → start
+```
+
+Standard plugin pattern (the `plugin()` function **must** be defined at module level):
 ```python
 def plugin(kernel, lifecycle=None):
     if lifecycle == "register":
-        kernel.register("provider/device/grbl", GRBLDevice)
+        kernel.register("path/to/item", item)
     elif lifecycle == "postboot":
         init_commands(kernel)
     elif lifecycle == "boot":
@@ -36,97 +67,78 @@ def plugin(kernel, lifecycle=None):
         pass
 ```
 
-Lifecycle phases (in order): `plugins` → `preregister` → `register` → `configure` → `boot` → `postboot` → `start`
-
-**Where to add plugin code**: Each module should have a `plugin.py` file (or the main `__init__.py`) that exports the `plugin()` function.
+Lifecycle phase usage:
+- `register`: Register providers, services, and formats
+- `boot`: Early initialization that doesn't depend on other plugins
+- `postboot`: Initialize commands that depend on registered services
 
 ### Internal vs External Plugins
 
-**Internal Plugins** (`meerk40t/internal_plugins.py`):
-- Core functionality bundled with MeerK40t
-- Registered in `internal_plugins.py` during the `plugins` lifecycle phase
-- Examples: core, device drivers, GUI components, image tools
-- To add: Import and append to the plugins list in `internal_plugins.py`
+**Internal Plugins** (`meerk40t/internal_plugins.py`): Core functionality bundled with MeerK40t, registered during the `plugins` lifecycle phase. To add one, import it and append to the plugins list.
 
-**External Plugins** (`meerk40t/external_plugins.py`):
-- Third-party extensions loaded via Python entry points
-- Entry point group: `meerk40t.extension`
-- Automatically discovered at runtime (not in frozen builds)
-- To create: Define entry point in `setup.py` or `pyproject.toml`:
-  ```python
-  entry_points={
-      "meerk40t.extension": [
-          "myplugin = mypackage.plugin:plugin",
-      ],
-  }
-  ```
+| Category | Plugins |
+|----------|---------|
+| Core | `core.core`, `device.basedevice`, `network.kernelserver` |
+| Drivers | `lihuiyu`, `moshi`, `grbl`, `ruida`, `newly`, `balormk` |
+| Hardware support | `rotary`, `cylinder`, `coolant` |
+| Image & Fill | `image.imagetools`, `fill.fills`, `fill.patterns` |
+| File formats | `dxf.plugin`, `extra.ezd`, `extra.lbrn`, `extra.xcs_reader` |
+| Tracing | `extra.vectrace`, `extra.potrace`, `extra.vtracer` |
+| Fonts & Shapes | `extra.hershey`, `extra.param_functions` |
+| Integration | `extra.inkscape`, `extra.serial_exchange`, `extra.updater` |
+| Camera | `camera.plugin` |
+| GUI | `gui.plugin` |
+| Other | `extra.imageactions`, `extra.outerworld`, `extra.winsleep`, `extra.cag` |
 
-**Important**: External plugins are disabled in frozen builds (PyInstaller executables). Use `external_plugins_build.py` for hardcoded plugins in builds.
+**External Plugins** (`meerk40t/external_plugins.py`): Third-party extensions discovered automatically via the `meerk40t.extension` setuptools entry-point group:
 
-## Essential Development Patterns
-
-### Device Driver Pattern
-Each device type follows this structure:
-- `device.py` - Main Device class inheriting from `Service` and `Status`
-- `controller.py` - Communication protocol handler
-- `driver.py` - Command translation layer (laser operations → device commands)
-- `gui/` - Device-specific UI panels
-- `plugin.py` - Plugin lifecycle and registration
-
-**Example location**: `meerk40t/grbl/device.py` shows the complete pattern with 1300+ lines of device choices registration.
-
-**How to add a new device driver**:
-1. Create a new directory under `meerk40t/` (e.g., `meerk40t/newdevice/`)
-2. Implement `device.py`, `controller.py`, `driver.py` following existing driver patterns
-3. Create `plugin.py` with registration in the `register` lifecycle phase
-4. Register the device provider: `kernel.register("provider/device/newdevice", NewDevice)`
-5. Add GUI components in `gui/` subdirectory if needed
-
-### Console Command Registration
-
-Console commands can be registered at the kernel level or service level. Use the appropriate decorator based on context:
-
-**For Kernel-level commands** (available globally):
 ```python
-from meerk40t.kernel.functions import kernel_console_command
-
-@kernel_console_command("command_name", help=_("Description"))
-def command_handler(command, channel, _, **kwargs):
-    """Long help text goes in docstring"""
-    channel(_("Command executed"))
-    return "elements", data  # Optional: return context type and data
+entry_points={
+    "meerk40t.extension": [
+        "myplugin = mypackage.plugin:plugin",
+    ],
+}
 ```
 
-**For Service-level commands** (within a Service class):
-```python
-from meerk40t.kernel.functions import console_command
+External plugins are disabled with `--no-plugins`, disabled in frozen builds (PyInstaller executables; use `external_plugins_build.py` for hardcoded plugins there), and invalidated if `lifecycle == "invalidate"` returns True.
 
-class MyService(Service):
-    def __init__(self, kernel):
-        super().__init__(kernel)
-        # Commands are registered automatically via decorator
-    
-    @console_command("service_command", help=_("Service command description"))
-    def my_command(self, command, channel, _, **kwargs):
-        """Long help text in docstring"""
-        channel(_("Service command executed"))
-        # self refers to the Service instance
+### Key Layers
+
+1. **Kernel** (`meerk40t/kernel/`) - Service bus, plugin system, signals, channels, settings, jobs
+2. **Core** (`meerk40t/core/`) - Element/node tree, operations, cutcode, planning, spooling, units
+3. **Device** (`meerk40t/device/`) - Hardware abstraction layer and base device
+4. **GUI** (`meerk40t/gui/`) - wxPython interface with AUI docking
+5. **Drivers** - Hardware-specific: `grbl/`, `lihuiyu/`, `ruida/`, `moshi/`, `newly/`, `balormk/`
+6. **Extra** (`meerk40t/extra/`) - File format parsers, tracing, fonts, parametric shapes, utilities
+
+---
+
+## Directory Structure
+
 ```
-
-**For Kernel instance commands** (when you have kernel reference):
-```python
-def init_commands(kernel):
-    @kernel.console_command("init_command", help=_("Init command"))
-    def cmd_handler(command, channel, _, **kwargs):
-        channel(_("Initialized command"))
-```
-
-**Key points**:
-- `channel` is used for user-visible messages (always use `_()` for translation)
-- The second parameter (often `_`) is the remainder string after command parsing
+meerk40t/
+├── meerk40t/
+│   ├── kernel/          # Service bus, signals, channels, settings, jobs
+│   ├── core/            # Element/node tree, planning, cutcode, units, drivers
+│   │   ├── node/        #   Node base class and all node type implementations
+│   │   ├── elements/    #   Element tree service (management, selection, undo)
+│   │   └── cutcode/     #   CutCode data structures and primitives
+│   ├── device/          # Hardware abstraction (basedevice.py)
+│   ├── gui/             # wxPython UI panels, dialogs, scene rendering
+│   ├── grbl/            # GRBL driver
+│   ├── lihuiyu/         # K40 (Lihuiyu) driver
+│   ├── ruida/           # Ruida driver
+│   ├── moshi/           # Moshiboard driver
+│   ├── newly/           # Newly driver
+│   ├── balormk/         # Balor galvo driver
+│   ├── image/           # Image processing and rasterization tools
+│   ├── fill/            # Hatch fills (scanline, Eulerian) and wobble patterns
+│   ├── tools/           # Geometric algorithms
+│   ├── extra/           # File parsers, tracing, fonts, utilities
+│   ├── camera/          # OpenCV-based camera integration
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [meerk40t/meerk40t](https://github.com/meerk40t/meerk40t) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
