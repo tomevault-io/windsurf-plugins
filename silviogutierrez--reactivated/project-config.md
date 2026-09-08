@@ -99,4 +99,4 @@ When `manage.py runserver` runs, `reactivated/__init__.py` patches the process:
 
 ---
 > Source: [silviogutierrez/reactivated](https://github.com/silviogutierrez/reactivated) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
