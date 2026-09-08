@@ -7,11 +7,11 @@ Contest-native, evidence-focused CUMCM workflow for Codex and Claude Code
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Lucasuiii/cumcm-workflow](https://github.com/Lucasuiii/cumcm-workflow).
+Original source: `CLAUDE.md` in [Lucasuiii/cumcm-workflow](https://github.com/Lucasuiii/cumcm-workflow).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
