@@ -7,11 +7,11 @@ Auto-generate fully-typed test spies from a class — across Vitest, Bun & node:
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ASDAlexey/vitest-auto-spy](https://github.com/ASDAlexey/vitest-auto-spy).
+Original source: `AGENTS.md` in [ASDAlexey/vitest-auto-spy](https://github.com/ASDAlexey/vitest-auto-spy).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
