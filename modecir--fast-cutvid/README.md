@@ -7,11 +7,11 @@ Fast, native video cutting for macOS, Windows, and Linux. Built in Rust with tim
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [modecir/fast-cutvid](https://github.com/modecir/fast-cutvid).
+Original source: `AGENTS.md` in [modecir/fast-cutvid](https://github.com/modecir/fast-cutvid).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
