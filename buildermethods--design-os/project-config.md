@@ -128,4 +128,4 @@ When creating screen designs, follow these guidelines:
 
 ---
 > Source: [buildermethods/design-os](https://github.com/buildermethods/design-os) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
