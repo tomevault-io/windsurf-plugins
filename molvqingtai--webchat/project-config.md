@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance for AI coding agents working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for AI coding agents working in this repository.
 
 ## Overview
 
@@ -15,7 +15,8 @@ WebChat is a decentralized, serverless browser extension that enables anonymous 
 
 - **WXT**: Browser extension framework (config: `wxt.config.ts`)
 - **Remesh**: DDD framework for domain logic with true UI/logic separation (RxJS-based reactive state management)
-- **Artico (@rtco/client)**: WebRTC P2P communication library (replaces previous trystero dependency)
+- **Artico**: Default WebRTC P2P room transport, using WebChat's owned signaling endpoint
+- **Trystero**: Supported alternative WebRTC P2P room transport using its default public Nostr strategy
 - **React 19** with TypeScript
 - **Tailwind CSS v4** with shadcn/ui components
 - **Valibot**: Runtime schema validation
@@ -31,7 +32,10 @@ npm run dev:firefox          # Firefox dev mode
 npm run check                # Run TypeScript compiler without emitting files
 
 # Linting
-npm run lint                 # ESLint with auto-fix and cache
+npm run format               # oxfmt write mode (formats source in place)
+npm run format:check         # read-only format check
+npm run lint                 # oxlint safe fixes
+npm run lint:check           # read-only lint check
 
 # Building
 npm run build                # Production build for all browsers
@@ -54,93 +58,50 @@ npm run postinstall          # WXT preparation (auto-runs after install)
 ### Extension Structure
 
 WebChat uses WXT's app-based structure (not entrypoints):
-- **src/app/content/** - Content script injected into web pages (main chat UI)
-- **src/app/background/** - Service worker handling notifications and extension actions
+
+- **src/app/content/** - Content-script UI; each page connects to the shared Runtime through comctx
+- **src/app/background/** - Extension actions, notifications, Runtime coordination, and the Firefox MV2 Runtime host
+- **src/app/offscreen/** - Chrome MV3 host document for the shared headless Runtime
 - **src/app/options/** - Options page UI for user profile settings
 - Entry files: `index.ts` or `index.tsx` in each app directory
 
 ### Domain-Driven Design (Remesh)
 
-Business logic is fully decoupled from UI using Remesh domains:
+Remesh is used across two ownership layers:
 
-**Core Domains** (`src/domain/`):
-- `ChatRoom.ts` - Site-specific P2P chat room (messages, users, sync)
-- `VirtualRoom.ts` - Global virtual room for cross-site user discovery
-- `MessageList.ts` - Message management and persistence
-- `UserInfo.ts` - User profile state
-- `AppStatus.ts` - Application state (open/minimized)
-- `Danmaku.ts` - Danmaku/bullet comments display
-- `Notification.ts` - Browser notifications
-- `Toast.ts` - In-app toast messages
+**Application/page Domains** (`src/domain/`):
 
-**Domain Pattern**:
-- `domain/` - Remesh domain definitions (pure logic, queries, commands, events)
-- `domain/externs/` - External dependency interfaces (define contracts)
-- `domain/impls/` - Concrete implementations of externs (WebRTC, storage, etc.)
+- `ChatRoom.ts` and `WorldRoom.ts` - UI-facing room state and Runtime event projection
+- `Message.ts`, `MessageList.ts`, and `MessageProjection.ts` - Local record model, persistence workflow, ordering, and reaction LWW projection
+- `UserInfo.ts`, `AppStatus.ts`, `Danmaku.ts`, `Notification.ts`, and `Toast.ts` - Page and extension behavior
+- `domain/externs/` - Application dependency contracts
+- `domain/impls/` - Page-side adapters, including the origin-owned message store and Runtime client
 - `domain/modules/` - Reusable domain sub-modules
+
+**Headless Runtime Domains** (`src/domain/runtime/`):
+
+- `Network.ts` - Trusted peer transport, World/Chat room orchestration, identity binding, and bounded history synchronization
+- `Lifecycle.ts` - Per-origin page leases and the shared host lifecycle
+- `Delivery.ts` - Volatile delivery and durable-settlement acknowledgement
+- `runtime/Server.ts` creates the headless Remesh store and injects clock, identity, wire, and page-port externs through adapters.
 
 ### P2P Communication Architecture
 
-**Two-Layer Room System**:
+The content pages are UI/comctx clients. They do not own peer rooms or duplicate durable history. A single shared headless Runtime lives in a Chrome MV3 offscreen document or the persistent Firefox MV2 background page. The Runtime owns one selected WebRTC room transport, trusted `sourcePeerId` context, World/Chat sessions, decode and delivery queues, and history scheduling, supply, cancellation, and admission. Artico is the shipped build-time default; Trystero remains a build-time alternative using its default Nostr strategy. `RoomTransportProvider.ts` instantiates exactly one provider for each Runtime host, with no runtime switch, automatic fallback, or simultaneous provider connection. After the last page for an origin detaches, that origin's domain state enters a five-second grace period; this does not release the shared Runtime or any other domain.
 
-1. **ChatRoom** (Site-specific):
-   - RoomId: Hash of current page's origin
-   - Users on same site chat in isolated rooms
-   - Message types: Text, Like, Hate, SyncUser, SyncHistory
-   - History sync: Last 90 days (`SYNC_HISTORY_MAX_DAYS`)
-   - Message size limit: 256KiB (`WEB_RTC_MAX_MESSAGE_SIZE`)
+`src/protocol/` is the third-party-facing peer boundary:
 
-2. **VirtualRoom** (Global):
-   - RoomId: `WEB_CHAT_VIRTUAL_ROOM` constant
-   - Cross-site user discovery
-   - Shares online user presence across different websites
-   - Message types: SyncUser only
+- Chat v2 is the closed union `session | text | reaction | history-request | history-response`.
+- World v2 has no message `type`; trusted room context selects its strict `{sessionId,user,sites}` shape.
+- Peer frames use the fixed `base64(deflate(UTF8(JSON)))` codec and strict schemas. Payload identity never replaces the transport-provided source identity.
 
 **Connection Flow**:
-1. User joins VirtualRoom (global presence)
-2. User joins ChatRoom (site-specific, based on `location.origin`)
-3. On peer join: Exchange SyncUser messages
-4. Sync message history if peer's lastMessageTime is older
-5. WebRTC data channels handle all message transport
 
-### Storage Strategy
-
-Three-tier storage implemented in `src/domain/impls/Storage.ts`:
-- **LocalStorage** - Fast, synchronous access (volatile)
-- **IndexDB** - Large data persistence (message history)
-- **BrowserSyncStorage** - Cross-device user profile sync (8kb limit per key)
-
-Key storage keys in `src/constants/config.ts`:
-- `USER_INFO_STORAGE_KEY` - User profile (synced)
-- `MESSAGE_LIST_STORAGE_KEY` - Message history (IndexDB)
-- `APP_STATUS_STORAGE_KEY` - App UI state (local)
-
-### Message Sync Logic
-
-**Important sync behavior** (documented in ChatRoom.ts:337-355):
-- New peer joins → existing peers with newer messages push history
-- Only messages newer than peer's `lastMessageTime` are synced
-- Messages chunked to respect WebRTC size limits
-- Incremental sync (not full 90-day diff) - may result in incomplete history for peers joining at different times
-
-## Code Organization
-
-```
-src/
-├── app/              # WXT applications (content, background, options)
-├── domain/           # Remesh domains (business logic)
-│   ├── externs/      # External dependency interfaces
-│   ├── impls/        # Concrete implementations
-│   └── modules/      # Reusable domain modules
-├── components/       # React UI components
-│   ├── ui/           # shadcn/ui base components
-│   └── magicui/      # Magic UI animated components
-├── utils/            # Pure utility functions
-├── constants/        # App constants and config
-├── hooks/            # React hooks
+1. A content page registers its `{ domain, pageId }` lease and attaches to the shared Runtime through comctx.
+2. The Runtime joins the v2 World room and the origin-derived v2 Chat room, then projects trusted snapshots and events to attached pages.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [molvqingtai/WebChat](https://github.com/molvqingtai/WebChat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
