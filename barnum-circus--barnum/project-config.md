@@ -88,4 +88,4 @@ Staff engineer. Jeff Dean's technical depth + Evan You's API elegance.
 
 ---
 > Source: [barnum-circus/barnum](https://github.com/barnum-circus/barnum) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
