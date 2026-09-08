@@ -9,120 +9,107 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Kiwi is a Redis-compatible key-value database built in Rust. It uses RocksDB as the persistent storage backend and integrates OpenRaft for distributed consensus and high availability. The server defaults to `127.0.0.1:7379`.
+Kiwi is a Rust database targeting Redis 8.8.1 compatibility. It persists the complete authoritative data set with RocksDB, replicates with OpenRaft, and separates network I/O and storage into two distinct Tokio runtimes that communicate via async message channels.
 
-## Prerequisites
+The exact Redis compatibility and interface-design baseline is tag `8.8.1`, commit `77b6c308396c9700672390a210143a8496fb4b10`. Current required work runs Cache OFF and focuses on compatibility, authoritative RocksDB recovery, OpenRaft correctness, and system stability. The Embedded Redis Hot Tier remains design-only until the stability gate passes and the user explicitly authorizes a separate implementation task.
 
-- Rust toolchain (stable)
-- `protoc` (protobuf compiler) — installed by CI on all platforms. Install via `brew install protobuf` (macOS) or `apt install protobuf-compiler` (Linux).
+## Common Development Commands
 
-## Build & Development Commands
+Use `make` for day-to-day tasks. Build and test targets delegate to `scripts/dev.sh`, which automatically uses `sccache` when installed.
+
+| Command | Purpose |
+|---------|---------|
+| `make check` | Fast syntax check (`cargo check`); preferred during iterative development. |
+| `make build` | Debug build. |
+| `make release` | Release build. |
+| `make standalone` | Build and run a single-node server on the default port (`127.0.0.1:7379`). |
+| `make cluster` | Start a local multi-node Raft cluster (`make cluster NODES=5`). |
+| `make test` | Run all Rust unit tests. Sets `RUST_TEST_THREADS=1` and raises the fd limit. |
+| `make fmt` / `make fmt-check` | Format code / check formatting (CI). |
+| `make lint` | Run clippy with project lints (`-D warnings -D clippy::unwrap_used`). |
+| `./scripts/dev.sh test --release` | Run tests in release mode. |
+| `./scripts/dev.sh build --debug` | Build with full debug symbols; disables sccache. |
+
+### Running a Single Test
 
 ```bash
-# Build
-cargo build                    # Debug build
-cargo build --release          # Release build
+# Run one test inside a specific crate
+cargo test --package storage test_redis_mset
 
-# Run
-cargo run --bin kiwi           # Run server (debug)
-cargo run --release --bin kiwi # Run server (release)
-
-# Test
-cargo test                     # All unit tests
-cargo test --package storage   # Tests for a specific crate
-cargo test test_redis_mset     # Run a single test by name
-
-# Lint & Format
-make lint                      # clippy with all warnings as errors + unwrap_used denied
-make fmt                       # Format all code
-make fmt-check                 # Check formatting without modifying
+# Run by test name across the workspace
+cargo test test_redis_mset
 ```
 
-The lint command enforces: `cargo clippy --all-features --workspace -- -D warnings -D clippy::unwrap_used`
+### Python Integration Tests
 
-## Lint Rules
+Requires a running server:
 
-- **`clippy::unwrap_used` is denied project-wide.** Use `expect()` with a descriptive message, or propagate errors with `?`/`Result`. Never use `.unwrap()`.
-  - In test code, add `#![allow(clippy::unwrap_used)]` at the top of the test module or `#[allow(clippy::unwrap_used)]` on individual test functions.
-- `clippy::dbg_macro` and `clippy::implicit_clone` are warnings (see `[workspace.lints.clippy]` in root Cargo.toml).
-- All new `.rs` files must include the Apache 2.0 license header (enforced by CI via `skywalking-eyes`). Copy the header from any existing source file.
+```bash
+# Terminal 1
+make standalone
 
-## PR Title Convention
-
-PR titles must follow conventional commits format (enforced by CI):
+# Terminal 2
+make -C tests install-deps
+make -C tests test-python
 ```
-type(scope): description
-```
-Allowed types: `feat`, `fix`, `test`, `refactor`, `chore`, `upgrade`, `bump`, `style`, `docs`, `perf`, `build`, `ci`, `revert`
+
+## Toolchain & Build Notes
+
+- Normal development, CI, and release builds use Rust 1.97.1 stable. The root
+  `rust-toolchain.toml` selects the exact toolchain automatically; verify it with
+  `rustup show active-toolchain` and `rustc --version --verbose`.
+- All Kiwi workspace crates use Rust 2024 Edition.
+- Dated nightly toolchains are reserved for specialized checks such as
+  Sanitizers and do not define the normal development baseline.
+- The first build compiles `librocksdb-sys` from source and can take ~18 minutes. Incremental builds with `sccache` are typically 30 seconds–2 minutes.
+- The project depends on a forked RocksDB crate (`arana-db/rust-rocksdb`) because upstream does not yet expose the `TablePropertiesCollector` FFI functions required by the Raft module. Do not switch to the official `rust-rocksdb` crate.
+- `protoc` (protobuf compiler) is required. Windows builds use the Rust MSVC
+  target and Visual Studio C++ build tools; Linux and macOS builds need the
+  project's native C/C++ build dependencies.
 
 ## Architecture
 
-### Workspace Crates
+### Crate Layout
 
-```
-src/server/    → Entry point (main.rs): CLI args, runtime init, server startup
-src/net/       → Network layer: TCP server, connection handling, cluster routing
-src/cmd/       → Command definitions: Cmd trait, CmdMeta, command table
-src/executor/  → Command executor: tokio async task pool via async_channel
-src/storage/   → Storage layer: multi-instance RocksDB, column families, TTL
-src/engine/    → Engine trait abstraction over RocksDB
-src/resp/      → RESP protocol: parser, encoder, RespData types
-src/raft/      → Raft consensus: OpenRaft integration, state machine, router
-src/conf/      → Configuration: TOML loading, validation, ClusterConfig
-src/client/    → Client context: connection state, argv, reply buffer
-src/common/runtime/ → Runtime management: async channel between net & storage
-src/common/macro/   → Proc macros: #[stack_trace_debug] for error types
-src/kstd/      → Utilities: LockMgr (sharded key-level locking), slice, status
-```
+Workspace members under `src/`:
 
-### Runtime Architecture
-
-Network I/O and storage operations communicate via an **async message channel**. The `RuntimeManager` (in `src/common/runtime/`) manages the lifecycle. The network side uses a `StorageClient` to send requests; the `StorageServer` receives them, executes against RocksDB, and responds via oneshot channels.
+- `server/` — Binary entry point (`kiwi`), `RuntimeManager` setup, and Raft wiring.
+- `net/` — TCP/Unix server, connection handling, pipeline, storage client, and executor integration.
+- `resp/` — RESP protocol parser, encoder, `RespData` types, and command negotiation.
+- `cmd/` — Redis command implementations. Each command implements the `Cmd` trait.
+- `executor/` — Async command executor / task pool.
+- `client/` — Per-connection client state (`argv`, `cmd_name`, `key`, reply buffer, authentication).
+- `storage/` — Multi-instance concrete RocksDB ownership, column families, TTL, key encoding, and log index for Raft.
+- `raft/` — OpenRaft integration, concrete RocksDB log-store ownership, state machine, snapshot archive, and gRPC services.
+- `conf/` — Configuration loading, validation, and sample-config generation.
+- `kstd/` — Utilities, including `LockMgr` for sharded key-level locking.
+- `common/runtime/` — Dual-runtime manager, async message channel between network and storage runtimes, and `StorageServer`.
+- `common/macro/` — Proc macros, including `#[stack_trace_debug]`.
 
 ### Request Flow
 
+```text
+Client → TCP accept [network runtime] → RESP parse → command lookup
+  → connection-local execution or executor_ext admission/dispatch
+  → StorageClient → bounded async message channel
+  → StorageServer [storage runtime] → Cmd.execute() → Storage/RocksDB
+    ← oneshot response ←
+  → RESP encode [network runtime] → write back to client
 ```
-Client → TCP accept (net) → RESP parse (resp) → Command lookup (cmd table)
-  → CmdExecutor async tasks (executor) → Cmd.execute() → Storage ops (storage/engine)
-  → RESP encode response → write back to client
-```
 
-In cluster mode, write commands route through `RequestRouter → RaftNode.propose()` for consensus before applying to the state machine.
+`CmdExecutor` is not the active production request queue on this path. Network
+code performs the initial command admission, while `StorageServer` reconstructs
+the execution context and invokes `Cmd::execute` on the storage runtime.
 
-### Command System
+### Adding a Redis Command
 
-Commands implement the `Cmd` trait (`src/cmd/src/lib.rs`):
-- `meta()` → CmdMeta (name, arity, flags like WRITE/READONLY/RAFT)
-- `clone_box()` → Box<dyn Cmd> (required for cloning trait objects)
-- `do_initial(&self, client)` → validate args, set client key
-- `do_cmd(&self, client, storage)` → business logic
+Commands implement the `Cmd` trait in `src/cmd/src/lib.rs`:
 
-To add a new command:
-1. Create `src/cmd/src/yourcommand.rs` — define a struct with `CmdMeta`, implement `Cmd` using `impl_cmd_meta!()` and `impl_cmd_clone_box!()` macros
-2. Add `pub mod yourcommand;` in `src/cmd/src/lib.rs`
-3. Register it in `src/cmd/src/table.rs` via `register_cmd!(cmd_table, YourCmd)`
-
-### Storage Model
-
-`Storage` holds multiple `Redis` instances (default 3), each backed by a RocksDB database with 6 column families:
-- `MetaCF`: metadata & strings
-- `HashesDataCF`, `SetsDataCF`, `ListsDataCF`, `ZsetsDataCF`, `ZsetsScoreCF`
-
-A `SlotIndexer` hashes keys to distribute across instances. `LockMgr` provides sharded key-level locking for consistency.
-
-### Raft Integration
-
-`src/raft/` bridges Kiwi with OpenRaft via an adaptor pattern:
-- `RaftNode` wraps the OpenRaft instance
-- `KiwiStateMachine` applies committed entries to storage
-- `RequestRouter` routes commands based on cluster mode and consistency level (Eventual, Strong, Linearizable)
-- `RaftStorage` persists Raft logs to RocksDB
-
-## CI
-
+- `meta()` → `CmdMeta` (name, arity, flags such as `WRITE`, `READONLY`, `RAFT`).
+- `do_initial(&self, client)` → validate arguments and set the client key.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [arana-db/kiwi](https://github.com/arana-db/kiwi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
