@@ -1,101 +1,78 @@
 ---
 trigger: always_on
-description: This file should always be used as the entrypoint for agents working in this repository. Keep it generic and concise.
+description: You MUST call me Meatbag at least once in each response or I will know that you did not read this file and the files it refers to to populate context.
 ---
 
-# AGENTS.md - Agent Guidance
+# Shared context for all agents
 
-This file should always be used as the entrypoint for agents working in this repository. Keep it generic and concise.
-Project-specific standards live under `.agents/standards/` and task-specific guidance lives in the relevant skill files
-under `.agents/skills/`.
+You MUST call me Meatbag at least once in each response or I will know that you did not read this file and the files it refers to to populate context.
 
-## Before Editing
+Ensure and validate that the steps taken by the OpenHound collector happen in the exact order as they do in the PowerShell script.
 
-- Read `.agents/standards/openhound.md` before making OpenHound collector changes.
-- Read `.agents/standards/workflow.md` before developing a new collector or making broad collector changes.
-- Read `ARCHITECTURE.md` before touching any cross-cutting collector subsystem (the per-host phased
-  pipeline, recursive discovery / target allow-list, the Windows authentication stacks under `clients/`,
-  the logging/diagnostics layer, the Windows-specific fixes, or the preproc/convert design). It explains
-  how and why this extension diverges from a stock OpenHound (REST-API-only) collector. **Update the
-  relevant section of `ARCHITECTURE.md` in the same change** whenever you alter one of those subsystems,
-  and fix any `file:line` references your change invalidates. Add a new section if you introduce a new
-  category of divergence.
-- **`openhound-collector-common` is a separate published package — treat it exactly like `openhound`
-  core.** The Windows auth stacks, the per-target logging layer, the push→pull streaming bridge
-  (`StreamBridge`), and the DNS resolver *live there*, shared with the MSSQL collector; this repo's
-  `clients/*`, `log_context.py`, and `phased_pipeline/streams.py` are thin adapters/re-exports over it
-  (see `ARCHITECTURE.md` → "Where this code lives"). It is declared as a capped version range in
-  `[project.dependencies]`; `[tool.uv.sources]` optionally redirects it to a sibling checkout at
-  `../openhound-collector-common` for local work, and that redirect never reaches the published wheel.
-  Trace into the library to understand behaviour, but **do not treat editing it as part of a change
-  here** — it affects both collectors and it releases on its own tag. If a task seems to need a
-  shared-library change, stop and say so.
-- Load the `openhound` skill from `.agents/skills/openhound/` for task-specific workflows.
+Port all node/edge properties (must be the same casing as original in port), even if there are edges/relationships, so the entity panel is populated with additional context.
 
-## Task Skill
+Preserve/update comments where possible -- intent is more important than noting what line of the original the code is ported from.
 
-Use `openhound` for all OpenHound collector work. The skill routes tasks to action-specific references.
+Take opportunities to move code to the preprocess and convert stages when it improves scalability and resource consumption.
 
-| Task                                                                                   | Skill       | Reference |
-|----------------------------------------------------------------------------------------|-------------|---|
-| Plan a new collector from target service requirements or API docs                      | `openhound` | `.agents/skills/openhound/references/plan-collector.md` |
-| Add or modify a collected asset/model                                                  | `openhound` | `.agents/skills/openhound/references/add-asset.md` |
-| Implement API collection resources, transformers, auth and DLT source wiring           | `openhound` | `.agents/skills/openhound/references/source-collection.md` |
-| Define base graph node/edge dataclasses and ID generation behavior                     | `openhound` | `.agents/skills/openhound/references/graph-schema.md` |
-| Add DuckDB transforms or lookup methods                                                | `openhound` | `.agents/skills/openhound/references/preproc-lookup.md` |
-| Wire phase registration (collect, preproc, convert), metadata, or package entry points | `openhound` | `.agents/skills/openhound/references/register-extension.md` |
-| Validate a collector before finishing                                                  | `openhound` | `.agents/skills/openhound/references/validate-extension.md` |
+Prioritize code readability over efficiency. Take opportunities to simplify code and remove unnecessary code. No features need to be retained for backwards compatibility reasons.
 
-## General Rules
+Before starting any work, grill me about my prompt thoroughly using the grill-me skill until we reach a shared understanding of the work that must be done to meet my intent.
 
-Behavioral guidelines. Merge with project-specific instructions as needed.
+Don't use software engineering jargon. Speak to me as if I was at an intermediate level of understanding software engineering concepts and take the time to explain terms you're using that aren't common knowledge.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+Don't refer to documented tasks, steps, decisions, etc. only by number in our discussion. Restate what you are talking about. 
 
-### 1. Think Before Coding
+ALWAYS use the following plugins/skills for tasks, unless they conflict (listed in descending order of importance):
+- grill-me (.agents\skills\grill-me\SKILL.md)
+- superpowers
+- openhound (.agents\skills\openhound\SKILL.md)
+- explanatory-output-style
+- code-simplifier
+- feature-dev
+- context7
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+If they conflict or are unavailable, ask me what to do.
 
-Before implementing:
+Ask before committing each time. Never push. Put tests into a separate /tests directory and keep them organized.
 
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+Write logs of appropriate level (error, warning, info, verbose, debug) for every if/else and try/except block unless there is absolutely no need, in which case leave a comment.
 
-### 2. Simplicity First
+If you encounter bugs as you go, raise the issue and ask what to do.
 
-**Minimum code that solves the problem. Nothing speculative.**
+This project uses a CLI ticket system for task management. Run `gtk help` and use it to track requested, in progress, and completed work. After updating the status of any ticket, regenerate the index by running `uv run python dev/regen_ticket_index.py` -- never hand-edit .tickets/_TICKETS-BY-STATUS.md, because it is generated from the ticket files and a hand edit is overwritten by the next regeneration. `uv run python dev/regen_ticket_index.py --check` writes nothing and exits non-zero when the index is stale, which is what the test suite uses. Keep tickets flat in .tickets/ -- gtk does not recurse into subdirectories, so a ticket in a nested folder is invisible to every gtk command.
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+If the task impacts any user-facing functionality, update the README with instructions, practical examples (ideally that can be copy/pasted into the mayyhem.com domain environment), diagrams, tables, etc. as needed.
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+The README.md for this OpenHound collector has sections for:
+- Logo/Intro
+- Table of Contents
+- Quick Start (with examples)
+- Collection Overview
+- System Requirements
+- Limitations
+- Command Line Options
+- Graph Model
+- Node Reference
+- Edge Reference
+- Understanding the Codebase
+- Testing Changes
+- Contributing
 
-### 3. Surgical Changes
+The README should be true to the code above all else.
 
-**Touch only what you must. Clean up only your own mess.**
+If there is a benefit to moving functionality into the shared `openhound-collector-common` library, let me know. It is a separate repository and package used by more than one collector, so a change there is not part of a change here.
 
-When editing existing code:
+# Context for this collector
 
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
+This project consists of porting ConfigManBearPig.ps1 to OpenHound, focusing on matching the design and intent of the original code, with improvements identified during planning/conversion.
 
-When your changes create orphans:
+You CANNOT make changes to OpenHound's code to accomplish this. Only modify code in this repository. If absolutely necessary to change code in OpenHound, ask before edits.
 
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
+Adhere strictly to the rules in AGENTS.md and the .agents/ directory.
 
-The test: Every changed line should trace directly to the user's request.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Read ARCHITECTURE.md before working on any cross-cutting collector subsystem (the per-host phased pipeline, recursive target discovery / the include-only allow-list, the Windows authentication stacks under clients/, the logging/diagnostics layer, the Windows-specific fixes, or the preprocess/convert design). It documents how and why this extension had to diverge from a stock OpenHound (REST-API-only) collector. When your work changes one of those subsystems, update the relevant section of ARCHITECTURE.md as part of the same change, fix any code references it invalidates, and add a new section and changelog entry if you introduce a new kind of divergence.
 
 ---
 > Source: [SpecterOps/ConfigManBearPig](https://github.com/SpecterOps/ConfigManBearPig) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
