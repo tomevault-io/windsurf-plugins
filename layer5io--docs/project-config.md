@@ -1,157 +1,83 @@
 ---
 trigger: always_on
-description: **IMPORTANT**: When using GitHub Copilot, always select the most powerful AI model available (e.g., GPT-5.1 Codex, Gemini 3 Pro Claude 4.5, or the latest advanced model) to ensure the most comprehensive, most human-understandable documentation with examples, tips, notes, analogies and so on.
+description: This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 ---
 
-# Coding Agent Instructions for Layer5 Docs
+# Project agent memory
 
-## AI Model Selection
+This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 
-**IMPORTANT**: When using GitHub Copilot, always select the most powerful AI model available (e.g., GPT-5.1 Codex, Gemini 3 Pro Claude 4.5, or the latest advanced model) to ensure the most comprehensive, most human-understandable documentation with examples, tips, notes, analogies and so on.
+- Add durable project-specific notes here as they are discovered through real work.
 
-## Project Overview
+## Building the site locally
 
-The Layer5 Docs website is a Hugo-based documentation site that serves as the primary documentation resource for Layer5 products, hosted at https://github.com/layer5io/docs and live at https://docs.layer5.io. It provides comprehensive documentation for Layer5 Cloud, Kanvas, and related products, offering tutorials, guides, and reference materials for users and contributors in the cloud native ecosystem.
+`hugo` alone fails with `binary with name "postcss" not found in PATH`. Run `npm install`
+once, then build with the local binaries on PATH:
 
-## Technology Stack
+    npm install
+    PATH="$PWD/node_modules/.bin:$PATH" hugo -d <outdir>
 
-- **Framework**: Hugo (extended version with SCSS support)
-- **Theme**: Docsy (Google's documentation theme)
-- **Language**: Go templates, HTML, CSS/SCSS, JavaScript
-- **Content**: Markdown with Hugo shortcodes
-- **Package Manager**: npm
-- **Node Version**: See `.nvmrc`
-- **Build System**: Hugo CLI, Make
+`npm run build` (see `package.json` scripts) does the same via the pinned Hugo.
 
-## Core Principles
+## Keeping old URLs alive
 
-### 1. Minimal, Surgical Changes
-- Make the **smallest possible changes** to accomplish the goal
-- Never delete or modify working code unless absolutely necessary
-- Focus on precise, targeted modifications rather than wholesale rewrites
-- Preserve existing patterns and conventions unless explicitly changing them
+When a page moves or an external system links to a URL this site no longer serves, add the
+dead path to the page's `aliases:` front matter rather than leaving a 404 - Hugo emits a
+redirect stub for each one. `content/en/kanvas/operator/_index.md` and
+`content/en/kanvas/operator/views/index.md` are the working examples. Verify after a build
+by checking the generated `<outdir>/<dead-path>/index.html` for the `url=` refresh target.
 
-### 2. Code Quality Standards
-- Follow the existing code style and patterns in the repository
-- Ensure proper indentation and formatting in templates and content
-- Write clean, readable, self-documenting code with minimal comments unless necessary for complex logic
-- Maintain accessibility standards (WCAG 2.1)
+Heading anchors are linked from outside this repo too, so renaming a heading silently breaks
+those links. The Layer5 Cloud UI hardcodes some of them: `MAIL_DOCS_URL` in
+meshery-cloud's `ui/components/identity/org-management/org-smtp-tab.tsx` points every
+"Learn more" link on the Email tab at
+`/cloud/guides/organizations/org-management/#configuring-your-own-mail-server`. Grep
+meshery-cloud's `ui/` for `docs.layer5.io` before renaming a heading on a cloud guide. Goldmark heading attributes are enabled: keep the old anchor by writing
+`### New Wording {#old-anchor-slug}`. To prove no anchor was lost, build master and your branch
+to separate directories and diff the `id=` attributes of every `<h1>`-`<h6>` across both trees;
+`content/en/cloud/academy/creating-content/building-certifications/index.md` is a worked example.
 
-### 3. Testing and Validation
-- Always validate changes work before considering them complete
-- Build the site and verify rendered content: `make build` or `hugo`
-- Run the site locally: `make site` or `hugo server -D -F`
-- Test changes incrementally and iteratively
+## Appending to a page bundle
 
-## Project Structure
+Several `index.md` files end without a trailing newline, and some end inside a raw HTML
+block. Appending a Markdown heading directly after a closing `</div>` leaves it unparsed and
+rendered as literal `## text`. Always leave a blank line between raw HTML and following
+Markdown, and check the built HTML for the heading's `id=` anchor.
 
-```
-docs/
-├── .github/                 # GitHub configuration and workflows
-├── assets/                  # Site assets (CSS, JS, images)
-├── charts/                  # Chart files
-├── content/
-│   └── en/                 # English content
-│       ├── cloud/          # Layer5 Cloud documentation
-│       ├── kanvas/         # Kanvas documentation
-│       ├── contributing/   # Contribution guidelines
-│       └── videos/         # Video content
-├── data/                   # Hugo data files
-├── layouts/                # Hugo templates and layouts
-│   ├── _default/           # Default layouts
-│   ├── partials/           # Partial templates
-│   └── shortcodes/         # Custom shortcodes
-├── static/                 # Static assets
-├── hugo.toml               # Hugo configuration
-├── package.json            # npm dependencies
-├── Makefile                # Build automation
-└── CONTRIBUTING.md         # Contribution guidelines
-```
+A literal backslash inside inline HTML is a related trap: Goldmark reads the `\<` in
+`<button>\</button>` as an escaped `<` and the tag never closes. Write the key as `&#92;`
+(`content/en/kanvas/reference/keyboard-shortcuts.md` is the worked example) and confirm the
+built HTML, not the source, before committing.
 
-## Development Workflow
+## Documenting Layer5 Cloud behavior
 
-1. Don't fork this repo.
-1. Create a branch and pull request in this repo.
-1. Don't mark your pull request as draft.
+The cloud guides describe a product that lives in `meshery-cloud`, so every product claim is
+verified against `origin/master` there, never against a summary. The screen strings are in
+`ui/components/identity/org-management/`; the behavior behind them is in `server/handlers/`.
 
-### Setup
-```bash
-# Install dependencies (required for fresh clone)
-make setup
-# or
-npm install
-```
+That repo's own `docs/reference/` and `docs/runbooks/` are the best starting point but are not
+the arbiter - they have described behavior the handlers do not implement. Confirm a capability
+has a producer in the Go or TSX before writing it up: a contract enum member or a runbook
+sentence is not proof the feature ships.
 
-### Development
-```bash
-# Start development server with drafts and future content
-make site
-# or
-hugo server -D -F
-```
+`meshery-cloud` is a PRIVATE repository, so never link one of its pull requests, issues or
+files from a content page - the link 404s for every reader of docs.layer5.io. Cite the released
+version instead (`v1.0.253`), which an operator can check against their own deployment, and keep
+the pull-request reference in the commit message and the docs pull request, where the audience
+can open it.
 
-### Building
-```bash
-# Build for production
-make build
-# or
-hugo
+Behavior can also disagree with `data/openapi.yml`. The server is the arbiter for what a
+response looks like: that file declares `401` as `text/plain` on every route, while any handler
+behind `AuthorizationMiddlewareForAdmin` answers `echo.NewHTTPError`, which echo serializes as
+JSON. Document what the handler sends and flag the specification.
 
-# Clean and rebuild
-make clean
-```
+## Maintaining this file
 
-### Docker Development
-```bash
-# Run with Docker (requires Docker Desktop 4.24+ or Docker Compose 2.22+)
-make docker
-```
-
-## Content Guidelines
-
-### Tone and Style
-- Use a **professional yet approachable** tone
-- Content should be clear, concise, and welcoming to both technical and non-technical audiences
-- Align with Layer5's mission of empowering engineers to "expect more from their infrastructure"
-- Use American English spelling and grammar
-
-### Markdown Content
-- All documentation content is written in Markdown
-- Place content files in appropriate directories under `content/en/`
-- Include proper frontmatter with metadata:
-
-```yaml
----
-title: "Page Title"
-description: "Short description for SEO (150-160 chars)"
-weight: 10  # Optional: controls ordering in navigation
----
-```
-
-### Hugo Shortcodes
-Use the project's custom shortcodes for enhanced content:
-
-```markdown
-{{< alert type="success" title="Note" >}} Your Note {{< /alert >}}
-```
-
-Alert types:
-- `type="danger"`: Critical alerts (security-related or breaking changes)
-- `type="info"`: General informational content
-- `type="warning"`: Important warnings that need attention
-- `type="note"`: Neutral notes and tips
-- `type="success"`: Positive outcomes or confirmations
-
-### Image Guidelines
-- Use the following syntax: `![alt text](/path/to/image.svg)` or `<img src="" alt="" />`
-- Always provide complete image paths for subpages
-- Add `data-modal="false"` to prevent images from opening in a modal
-- Always include descriptive alt text for accessibility and SEO
-
-### Content Restrictions
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.
 
 ---
 > Source: [layer5io/docs](https://github.com/layer5io/docs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
