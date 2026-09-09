@@ -1,236 +1,123 @@
 ---
 trigger: always_on
-description: 本文档约定了 **SPMS-Server** 项目的开发规范，供 AI 辅助开发（如 Qwen Code、Cursor、GitHub Copilot 等）参考，保证生成的代码与项目现有风格一致。
+description: > OpenCode 会话专属的精简指南。单一文件即可完成 ramp-up。
 ---
 
-# SPMS-Server 开发规范
+# SPMS-Server OpenCode 指南
 
-本文档约定了 **SPMS-Server** 项目的开发规范，供 AI 辅助开发（如 Qwen Code、Cursor、GitHub Copilot 等）参考，保证生成的代码与项目现有风格一致。
+> OpenCode 会话专属的精简指南。单一文件即可完成 ramp-up。
 
-## 技术栈
+## 1. 项目一句话
 
-| 技术              | 版本              | 说明     |
-|-----------------|-----------------|--------|
-| Java            | 17              | 开发语言   |
-| Spring Boot     | 3.x             | 应用框架   |
-| Maven           | 3.9+            | 依赖管理   |
-| JPA + Hibernate | Spring Data JPA | ORM框架  |
-| MySQL           | 8.x             | 数据库    |
-| Redis           | -               | 缓存     |
-| AirPower4J      | 6.x             | 核心基础框架 |
-| Lombok          | -               | 代码简化   |
+基于 **Spring Boot 3 + JPA + MySQL + Redis + MQTT + InfluxDB** 的智能生产管理后端（MES/WMS/ERP/IoT），强依赖 [
+`cn.hamm.airpower`](https://github.com/AirPowerTeam/AirPower4J) 6.5.0 父 POM 提供的 CURD / WebSocket / MCP / 字典 /
+异常体系。单 Maven 模块，无 monorepo、无 submodule、无 CI。
 
-## 项目整体结构
+## 2. 技术栈
 
-```
-SPMS-Server/
-├── src/main/java/cn/hamm/spms/
-│   ├── base/               # 项目基础类继承
-│   ├── common/             # 公共工具类和常量
-│   ├── module/             # 业务模块（按模块划分）
-│   │   ├── asset/          # 资产模块
-│   │   ├── channel/        # 渠道模块
-│   │   ├── chat/           # 聊天模块
-│   │   ├── factory/        # 工厂模块
-│   │   ├── iot/            # 物联网模块
-│   │   ├── mcp/            # MCP模块
-│   │   ├── mes/            # MES模块
-│   │   ├── open/           # 开放接口模块
-│   │   ├── personnel/      # 人事模块
-│   │   ├── system/         # 系统模块
-│   │   ├── wechat/         # 微信模块
-│   │   └── wms/            # WMS仓库管理模块
-│   ├── Application.java    # 启动类
-│   ├── DevDataInitRunner.java # 开发数据初始化
-│   └── WebConfig.java      # Web配置
-└── src/main/resources/
-    ├── application.yml         # 主配置文件
-    ├── application-template.yml # 配置模板
-    ├── application-production.yml # 生产配置
-    └── logback-spring.xml     # 日志配置
+| 技术                    | 版本            | 说明                                             |
+|-------------------------|-----------------|--------------------------------------------------|
+| Java                    | 17              | 已通过 `pom.xml` 父 POM 锁定                     |
+| Spring Boot             | 3.x             | 由 airpower 父 POM 带入                          |
+| Maven                   | 3.9+            | 使用 `./mvnw`（已含 wrapper），勿依赖系统 `mvn`  |
+| AirPower                | 6.5.0           | 父 POM，几乎所有能力都从 `cn.hamm.airpower.*` 取 |
+| JPA/Hibernate           | Spring Data JPA | `ddl-auto` 见 §4 "环境"                          |
+| MySQL                   | 8.x             | 库名 `spms`                                      |
+| Redis / MQTT / InfluxDB | -               | 缓存 / 物联网上行 / 时序数据                     |
+
+## 3. 常用命令
+
+```bash
+./mvnw -s settings.xml clean package -DskipTests   # 编译 / 打包（与 Dockerfile 完全一致）
+./mvnw test                                         # 注意：依赖 local-hamm profile，见 §5
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local-hamm   # 本地启动
+docker build -t spms-server .                       # Dockerfile 已含 COPY settings.xml
+./deploy.sh                                          # 仅在生产环境（/home/server/），注意 JAR 名见 §13
 ```
 
-## 模块内部结构规范
+## 4. 环境与 Profile（启动前必读）
 
-每个业务模块下，按照业务功能划分分包，每个业务功能包包含以下文件：
+- **本地 profile 配置**：复制 `src/main/resources/application-template.yml` 为 `application-local-<your-name>.yml`，按需填入
+  DB/Redis/MQTT/InfluxDB/OSS/邮箱密钥。`application-local-*.yml` 已在 `.gitignore`， **不要**提交个人密钥。
+    - 例外：`application-local-hamm.yml` 是仓库自带的 hamm 本地配置，被误提交——保留即可，但其中含明文邮箱密钥、AI
+      Key、企业微信密钥， **不要复制粘贴其中密钥**。
+- **默认 profile**：`application.yml` 中 `spring.profiles.active=production`；开发时务必显式切换到 `local-*`，否则会用
+  `production` profile 去连线上 MySQL/Redis。
+- **ddl-auto 行为差异**：
+    - `application.yml`（基线）→ `validate`
+    - `application-production.yml` → `update`（profile 覆盖基线，生产实际是 update）
+    - `application-local-hamm.yml` → `create-drop`（每次重启清表）
+    - `application-template.yml` → `update`
+- **依赖服务**：`localhost:3306` MySQL（库名 `spms`）、`localhost:6379` Redis、MQTT broker、InfluxDB。MQTT/InfluxDB 不在
+  docker-compose 默认栈里，需自行准备。
+- **端口**：`8080`（见 `application.yml`）。
+
+## 5. 测试与数据初始化
+
+- **测试目录目前只有一个**：`src/test/java/cn/hamm/spms/ApplicationTest.java`。它使用 `@ActiveProfiles("local-hamm")` +
+  `RedisHelper`，所以：
+    - 跑 `./mvnw test` **必须** 保证 `application-local-hamm.yml` 在 classpath（默认就在 `src/main/resources/` 下）。
+    - 跑测试需要本地 Redis 在线。
+- **`DevDataInitRunner`**：实现 `CommandLineRunner`，仅当 `app.is-dev-mode: true` 且（无 `init.lock` 或
+  `ddl-auto=create-drop`）时执行种子数据（用户、权限、菜单、demo 物料/仓库/BOM 等）。`init.lock` 写在 **仓库根目录**，已被
+  `.gitignore`；首次启动后即存在，再次启动不会重跑种子。删 `init.lock` + 重启可强制重跑。
+
+## 6. 仓库目录结构
 
 ```
-module/
-└── function/               # 业务功能包
-    ├── enums/              # 枚举类目录（可选）
-    │   └── XXXType.java    # 枚举定义
-    ├── XXXEntity.java      # 实体类
-    ├── XXXRepository.java  # 数据访问层接口
-    ├── XXXService.java     # 业务逻辑层
-    └── XXXController.java  # 接口控制层
+src/main/java/cn/hamm/spms/
+├── Application.java              # 启动类（cn.hamm.spms.Application），含 MQTT report listener 初始化
+├── DevDataInitRunner.java        # 种子数据
+├── WebConfig.java                # WebSocket / 拦截器 / 过滤器注册
+├── base/                         # BaseEntity / BaseService / BaseRepository / BaseController + bill/
+├── common/                       # Configs / AppConfig / AppWebSocketHandler / aliyun / influx / cron / interceptor ...
+└── module/                       # 业务模块根
+    ├── asset/  channel/  chat/   factory/  iot/  mcp/
+    ├── mes/    open/    personnel/  system/  wechat/  wms/
+
+src/main/resources/
+├── application.yml               # 基线配置（active=production，ddl-auto=validate）
+├── application-template.yml      # 本地 profile 模板（gitignore 之外、用于复制）
+├── application-production.yml    # 生产 profile（覆盖 ddl-auto=update）
+├── application-local-hamm.yml    # hamm 本地配置（已误提交，含明文密钥）
+├── logback-spring.xml
+└── templates/
 ```
 
-### 命名规范
+业务模块下的 **四件套**（如 `module/wms/inventory/`）：
 
-| 层次         | 命名规范                  | 示例                            |
-|------------|-----------------------|-------------------------------|
-| 包名         | 全小写，使用英文单词            | `inventory`、`input`、`output`  |
-| 实体类        | 大驼峰命名 + Entity后缀      | `InventoryEntity`             |
-| Repository | 大驼峰命名 + Repository后缀  | `InventoryRepository`         |
-| Service    | 大驼峰命名 + Service后缀     | `InventoryService`            |
-| Controller | 大驼峰命名 + Controller后缀  | `InventoryController`         |
-| 枚举类        | 大驼峰命名 + Type/Status后缀 | `InventoryType`               |
-| 方法名        | 小驼峰命名，见名知意            | `getByMaterialIdAndStorageId` |
-| 变量名        | 小驼峰命名                 | `materialId`、`storageId`      |
-| 常量         | 全大写下划线分隔              | `DEFAULT_PAGE_SIZE`           |
-
-## 编码风格规范
-
-### 1. 文件头注释
-
-每个文件必须包含类说明和作者：
-
-```java
-/**
- * <h1>类描述</h1>
- *
- * @author Hamm.cn
- */
+```
+function/
+├── enums/                # 枚举（可选），命名 XXXType / XXXStatus
+├── XxxEntity.java        # 大驼峰 + Entity 后缀
+├── XxxRepository.java    # 大驼峰 + Repository 后缀
+├── XxxService.java       # 大驼峰 + Service 后缀
+└── XxxController.java    # 大驼峰 + Controller 后缀
 ```
 
-### 2. 类注解顺序（实体类示例）
+命名规范：
 
-```java
+| 层次        | 命名           | 示例                                        |
+|-------------|----------------|---------------------------------------------|
+| 包名        | 全小写英文单词 | `inventory`、`input`、`output`              |
+| 类          | 大驼峰 + 后缀  | `InventoryEntity`                           |
+| 方法 / 变量 | 小驼峰         | `getByMaterialIdAndStorageId`、`materialId` |
+| 常量        | 全大写下划线   | `DEFAULT_PAGE_SIZE`                         |
 
-@EqualsAndHashCode(callSuper = true)
-@Accessors(chain = true)
-@Entity
-@Data
-@DynamicInsert
-@DynamicUpdate
-@Table(name = "table_name")
-@Description("描述")
-public class XxxEntity extends BaseEntity<XxxEntity> {
-    // ...
-}
-```
+模板示例见 `cn.hamm.spms.module.wms.inventory`、`cn.hamm.spms.module.factory.storage`。
 
-### 3. Controller 注解顺序
+## 7. 继承体系
 
-```java
+所有业务类继承项目提供的基类（位于 `cn.hamm.spms.base`）：
 
-@Api("api_path")
-@Description("功能描述")
-@Extends({GetDetail, GetPage})
-public class XxxController extends BaseController<XxxEntity, XxxService, XxxRepository> {
-}
-```
-
-一般情况下使用 `@Extends` 继承 CURD 接口即可，不需要重复写方法。常用的 CURD 接口：
-
-- `GetDetail` - 根据ID查询详情
-- `GetPage` - 分页查询
-- `Add` - 新增
-- `Update` - 更新
-- `Delete` - 删除
-
-### 4. Service 注解
-
-```java
-
-@Service
-public class XxxService extends BaseService<XxxEntity, XxxRepository> {
-    // ...
-}
-```
-
-### 5. Repository 注解
-
-```java
-
-@Repository
-public interface XxxRepository extends BaseRepository<XxxEntity> {
-    // 自定义查询方法
-}
-```
-
-### 6. 字段定义
-
-- 使用 `@Description` 注解描述每个字段
-- 数据库字段使用 `@Column` 定义 `columnDefinition`，包含类型和默认值注释
-- 外键使用 `@ManyToOne`，指定 `fetch = EAGER`
-
-示例：
-
-```java
-
-@Description("物料信息")
-@ManyToOne(fetch = EAGER)
-private MaterialEntity material;
-
-@Description("库存数量")
-@Column(columnDefinition = "double(20, 6) UNSIGNED default 0 comment '库存数量'")
-private Double quantity;
-
-@Description("存储类型")
-@Column(columnDefinition = "int UNSIGNED default 1 comment '存储类型'")
-@Dictionary(value = InventoryType.class, groups = {WhenAdd.class, WhenUpdate.class})
-private Integer type;
-```
-
-### 7. 枚举使用
-
-- 使用 `@Dictionary` 注解声明字典
-- 枚举实现 `IDictionary` 接口
-- 字段类型使用 `Integer` 存储枚举值
-
-示例：
-
-```java
-
-@Description("存储类型")
-@Column(columnDefinition = "int UNSIGNED default 1 comment '存储类型'")
-@Dictionary(value = InventoryType.class, groups = {WhenAdd.class, WhenUpdate.class})
-private Integer type;
-```
-
-### 8. 方法编写规范
-
-- 方法必须添加 JavaDoc 注释，说明方法用途和参数
-- 参数类型使用包装类（`Long`、`Integer`、`Double`、`Boolean`）而非基本类型
-- 空值判断使用 `Objects.isNull()` 或 `Objects.nonNull()`
-- 使用 `@NotNull` 注解标记不可为空的参数
-- 条件分支使用 `switch` 表达式时，使用 `->` 语法，`default` 留空即可
-
-### 9. 异常处理
-
-使用 AirPower 的 `Errors` 抛出业务异常：
-
-```java
-Errors.FORBIDDEN_EDIT.when(subtract< 0, "库存数量不足");
-```
-
-### 10. 依赖注入
-
-使用 `@Autowired` 注解注入依赖，放在字段上：
-
-```java
-
-@Autowired
-private StorageService storageService;
-```
-
-### 11. 代码格式化
-
-- 使用 4 空格缩进（不使用 Tab）
-- 大括号不换行，跟随语句
-- 每个方法之间保留一个空行
-- 导入包使用 * 方式，如 `import cn.hamm.airpower.*;`
-
-## 继承体系
-
-所有类都继承项目提供的基类：
-
-| 层次         | 基类                                                                                                  |
-|------------|-----------------------------------------------------------------------------------------------------|
+| 层次       | 基类                                                                |
+|------------|---------------------------------------------------------------------|
+| Entity     | `BaseEntity<E extends BaseEntity<E>>`                               |
+| Repository | `BaseRepository<E extends BaseEntity<E>>`                           |
+| Service    | `BaseService<E extends BaseEntity<E>, R extends BaseRepository<E>>` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [s-pms/SPMS-Server](https://github.com/s-pms/SPMS-Server) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
