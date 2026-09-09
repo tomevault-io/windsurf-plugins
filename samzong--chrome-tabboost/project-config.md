@@ -1,185 +1,66 @@
 ---
 trigger: always_on
-description: TabBoost is a Chrome extension that enhances browser tab efficiency with features inspired by Arc Browser. The extension provides link preview, split-screen browsing, tab management, and other productivity features.
+description: Project-local instructions for TabBoost, a Manifest V3 Chrome extension. Follow the shared global agent rules first, then these repository-specific rules.
 ---
 
-# Copilot Instructions for TabBoost
+## Scope
 
-## Project Overview
+Project-local instructions for TabBoost, a Manifest V3 Chrome extension. Follow the shared global agent rules first, then these repository-specific rules.
 
-TabBoost is a Chrome extension that enhances browser tab efficiency with features inspired by Arc Browser. The extension provides link preview, split-screen browsing, tab management, and other productivity features.
+## Project Shape
 
-**Key Technologies:**
-- Chrome Extension Manifest V3
-- Vanilla JavaScript (ES2021+)
-- Webpack for bundling
-- Jest for testing
-- ESLint for code quality
+- Package manager: npm. This repo has `package-lock.json`; use `npm ci`, `npm test`, `npm run build`, and `npm run validate`.
+- Runtime: Chrome Extension Manifest V3.
+- Main surfaces:
+  - `src/js/background.js`: service worker, Chrome APIs, commands, DNR ruleset toggling, extension messages.
+  - `src/js/contentScript.js`: page-injected behavior, link preview popup, save shortcut interception.
+  - `src/js/splitView/`: split view implementation.
+  - `src/popup/` and `src/options/`: extension UI.
+  - `rules/`: static Declarative Net Request rules.
+- Build output: `build/`. Load this directory as the unpacked extension for local verification.
 
-## Architecture
+## Chrome Extension Debugging
 
-### Directory Structure
-- `src/js/` - Core JavaScript files
-  - `background.js` - Service worker (background script)
-  - `contentScript.js` - Content script injected into web pages
-  - `splitView/` - Split view functionality
-- `src/popup/` - Extension popup UI
-- `src/options/` - Extension options page
-- `src/styles/` - CSS stylesheets
-- `src/assets/` - Icons and other assets
-- `src/_locales/` - Internationalization (i18n) files
-- `tests/` - Jest test files
-- `rules/` - Declarative Net Request rules
+Do not start with a patch. Convert every browser symptom into a layer-specific failure first.
 
-### Key Components
-1. **Background Service Worker** (`background.js`) - Handles extension lifecycle, commands, and tab management
-2. **Content Script** (`contentScript.js`) - Injected into web pages for link preview and split view
-3. **Split View** (`splitView/`) - Side-by-side page viewing functionality
-4. **Popup UI** - Quick access to extension features
-5. **Options Page** - User preferences and settings
+For link preview, separate these layers:
 
-## Coding Standards
+1. Source page policy: the page hosting TabBoost may block child frames through its own `Content-Security-Policy`, especially `frame-src`.
+2. Redirect layer: short links such as `https://t.co/...` may redirect before the final target is reached.
+3. Target page policy: the final target may block embedding through `X-Frame-Options` or `Content-Security-Policy: frame-ancestors`.
+4. Extension runtime: DNR rulesets, storage settings, service worker logs, content script logs, and iframe load detection may disagree.
 
-### JavaScript
-- Use ES2021+ features
-- Follow ESLint configuration in `.eslintrc.json`
-- Indentation: 2 spaces
-- Quotes: Double quotes
-- Semicolons: Required
-- Line endings: Unix (LF)
+Required evidence before fixing iframe/link-preview bugs:
 
-### Code Style
-```javascript
-// Use descriptive variable names and destructure returned objects
-const { isValid } = validateUrl(url);
+- Source page URL.
+- Clicked link selector, visible text, or exact `href`.
+- Whether the issue is Chrome Web Store build or local `build/`.
+- Extension service worker output for:
+  - `await chrome.storage.sync.get({ headerModificationEnabled: true })`
+  - `await chrome.declarativeNetRequest.getEnabledRulesets()`
+- Source page DevTools Console errors, especially `Refused to frame` or CSP violations.
+- Source page Network evidence:
+  - main document response headers;
+  - whether the main document is `from service worker`;
+  - iframe/redirect requests, if any;
+  - final target response headers.
 
-// Use async/await for asynchronous operations
-async function fetchData() {
-  const result = await chrome.storage.sync.get("key");
-  return result;
-}
+If Network shows the main document is `from service worker`, verify the same repro with DevTools `Application -> Service Workers -> Bypass for network`. This distinguishes a site service-worker path from an extension DNR/header-modification path.
 
-// Use Chrome Extension APIs correctly
-chrome.tabs.query({ active: true }, (tabs) => {
-  // Handle tabs
-});
-```
+For this class of bug, "Page loaded" in the popup is not proof of success. An iframe `load` event may still display a Chrome blocked page. Treat user-visible blocked content, Console CSP errors, and Network request absence as stronger evidence than the popup title.
 
-### Chrome Extension Best Practices
-1. **Manifest V3** - Use service workers instead of background pages
-2. **Content Security Policy** - Follow strict CSP defined in manifest.json
-3. **Permissions** - Request minimal permissions needed
-4. **Message Passing** - Use `chrome.runtime.sendMessage` for communication
-5. **Storage** - Use `chrome.storage.sync` for user preferences
+Use Chrome CDP or DevTools for browser verification. Do not scaffold Playwright/Puppeteer for ad-hoc extension debugging unless this repo already owns that test path.
 
-## Build and Test Commands
+## Verification
 
-**Note:** This project supports both `npm` and `yarn` package managers. The examples below use `npm`, but you can substitute with `yarn` commands.
+For code changes, run the narrowest meaningful check first, then the repo gate:
 
-### Development
-```bash
-npm run dev          # Build in development mode
-npm run start        # Start webpack dev server
-npm run build        # Build for production
-npm run clean        # Clean build artifacts
-```
+- Unit-level change: `npm test -- <matching test file or pattern>`.
+- Extension behavior change: `npm run build`, load `build/` as unpacked extension, and re-check the exact browser symptom.
+- Release-readiness change: `npm run validate`.
 
-### Testing
-```bash
-npm test             # Run all tests
-npm run test:watch   # Run tests in watch mode
-npm run test:coverage # Generate coverage report
-npm run test:ci      # Run tests in CI mode
-```
-
-### Code Quality
-```bash
-npm run format       # Format code with Prettier
-npm run format:check # Check code formatting
-npx eslint src/      # Run ESLint manually (not in npm scripts)
-```
-
-### Release
-```bash
-npm run validate     # Validate build
-npm run zip          # Create distribution zip
-npm run release      # Build, validate, and create zip
-```
-
-## Testing Guidelines
-
-- **Test Framework:** Jest with jsdom environment
-- **Chrome API Mocking:** Use `jest-chrome` for mocking Chrome APIs
-- **Coverage Targets:**
-  - Statement coverage: ≥60%
-  - Branch coverage: ≥50%
-  - Function coverage: ≥60%
-  - Line coverage: ≥60%
-
-### Test Structure
-```javascript
-describe("Component or Function", () => {
-  beforeEach(() => {
-    // Setup mocks
-    chrome.storage.sync.get.mockImplementation((keys, callback) => {
-      callback({ key: "value" });
-    });
-  });
-
-  test("should do something specific", () => {
-    // Test implementation
-  });
-});
-```
-
-## Security Considerations
-
-1. **URL Validation** - Always validate URLs before processing
-2. **CSP Compliance** - Respect Content Security Policy headers
-3. **XSS Prevention** - Sanitize user input and dynamic content
-4. **Frame Security** - Handle X-Frame-Options correctly
-5. **Permission Management** - Request minimal permissions
-
-### Security Patterns
-```javascript
-// URL validation example
-import { validateUrl } from "../utils/utils.js";
-
-const result = validateUrl(url);
-if (!result.isValid) {
-  console.error("Invalid URL:", result.message);
-  return;
-}
-```
-
-## Internationalization (i18n)
-
-The extension supports multiple languages via Chrome's i18n system:
-- English (en) - default
-- Chinese Simplified (zh_CN)
-- Chinese Traditional (zh_TW)
-- Japanese (ja)
-- Korean (ko)
-- French (fr)
-- German (de)
-- Spanish (es)
-- Russian (ru)
-- Thai (th)
-
-### i18n Best Practices
-1. All user-facing strings should be in `src/_locales/{locale}/messages.json`
-2. Use `chrome.i18n.getMessage("key")` to retrieve localized strings
-3. In manifest.json, use `__MSG_key__` format
-4. Always add new strings to all locale files or at minimum to English (en)
-
-### Example Usage
-```javascript
-// In JavaScript
-const message = chrome.i18n.getMessage("appName");
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Do not claim a Chrome extension behavior is fixed without a fresh browser repro or an explicit statement that browser verification was not possible.
 
 ---
 > Source: [samzong/chrome-tabboost](https://github.com/samzong/chrome-tabboost) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
