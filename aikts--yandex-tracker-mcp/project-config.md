@@ -1,11 +1,15 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to AI coding agents (Claude Code, Cursor, etc.) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents (Claude Code, Cursor, etc.) when working with code in this repository.
+
+## Rules
+
+Before naming a tool, writing a description, a CHANGELOG entry or a README section, read the rule that covers it - [`rules/README.md`](rules/README.md) indexes them, and each names the test that enforces it. This file covers the rest: architecture, the Tracker API's behaviour, and how to test.
 
 ## Project Overview
 
@@ -24,102 +28,33 @@ uv run mcp-tracker # Run the server
 
 ## Architecture
 
-- **Protocols** (`mcp_tracker/tracker/proto/`): Define API contracts (`IssueProtocol`, `QueuesProtocol`, etc.)
+- **Protocols** (`mcp_tracker/tracker/proto/`): Define API contracts (`QueuesProtocol`, `IssueProtocol`, `GlobalDataProtocol`, `TemplatesProtocol`, `UsersProtocol`, `EntitiesProtocol`, `BoardsProtocol`, `ComponentsProtocol`), each exposed on `AppContext` as `queues` / `issues` / `fields` / `templates` / `users` / `entities` / `boards` / `components`
 - **Client** (`mcp_tracker/tracker/custom/client.py`): Implements protocols, handles HTTP requests
 - **Caching** (`mcp_tracker/tracker/caching/client.py`): Wraps protocols with Redis caching
 - **MCP Server** (`mcp_tracker/mcp/server.py`): Server creation and configuration
 - **MCP Tools** (`mcp_tracker/mcp/tools/`): Tool definitions organized by category
   - `_access.py`: Access control helpers (`check_issue_access`, `check_queue_access`)
-  - `queue.py`: Queue tools (5 read-only tools)
-  - `field.py`: Global field/metadata tools (6 read-only tools)
-  - `issue_read.py`: Issue read tools (9 read-only tools)
-  - `issue_write.py`: Issue write tools (4 tools, conditional on `tracker_read_only`)
-  - `user.py`: User tools (4 read-only tools)
+  - `queue.py` / `queue_write.py`: Queue read-only / write tools
+  - `field.py`: Global field and metadata tools (read-only)
+  - `template.py`: Issue and comment template tools (read-only)
+  - `board.py`: Board and sprint tools (read-only)
+  - `component.py` / `component_write.py`: Queue component read-only / write tools (`queue_get_components` itself lives with the queue tools)
+  - `issue_read.py` / `issue_write.py`: Issue read-only / write tools
+  - `user.py`: User tools (read-only)
   - `__init__.py`: Exports `register_all_tools()` which orchestrates tool registration
+  - `*_write.py` modules are only registered when `settings.tracker_read_only=False`
+  - project/portfolio/goal modules are only registered when `settings.tracker_entities_enabled=True`
 - **Settings** (`mcp_tracker/settings.py`): Pydantic settings from environment variables
 - All protocol methods accept optional `auth: YandexAuth | None` parameter for OAuth support.
 - All Pydantic models for Yandex Tracker entities inherit from `BaseTrackerEntity`.
 
-## Testing
+### Talking to the Tracker API
 
-### Rules
-
-- Use **pytest** with asyncio mode `auto`
-- Use **aioresponses** for HTTP mocking in `TrackerClient` tests and `@tests/aioresponses_utils.py` for capturing request/response pairs.
-- Use **AsyncMock** with `spec=` for protocol mocking in MCP tool tests
-- Always type-hint all parameters including fixtures
-- Never import inside functions - all imports at top of file
-- Never use loops for test cases - use `@pytest.mark.parametrize`
-- Use `model_construct()` for creating Pydantic model fixtures (skips validation)
-
-### Test Locations
-
-| What to test               | Where                                      |
-|----------------------------|--------------------------------------------|
-| TrackerClient HTTP methods | `tests/tracker/custom/test_*.py`           |
-| Caching wrappers           | `tests/tracker/caching/test_*_protocol.py` |
-| MCP tools                  | `tests/mcp/tools/test_*_tools.py`          |
-| OAuth provider             | `tests/mcp/oauth/`                         |
-
-### Testing TrackerClient (HTTP layer)
-
-Use `aioresponses` to mock HTTP requests. Verify request headers and response parsing:
-
-```python
-async def test_api_method(self, client: TrackerClient) -> None:
-    with aioresponses() as m:
-        m.get("https://api.tracker.yandex.net/v3/endpoint", payload={"key": "value"})
-        result = await client.api_method()
-        assert result.key == "value"
-```
-
-### Testing MCP Tools
-
-MCP tools are tested via `ClientSession.call_tool()` against a real `FastMCP` server with mocked protocols.
-
-Key fixtures (from `tests/mcp/conftest.py`):
-- `client_session`: Connected MCP client session
-- `client_session_with_limits`: Session with queue restrictions enabled
-- `mock_issues_protocol`, `mock_queues_protocol`, etc.: Mocked protocol instances
-
-Use `get_tool_result_content(result)` helper to extract tool return values.
-
-```python
-async def test_tool(self, client_session: ClientSession, mock_issues_protocol: AsyncMock) -> None:
-    mock_issues_protocol.issue_get.return_value = sample_issue
-    result = await client_session.call_tool("issue_get", {"issue_id": "TEST-1"})
-    assert not result.isError
-    content = get_tool_result_content(result)
-    assert content["key"] == "TEST-1"
-```
-
-For paginated methods, use `side_effect` for sequential returns: `mock.method.side_effect = [page1, []]`
-
-## Adding New MCP Tools
-
-### Implementation Checklist
-
-1. **Protocol**: Add method signature to `mcp_tracker/tracker/proto/*.py`
-2. **Client**: Implement in `mcp_tracker/tracker/custom/client.py`
-3. **Caching**: Add wrapper in `mcp_tracker/tracker/caching/client.py`
-4. **Tool**: Add function to appropriate module in `mcp_tracker/mcp/tools/`:
-   - Queue tools → `queue.py`
-   - Global field/metadata tools → `field.py`
-   - Issue read-only tools → `issue_read.py`
-   - Issue write tools → `issue_write.py`
-   - User tools → `user.py`
-5. **Tests**: Add to appropriate `tests/mcp/tools/test_*_tools.py`
-6. **Docs**: Update `README.md`, `README_ru.md`, and `manifest.json`
-
-### Tool Categories
-
-| Category | Module | Read-Only | Description |
-|----------|--------|-----------|-------------|
-| Queue | `queue.py` | Yes | Queue listing, tags, versions, fields, metadata |
-| Field | `field.py` | Yes | Global fields, statuses, types, priorities, resolutions |
+- **Reference fields** (`type`, `priority`, `parent`, `sprint`, `followers`, `components`, `project`) use the shared models in `mcp_tracker/tracker/proto/types/inputs.py` (`Issue*Ref`), serialized by `_ref_body()` in the client. How Tracker resolves a bare value is per field, so check before widening a parameter: `type` / `priority` accept an id or a key and resolve a numeric string as an id (verified against the API), `followers` accept a uid or a login the same way, and a 422 from these means the referenced entity does not exist. `components` are the exception - a bare string there is a *name*, which makes a numeric-looking name ambiguous (this is what `components: ["694"]` answered 422 for), hence `IssueComponentRef` requiring exactly one of `id` / `name`. Create and update must accept and send the same value the same way - the API takes a bare key or id on both, so a parameter widened on one has to be widened on the other, or an agent that created an issue with a scalar hits a schema error when it updates the same way.
+- **Every request goes through `self._request()`** - or `self._read()`, which is `_request` plus reading the body and is what a method wanting nothing but the body uses. Nothing calls `self._session` directly: the funnel is what builds the auth headers, translates a `TimeoutError` into `TrackerAPITimeout` (`str(TimeoutError())` is the empty string, so an untranslated timeout reaches an agent as a message with nothing in it) and puts every response through `_raise_for_status`, so Tracker's own `errorMessages` / `errors` end up in the raised `TrackerAPIError` instead of a bare "Unprocessable Entity". The funnel exists because these were sixty copies of the same lines and the copies drifted; a method added beside it rather than through it starts that again.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aikts/yandex-tracker-mcp](https://github.com/aikts/yandex-tracker-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
