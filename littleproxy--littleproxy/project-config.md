@@ -59,4 +59,4 @@ For diagrams and the full lifecycle of CONNECT/MITM/filter callbacks, see `Littl
 
 ---
 > Source: [LittleProxy/LittleProxy](https://github.com/LittleProxy/LittleProxy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
