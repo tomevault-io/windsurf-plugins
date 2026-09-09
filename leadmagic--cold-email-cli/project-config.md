@@ -1,191 +1,230 @@
 ---
 trigger: always_on
-description: - ✅ All tests passing (`npm test`)
+description: The SmartLead CLI supports **Model Context Protocol (MCP)** integration for enhanced AI-assisted development and automation capabilities.
 ---
 
-# Deployment & Production Guidelines
+# MCP (Model Context Protocol) Configuration
 
-## 🚀 Production Deployment
+## 🌐 Overview
 
-### Pre-deployment Checklist
-- ✅ All tests passing (`npm test`)
-- ✅ TypeScript compilation successful (`npm run build`)
-- ✅ Code quality checks passing (`npm run lint`)
-- ✅ 90%+ test coverage (`npm run test:coverage`)
-- ✅ No security vulnerabilities (`npm audit`)
-- ✅ Documentation updated
-- ✅ Version bumped in [package.json](mdc:package.json)
+The SmartLead CLI supports **Model Context Protocol (MCP)** integration for enhanced AI-assisted development and automation capabilities.
 
-### Build Process
-The [scripts/build.sh](mdc:scripts/build.sh) handles production builds:
-1. **Clean**: Remove previous build artifacts
-2. **Type Check**: Validate TypeScript without compilation
-3. **Compile**: TypeScript to JavaScript (ES2020/CommonJS)
-4. **Package**: Copy essential files and set permissions
-5. **Binaries**: Create CLI executables
+## ⚙️ MCP Server Configuration
 
-### Distribution Channels
+### SmartLead MCP Server
+Based on the original SmartLead MCP server implementation, this CLI provides comprehensive API access.
 
-#### NPM Publishing
-```bash
-# Build and test
-npm run build
-npm test
-
-# Publish to NPM
-npm publish --access public
-
-# Verify installation
-npm install -g smartlead-cli
-smartlead --version
+```json
+{
+  "mcpServers": {
+    "smartlead": {
+      "command": "npx",
+      "args": [
+        "smartlead-cli",
+        "mcp-server"
+      ],
+      "env": {
+        "SMARTLEAD_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
 ```
 
-#### GitHub Releases
-Automated via [.github/workflows/ci.yml](mdc:.github/workflows/ci.yml):
-- **Tags**: Create git tags for releases
-- **Artifacts**: Build artifacts attached to releases
-- **Changelog**: Auto-generated from commits
-- **Cross-platform**: Builds for Windows, macOS, Linux
+### Instantly MCP Server (Coming Soon)
+Future integration with Instantly platform:
 
-## 🔧 Installation Methods
-
-### Global Installation (Recommended)
-```bash
-# From NPM (when published)
-npm install -g smartlead-cli
-
-# From source
-git clone https://github.com/username/smartlead-cli.git
-cd smartlead-cli
-bash scripts/install.sh
+```json
+{
+  "mcpServers": {
+    "instantly": {
+      "command": "npx",
+      "args": [
+        "smartlead-cli",
+        "mcp-server",
+        "--module=instantly"
+      ],
+      "env": {
+        "INSTANTLY_API_KEY": "your-instantly-api-key"
+      }
+    }
+  }
+}
 ```
 
-### Development Installation
-```bash
-# Clone and build
-git clone https://github.com/username/smartlead-cli.git
-cd smartlead-cli
-npm install
-npm run build
-npm run install-global
+## 🔧 Configuration Files
+
+### MCP Configuration Location
+- **Global**: `~/.smartlead-cli/mcp.json`
+- **Project**: `.smartlead-mcp.json`
+- **Environment**: Via environment variables
+
+### Example MCP Configuration
+Create `.smartlead-mcp.json` in your project root:
+
+```json
+{
+  "version": "1.0.0",
+  "servers": {
+    "smartlead": {
+      "module": "smartlead",
+      "apiKey": "${SMARTLEAD_API_KEY}",
+      "baseUrl": "https://server.smartlead.ai/api/v1",
+      "capabilities": [
+        "campaigns",
+        "leads", 
+        "email-accounts",
+        "analytics",
+        "webhooks"
+      ],
+      "rateLimit": {
+        "requests": 100,
+        "window": "1m"
+      }
+    },
+    "instantly": {
+      "module": "instantly",
+      "apiKey": "${INSTANTLY_API_KEY}",
+      "baseUrl": "https://api.instantly.ai/api/v1",
+      "capabilities": [
+        "campaigns",
+        "leads",
+        "sequences",
+        "analytics"
+      ],
+      "available": false,
+      "comingSoon": "Q2 2024"
+    }
+  },
+  "context": {
+    "projectType": "email-marketing-automation",
+    "modules": ["smartlead", "instantly"],
+    "integrations": ["webhook", "api", "cli"],
+    "documentation": [
+      "docs/README.md",
+      "docs/CONTRIBUTING.md", 
+      "docs/ROADMAP.md"
+    ]
+  }
+}
 ```
 
-### Professional Installer
-The [scripts/install.sh](mdc:scripts/install.sh) provides:
-- **Environment Validation**: Node.js and npm version checks
-- **Dependency Installation**: Automated npm install
-- **Build Process**: TypeScript compilation
-- **Global Installation**: CLI binary setup
-- **Verification**: Installation testing and validation
+## 🚀 MCP Integration Features
 
-## 🔐 Environment Configuration
+### Available MCP Tools
+The CLI provides MCP-compatible tools for:
 
-### Production Environment Variables
-Copy [environment.example](mdc:environment.example) to configure:
+#### SmartLead Tools
+- **Campaign Management**: Create, update, start, pause, stop campaigns
+- **Lead Operations**: Add, update, delete, search leads
+- **Email Account Management**: Setup, warmup, health monitoring
+- **Analytics**: Campaign performance, lead statistics, exports
+- **Webhook Management**: Create, update, delete webhooks
 
-```bash
-# Required
-SMARTLEAD_API_KEY=your-production-api-key
+#### Context Tools
+- **Configuration**: API key management, module switching
+- **Documentation**: Access to comprehensive docs and examples
+- **Status Monitoring**: Real-time API status and health checks
 
-# Optional Production Settings
-NODE_ENV=production
-MCP_SERVER_PORT=3001
-RATE_LIMIT_REQUESTS=100
-API_TIMEOUT=30000
+### MCP Tool Examples
+
+#### Campaign Tools
+```typescript
+// MCP Tool: smartlead_campaign_create
+{
+  "name": "smartlead_campaign_create",
+  "description": "Create a new SmartLead campaign",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {"type": "string"},
+      "clientId": {"type": "number", "optional": true}
+    },
+    "required": ["name"]
+  }
+}
+
+// MCP Tool: smartlead_campaign_analytics
+{
+  "name": "smartlead_campaign_analytics", 
+  "description": "Get campaign analytics and performance metrics",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "campaignId": {"type": "number"},
+      "startDate": {"type": "string", "optional": true},
+      "endDate": {"type": "string", "optional": true}
+    },
+    "required": ["campaignId"]
+  }
+}
 ```
 
-### Configuration Files
-- **Global Config**: `~/.smartlead-cli/config.json`
-- **Module Configs**: `~/.smartlead-cli/{module}.json`
-- **MCP Config**: [.smartlead-mcp.json](mdc:.smartlead-mcp.json)
-- **Environment**: [environment.example](mdc:environment.example)
-
-## 📊 Monitoring & Analytics
-
-### Health Checks
-```bash
-# CLI Health
-smartlead --version
-smartlead show-config
-smartlead modules
-
-# API Connectivity
-smartlead campaigns --limit 1
-smartlead email-accounts --limit 1
+#### Lead Tools
+```typescript
+// MCP Tool: smartlead_lead_add
+{
+  "name": "smartlead_lead_add",
+  "description": "Add leads to a SmartLead campaign",
+  "inputSchema": {
+    "type": "object", 
+    "properties": {
+      "campaignId": {"type": "number"},
+      "leads": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "email": {"type": "string"},
+            "firstName": {"type": "string", "optional": true},
+            "lastName": {"type": "string", "optional": true},
+            "companyName": {"type": "string", "optional": true}
+          },
+          "required": ["email"]
+        }
+      }
+    },
+    "required": ["campaignId", "leads"]
+  }
+}
 ```
 
-### Performance Monitoring
-- **Startup Time**: CLI initialization speed
-- **Command Response**: API call performance
-- **Memory Usage**: Resource consumption
-- **Error Rates**: Command failure tracking
+## 🛠️ Development Integration
 
-### Logging
-- **Debug Mode**: `DEBUG=true` for detailed logs
-- **Log Levels**: error, warn, info, debug
-- **Error Tracking**: Comprehensive error logging
-- **Performance Metrics**: Command timing and stats
+### MCP Server Implementation
+The CLI includes an MCP server mode for AI integration:
 
-## 🔄 CI/CD Pipeline
-
-### GitHub Actions Workflow
-The [.github/workflows/ci.yml](mdc:.github/workflows/ci.yml) includes:
-
-#### Test Suite (`test` job)
-- **Multi-Node**: Tests on Node.js 16, 18, 20
-- **TypeScript**: Type checking and compilation
-- **Code Quality**: ESLint and Prettier validation
-- **Test Coverage**: Jest with coverage reporting
-- **CLI Testing**: Command verification
-
-#### Quality Assurance (`quality` job)
-- **Strict TypeScript**: Enhanced type checking
-- **Code Analysis**: ESLint with detailed reporting
-- **Formatting**: Prettier consistency checks
-
-#### Security Scanning (`security` job)
-- **Dependency Audit**: npm audit for vulnerabilities
-- **Security Analysis**: audit-ci for critical issues
-
-#### Cross-Platform Builds (`build-matrix` job)
-- **Multi-OS**: Ubuntu, Windows, macOS
-- **Build Testing**: Compilation on all platforms
-- **Installation**: Package and installation testing
-
-#### NPM Publishing (`publish-npm` job)
-- **Release Trigger**: Automated on GitHub releases
-- **Production Build**: Full build and test cycle
-- **NPM Deployment**: Automated publishing
-
-### Release Process
-1. **Version Bump**: Update version in [package.json](mdc:package.json)
-2. **Changelog**: Update [docs/CHANGELOG.md](mdc:docs/CHANGELOG.md)
-3. **Git Tag**: Create release tag
-4. **GitHub Release**: Create release with notes
-5. **Automated**: CI/CD handles NPM publishing
-
-## 📦 Package Management
-
-### Package Configuration
-The [package.json](mdc:package.json) includes:
-- **Files**: Only essential files in distribution
-- **Binaries**: CLI command setup (`smartlead`, `sl`)
-- **Dependencies**: Minimal production dependencies
-- **Scripts**: Comprehensive build and development scripts
-
-### Distribution Files
-```
-smartlead-cli/
-├── dist/                    # Compiled JavaScript
-├── docs/                    # Documentation
-├── scripts/install.sh       # Installation script
-├── LICENSE                  # MIT license
-├── package.json            # Package configuration
-└── README.txt              # Quick reference
+```typescript
+// src/mcp/server.ts
+export class SmartLeadMCPServer {
+  private modules: Map<ModuleName, CLIModule>;
+  
+  public async handleToolCall(tool: string, args: any): Promise<any> {
+    const [moduleName, command] = tool.split('_');
+    const module = this.modules.get(moduleName as ModuleName);
+    
+    if (module) {
+      return await module.executeCommand(command, args);
+    }
+    
+    throw new Error(`Unknown tool: ${tool}`);
+  }
+}
 ```
 
-## 🎯 Production Checklist
+### Context7 Integration
+For enhanced context management:
 
+```json
+{
+  "context7": {
+    "smartlead-cli": {
+      "type": "typescript-cli",
+      "architecture": "modular",
+      "modules": {
+        "smartlead": {
+          "status": "available",
+          "commands": 80,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
