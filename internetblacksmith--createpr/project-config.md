@@ -25,4 +25,4 @@ make build    # Build the binary
 
 ---
 > Source: [internetblacksmith/createpr](https://github.com/internetblacksmith/createpr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
