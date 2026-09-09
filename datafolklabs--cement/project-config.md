@@ -1,151 +1,128 @@
 ---
 trigger: always_on
-description: **Analysis Date:** 2026-04-24
+description: <!-- Project-specific only. Org-wide rules belong in ../shared/ORG.md. -->
 ---
 
-# Coding Conventions
+# Cement
 
-**Analysis Date:** 2026-04-24
+<!-- Project-specific only. Org-wide rules belong in ../shared/ORG.md. -->
 
-## Naming Patterns
+> `../shared` is an optional sibling checkout. Without it, only this file applies.
 
-**Files:**
-- Module files: lowercase with underscores (`foundation.py`, `ext_smtp.py`)
-- Classes: PascalCase (e.g., `FrameworkError`, `SMTPMailHandler`, `MetaMixin`)
-- Test files: `test_<module>.py` pattern (e.g., `test_foundation.py`, `test_ext_smtp.py`)
+## Overview
 
-**Functions:**
-- Public methods: lowercase_with_underscores (`parse_file()`, `_setup_arg_handler()`)
-- Private/internal methods: leading underscore (`_get_params()`, `_parse_file()`)
-- Test functions: `test_<feature>()` pattern (e.g., `test_smtp_send()`, `test_basic()`)
+Cement is a CLI application framework built around a handler/interface pattern
+with the following core concepts:
 
-**Variables:**
-- Constants: UPPERCASE_WITH_UNDERSCORES (environment variables, signal lists)
-- Instance variables: lowercase_with_underscores
-- Module-level logger: `LOG = minimal_logger(__name__)`
+**Core Application (`cement.core.foundation.App`):**
+- The main `App` class in `cement/core/foundation.py` is the central orchestrator
+- Uses a Meta class pattern for configuration
+- Manages lifecycle through setup(), run(), and close() methods
+- Supports signal handling and application reloading
 
-**Types:**
-- Use PascalCase for class names
-- Use **PEP 585 builtin generics** (Python 3.10+): `dict[str, Any]`, `list[str]`, `tuple[int, str]`, `type[Handler]`
-- Use **PEP 604 union syntax** (Python 3.10+): `str | None`, `int | str`, `dict[str, Any] | None`
-- Phase 03 D-06 enabled ruff `UP` family enforcement; UP006/UP007/UP045 mechanically rewrite legacy syntax to the modern forms on every `make comply-ruff-fix`
-- Private Meta attribute annotations: `_meta: MetaClassName  # type: ignore` (see `cement/ext/ext_smtp.py` line 72)
+**Handler System:**
+- Interface/Handler pattern where interfaces define contracts and handlers provide implementations
+- Core handlers: arg, config, log, output, cache, controller, extension, plugin, template
+- Handlers are registered and resolved through `HandlerManager`
+- Located in `cement/core/` with corresponding modules (arg.py, config.py, etc.)
 
-## Code Style
+**Extensions System:**
+- Extensions in `cement/ext/` provide additional functionality
+- Examples: ext_yaml.py, ext_jinja2.py, ext_argparse.py, etc.
+- Optional dependencies managed through pyproject.toml extras
 
-**Formatting:**
-- Tool: `ruff` (v0.3.2+)
-- Line length: 100 characters
-- Indentation: 4 spaces
-- Python target: 3.9+
+**CLI Structure:**
+- Main CLI application in `cement/cli/main.py`
+- Uses CementApp class that extends core App
+- Includes code generation templates in `cement/cli/templates/`
 
-**Ruff Configuration** (`pyproject.toml` [tool.ruff]):
-```
-target-version = "py310"
-line-length = 100
-indent-width = 4
-preview = true
-extend-select = ["E", "F", "W"]  # PEP8, Pyflakes, warnings
-fixable = ["ALL"]
-```
+**Controllers:**
+- MVC-style controllers handle command routing
+- Base controller pattern in controllers/base.py files
+- Support nested sub-commands and argument parsing
 
-**Linting:**
-- Tool: `ruff check cement/ tests/`
-- All code must pass without errors before commit
-- Run via `make comply-ruff`
+## Repo Structure
 
-## Import Organization
+- `cement/core/` — interfaces and default handler implementations
+- `cement/ext/` — `ext_*.py` optional extensions
+- `cement/cli/` — CLI app, plus `templates/` code-generation sources
+- `tests/` — mirrors the source layout
+- `scripts/` — dev affordances: `audit-public-api.py`, `cli-smoke-test.sh`, `devtools.py`
+- `docs/` — Sphinx documentation sources
+- `.planning/` — bind-mounted from the sibling planning repo; untracked
 
-**Order** (strictly enforced):
-1. Standard library imports (`os`, `sys`, `signal`, `platform`, `importlib`)
-2. Third-party library imports (if any)
-3. Relative imports from cement (`from ..core`, `from ..utils`)
-4. TYPE_CHECKING block (deferred type imports to avoid circular dependencies)
+## Commands
 
-**Example** from `cement/core/foundation.py`:
-```python
-from __future__ import annotations
-import os
-import platform
-import signal
-import sys
-from importlib import reload as reload_module
-from time import sleep
-from typing import (IO, Any, Callable, Dict, List, Optional, TextIO, Tuple,
-                    Type, Union, TYPE_CHECKING)
-from ..core import (arg, cache, config, controller, exc, extension, log, mail,
-                    meta, output, plugin, template)
-from ..core.deprecations import deprecate
-from ..utils.misc import is_true, minimal_logger
+**Testing and Compliance:**
+- `make test` - Run full test suite with coverage and PEP8 compliance
+- `make test-core` - Run only core library tests
+- `make comply` - Run both ruff and mypy compliance checks
+- `make comply-ruff` - Run ruff linting
+- `make comply-ruff-fix` - Auto-fix ruff issues
+- `make comply-mypy` - Run mypy type checking
+- `pdm run pytest --cov=cement tests/` - Direct pytest execution
+- `pdm run pytest --cov=cement.core tests/core` - Test only core components
 
-if TYPE_CHECKING:
-    from types import FrameType, ModuleType, TracebackType  # pragma: nocover
-```
+**Development Environment:**
+- `make init` - Set up local development environment
+- `pdm run cement --help` - Run the cement CLI
 
-**Path Aliases:**
-- No centralized alias configuration; use relative imports exclusively (`..core.`, `..utils.`)
+**Documentation:**
+- `make docs` - Build Sphinx documentation
 
-## Type Annotations
+**Build and Distribution:**
+- `pdm build` - Build distribution packages
 
-**Strictness:** Full type annotation compliance required
-- mypy config in `pyproject.toml` enforces strict mode:
-  - `disallow_untyped_calls = true`
-  - `disallow_untyped_defs = true`
-  - `disallow_incomplete_defs = true`
-  - `warn_return_any = true`
+**GitHub Project (github.com/datafolklabs/cement):**
+- `gh issue list -R datafolklabs/cement` - List open issues
+- `gh issue view <number> -R datafolklabs/cement` - View a specific issue
+- `gh pr list -R datafolklabs/cement` - List open pull requests
+- `gh pr view <number> -R datafolklabs/cement` - View a specific PR
+- `gh pr checks <number> -R datafolklabs/cement` - View CI status for a PR
+- `gh api repos/datafolklabs/cement/pulls/<number>/comments` - View PR review comments
 
-**Patterns:**
-- Always annotate function parameters and return types: `def send(self, msg: str, **kw: Any) -> dict[str, Any]:`
-- Use **PEP 585 builtin generics** (Python 3.10+): `dict[str, Any]`, `list[str]`, `tuple[int, str]`, `type[Handler]`
-- Use **PEP 604 union syntax** (Python 3.10+): `str | None`, `int | str`, `dict[str, Any] | None`
-- Use `TYPE_CHECKING` block for deferred imports to prevent circular dependencies
-- Private Meta attributes require `# type: ignore` due to metaclass pattern (framework constraint)
-- Phase 03 D-06 enabled ruff `UP` family enforcement; UP006/UP007/UP045 mechanically rewrite legacy syntax to the modern forms on every `make comply-ruff-fix`. Phase 03 plan 03 landed the bulk migration.
+## Practices
 
-**Example** from `cement/ext/ext_smtp.py` (post Phase 03):
-```python
-def _get_params(self, **kw: Any) -> dict[str, Any]:
-    params = dict()
-    # ...
-    return params
-```
+**Key Development Practices:**
+- 100% test coverage required (pytest with coverage reporting)
+- 100% PEP8 compliance enforced via ruff
+- Type annotation compliance via mypy
+- PDM for dependency management
+- Zero external dependencies for core framework (optional for extensions)
 
-## Error Handling
+**Extension Development:**
 
-**Framework Exceptions** (from `cement/core/exc.py`):
-- `FrameworkError` - General framework (non-application) errors with message passing
-- `InterfaceError` - Interface-related errors
-- `CaughtSignal(signum, frame)` - Raised when signal is caught
+When working with extensions:
+- Check `cement/ext/` for existing extension patterns
+- Optional dependencies declared in pyproject.toml under `[project.optional-dependencies]`
+- Extensions follow naming pattern `ext_<name>.py`
+- Must implement proper interface contracts
 
-**Pattern:**
-- Raise framework exceptions for framework-level errors
-- Custom applications should extend `FrameworkError` for app-specific exceptions
-- Always include a message: `raise FrameworkError("descriptive message")`
+**Commits:**
+- Conventional Commits, subject under 72 characters, per ORG.md.
+- Body lines wrapped at 78 characters when a body is genuinely needed.
+- Author interactively via `make commit` (runs `pdm run cz commit`).
 
-**Exception Testing** (from `tests/core/test_exc.py`):
-```python
-with raises(FrameworkError, match=".*framework exception.*"):
-    raise FrameworkError("test framework exception message")
-```
+**Branching:**
+- Branch naming: `gsd/phase-{phase}-{slug}` for phase work; otherwise a short
+  `feat/...`, `fix/...`, or `docs/...` slug.
+- GSD's `branching_strategy` config defaults to `none`, which keeps work on
+  the current branch — it will not branch for you; branch manually before the
+  first commit.
 
-## Logging
+**Changelog Maintenance:**
+- Update `CHANGELOG.md` phase-by-phase as work lands; do not defer to release-cut time
+- Append entries to the active `## X.Y.Z - DEVELOPMENT` section using the existing buckets: **Bugs**, **Features**, **Refactoring**, **Misc**, **Deprecations**
+- Each entry: one line, prefixed with `[area]` — e.g., `[ext.smtp]`, `[cli]`, `[dev]`, `[core.handler]`
+- Filter out planning-artifact commits (`docs(NN.N):`, `docs(state):`, `docs(quick-...):`) — they are workflow scaffolding, not user-facing changes
+- Filter out commits superseded within the same branch (revert pairs, overwrites) — only the net effect ships in the changelog
+- Bucket by Conventional Commit type: `fix:` → Bugs, `feat:` → Features, `refactor:` → Refactoring, `chore:` (deps/tooling/dev-env) → Misc; structural removals (drop Python version, replace toolchain) or substantive structural reshuffles → Refactoring
 
-**Framework:** `cement.utils.misc.minimal_logger()`
-- Module-level logger created as: `LOG = minimal_logger(__name__)`
-- No logging.config setup needed; minimal logger is intentionally simple for framework
+## Gotchas
 
-**Patterns:**
-- Use `LOG.debug()` for framework internals: `LOG.debug(f'hook {hook_spec[0]} not defined')`
-- Framework runs silently by default; debug output only when app.debug is True
-- No INFO/WARNING/ERROR logging in framework core (by design)
-
-**Example** from `cement/core/foundation.py`:
-```python
-LOG = minimal_logger(__name__)
-# ...
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [datafolklabs/cement](https://github.com/datafolklabs/cement) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
