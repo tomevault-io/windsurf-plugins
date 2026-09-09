@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -20,8 +20,8 @@ uv sync
 # Run all tests
 pytest
 
-# Run tests with coverage
-pytest --cov . --cov-report=html
+# Run tests with coverage report (coverage of irsim/ is on by default via pyproject)
+pytest --cov-report=html
 
 # Run a single test file
 pytest tests/test_kinematics.py
@@ -97,6 +97,7 @@ cd docs && make html
 
 **Map** (`irsim/world/map/`):
 - `obstacle_map.py`: Obstacle map representation
+- `fog_map.py`: Fog-of-map overlay (`FogMap`, subclass of `Map`) revealed by lidar line of sight or robot field of view
 - `grid_map_generator_base.py`: Base grid map generator
 - `image_map_generator.py`: Image-based map generation
 - `perlin_map_generator.py`: Perlin noise procedural map generation
@@ -129,12 +130,9 @@ irsim/                  # Main package
 │   ├── behavior/       # Robot behaviors (dash, rvo, sfm, orca)
 │   ├── algorithm/      # Core algorithms (kinematics, rvo, sfm, generation)
 │   ├── path_planners/  # Path planning (A*, RRT, RRT*, Informed RRT*, JPS, PRM)
-│   └── handler/        # Geometry and kinematics handlers
-├── gui/                # Keyboard/mouse controls
-├── util/               # Utility functions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [hanruihua/ir-sim](https://github.com/hanruihua/ir-sim) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
