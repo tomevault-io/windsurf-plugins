@@ -1,122 +1,109 @@
 ---
 trigger: always_on
-description: Python package for dimensionality reduction of protein language model (pLM) embeddings, with annotation retrieval and data export for interactive visualization at [protspace.app](https://protspace.app).
+description: Canonical instructions for **all** AI coding agents (Codex, Claude Code, Cursor, Copilot, etc.)
 ---
 
-# protspace — Python CLI Package
+# Agent Instructions — protspace
 
-Python package for dimensionality reduction of protein language model (pLM) embeddings, with annotation retrieval and data export for interactive visualization at [protspace.app](https://protspace.app).
+Canonical instructions for **all** AI coding agents (Codex, Claude Code, Cursor, Copilot, etc.)
+working in this repository; tool-specific files (e.g. `.claude/CLAUDE.md`) import it.
 
-- **Version:** 4.3.1
-- **Python:** >=3.10
-- **License:** GPL-3.0
-- **PyPI:** `pip install protspace`
-- **GitHub:** https://github.com/tsenoner/protspace
+## Spec-driven development with OpenSpec (default workflow)
 
-## Running Commands
+Plan non-trivial work as an [OpenSpec](https://openspec.dev/) spec **before** writing
+implementation code. Proposals, design, spec deltas, and task lists live in
+`openspec/changes/<change-name>/`; do **not** save plans, specs, or design docs under `docs/`,
+scratch files, or other ad-hoc locations.
 
-**Always use `uv run` to execute Python commands in this project.** Do not use bare `python` or `python3`.
+- **Use the workflow commands** — or the equivalent OpenSpec skill, or the `openspec` CLI, when
+  slash commands are unavailable:
+  - `/opsx:propose <idea>` — create a change and its artifacts (proposal, design, specs, tasks)
+  - `/opsx:apply` — implement the change's tasks
+  - `/opsx:archive` — merge spec deltas into `openspec/specs/` and archive the change; run it as
+    the **last commit on the branch, before the merge** — see below
+  - `/opsx:explore` — investigate/clarify before committing to a change
+- **`openspec/specs/` is the source of truth** for current behavior; read the relevant specs first.
+- **Trivial changes** (typo, one-line fix, formatting, dependency bump) do not need a full
+  proposal — use judgment.
+
+### Archive before the merge, not after
+
+Run `/opsx:archive` on the branch, commit the result, and let CI go green on that commit.
+Deferred to "after the merge" it does not happen — the PR is closed and the branch is gone —
+leaving `openspec/specs/` describing behavior the code no longer has, which the next change
+reads as current.
+
+Before archiving, tick off `tasks.md` including anything the review added, and reread
+`proposal.md` / `design.md` against the final diff: rationale written before a review is often
+stale by the end of it, and archiving freezes it.
+
+One-time CLI setup is in [CONTRIBUTING.md](CONTRIBUTING.md#openspec-one-time-per-machine).
+
+## Before committing
+
+Always run `pnpm precommit` before any git commit. It is
+`lint-staged && quality && docs:annotations:check && docs:build`:
+
+- ESLint `--fix` and Prettier `--write`, on staged files only (lint-staged)
+- TypeScript typecheck, Knip, and Knip dependency validation (`pnpm quality`)
+- `docs:annotations:check` — the generated annotation reference must match its source
+- `docs:build`, a full VitePress build (a dead internal link fails it)
+
+**It runs no tests at all.** Run `pnpm test` yourself; `pnpm test:e2e` (below) and
+`pnpm test:contract` are separate again. It is also JS-only — Python workspace members
+have their own CI workflows (see below).
+
+lint-staged only inspects **staged** files, so unstaged work passes `pnpm precommit` and
+still fails CI's `format:check` — also run `pnpm format:check` when anything is unstaged.
+
+### A user-visible change is not done until the docs and the notebooks say so
+
+Move these in the same PR — `pnpm precommit` covers none, and all three have shipped stale:
+
+- **The published docs** (`docs/guide/`), for anything reaching a CLI flag, an option default,
+  or the bundle format. `docs/guide/annotations.md` is generated, so edit its source instead.
+- **The Colab notebooks** (`apps/protspace/notebooks/`), for anything a notebook restates — a
+  model list, an install command, a flag. Prettier and ruff's CI paths both skip them, so
+  nothing tells you when they drift; import from the package rather than retype, as the prep
+  notebook does with `EMBEDDER_MODELS`.
+- **`apps/protspace/CLAUDE.md`**, for a new command, test file, or dependency.
+
+Pin a fact that has to live in two places with a test, not a comment asking the next reader to
+keep them in step — see `apps/protspace/tests/test_docs_extras_sync.py`.
+
+## End-to-end tests (Playwright)
+
+`e2e.yml` alone drives the real app in a browser; the unit suites run in jsdom, which has no
+WebGL. Canvas-dependent wiring — EAT provenance connectors, isolation, dataset swap — is
+exercised nowhere else.
+
+It runs nightly on `main`, and on PRs touching the web app, `packages/`, or the root files
+those resolve through — `e2e.yml` owns the exact list.
+
+Dispatch it by hand when your change could reach the app by a route that list misses — a
+transitive dependency, a shared config, a generated asset — because a wrong `paths:` filter
+does not fail, it silently never runs. Not whenever the filter simply didn't match: a PR with
+no TS/JS and no root-file changes cannot reach the app, and the run costs ~10 min to confirm
+nothing.
 
 ```bash
-# Install with dev deps + enable pre-commit hook (once per clone)
-uv sync --group dev
-git config core.hooksPath .githooks
-
-# Run tests (skip slow)
-uv run pytest tests/ -m "not slow"
-
-# Run all tests
-uv run pytest tests/
-
-# Lint
-uv run ruff check src/ tests/
-
-# Run CLI
-uv run protspace prepare -i data/sizes/phosphatase.h5:prot_t5 -m pca2 -o output --no-scores
-
-# Run all 6 DR methods on sample data
-uv run protspace prepare -i data/sizes/phosphatase.h5:prot_t5 -m "pca2,tsne2,umap2,pacmap2,mds2,localmap2" -o output --no-scores -v
-
-# Compare UMAP with different parameters in a single run
-uv run protspace prepare -i data/sizes/phosphatase.h5:prot_t5 -m "umap2:n_neighbors=15" -m "umap2:n_neighbors=50" -m pca2 -o output --no-scores
+gh workflow run e2e.yml --ref <branch>   # in CI, any branch
+pnpm test:e2e                            # locally
 ```
 
-## CLI Commands
+**Never dismiss a red run as flaky on the strength of local passes.** The regression behind
+this rule failed 6/6 in CI and 0/17 locally. Compare against the nightly's history on `main`
+(`gh run list --workflow=e2e.yml --event=schedule`), not your machine.
 
-Single entry point: `protspace = protspace.cli.app:app`
+## Python workspace members (uv)
 
-| Command | Purpose |
-|---------|---------|
-| `protspace prepare` | Full pipeline: embed → reduce → annotate → bundle |
-| `protspace embed` | FASTA → HDF5 embeddings via Biocentral API |
-| `protspace project` | HDF5 → dimensionality reduction |
-| `protspace annotate` | Fetch protein annotations |
-| `protspace bundle` | Combine projections + annotations → .parquetbundle |
-| `protspace serve` | Launch Dash web frontend |
-| `protspace style` | Add annotation colors/styles |
+The Python packages are uv workspace members (root `[tool.uv.workspace]`) sharing one root
+`uv.lock`. A new **top-level** member needs three things it does not get for free:
 
-### protspace prepare Usage
-
-```bash
-protspace prepare -i <input> -m <methods> -o <output> [options]
-
-# From HDF5: protspace prepare -i embeddings.h5 -m pca2,umap2 -o output
-# From FASTA: protspace prepare -i sequences.fasta -e prot_t5 -m pca2 -o output
-# Multi-model: protspace prepare -i seq.fasta -e prot_t5,esm2_3b -m pca2 -o output
-# All 12 pLMs: protspace prepare -i seq.fasta -e prot_t5,prost_t5,esm2_8m,esm2_35m,esm2_150m,esm2_650m,esm2_3b,ankh_base,ankh_large,ankh3_large,esmc_300m,esmc_600m -m pca2 -o output
-# Combine datasets (same name → union): protspace prepare -i species_a.h5:prot_t5 -i species_b.h5:prot_t5 -m umap2 -o output
-# Multi-embedding (different names → intersection): protspace prepare -i esm2.h5 -i prott5.h5 -m pca2 -o output
-# With similarity: protspace prepare -i emb.h5 -f seq.fasta -s -m pca2,mds2 -o output
-# Name override: protspace prepare -i emb.h5:custom_name -m pca2 -o output
-# Parameter sweep: protspace prepare -i emb.h5 -m "umap2:n_neighbors=15" -m "umap2:n_neighbors=50" -m pca2 -o output
-# Inline params: protspace prepare -i emb.h5 -m "pca2,umap2:n_neighbors=50;min_dist=0.3" -o output
-```
-
-### Supported Embedders (via Biocentral API)
-
-| Shortcut | Model | Dim | License |
-|----------|-------|-----|---------|
-| `prot_t5` | Rostlab/prot_t5_xl_uniref50 | 1024 | MIT |
-| `prost_t5` | Rostlab/ProstT5 | 1024 | MIT |
-| `esm2_8m` | facebook/esm2_t6_8M_UR50D | 320 | MIT |
-| `esm2_35m` | facebook/esm2_t12_35M_UR50D | 480 | MIT |
-| `esm2_150m` | facebook/esm2_t30_150M_UR50D | 640 | MIT |
-| `esm2_650m` | facebook/esm2_t33_650M_UR50D | 1280 | MIT |
-| `esm2_3b` | facebook/esm2_t36_3B_UR50D | 2560 | MIT |
-| `ankh_base` | ElnaggarLab/ankh-base | 768 | CC-BY-NC-SA-4.0 |
-| `ankh_large` | ElnaggarLab/ankh-large | 1536 | CC-BY-NC-SA-4.0 |
-| `ankh3_large` | ElnaggarLab/ankh3-large | 1536 | CC-BY-NC-SA-4.0 |
-| `esmc_300m` | Synthyra/ESMplusplus_small | 960 | Cambrian Open |
-| `esmc_600m` | Synthyra/ESMplusplus_large | 1152 | Cambrian Non-Commercial |
-
-Ankh models, ankh3_large, and esmc_600m are non-commercial only. ESMC models use Synthyra's HuggingFace-compatible reimplementation of EvolutionaryScale's ESM-C (near-identical embeddings, MSE ~7.74e-10).
-
-Model shortcuts are defined in `MODEL_SHORT_KEYS` (CommonEmbedder models) and `EXTRA_SHORT_KEYS` (additional HuggingFace models) in `src/protspace/data/embedding/biocentral.py`. Display names are in `src/protspace/data/loaders/embedding_set.py`.
-
-## Package Structure
-
-```
-src/protspace/
-├── cli/
-│   ├── app.py                  # Typer app root, shared utilities
-│   ├── prepare.py              # Full pipeline command
-│   ├── embed.py                # FASTA → HDF5 embedding
-│   ├── project.py              # HDF5 → DR projections
-│   ├── annotate.py             # Annotation fetching
-│   ├── bundle.py               # Combine into .parquetbundle
-│   ├── serve.py                # Dash web frontend
-│   └── style.py                # Annotation styling
-├── data/
-│   ├── loaders/
-│   │   ├── embedding_set.py    # EmbeddingSet dataclass
-│   │   ├── h5.py               # HDF5 loading with model_name resolution
-│   │   ├── fasta.py            # FASTA → Biocentral → HDF5
-│   │   ├── query.py            # UniProt query → FASTA download
-│   │   └── similarity.py       # FASTA → MMseqs2 → similarity matrix
-│   ├── annotations/
+- **Its own workflow** in `.github/workflows/` (GitHub runs workflows only from the repo root),
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tsenoner/protspace](https://github.com/tsenoner/protspace) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
