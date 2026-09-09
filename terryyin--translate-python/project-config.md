@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: Guidance for Codex and other AI coding agents working in this repository.
+description: Guidance for Claude Code and other AI coding agents working in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for Codex and other AI coding agents working in this repository.
+Guidance for Claude Code and other AI coding agents working in this repository.
 
 Translate is a Python command-line translation tool with support for multiple providers (MyMemory, Microsoft, DeepL, LibreTranslate, Yandex).
 
@@ -83,4 +83,4 @@ translate-python/
 
 ---
 > Source: [terryyin/translate-python](https://github.com/terryyin/translate-python) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
