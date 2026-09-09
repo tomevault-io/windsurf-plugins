@@ -1,256 +1,143 @@
 ---
 trigger: always_on
-description: 用于生成 dbm 工具箱提单的完整指南，包括路由注册、组件实现、类型定义和单据详情页配置
+description: 蓝鲸 DBM（数据库管理系统）的前端，Vue 3 + TypeScript 单页应用。
 ---
 
+# BlueKing DBM Frontend
 
-# DBM 工具箱生成指南
+蓝鲸 DBM（数据库管理系统）的前端，Vue 3 + TypeScript 单页应用。
 
-本规则用于指导如何正确实现 DBM 工具箱提单功能。
+## 工作目录与命令
 
-## 目录结构
+仓库根是 `blueking-dbm`（monorepo），前端在 `dbm-ui/frontend`。**所有命令必须在 `dbm-ui/frontend` 下执行**，git
+hooks 也是先 `cd dbm-ui/frontend` 再跑。
 
-工具箱提单文件位于：`src/views/db-manage/{db-type}/{TICKET_TYPE}/Index.vue`
+| 命令                          | 用途                                     |
+| ----------------------------- | ---------------------------------------- |
+| `yarn dev`                    | 开发服务，`127.0.0.1:8088`，`strictPort` |
+| `yarn type-check`             | `vue-tsc --build` 全量类型校验           |
+| `npx eslint <改动文件> --fix` | 校验改动文件，见下方说明                 |
+| `yarn prettier`               | 格式化 `./src`                           |
+| `yarn build`                  | 生产构建                                 |
 
-其中：
-- `{db-type}` 为数据库类型（如 `mysql`, `redis`, `mongodb`, `tendb-cluster` 等）
-- `{TICKET_TYPE}` 为大写字母命名的单据类型（如 `MYSQL_DATA_MIGRATE`, `REDIS_BACKUP` 等）
+`yarn lint` 是 `run-s lint:*`，覆盖范围有坑，不要当成全项目检查：`lint:oxlint` 只查 `correctness`，`lint:script`
+的 eslint **只覆盖 `src/views/ticket-center/common/ticket-detail`**，`lint:lint-staged` 只处理已 `git add`
+的文件。所以校验自己的改动要么直接 `npx eslint <改动文件> --fix`，要么 `git add` 后跑 `yarn lint:lint-staged`（它对
+`.js/.ts/.tsx/.vue` 跑 eslint + prettier，对 `.less` 跑 stylelint）。
 
-## 实现步骤
+commit message 走 Conventional Commits，`commit-msg` 钩子会跑 commitlint 校验（type 白名单见 `commitlint.config.mjs`）。
 
-### 1. 注册 TicketType 常量
+## 改完怎么验证
 
-在 `src/common/const/ticketTypes.ts` 中添加新的单据类型枚举值：
+`src/` 下没有单元测试，也没有单测基建。**不要为了"有测试"而新建测试文件或引入测试框架。**
 
-```typescript
-export enum TicketTypes {
-  // ... 其他类型
-  MYSQL_YOUR_NEW_TYPE = 'MYSQL_YOUR_NEW_TYPE',
-}
-```
+**验证命令（type-check、eslint、stylelint 等）执行前先经用户确认，不要改完代码就自动跑。** 用户同意后按默认顺序执行：
 
-**注意事项：**
-- 枚举值必须与后端 API 的 `ticket_type` 字段完全一致
-- 命名格式：`{DB_TYPE}_{FEATURE_NAME}`（全大写，下划线分隔）
+1. `yarn type-check` 通过
+2. 改动文件 `npx eslint <改动文件> --fix` 通过，改了样式再补 stylelint
+3. 需要运行时验证的，写清「哪个页面 + 哪个操作 + 预期结果」交给人确认，不要声称自己已经验证过
 
-### 2. 创建工具箱页面组件
+## 仓库分层
 
-在 `src/views/db-manage/{db-type}/{TICKET_TYPE}/Index.vue` 创建页面组件。
+- `src/` 源码
+- `public/` 静态资源，构建后原样输出
+- `lib/` 内部库（别名 `@lib/*`）
+- `openspec/` 变更提案与规格（未纳入 git）
 
-#### 组件结构
+## src 分层
 
-```vue
-<template>
-  <div class="toolbox-container">
-    <!-- 批量操作区域（可选） -->
-    <BatchInput
-      v-if="showBatchInput"
-      @change="handleBatchInput" />
-    
-    <!-- 表单区域 -->
-    <DbForm
-      ref="form"
-      class="toolbox-form"
-      form-type="vertical"
-      :model="formData">
-      <!-- 可编辑表格 -->
-      <EditableTable
-        ref="editableTable"
-        class="mt-16 mb-16"
-        :model="formData.tableData">
-        <EditableRow
-          v-for="(item, index) in formData.tableData"
-          :key="index">
-          <!-- 自定义列组件 -->
-          <ClusterColumn
-            v-model="item.cluster"
-            :label="t('集群')"
-            :selected="selected"
-            @batch-edit="handleClusterBatchEdit" />
-          
-          <EditableColumn
-            :label="t('字段名')"
-            :width="200"
-            required>
-            <EditableInput
-              v-model="item.field_name"
-              :placeholder="t('请输入')" />
-          </EditableColumn>
-          
-          <!-- 操作列（必须） -->
-          <OperationColumn
-            :create-row-method="createRowData"
-            :table-data="formData.tableData" />
-        </EditableRow>
-      </EditableTable>
-      
-      <!-- 单据负载（必须） -->
-      <TicketPayload v-model="formData.payload" />
-    </DbForm>
-  </div>
-  
-  <template #action>
-    <BkButton
-      :loading="isSubmitting"
-      theme="primary"
-      @click="handleSubmit">
-      {{ t('提交') }}
-    </BkButton>
-  </template>
-</template>
+| 目录          | 职责                                                         |
+| ------------- | ------------------------------------------------------------ |
+| `views/`      | 页面，每个功能一个文件夹                                     |
+| `components/` | 跨业务可复用 UI                                              |
+| `services/`   | API、数据模型                                                |
+| `stores/`     | Pinia                                                        |
+| `hooks/`      | 全局 composable                                              |
+| `router/`     | 路由入口，`registerModule` / `registerBusinessModule`        |
+| `utils/`      | 通用工具                                                     |
+| `common/`     | 常量、正则、缓存（`TicketTypes`、`DBTypes`、`ClusterTypes`） |
+| `layout/`     | 导航壳                                                       |
+| `locales/`    | i18n                                                         |
+| `styles/`     | 全局样式                                                     |
+| `types/`      | 全局 TypeScript 类型声明                                     |
+| `images/`     | 图片资源                                                     |
+| `directives/` | 自定义指令                                                   |
+| `helper/`     | 本地缓存、校验器                                             |
 
-<script setup lang="ts">
-defineOptions({
-  name: 'ToolboxPageName',
-});
+组件命名：目录 kebab-case，入口固定 `Index.vue`，仅本组件使用的子文件放同级 `components/`。
 
-import { ref } from 'vue';
-import { useI18n } from 'vue-i18n';
+页面按业务拆在 `src/views/` 下，各自有 `routes.ts`，由 `src/router/index.ts`
+聚合。常见模块：`db-manage`、`ticket-center`、`resource-manage`、`monitor-alarm`、`service-apply`、`password-manage`、`db-configure`。
 
-import { useCreateTicket } from '@hooks';
+## 项目独有约定
 
-import type { TicketTypes } from '@common/const';
+只列工具查不出来的。导入顺序、模板属性顺序、缩进格式由 ESLint / Prettier / Stylelint 强制，写错跑一次 `--fix`
+就会自动修，不必手工记忆。
 
-// 使用 useCreateTicket hook
-const { loading: isSubmitting, run: submitTicket } = useCreateTicket(
-  TicketTypes.YOUR_TICKET_TYPE,
-  {
-    onSuccess: (ticketId) => {
-      // 成功回调
-    },
-    onError: (errors) => {
-      // 错误处理
-    },
-  },
-);
+- **vue / vue-router 的 API 已 auto-import**：`ref`、`computed`、`watch`、`useRouter`、`useRoute` 等不要显式 import
+- `<script setup>` 与 `<style>` 的内容整体缩进一级（`vueIndentScriptAndStyle`）
+- script setup 宏顺序：`defineOptions` → `defineProps` → `defineEmits` → `defineSlots` → `defineModel` → `defineExpose`
+- Props 用 `interface` + `withDefaults`；Emits 用类型别名，如 `type Emits = (e: 'change', value: string) => void`
+- 文案一律走 `t()`（`useI18n`），语言包在 `src/locales/`
+- 基础组件优先用 `src/components/bkui-vue/` 下的本地实现（如 `DbInput`，在 `src/common/importComps.ts`
+  全局注册）；该目录没有的组件再用 bkui-vue 包（`main.ts`
+  已全局注册）；element-plus 仅存量日期类组件在用，新代码不要再引入
+- Pinia 沿用 options 风格（`state` / `getters` / `actions`），现有 store 都是这个写法
+- 类名写完整的嵌套类名，禁止 `&_name`、`&-name`、`--name`
+- 路径别名优先于相对路径（`@services/*`、`@components/*`、`@views/*`、`@common/*`、`@utils`、`@hooks`、`@stores`
+  等），完整清单见 `tsconfig.json`
+- 不用 `any`，用具体类型或 `unknown`
+- 新建 `.vue` / `.ts` 文件要带 MIT 版权头，照抄同目录已有文件的头部
+- 技术栈版本不在文档里维护，以 `package.json` 为准
 
-const formData = ref({
-  tableData: [createRowData()],
-  payload: {},
-});
+## 工作方式
 
-function createRowData() {
-  return {
-    // 初始化行数据
-  };
-}
+编码前：
 
-function handleSubmit() {
-  // 表单验证
-  editableTable.value?.validate().then((valid) => {
-    if (valid) {
-      submitTicket(formData.value);
-    }
-  });
-}
-</script>
-```
+- 明确假设，不确定时询问而非猜测；存在歧义时列出多种解释，不默默选定一种
+- 有明显更简单的做法，直接指出
+- 发现代码矛盾、逻辑不一致时暂停，请求澄清
+- 重构 / 优化类需求，先理解现有功能，给出方案请求确认
 
-#### 核心组件说明
+改动范围：
 
-- **EditableTable**: 可编辑表格容器，提供表单验证功能
-- **EditableRow**: 表格行组件，包裹每一行数据
-- **EditableColumn**: 表格列组件，定义列的显示和编辑方式
-- **EditableInput/EditableSelect/EditableDatePicker 等**: 可编辑单元格组件
-- **OperationColumn**: 操作列组件（增删行），必须包含
-- **TicketPayload**: 单据负载组件，用于设置单据的额外参数，必须包含
+- 只改与当前任务直接相关的代码，严格匹配现有代码风格
+- 精简和重写只针对本次任务已经动到的代码；不顺手优化相邻代码、注释、排版
+- 不重构原本能正常运行的模块
+- 本次修改产生的无效导入、废弃变量直接删除
+- 项目原有的死代码、冗余内容只做文字提醒，不擅自删除
 
-#### 常用列组件
+改被多处引用的公共代码（`components/`、`hooks/`、`services/`）：
 
-在 `src/views/db-manage/common/toolbox-field/column/` 目录下有大量可复用的列组件：
+- 按引用点逐个读，不用命名模式抽样；确实抽样了就写「抽查 N 处」，不说成「已确认全部调用方」
+- 删除看不懂的条件分支前，先能复述它区分了什么；说不清就不删
+- 一个入口承担多种调用意图时，先枚举意图再定判据，不用「多数场景对」的默认值覆盖少数场景
+- 优先加性方案（加判据、加 API），而不是删既有守卫
+- 需求与代码现状冲突时不自行选边：先弄清现有实现在区分什么，能同时满足就给兼容判据，不能就摆出来问
 
-- `ClusterColumn`: 集群选择
-- `HostColumn`: 主机选择
-- `SpecColumn`: 规格选择
-- `CountColumn`: 数量输入
-- `ResourceTagColumn`: 资源标签
-- `OperationColumn`: 操作列（增删行）
+实现取舍：
 
-### 3. 注册路由
+- 用最少的代码解决问题
+- 不为一次性需求创建抽象层，不为"未来可能用到"增加扩展性和可配置性
+- 不抽离没有复用性的代码，允许大段代码保持阅读的完整性
+- 必要的代码注释，特殊变量注释，方法功能注释，逻辑分支注释
 
-在 `src/views/db-manage/{db-type}/routes.ts` 中注册路由：
+多步骤任务先给简短执行计划，并标注每一步的验证方式。
 
-```typescript
-import { createToolboxRoute } from '@utils/createToolboxRoute';
-import { DBTypes, TicketTypes } from '@common/const';
+任务收尾回顾：本次读过或改过的代码里，同一语义有没有在多处独立实现并已经漂移；够判据的按 `codebase-insights`
+skill 记录，**只记录不修改**。
 
-const { createRouteItem } = createToolboxRoute(DBTypes.MYSQL);
+## 规则与技能索引
 
-export default [
-  // ... 其他路由
-  createRouteItem(
-    TicketTypes.MYSQL_YOUR_NEW_TYPE,
-    t('你的功能名称'),
-    {
-      fullscreen: true,
-      ticketType: TicketTypes.MYSQL_YOUR_NEW_TYPE,
-    },
-  ),
-];
-```
+`.agents/rules/` 不会被工具自动附加，agent 按下表「什么时候读」主动加载：
 
-**注意事项：**
-- 使用 `createToolboxRoute` 工具函数创建路由
-- `ticketType` 必须在 `meta` 中设置，用于提交后的跳转
-- 路由 `name` 会自动设置为 `TicketTypes` 的值
-
-### 4. 注册单据详情页
-
-在 `src/views/ticket-center/common/ticket-detail/components/task-info/com-factory/` 目录下创建详情页组件。
-
-组件必须通过 `defineOptions` 注册 `name`，且 `name` 必须与 `TicketTypes` 枚举值完全一致：
-
-```vue
-<script setup lang="ts">
-defineOptions({
-  name: TicketTypes.MYSQL_YOUR_NEW_TYPE, // 必须与 TicketTypes 枚举值一致
-});
-
-// ... 组件实现
-</script>
-```
-
-### 5. 添加到工具箱菜单（可选）
-
-如果需要在工具箱菜单中显示，在 `src/views/db-manage/{db-type}/toolbox-menu.ts` 中添加菜单项：
-
-```typescript
-export default [
-  {
-    children: [
-      {
-        dbConsoleValue: 'mysql.toolbox.yourFeature',
-        id: TicketTypes.MYSQL_YOUR_NEW_TYPE,
-        name: t('你的功能名称'),
-        parentId: 'category-id',
-      },
-    ],
-    icon: 'db-icon-category',
-    id: 'category-id',
-    name: t('分类名称'),
-  },
-];
-```
-
-## 实现检查清单
-
-在实现工具箱需求时，必须确保以下项目已完成：
-
-- [ ] **TicketType 常量已注册**：在 `src/common/const/ticketTypes.ts` 中添加枚举值
-- [ ] **路由已注册**：在 `src/views/db-manage/{db-type}/routes.ts` 中注册路由
-- [ ] **TypeScript 类型正确**：确保所有类型定义正确，无类型错误
-- [ ] **单据详情页已实现**：在 `com-factory` 目录下创建详情页，且 `name` 与 `TicketType` 一致
-- [ ] **表单验证完整**：使用 `EditableTable` 的 `validate` 方法进行表单验证
-- [ ] **错误处理完善**：使用 `useCreateTicket` 的 `onError` 回调处理错误
-- [ ] **后端 API 协议确认**：确认后端 API 接口的数据格式和字段要求
-
-## 最佳实践
-
-1. **参考已有实现**：在实现新工具箱时，先阅读所有已实现的工具箱代码，了解通用模式
-2. **复用组件**：优先使用 `src/views/db-manage/common/toolbox-field/column/` 下的列组件
+| 文件                | 什么时候读                                                     |
+| ------------------- | -------------------------------------------------------------- |
+| `db-manage.mdc`     | 改 `db-manage/**`：集群/实例列表、集群详情、工具箱提单、路由    |
+| `direct-link.mdc`   | 新增或修改直达链接（URL 带 `?open=` 参数自动执行动作）入口      |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TencentBlueKing/blueking-dbm](https://github.com/TencentBlueKing/blueking-dbm) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
