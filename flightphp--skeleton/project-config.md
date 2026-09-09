@@ -1,86 +1,108 @@
 ---
 trigger: always_on
-description: This document provides guidelines and best practices for structuring and developing a project using the FlightPHP framework.
+description: **Source of truth for AI coding tools.** There is no separate Copilot / Cursor / Gemini / Windsurf rules file in this project — use this file and the **scoped `AGENTS.md` files under `app/` and `migrations/`** (and `tests/` when present).
 ---
 
-# FlightPHP Skeleton Project Instructions
+# AGENTS.md — FlightPHP Skeleton
 
-This document provides guidelines and best practices for structuring and developing a project using the FlightPHP framework.
+**Source of truth for AI coding tools.** There is no separate Copilot / Cursor / Gemini / Windsurf rules file in this project — use this file and the **scoped `AGENTS.md` files under `app/` and `migrations/`** (and `tests/` when present).
 
-## Instructions for AI Coding Assistants
+**Humans coding by hand:** start with **[README.md](README.md)**. You do not need this file to ship features; it keeps hand-written and generated code on the same pattern.
 
-As you are developing this project, follow these guidelines as close as you can. If you are unsure about something, ask for clarification before proceeding. You should feel 95% confident in the coding decisions that you make, but allow yourself an offramp if you are not sure about something to ask questions.
+**Security:** deliberate security rules live in **[SECURITY.md](SECURITY.md)**. Follow that file for auth, secrets, headers, XSS/CSRF, and reporting. Do not invent security policy in random comments.
 
-## Project Structure
+---
 
-Organize your project as follows:
+## How to use this file (routing)
 
-project-root/
-│
-├── app/                # Application-specific code
-│   ├── commands/       # Custom CLI commands for Runway (built using adhocore/cli)
-│   ├── config/         # Configuration files (database, app settings, routes)
-│                       # Key files in this folder:
-│                       #   - bootstrap.php: Bootstraps and connects the files in the config folder.
-│                       #   - routes.php: Route definitions.
-│                       #   - services.php: Service definitions (where config variables are used and injected).
-│   ├── controllers/    # Route controllers (e.g., HomeController.php)
-│   ├── logic/          # (For large projects) Business logic classes/services, called from controllers
-│   ├── middlewares/    # Custom middleware classes/functions
-│   ├── models/         # Data models (if needed, usually using flightphp/active-record)
-│   ├── utils/          # Utility/helper functions
-│   └── views/          # View templates (if using)
-│
-├── public/             # Web root (index.php, assets, etc.)
-│
-├── vendor/             # Composer dependencies
-│
-├── tests/              # Unit and integration tests
-│
-├── composer.json       # Composer config
-│
-└── README.md           # Project overview
+1. Read **this root file** for boot flow, global principles, DI, config, and “what not to do.”
+2. When editing code under a directory that has its own `AGENTS.md`, **also read that file** before changing or adding files there.
+3. Prefer the **nearest** scoped file for local conventions; root rules still apply (especially no `Flight::` in app layer, no `$_ENV` outside boot).
 
-## Development Guidelines
+| If you are working on… | Read |
+|------------------------|------|
+| Controllers | [app/Controller/AGENTS.md](app/Controller/AGENTS.md) |
+| Middleware | [app/Middleware/AGENTS.md](app/Middleware/AGENTS.md) |
+| Models (ActiveRecord) | [app/Model/AGENTS.md](app/Model/AGENTS.md) |
+| Twig templates | [app/views/AGENTS.md](app/views/AGENTS.md) |
+| Runway CLI commands | [app/commands/AGENTS.md](app/commands/AGENTS.md) |
+| Bootstrap / routes / services / config.php | [app/config/AGENTS.md](app/config/AGENTS.md) |
+| Utils classes (`Config`, `Env`, …) | [app/Utils/AGENTS.md](app/Utils/AGENTS.md) |
+| SQL migrations | [migrations/AGENTS.md](migrations/AGENTS.md) |
+| PHPUnit tests | [tests/AGENTS.md](tests/AGENTS.md) |
+| Security-sensitive changes | [SECURITY.md](SECURITY.md) |
 
-- **Controllers:** Place all route-handling logic in `app/controllers/`. Each controller should handle a specific resource or feature. For large projects, move business logic out of controllers and into the `app/logic/` directory as dedicated classes/services, and call them from your controllers. Use appropriate namespaces for organization. By default, all controllers inject the `Engine $app` variable unless this project has its own dependency injection handler.
-- **Namespaces:** Use lowercase namespaces for all classes in the `app/` directory. For example, `app/controllers/HomeController.php` should have the namespace `app\controllers`.
-- **Middlewares:** Store reusable middleware in `app/middlewares/`. Register them in your bootstrap or route files.
-- **Utils:** Place helper functions and utilities in `app/utils/`.
-- **Models:** If your app uses data models, keep them in `app/models/`.
-- **Views:** Store templates in `app/views/` if using a templating engine.
-- **Config:** Use the `app/config/` directory for configuration files. The main config file is `config.php`, which should be created by copying `config_sample.php` and updating as needed. In other main bootstrap files like bootstrap, and services.php, the $config variable is available to use to access configuration values.
-- **Public:** Only expose the `public/` directory to the web server. All requests should go through `public/index.php`.
-- **Environment:** Do not use .env files; all configuration should be managed in `app/config/config.php`.
-- **Routes:** Define routes in `app/config/routes.php`. Use the `$router->map()` method to register routes with all request methods or `$router->get()` for `GET $router->post()` for POST etc. and associate them with controller methods. Best practice for defining the controller is [ MyController::class, 'myMethod' ].
+If a directory has no scoped file yet, follow root rules + Flight docs; do not invent a second layout.
 
-## Getting Started
+---
 
-1. Clone the repository and run `composer install`.
-2. Copy `app/config/config_sample.php` to `app/config/config.php` and update configuration values as needed.
-3. Set your web server's document root to the `public/` directory.
-4. Add new controllers, middlewares, and utilities as needed, following the structure above.
-5. Register routes and middlewares in your bootstrap file (usually `public/index.php`).
+## Boot flow
 
-## CLI Commands
+```
+public/index.php
+  → app/config/bootstrap.php
+      → vendor/autoload.php
+      → App\Utils\Env::load(.env) → $_ENV
+      → $app = Flight::app()
+      → $fileConfig = require config.php          # literals only (Runway-safe)
+      → $merged = Config::mergeEnv($fileConfig, $_ENV)  # env wins for mapped keys
+      → $config = new App\Utils\Config($merged)
+      → apply flight.* + timezone + CSP nonce from Config
+      → app/config/services.php
+          Tracy, SimplePdo, Twig, Session,
+          Dice + Engine substitutions + shared services,
+          registerContainerHandler
+      → app/config/routes.php
+      → $app->start()
+```
 
-Flight projects can include custom CLI commands to automate tasks such as migrations, seeding, or maintenance. The recommended CLI tool is [flightphp/runway](https://github.com/flightphp/runway), which builds on the [adhocore/cli](https://github.com/adhocore/cli) package (not Symfony Console).
+---
 
-- Place your custom command classes in the `app/commands/` directory.
-- Runway will automatically discover and register commands from this directory.
-- All CLI commands should be built using the adhocore/cli package (do not use Symfony Console).
-- Use CLI commands to manage your application, generate code, or perform routine tasks.
+## Principles
 
-Refer to the Runway documentation for details on creating and using custom commands with adhocore/cli.
+1. **One pattern per concern** — hand-written and AI output must look the same.
+2. **No invented Flight APIs** — grep `vendor/flightphp/core` and use [docs](https://docs.flightphp.com) / MCP. If unsure, check docs.
+3. **No `Flight::` facade in app layer** — controllers, middleware, models, view logic. Inject `flight\Engine` and services. Bootstrap/services may use `Flight::app()`.
+4. **No `$_ENV` / superglobals** outside bootstrap + `App\Utils\Env` / `Config::mergeEnv`. Controllers use `Config` and `$app->request()`.
+5. **Namespaces are `App\…`** — `App\Controller`, `App\Middleware`, `App\Model`, `App\Utils`, `App\Command`.
+6. **Data path** — **ActiveRecord** for models; **SimplePdo** for connection, migrations, raw SQL.
+7. **Views** — **Twig only** under `app/views/`. `$app->render('name', $data)` maps to Twig.
+8. **Docs teach APIs; this repo teaches layout** — adapt one-file `Flight::` demos into this tree (see README “Flight docs ↔ this skeleton”).
+9. **Security is explicit** — see SECURITY.md; do not weaken headers, leak secrets, or trust client input.
 
-## Additional Tips
+---
 
-- Keep controllers focused and small; delegate global or common logic to `app/utils/` when possible. For large projects, move business logic to `app/logic/` and use appropriate namespaces.
-- Write tests for class files in the `tests/` directory.
-- Use Composer for dependency management.
+## Namespaces & layout
+
+| Layer | Namespace / path |
+|-------|------------------|
+| Controllers | `App\Controller\…` → `app/Controller/` |
+| Middleware | `App\Middleware\…` → `app/Middleware/` |
+| Models | `App\Model\…` → `app/Model/` |
+| Utils classes | `App\Utils\…` → `app/Utils/` |
+| CLI commands | `App\Command\…` → `app/commands/` (Runway scans this path) |
+| Views | `app/views/*.twig` (not PHP classes) |
+| Framework | `flight\…` (unchanged) |
+
+Composer PSR-4: `"App\\": "app/"`. Directory names **must** match case on Linux.
+
+**Commands exception:** Runway discovers `app/commands/*.php` by glob and `require`s them. Keep project commands there with namespace `App\Command`.
+
+---
+
+## How to add… (summary)
+
+| Task | Where | Details |
+|------|--------|---------|
+| Route | `app/config/routes.php` | Prefer `[Controller::class, 'method']` so Dice builds the controller |
+| Controller | `app/Controller/` | Constructor injection; see scoped AGENTS |
+| Middleware | `app/Middleware/` | `before(array $params)` / optional `after`; attach on group/route |
+| Model | `app/Model/` | Extend `flight\ActiveRecord`; pass SimplePdo |
+| Migration | `migrations/` | SQLite: `YYYYMMDDHHMMSS_description.sql`; MySQL: `…_description.mysql.sql`; then `php runway migrate` |
+| Config key | sample + ENV_MAP + Config | Literals in `config.php`; secrets in `.env` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [flightphp/skeleton](https://github.com/flightphp/skeleton) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
