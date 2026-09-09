@@ -1,100 +1,181 @@
 ---
 trigger: always_on
-description: Configuration management best practices in Go applications
+description: Usernaut is a Kubernetes operator built using Go 1.24.2 and controller-runtime. It manages user and team synchronization across multiple backends (LDAP, Fivetran, Red Hat Rover) with caching capabilities.
 ---
 
-# Cursor Rule: Go Configuration Management
+# GitHub Copilot Instructions for Usernaut
 
-## Rule ID: GO-CONF-001
+## Project Overview
 
-### Description: Viper for Configuration Loading and Precedence
+Usernaut is a Kubernetes operator built using Go 1.24.2 and controller-runtime. It manages user and team synchronization across multiple backends (LDAP, Fivetran, Red Hat Rover) with caching capabilities.
 
-- Use `github.com/spf13/viper` for robust configuration management.
-- Configure Viper to read from multiple sources with this precedence:
-  1. Command-line flags (`github.com/spf13/pflag`).
-  2. Environment variables (`viper.AutomaticEnv()`, `viper.SetEnvKeyReplacer`, `viper.SetEnvPrefix`).
-  3. Configuration files (YAML, JSON, TOML, etc.) in `/etc/<appname>/`, `$HOME/.<appname>`, or the working directory.
-  4. Default values set in code.
-- Use `viper.BindPFlags(pflag.CommandLine)` to unify flag and config management.
+## Go Development Best Practices
 
-## Rule ID: GO-CONF-002
+### Code Style and Formatting
 
-### Description: Configuration Structs and Field Tags
+- **Always run `gofmt`** on all Go files before committing
+- Use `goimports` to automatically manage imports
+- Follow the existing code structure and naming conventions
+- Use camelCase for variable and function names, PascalCase for exported types
+- Keep line length under reasonable limits (current project uses `lll` linter)
 
-- Define Go structs that mirror the configuration schema (e.g., `type Config struct { ... }`).
-- Use `viper.Unmarshal(&configStruct)` to load configuration values into the struct.
-- Use struct field tags (e.g., `mapstructure:"db_host"` or `yaml:"db_host"`) if configuration keys differ from struct field names.
+### Error Handling
 
-## Rule ID: GO-CONF-003
-
-### Description: Value Substitution for env| and file| Patterns
-
-- After unmarshalling, recursively walk the config struct/map and perform substitutions for all string fields matching these patterns:
-  - `env|VARNAME`: Substitute with the value of the environment variable `VARNAME`.
-  - `file|/path/to/secret`: Substitute with the contents of the file at `/path/to/secret` (trimmed of whitespace).
-- If the environment variable or file does not exist, handle gracefully (empty string or error message).
-- Substitution is recursive and applies to all nested structs, maps, and slices.
-
-## Rule ID: GO-CONF-004
-
-### Description: Command-line Flags with Pflag
-
-- Use `github.com/spf13/pflag` for parsing command-line flags.
-- Bind flags to Viper for unified precedence and override capability.
-- Define flags for essential parameters like configuration file paths, environment, etc.
-
-## Rule ID: GO-CONF-005
-
-### Description: Externalize Configuration and Secret Handling
-
-- Avoid hardcoding configuration values. Provide default configurations in source control (e.g., `config.yaml.example`), but load actual runtime configuration from external sources (files, environment variables, config maps) appropriate for the deployment environment.
-- Any field marked as sensitive (e.g., passwords, API keys) should fetch the value from a file mounted via Kubernetes secrets using the `file|` pattern, not from environment variables or config files directly.
-- Document which fields are sensitive and require externalization.
-
-## Rule ID: GO-CONF-006
-
-### Description: Edge Cases and Best Practices
-
-- If a substitution pattern is used for a non-string field, log a warning and skip substitution.
-- If a file referenced by `file|` is missing or unreadable, log an error and substitute with an empty string or error message.
-- If an environment variable referenced by `env|` is missing, log a warning and substitute with an empty string or error message.
-- Always trim whitespace from file contents when substituting.
-- Support for both YAML and TOML (and other formats supported by Viper).
-- Provide clear error messages for misconfigurations.
-
-## Rule ID: GO-CONF-007
-
-### Description: Security and Documentation
-
-- Never commit real secrets to source control. Use `file|` for secrets in production.
-- Document all required environment variables and secret file paths in your README or deployment docs.
-
-## Example Usage
-
-**YAML config:**
-
-```yaml
-cache:
-  redis:
-    host: file|/etc/secrets/redis_host
-    password: env|CACHE_REDIS_PASSWORD
-```
-
-**Go struct:**
+- Always handle errors explicitly - never ignore them
+- Use descriptive error messages that include context
+- Wrap errors with additional context using `fmt.Errorf` or error wrapping
+- Return errors as the last return value in functions
+- Use early returns to reduce nesting
 
 ```go
-type RedisConfig struct {
-    Host     string `yaml:"host"`
-    Password string `yaml:"password"`
+// Good
+func processUser(userID string) (*User, error) {
+    if userID == "" {
+        return nil, errors.New("userID cannot be empty")
+    }
+
+    user, err := fetchUser(userID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch user %s: %w", userID, err)
+    }
+
+    return user, nil
 }
 ```
 
-**Command-line flag binding:**
+### Struct and Interface Design
+
+- Use composition over inheritance
+- Keep interfaces small and focused (interface segregation principle)
+- Define interfaces where they are used, not where they are implemented
+- Use struct embedding for extending functionality
+- Add JSON/YAML tags for serialization when needed
 
 ```go
-pflag.String("config", "", "Path to config file")
-viper.BindPFlags(pflag.CommandLine)
+// Good interface design
+type UserFetcher interface {
+    FetchUser(ctx context.Context, id string) (*User, error)
+}
+
+type TeamManager interface {
+    CreateTeam(ctx context.Context, team *Team) error
+    DeleteTeam(ctx context.Context, teamID string) error
+}
 ```
+
+### Context Usage
+
+- Always pass `context.Context` as the first parameter to functions that may block
+- Use `context.Background()` for main functions and tests
+- Use `context.WithTimeout()` or `context.WithCancel()` for operations with timeouts
+- Never store context in structs
+
+### Testing
+
+- Write unit tests for all public functions
+- Use table-driven tests for multiple test cases
+- Mock external dependencies using interfaces
+- Use meaningful test names that describe the scenario
+- Follow the AAA pattern: Arrange, Act, Assert
+
+```go
+func TestUserService_CreateUser(t *testing.T) {
+    tests := []struct {
+        name    string
+        input   *User
+        want    *User
+        wantErr bool
+    }{
+        {
+            name:  "valid user creation",
+            input: &User{Email: "test@example.com"},
+            want:  &User{ID: "123", Email: "test@example.com"},
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Test implementation
+        })
+    }
+}
+```
+
+### Logging
+
+- Use structured logging with logrus (as used in the project)
+- Include relevant context fields in log entries
+- Use appropriate log levels (Debug, Info, Warn, Error)
+- Log errors with sufficient context but avoid logging the same error multiple times
+
+```go
+log := logger.Logger(ctx).WithFields(logrus.Fields{
+    "userID": userID,
+    "component": "user-service",
+})
+log.Info("processing user")
+```
+
+### Package Organization
+
+- Keep packages focused and cohesive
+- Use internal packages for implementation details
+- Group related functionality together
+- Avoid circular dependencies
+- Use clear, descriptive package names
+
+### Performance Considerations
+
+- Use context for cancellation and timeouts
+- Implement proper caching strategies (as done with Redis in this project)
+- Avoid unnecessary allocations in hot paths
+- Use buffered channels appropriately
+- Consider using sync.Pool for frequently allocated objects
+
+### Kubernetes Operator Specific Guidelines
+
+- Follow controller-runtime patterns for reconciliation
+- Use proper status updates with conditions
+- Implement proper finalizers for cleanup
+- Handle resource creation idempotently
+- Use client-go best practices for API interactions
+
+```go
+// Good reconciler pattern
+func (r *GroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+    log := r.Log.WithValues("group", req.NamespacedName)
+
+    var group usernautdevv1alpha1.Group
+    if err := r.Get(ctx, req.NamespacedName, &group); err != nil {
+        return ctrl.Result{}, client.IgnoreNotFound(err)
+    }
+
+    // Reconciliation logic here
+
+    return ctrl.Result{}, nil
+}
+```
+
+### Security Best Practices
+
+- Never log sensitive information (passwords, API keys, tokens)
+- Validate all inputs
+- Use proper authentication and authorization
+- Handle secrets securely
+- Implement proper RBAC for Kubernetes resources
+
+### Code Quality Tools
+
+This project uses golangci-lint with the following enabled linters:
+
+- `dupl` - Check for code duplication
+- `errcheck` - Check for unchecked errors
+- `copyloopvar` - Check for loop variable copying issues
+- `ginkgolinter` - Ginkgo test framework linting
+- `goconst` - Check for repeated strings that could be constants
+- `gocyclo` - Check cyclomatic complexity
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [redhat-data-and-ai/usernaut](https://github.com/redhat-data-and-ai/usernaut) — distributed by [TomeVault](https://tomevault.io).
