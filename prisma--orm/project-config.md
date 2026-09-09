@@ -58,4 +58,4 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 
 ---
 > Source: [prisma/orm](https://github.com/prisma/orm) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
