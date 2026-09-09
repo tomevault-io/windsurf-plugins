@@ -32,4 +32,4 @@ uvx ruff format . && uvx ruff check .
 
 ---
 > Source: [marimo-team/marimo-jupyter-extension](https://github.com/marimo-team/marimo-jupyter-extension) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
