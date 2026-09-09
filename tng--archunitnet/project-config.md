@@ -1,0 +1,18 @@
+---
+trigger: always_on
+description: - Setup: `mise install` (also restores NuGet packages and local .NET tools)
+---
+
+# AGENTS.md
+
+- Setup: `mise install` (also restores NuGet packages and local .NET tools)
+- Build: `dotnet build`
+- Test: `dotnet test`
+- Lint/format check: `mise run check`
+- Lint/format autofix: `mise run check --fix`
+- Run build, test, and `mise run check` before finishing a task
+- Sign off commits per the [DCO](DCO): `git commit -s`
+
+---
+> Source: [TNG/ArchUnitNET](https://github.com/TNG/ArchUnitNET) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
