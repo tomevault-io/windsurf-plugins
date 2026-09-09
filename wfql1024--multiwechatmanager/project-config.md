@@ -3,9 +3,9 @@ trigger: always_on
 description: > 当前阶段: 见 MEMORY/FACTS.MD
 ---
 
-# CLAUDE.md — JhiFengMultiChat（极峰多聊）
+# AGENTS.md — JhiFengMultiChat（极峰多聊）
 
-> 最后更新: 2026-07-31
+> 最后更新: 2026-08-16
 > 当前阶段: 见 MEMORY/FACTS.MD
 > 记忆系统: MEMORY/（MEMORY.md + DECISIONS.MD/TODOS.MD/FACTS.MD/DEV_LOGS.MD）
 
@@ -35,12 +35,10 @@ description: > 当前阶段: 见 MEMORY/FACTS.MD
 | HTTP | `java.net.http.HttpClient`（JDK 内置） |
 | 加密 | `javax.crypto.Cipher`（AES/CBC/PKCS5Padding） |
 | 异步 | `ExecutorService` → `Platform.runLater` → `executeScript` |
+| 事件 | 自建 EventBus（`core` 包，观察者模式，数据更新↔UI刷新解耦） |
 | 图标 | MCP 服务器 `mcp-universal-icons` + `icons-mcp`（`.mcp.json`） |
 | JNA | 5.14.0 (`jna` + `jna-platform`)，用于 Windows API 调用 |
 | 测试 | JUnit 5.10.2 + Mockito 5.10.0 |
-
----
-
 
 ---
 
@@ -86,6 +84,8 @@ gradle build --no-daemon                   # 完整构建
 - SSL 握手 — 打包版 handshake_failure
 - LoggerUtils.java — 待移植
 - Handle 操作 — JNA 仿照 pywinhandle.py 重写约 300-500 行
+- 登录状态 UI 接入 — 数据已自动维护落库（EventBus 流A），界面未展示
+- 其余账号操作的事件驱动迁移 — 删除/批量/头像/快捷键等按 EventBus 流B 增量迁移
 
 ---
 
@@ -105,7 +105,7 @@ gradle build --no-daemon                   # 完整构建
 
 - **背景**: 账号列表头像不显示，需将 Java 版本调整至与旧版 Python 一致的行为，同时适配用户可设置的自定义数据目录
 - **新增**: `AvatarUtils.java` — 核心逻辑封装，获取顺序：本地文件 `{userDir}/{sw}/{acc}/{acc}.jpg` → URL 下载（以 `/0` 结尾）→ SVG 文字头像回退
-- **路径使用**: `ConfigManager.getInstance().getUserataPath()` 支持用户设置的数据目录
+- **路径使用**: `ConfigManager.getInstance().getUserDataPath()` 支持用户设置的数据目录
 - **JsBridge** 中 `getAccountGroupData()` 改单行调用 `AvatarUtils.getAvatarDataUrl()`
 - **CSS 调整**: `.manage-account-avatar` `border-radius` 从 `50%` → `6px`（圆角矩形）
 - **SVG 文字头像**: 深灰背景 `#555` + 白色首字母，圆角矩形 `rx=6`
@@ -132,34 +132,24 @@ gradle build --no-daemon                   # 完整构建
 - **Launcher.java**: `jfmultichat.logdir` 设为 main 首行语句（任何 Logger 前）
 - **设置页新增"日志"子项**: 打开日志目录 + 预留"上传日志"按钮；日志目录固定 `AppPaths.getLogsDir()`（`%APPDATA%\JhiFengMultiChat\{ver}\{Dev?}UserFiles\logs`，按 Dev/Prod 模式自动切换，不随用户配置）
 
----
+### 账号展示名显示（2026-08-01，commit `c2561a4`）
 
-## 十、关键技术参考
+- 账号列表"昵称"列头改为空白（讨论中用"展示名"列代表），`data-sort` 改 `display_name`
+- `JsBridge.getSwDetailData` 每账号注入 `display_name` = `AccInfoFuncCore.getAccOriginDisplayName`（remark → nickname → alias → 账号 ID）
+- `main.js`：展示名列/头像首字符/排序均改用展示名（前端兜底 `nickname`/`id`）
 
-### Avatar 头像获取流程（自 2026-07-30）
-顺序：本地文件 `{userDir}/{sw}/{acc}/{acc}.jpg` → URL 下载（以 `/0` 结尾）→ SVG 文字回退。支持用户自定义数据目录，通过 `ConfigManager.getInstance().getUserDataPath()` 获取。2026-07-31 起账号列表由 `JsBridge.getAccAvatarAsync` 异步接入（先 `getAvatarFromCache` 恢复缓存）。详见 `MEMORY/DEV_LOGS.MD` 和 `MEMORY/FACTS.MD`。
+### SwAccData 账号自动填充（2026-08-01，commit `c2561a4`）
 
-### 账号列表来源（自 2026-07-31）
-磁盘扫描：`SwInfoFuncCore.getSwAllAccountsExisted(sw, null)`（数据目录子目录 − 排除目录 + 共存 exe）。由 `JsBridge.getSwExistedAccounts(swId)` 暴露，main.js `loadAccountData` 以它为来源并与 SwAccData 详情合并。
+- `AccInfoFuncCore.syncSwAccAccounts(sw, accountIds)` — 遍历磁盘扫描账号列表，SwAccData 缺失节点自动补空
+- `JsBridge.getSwExistedAccounts` 取得列表后调用（进入平台页即触发）
 
-### 日志目录（自 2026-07-31）
-固定 `AppPaths.getLogsDir()` = `%APPDATA%\JhiFengMultiChat\{ver}\{Dev?}UserFiles\logs`（`AppEnv.isDev()` 决定 Dev/Prod，不随用户配置）。logback 属性 `${jfmultichat.logdir:-logs}` 有默认回退。
+### EventBus 事件机制（2026-08-01）
 
-### JS↔Java 异步架构
-所有网络操作必须后台线程执行，避免阻塞 UI 线程。调用栈：JS void Java 方法 → 立刻返回 → ExecutorService 后台任务 → Platform.runLater → executeScript → JS 回调更新 DOM。详见 `MEMORY/DEV_LOGS.MD`。
-
-### 六级路径探测策略
-内存映射正则 > 注册表 > 猜测 > 进程 > 其他SW > DLL遍历。由 `SwPathDetective.detectAll()` 并发执行，支持超时保护。`swcore` 包内部详细说明。
-
----
-
-## 十一、关键技术教训
-
-1. **WebView 拦截鼠标** → 透明 Region 覆盖层绕过
-2. **location listener 二次触发** → suppressLinkIntercept 标志
+- **新增 `core` 包**: `EventBus` 单例（subscribe/publish）+ `event/PlatformEnteredEvent`、`event/AccountDataChangedEvent`
+- **流A 平台进入自动维护**: `selectPlatformInternal` 顶部 → `notifyPlatformEntered(swId)` → `PlatformEnteredEvent` → 后台执行登录态维护（`AccInfoFuncCore.resolvePidAccountMap` → `associateCoexistAccounts` → `updateAccLoginData`，拆分自原 god-method `getSwAccountsLoginStatus`，原方法保留为门面）
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [wfql1024/MultiWeChatManager](https://github.com/wfql1024/MultiWeChatManager) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
