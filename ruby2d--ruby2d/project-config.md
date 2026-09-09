@@ -53,4 +53,4 @@ Match the surrounding code. The conventions that aren't obvious from it:
 
 ---
 > Source: [ruby2d/ruby2d](https://github.com/ruby2d/ruby2d) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
