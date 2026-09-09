@@ -1,186 +1,67 @@
 ---
 trigger: always_on
-description: The SmartLead CLI uses a **modular architecture** where each email marketing platform is implemented as a separate module. This allows for:
+description: This is a **professional TypeScript CLI** with modular architecture supporting multiple email marketing platforms.
 ---
 
-# Module System Architecture
+# SmartLead CLI - Project Overview
 
-## 🧩 Core Concept
+## 🏗️ Architecture
 
-The SmartLead CLI uses a **modular architecture** where each email marketing platform is implemented as a separate module. This allows for:
-- **Platform Independence**: Each module operates independently
-- **Branded Experience**: Module-specific themes and UX
-- **Easy Extension**: Add new platforms without affecting existing ones
-- **Clean Separation**: Clear boundaries between platform implementations
+This is a **professional TypeScript CLI** with modular architecture supporting multiple email marketing platforms.
 
-## 📁 Module Structure
+### 📁 Core Structure
+- **[src/core/index.ts](mdc:src/core/index.ts)** - Main CLI entry point with module selector
+- **[src/core/module-selector.ts](mdc:src/core/module-selector.ts)** - Interactive module switching system
+- **[src/core/utils/config.ts](mdc:src/core/utils/config.ts)** - Configuration management (API keys, modules)
+- **[src/core/utils/theme.ts](mdc:src/core/utils/theme.ts)** - Theme system with brand colors
 
-### Current Modules
-- **[src/modules/smartlead/](mdc:src/modules/smartlead/)** - SmartLead platform (✅ Available, 80+ commands)
-- **[src/modules/instantly/index.ts](mdc:src/modules/instantly/index.ts)** - Instantly platform (🟡 Coming Q2 2024)
+### 🧩 Module System
+- **[src/modules/smartlead/](mdc:src/modules/smartlead/)** - SmartLead module (80+ commands, available)
+- **[src/modules/instantly/index.ts](mdc:src/modules/instantly/index.ts)** - Instantly module (placeholder, coming Q2 2024)
+- **[src/types/global.ts](mdc:src/types/global.ts)** - Global TypeScript interfaces and types
+- **[src/modules/smartlead/types.ts](mdc:src/modules/smartlead/types.ts)** - SmartLead-specific types
 
-### Module Interface
-All modules implement the `CLIModule` interface defined in [src/types/global.ts](mdc:src/types/global.ts):
+### 🧪 Testing & Quality
+- **[tests/](mdc:tests/)** - Jest test suites with 90%+ coverage
+- **[jest.config.js](mdc:jest.config.js)** - Jest configuration with TypeScript support
+- **[tests/setup.ts](mdc:tests/setup.ts)** - Test environment setup and utilities
 
-```typescript
-export interface CLIModule {
-  name: ModuleName;
-  displayName: string;
-  description: string;
-  version: string;
-  commands: Command[];
-  initialize(): Promise<void>;
-  getCommands(): Command[];
-  executeCommand(commandName: string, args: string[]): Promise<void>;
-}
-```
+### 📦 Build & Distribution
+- **[tsconfig.json](mdc:tsconfig.json)** - TypeScript configuration with strict rules
+- **[scripts/build.sh](mdc:scripts/build.sh)** - Automated build script
+- **[scripts/install.sh](mdc:scripts/install.sh)** - Professional installer with validation
+- **[package.json](mdc:package.json)** - npm configuration with comprehensive scripts
 
-## 🔧 Module Management
+### 📚 Documentation
+- **[docs/README.md](mdc:docs/README.md)** - Comprehensive project documentation
+- **[docs/CONTRIBUTING.md](mdc:docs/CONTRIBUTING.md)** - Development guidelines
+- **[docs/ROADMAP.md](mdc:docs/ROADMAP.md)** - Feature roadmap and project direction
+- **[docs/CHANGELOG.md](mdc:docs/CHANGELOG.md)** - Version history and changes
 
-### Module Selector
-The **[src/core/module-selector.ts](mdc:src/core/module-selector.ts)** handles:
-- **Module Registration**: Registering available modules
-- **Interactive Selection**: UI for switching between modules
-- **Module Loading**: Dynamic module loading and initialization
-- **Module Information**: Display module status and capabilities
+## 🎯 Key Concepts
 
-### Configuration per Module
-Each module can have its own configuration:
-- **Global Config**: `~/.smartlead-cli/config.json` (active module, shared settings)
-- **Module Config**: `~/.smartlead-cli/{module-name}.json` (API keys, module settings)
-- **Environment Variables**: Module-specific environment variables
+### Module System
+Each module implements the `CLIModule` interface and provides:
+- Platform-specific commands and functionality
+- Branded themes and user experience
+- Independent configuration and API management
 
-Example configuration in [src/core/utils/config.ts](mdc:src/core/utils/config.ts):
-```typescript
-public getModuleConfig(moduleName: ModuleName): ModuleConfig | null {
-  const moduleConfigFile = path.join(this.configDir, `${moduleName}.json`);
-  // Load module-specific configuration
-}
-```
+### Theme System
+Supports multiple branded themes:
+- **SmartLead**: Professional blue gradient (#2563eb → #0ea5e9 → #06b6d4)
+- **Instantly**: Purple gradient (#7c3aed → #a855f7 → #ec4899)
 
-## 🎨 Theme System per Module
+### Configuration
+- Global config: `~/.smartlead-cli/config.json`
+- Module-specific: `~/.smartlead-cli/{module}.json`
+- Environment variables: `SMARTLEAD_API_KEY`, `SMARTLEAD_BASE_URL`
 
-### Theme Management
-The **[src/core/utils/theme.ts](mdc:src/core/utils/theme.ts)** provides module-specific themes:
+## 🚀 Getting Started
 
-```typescript
-export const themes: Record<ModuleName, ThemeColors> = {
-  smartlead: {
-    primary: '#2563eb',    // SmartLead Blue
-    secondary: '#0ea5e9',  // Light Blue  
-    accent: '#06b6d4',     // Cyan
-    // ... other colors
-  },
-  instantly: {
-    primary: '#7c3aed',    // Purple
-    secondary: '#a855f7',  // Light Purple
-    accent: '#ec4899',     // Pink
-    // ... other colors
-  }
-};
-```
-
-### Using Themes in Modules
-```typescript
-export default class MyModule implements CLIModule {
-  private theme: ThemeManager;
-
-  constructor() {
-    this.theme = new ThemeManager(this.name);
-  }
-
-  private showMessage() {
-    console.log(this.theme.primary('Welcome to MyModule!'));
-    console.log(this.theme.success('✅ Operation completed'));
-  }
-}
-```
-
-## 📝 Creating New Modules
-
-### Step 1: Create Module File
-Create `src/modules/newmodule/index.ts`:
-```typescript
-import { CLIModule, ModuleName, Command } from '../../types/global';
-import { ThemeManager } from '../../core/utils/theme';
-
-export default class NewModule implements CLIModule {
-  public name: ModuleName = 'newmodule';
-  public displayName = 'New Module';
-  public description = 'Description of the new module';
-  public version = '1.0.0';
-  public commands: Command[] = [];
-  private theme: ThemeManager;
-
-  constructor() {
-    this.theme = new ThemeManager(this.name);
-    this.setupCommands();
-  }
-
-  private setupCommands(): void {
-    this.commands = [
-      {
-        name: 'example',
-        description: 'Example command',
-        usage: 'newmodule example',
-        examples: ['newmodule example --option value']
-      }
-    ];
-  }
-
-  public async initialize(): Promise<void> {
-    this.theme.setModule(this.name);
-  }
-
-  public getCommands(): Command[] {
-    return this.commands;
-  }
-
-  public async executeCommand(commandName: string, args: string[]): Promise<void> {
-    switch (commandName) {
-      case 'example':
-        await this.handleExample(args);
-        break;
-      default:
-        console.log(this.theme.errorMessage(`Unknown command: ${commandName}`));
-    }
-  }
-
-  private async handleExample(args: string[]): Promise<void> {
-    console.log(this.theme.success('Example command executed!'));
-  }
-}
-```
-
-### Step 2: Add Types
-Update [src/types/global.ts](mdc:src/types/global.ts):
-```typescript
-export type ModuleName = 'smartlead' | 'instantly' | 'newmodule';
-```
-
-### Step 3: Add Theme
-Update [src/core/utils/theme.ts](mdc:src/core/utils/theme.ts):
-```typescript
-export const themes: Record<ModuleName, ThemeColors> = {
-  // ... existing themes
-  newmodule: {
-    primary: '#your-color',
-    secondary: '#your-color',
-    // ... other colors
-  }
-};
-```
-
-### Step 4: Register Module
-Update [src/core/module-selector.ts](mdc:src/core/module-selector.ts):
-```typescript
-private registerModules(): void {
-  // ... existing modules
-  this.modules.set('newmodule', {
-    name: 'newmodule',
-    displayName: 'New Module',
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. **Development**: `npm run dev` - TypeScript watch mode
+2. **Build**: `npm run build` - Compile to JavaScript
+3. **Test**: `npm test` - Run Jest test suite
+4. **Install**: `npm run install-global` - Install globally
 
 ---
 > Source: [LeadMagic/cold-email-cli](https://github.com/LeadMagic/cold-email-cli) — distributed by [TomeVault](https://tomevault.io).
