@@ -1,230 +1,184 @@
 ---
 trigger: always_on
-description: The SmartLead CLI supports **Model Context Protocol (MCP)** integration for enhanced AI-assisted development and automation capabilities.
+description: The SmartLead CLI uses a **modular architecture** where each email marketing platform is implemented as a separate module. This allows for:
 ---
 
-# MCP (Model Context Protocol) Configuration
+# Module System Architecture
 
-## 🌐 Overview
+## 🧩 Core Concept
 
-The SmartLead CLI supports **Model Context Protocol (MCP)** integration for enhanced AI-assisted development and automation capabilities.
+The SmartLead CLI uses a **modular architecture** where each email marketing platform is implemented as a separate module. This allows for:
+- **Platform Independence**: Each module operates independently
+- **Branded Experience**: Module-specific themes and UX
+- **Easy Extension**: Add new platforms without affecting existing ones
+- **Clean Separation**: Clear boundaries between platform implementations
 
-## ⚙️ MCP Server Configuration
+## 📁 Module Structure
 
-### SmartLead MCP Server
-Based on the original SmartLead MCP server implementation, this CLI provides comprehensive API access.
+### Current Modules
+- **[src/modules/smartlead/](mdc:src/modules/smartlead/)** - SmartLead platform (✅ Available, 80+ commands)
+- **[src/modules/instantly/index.ts](mdc:src/modules/instantly/index.ts)** - Instantly platform (🟡 Coming Q2 2024)
 
-```json
-{
-  "mcpServers": {
-    "smartlead": {
-      "command": "npx",
-      "args": [
-        "smartlead-cli",
-        "mcp-server"
-      ],
-      "env": {
-        "SMARTLEAD_API_KEY": "your-api-key-here"
-      }
-    }
-  }
+### Module Interface
+All modules implement the `CLIModule` interface defined in [src/types/global.ts](mdc:src/types/global.ts):
+
+```typescript
+export interface CLIModule {
+  name: ModuleName;
+  displayName: string;
+  description: string;
+  version: string;
+  commands: Command[];
+  initialize(): Promise<void>;
+  getCommands(): Command[];
+  executeCommand(commandName: string, args: string[]): Promise<void>;
 }
 ```
 
-### Instantly MCP Server (Coming Soon)
-Future integration with Instantly platform:
+## 🔧 Module Management
 
-```json
-{
-  "mcpServers": {
-    "instantly": {
-      "command": "npx",
-      "args": [
-        "smartlead-cli",
-        "mcp-server",
-        "--module=instantly"
-      ],
-      "env": {
-        "INSTANTLY_API_KEY": "your-instantly-api-key"
-      }
-    }
-  }
+### Module Selector
+The **[src/core/module-selector.ts](mdc:src/core/module-selector.ts)** handles:
+- **Module Registration**: Registering available modules
+- **Interactive Selection**: UI for switching between modules
+- **Module Loading**: Dynamic module loading and initialization
+- **Module Information**: Display module status and capabilities
+
+### Configuration per Module
+Each module can have its own configuration:
+- **Global Config**: `~/.smartlead-cli/config.json` (active module, shared settings)
+- **Module Config**: `~/.smartlead-cli/{module-name}.json` (API keys, module settings)
+- **Environment Variables**: Module-specific environment variables
+
+Example configuration in [src/core/utils/config.ts](mdc:src/core/utils/config.ts):
+```typescript
+public getModuleConfig(moduleName: ModuleName): ModuleConfig | null {
+  const moduleConfigFile = path.join(this.configDir, `${moduleName}.json`);
+  // Load module-specific configuration
 }
 ```
 
-## 🔧 Configuration Files
+## 🎨 Theme System per Module
 
-### MCP Configuration Location
-- **Global**: `~/.smartlead-cli/mcp.json`
-- **Project**: `.smartlead-mcp.json`
-- **Environment**: Via environment variables
+### Theme Management
+The **[src/core/utils/theme.ts](mdc:src/core/utils/theme.ts)** provides module-specific themes:
 
-### Example MCP Configuration
-Create `.smartlead-mcp.json` in your project root:
-
-```json
-{
-  "version": "1.0.0",
-  "servers": {
-    "smartlead": {
-      "module": "smartlead",
-      "apiKey": "${SMARTLEAD_API_KEY}",
-      "baseUrl": "https://server.smartlead.ai/api/v1",
-      "capabilities": [
-        "campaigns",
-        "leads", 
-        "email-accounts",
-        "analytics",
-        "webhooks"
-      ],
-      "rateLimit": {
-        "requests": 100,
-        "window": "1m"
-      }
-    },
-    "instantly": {
-      "module": "instantly",
-      "apiKey": "${INSTANTLY_API_KEY}",
-      "baseUrl": "https://api.instantly.ai/api/v1",
-      "capabilities": [
-        "campaigns",
-        "leads",
-        "sequences",
-        "analytics"
-      ],
-      "available": false,
-      "comingSoon": "Q2 2024"
-    }
+```typescript
+export const themes: Record<ModuleName, ThemeColors> = {
+  smartlead: {
+    primary: '#2563eb',    // SmartLead Blue
+    secondary: '#0ea5e9',  // Light Blue  
+    accent: '#06b6d4',     // Cyan
+    // ... other colors
   },
-  "context": {
-    "projectType": "email-marketing-automation",
-    "modules": ["smartlead", "instantly"],
-    "integrations": ["webhook", "api", "cli"],
-    "documentation": [
-      "docs/README.md",
-      "docs/CONTRIBUTING.md", 
-      "docs/ROADMAP.md"
-    ]
+  instantly: {
+    primary: '#7c3aed',    // Purple
+    secondary: '#a855f7',  // Light Purple
+    accent: '#ec4899',     // Pink
+    // ... other colors
+  }
+};
+```
+
+### Using Themes in Modules
+```typescript
+export default class MyModule implements CLIModule {
+  private theme: ThemeManager;
+
+  constructor() {
+    this.theme = new ThemeManager(this.name);
+  }
+
+  private showMessage() {
+    console.log(this.theme.primary('Welcome to MyModule!'));
+    console.log(this.theme.success('✅ Operation completed'));
   }
 }
 ```
 
-## 🚀 MCP Integration Features
+## 📝 Creating New Modules
 
-### Available MCP Tools
-The CLI provides MCP-compatible tools for:
-
-#### SmartLead Tools
-- **Campaign Management**: Create, update, start, pause, stop campaigns
-- **Lead Operations**: Add, update, delete, search leads
-- **Email Account Management**: Setup, warmup, health monitoring
-- **Analytics**: Campaign performance, lead statistics, exports
-- **Webhook Management**: Create, update, delete webhooks
-
-#### Context Tools
-- **Configuration**: API key management, module switching
-- **Documentation**: Access to comprehensive docs and examples
-- **Status Monitoring**: Real-time API status and health checks
-
-### MCP Tool Examples
-
-#### Campaign Tools
+### Step 1: Create Module File
+Create `src/modules/newmodule/index.ts`:
 ```typescript
-// MCP Tool: smartlead_campaign_create
-{
-  "name": "smartlead_campaign_create",
-  "description": "Create a new SmartLead campaign",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "name": {"type": "string"},
-      "clientId": {"type": "number", "optional": true}
-    },
-    "required": ["name"]
-  }
-}
+import { CLIModule, ModuleName, Command } from '../../types/global';
+import { ThemeManager } from '../../core/utils/theme';
 
-// MCP Tool: smartlead_campaign_analytics
-{
-  "name": "smartlead_campaign_analytics", 
-  "description": "Get campaign analytics and performance metrics",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "campaignId": {"type": "number"},
-      "startDate": {"type": "string", "optional": true},
-      "endDate": {"type": "string", "optional": true}
-    },
-    "required": ["campaignId"]
-  }
-}
-```
+export default class NewModule implements CLIModule {
+  public name: ModuleName = 'newmodule';
+  public displayName = 'New Module';
+  public description = 'Description of the new module';
+  public version = '1.0.0';
+  public commands: Command[] = [];
+  private theme: ThemeManager;
 
-#### Lead Tools
-```typescript
-// MCP Tool: smartlead_lead_add
-{
-  "name": "smartlead_lead_add",
-  "description": "Add leads to a SmartLead campaign",
-  "inputSchema": {
-    "type": "object", 
-    "properties": {
-      "campaignId": {"type": "number"},
-      "leads": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "email": {"type": "string"},
-            "firstName": {"type": "string", "optional": true},
-            "lastName": {"type": "string", "optional": true},
-            "companyName": {"type": "string", "optional": true}
-          },
-          "required": ["email"]
-        }
+  constructor() {
+    this.theme = new ThemeManager(this.name);
+    this.setupCommands();
+  }
+
+  private setupCommands(): void {
+    this.commands = [
+      {
+        name: 'example',
+        description: 'Example command',
+        usage: 'newmodule example',
+        examples: ['newmodule example --option value']
       }
-    },
-    "required": ["campaignId", "leads"]
+    ];
   }
-}
-```
 
-## 🛠️ Development Integration
+  public async initialize(): Promise<void> {
+    this.theme.setModule(this.name);
+  }
 
-### MCP Server Implementation
-The CLI includes an MCP server mode for AI integration:
+  public getCommands(): Command[] {
+    return this.commands;
+  }
 
-```typescript
-// src/mcp/server.ts
-export class SmartLeadMCPServer {
-  private modules: Map<ModuleName, CLIModule>;
-  
-  public async handleToolCall(tool: string, args: any): Promise<any> {
-    const [moduleName, command] = tool.split('_');
-    const module = this.modules.get(moduleName as ModuleName);
-    
-    if (module) {
-      return await module.executeCommand(command, args);
+  public async executeCommand(commandName: string, args: string[]): Promise<void> {
+    switch (commandName) {
+      case 'example':
+        await this.handleExample(args);
+        break;
+      default:
+        console.log(this.theme.errorMessage(`Unknown command: ${commandName}`));
     }
-    
-    throw new Error(`Unknown tool: ${tool}`);
+  }
+
+  private async handleExample(args: string[]): Promise<void> {
+    console.log(this.theme.success('Example command executed!'));
   }
 }
 ```
 
-### Context7 Integration
-For enhanced context management:
+### Step 2: Add Types
+Update [src/types/global.ts](mdc:src/types/global.ts):
+```typescript
+export type ModuleName = 'smartlead' | 'instantly' | 'newmodule';
+```
 
-```json
-{
-  "context7": {
-    "smartlead-cli": {
-      "type": "typescript-cli",
-      "architecture": "modular",
-      "modules": {
-        "smartlead": {
-          "status": "available",
-          "commands": 80,
+### Step 3: Add Theme
+Update [src/core/utils/theme.ts](mdc:src/core/utils/theme.ts):
+```typescript
+export const themes: Record<ModuleName, ThemeColors> = {
+  // ... existing themes
+  newmodule: {
+    primary: '#your-color',
+    secondary: '#your-color',
+    // ... other colors
+  }
+};
+```
+
+### Step 4: Register Module
+Update [src/core/module-selector.ts](mdc:src/core/module-selector.ts):
+```typescript
+private registerModules(): void {
+  // ... existing modules
+  this.modules.set('newmodule', {
+    name: 'newmodule',
+    displayName: 'New Module',
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
