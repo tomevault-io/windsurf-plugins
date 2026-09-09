@@ -134,4 +134,4 @@ The full suite is slow; run the test files matching your change (e.g. atom chang
 
 ---
 > Source: [cvxpy/cvxpy](https://github.com/cvxpy/cvxpy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
