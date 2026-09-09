@@ -3,7 +3,7 @@ trigger: always_on
 description: Personal multi-host Nix/NixOS/nix-darwin/home-manager config built on the
 ---
 
-# Repository guide for Claude
+# Repository guide for Codex
 
 Personal multi-host Nix/NixOS/nix-darwin/home-manager config built on the
 **dendritic pattern** (flake-parts + `vic/import-tree`). Read this file
@@ -152,4 +152,4 @@ attribute under `flake.nixosConfigurations` / `flake.darwinConfigurations` /
 
 ---
 > Source: [kclejeune/system](https://github.com/kclejeune/system) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
