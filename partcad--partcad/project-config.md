@@ -93,4 +93,4 @@ a CAD addon, or documentation.
 
 ---
 > Source: [partcad/partcad](https://github.com/partcad/partcad) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
