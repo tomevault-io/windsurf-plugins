@@ -1,0 +1,102 @@
+---
+trigger: always_on
+description: - **Project:** MPV Anime Build
+---
+
+# MPV Anime Build — Project Instructions
+
+## Project
+
+- **Project:** MPV Anime Build
+- **Current version:** v5.3
+- **Repository:** https://github.com/Chinna95P/mpv-anime-build
+
+## General development rules
+
+- This is a heavily customized MPV configuration project.
+- Preserve existing functionality unless the user explicitly asks to change it.
+- Prefer minimal, targeted changes over broad rewrites.
+- Understand existing code and dependencies before modifying it.
+- Do not replace customized implementations with upstream code blindly.
+- When updating an upstream component, compare the existing customized version with the upstream versions and port customizations deliberately.
+- Preserve existing filenames, directory structure, script names, shader names, configuration names, and public script-message interfaces unless explicitly asked to change them.
+- Maintain both Linux and Windows compatibility where the affected feature supports both platforms.
+- Do not make unrelated cleanup/refactoring changes while implementing a requested feature.
+
+## Git rules
+
+- Never commit automatically.
+- Never push automatically.
+- Never reset, checkout, rebase, merge, or modify Git history unless explicitly instructed.
+- Never discard the user's uncommitted changes.
+- Before significant modifications, inspect Git status and understand the current working tree.
+- After modifications, show the user the relevant Git diff and summarize the changed files.
+- The user prefers to test changes locally before committing or pushing to GitHub.
+
+## Version rules
+
+- The authoritative application version is `script-opts/build_info.conf`.
+- Keep `build_info.conf`, README, CHANGELOG, website version information, and release metadata synchronized when explicitly performing a release/version update.
+- Do not infer the application version from `git describe` output.
+- Historical version references in changelogs/comments are not necessarily active version sources.
+
+## UOSC rules
+
+- UOSC is currently version 5.13.0.
+- `scripts/uosc/main.lua` is heavily customized.
+- Never replace `scripts/uosc/main.lua` with an upstream version without first identifying and preserving MPV Anime Build customizations.
+- When upgrading UOSC, compare:
+  1. clean previous upstream UOSC;
+  2. current customized UOSC;
+  3. new upstream UOSC;
+  and perform a deliberate three-way port.
+- Preserve Anime Build UOSC menus, history, denoise controls, shader/profile controls, HDR controls, audio-only controls, download integration, chapter highlighting, state synchronization, and other custom functionality.
+- Treat `scripts/uosc/elements/`, `scripts/uosc/lib/`, `scripts/uosc/intl/`, and `script-opts/uosc.conf` as part of the UOSC integration and check compatibility when changing UOSC.
+- Do not introduce duplicate UOSC functionality when the upstream version already provides an appropriate mechanism.
+
+## Anime profile controller
+
+- `anime_profile_controller.lua` is a high-risk/core file.
+- It controls anime/live-action detection, resolution tiers, shader selection/order, persistence, profile switching, UOSC state synchronization, and public script-message interfaces.
+- Before changing it, understand its state flow and all callers.
+- Preserve existing script-message names and state keys unless explicitly instructed otherwise.
+- Changes to shader chains must be checked against the corresponding UI labels, persistence logic, and resolution tiers.
+
+## Shader rules
+
+- Preserve existing shader filenames and directory structure.
+- Do not rename or remove shaders unless explicitly instructed.
+- Treat shader ordering as functional.
+- Check resolution-specific chains carefully.
+- Changes to Adaptive Sharpen, Anime Line-Thinner, FSRCNNX, NNEDI3, Anime4K, ArtCNN, restoration, downscaling, and related shader stages must be tested at the relevant resolutions.
+- Do not optimize shader chains purely by appearance of the code; understand their runtime purpose first.
+
+## Audio-only and visualizer rules
+
+- Audio-only mode must avoid unnecessary video processing.
+- Preserve existing visualizer lifecycle and style persistence.
+- Changes involving `audio-visualizer.lua`, audio profiles, equalizer, album art, spatial audio, passthrough, or audio-device selection should be tested together.
+
+## Track selector rules
+
+- `track-selector.lua` uses smart audio/subtitle selection.
+- Manual track changes create a manual override.
+- Manual override is intended to remain active for the current MPV session/playlist.
+- A saved per-video manual override may restore that session-level override when the same video is resumed in a later MPV session.
+- Do not accidentally reset `manual_override` on `file-loaded` when moving to next/previous files.
+- Preserve the console message indicating that manual override is active.
+- Do not change the override semantics without explicit instruction.
+
+## Skip Intro and chapter rules
+
+- `skip_intro.lua` detects OP, ED, PV, and Intro chapters.
+- UOSC chapter highlighting uses the same category/color mapping.
+- Current displayed category colors are Intro = `#FF00FF`, OP = `#00FF00`, PV = `#FF9900`, and ED = `#0080FF`.
+- `skip_intro.lua` stores those colors in ASS BGR order: Intro = `FF00FF`, OP = `00FF00`, PV = `0099FF`, and ED = `FF8000`.
+- UOSC stores the same displayed colors in RGB/RGBA order.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Chinna95P/mpv-anime-build](https://github.com/Chinna95P/mpv-anime-build) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
