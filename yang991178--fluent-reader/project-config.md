@@ -3,13 +3,13 @@ trigger: always_on
 description: Fluent Reader is a **modern desktop RSS reader** built with **Electron + React + Redux + TypeScript**. It targets Windows, macOS (including Mac App Store), and Linux. The UI uses Microsoft's **Fluent UI (v7)** component library. Data is stored client-side using **Lovefield** (SQL-like browser DB) and **NeDB**. Articles are parsed with **Mercury Parser** and fetched via **rss-parser**. Settings are persisted with **electron-store**.
 ---
 
-# Copilot Instructions — Fluent Reader
+# Fluent Reader
 
 ## Overview
 
 Fluent Reader is a **modern desktop RSS reader** built with **Electron + React + Redux + TypeScript**. It targets Windows, macOS (including Mac App Store), and Linux. The UI uses Microsoft's **Fluent UI (v7)** component library. Data is stored client-side using **Lovefield** (SQL-like browser DB) and **NeDB**. Articles are parsed with **Mercury Parser** and fetched via **rss-parser**. Settings are persisted with **electron-store**.
 
-The repository is ~80 TypeScript/TSX source files under `src/`. There is no test suite. There is no ESLint — formatting is handled solely by **Prettier**.
+The repository is ~80 TypeScript/TSX source files under `src/`. There is no ESLint — formatting is handled solely by **Prettier**.
 
 ## Build & Validate
 
@@ -64,9 +64,17 @@ npm run format
 
 ### Tests
 
-There is **no test suite** in this project. Validation consists of:
+Basic validation of code changes consists of:
 1. `npm run build` — must compile without errors.
 2. `npx prettier --check .` — must pass with no formatting violations.
+
+A private suite of E2E tests is available for project maintainers. Run the suite from the repository root:
+
+```bash
+npm --prefix tests/e2e test
+```
+
+See `tests/README.md` for test setup details.
 
 ### Packaging (not needed for typical changes)
 
@@ -112,10 +120,9 @@ Both CI pipelines run `npm install` then `npm run build`. There are no lint or t
 | `scripts/settings.ts` | Theme management, locale setup, Fluent UI theming. |
 | `scripts/db.ts` | Lovefield database schema definitions (sources, items). |
 | `scripts/utils.ts` | Shared utilities and type helpers. |
-| `scripts/models/` | Redux slices: `app.ts`, `feed.ts`, `group.ts`, `item.ts`, `page.ts`, `rule.ts`, `service.ts`, `source.ts`, plus `services/` for RSS service integrations. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yang991178/fluent-reader](https://github.com/yang991178/fluent-reader) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
