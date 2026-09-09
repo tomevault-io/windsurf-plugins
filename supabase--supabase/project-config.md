@@ -1,70 +1,69 @@
 ---
 trigger: always_on
-description: You are a code reviewer for a large TypeScript/Next.js/React monorepo. Your reviews must be **low-noise and high-signal**. The team acts on fewer than 20% of default Copilot suggestions, so every comment you leave must earn its place.
+description: pnpm 11 + Turborepo monorepo. Requires Node >= 22.13.
 ---
 
-# Copilot Code Review Instructions
+# Supabase Monorepo
 
-## Review Policy — Read This First
+pnpm 11 + Turborepo monorepo. Requires Node >= 22.13.
 
-You are a code reviewer for a large TypeScript/Next.js/React monorepo. Your reviews must be **low-noise and high-signal**. The team acts on fewer than 20% of default Copilot suggestions, so every comment you leave must earn its place.
+## Structure
 
-### Confidence Threshold
+| Directory                | Purpose                                                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `apps/studio`            | Supabase Studio/Dashboard — has its own `apps/studio/AGENTS.md` (see below)                                        |
+| `apps/docs`              | Documentation site — Next.js app router, MDX (port 3001, served under `/docs`) — has its own `apps/docs/AGENTS.md` |
+| `apps/www`               | Marketing website — Next.js, app + pages (port 3000)                                                               |
+| `apps/design-system`     | Component demos — source of truth for Studio UI patterns (port 3003)                                               |
+| `apps/ui-library`        | shadcn-style registry site for Supabase UI blocks (port 3004)                                                      |
+| `apps/lite-studio`       | Lightweight Studio — different stack: React Router 7 + Vite + Tailwind v4                                          |
+| `apps/kb`                | Knowledge base — Astro — has its own `apps/kb/AGENTS.md`                                                           |
+| `apps/learn`             | Courses site — Next.js + Contentlayer (port 3007), early stage                                                     |
+| `packages/ui`            | Shared UI components (shadcn/ui based) — `import { Button } from 'ui'`                                             |
+| `packages/ui-patterns`   | Composite components — subpath imports, e.g. `ui-patterns/AssistantChat`                                           |
+| `packages/common`        | Shared utils, telemetry constants, feature flags                                                                   |
+| `packages/api-types`     | Generated platform Management API types                                                                            |
+| `packages/pg-meta`       | SQL builders for Postgres introspection (`SafeSqlFragment`)                                                        |
+| `packages/shared-data`   | Static data: pricing, plans, regions, error codes                                                                  |
+| `e2e/studio`, `e2e/docs` | Playwright E2E tests                                                                                               |
+| `supabase/`              | Local Supabase project: edge functions, migrations, config.toml                                                    |
 
-Only comment when you are **>85% confident** the issue is a real bug, security vulnerability, or logic error. If you are unsure, do not comment. Silence is better than noise.
+## Common Commands
 
-### What NOT to Comment On
+```bash
+pnpm dev:studio              # run Studio dev server → http://localhost:8082
+pnpm dev:docs                # run docs dev server
+pnpm dev:www                 # run www dev server
+pnpm dev:kb                  # run knowledge base dev server
+pnpm test:studio             # Studio unit tests (vitest)
+pnpm e2e                     # Studio E2E tests (playwright)
+pnpm build --filter=studio   # build Studio
+pnpm lint --filter=studio    # lint Studio
+pnpm typecheck               # typecheck all packages
+pnpm format                  # Prettier write (check: pnpm test:prettier)
+pnpm generate:types          # local DB types → supabase/functions/common/database-types.ts
+pnpm api:codegen             # platform Management API types → packages/api-types
+```
 
-Our CI pipeline already validates the following. **Never comment on these topics:**
+## CI
 
-- **Formatting or whitespace** — Prettier runs on every PR
-- **Linting issues** — ESLint with auto-fix runs on every PR
-- **Type errors** — TypeScript strict-mode typecheck runs on every PR
-- **Typos or spelling** — Automated typo detection runs on every PR
-- **Missing tests for trivial changes** — Handled by topic-specific test instructions
-- **Import ordering or grouping** — Handled by linter
-- **Naming style preferences** (camelCase vs snake_case debates) — Follow existing file conventions
-- **Accessibility attributes on shadcn/Radix UI components** — See `studio-shadcn-components.instructions.md` for details
+Every PR must pass typecheck + lint (one workflow), Prettier, and a typos check. Other checks are path-filtered: Studio unit tests/build and the lint ratchet (ESLint warning count must not increase) run on `apps/studio/**` changes; app-specific test suites run on their own paths.
 
-### What TO Comment On (Priority Order)
+Never hand-edit generated files: `packages/api-types/types/**`, `**/routeTree.gen.ts`, `**/__generated__/**`, `apps/docs/features/docs/generated/**`, `apps/www/.generated/**`, `supabase/functions/common/database-types.ts`, `apps/docs/content/_partials/access-control/scoped_pat_*.mdx` (run `make -C apps/docs/spec generate.partials.access-control`).
 
-1. **Logic errors and bugs** — Off-by-one, null derefs, wrong conditional, unreachable code, incorrect early returns
-2. **Security vulnerabilities** — XSS, SQL injection, auth bypass, secrets in code, unsafe `dangerouslySetInnerHTML`
-3. **Race conditions and async bugs** — Missing `await`, unhandled promise rejections, stale closures, effect cleanup issues
-4. **Data loss risks** — Destructive operations without confirmation, missing error handling on writes
-5. **API contract violations** — Wrong HTTP method, missing auth headers, incorrect request/response shapes
+## Conventions
 
-### Comment Style
+**UI** — import from `'ui'`; primitives are shadcn/ui-based and exported unsuffixed (`Input`, `Select`, `Form`, …). Use `Button` — the in-house component and the standard everywhere (a raw shadcn `Button_Shadcn_` also exists but is rarely the right choice). Check `packages/ui/index.tsx` before creating new primitives. Higher-level patterns live in `packages/ui-patterns`.
 
-- **Be advisory, not prescriptive.** Use "Consider..." or "This may..." — never demand changes.
-- **One comment per distinct issue.** Do not leave multiple comments about the same underlying problem.
-- **No self-contradictions.** If you suggest a change, do not then flag a problem with your own suggestion.
-- **Do not comment on individual commits.** Review the final state of the PR diff only.
+**Styling** — Tailwind only, semantic tokens (`bg-muted`, `text-foreground-light`), no hardcoded colors.
 
-## Repo Context
+**Exports** — named exports only; default exports are allowed only where a framework requires them (`pages/**`, `app/**`, config files — the eslint preset has the exact carve-out list). Lint-enforced across all apps via `eslint-config-supabase` (severity `warn` everywhere; hard-enforced in Studio by the lint ratchet).
 
-This is a TypeScript/Next.js/React monorepo:
+**Language** — Use U.S. English everywhere.
 
-- `apps/studio/` — Supabase Dashboard (primary review target)
-- `apps/www/` — Marketing site
-- `apps/docs/` — Documentation
-- `packages/common/` — Shared code including telemetry definitions
 
-## Topic-Specific Guidelines
-
-Path-specific rules in `.github/instructions/`:
-
-- **Telemetry**: `studio-telemetry.instructions.md` — event naming, property conventions, feature flag measurement
-- **Testing**: `studio-testing.instructions.md` — test strategy, extraction patterns, coverage expectations
-- **Error Handling**: `studio-error-handling.instructions.md` — error classification, `ErrorMatcher` usage
-- **E2E Tests**: `studio-e2e-tests.instructions.md` — selector priority, anti-patterns (`waitForTimeout`, `force: true`)
-- **Composition Patterns**: `studio-composition-patterns.instructions.md` — avoid boolean props, use compound components
-- **UI Copy**: `studio-copy.instructions.md` → `apps/design-system/content/docs/copywriting.mdx`
-- **shadcn/Radix Components**: `studio-shadcn-components.instructions.md` — accessibility handled by primitives, do not flag
-- **Keyboard Shortcuts**: `studio-shortcuts.instructions.md` — shortcut registry pattern, search-input escape handler, when to flag missing coverage
-
-These files are scoped to `apps/studio/` and applied automatically during reviews.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [supabase/supabase](https://github.com/supabase/supabase) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
