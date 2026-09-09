@@ -130,4 +130,4 @@ zentinel-agent-protocol
 
 ---
 > Source: [zentinelproxy/zentinel](https://github.com/zentinelproxy/zentinel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
