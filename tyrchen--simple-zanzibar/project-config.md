@@ -1,201 +1,76 @@
 ---
 trigger: always_on
-description: > **TL;DR:** Leverage Rust's powerful type system for safety, performance, and expressiveness through newtype patterns, phantom types, and zero-cost abstractions.
+description: IMPORTANT: Never enter plan mode automatically!!! Never enter plan mode automatically!!!
 ---
 
-# 🔍 RUST TYPE SYSTEM BEST PRACTICES
+# Simple Zanzibar
 
-> **TL;DR:** Leverage Rust's powerful type system for safety, performance, and expressiveness through newtype patterns, phantom types, and zero-cost abstractions.
+IMPORTANT: Never enter plan mode automatically!!! Never enter plan mode automatically!!!
 
-## 🔍 TYPE SYSTEM DESIGN STRATEGY
+## Core Principles
 
-```mermaid
-graph TD
-    Start["Type Design"] --> DomainCheck{"Domain-Specific<br>Types Needed?"}
+### Completion Discipline
 
-    DomainCheck -->|Yes| NewtypePattern["Newtype Pattern"]
-    DomainCheck -->|No| PrimitiveCheck{"Primitive<br>Obsession?"}
+- **Do Not Stop Early**: If the user's requested outcome is not fully complete, do not stop at a draft, partial pass, or "good enough" result. Continue reviewing and improving until the request is genuinely handled or a concrete blocker requires user input.
+- **Polish Bar**: Before declaring work complete, ask whether the result is fully polished, concrete, correct, complete, and elegant. If there is doubt, review the work again and update it.
+- **Honest Status**: Do not claim a task is finished when it is only a first pass, scaffold, or partial draft. State the remaining gaps and keep working unless the user explicitly asks to pause.
 
-    NewtypePattern --> StateTracking{"State Tracking<br>Required?"}
-    PrimitiveCheck -->|Yes| NewtypePattern
-    PrimitiveCheck -->|No| TraitDesign["Trait Design"]
+### Code Quality
 
-    StateTracking -->|Yes| PhantomTypes["Phantom Types"]
-    StateTracking -->|No| ValidatedTypes["Validated Types"]
+- **SOLID and DRY Principles**: Maintain clean, maintainable code following SOLID and DRY principles
+- **No Incomplete Code**: Never write TODO comments or temporary solutions. If you encounter such a situation:
+  1. Stop the current task
+  2. Review the problem globally
+  3. Rethink the design and identify the best alternative solutions
+  4. Proceed with the complete solution
+- **Thorough Analysis**: Always perform a comprehensive review and analysis of the problem before starting work
+- Do not suppress dead code, remove them; Unless explicitly requested, do not go through deprecation process, just remove the code that is no longer needed.
 
-    PhantomTypes --> CompileTimeCheck["Compile-Time Validation"]
-    ValidatedTypes --> RuntimeCheck["Runtime Validation"]
+### Development Workflow
 
-    CompileTimeCheck --> ZeroCost["Zero-Cost Abstractions"]
-    RuntimeCheck --> ZeroCost
-    TraitDesign --> ZeroCost
+- **Latest Dependencies**: Always search the web for the latest dependencies or helm charts or resources and their current usage patterns. If doing a deep research, put the research doc under ./docs/research. You shall look into that directory before doing researches.
+- **Automation via Makefile**:
+  - Explore existing Makefile targets and use them accordingly
+  - For new automation tasks, always add a Makefile target instead of creating shell scripts
+  - Keep automation consistent and discoverable
 
-    ZeroCost --> ErrorModeling["Error Modeling"]
-    ErrorModeling --> SafetyPatterns["Safety Patterns"]
-    SafetyPatterns --> Performance["Performance Optimization"]
+## Documentation
 
-    style Start fill:#4da6ff,stroke:#0066cc,color:white
-    style NewtypePattern fill:#4dbb5f,stroke:#36873f,color:white
-    style PhantomTypes fill:#ffa64d,stroke:#cc7a30,color:white
-    style ZeroCost fill:#d94dbb,stroke:#a3378a,color:white
-```
+For specs, explore ./specs directory and put it to the right place, name the spec file as {feature-name}-{type}.md and update index.md accordingly. type can be prd, design, impl-plan, verification-plan, review, etc.
 
-## 🎯 TYPE SAFETY PRINCIPLES
+For docs, explore ./docs directory and put it to the right place, and update index.md accordingly. If you generate documentation that wasn't explicitly requested, make sure to place it under `./docs` and follow the same rule.
 
-### Newtype Pattern for Domain Modeling
-```rust
-use derive_more::{Constructor, Display, From, Into};
-use serde::{Deserialize, Serialize};
-use std::fmt;
+## Toolchain & Build
 
-// ✅ Strong typing for domain concepts
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Constructor, Display, From, Into)]
-pub struct UserId(uuid::Uuid);
+- Always use Rust 2024 edition with latest stable version. Pin version in `rust-toolchain.toml`.
+- Always run `cargo build`, `cargo test`, `cargo +nightly fmt`, and `cargo clippy -- -D warnings` before finishing the task.
+- Use `cargo clippy -- -D warnings -W clippy::pedantic` for stricter linting. Allow specific lints with justification.
+- Run `cargo audit` regularly to check for security vulnerabilities in dependencies.
+- Use `cargo-deny` to enforce license policies and ban specific crates.
+- Enable all rustc lints in Cargo.toml: `#![warn(rust_2024_compatibility, missing_docs, missing_debug_implementations)]`.
+- DO NOT use `cargo clean` at any time. If you indeed need it, ask user for permission
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Constructor, Display, From, Into)]
-pub struct ProductId(uuid::Uuid);
+## Error Handling
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Constructor, Display, From, Into)]
-pub struct OrderId(uuid::Uuid);
+- Never use `unwrap()` or `expect()` in production code. Always handle errors properly with `?` operator or explicit match.
+- Use `thiserror` for library error types (with custom error enums). Use `anyhow` for application error handling.
+- Implement proper error context with `.context()` or `.with_context()` when propagating errors.
+- Use `Result<T>` as return type for fallible functions. Never use `Option` to represent errors.
+- For unrecoverable errors in applications, use `panic!`. For libraries, always return `Result`.
+- Define domain-specific error types using enums with `thiserror`. Include source errors with `#[source]`.
 
-// ✅ Prevents mixing up IDs at compile time
-fn process_order(user_id: UserId, product_id: ProductId) -> OrderId {
-    // Compiler prevents: process_order(product_id, user_id)
-    OrderId(uuid::Uuid::new_v4())
-}
+## Async & Concurrency
 
-// ❌ Weak typing - prone to errors
-// fn process_order(user_id: String, product_id: String) -> String
-```
-
-### Validated Types with Builder Pattern
-```rust
-use typed_builder::TypedBuilder;
-use validator::Validate;
-
-#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder, Validate)]
-#[serde(rename_all = "camelCase")]
-pub struct Email {
-    #[validate(email)]
-    #[builder(setter(into))]
-    value: String,
-}
-
-impl Email {
-    pub fn new(value: impl Into<String>) -> Result<Self, ValidationError> {
-        let email = Self { value: value.into() };
-        email.validate()?;
-        Ok(email)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.value
-    }
-}
-
-impl fmt::Display for Email {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
-
-// ✅ Usage - compile-time guarantee of valid email
-let email = Email::new("user@example.com")?;
-```
-
-### Phantom Types for Compile-Time State
-```rust
-use std::marker::PhantomData;
-
-// State types
-pub struct Draft;
-pub struct Published;
-pub struct Archived;
-
-// Document with compile-time state tracking
-#[derive(Debug, Clone)]
-pub struct Document<State> {
-    id: DocumentId,
-    title: String,
-    content: String,
-    _state: PhantomData<State>,
-}
-
-impl<State> Document<State> {
-    pub fn id(&self) -> DocumentId {
-        self.id
-    }
-
-    pub fn title(&self) -> &str {
-        &self.title
-    }
-}
-
-impl Document<Draft> {
-    pub fn new(title: String, content: String) -> Self {
-        Self {
-            id: DocumentId::new(),
-            title,
-            content,
-            _state: PhantomData,
-        }
-    }
-
-    pub fn publish(self) -> Document<Published> {
-        Document {
-            id: self.id,
-            title: self.title,
-            content: self.content,
-            _state: PhantomData,
-        }
-    }
-}
-
-impl Document<Published> {
-    pub fn archive(self) -> Document<Archived> {
-        Document {
-            id: self.id,
-            title: self.title,
-            content: self.content,
-            _state: PhantomData,
-        }
-    }
-
-    pub fn content(&self) -> &str {
-        &self.content
-    }
-}
-
-impl Document<Archived> {
-    pub fn restore(self) -> Document<Draft> {
-        Document {
-            id: self.id,
-            title: self.title,
-            content: self.content,
-            _state: PhantomData,
-        }
-    }
-}
-
-// ✅ Usage - compiler prevents invalid state transitions
-let draft = Document::<Draft>::new("Title".to_string(), "Content".to_string());
-let published = draft.publish();
-let archived = published.archive();
-// Compiler error: draft.archive() - can't archive a draft
-```
-
-## 🔄 TRAIT DESIGN PATTERNS
-
-### Trait Objects vs Generic Bounds
-```rust
-// ✅ Use generics for known types at compile time
-pub fn process_items<T: Processable>(items: &[T]) -> Vec<T::Output> {
-    items.iter().map(|item| item.process()).collect()
-}
-
+- Use Tokio as async runtime. Always specify features explicitly (e.g., `tokio = { version = "1", features = ["rt-multi-thread", "macros"] }`).
+- Prefer message passing (channels) over shared state. Use `tokio::sync::mpsc` for MPSC, `flume` for faster channels.
+- Organize system into subsystems using Actor model. Each actor owns its state and communicates via channels. For non-Send/Sync types (e.g., Tantivy Index), isolate in dedicated thread and use channels for communication. Never wrap in Mutex/RwLock. For Actors, it shall have proper start/stop/restart logic. Consider using AtomicBool for shutdown signal.
+- Use `DashMap` for concurrent HashMap instead of `Mutex<HashMap>` or `RwLock<HashMap>`. Provides better performance.
+- Use `ArcSwap` for infrequently updated shared data (e.g., configuration). Allows lock-free reads.
+- Always consider using config crate for configuration management. Always use yaml format for configuration. For data that shall be tuned at runtime, put in configuration file. For data that shall be tuned at compile time, use compile time constants.
+- For async traits, use native `async fn` in traits (stable since Rust 1.75). **Exception**: When traits require object safety (used with `dyn Trait` for dynamic dispatch like `Arc<dyn TaskStorage>`), use `async-trait` crate and document the reason in module-level docs.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/tyrchen) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
+> Source: [tyrchen/simple-zanzibar](https://github.com/tyrchen/simple-zanzibar) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
