@@ -93,4 +93,4 @@ Do not use `expectFail`, `expectFailBecause`, or another expected-failure wrappe
 
 ---
 > Source: [SoftwareFoundationGroupAtKyotoU/pure-borrow](https://github.com/SoftwareFoundationGroupAtKyotoU/pure-borrow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
