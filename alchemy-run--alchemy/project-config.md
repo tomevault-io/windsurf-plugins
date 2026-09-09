@@ -1,238 +1,158 @@
 ---
 trigger: always_on
-description: Alchemy is a Typescript-native Infrastructure-as-Code repository.
+description: This document describes the process for going from zero to full Alchemy coverage for a single AWS service:
 ---
 
-# Alchemy
+# AWS Service Bring-Up Process
 
-Alchemy is a Typescript-native Infrastructure-as-Code repository.
-Your job is to implement "Resource" providers for various cloud services by following a set of strict conventions and patterns.
+This document describes the process for going from zero to full Alchemy coverage for a single AWS service:
 
-Your job is to build and maintain resource providers following the following convention and structure:
+- all canonical resources
+- all bindings
+- all event sources
+- all ergonomic helpers
+- deterministic audit and test coverage checks
 
-## Provider Layout
+Use this process whenever adding a brand new AWS service or finishing an incomplete one.
 
-```
-alchemy/
-  src/
-    {provider}/
-      README.md
-      {resource}.ts
-  test/
-    {provider}/
-      {resource}.test.ts
-alchemy-web/
-  guides/
-    {provider}.md # guide on how to get started with the {provider}
-  docs/
-    providers/
-      {provider}/
-        index.md # overview of usage and link to all the resources for the provider
-        {resource}.md # example-oriented reference docs for the resource
-examples/
-  {provider}-{qualifier?}/ # only add a qualifier if there are more than one example for this {provider}, e.g. {cloudflare}-{vitejs}
-    package.json
-    tsconfig.json
-    alchemy.run.ts
-    README.md #
-    src/
-      # source code
-```
+## Goal
 
-## Convention
+For a given AWS service, the end state should include:
 
-> Each Resource has one .ts file, one test suite and one documentation page
+1. Every canonical Alchemy resource for that service.
+2. Every important AWS API operation represented either as:
+   - a binding,
+   - a resource lifecycle provider,
+   - an event source surface,
+   - or an intentional helper abstraction.
+3. Runtime-specific event-source implementations where applicable.
+4. End-to-end tests covering the implemented binding and event-source surface.
+5. Deterministic audit checks that report what is still missing.
 
-## README
+## Source Of Truth
 
-Please provide a comprehensive document of all the Resources for this provider with relevant links to documentation. This is effectively the design and internal documentation.
+Start from the distilled spec in:
 
-## Resource File
+- `submodules/distilled/packages/aws/src/services/<service>.ts`
 
-> [!NOTE]
-> Follow rules and conventions laid out in the [cursorrules](./.cursorrules).
+Never start from ad-hoc memory of the AWS service. The distilled spec is the source of truth for operations.
 
-```ts
-// ./alchemy/src/{provider}/{resource}.ts
-import { Context } from "../context.ts";
+## Core Concepts
 
-export interface {Resource}Props {
-    // input props
-}
+Every distilled operation must be classified into one of these buckets:
 
-export interface {Resource} extends Resource<"{provider}::{resource}"> {
-    // output props
-}
+### 1. Binding
 
-/**
- * {overview}
- *
- * @example
- * ## {Example Title}
- *
- * {concise description}
- *
- * {example snippet}
- *
- * @example
- * // .. repeated for all examples
- */
-export const {Resource} = Resource(
-  "{provider}::{resource}",
-  async function (this: Context<>, id: string, props: {Resource}Props): Promise<{Resource}> {
-    // Create, Update, Delete lifecycle
-  }
-);
-```
+Use a binding when the operation is a runtime capability.
 
-> [!CAUTION]
-> When designing input props, there is the common case of having a property that references another entity in the {provider} domain by Id, e.g. tableId, bucketArn, etc.
->
-> In these cases, you should instead opt to represent this as `{resource}: string | {Resource}`, e.g. `table: string | Table`. This "lifts" the Resource into the Alchemy abstraction without sacrificing support for referencing external entities by name.
+Examples:
 
-## Test Suite
+- `GetItem(table)`
+- `PutItem(table)`
+- `ListTables()`
+- `DescribeTable(table)`
 
-> [!NOTE]
-> Follow rules and conventions laid out in the [cursorrules](./.cursorrules).
+Bindings are:
 
-```ts
-// ./alchemy/test/{provider}/{resource}.test.ts
-import { destroy } from "../src/destroy.ts"
-import { BRANCH_PREFIX } from "../util.ts";
+- one file per operation
+- the combined `Binding.Service` form (`interface X extends Binding.Service<X, "id", Shape>` + `const X = Binding.Service<X>("id")`); the deploy-time IAM registration is inlined into the impl layer under `if (!globalThis.__ALCHEMY_RUNTIME__)`, resolving the host via `yield* Binding.host`
+- usually named `alchemy/src/AWS/<Service>/<Operation>.ts` (callable + types) with the impl layer in `<Operation>Http.ts` (AWS runtime impls call the distilled HTTP API authenticated by the Lambda's IAM role; `Http`, not `Binding` — `Binding` is a Cloudflare native-worker concept)
 
-import "../../src/test/vitest.ts";
+### 2. Resource
 
-const test = alchemy.test(import.meta, {
-  prefix: BRANCH_PREFIX,
-});
+Use a resource when the operation set implies lifecycle ownership of infrastructure.
 
-describe("{Provider}", () => {
-  test("{test case}", async (scope) => {
-    const resourceId = `${BRANCH_PREFIX}-{id}` // an ID that is: 1) deterministic (non-random), 2) unique across all tests and all test suites
-    let resource: {Resource}
-    try {
-      // create
-      resource = await {Resource}("{id}", {
-        // {props}
-      })
+Examples:
 
-      expect(resource).toMatchObject({
-        // {assertions}
-      })
+- `createTable` / `updateTable` / `deleteTable` -> `Table`
+- `createBucket` / `deleteBucket` -> `Bucket`
 
-      // update
-      resource = await {Resource}("{id}", {
-        // {update props}
-      })
+Resources are:
 
-      expect(resource).toMatchObject({
-        // {updated assertions}
-      })
-    } finally {
-      await destroy(scope);
-      await assert{ResourceDoesNotExist}(resource)
-    }
-  })
-});
+- canonical Alchemy infrastructure entities
+- implemented as `Resource` contract + provider in a single file
 
-async function assert{Resource}DoesNotExist(api: {Provider}Client, resource: {Resource}) {
-    // {call api to check it does not exist, throw test error if it does}
-}
-```
+### 3. Event Source
 
-## Provider Overview Docs (index.md)
+Use an event source when the service can push records/events into a runtime.
 
-Each provider folder should have an `index.md` that indexes and summarizes the provider and links to each resource.
+This always has two layers:
 
-```md
-# {Provider}
+1. Service-level abstraction in `alchemy/src/AWS/<Service>/...`
+2. Runtime-specific implementation in places like:
+   - `alchemy/src/AWS/Lambda/...`
+   - `alchemy/src/Process/...`
 
-{overview of the provider}
+Examples:
 
-{official links out to the provider website}
+- `consumeBucketEvents(bucket, handler)`
+- `consumeQueueMessages(queue, handler)`
+- `consumeTableChanges(table, handler)` for DynamoDB-style change streams
 
-## Resources
+### 4. Helper
 
-- [{Resource}1](./{resource}1.md) - {brief description}
-- [{Resource}2](./{resource}2.md) - {brief description}
-- ..
-- [{Resource}N](./{resource}n.md) - {brief description}
+Use a helper when multiple raw operations should collapse into a more ergonomic surface.
 
-## Example Usage
+Examples:
 
-\`\`\`ts
-// {comprehensive end-to-end usage}
-\`\`\`
-```
+- `consumeBucketEvents(bucket, handler)`
+- `consumeQueueMessages(queue, handler)`
+- batch or transaction wrappers
 
-## Example Project
+Helpers should not hide missing low-level primitives. Implement the primitives first.
 
-An example project is effectively a whole NPM package that demonstrates
+## Resource Arity
 
-```
-examples/
-  {provider}-{qualifier?}/
-    package.json
-    tsconfig.json # extends ../../tsconfig.base.json
-    alchemy.run.ts
-    README.md
-    src/
-      # code
-tsconfig.json # is updated to reference examples/{provider}-{qualifier?}
-```
+Classify each binding by resource arity:
 
-## Guide
+- `0`: service/account scoped
+  - example: `ListTables`
+- `1`: one resource
+  - example: `GetItem(table)`
+- `2+`: multiple resources
+  - example: `RestoreTableToPointInTime(fromTable, toTable)`
+  - example: copy, batch, or transaction style operations
 
-Each Provider has a getting started guide in ./alchemy-web/docs/guides/{provider}.md.
+This classification helps decide:
 
-```md
----
-order: { number to decide the position in the tree view }
-title: { Provider }
-description: { concise description of the tutorial }
----
+- binding shape
+- helper shape
+- policy shape
+- whether the operation belongs on a resource or service surface
 
-# Getting Started {Provider}
+Arity should be modeled in terms of canonical resources whenever possible.
 
-{1 sentence overview of what this tutorial will set the user up with}
+- good: a `2`-arity binding accepts `<From extends Table, To extends Table>`
+- bad: a `2`-resource operation accepts one `Table` plus a raw `string` target name
+- only fall back to raw identifiers when there is no real canonical resource to bind against
+- when there's a missing canonical resource, that might suggest we need to add one
 
-## Install
+### Case Study: `ExecuteTransaction`
 
-{any installation pre-requisites}
+Use `ExecuteTransaction` as the reference pattern for bindings that touch `1..*` canonical resources.
 
-::: code-group
+The ambiguity we want to avoid is:
 
-\`\`\`sh [bun]
-bun ..
-\`\`\`
+- bad: `ExecuteTransaction()` with IAM `Resource: ["*"]`
+- bad: `ExecuteTransaction(tableNames: string[])`
+- bad: a SID like `AWS.DynamoDB.ExecuteTransaction(2 table(s))` that hides which resources were bound
 
-\`\`\`sh [npm]
-npm ...
-\`\`\`
+The required pattern is:
 
-\`\`\`sh [pnpm]
-pnpm ..
-\`\`\`
+- good: `ExecuteTransaction(tableA, tableB, ...)`
+- good: the binding type requires at least one table
+- good: the policy enumerates exactly those table ARNs
+- good: the SID is deterministic and names the participating resources
 
-\`\`\`sh [yarn]
-yarn ..
-\`\`\`
+Runbook for any `1..*` resource-bound binding:
 
-:::
-
-## Credentials
-
-{how to get credentials and store in .env}
-
-## Create a {Provider} application
-
-{code group with commands to run to init a new project}
-
-## Create `alchemy.run.ts`
-
+1. Model the binding arguments as a non-empty tuple of canonical resources.
+2. Call `.bind(resourceA, resourceB, ...)`, never `.bind()` with hidden resource discovery.
+3. Before constructing the SID, sort the resources by `LogicalId` so equivalent calls produce the same binding identity.
+4. Pass the sorted resource array into the `host.bind` template so the SID renders each resource name explicitly, for example `AWS.DynamoDB.ExecuteTransaction(TableA, TableB)`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [alchemy-run/alchemy](https://github.com/alchemy-run/alchemy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
