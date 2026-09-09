@@ -1,11 +1,26 @@
 ---
 trigger: always_on
-description: Snap package for [Immich](https://github.com/immich-app/immich). Base: `core22` (Ubuntu 22.04). Strict confinement. Version in `VERSION` file, bumped via automated `bump/*` branch PRs (reviewed with the `/verify-release` command). Upstream is Docker-based; mapping it onto snapd sometimes requires creative thinking. All deps must exist in Ubuntu 22.04 repos or the custom APT repo. User config via `snap set/get` and hooks.
+description: Snap package for [Immich](https://github.com/immich-app/immich). Base: `core22` (Ubuntu 22.04). Strict confinement. Version in `VERSION` file, bumped via automated `bump/*` branch PRs. Upstream is Docker-based; mapping it onto snapd sometimes requires creative thinking. All deps must exist in Ubuntu 22.04 repos or the custom APT repo. User config via `snap set/get` and hooks.
 ---
 
 # Immich Snap Distribution
 
-Snap package for [Immich](https://github.com/immich-app/immich). Base: `core22` (Ubuntu 22.04). Strict confinement. Version in `VERSION` file, bumped via automated `bump/*` branch PRs (reviewed with the `/verify-release` command). Upstream is Docker-based; mapping it onto snapd sometimes requires creative thinking. All deps must exist in Ubuntu 22.04 repos or the custom APT repo. User config via `snap set/get` and hooks.
+Snap package for [Immich](https://github.com/immich-app/immich). Base: `core22` (Ubuntu 22.04). Strict confinement. Version in `VERSION` file, bumped via automated `bump/*` branch PRs. Upstream is Docker-based; mapping it onto snapd sometimes requires creative thinking. All deps must exist in Ubuntu 22.04 repos or the custom APT repo. User config via `snap set/get` and hooks.
+
+## Building
+
+Do all development work in the current sandbox. Use the configured `build-host`
+skill only to build snaps: copy the inputs needed for the build to the host, run
+the build there, then copy the resulting snap back into this sandbox.
+
+The build host is shared. Use a build directory dedicated to this repository,
+and reuse that directory for later builds so the retained build state and caches
+can speed them up. Do not clean up the remote build directory, outputs, or
+caches; the build host's regular recreation handles stale state. Never reuse or
+modify a directory belonging to another repository or job.
+
+Run pytest, Playwright, and similar test suites from this sandbox against the
+Telesnap server. Do not use the build host for those test runs.
 
 ## Gotchas
 
@@ -42,11 +57,17 @@ Data-touching operations must run as `snap_daemon`, via `drop_privileges` in `sr
 ### `upstream/` Is Not a Submodule
 `upstream/` is gitignored scratch clones (`immich`, `aptly`). Must be manually cloned and checked out at the right tag for patch generation/validation and `update.sh` to work. Fetching/checking out tags there is always fine.
 
-## AI Behavior
-- Gather context before changes. Be concise.
-- **NEVER commit without the user explicitly asking to commit.** Not after making changes, not as part of a workflow, not "while you're at it".
-- Minimal code comments, no extra files unless requested.
+### Test Installation
+Install and exercise built snaps only on the Telesnap server by following
+`SNAPTEST.md`. Never install a snap on the build host or inside the current
+sandbox.
+
+### Test Isolation
+Do not run all pytest files sequentially against one Telesnap installation.
+Mirror the GitHub Actions job boundaries: use a clean snap installation for
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nsg/immich-distribution](https://github.com/nsg/immich-distribution) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
