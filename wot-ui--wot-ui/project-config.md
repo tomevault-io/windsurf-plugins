@@ -163,4 +163,4 @@ Prompts 文件位于 `.github/prompts/`，可在 VS Code 聊天中以 `/` 触发
 
 ---
 > Source: [wot-ui/wot-ui](https://github.com/wot-ui/wot-ui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
