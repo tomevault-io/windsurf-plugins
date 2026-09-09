@@ -1,11 +1,27 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This is the canonical guide for both humans and coding agents (Claude Code,
 ---
 
-# CLAUDE.md
+# orb-agent — contributor & agent guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This is the canonical guide for both humans and coding agents (Claude Code,
+Codex, etc.) working in this repository. `CLAUDE.md` points here.
+
+`orb-agent` runs network-discovery backends as managed subprocesses. The
+discovery backends (device, network, snmp, gnmi) and the worker live in this
+repo under `orb-discovery/`; the agent talks to them only by exec'ing binaries
+on PATH.
+
+## Contributing & releases
+
+- PRs are **squash-merged into `develop`**; the PR title becomes the commit
+  message and must follow Conventional Commits with **one allowlisted scope**
+  (e.g. `feat(agent): …`). The **Validate PR title** check enforces this.
+- A versioned **agent release** is cut only from agent-scoped changes (`agent/`,
+  `cmd/`) or a manual `workflow_dispatch` — not from backend-only changes.
+- See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full scope allowlist and the
+  type→release mapping.
 
 ## Commands
 
@@ -27,7 +43,18 @@ make fix-lint               # lint with --fix (gci + gofumpt formatters)
 
 # Dependencies
 make deps                   # go mod tidy
+
+# Local multi-module workspace (agent + Go discovery backends)
+make work                   # generate a git-ignored go.work for local dev
+                            # use GOWORK=off for single-module commands
 ```
+
+The discovery backends live in their own modules under `orb-discovery/`. `go.work`
+is a local convenience only — it is git-ignored, and the agent image and CI build
+the agent as a single module. If your global `go env` sets `GOFLAGS=-mod=mod`, clear
+it (`go env -u GOFLAGS`): `-mod=mod` is invalid in workspace mode and breaks
+gopls/govulncheck while a `go.work` exists. `make` targets are unaffected — they run
+with `GOWORK=off`.
 
 After editing, always run `make fix-lint` — gci (import ordering) and gofumpt (formatting) are enforced in CI.
 
@@ -84,12 +111,9 @@ Secrets are solved at *apply time*, not at *store time*. `SolvePolicySecrets` is
 
 ### Context Pattern in Backends
 
-Each backend's `Start(ctx, cancelFunc)` receives a context derived from the root context with a `"routine"` key set to the backend name. Backends must respect cancellation; `cancelFunc` is called by the backend itself if it encounters a fatal error (self-termination pattern).
 
-## Testing Patterns
-
-Tests use `testify/assert` + `testify/require`. Mocks are interface-based, defined inline in `_test.go` files (no generated mocks).
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [netboxlabs/orb-agent](https://github.com/netboxlabs/orb-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
