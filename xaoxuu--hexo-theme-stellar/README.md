@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [xaoxuu/hexo-theme-stellar](https://github.com/xaoxuu/hexo-theme-stellar).
+Original source: `CLAUDE.md` in [xaoxuu/hexo-theme-stellar](https://github.com/xaoxuu/hexo-theme-stellar).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
