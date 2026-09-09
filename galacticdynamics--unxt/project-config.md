@@ -1,88 +1,70 @@
 ---
 trigger: always_on
-description: `unxt` uses a few conventions to make the code more readable and to avoid verbosity. Many of these are also found in the [Glossary](glossary.md).
+description: `unxt` is unitful quantities and calculations in JAX, built on [Equinox](https://github.com/patrick-kidger/equinox), [Quax](https://github.com/nstarman/quax), [quaxed](https://github.com/GalacticDynamics/quaxed), and [quax-blocks](https://github.com/GalacticDynamics/quax-blocks), with [plum](https://github.com/beartype/plum) multiple dispatch throughout. It's the foundation quantity library other GalacticDynamics packages (coordinax, galax) build on.
 ---
 
-# 📜 Conventions
+# unxt — Agent Instructions
 
-## Naming Conventions
+`unxt` is unitful quantities and calculations in JAX, built on [Equinox](https://github.com/patrick-kidger/equinox), [Quax](https://github.com/nstarman/quax), [quaxed](https://github.com/GalacticDynamics/quaxed), and [quax-blocks](https://github.com/GalacticDynamics/quax-blocks), with [plum](https://github.com/beartype/plum) multiple dispatch throughout. It's the foundation quantity library other GalacticDynamics packages (coordinax, galax) build on.
 
-`unxt` uses a few conventions to make the code more readable and to avoid verbosity. Many of these are also found in the [Glossary](glossary.md).
+For _using_ `unxt` correctly — `Quantity` vs `ParametricQuantity`, dispatch gotchas, the `_mk` hazard — read [skills/unxt/SKILL.md](skills/unxt/SKILL.md). This file is for working _inside_ this repo.
 
-- `Abstract...`: a class that is not meant to be instantiated directly, but rather to be subclassed. Abstract classes are prefixed with 'Abstract'. Concrete (or 'final') classes are not so prefixed. As a further rule, no abstract class inherits from a concrete class and no concrete class inherits from any other concrete class.
-- `USys`: a shorthand for "unit system", used in class names for concision.
-- `Sim`: a shorthand for "simulation", used in class names for concision.
+## Essential commands
 
-## Functional vs Object-Oriented APIs
-
-As `JAX` is function-oriented, but Python is generally object-oriented, `unxt` provides both functional and object-oriented APIs. The functional APIs are the primary APIs, but the object-oriented APIs are easy to use and call the functional APIs, so lose none of the power.
-
-As an example, consider the following code snippets:
-
-```{code-block} python
-
->>> import unxt as u
-
->>> q = u.Q(1, 'm')
->>> q
-Quantity(Array(1, dtype=int32...), unit='m')
+```bash
+uv sync --group dev --extra all      # install, all extras + dev tooling
+uv run nox -s all                    # the full gate: lint -> test -> docs
+uv run nox -s lint                   # pre-commit (incl. pyright/ty/mypy) + pylint
+uv run nox -s test                   # pytest, every workspace package
+uv run nox -s pytest -- unxt         # pytest for one package only (see PackageEnum)
+uv run nox -s docs -- --serve        # build + preview the Sphinx site
+uv run nox -s docs -- -b linkcheck   # check doc links
+uv run nox -s pytest_benchmark       # CodSpeed benchmarks (also gated by the `run-benchmarks` PR label)
 ```
 
-First we'll show the object-oriented API:
+Always go through `uv run`/`nox` — never bare `python`/`pytest`/`ruff`. Sync first if `uv.lock` moved.
 
-```{code-block} python
+## Workspace layout
 
->>> q.uconvert('cm')
-Quantity(Array(100., dtype=float32, weak_type=True), unit='cm')
-```
+Root `unxt` (`src/unxt/`) plus a `uv` workspace at `packages/*`. Two package families, same functionality, **different names — don't confuse them**:
 
-And now the function-oriented API:
+| Family | Packages | Status |
+| --- | --- | --- |
+| **canonical** (dotted, `unxts.*`) | `unxts.api`, `unxts.hypothesis`, `unxts.interop.gala`, `unxts.interop.matplotlib`, `unxts.interop.xarray`, `unxts.linalg`, `unxts.parametric` | current, since v2.0.0 |
+| **legacy shims** (hyphenated, `unxt-*`) | `unxt-api`, `unxt-hypothesis` | back-compat re-exports of `unxts.api`/`unxts.hypothesis`; new code should depend on the canonical package |
 
-```{code-block} python
+New functionality goes in a canonical `unxts.*` package, never in a shim. Release tags are hyphenated even for dotted packages (`unxts.api` → tag `unxts-api-vX.Y.Z`) — see [RELEASING.md](RELEASING.md).
 
->>> u.uconvert("cm", q)
-Quantity(Array(100., dtype=float32, weak_type=True), unit='cm')
-```
+| Package | Provides |
+| --- | --- |
+| `unxt` (root) | `Quantity`/`Q`, `Angle`, `StaticQuantity`, units, dims, unit systems, plum dispatch API |
+| `unxts.api` | abstract dispatch interfaces (`uconvert`, `ustrip`, `unit`, `dimension`, ...), minimal deps |
+| `unxts.hypothesis` | Hypothesis strategies for property-based testing of quantities |
+| `unxts.parametric` | `ParametricQuantity`/`PQ` — dimension baked into the type, runtime-checked |
+| `unxts.linalg` | `QuantityMatrix`/`QM`, `UnitsMatrix` — heterogeneous-unit linear algebra |
+| `unxts.interop.gala` | `gala.units.UnitSystem` ↔ unxt `UnitSystem`, via `plum.conversion_method` |
+| `unxts.interop.matplotlib` | `matplotlib.units.ConversionInterface` for plotting quantities |
+| `unxts.interop.xarray` | xarray accessors/conversion for quantities |
 
-## Argument Order of Functional APIs
+## Architecture
 
-The functional APIs in `unxt` are inspired by the `Unitful.jl` library. The way to remember the order of arguments is to think of the function as constructing an operator that is then applied to the quantity.
+`AbstractQuantity` (a `quax.ArrayValue`, so it's a JAX PyTree via Equinox) is the base of the whole hierarchy:
 
-For example, to convert a quantity `q` to centimeters, we use the `uconvert` function with the unit as the first argument and the quantity as the second:
+- **`Quantity`/`Q`** (default, root `unxt`) — non-parametric: one class, one pytree node type, for every physical dimension. No dimension checking at construction.
+- **`ParametricQuantity`/`PQ`** (`unxts.parametric`, opt-in) — dimension encoded in the type (`PQ["length"]`), a distinct pytree type per dimension, runtime-checked at construction.
+- **`BareQuantity`** — **deprecated** alias of `Quantity`; don't reintroduce it in new code (see [docs/reference/glossary.md](docs/reference/glossary.md), [docs/how-to/migrate-to-v2.md](docs/how-to/migrate-to-v2.md)).
+- **`StaticQuantity`** — value held as a hashable static field (for `jax.jit(static_argnames=...)`); equality is unit-label-based by design (`same_unit_label`), not physical equivalence.
+- **`Angle`** — wrapping-aware `Quantity` subtype.
 
-```{code-block} python
+Dims (`unxt.dims`) parse expressions via a small AST-based grammar in `src/unxt/_src/dimensions.py` — `* / ** ()` are supported, unary `+`/`-` deliberately raise ("dimensions are invariant under negation," not a missing feature). Units (`unxt.units`) wrap `astropy.units`; `AbstractUnit = apyu.UnitBase | apyu.FunctionUnitBase` (`StructuredUnit` is deliberately excluded). Unit systems live under `src/unxt/_src/unitsystems/`.
 
->>> u.uconvert("cm", q)  # convert[to_unit](quantity)
-Quantity(Array(100., dtype=float32, weak_type=True), unit='cm')
-```
+Naming rule (see [docs/explanation/api-conventions.md](docs/explanation/api-conventions.md)): `Abstract...` prefix marks a non-instantiable base; no abstract class inherits from a concrete one, no concrete class inherits from another concrete one.
 
-One of the reasons for this order is because it works very well with a multiple-dispatch system, where many variants of the same function can be defined based on the types of the arguments. The arguments for "operator" part of the function are the first arguments, and the arguments for the "operand" are the last arguments.
+## The `_mk` unchecked constructor
 
-## Multiple Dispatch
 
-`unxt` uses [multiple dispatch](https://beartype.github.io/plum/) to hook into `quax`'s flexible and extensible system to enable custom array-ish objects, like `Quantity`, in `JAX`. Also, `unxt` uses multiple dispatch to enable deep interoperability between `unxt` and other libraries, like `astropy`, `gala` (, and anything user-defined).
-
-For example, `unxt` provides a `Quantity.from_` method that can convert an `astropy.Quantity` to a `unxt.Quantity`:
-
-```{code-block} python
-
->>> import astropy.units as apyu
->>> import unxt as u
-
->>> aq = apyu.Quantity(1, 'm')  # Astropy Quantity
->>> aq
-<Quantity 1. m>
-
->>> xq = u.Q.from_(aq)  # unxt Quantity
->>> xq
-Quantity(Array(1., dtype=float32), unit='m')
-
-```
-
-This easy interoperability is enabled by multiple dispatch, which allows the `Quantity.from_` method to dispatch to the correct implementation based on the types of the arguments.
-
-For more information on multiple dispatch, see the [plum documentation](https://beartype.github.io/plum/).
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [GalacticDynamics/unxt](https://github.com/GalacticDynamics/unxt) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
