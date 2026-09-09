@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to coding agents working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository.
 
 ## Project Overview
 
@@ -43,7 +43,7 @@ CI matrix: Julia stable + min, Ubuntu/Windows/macOS, 1 and 2 threads.
 
 Most complexity is in DynamicPPL. Turing.jl contains:
 
-  - **Sampler implementations** (`src/mcmc/`): HMC/NUTS/HMCDA (wrapping AdvancedHMC), MH (wrapping AdvancedMH), particle samplers SMC/PG/CSMC (wrapping AdvancedPS), ESS (wrapping EllipticalSliceSampling), SGLD/SGHMC, Emcee, and Gibbs.
+  - **Sampler implementations** (`src/mcmc/`): HMC/NUTS/HMCDA (wrapping AdvancedHMC), MH (wrapping AdvancedMH), particle samplers SMC/PG/CSMC (implemented natively in `particle_mcmc.jl` on top of Libtask coroutines), ESS (wrapping EllipticalSliceSampling), Emcee, and Gibbs.
   - **External sampler interface** (`src/mcmc/external_sampler.jl`): The `externalsampler()` wrapper lets any `AbstractMCMC.AbstractSampler` that implements `step` for `LogDensityModel` work with Turing models. This is the easier path for new samplers — it only requires a dependency on AbstractMCMC and the LogDensityProblems.jl interface, with no Turing internals. The tradeoff is less power: you can only interact with the model as a black-box log-density function, just like using `LogDensityFunction` directly.
   - **Variational inference** (`src/variational/`): Wraps AdvancedVI algorithms.
   - **Mode estimation** (`src/optimisation/`): MAP and MLE via Optimization.jl.
@@ -53,27 +53,22 @@ For how the model and inference machinery works under the hood, see the [Dynamic
 
 ### Gibbs sampler
 
-The Gibbs sampler (`src/mcmc/gibbs.jl`) is the most complex piece in Turing.jl. It maintains a global `VarNamedTuple` of raw values for all variables. On each iteration, it conditions the model on the non-target variables via `GibbsContext`, runs the component sampler, and updates the global state.
+The Gibbs sampler (`src/mcmc/gibbs.jl`) is the most complex piece in Turing.jl. It threads a `VarNamedTuple` of raw values for all variables through the sweep. To step a component, it `condition`s the model on the values of every variable that component does not sample (`conditioned_values` picks them out), runs the component sampler, and merges the values it returns into the next component's conditioning set. The threaded `VarNamedTuple` is never mutated in place.
+
+Gibbs owns the assignment of variables to component samplers. Repeating that assignment
+inside a component risks updating or scoring the wrong variables; see
+`VarNamedTuple` for parameter collections below.
+`Gibbs(@varname(x) => MH(cov_matrix))` applies `cov_matrix` to the complete linked vector of
+the conditioned `x` block.
 
 To plug a sampler into Gibbs, implement:
 
-  - `gibbs_get_raw_values(state)` — return a `VarNamedTuple` of raw values for the variables this sampler is responsible for.
+  - `gibbs_get_parameter_values(state)` — return a `VarNamedTuple` of the values of the variables this sampler is responsible for, leaving out `:=` quantities. The old name `gibbs_get_raw_values` still works, with a deprecation warning.
   - `gibbs_update_state!!(sampler, state, model, global_vals)` — update the sampler's state to reflect new conditioned values. For samplers that use `LogDensityFunction`, the helper `gibbs_recompute_ldf_and_params` handles the common case.
-  - Optionally, `isgibbscomponent(sampler)` — return `false` to disallow use in Gibbs (the default is `true`).
-
-### Extension
-
-`ext/TuringDynamicHMCExt` provides the DynamicHMC.jl integration (loaded when DynamicHMC is imported).
-
-## Review Guidelines
-
-### Use `OnlyAccsVarInfo`, not `VarInfo`
-
-Sampler state should use `OnlyAccsVarInfo` (with appropriate accumulators), not `VarInfo`. `VarInfo` is being phased out across the ecosystem.
-
+  - Optionally, `supports_gibbs(sampler)` — return `false` to disallow use in Gibbs (the default is `true`). The old name `isgibbscomponent` still works, with a deprecation warning.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TuringLang/Turing.jl](https://github.com/TuringLang/Turing.jl) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
