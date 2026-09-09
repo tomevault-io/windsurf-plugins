@@ -121,4 +121,4 @@ pnpm exec playwright test tests/slots.spec.js --project=chromium  # one engine
 
 ---
 > Source: [markmead/alpinejs-component](https://github.com/markmead/alpinejs-component) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
