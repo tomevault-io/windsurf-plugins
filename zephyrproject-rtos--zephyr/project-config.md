@@ -1,155 +1,98 @@
 ---
 trigger: always_on
-description: These instructions are derived from `doc/contribute/` and apply to all AI-assisted
+description: SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
 ---
 
-# Zephyr Project — Copilot Instructions
+<!--
+SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
+SPDX-License-Identifier: Apache-2.0
+-->
 
-These instructions are derived from `doc/contribute/` and apply to all AI-assisted
-contributions to the Zephyr RTOS repository.
+# Zephyr RTOS: instructions for AI coding agents
 
-## Prerequisites
+This file is for coding agents, and for the humans driving them, working in this repository.
+It is a digest of `doc/contribute/` plus the things CI and maintainers reject most often. Where
+it is silent or disagrees with the documentation, the documentation wins:
+`doc/contribute/guidelines.rst` (process, DCO, AI-assistant policy),
+`doc/contribute/contributor_expectations.rst` (PR shape), `doc/contribute/style/` (C, Kconfig,
+CMake, Doxygen and devicetree style) and `doc/contribute/coding_guidelines/index.rst` (the
+MISRA-C subset). Read the relevant page before working in an area you have not touched before;
+do not rely on this digest or on training data alone.
 
-- All contributions target the `main` branch via GitHub Pull Requests.
-- Familiarity with CMake, Git, and GitHub is assumed.
+## Rules for agents
 
----
+- Never add a `Signed-off-by:` line: only the human submitter may sign off (DCO). Never add
+  `Co-authored-by:`. Do not put "Generated with ...", session links or any other mention of AI
+  tools in commit messages, PR bodies, issues or comments. The `Assisted-by:` trailer below is
+  the only place AI involvement is recorded.
+- Add exactly one `Assisted-by: <Agent>:<model-version> [tool ...]` trailer, for example
+  `Assisted-by: Claude:claude-opus-4.6 coccinelle`, naming the tool actually used. Replace it
+  rather than stacking when a different model amends the commit. `checkpatch.pl` validates the
+  format; basic tools (git, gcc, cmake, editors) are not listed.
+- The human reviews and tests every change before it is submitted. State what you did not do
+  (not built, not run, not run on hardware, no reproducer) instead of implying it was done.
+- Review comments written with AI help are verified by the human before posting; never post raw
+  model output (`doc/contribute/reviewer_expectations.rst`).
+- Commit messages, code comments, Kconfig help texts and docs describe the tree as it is: no
+  references to prompts, plans, sessions, "the rework" or "as requested". Write tersely and
+  concretely; maintainers reject verbose, hedging or self-congratulatory prose. No emoji.
+- Change what the task needs, which can mean refactoring the code a fix touches, but keep
+  unrelated reformatting, renames and cleanups out of the change; style is enforced on new or
+  modified lines only. A wider cleanup is a separate PR.
 
-## Licensing & File Headers
+## Build and test
 
-- All new files must use **Apache 2.0** and include SPDX headers at the very top using
-  the file's native comment syntax:
+- Zephyr builds only inside a west workspace: from the parent directory of the clone,
+  `west init -l <zephyr-dir> && west update` (most boards need HAL and module repositories from
+  `west.yml`). Build with `west build -b <board> <app-dir>`; `native_sim` runs on the host.
+  See `doc/develop/west/workspaces.rst`.
+- Tests and samples are run by twister: `west twister -p native_sim -T <test-dir>` or
+  `-s <test-dir>/<scenario-id>`; `--build-only` skips execution; `-i` prints failing logs.
+  Suites whose `tests.yaml` lists `unit_testing` as platform need `-p unit_testing`. See
+  `doc/develop/twister/index.rst`.
+- In a `git worktree`, export `ZEPHYR_BASE=<worktree>` for `west build` and twister; otherwise
+  the workspace's registered checkout is built silently instead of your tree.
+- Every commit in a series must build and pass its tests on its own (bisectability).
 
-  ```
-  SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
-  SPDX-License-Identifier: Apache-2.0
-  ```
+## Checks to run before pushing
 
-  The copyright statement may refer to the individual or organization who authored the contribution
-  but "Copyright The Zephyr Project Contributors" is always the preferred form.
+CI runs the same checks (`.github/workflows/compliance.yml`); each failure costs a full round
+trip. Fix the cause, never work around a check.
 
-- External code under a license other than Apache 2.0 requires TSC + governing board
-  approval before integration.
+- `pip install -r scripts/requirements-compliance.txt`, then
+  `./scripts/ci/check_compliance.py --parallel -c upstream/main..HEAD` (`upstream` being the
+  zephyrproject-rtos remote, `origin` in a plain clone; the same below). `-l` lists the checks
+  (Checkpatch, Gitlint, KconfigBasic, CMakeStyle, DevicetreeBindings, Ruff, Pylint, YAMLLint,
+  SphinxLint, KeepSorted, ...); `-m <Check>` runs one.
+- checkpatch on one commit: `git format-patch -1 --stdout <sha> | ./scripts/checkpatch.pl -`.
+  Piping `git show` instead produces bogus `BAD_SIGN_OFF` errors.
+- ClangFormat is advisory (`.clang-format`). Apply it to your own hunks only and skip hunks
+  where it reflows surrounding macro tables; never run it on whole files.
+- CMake style (`doc/contribute/style/cmake.rst`) is checked on touched lines only and old files
+  are grandfathered: copying an old `CMakeLists.txt` as a template can fail CI although the
+  original passes. The same holds for any in-tree file you copy: check it against the current
+  style page, not only against its neighbors.
 
----
+## Commits
 
-## Developer Certificate of Origin (DCO)
+    area: subarea: imperative summary (75 columns max, no trailing period)
 
-- Every commit requires a `Signed-off-by` line — **only humans** may add this; AI agents
-  should not add `Signed-off-by` tags unless explicitly requested by humans.
-- The human submitter is responsible for reviewing all AI-generated code, ensuring license
-  compliance, and signing off.
-- Use a real legal name and real email address (no pseudonyms, no noreply addresses).
+    Body wrapped at 75 columns: what the change does, why this approach,
+    which assumptions were made and how it was tested. Never empty.
 
-Do not add a `Co-authored-by` tag to commit messages.
+    Fixes #12345
 
-When AI tools are used, add an attribution tag in the commit message:
+    Assisted-by: Claude:claude-opus-4.6
+    Signed-off-by: Full Name <email@example.com>
 
-```
-Assisted-by: [Agent Name]:[Model Version] [Tool1] [Tool2]
-```
-
-Example:
-
-```
-Assisted-by: Claude:claude-opus-4.6 coccinelle
-```
-
-Basic tools (git, gcc, make, editors) should not be listed.
-
----
-
-## C Code Style
-
-Follow the
-[Linux kernel coding style](https://kernel.org/doc/html/latest/process/coding-style.html)
-with these Zephyr-specific rules:
-
-- **Tabs** are 8 characters; **line length** ≤ 100 columns.
-- Use `snake_case` for all code and variable names.
-- **Always add braces** to `if`, `else`, `do`, `while`, `for`, and `switch` bodies — even
-  single-line blocks.
-- Use `/* */` for comments; `//` is not allowed.
-- Use `/** */` for Doxygen API documentation.
-- Avoid ASCII decoration or ASCII rulers delimiters in comments
-- No binary literals (`0b...`).
-- No non-ASCII symbols in code (no emojis under any circumstances).
-- Capitalize correctly in comments: `UART` not `uart`, `CMake` not `cmake`.
-- Use spaces (not tabs) to align inline comments after declarations.
-- Style is enforced on new or modified code only — do not reformat unrelated existing code.
-
----
-
-## Naming Conventions (C)
-
-- All public APIs must be prefixed by subsystem: `k_` (kernel), `sys_`, `net_`, `bt_`,
-  `i2c_`, etc.
-- Identifiers must be unique across all scopes; no shadowing of outer-scope identifiers.
-- `typedef` names and tag names must be globally unique identifiers.
-- Macro identifiers must be distinct from all other identifiers.
-
----
-
-## MISRA-C Coding Guidelines
-
-All new code must comply with the Zephyr MISRA-C subset. Key required rules:
-
-- **No dynamic memory allocation** (`malloc`, `calloc`, etc.).
-- Document all implementation-defined behavior on which program output depends.
-- All source files must compile without errors.
-- No unreachable code and no dead code.
-- No commented-out code sections.
-- Check return values of all functions that return error information.
-- Use fixed-width typedefs (`uint8_t`, `int32_t`, etc.) instead of bare `int`, `char`.
-- Prefer `inline` or `static` functions over function-like macros.
-- All header files must have include guards.
-- Octal constants are not allowed.
-- Apply a `u` or `U` suffix to all unsigned integer constants.
-- Do not use the lowercase `l` suffix in literals.
-- Identifiers in the same namespace with overlapping visibility must be typographically
-  distinct.
-
----
-
-## Kconfig Style
-
-- **Indentation**: tabs; `help` text: one tab + two extra spaces.
-- **Line length**: ≤ 100 columns.
-- One blank line between symbol declarations.
-- Comments: `# Comment` (space after `#`).
-- One blank line before and after top-level `if` / `endif` blocks.
-
-### Symbol Naming
-
-| Subtree | Symbol format | Prompt format |
-|---|---|---|
-| Drivers | `{DRIVER_TYPE}_{DRIVER_NAME}` | `{Driver Name} {Driver Type} driver` |
-| Sensors | `SENSOR_{SENSOR_NAME}` | `{Sensor Name} sensor driver` |
-| Samples | `SAMPLE_...` | — |
-| Tests | `TEST_...` | — |
-| Boards | `BOARD_...` | — |
-| SoCs | `SOC_FAMILY_...`, `SOC_SERIES_...`, or `SOC_...` | — |
-
-- Use `menuconfig` (not `config`) for enabling symbols that have sub-options.
-- Encapsulate sub-symbols in an `if` block keyed to the enabling symbol.
-- Prefix sub-symbols with the enabling symbol's name.
-
----
-
-## CMake Style
-
-- **Indentation**: 2 spaces (no tabs).
-- **Line length**: ≤ 100 characters.
-- Always use **lowercase** CMake commands: `add_library`, not `ADD_LIBRARY`.
-- No space between a command name and its opening parenthesis: `if(...)` not `if (...)`.
-- One source file argument per line in `target_sources()` and similar calls.
-- **UPPERCASE** for cache variables and variables shared across files
-  (`option`, `set(... CACHE ...)`).
-- **lowercase / snake_case** for local variables.
-- Always quote strings and path variables; do not quote boolean values (`ON`, `OFF`).
+- `area:` is the prefix the file's recent history uses: `git log --format=%s -20 -- <path>`.
+  Examples: `Bluetooth: Host:`, `drivers: i2c: nrfx:`, `dts: arm: st:`, `boards: nordic:`,
+  `kernel:`, `doc:`, `.github:`. Never `subsys:` or `treewide:`, never `WIP`.
+- Trailers (`Assisted-by`, `Signed-off-by`, `Link:`, `(cherry picked from commit ...)`) form one
+  block as the last paragraph. `Fixes #N` goes in its own paragraph directly before that
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zephyrproject-rtos/zephyr](https://github.com/zephyrproject-rtos/zephyr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
