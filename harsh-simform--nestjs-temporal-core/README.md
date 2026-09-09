@@ -7,11 +7,11 @@ NestJS integration for Temporal.io with Worker and Client support
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [harsh-simform/nestjs-temporal-core](https://github.com/harsh-simform/nestjs-temporal-core).
+Original source: `CLAUDE.md` in [harsh-simform/nestjs-temporal-core](https://github.com/harsh-simform/nestjs-temporal-core).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
