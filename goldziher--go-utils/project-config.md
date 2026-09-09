@@ -8,7 +8,7 @@ description: Provides safe CRUD tools for reading and modifying .ai-rulez/ conte
 Project: go-utils
 Generated: 2026-07-08 15:53:27
 Source: .ai-rulez/config.toml
-Target: AGENTS.md
+Target: CLAUDE.md
 Content: rules=53, sections=0, agents=4
 
 WHAT IS AI-RULEZ
@@ -31,7 +31,7 @@ Domain content (profile-specific):
 Profiles in config.toml control which domains are included.
 
 INSTRUCTIONS FOR AI AGENTS
-1. NEVER edit this file (AGENTS.md) - it is auto-generated
+1. NEVER edit this file (CLAUDE.md) - it is auto-generated
 
 2. ALWAYS edit files in .ai-rulez/ instead:
    - Add/modify rules: .ai-rulez/rules/*.md
@@ -124,4 +124,4 @@ All code must pass golangci-lint checks using the configuration in .golangci.yml
 
 ---
 > Source: [Goldziher/go-utils](https://github.com/Goldziher/go-utils) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
