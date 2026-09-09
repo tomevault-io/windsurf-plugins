@@ -1,16 +1,173 @@
 ---
 trigger: always_on
-description: // GOOD: Preallocate with known capacity
+description: - **Prefer clarity over cleverness** - code should be readable and maintainable
 ---
 
-# Go Performance Best Practices
+# Go Development Standards
 
-## Memory Management
+## Code Style and Conventions
 
-### Slice Preallocation
+### Effective Go Principles
+- **Prefer clarity over cleverness** - code should be readable and maintainable
+- **Use Go conventions consistently** - follow community standards
+- **Embrace Go's simplicity** - don't over-engineer solutions
+- **Write self-documenting code** - good names reduce need for comments
+
+### Naming Conventions (Official Go Style)
+- Use **camelCase** for local variables: `appName`, `clientTimeout`
+- Use **PascalCase** for exported functions and types: `NewApplication`, `ApplicationState`
+- Use **UPPER_CASE** for constants with package prefix: `APPLICATION_STATE_RUNNING`
+- Package names should be **short and descriptive**: `application`, `dokku`, `mcp`
+
 ```go
-// GOOD: Preallocate with known capacity
+// GOOD: Clear, concise, contextual names
+type UserService struct{}
+func (s *UserService) GetActiveUsers() []User {}
+
+// Constants: Use descriptive names
+const (
+    DefaultTimeout = 30 * time.Second
+    MaxRetries     = 3
+)
+
+// Avoid: Unnecessary prefixes/suffixes
+type UserStruct struct{} // Don't add "Struct"
+func GetUserData() {}    // "Data" is redundant
+```
+
+### Error Handling - Go Best Practices
+```go
+// 1. Return errors as last value
+func ProcessApplication(name string) (*Application, error) {
+    if name == "" {
+        return nil, fmt.Errorf("application name cannot be empty")
+    }
+    // ... business logic ...
+    return app, nil
+}
+
+// 2. Handle errors immediately
+app, err := ProcessApplication("my-app")
+if err != nil {
+    return fmt.Errorf("failed to process application: %w", err)
+}
+
+// 3. Use custom error types for business logic
+type ValidationError struct {
+    Field   string
+    Message string
+}
+
+func (e ValidationError) Error() string {
+    return fmt.Sprintf("validation error on %s: %s", e.Field, e.Message)
+}
+```
+
+### Strong Typing
+- **No `interface{}` without valid reason** - create specific types instead
+- **Use typed enums with constants** for state management
+- **Create business domain types** instead of primitive strings/ints
+- **No unsafe type assertions** - always check with comma ok idiom
+
+```go
+// GOOD: Domain-specific type
+type ApplicationState string
+
+const (
+    ApplicationStateRunning ApplicationState = "running"
+    ApplicationStateStopped ApplicationState = "stopped"
+)
+
+// BAD: Using primitive string
+func SetAppState(state string) error // Don't do this
+```
+
+### Concurrency Patterns (From Go Documentation)
+```go
+// Pattern 1: Worker pools with context
+func (s *DeploymentService) ProcessBatch(ctx context.Context, apps []Application) error {
+    const numWorkers = 5
+    jobs := make(chan Application, len(apps))
+    results := make(chan error, len(apps))
+    
+    // Start workers
+    for i := 0; i < numWorkers; i++ {
+        go func() {
+            for app := range jobs {
+                select {
+                case <-ctx.Done():
+                    results <- ctx.Err()
+                    return
+                case results <- s.deployApp(ctx, app):
+                }
+            }
+        }()
+    }
+    
+    // Send jobs
+    for _, app := range apps {
+        jobs <- app
+    }
+    close(jobs)
+    
+    // Collect results
+    for i := 0; i < len(apps); i++ {
+        if err := <-results; err != nil {
+            return fmt.Errorf("batch processing failed: %w", err)
+        }
+    }
+    
+    return nil
+}
+
+// Pattern 2: Timeout and cancellation
+func (c *DokkuClient) ExecuteWithTimeout(cmd string, timeout time.Duration) error {
+    ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
+    
+    done := make(chan error, 1)
+    go func() {
+        done <- c.execute(cmd)
+    }()
+    
+    select {
+    case err := <-done:
+        return err
+    case <-ctx.Done():
+        return fmt.Errorf("command timed out after %v: %w", timeout, ctx.Err())
+    }
+}
+```
+
+### Interface Design (Go Philosophy)
+```go
+// Prefer small interfaces
+type Deployer interface {
+    Deploy(ctx context.Context, app Application) error
+}
+
+type Scaler interface {
+    Scale(ctx context.Context, app string, instances int) error
+}
+
+// Composition over large interfaces
+type ApplicationManager interface {
+    Deployer
+    Scaler
+}
+```
+
+### Function Design
+- **Keep functions focused** - single responsibility principle
+- **Limit cognitive complexity** to under 25 per function
+- **Input parameters before output parameters**
+- **Use descriptive names** that clearly indicate function purpose
+
+### Memory Management Best Practices
+```go
+// Preallocate slices when size is known
 func processApplications(apps []Application) []ProcessedApp {
+    // GOOD: Preallocate with known capacity
     processed := make([]ProcessedApp, 0, len(apps))
     
     for _, app := range apps {
@@ -20,206 +177,26 @@ func processApplications(apps []Application) []ProcessedApp {
     return processed
 }
 
-// BAD: Progressive growth is expensive
-func processApplicationsBad(apps []Application) []ProcessedApp {
-    var processed []ProcessedApp // Will start at zero, require multiple reallocations
-    
-    for _, app := range apps {
-        processed = append(processed, processApp(app))
-    }
-    
-    return processed
-}
-```
-
-### Buffer Reuse Pattern
-```go
 // Buffer reuse to reduce allocations
 type LogProcessor struct {
-    buffer    bytes.Buffer
-    jsonBuf   bytes.Buffer
-    mu        sync.Mutex // Protect concurrent access
-}
-
-func NewLogProcessor() *LogProcessor {
-    return &LogProcessor{
-        buffer:  bytes.Buffer{},
-        jsonBuf: bytes.Buffer{},
-    }
+    buffer bytes.Buffer
 }
 
 func (lp *LogProcessor) FormatLog(entry LogEntry) string {
-    lp.mu.Lock()
-    defer lp.mu.Unlock()
-    
     lp.buffer.Reset() // Reuse buffer
     lp.buffer.WriteString(entry.Timestamp.Format(time.RFC3339))
     lp.buffer.WriteString(" [")
     lp.buffer.WriteString(entry.Level)
     lp.buffer.WriteString("] ")
     lp.buffer.WriteString(entry.Message)
-    
     return lp.buffer.String()
 }
-
-// Buffer pool for high concurrency
-var bufferPool = sync.Pool{
-    New: func() interface{} {
-        return &bytes.Buffer{}
-    },
-}
-
-func FormatLogConcurrent(entry LogEntry) string {
-    buf := bufferPool.Get().(*bytes.Buffer)
-    defer bufferPool.Put(buf)
-    
-    buf.Reset()
-    buf.WriteString(entry.Timestamp.Format(time.RFC3339))
-    buf.WriteString(" [")
-    buf.WriteString(entry.Level)
-    buf.WriteString("] ")
-    buf.WriteString(entry.Message)
-    
-    return buf.String()
-}
 ```
 
-### String Building Optimization
+## Examples
+
+### Good Error Handling
 ```go
-// GOOD: Use strings.Builder for string construction
-func buildDokkuCommand(command string, args []string, envVars map[string]string) string {
-    var builder strings.Builder
-    
-    // Estimate capacity to avoid reallocations
-    capacity := len(command) + 10 // command + spaces
-    for _, arg := range args {
-        capacity += len(arg) + 1 // arg + space
-    }
-    for k, v := range envVars {
-        capacity += len(k) + len(v) + 2 // key=value + space
-    }
-    
-    builder.Grow(capacity)
-    
-    // Build environment variables
-    for key, value := range envVars {
-        builder.WriteString(key)
-        builder.WriteByte('=')
-        builder.WriteString(value)
-        builder.WriteByte(' ')
-    }
-    
-    builder.WriteString(command)
-    for _, arg := range args {
-        builder.WriteByte(' ')
-        builder.WriteString(arg)
-    }
-    
-    return builder.String()
-}
-
-// BAD: Repeated string concatenation
-func buildDokkuCommandBad(command string, args []string, envVars map[string]string) string {
-    result := ""
-    
-    for key, value := range envVars {
-        result += key + "=" + value + " " // Creates new strings each time
-    }
-    
-    result += command
-    for _, arg := range args {
-        result += " " + arg // More new allocations
-    }
-    
-    return result
-}
-```
-
-## Profiling Integration
-
-### Built-in Profiling Support
-```go
-//go:build debug
-
-package main
-
-import (
-    "context"
-    "log"
-    "net/http"
-    _ "net/http/pprof" // HTTP profiling endpoints
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
-)
-
-func init() {
-    // Profiling server in debug mode
-    go func() {
-        log.Println("Profiling server started on :6060")
-        log.Println("Visit http://localhost:6060/debug/pprof/ for profiling")
-        log.Println(http.ListenAndServe(":6060", nil))
-    }()
-}
-
-// Example of profiling usage in application
-func main() {
-    // Conditional profiling configuration
-    if os.Getenv("ENABLE_PROFILING") == "true" {
-        go startProfilingServer()
-    }
-    
-    // Main application logic
-    startApplication()
-}
-
-func startProfilingServer() {
-    mux := http.NewServeMux()
-    
-    // Custom profiling endpoints
-    mux.HandleFunc("/debug/pprof/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("Profiling request: %s", r.URL.Path)
-        http.DefaultServeMux.ServeHTTP(w, r)
-    }))
-    
-    server := &http.Server{
-        Addr:    ":6060",
-        Handler: mux,
-    }
-    
-    log.Printf("Profiling server available at http://localhost:6060/debug/pprof/")
-    if err := server.ListenAndServe(); err != nil {
-        log.Printf("Profiling server error: %v", err)
-    }
-}
-```
-
-### Benchmarking Critical Operations
-```go
-func BenchmarkApplicationDeploy(b *testing.B) {
-    service := setupDeploymentService()
-    app := createTestApplication("benchmark-app")
-    
-    b.ResetTimer()
-    b.ReportAllocs() // Report memory allocations
-    
-    for i := 0; i < b.N; i++ {
-        if err := service.Deploy(context.Background(), app); err != nil {
-            b.Fatalf("deployment failed: %v", err)
-        }
-    }
-}
-
-func BenchmarkLogFormatting(b *testing.B) {
-    processor := NewLogProcessor()
-    entry := LogEntry{
-        Timestamp: time.Now(),
-        Level:     "INFO",
-        Message:   "Log formatting performance test",
-    }
-    
-    b.ResetTimer()
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
