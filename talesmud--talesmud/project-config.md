@@ -3,7 +3,7 @@ trigger: always_on
 description: When working on this project, keep documentation in sync with code changes.
 ---
 
-# Claude Code Instructions
+# Codex Instructions
 
 ## Documentation Update Requirements
 
@@ -71,4 +71,4 @@ import { roomColumns } from "./tableColumns.js"; // or npcColumns, scriptColumns
 
 ---
 > Source: [TalesMUD/talesmud](https://github.com/TalesMUD/talesmud) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
