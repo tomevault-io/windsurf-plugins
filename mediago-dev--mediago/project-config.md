@@ -1,26 +1,24 @@
 ---
 trigger: always_on
-description: MediaGo is a pnpm/turborepo monorepo. Feature apps live in `apps/` (`frontend-main`, `frontend-mobile`, `backend-web`, `backend-electron`) for the user surfaces and API. Reusable logic stays in `packages/` (`shared` for cross-runtime helpers, `backend` for orchestration, `main` for Electron packaging). Long-form docs and assets sit in `docs/`, `images/`, and `docker/`. End-to-end checks live in `tests/`.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Repository Guidelines
+# CLAUDE.md
 
-## Project Structure & Module Organization
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-MediaGo is a pnpm/turborepo monorepo. Feature apps live in `apps/` (`frontend-main`, `frontend-mobile`, `backend-web`, `backend-electron`) for the user surfaces and API. Reusable logic stays in `packages/` (`shared` for cross-runtime helpers, `backend` for orchestration, `main` for Electron packaging). Long-form docs and assets sit in `docs/`, `images/`, and `docker/`. End-to-end checks live in `tests/`.
+## Project Overview
 
-## Tooling and Script Placement
+MediaGo is a cross-platform video downloader supporting m3u8/HLS streams. The codebase is a pnpm monorepo with two delivery products:
 
-Repository automation is centralized in `packages/tooling`.
+1. **Desktop app** (`apps/electron` + `apps/ui`) — Electron wrapper that launches Go Core as a subprocess
+2. **Docker Web app** (`apps/core` + `apps/ui`) — Docker runs Go Core directly; the main UI is embedded in the Core binary
 
-- Do not create app-local or package-local `scripts/` directories.
-- Put build, development, release, migration, code-generation, and verification entrypoints under `packages/tooling/src/<domain>/` and invoke them from `Taskfile.yml` or package scripts.
-- Before adding a new tooling entrypoint, search `packages/tooling` and extend an existing domain module when practical.
-- Keep product runtime code in its owning app or package; this rule applies to repository automation and one-off executable tooling, not application features.
+The Player UI (`apps/player-ui`) is also embedded in every Core binary. Electron Core serves `/player/` but suppresses the embedded main UI because Electron owns the main renderer.
 
 ## Documentation Site Safety
 
-`docs/` is the production VitePress source directory. Its contents are packaged and deployed to the public documentation site.
+`docs/` is the production VitePress source directory. Everything placed there can be packaged and deployed to the public documentation site.
 
 - Never create agent planning or working artifacts anywhere under `docs/`. This includes `docs/plans/`, `docs/superpowers/`, design or implementation plans, audit reports, task logs, handoff notes, scratch Markdown, generated prompts, and session notes.
 - Only add or edit files under `docs/` when they are intentional public documentation, documentation assets, VitePress source/configuration, or tests required for the documentation site.
@@ -28,33 +26,66 @@ Repository automation is centralized in `packages/tooling`.
 - This rule overrides any skill, tool, or template that defaults to writing plans under `docs/` or `docs/plans/`.
 - Before finishing a task that touches documentation, inspect `git status --short -- docs` and remove accidental internal artifacts without deleting legitimate documentation content.
 
-## Build, Test, and Development Commands
+## Common Commands
 
-Run `pnpm install` once per clone. Use `pnpm dev` for the unified desktop + web experience, or scope to `pnpm dev:web` / `pnpm dev:electron`. `pnpm build` triggers the production Turborepo pipeline; `pnpm build:web-release` plus `pnpm build:docker` produce the deployable web bundle. Keep the codebase healthy with `pnpm lint`, `pnpm lint:fix`, `pnpm format`, and verify types through `pnpm types`.
+```bash
+pnpm install                # Install all dependencies (run once per clone)
+task dev:electron           # Start Electron desktop dev environment (HMR)
+task dev:web                # Start Web Core directly plus the Vite UI
+task build:electron         # Production build for Electron
+task build:docker           # Build the deployable Web image
+pnpm core:dev               # Start Go Core dev server (port 9900)
+pnpm core:build             # Compile Go Core binary
+pnpm player:dev             # Start Player dev (alias for core:dev)
+pnpm player:build           # Build Player (alias for core:build)
+pnpm deps:download          # Download third-party tools (ffmpeg, BBDown, etc.)
+pnpm deps:download:all      # Download tools for all platforms
+pnpm lint                   # Lint with oxlint
+pnpm lint:fix               # Auto-fix lint issues
+pnpm format                 # Format with oxfmt
+pnpm format:check           # Check formatting without modifying
+pnpm check                  # Full check: lint + format + type check
+pnpm type:check             # TypeScript type checking via Turborepo
+pnpm pack:electron          # Build + package Electron distributable
+```
 
-## Coding Style & Naming Conventions
+Commits use Conventional Commits format (e.g. `feat(electron): add queue UI`).
 
-Target modern TypeScript with ES modules, two-space indentation, UTF-8, and LF endings per `.editorconfig`. Components, hooks, and services adopt PascalCase (e.g. `UserPreferencesPanel.tsx`). Utilities and helpers stay camelCase, and constants use SCREAMING_SNAKE_CASE. Always run `pnpm format` before committing; reserve comments for clarifying complex logic.
+## Architecture
 
-## UI Interaction and Cursor Semantics
+### Monorepo Layout
 
-Mouse cursors must communicate what an element will do. Define cursor behavior in shared UI primitives whenever possible so every consumer inherits it.
+**Apps:**
 
-| Interaction                                                                      | Cursor                                    |
-| -------------------------------------------------------------------------------- | ----------------------------------------- |
-| Enabled buttons, links, menu items, select options, toggles, and clickable cards | pointer                                   |
-| Disabled or unavailable controls                                                 | not-allowed                               |
-| Editable text                                                                    | text                                      |
-| Draggable content                                                                | grab, changing to grabbing while dragging |
-| Horizontal or vertical resize handles                                            | col-resize or row-resize                  |
-| Work continuing in the background                                                | progress                                  |
-| Blocking work where the UI cannot accept input                                   | wait                                      |
-| Non-interactive content                                                          | default                                   |
+- **`apps/core/`** — Go (Gin) REST API backend for download orchestration. Runs on port 9900. Uses SQLite (GORM), SSE for real-time events, PTY for capturing download tool output, and embeds both browser UIs through `//go:embed`.
+- **`apps/electron/`** — Electron main process (tsdown build, inversify DI). Launches Go Core via `@mediago/service-runner`.
+- **`apps/ui/`** — Shared React 19 frontend (Vite 8, Ant Design 6, Zustand, TailwindCSS 4, i18next). Used by both Electron and server targets.
+- **`apps/player-ui/`** — React 19 frontend for player (Vite 8, shadcn/ui, video.js, TailwindCSS 4). Built assets are embedded into Go Core via `//go:embed`.
 
-Do not use cursor-default on an enabled interactive element. Avoid pointer-events: none on disabled controls when it prevents the not-allowed cursor from being shown; use native disabled, aria-disabled, or the component library's disabled state to block the action. Cursor styling does not replace semantic HTML, keyboard interaction, focus states, or accessible names.
+**Packages:**
 
-## Testing Guidelines
+- **`packages/common/`** — Platform-agnostic shared types, constants, and utilities
+- **`packages/core-sdk/`** — TypeScript SDK for Go Core REST API (Axios, SSE via eventsource)
+- **`packages/electron-preload/`** — Electron preload scripts for IPC bridge
+- **`packages/browser-extension/`** — Browser extension (Lit web components)
+- **`docs/`** — VitePress documentation (Chinese, English, Japanese)
 
+### Multi-Target Build
+
+The `APP_TARGET` env var (`electron` | `server`) controls which backend the UI builds against. Both targets share the same React UI but connect via different transports:
+
+- **Electron**: IPC bridge (preload) + Go Core direct (via `@mediago/core-sdk`)
+- **Server/Web**: HTTP/WebSocket + Go Core direct (via `@mediago/core-sdk`)
+
+The UI adapter layer (`apps/ui/src/hooks/adapters/`) abstracts this: `electron.ts` provides IPC bridge in desktop mode, `platform-stubs.ts` provides no-op stubs in web mode, and `index.ts` exports `platformApi` which selects the appropriate adapter.
+
+### Key Patterns
+
+- **Go Core lifecycle**: Electron launches Core via `@mediago/service-runner`; Task and Docker execute Core directly for Web usage
+- **Dependency Injection**: inversify with `@inversifyjs/binding-decorators` in Electron backend
+- **State Management**: Zustand in the UI
+- **Real-time events**: Go Core emits SSE events (`/api/events`); the UI's `api/events.ts` subscribes and dispatches to React via a listener pattern
+- **TypeScript**: Strict mode with experimental decorators and decorator metadata enabled
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
