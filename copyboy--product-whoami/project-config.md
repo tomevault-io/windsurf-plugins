@@ -1,134 +1,123 @@
 ---
 trigger: always_on
-description: CursorRIPER Framework - Customization
+description: CursorRIPER Framework - RIPER Workflow
 ---
 
+date_created: "2025-04-05"
+last_updated: "2025-06-05"
+framework_component: "riper-workflow"
+priority: "high"
+scope: "development_maintenance"
+---
 <!-- Note: Cursor will strip out all the other header information and only keep the first three. -->
-# CursorRIPER Framework - Customization
-# Version 1.0.1
+# CursorRIPER Framework - RIPER Workflow
+# Version 1.0.3
 
 ## AI PROCESSING INSTRUCTIONS
-This file contains user-defined customizations for the CursorRIPER Framework. As an AI assistant, you MUST:
-- Load this file after core framework components if it exists
-- Apply these customizations to override default framework behavior
-- Never modify this file unless explicitly requested by the user
-- Acknowledge the active customizations in your first response of each session
+This file defines the RIPER workflow component of the CursorRIPER Framework. As an AI assistant, you MUST:
+- Load this file when PROJECT_PHASE is "DEVELOPMENT" or "MAINTENANCE"
+- **VALIDATE PROJECT_PHASE before entering any RIPER mode**
+- Follow mode-specific instructions for each RIPER mode
+- Always declare your current mode at the beginning of each response
+- Only transition between modes when explicitly commanded
+- Reference memory bank files to maintain context
+- **AUTOMATICALLY manage tasks throughout the RIPER workflow**
+- **Create, update, and track tasks as part of the workflow process**
 
-## USER PREFERENCES
+## STATE VALIDATION REQUIREMENT
 
-### Response Style
-RESPONSE_VERBOSITY: "BALANCED"
-# Possible values: "CONCISE", "BALANCED", "DETAILED"
-# Controls the level of detail in AI responses
-
-CODE_STYLE_PREFERENCES: ""
-# Specify coding style preferences (indentation, naming conventions, etc.)
-
-EXPLANATION_LEVEL: "MEDIUM"
-# Possible values: "MINIMAL", "MEDIUM", "COMPREHENSIVE"
-# Controls how much explanation is provided with code
-
-### Mode Behavior
-SUGGEST_MODE_TRANSITIONS: true
-# If true, AI can suggest when a mode transition might be appropriate
-
-AUTO_MODE_TRANSITION: false
-# If true, AI can automatically transition between modes (except to EXECUTE)
-# EXECUTE mode always requires explicit user authorization
-
-PLAN_QUESTION_COUNT: 5
-# Number of clarifying questions to ask in PLAN mode
-
-### Memory Management
-AUTO_UPDATE_MEMORY: true
-# If true, AI will automatically update memory files after significant changes
-
-MEMORY_UPDATE_FREQUENCY: "AFTER_COMPLETION"
-# Possible values: "AFTER_EVERY_RESPONSE", "AFTER_COMPLETION", "MANUAL_ONLY"
-# Controls when memory files are updated
-
-REQUIRED_MEMORY_FILES: ["projectbrief.md", "activeContext.md", "progress.md"]
-# List of memory files that must exist for the framework to function
-
-### Archive Behavior
-AUTO_ARCHIVE_START_PHASE: true
-# If true, START phase will be automatically archived upon completion
-
-BACKUP_FREQUENCY: "DAILY"
-# Possible values: "NEVER", "DAILY", "WEEKLY", "BEFORE_CHANGES"
-# Controls how often memory bank backups are created
-
-KEEP_BACKUP_COUNT: 5
-# Number of backup sets to retain before deleting oldest
-
-## ADVANCED CUSTOMIZATION
-
-### Command Aliases
-CUSTOM_COMMANDS: {
-  "/r": "/research",
-  "/i": "/innovate",
-  "/p": "/plan",
-  "/e": "/execute",
-  "/rev": "/review"
+**CRITICAL**: Before entering ANY RIPER mode, you MUST verify:
+```
+if (PROJECT_PHASE not in ["DEVELOPMENT", "MAINTENANCE"]) {
+  return "❌ Cannot enter RIPER modes. Current phase: " + PROJECT_PHASE + 
+         ". Required: DEVELOPMENT or MAINTENANCE. Use /start to initialize project.";
 }
-# Custom command shortcuts for mode transitions
+```
 
-### Mode Extensions
-RESEARCH_MODE_EXTENSIONS: []
-# Additional behaviors for RESEARCH mode
+## THE RIPER-5 MODES
 
-INNOVATE_MODE_EXTENSIONS: []
-# Additional behaviors for INNOVATE mode
+```mermaid
+flowchart LR
+    R[RESEARCH] --> I[INNOVATE]
+    I --> P[PLAN]
+    P --> E[EXECUTE]
+    E --> Rev[REVIEW]
+    Rev -.-> R
+    
+    style R fill:#e6f3ff,stroke:#0066cc
+    style I fill:#e6ffe6,stroke:#006600
+    style P fill:#fff0e6,stroke:#cc6600
+    style E fill:#ffe6e6,stroke:#cc0000
+    style Rev fill:#f0e6ff,stroke:#6600cc
+```
 
-PLAN_MODE_EXTENSIONS: []
-# Additional behaviors for PLAN mode
+### MODE 1: RESEARCH
+[MODE: RESEARCH]
+- **Entry Validation**: PROJECT_PHASE must be "DEVELOPMENT" or "MAINTENANCE"  
+- **Purpose**: Information gathering ONLY
+- **Permitted**: Reading files, asking clarifying questions, understanding code structure
+- **Forbidden**: Suggestions, implementations, planning, or any hint of action
+- **Requirement**: You may ONLY seek to understand what exists, not what could be
+- **Duration**: Until user explicitly signals to move to next mode
+- **Output Format**: Begin with [MODE: RESEARCH], then ONLY observations and questions
+- **Pre-Research Checkpoint**: Confirm which files/components need to be analyzed before starting
 
-EXECUTE_MODE_EXTENSIONS: []
-# Additional behaviors for EXECUTE mode
+#### **AUTOMATIC TASK MANAGEMENT - RESEARCH MODE**:
+1. **State Check**: Verify PROJECT_PHASE allows RESEARCH mode
+2. **Task Detection**: If no active task exists and user describes a problem/requirement, automatically identify task type (feature/bugfix/enhancement/maintenance)
+3. **Task Creation**: Create new task with appropriate template if none exists
+4. **Task Update**: If active task exists, update research findings in `notes.md`
+5. **Progress Tracking**: Update task `progress.md` with research status
 
-REVIEW_MODE_EXTENSIONS: []
-# Additional behaviors for REVIEW mode
+### MODE 2: INNOVATE
+[MODE: INNOVATE]
+- **Entry Validation**: PROJECT_PHASE must be "DEVELOPMENT" or "MAINTENANCE"
+- **Purpose**: Brainstorming potential approaches
+- **Permitted**: Discussing ideas, advantages/disadvantages, seeking feedback
+- **Forbidden**: Concrete planning, implementation details, or any code writing
+- **Requirement**: All ideas must be presented as possibilities, not decisions
+- **Duration**: Until user explicitly signals to move to next mode
+- **Output Format**: Begin with [MODE: INNOVATE], then ONLY possibilities and considerations
+- **Decision Documentation**: Capture design decisions with explicit rationales using high relevance scores
 
-### Framework Extensions
-CUSTOM_PHASES: []
-# Additional project phases beyond standard ones
+#### **AUTOMATIC TASK MANAGEMENT - INNOVATE MODE**:
+1. **State Check**: Verify PROJECT_PHASE allows INNOVATE mode
+2. **Task Validation**: Ensure active task exists, create if missing
+3. **Innovation Documentation**: Update task `notes.md` with brainstormed approaches
+4. **Decision Recording**: Document design alternatives and rationales
+5. **Progress Update**: Mark innovation phase as complete in `progress.md`
 
-CUSTOM_WORKFLOWS: []
-# Custom workflows for specific project types
+### MODE 3: PLAN
+[MODE: PLAN]
+- **Entry Validation**: PROJECT_PHASE must be "DEVELOPMENT" or "MAINTENANCE"
+- **Purpose**: Creating exhaustive technical specification
+- **Permitted**: Detailed plans with exact file paths, function names, and changes
+- **Forbidden**: Any implementation or code writing, even "example code"
+- **Requirement**: Plan must be comprehensive enough that no creative decisions are needed during implementation
+- **Planning Process**:
+  1. **Validate project state** allows PLAN mode
+  2. Deeply reflect upon the changes being asked
+  3. Analyze existing code to map the full scope of changes needed
+  4. Ask 4-6 clarifying questions based on your findings
+  5. Once answered, draft a comprehensive plan of action
+  6. Ask for approval on that plan
+- **Mandatory Final Step**: Convert the entire plan into a numbered, sequential CHECKLIST with each atomic action as a separate item
+- **Checklist Format**:
+```
+IMPLEMENTATION CHECKLIST:
+1. [Specific action 1]
+2. [Specific action 2]
+...
+n. [Final action]
+```
+- **Duration**: Until user explicitly approves plan and signals to move to next mode
+- **Output Format**: Begin with [MODE: PLAN], then ONLY specifications and implementation details
+- **Implementation Dry Run**: Optional step to outline potential side effects of planned changes
 
-## USER DOCUMENTATION PREFERENCES
+#### **AUTOMATIC TASK MANAGEMENT - PLAN MODE**:
+1. **State Check**: Verify PROJECT_PHASE allows PLAN mode
 
-### Documentation Format
-DOCUMENTATION_STYLE: "MARKDOWN"
-# Format for generated documentation
-
-INCLUDE_CODE_COMMENTS: true
-# Whether to include detailed comments in generated code
-
-CODE_BLOCK_LANGUAGE_TAGS: true
-# Whether to include language tags in code blocks
-
-### AI Output Format
-MODE_DECLARATION_FORMAT: "[MODE: {mode}]"
-# Format string for mode declarations
-
-PROGRESS_INDICATOR_FORMAT: "[{current_step}/{total_steps}]"
-# Format for progress indicators in responses
-
-## CUSTOM PROJECT STRUCTURE
-
-PROJECT_TYPE: "DEFAULT"
-# Identifies the type of project for specialized handling
-
-CUSTOM_FOLDER_STRUCTURE: {}
-# Custom folder structure definitions for project scaffolding
-
-TECHNOLOGY_PRESETS: {}
-# Predefined technology stacks for quick selection
-
----
-
-*This file contains user-defined customizations for the CursorRIPER Framework. Edit these settings to adjust framework behavior to your preferences.*
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [copyboy/product_whoami](https://github.com/copyboy/product_whoami) — distributed by [TomeVault](https://tomevault.io).
