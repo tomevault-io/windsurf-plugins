@@ -45,4 +45,4 @@ This file holds repo-wide rules. Per-package guidance lives next to the code:
 
 ---
 > Source: [bex-co/beancount-io](https://github.com/bex-co/beancount-io) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
