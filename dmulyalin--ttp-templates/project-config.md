@@ -124,27 +124,16 @@ Return shape:
 
 ---
 
-## Development environment
+## References
 
-The project uses [Poetry](https://python-poetry.org/) for dependency and
-build management.
+Use these project documents before adding or changing templates:
 
-```bash
-# install all dependencies (including dev group)
-poetry install
-
-# run the full test suite
-cd test
-poetry run pytest -vv
-
-# run a specific test file
-cd test
-poetry run pytest test_ttp_templates_methods.py -vv
-
-# build docs locally
+| Document | Purpose |
+|---|---|
+| `docs/contribute.md` | Contribution flow, template layout, utility function structure, mock data, tests and Pydantic model guidance |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dmulyalin/ttp_templates](https://github.com/dmulyalin/ttp_templates) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
