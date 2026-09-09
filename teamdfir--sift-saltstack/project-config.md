@@ -136,4 +136,4 @@ and `sift-package-<pkgname>:` (91 files, the newer style). **Use the `sift-` pre
 
 ---
 > Source: [teamdfir/sift-saltstack](https://github.com/teamdfir/sift-saltstack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
