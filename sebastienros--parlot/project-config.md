@@ -1,157 +1,108 @@
 ---
 trigger: always_on
-description: Parlot is a fast, lightweight and simple to use .NET parser combinator library. It provides a fluent API based on parser combinators that offer readable grammar definitions.
+description: Guidance for AI agents working in this repository. This is the single source of truth: `CLAUDE.md` and
 ---
 
-# Copilot Instructions for Parlot
+# AGENTS.md
 
-## Project Overview
+Guidance for AI agents working in this repository. This is the single source of truth: `CLAUDE.md` and
+`.github/copilot-instructions.md` only point here. Record new guidance in this file.
 
-Parlot is a fast, lightweight and simple to use .NET parser combinator library. It provides a fluent API based on parser combinators that offer readable grammar definitions.
+Parlot is a parser combinator library whose reason to exist is speed. Every change is judged on allocations
+and throughput first, ergonomics second. Assume any code you touch under `src/Parlot` is on a hot path
+until a benchmark says otherwise.
 
-## Repository Structure
+## Build, test, benchmark
 
-- `src/Parlot/` - Core library source code
-- `src/Samples/` - Example parsers (Calculator, JSON, SQL)
-- `test/Parlot.Tests/` - Unit tests
-- `test/Parlot.Benchmarks/` - Performance benchmarks
-- `docs/` - Documentation files
+The SDK is pinned by `global.json` (10.0.100, `rollForward: latestMajor`). Tests run on
+Microsoft.Testing.Platform (also configured in `global.json`) with xunit v3.
 
-## Target Frameworks and Build Strategy
-
-### Primary Development Framework
-- **Use .NET 9.0 (`net9.0`) as the primary target for development, testing, and validation**
-- All new features should be developed and tested against `net9.0` first
-- Performance optimizations and benchmarks should target `net9.0`
-
-### Multi-Target Framework Support
-The library supports multiple target frameworks:
-- `net472` - .NET Framework 4.7.2
-- `netstandard2.0` - .NET Standard 2.0 
-- `net8.0` - .NET 8.0
-- `net9.0` - .NET 9.0
-- `net10.0` - .NET 10.0 (primary development target)
-
-**Important**: Only build and test other target frameworks once functionality is proven to work correctly on `net9.0`. This approach improves development velocity and performance.
-
-## Build and Test Commands
-
-### Preferred Commands (Performance Optimized)
 ```bash
-# Build targeting net9.0 only
-dotnet build -f net9.0
-
-# Run tests targeting net9.0 only  
-dotnet test -f net9.0
-
-# Run benchmarks (net9.0 only)
-dotnet run -p test/Parlot.Benchmarks -f net9.0
+dotnet build                       # all TFMs: net472, netstandard2.0, net8.0, net10.0 (~3s incremental)
+dotnet test test/Parlot.Tests/Parlot.Tests.csproj -f net10.0
+dotnet test test/Parlot.SourceGenerator.Tests/Parlot.SourceGenerator.Tests.csproj   # net10.0 only
+dotnet test test/Parlot.Standalone.Tests/Parlot.Standalone.Tests.csproj              # net8.0/net10.0; net472 on Windows, no Parlot reference
+dotnet build test/Parlot.Standalone.NetStandard/Parlot.Standalone.NetStandard.csproj # netstandard2.0 generated consumer
 ```
 
-### Full Multi-Target Build (Use Only When Required)
+Develop and validate against `net10.0` first; only widen to the other TFMs once the behaviour is right.
+
+**`-f net10.0` does not work solution-wide.** `dotnet build -f net10.0` and `dotnet test -f net10.0` from
+the root fail with `NETSDK1005`, because `Parlot.SourceGenerator` targets `netstandard2.0` only. Pass `-f`
+to an individual project, or build everything without `-f`.
+
+### Running a single test
+
+Microsoft.Testing.Platform has no VSTest `--filter`. Use xunit v3's filters, after `--`:
+
 ```bash
-# Build all target frameworks
-dotnet build
-
-# Test all target frameworks
-dotnet test
+dotnet test test/Parlot.Tests/Parlot.Tests.csproj -f net10.0 -- --filter-method "*.ShouldReturnElse*"
 ```
 
-## Code Style and Architecture
+Faster inner loop — run the test host directly (it is an `Exe`), no MSBuild pass:
 
-### Parser Combinator Patterns
-- Use the fluent API with static imports: `using static Parlot.Fluent.Parsers;`
-- Grammar definitions should be readable and self-documenting
-- Prefer composition over inheritance for parser combinators
-- Use deferred parsers for recursive grammars
-
-### Performance Considerations
-- Parlot prioritizes performance - always consider allocation patterns
-- Use `TextSpan` and `ReadOnlySpan<char>` where possible
-- Avoid unnecessary string allocations
-- Consider compilation for frequently used parsers
-
-### Testing Strategy
-- Write comprehensive unit tests for new parser combinators
-- Include both positive and negative test cases
-- Test error handling and edge cases
-- Add benchmarks for performance-critical changes
-
-## Common Development Patterns
-
-### Creating New Parsers
-1. Define the grammar using fluent API
-2. Write unit tests targeting `net9.0`
-3. Add benchmarks if performance is critical
-4. Add documentation with examples
-
-### Example Parser Structure
-```csharp
-using Parlot.Fluent;
-using static Parlot.Fluent.Parsers;
-
-public static class MyGrammar
-{
-    public static readonly Parser<MyResult> MyParser = 
-        Terms.Text("keyword")
-        .And(Terms.Identifier())
-        .And(Terms.Char(';'))
-        .Then(result => new MyResult(result.Item2));
-}
+```bash
+dotnet build test/Parlot.Tests/Parlot.Tests.csproj -f net10.0
+test/Parlot.Tests/bin/Debug/net10.0/Parlot.Tests.exe --filter-method "*.ShouldReturnElse*"   # drop .exe on Unix
 ```
 
-### `And()` builds flat tuples
+Also available: `--filter-class`, `--filter-namespace`, `--filter-trait`, `--filter-query`,
+`--filter-not-*`, `--list-tests`. Simple filters and query filters cannot be mixed.
 
-The `And()` parser combinator builds flat tuples when combining multiple parsers. For example, combining three parsers using `And()` will result in a tuple of three elements.
+### Benchmarks
 
-```c#
-var parser = Terms.Char('a').And(Terms.Char('b')).And(Terms.Char('c'));
-// The result type is (char, char, char)
-
-parser.Then(result =>
-{
-    var (first, second, third) = result; // result is a flat tuple (char, char, char)
-    // or result.Item1, result.Item2, result.Item3
-    return ...;
-});
+```bash
+dotnet run --project test/Parlot.Benchmarks/Parlot.Benchmarks.csproj -c Release -- --list flat
+dotnet run --project test/Parlot.Benchmarks/Parlot.Benchmarks.csproj -c Release -- --filter "*Json*"
 ```
 
-### Keyworkds should be skipped
-When defining keywords using the `Terms.Text()` parser, these keywords can be skipped in the resulting AST.
-`SkipAnd` and `AndSkip` combinators can be used to ignore the keywords while still parsing the surrounding expressions.
+`-p` no longer resolves a project directory; pass `--project` with the full `.csproj` path.
 
-```c#
-var ifKeyword = Terms.Text("if");
-var expressionParser = ...;
-var thenKeyword = Terms.Text("then");
+### Two things that will waste your time
 
-var condition = ifKeyword.SkipAnd(expressionParser).AndSkip(thenKeyword).And(expressionParser);
-// The result type is (Expression, Expression), skipping the "if" and "then" keywords
-```
+- `TreatWarningsAsErrors` is on repo-wide (`Directory.Build.props`) with `AnalysisLevel=latest-Recommended`
+  for `src`. An unused variable fails the build.
+- `Parlot.Benchmarks` and `Parlot.SourceGenerator.Tests` load `src/Parlot/bin/$(Configuration)/netstandard2.0/Parlot.dll`
+  as an `<Analyzer>`, because the generator *executes* your parser code at compile time. After changing
+  `src/Parlot`, run a plain `dotnet build` in the **same configuration** before trusting generated output —
+  a stale `netstandard2.0` assembly means the generator emits code from the old parser logic, and a missing
+  one breaks generation outright.
 
-### Terms and Literals differences
+## Architecture
 
-`Terms` parsers are designed to skip whitespace and comments automatically, making them suitable for parsing programming languages or structured text where such elements are common. In contrast, `Literals` parsers do not skip whitespace or comments, providing more control over the parsing process when needed.
-It is not necessary to wrap `Terms` parsers with `SkipWhitespace()` as they already handle whitespace and comments internally.
+Two layers, plus a compile-time path that mirrors the runtime one.
 
-### `Optional()` usage
+**Scanning layer** (`src/Parlot`): `Scanner` owns the input `string` and a `Cursor`; `TextSpan` carries
+buffer + offset + length so no substring is ever allocated. `Character` is a partial class split by
+technique: `Character.SearchValues.cs` for net8.0+, `Character.Mask.cs` plus the byte table in
+`Character.Generated.cs` for everything below. That table is **generated** — don't hand-edit it; rerun
+`CanGenerateMasks` in `test/Parlot.Tests/CharMaskGeneratorTest.cs` and take the string it builds from the
+debugger.
 
-Use the `Optional()` combinator to make a parser optional. It will always return an instance of `Option<T>` regardless of whether the parser matches or not. Use `HasValue` to check if the parser was successful. Or use `OrSome()` to provide a default value when the parser does not match.
+**Combinator layer** (`src/Parlot/Fluent`): `Parser<T>` is the abstract base; the whole library is
+instances of it composed into a graph. `Parsers` is the static entry point exposing the `Literals` and
+`Terms` builder structs; the combinators are spread over `Parsers.*.cs` / `ParserExtensions.*.cs` by
+concern. `Deferred<T>` closes recursive grammars.
 
-```c#
-// Parse an integer or return -1 if not present
-var optionalParser = Terms.Integer().Optional().Then(x => x.HasValue ? x.Value : -1);
-```
+`Parser<T>.Parse(ParseContext, ref ParseResult<T>)` is the hot method and carries a contract
+(see `docs/writing.md`, read it before writing a parser):
 
-## File Organization
+- bracket the body with `context.EnterParser(this)` / `context.ExitParser(this)`;
+- **on failure the cursor must be back where it started** — `Cursor.ResetPosition(start)` when this parser
+  advanced it, but not when a sub-parser failed (that one already reset itself);
+- write a test that asserts the cursor position is restored on failure.
 
-### Core Library (`src/Parlot/`)
-- `Character.*.cs` - Character classification and utilities
-- `Scanner.cs` - Low-level text scanning
-- `Cursor.cs` - Position tracking
+### The optimization surface — three opt-in interfaces
+
+Most of Parlot's speed comes from parsers advertising capabilities rather than from the `Parse` bodies.
+A new parser type should implement each one that applies:
+
+| Interface | Namespace | Effect |
+|---|---|---|
+| `ISeekable` | `Parlot.Rewriting` | Declares the first chars that can match, so `OneOf` builds a char lookup table, skips branches that cannot match, and hoists the whitespace skip. About two thirds of the parser types implement it. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sebastienros/parlot](https://github.com/sebastienros/parlot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
