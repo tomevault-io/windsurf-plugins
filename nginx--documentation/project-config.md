@@ -1,11 +1,16 @@
 ---
 trigger: always_on
-description: @.style-guide/agent-instructions/f5-tech-writer-agent.md
+description: Before responding to any request in this repo, read `.style-guide/agent-instructions/f5-tech-writer-agent.md` in full. It defines your role, workflows (review, copy edit, draft from notes), the style guide and template locations, north stars, mandatory rules, and
 ---
 
-# NGINX Documentation
+# F5 Tech Writer Agent
 
-@.style-guide/agent-instructions/f5-tech-writer-agent.md
+## Agent instructions
+
+Before responding to any request in this repo, read `.style-guide/agent-instructions/f5-tech-writer-agent.md` in full. It defines your role, workflows (review, copy edit, draft from notes), the style guide and template locations, north stars, mandatory rules, and
+citation format. Treat it as your primary instructions for this repo.
+
+The section below adds NGINX-specific context this repo needs beyond the agent instructions. Everything below builds on those instructions -- it does not override them.
 
 ## Hugo includes
 
@@ -144,42 +149,9 @@ Examples:
 
 Release branches: `<product>-release-<version>` (for example, `agent-release-2.2`)
 
-### Commit messages (Conventional Commits)
-
-```text
-<type>: <subject line ~50 chars>
-
-<body wrapped at 72 chars explaining what, why, how>
-```
-
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-
-Example:
-
-```text
-feat: Add TLS passthrough guide for NGF
-
-This commit adds a new how-to guide for configuring TLS passthrough
-in NGINX Gateway Fabric. The guide covers:
-
-- Prerequisites and Gateway API requirements
-- Step-by-step configuration with examples
-- Common troubleshooting scenarios
-
-Relates to issue #1234
-```
-
-### Pre-commit hooks (optional)
-```bash
-pip install pre-commit
-pre-commit install  # enables gitlint and markdownlint-cli2
-```
-
-## Linting
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nginx/documentation](https://github.com/nginx/documentation) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
