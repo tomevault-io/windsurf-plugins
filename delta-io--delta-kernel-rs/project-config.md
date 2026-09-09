@@ -1,35 +1,94 @@
 ---
 trigger: always_on
-description: `datafusion_executor` is a DataFusion-based `PlanExecutor` for delta_kernel declarative plans.
+description: Delta-kernel-rs is a Rust library for building Delta Lake connectors. It encapsulates the
 ---
 
-# CLAUDE.md -- datafusion-executor
+# AGENTS.md
 
-`datafusion_executor` is a DataFusion-based `PlanExecutor` for delta_kernel declarative plans.
-Kernel emits executor-independent logical `Plan`s; this crate executes them by lowering each
-plan to a DataFusion `LogicalPlan`, optimizing it, and running the resulting `ExecutionPlan`.
+## Project Overview
 
-## Separate workspace
+Delta-kernel-rs is a Rust library for building Delta Lake connectors. It encapsulates the
+Delta protocol so connectors can read and write Delta tables without understanding protocol
+internals. Kernel never does I/O directly: it defines _what_ to do via its APIs
+(`Snapshot`, `Scan`, `Transaction`) and delegates _how_ to the `Engine` trait.
 
-This crate has its own `[workspace]`, so it is NOT a member of the root workspace and the root's
-`--workspace` commands do not touch it. The isolation exists to avoid an arrow version mismatch:
-DataFusion pins a specific arrow major, so kernel must be built against that same major here. The
-root workspace builds kernel against its own default arrow major, which need not match. As a root
-member, Cargo feature unification would compile kernel against a single arrow major shared with
-the rest of the workspace, so DataFusion's types would link against a kernel built on a different
-arrow major -- a mismatch that breaks the build. A separate workspace resolves kernel's arrow
-major in isolation, matched to DataFusion's.
+Current capabilities include table reads with predicates, data skipping, deletion vectors,
+change data feed, incremental scans (`incremental_scan_builder`) and commit ranges, checkpoints
+(V1 & V2), version checksums, blind appends, file removals, table creation (including clustered
+tables), limited schema alteration, and catalog-managed tables. Log compaction remains disabled
+(#2337).
 
 ## Build & Test Commands
 
-cd into the crate (the subshell keeps that from leaking out); cargo picks up the nested workspace
-automatically.
+> **`datafusion-executor` and `integration-tests` are separate workspaces.** Root `--workspace`
+> commands do not include them. For `datafusion_executor` commands, see
+> `datafusion-executor/CLAUDE.md`. `integration-tests/test-all-arrow-versions.sh` tests each
+> supported Arrow version.
 
 ```bash
-(cd datafusion-executor && cargo build)
-(cd datafusion-executor && cargo test)
+# Build
+cargo build --workspace --all-features
+
+# Run all tests (prefer nextest over cargo test)
+cargo nextest run --workspace --all-features
+
+# Run tests for a specific crate
+cargo nextest run -p delta_kernel --all-features
+
+# Run a single test in a specific crate (fastest: only compiles that crate)
+cargo nextest run -p delta_kernel --lib --all-features test_name_here
+
+# Run a test by name, searching all crates (slow: compiles everything)
+cargo nextest run --workspace --all-features test_name_here
+
+# Format, lint, and doc check (always run after code changes)
+cargo +nightly fmt \
+  && cargo clippy --workspace --benches --tests --all-features -- -D warnings \
+  && cargo doc --workspace --all-features --no-deps
+
+# Split no-default-features CI checks (cargo aliases from .cargo/config.toml)
+cargo clippy-no-default-kernel-dependents
+cargo check-no-default-kernel
+cargo check-no-default-engine
+cargo clippy-no-default-kernel-leaves
+
+# Quick pre-push check (mimics CI)
+cargo +nightly fmt \
+  && cargo clippy --workspace --benches --tests --all-features -- -D warnings \
+  && cargo doc --workspace --all-features --no-deps \
+  && cargo nextest run --workspace --all-features
 ```
+
+### Crate Names for `-p` Flag
+
+| Crate                                | Directory                             | Description                                                              |
+|--------------------------------------|---------------------------------------|--------------------------------------------------------------------------|
+| `delta_kernel`                       | `kernel/`                             | Core library                                                             |
+| `delta_kernel_default_engine`        | `default-engine/`                     | Default Arrow/Tokio `Engine` implementation                              |
+| `delta_kernel_default_engine_test_utils` | `default-engine/test-utils/`      | Default-engine test utilities                                            |
+| `delta_kernel_ffi`                   | `ffi/`                                | C/C++ FFI bindings                                                       |
+| `delta_kernel_ffi_macros`            | `ffi-proc-macros/`                    | FFI proc macros                                                          |
+| `delta_kernel_derive`                | `derive-macros/`                      | Proc macros                                                              |
+| `acceptance`                         | `acceptance/`                         | Acceptance tests (DAT)                                                   |
+| `test_utils`                         | `test-utils/`                         | Shared test utilities                                                    |
+| `delta_kernel_workloads`             | `workloads/`                          | Shared workload spec types + SQL predicate parser                        |
+| `delta_kernel_benchmarks`            | `benchmarks/`                         | Workload benchmarks                                                      |
+| `feature_tests`                      | `feature-tests/`                      | Feature flag tests                                                       |
+| `mem-test`                           | `mem-test/`                           | Memory-usage test executable                                             |
+| `delta-kernel-unity-catalog`         | `delta-kernel-unity-catalog/`         | Unity Catalog integration (UCCommitter, snapshot + create-table helpers) |
+| `unity-catalog-delta-client-api`     | `unity-catalog-delta-client-api/`     | Transport-agnostic UC client traits + wire models                        |
+| `unity-catalog-delta-rest-client`    | `unity-catalog-delta-rest-client/`    | REST/HTTP client for the Unity Catalog Delta Tables API                  |
+
+Packages under `kernel/examples/` are also workspace members. Use the package name from the
+example's `Cargo.toml` with `-p`.
+
+### Feature Flags
+
+Some noteworthy ones (see `[features]` in `kernel/Cargo.toml` for the full list):
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [delta-io/delta-kernel-rs](https://github.com/delta-io/delta-kernel-rs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
