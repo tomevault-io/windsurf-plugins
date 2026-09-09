@@ -1,11 +1,7 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Bark is an iOS push notification tool app that allows users to send custom push notifications to their devices via HTTP requests. It leverages Apple Push Notification service (APNs) and supports advanced iOS notification features like grouping, custom icons/sounds, time-sensitive notifications, critical alerts, and end-to-end encryption.
 ---
-
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -113,12 +109,9 @@ bundle exec fastlane beta
 3. **Message Storage**: `ArchiveProcessor` saves to Realm → Darwin notification sent to main app → main app refreshes message list
 4. **Encryption Flow**: If ciphertext parameter present → `CiphertextProcessor` decrypts using locally stored key → continues normal processing
 
-### App Groups & Data Sharing
-
-The app uses App Groups to share data between the main app and notification extensions:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Finb/Bark](https://github.com/Finb/Bark) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
