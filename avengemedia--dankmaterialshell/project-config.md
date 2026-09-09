@@ -1,130 +1,71 @@
 ---
 trigger: always_on
-description: This file provides guidance to AI coding assistants.
+description: DMS is an open-source, MIT-licensed desktop shell for Wayland compositors on linux. Like KWin, gnome-shell, or cosmic-shell - but designed to work with many different compositors.
 ---
 
-# AGENTS.md
+## What is this?
 
-This file provides guidance to AI coding assistants.
+DMS is an open-source, MIT-licensed desktop shell for Wayland compositors on linux. Like KWin, gnome-shell, or cosmic-shell - but designed to work with many different compositors.
 
-## AI Guidance
+## Repo Structure:
 
-* After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your thinking to plan and iterate based on this new information, and then take the best next action.
-* For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
-* Before you finish, please verify your solution
-* Do what has been asked; nothing more, nothing less.
-* NEVER create files unless they're absolutely necessary for achieving your goal.
-* ALWAYS prefer editing an existing file to creating a new one.
-* NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
-* When you update or modify core context files, also update markdown documentation and memory bank
-* When asked to commit changes, exclude AGENTS.md and AGENTS-*.md referenced memory bank system files from any commits.
+There are 2 main apps in the repo, they are designed to operate together. Additionally there is a dank-qml-common submodule which contains common QML widgets, like a shared library, that is leveraged by other quickshell apps in the Dank Desktop suite.
 
-## Memory Bank System
+There is a GO module (dankgo) that is used by core for certain common go functionality.
 
-This project uses a structured memory bank system with specialized context files. Always check these files for relevant information before starting work:
+### 1- core:
 
-### Core Context Files
+Contains 2 apps:
 
-* **AGENTS-activeContext.md** - Current session state, goals, and progress (if exists)
-* **AGENTS-patterns.md** - Established code patterns and conventions (if exists)
-* **AGENTS-decisions.md** - Architecture decisions and rationale (if exists)
-* **AGENTS-troubleshooting.md** - Common issues and proven solutions (if exists)
-* **AGENTS-config-variables.md** - Configuration variables reference (if exists)
-* **AGENTS-temp.md** - Temporary scratch pad (only read when referenced)
+1. cmd/dms - The parent process for quickshell (shell runner), and general purpose tools and utilities (such as screenshot, clipboard). It also runs the unix socket server the UI uses for functionality quickshell doesn't provide.
+2. cmd/dankinstall - An entirely separate app, a TUI for quickly installing DMS
 
-**Important:** Always reference the active context file first to understand what's currently being worked on and maintain session continuity.
+### 2- quickshell:
 
-### Memory Bank System Backups
+A quickshell application, the entirety of the UI for DMS. It uses quickshells own services supplemented by the core unix socket server for additional functionality.
 
-When asked to backup Memory Bank System files, you will copy the core context files above and @.agents settings directory to directory @/path/to/backup-directory. If files already exist in the backup directory, you will overwrite them.
+Layout:
 
-## Project Overview
+- Common/ - app-wide singletons and helpers (Theme, SettingsData, SessionData, I18n, PopoutManager)
+- Services/ - headless singletons that talk to the system and to core
+- Modules/ - the visible shell: DankBar, ControlCenter, Dock, Lock, Notifications, OSD, and so on
+- Modals/ - large standalone surfaces: Settings, DankLauncherV2, Clipboard, Greeter
+- Widgets/ - reusable Dank* components (DankListView, DankIcon, DankToggle, ...)
+- PLUGINS/ - the plugin system; third-party plugins load from the user's config dir
+- translations/ - POEditor-synced catalogs
 
-DankMaterialShell is a complete desktop environment for Wayland compositors, built as a **monorepo** with two main components:
+### Other directories:
 
-**1. Go Backend (core/)** - System integration, IPC server, and CLI tools (~118,000 lines)
-**2. QML Frontend (quickshell/)** - UI layer consuming the backend's IPC API
+- docs/ - IPC reference, custom theme docs
+- distro/ - packaging for debian, fedora, nix, opensuse, ubuntu, void
 
-**Architecture**: The Go backend provides all system integration via IPC (Inter-Process Communication), while QML services act as thin wrappers that communicate with the backend. This separation allows for robust system integration while maintaining a reactive, modern UI.
+## General Rules:
 
-**Compositor Support**: Niri, Hyprland, MangoWC, Sway, labwc, Scroll (6 compositors supported)
-**Distribution Support**: Arch, Fedora, Debian, Ubuntu, openSUSE, Gentoo (6 distributions supported)
+- Keep it simple. Do not overcomplicate things.
+- Follow each apps' own conventions. For example, QML widgets use Theme tokens instead of hardcoding colors, spacing, or other constants.
+- Resource usage is extremely important to DMS. The shell runs 24/7 on every machine it's installed on - audit any change for idle CPU cost, extra processes, timers, and retained memory.
+- `core` and `quickshell` are tightly coupled through the unix socket protocol. When you are changing one, be mindful of the consequences for the other.
+- Use the Dank* wrappers in Widgets/ (DankListView, DankFlickable, and so on) instead of raw ListView/Flickable/ScrollView.
+- All user-facing text goes through I18n.tr(). Prefer reusing existing catalog terms over adding new ones. Never edit the translation catalogs by hand, they are synced with POEditor.
+- Do not start editing code in response to a question. We'll tell you when to edit code.
+- Do not leave paragraphs of comments on top of the code. You should try to avoid them as much as possible with understandable function names and code. If they are necessary even then, make them concise. Remove such comments when you come by them in the codebase. Comments should always move with code, not be left behind.
+- Use guard statement patterns in any code you write.
+- Do not write any useless tests, tests should cover input output validation - not useless things like "main.go contains func main()"
+- Do not edit generated code directly, mocks are generated with mockery. Not edited by hand
+- If we are missing a glaring issue when we ask you to do something, do not hesitate to point it out.
+- Reinvent the wheel but do not reinvent the car. If you are solving a simple problem do not introduce a library. If you are solving a complex but a common problem, there is likely a modern library for it, if so, use it.
+- Never commit or push code unless explicitly asked to do so.
+- Never make a PR unless explicitly asked to do so.
 
-## Technology Stack
+## Commit Messages
 
-### Backend (core/)
-- **Go 1.24+** - System integration and backend services
-- **Wayland Protocols** - Display management, screenshots, clipboard, workspaces
-- **D-Bus** - Bluetooth, NetworkManager, systemd-logind, desktop portals
-- **IPC Server** - Unix socket JSON API for QML ↔ Go communication
-- **CLI Tools** - `dms` command with 20+ subcommands, `dankinstall` TUI installer
+Commit messages start with the part of the system they touched, followed by a short lowercase explanation of the work:
 
-### Frontend (quickshell/)
-- **QML (Qt Modeling Language)** - UI components and visual presentation
-- **Quickshell Framework** - QML-based desktop shell framework
-- **Qt/QtQuick** - UI rendering and controls
-- **Matugen** - Dynamic theming system for wallpaper-based colors
+network: report wifi state from the associated adapter
+doctor: flag config files that fail to parse
 
-## Development Commands
-
-### Backend (Go)
-
-```bash
-cd core/
-
-# Build
-make                 # Build dms CLI (bin/dms)
-make dankinstall     # Build installer (bin/dankinstall)
-make test            # Run tests
-make dist            # Build distribution binaries (no update/greeter features)
-
-# Install
-sudo make install    # Install to /usr/local/bin/dms
-
-# Development
-gofmt -w .           # Format Go code
-go mod tidy          # Clean up dependencies
-golangci-lint run    # Run linter
-
-# Run dms CLI
-./bin/dms run        # Start shell via dms daemon
-./bin/dms ipc <cmd>  # Send IPC command to running shell
-./bin/dms --help     # View all commands
-```
-
-### Frontend (QML)
-
-```bash
-cd quickshell/
-
-# Run the shell (requires dms backend running or use 'dms run')
-quickshell -p shell.qml
-qs -p .              # Shorthand
-qs -v -p shell.qml   # Verbose debugging
-
-# Code formatting and linting
-qmlfmt -t 4 -i 4 -b 250 -w /path/to/file.qml  # Format QML (don't use qmlformat)
-make -C .. lint-qml  # From quickshell/, call the repo-root lint target; requires the generated .qmlls.ini VFS from `qs -p .`
-./qmlformat-all.sh   # Format all QML files
-```
-
-## Architecture Overview
-
-### Monorepo Structure
-
-The project is organized as a monorepo with clear separation between backend and frontend:
-
-```
-DankMaterialShell/
-├── core/               # Go backend (~118,000 lines)
-│   ├── cmd/            # Binary entrypoints
-│   │   ├── dms/        # Main CLI with 20+ commands
-│   │   └── dankinstall/# TUI installer
-│   ├── internal/       # System integration packages (23 packages)
-│   │   ├── clipboard/  # Clipboard history (ext-data-control-v1)
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+The title should be concise. Description should explain the work in more detail (only if required) while still being concise. Use simple language, do not try to sound smart.
 
 ---
 > Source: [AvengeMedia/DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
