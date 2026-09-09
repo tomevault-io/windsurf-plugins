@@ -3,7 +3,7 @@ trigger: always_on
 description: This document provides AI assistants with comprehensive information about the Livewire Workflows codebase structure, development workflows, and key conventions.
 ---
 
-# CLAUDE.md - AI Assistant Guide for Livewire Workflows
+# AGENTS.md - AI Assistant Guide for Livewire Workflows
 
 This document provides AI assistants with comprehensive information about the Livewire Workflows codebase structure, development workflows, and key conventions.
 
@@ -32,7 +32,7 @@ This document provides AI assistants with comprehensive information about the Li
 - **Namespace**: `Pixelworxio\LivewireWorkflows`
 - **Requirements**: PHP 8.3+, Laravel 11.x/12.x/13.x, Livewire 3.x/4.x
 - **License**: MIT
-- **Test Framework**: Pest v3/v4
+- **Test Framework**: Pest v5
 - **Code Quality**: PHPStan (level 2), Laravel Pint
 
 ### Primary Features
@@ -43,7 +43,8 @@ This document provides AI assistants with comprehensive information about the Li
 4. **History tracking** for back navigation
 5. **Progress tracking** API
 6. **Event-driven extensibility**
-7. **Livewire 3 native integration**
+7. **Signed resume links** for Eloquent-backed workflows
+8. **Livewire 3 and 4 integration**
 
 ---
 
@@ -122,6 +123,8 @@ livewire-workflows/
 │   │   ├── MakeWorkflowGuardCommand.php
 │   │   ├── WorkflowsInstallCommand.php
 │   │   └── WorkflowsScanCommand.php
+│   │   ├── WorkflowsAuditCommand.php
+│   │   └── WorkflowsUpgradeCommand.php
 │   ├── Contracts/                      # Interfaces
 │   │   ├── GuardContract.php
 │   │   └── WorkflowStateRepository.php
@@ -136,15 +139,13 @@ livewire-workflows/
 │   │   └── Workflow.php
 │   ├── Http/Controllers/               # HTTP Controllers
 │   │   └── WorkflowEntryController.php
+│   │   └── WorkflowResumeController.php
 │   ├── Livewire/Concerns/             # Livewire Traits
 │   │   └── InteractsWithWorkflows.php
 │   ├── Registrar/                      # DSL Implementation
-│   │   ├── WorkflowRegistrar.php      # Central registry
-│   │   ├── FlowBuilder.php            # Flow builder
-│   │   └── StepBuilder.php            # Step builder
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pixelworxio/livewire-workflows](https://github.com/pixelworxio/livewire-workflows) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
