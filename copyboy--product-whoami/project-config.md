@@ -1,121 +1,372 @@
 ---
 trigger: always_on
-description: CursorRIPER Framework - RIPER Workflow
+description: <!-- Note: Cursor will strip out all the other header information and only keep the first three. -->
 ---
 
-date_created: "2025-04-05"
-last_updated: "2025-06-05"
-framework_component: "riper-workflow"
-priority: "high"
-scope: "development_maintenance"
----
 <!-- Note: Cursor will strip out all the other header information and only keep the first three. -->
-# CursorRIPER Framework - RIPER Workflow
-# Version 1.0.3
+
+# SOP理论文章写作指导规则
+# Version 1.0.0
 
 ## AI PROCESSING INSTRUCTIONS
-This file defines the RIPER workflow component of the CursorRIPER Framework. As an AI assistant, you MUST:
-- Load this file when PROJECT_PHASE is "DEVELOPMENT" or "MAINTENANCE"
-- **VALIDATE PROJECT_PHASE before entering any RIPER mode**
-- Follow mode-specific instructions for each RIPER mode
-- Always declare your current mode at the beginning of each response
-- Only transition between modes when explicitly commanded
-- Reference memory bank files to maintain context
-- **AUTOMATICALLY manage tasks throughout the RIPER workflow**
-- **Create, update, and track tasks as part of the workflow process**
+This file provides comprehensive guidelines for writing SOP (Standard Operating Procedure) theory articles. As an AI assistant, you MUST:
+- Follow the IMPACT-DRIVEN structure for all SOP articles
+- Apply case-first methodology with pyramid principle integration
+- Ensure high reader engagement and practical value
+- Use the specified templates and quality standards
+- Maintain consistency across all SOP series articles
 
-## STATE VALIDATION REQUIREMENT
+## 核心写作理念
 
-**CRITICAL**: Before entering ANY RIPER mode, you MUST verify:
+### CASE-FIRST + PYRAMID PRINCIPLE
+**设计原理**：先用案例建立情感连接，再用金字塔原理组织信息层次
+
+**认知友好性**：
+- 降低学习门槛，提高接受度
+- 渐进式信息展开，避免认知过载
+- 多感官学习支持，增强记忆效果
+
+**实用价值导向**：
+- 每个章节都有立即可用的内容
+- 提供完整的工具和模板
+- 确保读者能获得正反馈
+
+## IMPACT-DRIVEN 文档结构模板
+
+### 📋 标准文章结构
+
+```markdown
+---
+title: "[方法名称]：[核心价值承诺]"
+description: "[问题导向的描述，突出解决的痛点和价值]"
+pubDate: [发布日期]
+updatedDate: [更新日期]
+tags: ["sop", "workplace", "[核心方法标签]", "[应用场景标签]"]
+categories: ["workplace-sop"]
+subject: "[具体主题分类]"
+draft: false
+featured: [true/false]
+author: "Gerrad Zhang"
+location: "武汉，中国"
+---
+
+## 🔥 开场：真实冲击案例（2分钟阅读）
+
+### 🤦‍♂️ 你是否也遇到过这样的困扰？
+
+#### 场景还原
+> [具体的、有代入感的真实场景描述]
+> [使用第二人称，增强代入感]
+> [包含具体的时间、地点、人物]
+
+#### 痛点具体化
+- **[痛点1]**：[具体描述 + 影响]
+- **[痛点2]**：[具体描述 + 影响]
+- **[痛点3]**：[具体描述 + 影响]
+
+#### 成本量化
+- **时间成本**：[具体数据，如"每天浪费1-2小时"]
+- **机会成本**：[错失的机会和损失]
+- **心理成本**：[压力、焦虑等情感成本]
+
+## 💎 核心：解决方案总览（1分钟理解）
+
+### ✨ 一句话精华
+**[30秒就能理解的核心概念，突出核心价值]**
+
+### 🎯 三大立即价值
+1. **[立即价值]** - [马上就能感受到的改变]
+2. **[短期价值]** - [1-4周内的显著改善]
+3. **[长期价值]** - [持续使用的复合收益]
+
+### 📊 效果预览
+| 维度 | 改善前 | 改善后 | 提升幅度 |
+|------|--------|--------|----------|
+| [关键指标1] | [数据] | [数据] | [百分比] |
+| [关键指标2] | [数据] | [数据] | [百分比] |
+| [关键指标3] | [数据] | [数据] | [百分比] |
+
+### 🎪 适用场景检查
+- ✅ [适用场景1]
+- ✅ [适用场景2] 
+- ✅ [适用场景3]
+- ❌ [不适用场景1]
+- ❌ [不适用场景2]
+
+## 🧠 原理：为什么有效（3分钟深度理解）
+
+### 🔬 科学基础
+#### [理论基础1]
+- **核心原理**：[简化的理论解释]
+- **科学依据**：[相关研究或理论支撑]
+- **实际应用**：[在该方法中的具体体现]
+
+#### [理论基础2]
+- **核心原理**：[简化的理论解释]
+- **科学依据**：[相关研究或理论支撑]
+- **实际应用**：[在该方法中的具体体现]
+
+### 📈 成功验证
+#### 权威案例
+- **[知名人物/企业]**：[如何使用该方法及效果]
+- **[行业应用]**：[在特定行业的应用情况]
+- **[数据支撑]**：[相关统计数据或研究结果]
+
+#### 用户反馈
+> **案例分享**：[真实用户的使用体验和效果]
+
+## 🔍 诊断：你的现状如何（1分钟自测）
+
+### 📋 快速自我诊断
+
+**请诚实回答以下问题：**
+
+1. [诊断问题1]
+   - A. [选项A]
+   - B. [选项B]
+   - C. [选项C]
+   - D. [选项D]
+
+2. [诊断问题2]
+   - A. [选项A]
+   - B. [选项B]
+   - C. [选项C]
+   - D. [选项D]
+
+3. [诊断问题3]
+   - A. [选项A]
+   - B. [选项B]
+   - C. [选项C]
+   - D. [选项D]
+
+### 📊 诊断结果
+- **主要选A**：[状态描述 + 建议]
+- **主要选B/C**：[状态描述 + 建议]
+- **主要选D**：[状态描述 + 建议]
+
+## 📋 实践：如何操作（5分钟掌握）
+
+### 🚀 核心步骤（3-5步）
+
+#### 步骤1：[步骤名称]
+**目标**：[这一步要达成什么]
+**具体操作**：
+1. [具体行动1]
+2. [具体行动2]
+3. [具体行动3]
+
+**关键要点**：
+- ⚠️ [注意事项1]
+- 💡 [技巧提示1]
+
+#### 步骤2：[步骤名称]
+**目标**：[这一步要达成什么]
+**具体操作**：
+1. [具体行动1]
+2. [具体行动2]
+3. [具体行动3]
+
+**关键要点**：
+- ⚠️ [注意事项1]
+- 💡 [技巧提示1]
+
+#### [重复步骤3-5的结构]
+
+### 🎯 实战演练：跟着做一遍
+
+#### 练习场景
+> [设计一个具体的练习场景，让读者可以立即尝试]
+
+#### 操作指导
+**步骤1：[具体指导]**
+[提供填空或选择的形式]
+
+**步骤2：[具体指导]**
+[提供填空或选择的形式]
+
+**步骤3：[具体指导]**
+[提供填空或选择的形式]
+
+#### 效果检验
+- [ ] [检查点1]
+- [ ] [检查点2]
+- [ ] [检查点3]
+
+## 🛠️ 工具：立即可用（2分钟上手）
+
+### 📊 核心工具模板
+
+#### [工具名称1]
+**用途**：[工具的具体用途]
+**使用场景**：[什么时候使用]
+
+| [列1] | [列2] | [列3] | [列4] |
+|-------|-------|-------|-------|
+| [示例数据] | [示例数据] | [示例数据] | [示例数据] |
+| [空行供填写] | [空行供填写] | [空行供填写] | [空行供填写] |
+
+#### [工具名称2]
+**用途**：[工具的具体用途]
+**使用场景**：[什么时候使用]
+
+**检查清单**：
+- [ ] [检查项1]
+- [ ] [检查项2]
+- [ ] [检查项3]
+- [ ] [检查项4]
+
+### 🎯 快速上手版本
+
+#### 5分钟极简版
+**适用场景**：[紧急情况或初次尝试]
+**核心步骤**：
+1. [最简步骤1]
+2. [最简步骤2]
+3. [最简步骤3]
+
+#### 效果测量
+**关键指标**：
+- [指标1]：[如何测量]
+- [指标2]：[如何测量]
+- [指标3]：[如何测量]
+
+## 🚀 进阶：持续优化（3分钟提升）
+
+### 🎖️ 高级应用技巧
+
+#### 技巧1：[高级技巧名称]
+**应用场景**：[什么情况下使用]
+**具体方法**：[详细操作步骤]
+**预期效果**：[能带来什么额外价值]
+
+#### 技巧2：[高级技巧名称]
+**应用场景**：[什么情况下使用]
+**具体方法**：[详细操作步骤]
+**预期效果**：[能带来什么额外价值]
+
+### 🔗 组合应用
+
+#### 与[其他方法1]结合
+**结合方式**：[如何结合使用]
+**适用场景**：[什么情况下结合]
+**协同效果**：[1+1>2的效果]
+
+#### 与[其他方法2]结合
+**结合方式**：[如何结合使用]
+**适用场景**：[什么情况下结合]
+**协同效果**：[1+1>2的效果]
+
+### ❓ 常见问题与解决方案
+
+#### Q1: [常见问题1]
+**问题描述**：[具体问题情况]
+**解决方案**：[具体解决步骤]
+**预防措施**：[如何避免再次发生]
+
+#### Q2: [常见问题2]
+**问题描述**：[具体问题情况]
+**解决方案**：[具体解决步骤]
+**预防措施**：[如何避免再次发生]
+
+### 📈 持续改进建议
+
+#### 每周优化
+- [优化建议1]
+- [优化建议2]
+
+#### 每月升级
+- [升级建议1]
+- [升级建议2]
+
+#### 季度进阶
+- [进阶建议1]
+- [进阶建议2]
+
+## 💡 总结与行动
+
+### 🎯 核心要点回顾
+1. **[要点1]**：[简要说明]
+2. **[要点2]**：[简要说明]
+3. **[要点3]**：[简要说明]
+
+### 🚀 立即行动计划
+**今天就开始**：
+- [ ] [立即可做的行动1]
+- [ ] [立即可做的行动2]
+
+**本周实践**：
+- [ ] [本周要完成的实践1]
+- [ ] [本周要完成的实践2]
+
+**持续优化**：
+- [ ] [长期坚持的习惯1]
+- [ ] [长期坚持的习惯2]
+
+### 🔗 相关资源
+- **延伸阅读**：[相关SOP文章链接]
+- **工具下载**：[模板和工具的获取方式]
+- **社群交流**：[讨论和分享的渠道]
+
+---
+
+*记住：最好的方法是开始行动的方法。选择一个小的改变，今天就开始实践！*
 ```
-if (PROJECT_PHASE not in ["DEVELOPMENT", "MAINTENANCE"]) {
-  return "❌ Cannot enter RIPER modes. Current phase: " + PROJECT_PHASE + 
-         ". Required: DEVELOPMENT or MAINTENANCE. Use /start to initialize project.";
-}
+
+## 写作质量控制标准
+
+### 内容质量要求
+
+#### 案例设计标准
+- **真实性**：基于真实职场场景，避免虚构
+- **代表性**：选择90%读者都能遇到的典型情况
+- **冲击力**：能够在30秒内引起强烈共鸣
+- **对比性**：使用前后对比，突出改善效果
+
+#### 理论阐述标准
+- **简化性**：复杂理论用通俗语言解释
+- **实用性**：重点说明"为什么有用"而非"是什么"
+- **权威性**：引用可靠的研究和权威案例
+- **关联性**：与实际应用场景紧密结合
+
+#### 操作指导标准
+- **具体性**：每个步骤都有明确的行动指导
+- **可执行性**：普通读者能够独立完成
+- **检验性**：提供明确的完成标准和检查点
+- **渐进性**：从简单到复杂，循序渐进
+
+### 用户体验标准
+
+#### 阅读体验指标
+- **阅读时长**：目标8-12分钟完整阅读
+- **信息密度**：每分钟提供1-2个可行动的要点
+- **跳出率**：目标<30%（通过引人入胜的开头）
+- **完成率**：目标>70%（通过合理的文章长度）
+
+#### 实践转化指标
+- **立即尝试率**：目标>60%的读者会立即尝试
+- **持续使用率**：目标>40%的读者会持续使用
+- **推荐分享率**：目标>30%的读者会推荐给他人
+
+### 技术质量标准
+
+#### Markdown格式规范
+- 使用标准的Front Matter格式
+- 正确的标题层级结构（H1-H6）
+- 合适的列表和表格格式
+- 规范的链接和图片引用
+
+#### SEO优化要求
+- 标题包含核心关键词
+- 描述突出解决的问题和价值
+- 合理的标签和分类设置
+- 内部链接和相关文章推荐
+
+## 情感设计策略
+
+### 情感共鸣技巧
+
+#### 痛点共鸣公式
 ```
-
-## THE RIPER-5 MODES
-
-```mermaid
-flowchart LR
-    R[RESEARCH] --> I[INNOVATE]
-    I --> P[PLAN]
-    P --> E[EXECUTE]
-    E --> Rev[REVIEW]
-    Rev -.-> R
-    
-    style R fill:#e6f3ff,stroke:#0066cc
-    style I fill:#e6ffe6,stroke:#006600
-    style P fill:#fff0e6,stroke:#cc6600
-    style E fill:#ffe6e6,stroke:#cc0000
-    style Rev fill:#f0e6ff,stroke:#6600cc
-```
-
-### MODE 1: RESEARCH
-[MODE: RESEARCH]
-- **Entry Validation**: PROJECT_PHASE must be "DEVELOPMENT" or "MAINTENANCE"  
-- **Purpose**: Information gathering ONLY
-- **Permitted**: Reading files, asking clarifying questions, understanding code structure
-- **Forbidden**: Suggestions, implementations, planning, or any hint of action
-- **Requirement**: You may ONLY seek to understand what exists, not what could be
-- **Duration**: Until user explicitly signals to move to next mode
-- **Output Format**: Begin with [MODE: RESEARCH], then ONLY observations and questions
-- **Pre-Research Checkpoint**: Confirm which files/components need to be analyzed before starting
-
-#### **AUTOMATIC TASK MANAGEMENT - RESEARCH MODE**:
-1. **State Check**: Verify PROJECT_PHASE allows RESEARCH mode
-2. **Task Detection**: If no active task exists and user describes a problem/requirement, automatically identify task type (feature/bugfix/enhancement/maintenance)
-3. **Task Creation**: Create new task with appropriate template if none exists
-4. **Task Update**: If active task exists, update research findings in `notes.md`
-5. **Progress Tracking**: Update task `progress.md` with research status
-
-### MODE 2: INNOVATE
-[MODE: INNOVATE]
-- **Entry Validation**: PROJECT_PHASE must be "DEVELOPMENT" or "MAINTENANCE"
-- **Purpose**: Brainstorming potential approaches
-- **Permitted**: Discussing ideas, advantages/disadvantages, seeking feedback
-- **Forbidden**: Concrete planning, implementation details, or any code writing
-- **Requirement**: All ideas must be presented as possibilities, not decisions
-- **Duration**: Until user explicitly signals to move to next mode
-- **Output Format**: Begin with [MODE: INNOVATE], then ONLY possibilities and considerations
-- **Decision Documentation**: Capture design decisions with explicit rationales using high relevance scores
-
-#### **AUTOMATIC TASK MANAGEMENT - INNOVATE MODE**:
-1. **State Check**: Verify PROJECT_PHASE allows INNOVATE mode
-2. **Task Validation**: Ensure active task exists, create if missing
-3. **Innovation Documentation**: Update task `notes.md` with brainstormed approaches
-4. **Decision Recording**: Document design alternatives and rationales
-5. **Progress Update**: Mark innovation phase as complete in `progress.md`
-
-### MODE 3: PLAN
-[MODE: PLAN]
-- **Entry Validation**: PROJECT_PHASE must be "DEVELOPMENT" or "MAINTENANCE"
-- **Purpose**: Creating exhaustive technical specification
-- **Permitted**: Detailed plans with exact file paths, function names, and changes
-- **Forbidden**: Any implementation or code writing, even "example code"
-- **Requirement**: Plan must be comprehensive enough that no creative decisions are needed during implementation
-- **Planning Process**:
-  1. **Validate project state** allows PLAN mode
-  2. Deeply reflect upon the changes being asked
-  3. Analyze existing code to map the full scope of changes needed
-  4. Ask 4-6 clarifying questions based on your findings
-  5. Once answered, draft a comprehensive plan of action
-  6. Ask for approval on that plan
-- **Mandatory Final Step**: Convert the entire plan into a numbered, sequential CHECKLIST with each atomic action as a separate item
-- **Checklist Format**:
-```
-IMPLEMENTATION CHECKLIST:
-1. [Specific action 1]
-2. [Specific action 2]
-...
-n. [Final action]
-```
-- **Duration**: Until user explicitly approves plan and signals to move to next mode
-- **Output Format**: Begin with [MODE: PLAN], then ONLY specifications and implementation details
-- **Implementation Dry Run**: Optional step to outline potential side effects of planned changes
-
-#### **AUTOMATIC TASK MANAGEMENT - PLAN MODE**:
-1. **State Check**: Verify PROJECT_PHASE allows PLAN mode
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
