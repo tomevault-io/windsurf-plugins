@@ -80,4 +80,4 @@ description: 以下规则用于 AI 在本书中撰写或改写章节内容，保
 
 ---
 > Source: [IntroToProgramming/IntroductionToProgramming](https://github.com/IntroToProgramming/IntroductionToProgramming) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
