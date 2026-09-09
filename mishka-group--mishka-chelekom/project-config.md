@@ -1,94 +1,96 @@
 ---
 trigger: always_on
-description: This is a web application written using the Phoenix web framework.
+description: Read `README.md` first for how to run it. This file is the part that needs
 ---
 
-This is a web application written using the Phoenix web framework.
+# Component demo video pipeline
 
-## Project guidelines
+Read `README.md` first for how to run it. This file is the part that needs
+judgement: writing specs, and the decisions that are not obvious from the code.
 
-- Use `mix precommit` alias when you are done with all changes and fix any pending issues
-- Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+## Do not relitigate these
 
-### Phoenix v1.8 guidelines
+**Gladia cannot narrate.** It is speech-to-text. Both tracks generate the voice
+with the same local TTS; Gladia only reads that audio back for word-level
+timestamps. If you find yourself looking for a Gladia TTS endpoint, stop.
 
-- **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
-- The `MyAppWeb.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
-- Anytime you run into errors with no `current_scope` assign:
-  - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
-  - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
-- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
-- Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
-- **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
-- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
-custom classes must fully style the input
+**Word timestamps have no flag.** Gladia always returns
+`result.transcription.utterances[].words[]`. There is no `word_timestamps`
+option to enable and searching for one is wasted time.
 
-### JS and CSS guidelines
+**Gladia reports SECONDS as floats; this pipeline works in ms.** The conversion
+happens once, in `sync-captions.mjs`, at the boundary. Do not convert again
+downstream — getting this wrong is silent and puts every caption 1000x off.
+Words also arrive with leading spaces (`" code"`); they are trimmed there too.
 
-- **Use Tailwind CSS classes and custom CSS rules** to create polished, responsive, and visually stunning interfaces.
-- Tailwindcss v4 **no longer needs a tailwind.config.js** and uses a new import syntax in `app.css`:
+**Generative video is the wrong tool.** A component demo must show the actual
+component with the actual Tailwind classes and theme tokens. Accuracy is the
+entire point, so this is a deterministic screen-capture problem.
 
-      @import "tailwindcss" source(none);
-      @source "../css";
-      @source "../js";
-      @source "../../lib/my_app_web";
+**Card duration is trimmed from the END of the recording.** Playwright starts
+recording before webfonts rasterise and that startup jitter is not constant. The
+tail is deterministic — the context closes the moment the animation completes.
+So `render-cards.mjs` probes total duration and trims `total - duration - tail`,
+never from `0`.
 
-- **Always use and maintain this import syntax** in the app.css file for projects generated with `phx.new`
-- **Never** use `@apply` when writing raw css
-- **Always** manually write your own tailwind-based components instead of using daisyUI for a unique, world-class design
-- Out of the box **only the app.js and app.css bundles are supported**
-  - You cannot reference an external vendor'd script `src` or link `href` in the layouts
-  - You must import the vendor deps into app.js and app.css to use them
-  - **Never write inline <script>custom js</script> tags within templates**
+**Captions are burned from ASS, not drawtext.** Chained `drawtext` filters get
+unreadable past three captions and cannot style one beat differently.
 
-### UI/UX & design guidelines
+**ASS colour is `&HAABBGGRR`** — alpha first, then blue, green, red, and alpha is
+inverted (`00` opaque, `FF` transparent). Wrong byte order produces a
+plausible-looking wrong colour rather than an error, so it is pinned by test in
+`shared/assemble.test.mjs` against values observed in a real render.
 
-- **Produce world-class UI designs** with a focus on usability, aesthetics, and modern design principles
-- Implement **subtle micro-interactions** (e.g., button hover effects, and smooth transitions)
-- Ensure **clean typography, spacing, and layout balance** for a refined, premium look
-- Focus on **delightful details** like hover effects, loading states, and smooth page transitions
+**Specs are committed, `out/` is not.**
 
+## Writing specs
 
-<!-- usage-rules-start -->
+For each component:
 
-<!-- phoenix:elixir-start -->
-## Elixir guidelines
+1. Read the component source and its `@doc`, every `attr`, every `slot`.
+2. **Open the showcase route and read the real markup.** Never invent a
+   selector. The headless showcase renders `id={"hl-#{component}"}` on the live
+   preview (secondary previews suffix it, e.g. `#hl-otp_field-an`); the Base UI
+   gallery uses literal ids per section, e.g. `#baseui-otp_field-grouped`.
+   Prefer an id or a `data-part` over structural selectors — `div > div:nth-child(3)`
+   is not a contract.
+3. Write `specs/<variant>/<component>.json`, then `npm run validate`.
 
-- Elixir lists **do not support index based access via the access syntax**
+Rules:
 
-  **Never do this (invalid)**:
+- 3–6 beats. Each beat demonstrates exactly ONE attr, slot or state.
+- Beat order: default appearance -> primary interaction -> variants -> edge state.
+- Captions max 48 chars, sentence case, active voice, no marketing words.
+  "Paste fills every slot at once" — not "Seamlessly handles paste!"
+- At most one `accent: true` beat per video.
+- `hero: true` requires `narration`; narration without `hero` is never spoken and
+  the validator rejects it.
+- If the showcase genuinely has no element for a beat you want, change the beat.
+  Do not add `needs_markup: true` and move on — the validator fails on it,
+  because a placeholder selector surfaces as a Playwright timeout three minutes
+  into a capture rather than as an error.
 
-      i = 0
-      mylist = ["blue", "green"]
-      mylist[i]
+## Signature motion
 
-  Instead, **always** use `Enum.at`, pattern matching, or `List` for index based list access, ie:
+The intro card is not a generic title slide; it is the component performing
+itself. `signature` names the animation:
 
-      i = 0
-      mylist = ["blue", "green"]
-      Enum.at(mylist, i)
+- `otp_field` -> `segments`: slots fill one character at a time
+- `accordion` -> `unfold`: stacked rules expand
+- `modal` -> `lift`: a plane rises off the backdrop
 
-- Elixir variables are immutable, but can be rebound, so for block expressions like `if`, `case`, `cond`, etc
-  you *must* bind the result of the expression to a variable if you want to use it and you CANNOT rebind the result inside the expression, ie:
+A component with no obvious signature gets `"plain"`. A forced signature is
+worse than none. Adding one means editing `templates/intro.html` and the
+`signature` enum in `specs/_schema.json`.
 
-      # INVALID: we are rebinding inside the `if` and the result never gets assigned
-      if connected?(socket) do
-        socket = assign(socket, :val, val)
-      end
+## Hard rules
 
-      # VALID: we rebind the result of the `if` to a new variable
-      socket =
-        if connected?(socket) do
-          assign(socket, :val, val)
-        end
-
-- **Never** nest multiple modules in the same file as it can cause cyclic dependencies and compilation errors
-- **Never** use map access syntax (`changeset[:field]`) on structs as they do not implement the Access behaviour by default. For regular structs, you **must** access the fields directly, such as `my_struct.field` or use higher level APIs that are available on the struct if they exist, `Ecto.Changeset.get_field/2` for changesets
-- Elixir's standard library has everything necessary for date and time manipulation. Familiarize yourself with the common `Time`, `Date`, `DateTime`, and `Calendar` interfaces by accessing their documentation as necessary. **Never** install additional dependencies unless asked or for date/time parsing (which you can use the `date_time_parser` package)
-- Don't use `String.to_atom/1` on user input (memory leak risk)
-- Predicate function names should not start with `is_` and should end in a question mark. Names like `is_thing` should be reserved for guards
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Never write a key, token or `.env` value into a spec, template, script or commit.
+- Never commit anything under `out/`.
+- Local TTS missing must warn, never fail — captions are the product, voice is
+  polish. The exception is `gladia/run.sh`, where narration is fatal because
+  without audio there is nothing to sync and continuing would silently produce
+  free-track output.
 
 ---
 > Source: [mishka-group/mishka_chelekom](https://github.com/mishka-group/mishka_chelekom) — distributed by [TomeVault](https://tomevault.io).
