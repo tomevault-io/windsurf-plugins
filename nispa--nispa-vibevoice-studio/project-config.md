@@ -1,122 +1,84 @@
 ---
 trigger: always_on
-description: > Contesto di progetto per Claude Code. Aggiornato: 2026-03-25.
+description: Work as a senior software engineer on Nispa Voiceover, a local-first desktop application for subtitle voiceover and untimed multi-speaker dialogue generation.
 ---
 
-# CLAUDE.md — Nispa VibeVoice Studio
+# AGENTS.md — Engineering instructions for Nispa Voiceover
 
-> Contesto di progetto per Claude Code. Aggiornato: 2026-03-25.
+## Mission
 
-## Cos'è il progetto
+Work as a senior software engineer on Nispa Voiceover, a local-first desktop application for subtitle voiceover and untimed multi-speaker dialogue generation.
 
-Nispa VibeVoice Studio — app desktop offline per:
-- **Voiceover AI** da sottotitoli (.srt/.vtt) o script liberi
-- **Traduzione AI** offline (NLLB-200 + Ollama)
-- **Voice cloning** con Qwen3-TTS e VibeVoice
+The immediate product goal is to integrate OmniVoice as an additional local TTS provider and refactor the current two-provider implementation into a maintainable, data-driven architecture. Deliver working product functionality, not demos, placeholders, or model-specific branches scattered through the codebase.
 
-**Stack:** React 19 + Vite + TypeScript + Tailwind v4 (frontend) | FastAPI + SQLite + PyTorch (backend)
+The primary usage is English dialogue with UK-accented cloned voices. Italian and other languages remain supported but are not the main optimisation target.
 
-**Avvio:** `start.bat` (lancia backend uvicorn + frontend npm dev + browser)
+## Source of truth and task workflow
 
-**Versione corrente:** 0.7.0
+Before changing code:
 
----
+1. Read this file completely.
+2. Read `TASKS.md`, `PLANNING.md`, and the files directly involved in the current task.
+3. Inspect `git status --short` and preserve all unrelated user changes.
+4. Verify claims against the current code, installed environment, and tests. Documentation may lag behind implementation; do not treat version numbers or architecture descriptions as authoritative without checking.
+5. Identify the current phase in `TASKS.md` and work only on a coherent, testable slice.
 
-## Ambiente Hardware
+After completing a slice:
 
-- GPU: **NVIDIA RTX 5070 Ti Laptop** (Blackwell, sm_120, 16GB VRAM)
-- CUDA: **13.2**
-- PyTorch: **2.10.0+cu130** (installato da `https://download.pytorch.org/whl/cu130`)
-- Flash Attention: installato con `pip install flash-attn --no-build-isolation`
-- **IMPORTANTE:** Non usare `cu124` o build stabili standard — non supportano sm_120
+1. Run focused tests for the changed area.
+2. Run the broader regression suite appropriate to the risk.
+3. Update `TASKS.md` checkboxes only for work actually implemented and verified.
+4. Update documentation when public behaviour, installation, configuration, API payloads, or limitations change.
+5. Report what changed, what was verified, and any remaining risk or decision.
 
----
+Do not mark a task complete based only on mocked tests when the task explicitly requires a real model, GPU, installer, or offline smoke test.
 
-## Struttura del Progetto
+## Non-negotiable product constraints
 
-```
-nispa-voiceover/
-├── backend/
-│   ├── main.py                    # FastAPI app, startup, serve audio files
-│   ├── api/routers/
-│   │   ├── tasks.py               # SSE generation tasks, VRAM batching, /tasks/active
-│   │   ├── system.py              # /health, /status, VRAM info, maintenance
-│   │   ├── voices.py              # gestione voci
-│   │   ├── jobs.py                # archivio job (DB)
-│   │   ├── generation.py          # generate-segment singolo
-│   │   └── translation.py         # traduzione
-│   ├── core/
-│   │   ├── tts_provider.py        # MultiModelProvider (lazy init, orchestrator)
-│   │   ├── tts/
-│   │   │   ├── vibe_provider.py   # VibeVoice — batching nativo HuggingFace
-│   │   │   └── qwen_provider.py   # Qwen3-TTS — lru_cache ref audio, language detection
-│   │   ├── queue_manager.py       # TTSQueueManager, task eviction 10min, get_active_task()
-│   │   ├── config.py              # config_manager → data/settings.json
-│   │   ├── audio_storage.py       # salvataggio segmenti WAV su disco
-│   │   └── parser.py              # parse SRT/VTT/script
-│   ├── db/
-│   │   ├── database.py            # SQLite init, get_job, update_job
-│   │   └── models.py              # Pydantic models (extra="ignore" per compat legacy)
-│   └── requirements.txt           # torch==2.10.0 cu130
-├── frontend/src/
-│   ├── features/subtitle/
-│   │   ├── context/SubtitleContext.tsx      # state centrale subtitle feature
-│   │   ├── components/GenerationControls.tsx # SSE, session recovery, persistActiveTask
-│   │   ├── components/GenerationProgressDisplay.tsx
-│   │   └── hooks/useGenerationProgress.ts   # ETA calc (Xs / Xm Xs / Xh Xm)
-│   ├── features/script/           # script voiceover feature
-│   ├── context/GlobalContext.tsx  # voices, models, isProcessing globale
-│   ├── services/ttsApi.ts         # API calls (getActiveTask, submitGenerationTask, ecc.)
-│   └── utils/audio.ts             # base64ToBlobUrl, filePathToHttpUrl, serializeAudioUrl
-├── data/
-│   ├── settings.json              # config persistita (batch_overrides, ecc.)
-│   ├── voices/                    # file WAV voci + .txt trascrizioni
-│   ├── audio-rendering/           # segmenti WAV generati, per job
-│   └── outputs/                   # file audio finali esportati
-├── start.bat                      # launcher (include SoX PATH patch via delayed expansion)
-└── install.bat                    # installer v0.7.0 (torch cu130 + flash-attn)
-```
+- TTS inference is local. Do not add cloud TTS APIs or remote fallbacks.
+- Voice references, transcripts, embeddings, acoustic tokens, cached prompts, generated segments, and outputs are biometric or sensitive data. They must remain local and must not appear in telemetry, remote requests, fixtures, Git history, or verbose logs.
+- Model download is an explicit installation action. Synthesis must never trigger an implicit download.
+- Runtime must support strict offline operation after models and dependencies are installed.
+- OmniVoice is an additional provider, regardless of whether it outperforms Qwen in every benchmark. Benchmarks determine recommendations and presets, not whether the provider exists.
+- OmniVoice v1 is a per-utterance provider in the existing Script Mode. Do not claim or simulate native multi-speaker generation.
+- Existing Qwen and VibeVoice workflows, archived jobs, voice files, and settings must remain backward compatible unless a migration is deliberately designed and tested.
+## Current environment assumptions
 
----
+Treat these as important project constraints, but verify the installed environment before changing dependencies:
 
-## Decisioni Architetturali Chiave
+- Primary development machine: NVIDIA RTX 5070 Ti Laptop, Blackwell `sm_120`, 16 GB VRAM.
+- Current CUDA target: CUDA 13.2.
+- Current PyTorch target: `2.10.0+cu130`, installed from the CUDA 13.0 PyTorch index.
+- Flash Attention may be installed with `pip install flash-attn --no-build-isolation`.
+- Do not switch to `cu124`, generic stable wheels, or nightly wheels just because an upstream README uses them. Blackwell support and the installed application environment take precedence.
 
-### TTS Engine
-- **Lazy loading**: i modelli non vengono caricati all'avvio — solo al primo `synthesize()` call
-- **VibeVoice**: batching nativo con singolo `processor()` + `model.generate()` sulla batch intera
-- **Qwen3-TTS**: `lru_cache` su `_get_voice_ref()`, language detection per-segmento, `soundfile.write()` invece di `torchaudio.save()` (evita dipendenza torchcodec)
-- **MultiModelProvider** (`tts_provider.py`): orchestrator, seleziona provider da model_name
+Useful existing project patterns:
 
-### VRAM & Batching
-- Budget: `free_vram * 0.60` (40% headroom per KV cache/attention peaks)
-- Config per modello in `_MODEL_VRAM_CONFIG`: `(cost_gb, peak_multiplier, max_batch)`
-- OOM recovery: dimezza batch, raddoppia stima costo, retry sequenziale
-- First-batch profiling: misura costo reale VRAM e aggiorna stima
-- Log VRAM: stampa solo quando il batch size cambia (no spam)
-- User override: `settings.json` → `tts.batch_overrides[model_name]`
+- Launch from `start.bat` / `start.sh`.
+- Install through `install.bat` / `install.sh`; model downloads go through `backend/scripts/download_model.py`.
+- Backend stack: FastAPI, SQLite, PyTorch, local model inference.
+- Frontend stack: React, Vite, TypeScript, Tailwind.
+- Keep TTS model loading lazy. Application startup must not load model weights.
+- Save generated segments as WAV under `data/audio-rendering/` and final outputs under `data/outputs/`.
+- Prefer `soundfile.write()` for generated WAV bytes. Do not reintroduce known `torchaudio.save()` / TorchCodec issues in Qwen paths.
+- Use `asyncio.to_thread()` or a managed worker for blocking TTS work.
 
-### Audio Storage
-- Segmenti salvati come WAV in `data/audio-rendering/{slug}_{id}/`
-- `audioUrl` nel DB = path relativo su disco
-- Serviti via `GET /audio-files/{job_folder}/{filename}` con `Cache-Control: no-store`
-- SSE non invia più base64 — invia `audio_url` HTTP
+Known legacy risks to re-check before touching the area:
 
-### Session Recovery (refresh durante generazione)
-- `task_id` + `job_id` salvati in `sessionStorage` all'avvio generazione
-- Al mount di `GenerationControls`, chiama `GET /api/tasks/active`
-- Se il task è ancora attivo, riconnette SSE automaticamente
-- `sessionStorage` pulito a completamento / errore / cancel
+- `backend/core/tts_provider.py` currently routes providers through hard-coded pools and model-name heuristics.
+- `backend/api/routers/voices.py` currently derives model/provider behaviour from discovered model folders and name checks.
+- `backend/api/routers/tasks.py` contains script/dialogue orchestration, batching, cancellation, SSE progress, and speaker limits.
+- `backend/api/routers/translation.py` may contain older Transformers argument usage; verify before editing translation code.
+- `backend/db/database.py` may still have SQLite connection lifecycle issues; fix only if they block the current slice or are already in touched code.
+- `backend/main.py` may still use deprecated FastAPI startup events; do not fold that cleanup into OmniVoice work unless it becomes necessary.
 
-### Task Lifecycle
-- Task in memoria nel `queue_manager.tasks` dict
-- Eviction automatica 10 min dopo completamento/fallimento/cancel
-- `GET /api/tasks/active` → restituisce il task QUEUED/PROCESSING corrente
+## Definition of professional implementation
 
-### CORS & Cache
-- `Cache-Control: no-store` su tutti gli endpoint audio (fix Edge cache poisoning)
+### Build features, not patches
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nispa/nispa-vibevoice-studio](https://github.com/nispa/nispa-vibevoice-studio) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
