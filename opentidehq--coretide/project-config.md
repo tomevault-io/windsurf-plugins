@@ -97,7 +97,7 @@ CoreTide/
 │   │   │   └── configurations.py  # Configurations.Visibility (assets, logsources, detectors)
 │   │   └── systems/        # Per-system helper modules (kql.py, sentinel.py, etc.)
 │   ├── deployment/         # System deployer plugins (one .py per platform)
-│   ├── validation/         # Validators (schema, UUID, query per platform, CVE, lookups)
+│   ├── validation/         # Validators (schema, UUID, query per platform, CVE)
 │   ├── indexing/           # Index generation (objects_indexer, staging, revisions)
 │   ├── framework/          # Framework generators (JSON schemas, templates, VS Code snippets)
 │   ├── documentation/      # Markdown wiki generation (per-object docs, navigation)
@@ -108,5 +108,5 @@ CoreTide/
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [OpenTideHQ/CoreTide](https://github.com/OpenTideHQ/CoreTide) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
+> Source: [opentidehq/CoreTide](https://github.com/opentidehq/CoreTide) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
