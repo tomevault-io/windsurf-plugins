@@ -145,4 +145,4 @@ ERL_NIF_INIT(Elixir.Exqlite.Sqlite3NIF, nif_funcs, NULL, NULL, NULL, NULL)
 
 ---
 > Source: [elixir-sqlite/exqlite](https://github.com/elixir-sqlite/exqlite) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
