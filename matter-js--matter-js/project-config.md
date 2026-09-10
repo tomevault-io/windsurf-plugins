@@ -1,148 +1,124 @@
 ---
 trigger: always_on
-description: matter.js is a comprehensive TypeScript implementation of the Matter/Thread smart home protocol. This is a monorepo containing multiple packages that work together to provide Matter protocol support for JavaScript/TypeScript applications.
+description: Guidance for AI coding agents working with code in this repository. `AGENTS.md` is a symlink to
 ---
 
-# GitHub Copilot Instructions for matter.js
+# CLAUDE.md
 
-## Project Overview
+Guidance for AI coding agents working with code in this repository. `AGENTS.md` is a symlink to
+this file, so agents reading either name get the same instructions.
 
-matter.js is a comprehensive TypeScript implementation of the Matter/Thread smart home protocol. This is a monorepo containing multiple packages that work together to provide Matter protocol support for JavaScript/TypeScript applications.
+Architecture, package layout, code generation, build and test reference:
+[.github/copilot-instructions.md](.github/copilot-instructions.md). This file carries the rules
+that apply to every change.
 
-## Architecture & Key Packages
+## AI policy
 
-### Core Packages
+This project follows the [Open Home Foundation AI Policy](AI_POLICY.md). Autonomous
+contributions are not accepted: a human must review, understand, and be able to explain every
+change before it is submitted. Do not open issues or pull requests autonomously, and do not post
+comments on behalf of a user without their review.
 
-- `@matter/general` - Core utilities, crypto, networking abstractions
-- `@matter/protocol` - Matter protocol implementation, commissioning, clustering
-- `@matter/model` - Matter data model, cluster definitions, device types
-- `@matter/node` - Node/endpoint implementations, behaviors, supervision
-- `@matter/types` - TypeScript type definitions for Matter clusters and data types
+Additionally in this repository: never submit a bug report, root-cause claim, or fix whose
+justification is an analysis without the complete raw log file it is derived from.
 
-### Platform Packages
+## Before declaring work done
 
-- `@matter/nodejs` - Node.js platform implementation
-- `@matter/nodejs-ble` - Bluetooth Low Energy support for Node.js
-- `@matter/nodejs-shell` - Interactive shell for Matter operations
-
-### Application Packages
-
-- `@matter/main` - Main entry point package
-- `@matter/examples` - Example applications and devices
-- `@matter/create` - Project scaffolding tool
-- `@project-chip/matter.js` - Legacy compatibility package
-
-### Development Tools
-
-- `packages/tools` - Build system, documentation generation, project management
-- `support/codegen` - Code generation from Matter specifications
-- `support/chip-testing` - Integration with Project CHIP/connectedhomeip for testing
-
-## Code Generation System
-
-This project heavily uses code generation:
-
-### Cluster Generation
-
-- Clusters are generated from Matter specifications in `support/codegen/src/clusters/`
-- Use `ClusterFile`, `ClusterComponentGenerator` for cluster definitions
-- Generated files follow pattern: `src/clusters/[ClusterName].ts`
-
-### Endpoint Generation
-
-- Device endpoints generated in `support/codegen/src/endpoints/`
-- Use `EndpointFile`, `RequirementGenerator` for device type definitions
-- Generated files follow pattern: `src/endpoints/[DeviceType].ts`
-
-### Forward Exports
-
-- Re-export generation in `support/codegen/src/forwards/`
-- Creates proxy modules for clean package boundaries
-- Generated files include header: `/*** THIS FILE IS GENERATED, DO NOT EDIT ***/`
-- Pattern for main package forwards: `packages/main/src/forwards/[category]/[name].ts`
-
-## Development Patterns
-
-### Behaviors
-
-- Core abstraction for endpoint functionality in `@matter/node`
-- Extend `Behavior` class for cluster implementations
-- Use `@behavior` decorator for registration
-- File pattern: `src/behaviors/[cluster-name]/[ClusterName]Behavior.ts`
-
-### Environment and ServerNode
-
-- `Environment` provides platform-specific runtime services registered by each platform (Node.js, React Native, etc.)
-- Access the default environment for your platform using `Environment.default`
-- Create `ServerNode` instances for Matter devices:
-    ```typescript
-    const server = await ServerNode.create({
-        id: "unique-device-id",
-        network: { port: 5540 },
-        commissioning: { passcode: 20202021, discriminator: 3840 },
-        // ... other config
-    });
-    ```
-- Add endpoints to nodes: `await server.add(endpoint);`
-- Start the server non-blocking: `await server.start();` (resolves when online)
-- Run the server blocking: `await server.run();` (resolves when server shuts down)
-- See `examples/device-onoff-advanced/src/DeviceNodeFull.ts` for comprehensive examples
-
-### Models
-
-- Use `ClusterModel`, `DeviceTypeModel`, `AttributeModel` etc. from `@matter/model`
-- Models represent Matter specification elements
-- Support variance analysis for conditional features
-
-### Type Safety
-
-- Extensive use of TypeScript generics and conditional types
-- **IMPORTANT**: Requires at least `"strictNullChecks": true` or preferably `"strict": true`
-- Base TypeScript configuration in `packages/tools/tsc/tsconfig.base.json` uses `"strict": true`
-- Schema validation with `Schema` classes
-
-## CLI Tools and Examples
-
-### Available CLI Tools
-
-- `nacho-build` - Build packages and documentation
-- `nacho-run` - Execute TypeScript files with automatic transpilation and source maps
-- `matter-test` - Run tests across workspace packages
-- `matter-create` - Scaffolding tool for new Matter.js projects
-- `matter-version` - Version management tool
-
-### Example Applications
-
-The repository includes ready-to-run example applications:
+Run from the repository root, in this order:
 
 ```bash
-npm run matter-device       # Simple on/off device
-npm run matter-bridge       # Bridge with multiple devices
-npm run matter-composeddevice # Composed device example
-npm run matter-multidevice  # Multiple device example
-npm run matter-controller   # Controller example
-npm run shell              # Interactive Matter shell
+npm run build        # `npm run build-clean` before opening a PR — incremental caches mask errors in dependent packages
+npm run format       # rewrites files in place; `npm run format-verify` only checks
+npm run lint
+npm test             # `npm test -- -p packages/<name>` while iterating on one package
 ```
 
-### Running Examples
+Use the project scripts, never invoke oxfmt, oxlint or the test runner directly — the scripts
+pick up project configuration a direct call misses. Single tests are fine for fast iteration, but
+the full suite gates completion.
 
-Use `nacho-run` to execute any TypeScript example directly:
+If a test fails after your change, assume the change broke it. Do not fix unrelated failures
+along the way; report them.
 
-```bash
-nacho-run examples/device-onoff/src/DeviceNode.ts
-nacho-run examples/controller/src/ControllerNode.ts
-```
+Claims of "done", "fixed" or "passing" need the command output behind them.
 
-## TypeScript Configuration
+## Code comments
 
-### Required Settings
+WHY, not WHAT. Add a WHAT comment only when the logic is genuinely non-obvious. Before writing
+any comment, ask: would a reader who sees only the final code — not the diff — need it? If the
+identifiers and JSDoc already say it, delete the comment.
 
-- **Minimum required**: `"strictNullChecks": true`
-- **Recommended**: `"strict": true` for best type safety
-- **Module settings**: `"module": "node16"`, `"moduleResolution": "node16"`
+Acceptable, and rare:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- An invariant a future refactor could innocently break (one line, forward-looking)
+- A non-obvious specification constraint the code depends on
+- A documented tradeoff ("we accept X because Y is worse")
+- Cross-file coupling the type system cannot express
+
+Always wrong:
+
+- Narrating the change ("moved from A to B because…", "this used to do Y") — that belongs in the
+  commit message
+- Restating an `if` condition or an identifier in prose
+- Pointing at structure the reader can see ("cleanup lives in the outer `finally`")
+- Trivia about standard APIs
+- Justifying the code by walking through rejected alternatives — state the invariant instead
+
+Never put GitHub issue or pull request numbers or URLs in code or test comments. Describe the
+case; references belong in the commit message or pull request body.
+
+Public APIs get JSDoc, including `@see` references to the relevant Matter specification section.
+
+## TypeScript
+
+- Avoid type casts (`as any`, `as SomeType`). Use generics, type narrowing, overloads or proper
+  interfaces. If a cast is genuinely unavoidable, say so in the pull request.
+- No `ts-ignore` or comparable escapes — find and fix the real typing issue.
+- `new Array<T>()` for empty typed arrays, not `const x: T[] = []`.
+- The base configuration is `"strict": true`; consumers need at least `strictNullChecks`.
+
+## Errors
+
+Never throw a plain `Error`. Throw a typed `MatterError` subclass from `@matter/general`, chosen
+for what actually went wrong:
+
+- `InternalError` — cannot happen; an invariant of our own code was violated
+- `ImplementationError` — the caller used the API wrongly
+- `NotImplementedError`, `ConstraintError`, `CommissioningError`, … — see
+  `packages/general/src/MatterError.ts` and the protocol packages for the full set
+
+Error messages carry context, not just a symptom.
+
+## Async
+
+- Prefer `async`/`await` over raw promise chains.
+- Never void or swallow a promise. For event-driven asynchronous work in behaviors use
+  `reactTo`/`stopReacting`. If catching is genuinely unavoidable, log the error.
+- Handle cancellation with `AbortSignal` where the operation can be abandoned.
+- Use `using` for resource management where applicable.
+
+## Values and formatting
+
+- Format durations with `Duration.format()`. Never hand-roll `/ 1000` arithmetic for display.
+- Encode Matter payloads through the TLV schemas; validate all external input against a schema.
+
+## Monorepo
+
+- Always run `npm install` from the repository root, never from a package directory — installing
+  inside a workspace breaks hoisting and produces a wrong `node_modules` layout, even when the
+  `package.json` you edited lives in `packages/foo/`.
+- Packages use TypeScript project references. A new cross-package dependency must be added to the
+  relevant `tsconfig.json`, not only to `package.json`.
+- Generated files (`/*** THIS FILE IS GENERATED, DO NOT EDIT ***/`) are never edited by hand.
+  Change the generator in `support/codegen` or the model overrides in `support/models/src/local`.
+
+## Changelog and working documents
+
+- User-visible changes get a `CHANGELOG.md` entry under the `## __WORK IN PROGRESS__` heading:
+  state the change, keep it short, skip the rationale. That heading is matched literally by the
+  release workflow — do not reformat it.
+- Plans, analyses and other working documents stay uncommitted.
 
 ---
 > Source: [matter-js/matter.js](https://github.com/matter-js/matter.js) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
