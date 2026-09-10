@@ -1,151 +1,59 @@
 ---
 trigger: always_on
-description: | ------------------ | --------------------------------- |
+description: This file provides guidance to Claude Code when working inside `packages/muya`.
 ---
 
-# Agent Guidelines
+# CLAUDE.md (packages/muya)
 
-| ------------------ | --------------------------------- |
-| User preferences   | `src/main/preferences/`           |
-| Keyboard shortcuts | `src/main/keyboard/`              |
-| Menu definitions   | `src/main/menu/templates/`        |
-| Vue components     | `src/renderer/src/components/`    |
-| Pinia stores       | `src/renderer/src/store/`         |
-| CSS themes         | `src/renderer/src/assets/themes/` |
-| Editor engine      | `src/muya/lib/`                   |
-| Translations       | `static/locales/`                 |
-| Build icons        | `build/`                          |
+This file provides guidance to Claude Code when working inside `packages/muya`.
 
-## Getting Help
+> **Location.** `packages/muya` is the TypeScript rewrite of muya (upstream: <https://github.com/marktext/muya>), migrated into this marktext monorepo and published as `@muyajs/core`. The desktop renderer now consumes `@muyajs/core` as its editor engine; the legacy JS engine `packages/muyajs` (`@marktext/muyajs`, the `muya/` alias) is being retired and only a handful of call sites still reference it. `packages/muya` keeps its own toolchain (ESLint/antfu, stylelint, madge, vitest), and the marktext-root ESLint ignores `packages/muya/**` — treat it as a self-contained package with its own conventions.
 
-- **Existing docs**: `docs/` folder has detailed documentation
-- **Developer docs**: `docs/dev/` for architecture and build info
-- **Original repo**: https://github.com/marktext/marktext (historical reference)
-- **This fork**: https://github.com/Tkaixiang/marktext
+## Layout inside `packages/muya`
 
-## Summary for Quick Reference
+- `src/` — `@muyajs/core` TypeScript source. Public API entrypoint is `src/index.ts`.
+- `test/spec/` — CommonMark / GFM conformance suites (run via `test:spec`, separate vitest config).
+- `examples/` — `muya-examples`, a Vite vanilla-TS demo that consumes `@muyajs/core` via `workspace:*`. Listed as its own workspace in the repo-root `pnpm-workspace.yaml`.
+- `e2e/` — `muya-e2e`, Playwright real-browser E2E suite. Self-contained host page under `e2e/host/`. See `e2e/README.md` and `e2e/BACKLOG.md`.
+- `eslint.config.mjs`, `.stylelintrc`, `.madgerc` — package-local tooling. The marktext-root ESLint explicitly ignores `packages/muya/**`, so muya self-lints with its own antfu-based config.
 
-```
-Main Process (Node.js)     →  src/main/
-Renderer Process (Vue 3)   →  src/renderer/src/
-Preload (IPC Bridge)       →  src/preload/
-Editor Engine (Muya)       →  src/muya/
-Shared Code                →  src/common/
-User Preferences           →  src/main/preferences/schema.json
-Translations               →  static/locales/
-Build Config               →  electron-builder.yml
-Vite Config                →  electron.vite.config.mjs
-```
+Stub packages (`packages/facade`, `packages/findReplace`) from the upstream muya monorepo were not migrated — they had no source.
 
-When in doubt, check the existing patterns in the codebase and follow them.
+## Commands
 
-# AI Agent Guide for MarkText
+Run from the marktext repo root.
 
-This guide is designed for AI agents (Claude, GPT, Copilot, etc.) loading into this repository for the first time. It provides essential context to help you understand, navigate, and contribute to this codebase effectively.
+- `pnpm -C packages/muya/examples dev:demo` — start the examples Vite dev server. (Upstream `pnpm dev` / Turbo `dev:demo` is not wired here — run vite directly.)
+- `pnpm -C packages/muya build` — `tsc && vite build`, emits `lib/{es,umd,cjs}` and `lib/types`.
+- `pnpm -C packages/muya test` / `pnpm -C packages/muya coverage` — Vitest unit tests (co-located under `src/**/__tests__/`). Single file: `pnpm -C packages/muya exec vitest run path/to/file.test.ts`.
+- `pnpm -C packages/muya test:spec` — CommonMark 0.31 + GFM 0.29-gfm fixture suites against `renderToStaticHTML(..., { sanitize: false })`. `test:spec:commonmark` / `test:spec:gfm` scope to one suite. Pass/fail counts are locked by `test/spec/expected-failures.json`: any listed example that starts passing fails the suite (remove it from the list); any unlisted example that starts failing fails the suite. Compliance can only go up. Baseline lives in `test/spec/conformance.md` (CommonMark 87.7% / GFM 86.3% at PR-6a).
+- `pnpm -C packages/muya lint` / `pnpm -C packages/muya lint:fix` — ESLint over `src test` (antfu config; rules below).
+- `pnpm -C packages/muya lint:types` — `tsc --noEmit`.
+- `pnpm -C packages/muya lint:css` — Stylelint over `src/**/*.css`.
+- `pnpm -C packages/muya check-circular` — `madge --circular src/index.ts`. CI enforces this.
+- `pnpm -C packages/muya/e2e e2e` — Playwright E2E (chromium/firefox/webkit). `e2e:install` is a one-time browser install. CI (`muya-e2e.yml`) runs Chromium only; Firefox + WebKit are configured in `playwright.config.ts` and runnable locally, but excluded from the CI matrix until the engine-independent rewrites in BACKLOG Phase 3 land (triple-click selection, search-replace mutation timing).
 
-## Quick Overview
+Engines: Node ≥20.19 (matches marktext root). Build target is `chrome70`.
 
-**MarkText** is a cross-platform markdown editor built with:
+## Architecture
 
-- **Electron 39** - Desktop application framework
-- **Vue 3** - Frontend UI framework (Composition API)
-- **Pinia** - State management
-- **electron-vite** - Build system (Vite-based)
-- **Muya** - Custom WYSIWYG markdown editor engine (in `src/muya/`)
+### Entry point and plugin system
 
-This a new fork by **Peter Thomson** of the fork recent by [Tkaixiang](https://github.com/Tkaixiang/marktext) that modernized the original MarkText with Vue 3, Pinia, and electron-vite.
+`src/muya.ts` exports the `Muya` class. UI plugins are registered globally via the static `Muya.use(Plugin, options)` and instantiated inside `muya.init()`. Plugins are keyed by `Plugin.pluginName` and stored on `muya._uiPlugins`. The plugin set in `examples/src/main.ts` is the canonical reference for wiring up toolbars, selectors, and menus.
 
-## Project Structure
+`new Muya(element, options)` replaces the passed-in element with a new `contenteditable` div (`getContainer` in `muya.ts`), then constructs `EventCenter`, `Editor`, `Ui`, and `I18n`. Nothing renders until `muya.init()` runs `Editor.init()`, which calls `registerBlocks()` and creates the root `ScrollPage`.
 
-```
-marktext/
-├── src/
-│   ├── main/              # Electron main process (Node.js)
-│   │   ├── app/           # App controller, window management
-│   │   ├── menu/          # Application menus
-│   │   ├── preferences/   # User settings (schema.json)
-│   │   ├── commands/      # Command system
-│   │   ├── keyboard/      # Keyboard shortcuts
-│   │   ├── filesystem/    # File operations, watchers
-│   │   └── windows/       # Window classes
-│   │
-│   ├── renderer/src/      # Electron renderer (Vue 3 SPA)
-│   │   ├── pages/         # Top-level pages (app.vue, preference.vue)
-│   │   ├── components/    # Vue components
-│   │   ├── store/         # Pinia stores
-│   │   ├── prefComponents/# Preference UI components
-│   │   └── assets/        # CSS, icons, themes
-│   │
-│   ├── preload/           # Preload scripts (IPC bridge)
-│   │
-│   ├── muya/              # Markdown editor engine (DO NOT MODIFY LIGHTLY)
-│   │   └── lib/
-│   │       ├── contentState/  # Document state management
-│   │       ├── parser/        # Markdown parsing (marked.js)
-│   │       ├── ui/            # Editor UI components
-│   │       └── eventHandler/  # Input handling
-│   │
-│   └── common/            # Shared utilities (both processes)
-│
-├── static/                # Static assets
-│   ├── locales/           # i18n JSON files (9 languages)
-│   └── preference.json    # Default preferences
-│
-├── docs/                  # Documentation
-│   └── dev/               # Developer docs
-│
-├── build/                 # Build resources (icons)
-├── electron-builder.yml   # Packaging configuration
-└── electron.vite.config.mjs  # Vite build config
-```
+### The `Editor` (`src/editor/index.ts`)
 
-## Key Concepts
+Holds the runtime modules: `JSONState`, `InlineRenderer`, `Selection`, `Search`, `Clipboard`, `History`, and the root `ScrollPage`. It owns `activeContentBlock` (the focused leaf) and routes DOM events (`click`, `input`, `keydown`, `keyup`, `compositionstart/end`) merged via RxJS to the active block's handlers (`clickHandler`, `inputHandler`, etc.). Anything that listens to user input on a block ultimately flows through this dispatch.
 
-### 1. Process Architecture
+`Editor.updateContents(operations, selection, source)` applies `ot-json1` operations to the live block tree. The `pick`/`drop` walk is hand-rolled from `ot-json1.apply` so it can call `block.replaceWith`, `container.insertBefore`, `ScrollPage.loadBlock(name).create(...)`, and `otText.type.apply` on the matching subdocument — the block tree and the JSON state stay in lockstep.
 
-| Process  | Location        | Module Type | Purpose                                        |
-| -------- | --------------- | ----------- | ---------------------------------------------- |
-| Main     | `src/main/`     | CommonJS    | System operations, window management, file I/O |
-| Renderer | `src/renderer/` | ES Modules  | Vue 3 UI, user interaction                     |
-| Preload  | `src/preload/`  | CommonJS    | IPC bridge, exposes safe APIs to renderer      |
-
-### 2. IPC Communication
-
-Main and renderer communicate via IPC with `mt::` prefixed event names:
-
-```javascript
-// Renderer → Main
-window.electron.ipcRenderer.send('mt::save-file', data)
-
-// Main → Renderer
-win.webContents.send('mt::file-saved', result)
-```
-
-### 3. State Management (Pinia)
-
-Key stores in `src/renderer/src/store/`:
-
-- `editor.js` - Document tabs, content, file tree (largest store)
-
-- `preferences.js` - User settings
-
-- `layout.js` - UI layout state
-
-- `project.js` - Open folder/project
-
-- `commandCenter.js` - Command palette
-  
-  # AI Agent Guide for MarkText
-
-This guide is designed for AI agents (Claude, GPT, Copilot, etc.) loading into this repository for the first time. It provides essential context to help you understand, navigate, and contribute to this codebase effectively.
-
-## Quick Overview
-
-**MarkText** is a cross-platform markdown editor built with:
+### Block tree
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [peterjthomson/marktext](https://github.com/peterjthomson/marktext) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
