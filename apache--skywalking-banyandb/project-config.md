@@ -1,42 +1,109 @@
 ---
 trigger: always_on
-description: Lessons distilled from setting up the G5d soak harness (commit `abedc3f0` — see `docs/soak/g5d-runbook.md` and `scripts/soak-vectorized.sh` for a worked example). Apply these to any new harness in this repo: integration suites under `test/`, chaos scenarios, perf rigs, soak runs.
+description: `bydbctl agent` is a two-pane terminal workspace where Codex or Claude holds a multi-turn BanyanDB conversation, discovers schemas, proposes typed query
 ---
 
-# Test Infrastructure Guidance
+# BYDBQL Agent TUI
 
-Lessons distilled from setting up the G5d soak harness (commit `abedc3f0` — see `docs/soak/g5d-runbook.md` and `scripts/soak-vectorized.sh` for a worked example). Apply these to any new harness in this repo: integration suites under `test/`, chaos scenarios, perf rigs, soak runs.
+`bydbctl agent` is a two-pane terminal workspace where Codex or Claude holds a multi-turn BanyanDB conversation, discovers schemas, proposes typed query
+plans, and safely runs read-only queries.
 
-## Diagnostic visibility — design the harness so failure leaves evidence
+Install Codex CLI 0.144.5 or newer and log in before starting the TUI:
 
-- **Tee the orchestrator log to disk from the very first command.** Put `exec > >(tee -a "${DIST}/run.log") 2>&1` immediately after the run dir is created. Without this, `set -e` exits leave only the tail of stdout and you debug blind.
-- **Inspect every gRPC response, don't drain it.** When using streaming RPCs (e.g. `MeasureService.Write`), check `resp.GetStatus()` against `modelv1.Status_STATUS_SUCCEED.String()`. Non-success statuses are not errors at the transport layer — they're per-record rejections that disappear if you ignore the response.
-- **Default to fail-fast in setup, fail-tolerant in the inner loop.** Setup phases (compose up, schema create, fixture seed, baseline record) should `set -e` so a 48 h run aborts in 5 minutes when misconfigured. Inner periodic loops (pprof grab, parity diff, log scrape) should `|| log WARN` so a single bad sample doesn't kill a long-running observation window.
-- **`set -e` + bash arithmetic + multi-line `$()` capture is a silent-failure pattern.** `x=$(grep -c PAT file || echo 0)` returns `"0\n0"` when grep finds nothing, which `(( x == 0 ))` parses as a syntax error and silently treats as false. For anything beyond pure integer comparison, hand off to `python3 -c` or set `pipefail` and avoid the `|| echo` fallback.
+```shell
+codex login
+```
 
-## Container hygiene on a single-host (no swap, no orchestrator) test box
+Codex owns its login credentials. bydbctl neither reads nor copies them.
 
-- **Set explicit `deploy.resources.limits.memory` and `cpus` on every service.** A 31 GB no-swap host OOM-kills immediately at the limit; defaults will eventually exceed it. Total compose footprint must leave at least 8 GB host headroom for the OS and IDE.
-- **Java + SkyWalking agent + Spring Boot demo needs ≥ 1 GB even with `-Xmx384m`.** The non-heap JVM overhead (metaspace, code cache, native, classloading) routinely exceeds heap. 512 MB caps OOM-kill at startup before `-Xmx` is meaningful.
-- **Containers default to root with mode 0700.** If the host shell needs to read or copy bind-mounted contents (snapshot/restore between phases), set `user: "${SOAK_UID:-1000}:${SOAK_GID:-1000}"` and export both from the orchestrator. Without this, `cp -a` from the host silently copies empty subdirs.
-- **`expose:` is for inter-container only; clients on the host need `ports:`.** A `connection refused` on `localhost:<port>` from a host-side test driver almost always means the port is exposed but not published.
-- **`docker compose down -v` is the correct teardown.** Plain `down` leaves volumes; subsequent `up` reuses them and you debug stale state.
+To use Claude instead, install Claude Code and authenticate it using either its normal login flow or `ANTHROPIC_API_KEY`:
 
-## BanyanDB-specific timing and config semantics
+```shell
+claude auth login
+bydbctl agent --provider claude
+```
 
-These are the things you will assume wrong on first contact. Pin them in any harness that talks to BanyanDB:
+Claude Code owns its login credentials. bydbctl starts the CLI directly; it does not call the Anthropic Messages API or embed the TypeScript/Python Claude Agent SDK.
 
-- **Flush is asynchronous and ~5 s by default.** Both the schema-property server (`--schema-server-flush-timeout`) and measure data (`--measure-flush-timeout`) buffer writes for up to 5 s before persisting. Snapshot-immediately-after-write produces silently-empty snapshots. Either pass smaller flush timeouts (`--measure-flush-timeout=500ms` etc.) or have the test driver poll-until-queryable instead of sleeping for a fixed delay.
-- **Query `Limit` defaults to 100.** A query against 1000 written rows returns 100 silently. Always set `Limit` explicitly when the test cares about totals; a parity check that "passes" by comparing 100 vs 100 truncations is meaningless.
-- **Write timestamps must be millisecond-aligned.** The validator rejects sub-millisecond precision with `STATUS_INVALID_TIMESTAMP`. `time.Now()` has nanosecond precision and will be rejected — `time.Now().Truncate(time.Millisecond)` first.
-- **Default root paths point at `/tmp`, not at any subdirectory.** `--measure-root-path` (and `--stream-root-path`, `--property-root-path`, `--trace-root-path`, `--schema-server-root-path`) all default to `/tmp`. The quick-start docker-compose mounts `/tmp/banyanDB` and ignores it; the binary still writes to `/tmp/measure/...`. For any harness that needs persistence, override every root path to your bind-mounted dir.
-- **`FieldSpec` requires both `EncodingMethod` and `CompressionMethod`.** Creating a measure programmatically without setting these returns `compression method is unspecified`. Use `EncodingMethod_ENCODING_METHOD_GORILLA` + `CompressionMethod_COMPRESSION_METHOD_ZSTD` as a safe default for numeric fields.
+## Start
 
-## Fixture strategy
+```shell
+bydbctl agent \
+  --addr http://localhost:17913 \
+  --goal "top slow payment endpoints in the last 30 minutes"
+```
 
+To use a Codex binary outside `PATH`:
+
+```shell
+bydbctl agent \
+  --codex-command /path/to/codex \
+  --addr https://banyandb.example:17913 \
+  --enable-tls \
+  --cert /path/to/ca.pem
+```
+
+To select Claude Code or use a binary outside `PATH`:
+
+```shell
+bydbctl agent \
+  --provider claude \
+  --claude-command /path/to/claude \
+  --claude-model sonnet \
+  --claude-max-turns 12 \
+  --addr https://banyandb.example:17913
+```
+
+`--claude-api-key` and `--claude-base-url` optionally override `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL` for the child process.
+When omitted, Claude Code uses its normal authentication and provider configuration.
+
+The Agent TUI uses the same `--addr`, username/password, TLS certificate, and `--insecure` semantics as the normal bydbctl HTTP commands. Codex never
+receives those settings or BanyanDB credentials.
+
+## Controlled tools and safety
+
+Each TUI session creates a private, local MCP bridge. It exposes exactly these tools:
+
+- `list_groups_schemas`
+- `describe_schema`
+- `propose_query_plan`
+- `validate_bydbql`
+- `execute_bydbql`
+
+A schema, capability, or usage question is answered from `list_groups_schemas` and `describe_schema` alone. Those turns are classified as
+answer turns, and the provider is explicitly instructed not to compile a plan or read stored rows. Asking what fields a resource has therefore
+inspects the schema instead of querying data. A request for stored data follows the full query workflow below.
+
+When such a question names exactly one resource, bydbctl reads that schema itself and never starts a provider turn at all; see
+[Direct schema lookups](#direct-schema-lookups). The reachable data is identical either way, because both paths call the same read-only schema API.
+
+The Agent starts with no selected schema. It ranks catalog candidates but resolves resources against the complete discovered catalog using exact type,
+name, and group identity. It never silently substitutes a similar resource or another time granularity. Typed schemas are cached per resource and group set,
+so a workflow can compile several resources independently. If the best choices remain ambiguous, it asks one focused clarification question. The Schema
+panel is read-only and cannot pin a resource.
+
+`propose_query_plan` accepts a strict JSON plan or a bounded workflow. The bridge loads the exact schema when needed, binds the compiled query to a
+schema fingerprint, and returns path-based diagnostics with allowed values when compilation fails. The planner supports typed projections, tag/entity
+comparison and `IN` filters with `AND`/`OR`, exact sortable index-rule ordering, numeric Measure aggregation/grouping, empty Trace projection, and
+registered TopN aggregations. A normal Measure is never treated as a TopN aggregation. Failed proposals remain visible diagnostics but are not
+executable candidates.
+
+The planner rejects unknown JSON fields, implicit value coercion, field filters, tag aggregation, invalid time formats, out-of-range limits, `MATCH`,
+`HAVING`, `OFFSET`, `STAGES`, `WITH QUERY_TRACE`, joins, and unknown columns rather than guessing. `validate_bydbql` remains a parse/safety and
+manual-editor check; only a successful `propose_query_plan` can publish a provider candidate. The bridge rejects every other tool, shell command,
+external MCP server, dynamic registration, and download.
+
+When `propose_query_plan` returns `valid=false`, the provider receives the structured diagnostic and repairs the plan within the same agent turn.
+The bridge allows at most three proposal attempts per schema-description cycle and reports the exhausted repair budget instead of looping indefinitely.
+
+For Codex, bydbctl starts one isolated `codex app-server --stdio` process with an ephemeral in-memory thread, read-only sandboxing, and no approval requests. Built-in
+shell, web, app, plugin, hook, sub-agent, goal, memory, and shell-snapshot features are disabled. Existing user MCP servers are disabled for this process.
+Startup fails unless runtime inventory contains exactly the five controlled tools and no uncontrolled tools or resources.
+
+For Claude, bydbctl starts `claude --print --output-format stream-json` directly from Go. Each TUI turn gets a supervised CLI process; later turns use
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apache/skywalking-banyandb](https://github.com/apache/skywalking-banyandb) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
