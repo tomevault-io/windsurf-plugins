@@ -1,93 +1,110 @@
 ---
 trigger: always_on
-description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Agent Guide for opentelemetry-go
+# CLAUDE.md
 
-This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
-Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
+## About
 
-## Core expectations
+`amqp091-go` is the official Go AMQP 0.9.1 client maintained by the RabbitMQ core team (`github.com/rabbitmq/amqp091-go`). It is a single root package with no external runtime dependencies (only `go.uber.org/goleak` for tests).
 
-- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
-- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
-- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
-- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
-- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
-- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
-- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
-- Keep dependencies minimal and justified.
-- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
-- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
-- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
+## Commands
 
-## Default workflow
+```bash
+# Format
+make fmt
+make check-fmt       # check-only, no writes
 
-For new features and behavior changes, use this order unless the task explicitly says otherwise:
+# Lint
+make checks          # golangci-lint (must be installed)
 
-1. Read the relevant package, its tests, and any package docs or `README.md`.
-2. Add or update a failing unit test that captures the required behavior or regression.
-3. Implement the smallest change that makes the test pass.
-4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
-5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
-6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
-7. Run `make precommit` each time before considering the work complete.
+# Integration tests — require a running RabbitMQ on localhost:5672
+make tests
+make tests-docker    # spins up RabbitMQ in Docker, runs, then tears down
 
-For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
+# Run a specific test
+go test -race -v -tags integration -run TestIntegrationOpenClose
 
-## Verification
+# Start / stop Dockerized RabbitMQ manually
+make rabbitmq-server
+make stop-rabbitmq-server
+```
 
-- Use `make` as the canonical repository verification command. The default target is `precommit`.
-- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
-- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
-- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
+Integration tests use the `integration` build tag. Without it (or without a running broker), only unit tests run. The env var `RABBITMQ_RABBITMQCTL_PATH=DOCKER:<container>` (or path to a local `rabbitmqctl` executable) enables administrative/broker control tests.
 
-## Documentation and changelog
+## Architecture
 
-- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
-- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
-- Prefer examples over long code snippets in GoDoc when practical.
-- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
-- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
+All core code is in the root package (excluding examples under `_examples/` and generator files under `spec/`).
 
-## Repository habits
+### Layers
 
-- Prefer focused diffs. Avoid drive-by cleanup.
-- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
-- Generated files are checked in. If your change affects generation, keep generated output up to date.
-- Prefer fast local search tools such as `rg` when exploring the repository.
-- When changing behavior, make the invariants explicit in tests.
+```
+Caller
+  └─ Connection (connection.go)     TCP socket, AMQP handshake, heartbeat, frame mux
+       ├─ read.go / write.go        frame (de)serialization
+       ├─ recovery.go               connection/channel recovery (reconnection)
+       ├─ lifecycle.go              StateOpen/Reconnecting/Closing/Closed FSM + NotifyStateChange fan-out
+       ├─ log.go                    package-level Logger (SetLogger), no-op by default
+       └─ Channel (channel.go)      AMQP channel — all protocol methods
+            ├─ confirms.go          publisher confirm tracking
+            └─ consumers.go         consumer tag → delivery channel dispatch
+```
 
-## Personas
+`spec091.go` is auto-generated from the AMQP 0.9.1 spec XML. Do not hand-edit it.
 
-### Feature Agent
+### Connection
 
-Use this persona for new behavior, new API surface, or spec-driven feature work.
+- `Dial` / `DialConfig` / `DialTLS` are the entry points; `DialConfig` is the most general.
+- One **reader goroutine** (`connection.reader`) reads frames from the socket and calls `demux` to route them to channels.
+- One **heartbeater goroutine** (`connection.heartbeater`) monitors activity and sends keep-alive frames.
+- Channels are tracked in `Connection.channels map[uint16]*Channel`. Channel 0 is reserved for connection-level control frames.
 
-- Start with a failing unit test.
-- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
-- Implement the smallest viable change.
-- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
-- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
+### Channel
 
-### Refactoring Agent
+- Obtained via `conn.Channel()`.
+- All AMQP operations (declare, bind, publish, consume, ack, transactions) are methods on `Channel`.
+- RPC-style operations call `call()`, which sends a method frame and blocks on the reply. Non-RPC sends are fire-and-forget.
+- Concurrent publishes from multiple goroutines are safe; the write side is mutex-protected via `Connection.sendM`.
 
-Use this persona when improving structure without intentionally changing behavior.
+### Frame assembly state machine
 
-- Treat behavior preservation as the default contract.
-- Add or tighten tests before moving code if current behavior is not already pinned down.
-- Avoid broad rewrites, clever abstractions, or package-wide cleanup unless explicitly requested.
-- If a refactor touches a hot path, benchmark before and after.
-- Keep API shape, semantics, concurrency guarantees, and failure modes unchanged unless the task says otherwise.
+`Channel.recv` is a function pointer that acts as a state machine:
 
-### Test Agent
+```
+recvMethod  →  (method with content)  →  recvHeader  →  recvContent  →  recvMethod
+           →  (method without content: dispatch immediately, stay in recvMethod)
+```
 
+Body can span multiple `frameBody` frames; `Channel` accumulates them before dispatch.
+
+### Publisher confirms (`confirms.go`)
+
+`Channel.Confirm(noWait)` enables confirm mode. Each subsequent publish is assigned a monotonically increasing delivery tag. The broker acknowledges with `basic.ack` / `basic.nack` frames, which may arrive out of order. `confirms.resequence()` buffers out-of-order acks and delivers them in order to all listeners. `DeferredConfirmation` provides a future-style API (`Wait`, `WaitContext`, `Acked`).
+
+### Consumer dispatch (`consumers.go`)
+
+`Channel.Consume` registers a consumer tag and launches a **buffer goroutine** per consumer that relays deliveries from an internal `chan *Delivery` to the application-facing `chan Delivery`. This decouples the reader goroutine from application consumption speed. Buffer goroutines nil out slice elements explicitly to aid GC under high load.
+
+### Notify channels
+
+All `Notify*` methods (`NotifyClose`, `NotifyBlocked`, `NotifyFlow`, `NotifyReturn`, `NotifyCancel`, `NotifyConfirm`, `NotifyPublish`, `NotifyStateChange`, `NotifyRecoveryCancel`) follow the same contract:
+
+- The caller provides a channel (buffered recommended).
+- The library writes to it (or closes it for signal-only notifications) and **closes it** when the entity shuts down, is closed, or the event occurs.
+- Multiple registrations result in a broadcast — all listeners receive every event or signal.
+- Reading from a closed listener channel signals shutdown or cancellation.
+
+### Connection Recovery / Reconnection
+
+The library supports automatic connection and channel recovery (reconnection) when a network failure occurs.
+
+- **Enabling Recovery**: Automatic recovery is enabled by providing a non-nil `Recovery` configuration in `Config` when calling `DialConfig`. If `Recovery` is nil (the default), automatic recovery is disabled.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [knative-extensions/eventing-rabbitmq](https://github.com/knative-extensions/eventing-rabbitmq) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
