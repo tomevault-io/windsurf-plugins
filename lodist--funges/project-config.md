@@ -1,109 +1,182 @@
 ---
 trigger: always_on
-description: This project uses @shadcn/ui for UI components. These are beautifully designed, accessible components that you can copy and paste into your apps.
+description: TanStack Router: API
 ---
 
 
-# Shadcn UI Components
+# ActiveLinkOptions type
 
-This project uses @shadcn/ui for UI components. These are beautifully designed, accessible components that you can copy and paste into your apps.
-
-## Finding and Using Components
-
-Components are available in the `src/components/ui` directory, following the aliases configured in `components.json`
-
-## Using Components
-
-Import components from the ui directory using the configured aliases:
+The `ActiveLinkOptions` type extends the [`LinkOptions`](../LinkOptionsType.md) type and contains additional options that can be used to describe how a link should be styled when it is active.
 
 ```tsx
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+type ActiveLinkOptions = LinkOptions & {
+  activeProps?:
+    | React.AnchorHTMLAttributes<HTMLAnchorElement>
+    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>);
+  inactiveProps?:
+    | React.AnchorHTMLAttributes<HTMLAnchorElement>
+    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>);
+};
 ```
 
-Example usage:
+## ActiveLinkOptions properties
+
+The `ActiveLinkOptions` object accepts/contains the following properties:
+
+### `activeProps`
+
+- `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+- Optional
+- The props that will be applied to the anchor element when the link is active
+
+### `inactiveProps`
+
+- Type: `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+- Optional
+- The props that will be applied to the anchor element when the link is inactive
+
+# AsyncRouteComponent type
+
+The `AsyncRouteComponent` type is used to describe a code-split route component that can be preloaded using a `component.preload()` method.
 
 ```tsx
-<Button variant="outline">Click me</Button>
-
-<Card>
-  <CardHeader>
-    <CardTitle>Card Title</CardTitle>
-    <CardDescription>Card Description</CardDescription>
-  </CardHeader>
-  <CardContent>
-    <p>Card Content</p>
-  </CardContent>
-  <CardFooter>
-    <p>Card Footer</p>
-  </CardFooter>
-</Card>
+type AsyncRouteComponent<TProps> = SyncRouteComponent<TProps> & {
+  preload?: () => Promise<void>;
+};
 ```
 
-## Installing Additional Components
+# FileRoute class
 
-Many more components are available but not currently installed. You can view the complete list at https://ui.shadcn.com/r
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`createFileRoute`](../createFileRouteFunction.md) function instead.
 
-To install additional components, use the Shadcn CLI:
+The `FileRoute` class is a factory that can be used to create a file-based route instance. This route instance can then be used to automatically generate a route tree with the `tsr generate` and `tsr watch` commands.
 
-```bash
-npx shadcn@latest add [component-name]
+## `FileRoute` constructor
+
+The `FileRoute` constructor accepts a single argument: the `path` of the file that the route will be generated for.
+
+### Constructor options
+
+- Type: `string` literal
+- Required, but **automatically inserted and updated by the `tsr generate` and `tsr watch` commands**.
+- The full path of the file that the route will be generated from.
+
+### Constructor returns
+
+- An instance of the `FileRoute` class that can be used to create a route.
+
+## `FileRoute` methods
+
+The `FileRoute` class implements the following method(s):
+
+### `.createRoute` method
+
+The `createRoute` method is a method that can be used to configure the file route instance. It accepts a single argument: the `options` that will be used to configure the file route instance.
+
+#### .createRoute options
+
+- Type: `Omit<RouteOptions, 'getParentRoute' | 'path' | 'id'>`
+- [`RouteOptions`](../RouteOptionsType.md)
+- Optional
+- The same options that are available to the `Route` class, but with the `getParentRoute`, `path`, and `id` options omitted since they are unnecessary for file-based routing.
+
+#### .createRoute returns
+
+A [`Route`](../RouteType.md) instance that can be used to configure the route to be inserted into the route-tree.
+
+> ⚠️ Note: For `tsr generate` and `tsr watch` to work properly, the file route instance must be exported from the file using the `Route` identifier.
+
+### Examples
+
+```tsx
+import { FileRoute } from '@tanstack/react-router';
+
+export const Route = new FileRoute('/').createRoute({
+  loader: () => {
+    return 'Hello World';
+  },
+  component: IndexComponent,
+});
+
+function IndexComponent() {
+  const data = Route.useLoaderData();
+  return <div>{data}</div>;
+}
 ```
 
-For example, to add the Accordion component:
+# LinkOptions type
 
-```bash
-npx shadcn@latest add accordion
+The `LinkOptions` type extends the [`NavigateOptions`](../NavigateOptionsType.md) type and contains additional options that can be used by TanStack Router when handling actual anchor element attributes.
+
+```tsx
+type LinkOptions = NavigateOptions & {
+  target?: HTMLAnchorElement['target'];
+  activeOptions?: ActiveOptions;
+  preload?: false | 'intent';
+  preloadDelay?: number;
+  disabled?: boolean;
+};
 ```
 
-Note: `npx shadcn-ui@latest` is deprecated, use `npx shadcn@latest` instead
+## LinkOptions properties
 
-Some commonly used components are
+The `LinkOptions` object accepts/contains the following properties:
 
-- Accordion
-- Alert
-- AlertDialog
-- AspectRatio
-- Avatar
-- Calendar
-- Checkbox
-- Collapsible
-- Command
-- ContextMenu
-- DataTable
-- DatePicker
-- Dropdown Menu
-- Form
-- Hover Card
-- Menubar
-- Navigation Menu
-- Popover
-- Progress
-- Radio Group
-- ScrollArea
-- Select
-- Separator
-- Sheet
-- Skeleton
-- Slider
-- Switch
-- Table
-- Textarea
-- Toast
-- Toggle
-- Tooltip
+### `target`
 
-## Component Styling
+- Type: `HTMLAnchorElement['target']`
+- Optional
+- The standard anchor tag target attribute
 
-This project uses the "new-york" style variant with the "neutral" base color and CSS variables for theming, as configured in `components.json`.
+### `activeOptions`
+
+- Type: `ActiveOptions`
+- Optional
+- The options that will be used to determine if the link is active
+
+### `preload`
+
+- Type: `false | 'intent' | 'viewport' | 'render'`
+- Optional
+- If set, the link's preloading strategy will be set to this value.
+- See the [Preloading guide](../../../guide/preloading.md) for more information.
+
+### `preloadDelay`
+
+- Type: `number`
+- Optional
+- Delay intent preloading by this many milliseconds. If the intent exits before this delay, the preload will be cancelled.
+
+### `disabled`
+
+- Type: `boolean`
+- Optional
+- If true, will render the link without the href attribute
+
+# LinkProps type
+
+The `LinkProps` type extends the [`ActiveLinkOptions`](../ActiveLinkOptionsType.md) and `React.AnchorHTMLAttributes<HTMLAnchorElement>` types and contains additional props specific to the `Link` component.
+
+```tsx
+type LinkProps = ActiveLinkOptions &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
+    children?:
+      | React.ReactNode
+      | ((state: { isActive: boolean }) => React.ReactNode);
+  };
+```
+
+## LinkProps properties
+
+- All of the props from [`ActiveLinkOptions`](../ActiveLinkOptionsType.md)
+- All of the props from `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+
+#### `children`
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lodist/funges](https://github.com/lodist/funges) — distributed by [TomeVault](https://tomevault.io).
