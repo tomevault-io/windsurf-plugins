@@ -24,4 +24,4 @@ pixi run docs                  # serve docs locally (pixi run docs-build to buil
 
 ---
 > Source: [marimo-team/mkdocs-marimo](https://github.com/marimo-team/mkdocs-marimo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
