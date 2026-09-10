@@ -1,126 +1,111 @@
 ---
 trigger: always_on
-description: > Scope: `libs/naas-abi-marketplace/naas_abi_marketplace/domains/`.
+description: > Scope: `libs/naas-abi-core/naas_abi_core/services/dataset/`. Canonical reference for agents.
 ---
 
-# AGENT.md — How to file a module in the staff framework
+# Dataset Service — AGENTS.md
 
-> Scope: `libs/naas-abi-marketplace/naas_abi_marketplace/domains/`.
-> This file explains the **decision logic**. For the structure itself, read [`README.md`](README.md).
-> For the module index, read [`AGENTS.md`](AGENTS.md).
+> Scope: `libs/naas-abi-core/naas_abi_core/services/dataset/`. Canonical reference for agents.
 
-Filing a module takes two decisions, in this order:
+## Purpose
 
-1. **Which bucket?** — determined by the *organizational function* the module serves.
-2. **Which component folder?** — determined by what the module *primarily is*.
+Named, partitioned tables that modules **create, write, and query with SQL**. Identity and links stay in the triple store; volume (commits, emails, events) lives here.
 
-Result: `domains/<bucket>/<component>/<module>/`.
+The graph can catalog a dataset (`dcat:Dataset`). This service stores the table in DuckLake, with one coherent catalog snapshot shared by every dataset.
 
----
+## Files
 
-## Decision 1 — Which bucket?
+```
+dataset/
+├── DatasetPort.py                 # IDatasetPort, DatasetSpec, exceptions
+├── DatasetService.py              # public service
+├── DatasetFactory.py
+├── DatasetService_test.py
+├── adapters/secondary/
+│   ├── DatasetSecondaryAdapterDuckLake.py
+│   └── DatasetSecondaryAdapterDuckLake_test.py
+├── tests/dataset__secondary_adapter__generic_test.py
+└── AGENTS.md
+```
 
-### The question to ask
+## Port (`DatasetPort.py`)
 
-> **What organizational function does this serve?**
+```python
+class IDatasetPort:
+    def create(spec: DatasetSpec) -> DatasetInfo
+    def describe(name, *, namespace="default") -> DatasetInfo
+    def list(*, namespace=None) -> list[DatasetInfo]
+    def write(name, rows, *, namespace="default", mode="append"|"replace"|"upsert", snapshot_id=None) -> DatasetInfo
+    def query(sql, *, namespace="default", snapshot_id=None) -> QueryResult
+    def list_snapshots() -> list[DatasetSnapshotInfo]
+    def drop(name, *, namespace="default") -> None
+```
 
-Not *what technology does it use*, not *which department would own it*, not *who asked for it*.
+`DatasetSpec` carries `name`, `namespace`, columns (`string|integer|bigint|double|boolean|date|timestamp|json`), partitions (`column` + `identity|year|month|day`), and `primary_key`. Primary-key columns must exist. DuckLake does not enforce uniqueness; the key only defines `MERGE INTO` matching for upsert, and ordinary appends can create duplicate keys.
 
-A Postgres integration is not "signals because it is a database". A Postgres integration used to
-run payroll queries serves **personnel**; used to serve the data platform it serves **signals**.
-Technology is not function. If you find yourself filing by tech stack, you are answering the
-wrong question.
+The optional write `snapshot_id` is a catalog-wide compare-and-swap token, not a per-dataset version. A write to any dataset advances it and can cause `DatasetSnapshotConflictError`. Successful mutating writes return the exact snapshot committed by that connection; a no-op returns the current observed snapshot.
 
-### The nine questions
+Partition transforms are physical layout metadata and do not add query columns; use SQL functions such as `month(author_date)` when filtering. Reserved identifiers (`end`, `start`) are valid schema names but must be quoted in caller SQL (`SELECT "end" FROM time_entries`).
 
-Each bucket answers exactly one question. Find the one your module answers:
+JSON values are parsed and deterministically serialized before DuckDB binds them to native `JSON` columns. Invalid values fail with `DatasetSchemaError`. Upserts reject null primary-key values and duplicate keys within one incoming batch.
 
-| Bucket | The question it answers |
+## Adapter
+
+| Adapter | Notes |
 |---|---|
-| `personnel` | *Who is in the organization, and what is their status?* |
-| `intelligence` | *What is true about the world outside us?* |
-| `operations` | *How do we execute the mission we are on right now?* |
-| `logistics` | *What physical or contracted resources do we need, and where are they?* |
-| `plans` | *What should we do next, and how will we get there?* |
-| `signals` | *How does information move and get stored inside the organization?* |
-| `training` | *How do our people become capable of their work?* |
-| `finance` | *Where does the money go, and what is it worth?* |
-| `external` | *How do we relate to people and bodies outside the organization?* |
+| `ducklake` | DuckLake catalog backed by SQLite or PostgreSQL, with Parquet/inlined data under `data_path`, on a local path or S3-compatible object storage. Supports catalog snapshots, time travel, JSON, and upsert. |
 
-### Tie-breakers
+## Engine config
 
-These are the ambiguities that actually come up.
-
-**`operations` vs `plans` — the timeline test.**
-Operations is *now*; plans is *next*. Executing this quarter's campaign is `operations`;
-designing next year's is `plans`. If the module acts on committed work, it is operations. If it
-produces a decision about work not yet committed, it is plans.
-
-**`intelligence` vs `signals` — inside or outside.**
-Intelligence is about the world *outside* the organization. Signals is about information moving
-*inside* it. A competitor-monitoring module is intelligence; a document-ingestion pipeline that
-serves every internal team is signals — even though both end up producing searchable text.
-
-**`signals` vs `logistics` — information or materiel.**
-S4 in the staff system is explicitly physical: materiel, transport, facilities, medical. If the
-thing being moved or stored is *information*, it is signals. If it is *goods, money-as-assets, or
-physical space*, it is logistics. This is why `document` is signals: it moves bytes, not boxes.
-
-**`external` vs `operations` — audience or customer.**
-If the counterparty is a paying customer in a commercial relationship, it is operations
-(sales, success, support). If the counterparty is a broader audience, community, partner body or
-public, it is external.
-
-**`intelligence` vs `plans` — analysis or decision.**
-Intelligence tells you what is true. Plans decides what to do about it. A module that measures
-content performance is intelligence; a module that decides the next content calendar is plans.
-
-**Cross-cutting modules.** If a module genuinely serves every bucket equally — an LLM provider, a
-generic storage adapter — it does not belong in `domains/` at all. Those live at the marketplace
-top level (`ai/`, `applications/`).
-
-**Still stuck?** A module that plausibly fits two buckets is usually doing two jobs. Prefer
-splitting it over guessing. If it cannot be split, file it under the bucket that owns its
-*output*, not its input.
-
----
-
-## Decision 2 — Which component folder?
-
-### The rule: primary component
-
-File the module under the component folder matching **what the module principally is**. Look at
-what the module actually contains and pick the dominant one.
-
-```
-<bucket>/agents/        module whose deliverable is a conversational agent
-<bucket>/apps/          module whose deliverable is a launchable web app
-<bucket>/workflows/     module whose deliverable is multi-step automations
-<bucket>/pipelines/     module whose deliverable is data processing
-<bucket>/integrations/  module whose deliverable is a third-party API wrapper
-<bucket>/ontologies/    module whose deliverable is vocabulary / RDF schema
+```yaml
+services:
+  dataset:
+    dataset_adapter:
+      adapter: "ducklake"
+      config:
+        catalog: "sqlite:storage/datasets.sqlite"
+        data_path: "storage/datasets/"
+        max_retries: 10
+        retry_base_delay_seconds: 0.05
+        retry_max_delay_seconds: 1.0
 ```
 
-**The module keeps its own internal structure.** Filing a module under `agents/` does not flatten
-it. `finance/agents/accountant/` still contains `accountant/agents/`, `accountant/workflows/`,
-`accountant/ontologies/` and `accountant/models/`. The outer folder says *what kind of module
-this is*; the inner folders are the module's own shape, unchanged.
+Default is that block.
 
-### Worked examples
+`data_path` may instead use an `s3://` or `s3a://` URI, which keeps table data
+wherever the deployment persists datasets rather than on a container disk. Other
+schemes are rejected until the adapter can configure their native DuckDB secret
+types. DuckDB cannot guess a custom endpoint or its credentials, so an S3-compatible
+store such as MinIO needs them here:
 
-**Single-component modules — unambiguous.**
+```yaml
+        data_path: "s3://abi/abi/datasets/"
+        s3_endpoint: "http://minio:9000"
+        s3_access_key_id: "{{ secret.MINIO_ROOT_USER }}"
+        s3_secret_access_key: "{{ secret.MINIO_ROOT_PASSWORD }}"
+```
 
-`financial_cockpit` is an app-only module (P&L and treasury dashboard under `web/`).
-→ `finance/apps/financial_cockpit/`
+The scheme on `s3_endpoint` sets the SSL default and an endpoint implies path-style
+URLs; `s3_use_ssl`, `s3_url_style` and `s3_region` override both. A scheme-less
+endpoint such as `minio:9000` must set `s3_use_ssl` explicitly so transport security
+is never guessed. Omit all of them for AWS with ambient credentials. Setting them
+alongside a local `data_path` raises, because that pairing can only mean a store was
+intended and would not be used.
 
-`organizations` contains only `ontologies/`. Nothing else.
-→ `intelligence/ontologies/organizations/`
+A remote `data_path` does not make a SQLite catalog shared. A single-process runtime
+may deliberately pair the two, but every replica in a scaled deployment must use the
+same durable catalog; use PostgreSQL rather than an ephemeral per-container SQLite
+file or the replicas will silently diverge.
 
-**Multi-component modules — pick the dominant one.**
+Without them, a write to an object store fails with HTTP 403 — or, for a batch small
+enough for DuckLake to inline in the catalog, appears to succeed while never reaching
+the store. Modules that use the service declare `DatasetService` in `ModuleDependencies.services`.
+
+Each write uses a fresh connection and retries the complete transaction up to 10 times for catalog locks/transaction conflicts. Backoff starts at 50 ms, doubles to a 1-second cap, and has +/-25% jitter. SQLite writers sharing one adapter are serialized before the cross-process retry boundary; PostgreSQL writers remain concurrent. PostgreSQL deployment credentials are rendered from the secret service; do not log the catalog DSN.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jupyter-naas/abi](https://github.com/jupyter-naas/abi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
