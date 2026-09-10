@@ -1,123 +1,144 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides repository guidance for Codex when working in this project.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides repository guidance for Codex when working in this project.
+
+## Communication
+
+- Always answer in Simplified Chinese first, unless the user explicitly requests another language.
 
 ## Project Overview
 
-JeecgBoot Vue3 frontend — an enterprise low-code platform built with Vue 3 + Vite 6 + Ant Design Vue 4 + TypeScript. Uses pnpm as package manager. Node 18 or 20+ required (`engines: "^18 || >=20"`).
+JeecgBoot Vue3 (v3.8.3) is an enterprise low-code admin platform frontend. It is built on Vue 3, TypeScript, Vite, Ant Design Vue 4, and Pinia. It was originally forked from Vben Admin and customized with JeecgBoot-specific components such as online forms, code generation, workflow, and related low-code modules.
 
-## Common Commands
+This workspace uses SVN for version control. Do not assume Git is available in this directory.
+
+Backend: Spring Boot (JeecgBoot), expected at `http://127.0.0.1:8080/jeecg-boot` during development.
+
+## Related Projects
+
+| Project | Path |
+| --- | --- |
+| Frontend (Vue3, this repo) | `E:\workspace-cc-jeecg\jeecgboot-vue3-2026` |
+| Backend (Spring Boot 3) | `E:\workspace-cc-jeecg\jeecg-boot-framework-2026` |
+
+## Commands
 
 ```bash
-pnpm dev              # Start dev server (port 3100, mock enabled)
-pnpm build            # Production build (output: dist/)
-pnpm build:docker     # Docker production build
-pnpm build:dockercloud # Docker cloud production build
-pnpm build:report     # Build with bundle visualizer
-pnpm preview          # Build + preview
-
-# Linting (no unified "lint" script — run individually)
-npx eslint src/path/to/file.vue          # Lint specific file
-npx stylelint "src/**/*.{vue,less,css}"  # Stylelint
-pnpm batch:prettier                       # Format all src files
-
-# Testing (Jest configured but not integrated into npm scripts)
-# Tests exist in tests/ directory but no test script in package.json
-# Run manually if needed: npx jest
-
-pnpm clean:cache      # Clear Vite cache
-pnpm gen:icon         # Regenerate icon data
-pnpm reinstall        # Clean reinstall all dependencies
+pnpm install
+pnpm dev
+pnpm build
+pnpm batch:prettier
 ```
+
+- `pnpm dev` starts the dev server on port 3100.
+- `pnpm build` creates the production build in `dist/`.
+- `pnpm batch:prettier` formats all matching files under `src/`; run it only when broad formatting is intended.
+- No regular test script is configured in `package.json`; a Jest config exists, but there is no `test` script.
 
 ## Path Aliases
 
-- `/@/` and `@/` → `src/`
-- `/#/` and `#/` → `types/`
-- `~icons/{collection}/{name}` → unplugin-icons (compile-time icon imports)
+- `/@/` or `@/` maps to `src/`.
+- `/#/` or `#/` maps to `types/`.
+- Prefer the `/@/` prefix with the leading slash, which is the convention used throughout this codebase.
 
-The `/@/` prefix (with leading slash) is the project's conventional alias — prefer it for consistency.
+## Source Structure
 
-## Architecture
+| Directory | Purpose |
+| --- | --- |
+| `src/api/` | HTTP request functions organized by domain, such as `sys/` and `common/`. |
+| `src/components/` | Reusable components, including generic components and JeecgBoot-specific components under `jeecg/`. |
+| `src/hooks/` | Composition API hooks, including `web/`, `setting/`, and `system/`. |
+| `src/layouts/` | App layouts, including `default/`, `iframe/`, and `page/`. |
+| `src/router/` | Vue Router setup with dynamic route registration based on backend permissions. |
+| `src/store/` | Pinia stores for app, user, permission, tabs, locale, and lock state. |
+| `src/settings/` | Global project, component, and design settings. |
+| `src/utils/` | HTTP client, auth/token management, encryption, dict helpers, and shared utilities. |
+| `src/views/` | Feature pages, including `system/`, `dashboard/`, `monitor/`, and `super/`. |
+| `src/locales/` | i18n files such as `zh_CN` and `en`. |
+| `src/enums/` | TypeScript enums for constants. |
+| `src/directives/` | Custom directives such as `v-auth`, `v-loading`, `v-click-outside`, and `v-ripple`. |
 
-### Bootstrap Sequence (src/main.ts)
+## View Conventions
 
-`createApp` → createRouter → setupStore (pinia) → setupProps → i18n → initAppConfigStore → registerPackages (@jeecg/online) → registerGlobComp (core Ant Design components) → SSO login → registerSuper (dynamic module discovery) → setupRouter → guards → directives → error handler → registerThirdComp (vxe-table, emoji, dayjs) → setupElectron → router.isReady() → mount
+Each feature module in `src/views/` typically includes:
 
-### Routing & Permissions
+- `index.vue` for the main list page.
+- `*.data.ts` for table column definitions and form schemas.
+- `*.api.ts` for API endpoint calls.
+- `*Modal.vue` or `*Drawer.vue` for detail and edit components.
 
-- **Permission mode: BACK** — routes and menus are fetched from the backend API via `getBackMenuAndPerms()`
-- Dynamic routes added at runtime in `src/store/modules/permission.ts`
-- Static routes: login, oauth2-login, token-login, error pages, AI dashboard
-- Router mode: HTML5 history (hash mode when running in Electron)
-- Super modules discovered dynamically via `import.meta.glob('./**/register.ts')` in `src/views/super/registerSuper.ts`
+## Component Patterns
 
-### State Management (Pinia)
+Use `BasicTable` and `BasicForm` for list pages:
 
-Key stores in `src/store/modules/`:
-- `user.ts` (app-user) — auth token, user info, roles, tenant, dict items
-- `permission.ts` (app-permission) — dynamic routes, permission codes, backend menus
-- `app.ts` (app) — project config, theme, layout settings
-- `locale.ts` (app-locale) — i18n locale
-- `multipleTab.ts` (app-multiple-tab) — tab state
+```ts
+import { BasicTable, useTable } from '/@/components/Table';
 
-Auth persisted in localStorage via `src/utils/auth/index.ts`.
+const [registerTable] = useTable({ api, columns, formConfig: { schemas } });
+```
 
-### API Layer
+Use `useModal` and `useDrawer` for detail panels:
 
-- Custom Axios wrapper: `src/utils/http/axios/` — configured instance exported as `defHttp`
-- All requests signed with MD5 via `signMd5Utils`
-- Tenant ID injected as header when `VITE_GLOB_TENANT_MODE` is enabled
-- Response format: `{ code, result, message, success }` where `code === 200` is success
+```ts
+const [registerModal, { openModal }] = useModal();
+openModal(true, { isUpdate: true, record });
+```
 
-### Component Registration
+Use `useListPage` from `src/hooks/system/` for standard CRUD pages that combine table, form, modal, and drawer behavior.
 
-- **Auto-import**: `unplugin-vue-components` with `AntDesignVueResolver` auto-imports all Ant Design Vue components (no manual import needed in templates)
-- **Global manual**: `registerGlobComp.ts` registers Icon, AIcon, JUploadButton, Button, TinyMCE Editor
-- **Third-party**: `registerThirdComp.ts` registers vxe-table (full import), custom vxe cell components, emoji picker, dayjs plugins
-- **Async loading**: Heavy components use `src/utils/factory/createAsyncComponent.tsx`
+Form schemas use `FormSchema[]` with `component` specifying Ant Design Vue or custom components such as `Input`, `Select`, `JDictSelectTag`, and `JSearchSelect`.
 
-### Icon System
+## HTTP Client
 
-Three icon approaches:
-1. **Iconify runtime** — `<Icon icon="mdi:home" />` via `@iconify/iconify` CDN lazy-load
-2. **SVG sprites** — `<Icon icon="icon-name|svg" />` via `vite-plugin-svg-icons`
-3. **unplugin-icons** — `import IconName from '~icons/collection/name'` for compile-time tree-shaken icons
+`defHttp` in `src/utils/http/axios/` wraps Axios with:
 
-### Theme System
+- Token injection through interceptors.
+- MD5 request signing for API security.
+- Multi-tenant header support.
+- Standard response unwrapping through the `result` field.
 
-- Less variables generated by `build/generate/generateModifyVars.ts`
-- Dark mode via Ant Design Vue `theme.darkAlgorithm`
-- CSS variable `--j-global-primary-color` set dynamically from theme color
-- CSS class prefix: `jeecg` (defined in `src/settings/designSetting.ts`)
+API functions usually follow this pattern:
 
-### External Packages
+```ts
+enum Api {
+  List = '/sys/user/list',
+}
 
-- `@jeecg/online` and `@jeecg/aiflow` are external monorepo packages excluded from Vite optimizeDeps (CJS compatibility issues)
-- Registered via `registerPackages(app)` in main.ts
+export const list = (params) => defHttp.get({ url: Api.List, params });
+```
 
-### Performance Optimization Patterns
+## Authentication And Permissions
 
-**Critical: Use dynamic imports for non-critical modules**
-- Static `import` at top of file causes the entire dependency chain to load on initial page
-- Use `await import('module')` or `import('path/to/module').then()` for lazy loading
-- Key files using dynamic imports:
-  - `src/settings/registerThirdComp.ts` — vxe-table, emoji picker (loaded after mount)
-  - `src/views/super/registerSuper.ts` — dynamic module discovery
-  - Non-critical Ant Design Vue components loaded asynchronously
+- Tokens are stored in localStorage through auth utilities.
+- `src/router/guard/permissionGuard.ts` fetches user info and dynamic menus from the backend.
+- Permission mode is `BACK`, meaning routes and button permissions are backend-driven.
+- Button-level auth uses the `v-auth="'system:user:add'"` directive or the `usePermission()` hook.
 
-**Vite optimizeDeps**
-- Pre-bundled dependencies in `vite.config.ts` include: dayjs, axios, pinia, nprogress, qs, crypto-js, md5, sortablejs, xe-utils, vue-i18n, lodash-es, xss, mockjs
-- External packages (`@jeecg/*`) excluded due to CJS issues
+## Component Settings
+
+Table pagination uses `pageNo` and `pageSize` params and expects `records` and `total` in the response. This is configured in `src/settings/componentSetting.ts`.
+
+## Environment Variables
+
+- `.env` contains base config such as port, app title, SSO, and qiankun toggles.
+- `.env.development` contains dev proxy, mock toggle, and backend URL.
+- `.env.production` contains production API URL and gzip config.
+- Key variables include `VITE_GLOB_DOMAIN_URL`, `VITE_GLOB_API_URL`, and `VITE_PROXY`.
+
+## Build System
+
+`vite.config.ts` delegates plugin setup to `build/vite/plugin/`. Plugins include HTML template handling, mock data, gzip compression, SVG sprites, dynamic theme, qiankun micro-frontend, and PWA. Build scripts under `build/script/` handle post-build tasks.
+
+## Online Forms
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jeecgboot/JeecgBoot](https://github.com/jeecgboot/JeecgBoot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
