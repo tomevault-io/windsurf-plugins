@@ -1,104 +1,147 @@
 ---
 trigger: always_on
-description: Branding instructions for Microsoft and related services and components.
+description: > This file documents the structure and conventions of the Agent Framework
 ---
 
+# Docs Structure & Design Choices — Agent Framework
 
-# Branding instructions for Foundry documentation
+> This file documents the structure and conventions of the Agent Framework
+> documentation so that agents (AI or human) can maintain it without
+> rediscovering decisions.
 
-Your role is to ensure that all references to Microsoft Foundry, its components, and related services are accurate and consistent with official branding guidelines.
+## Directory layout
 
-## First-mention vs. subsequent-mention patterns
+```
+agent-framework/
+├── TOC.yml                    # Single flat table of contents (no nested sub-TOCs)
+├── index.yml                  # Landing page (hub page)
+├── zone-pivot-groups.yml      # Language pivot definitions
+├── docfx.json                 # Build configuration
+├── breadcrumb/agent-framework/toc.yml  # Breadcrumb navigation
+├── overview/
+│   ├── index.md               # "What is Agent Framework" landing
+│   └── index.md
+├── concepts/                  # Fundamental mental models, semantics, and architecture
+│   ├── index.md               # Concepts landing
+│   ├── agents/
+│   │   ├── index.md           # Agents landing
+│   │   ├── conversations/
+│   │   └── middleware/
+│   ├── workflows/
+│   │   ├── index.md           # Workflows landing
+│   │   └── advanced/
+│   └── harness.md             # Agent Harness composition and architecture
+├── get-started/               # 7-step progressive tutorial
+│   ├── index.md               # Tutorial landing page
+│   ├── your-first-agent.md    # Step 1
+│   ├── add-tools.md           # Step 2
+│   ├── multi-turn.md          # Step 3
+│   ├── memory.md              # Step 4
+│   ├── workflows.md           # Step 5
+│   ├── harness.md             # Step 6
+│   └── hosting.md             # Step 7
+├── agents/                    # Generic and built-in agent capability guides
+│   ├── index.md               # Agent capabilities landing
+│   ├── structured-outputs.md
+│   ├── declarative.md
+│   ├── observability.md
+│   ├── rag.md
+│   ├── multimodal.md
+│   ├── background-responses.md
+│   ├── background-agents.md
+│   ├── looping.md
+│   ├── planning-and-todos.md
+│   ├── security.md
+│   ├── tools/                 # 1 page per tool type
+│   │   ├── index.md           # Tools overview & landing
+│   │   └── ...
+├── workflows/                 # Generic and built-in workflow capability guides
+│   ├── index.md               # Workflow capabilities landing
+│   ├── agents-in-workflows.md
+│   ├── human-in-the-loop.md
+│   ├── checkpoints.md
+│   ├── declarative.md
+│   ├── visualization.md
+│   ├── observability.md
+│   ├── as-agents.md
+│   └── orchestrations/       # Multi-agent orchestration patterns
+│       ├── index.md           # Orchestrations landing
+│       ├── sequential.md
+│       ├── concurrent.md
+│       ├── handoff.md
+│       ├── group-chat.md
+│       └── magentic.md
+├── integrations/              # Named external things; usually outside services
+│   ├── index.md               # Integrations overview & landing
+│   ├── by-provider/           # Cross-component provider ecosystem landing pages
+│   │   ├── index.md
+│   │   ├── microsoft-foundry.md
+│   │   ├── microsoft-azure.md
+│   │   └── ...
+│   └── by-component/          # Canonical implementation guidance by framework surface
+│       ├── index.md
+│       ├── model-providers/   # Inference providers
+│       │   ├── index.md
+│       │   └── ...
+│       ├── agent-services/    # Managed or protocol-backed remote agent runtimes
+│       │   ├── index.md
+│       │   ├── a2a.md
+│       │   └── ...
+│       ├── tools/             # Provider-managed and optional tool integrations
+│       │   ├── index.md
+│       │   ├── foundry-toolbox.md
+│       │   └── shell-tools.md
+│       ├── context-providers/ # External before-run/after-run providers
+│       │   ├── index.md
+│       │   └── ...            # One flat page per external provider
+│       ├── middleware/        # External middleware integrations
+│       │   └── ...
+│       ├── evaluation/        # External evaluation services
+│       │   └── ...
+│       └── ui/                # Shared UI integrations
+│           ├── ag-ui/
+│           │   ├── index.md
+│           │   └── ...
+│           ├── chatkit.md     # Flat page (no subfolder)
+│           └── devui/
+│               ├── index.md
+│               └── ...
+├── hosting/                   # Hosting model selection and guides
+│   ├── index.md               # Managed vs self-hosted overview
+│   ├── azure-functions.md     # Azure Functions and Durable Extension
+│   ├── foundry-hosted-agent.md
+│   └── self-hosting/
+│       ├── index.md           # Shared self-hosting state and protocol choices
+│       ├── responses.md
+│       ├── openai-endpoints.md
+│       ├── telegram.md
+│       ├── a2a/
+│       │   ├── index.md
+│       │   ├── server.md      # Multi-language A2A server guide
+│       │   └── dotnet.md
+│       └── mcp.md
+├── migration-guide/           # SK & AutoGen migration
+│   ├── index.md
+│   ├── from-autogen/
+│   └── from-semantic-kernel/
+├── api-docs/                  # API reference (external links)
+└── support/                   # FAQ, troubleshooting, upgrade guides
+    ├── index.md
+    ├── faq.md
+    ├── troubleshooting.md
+    └── upgrade/
+        ├── index.md
+        └── ...
+```
 
-In our documentation, we use different terminology on first mention versus subsequent mentions within an article. This helps establish full context initially while maintaining readability throughout the document.
+## Design principles
 
-### Core product and services
-
-| Original Term | New term - First Mention | New term - Subsequent Mentions |
-|---------------|---------------|---------------------|
-| Azure AI Foundry | Microsoft Foundry | Foundry |
-| Azure AI Foundry Agent Service | Foundry Agent Service | Agent Service |
-| Azure AI Foundry IQ | Foundry IQ in Foundry Tools | Foundry IQ |
-| Azure AI Foundry SDK | Microsoft Foundry SDK | Microsoft Foundry SDK |
-
-### AI services in Foundry Tools
-
-When referencing individual AI services, use the pattern "Azure [Service] in Foundry Tools" on first mention, then just the service name subsequently:
-
-| Original Term | New term - First Mention | New term - Subsequent Mentions |
-|---------------|---------------|---------------------|
-| Azure AI Speech | Azure Speech in Foundry Tools | Speech |
-| Azure AI Language | Azure Language in Foundry Tools | Language |
-| Azure AI Vision | Azure Vision in Foundry Tools | Vision |
-| Azure AI Document Intelligence | Azure Document Intelligence in Foundry Tools | Document Intelligence |
-| Azure AI Form Recognizer | Azure Document Intelligence in Foundry Tools | Document Intelligence |
-| Azure AI Translator | Azure Translator in Foundry Tools | Translator |
-| Azure AI Content Understanding | Azure Content Understanding in Foundry Tools | Content Understanding |
-
-**Note**: Azure AI Form Recognizer is now referred to as Azure Document Intelligence.
-
-### Model catalog
-
-| Original Term | New term - First Mention | New term - Subsequent Mentions |
-|---------------|---------------|---------------------|
-| Azure AI model catalog | Foundry model catalog | model catalog |
-| Azure AI Foundry model catalog | Foundry model catalog | model catalog |
-
-### Foundry Models
-
-Use CELA-approved category names for Foundry Models. On first mention, include "Foundry Models" for context. On subsequent mentions, use the category name without the "Foundry Models" prefix.
-
-| Original Term | New term - First Mention | New term - Subsequent Mentions |
-|---------------|---------------|---------------------|
-| Models sold directly by Azure | Foundry Models sold by Azure | Models sold by Azure |
-| Azure Direct Models | Foundry Models sold by Azure | Models sold by Azure |
-| Direct from Azure Models | Foundry Models sold by Azure | Models sold by Azure |
-| AI Foundry Direct Models | Foundry Models sold by Azure | Models sold by Azure |
-| Foundry Models sold by Azure | Foundry Models sold by Azure | Models sold by Azure |
-| Partner models | Foundry Models from partners and community | Models from partners and community |
-| Community models | Foundry Models from partners and community | Models from partners and community |
-| Models from partners and community | Foundry Models from partners and community | Models from partners and community |
-| Third-party models | Foundry Models from partners and community | Models from partners and community |
-
-Do not use "Direct Models," "Azure Direct Models," "Direct from Azure Models," or "AI Foundry Direct Models" as category names.
-
-### RBAC role names
-
-Use the current Foundry RBAC role names in Foundry documentation. The role IDs and core permissions did not change during the rename.
-
-| Original Term | New term |
-|---------------|----------|
-| Azure AI User | Foundry User |
-| Azure AI Owner | Foundry Owner |
-| Azure AI Account Owner | Foundry Account Owner |
-| Azure AI Project Manager | Foundry Project Manager |
-
-When an article mentions one of the renamed roles for the first time, add the include `foundry/includes/role-rename-note.md`.
-
-For code examples or CLI commands that assign one of these roles, prefer the role definition ID during the rename rollout and add the include `foundry/includes/role-rename-note-code.md` after the example.
-
-Do not rename **Azure AI Developer** to a Foundry role name. That role is not part of the Foundry RBAC role rename.
-
-## Protected terms (never replace)
-
-The following terms must **NEVER** be changed, regardless of context:
-
-- **Azure OpenAI** — Retains "Azure" branding as a distinct service
-- **Azure AI Projects client library** — SDK/library names remain unchanged (all case variations)
-- **Azure Project client library** — SDK/library names remain unchanged (all case variations)
-- **Azure AI services subscription** — Subscription terminology remains unchanged (all case variations)
-- **Azure AI Developer** — This role name is not part of the Foundry RBAC role rename
-- **"Azure AI Foundry is now Microsoft Foundry"** — The announcement phrase itself must not be altered
-
-**Rationale**: These terms represent specific technical artifacts (SDKs, subscription types) or the rebrand announcement that require exact terminology for accuracy.
-
-## Special handling rules
-
-### Historical context preservation
-
+1. **Progressive then deep**: Get-started (01→07) is a linear tutorial that
+   builds complexity step by step. Concepts explain foundational mental models
+   and architecture; Agent Capabilities and Workflow Capabilities document
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [MicrosoftDocs/azure-ai-docs](https://github.com/MicrosoftDocs/azure-ai-docs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
