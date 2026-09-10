@@ -1,115 +1,135 @@
 ---
 trigger: always_on
-description: This project demonstrates how to trace and evaluate LangChain LangGraph LLM agents using Amazon SageMaker MLflow. It features a ReAct-type financial assistant agent that integrates with MLflow for enhanced experimentation, management, observability, and evaluation.
+description: Samples for governing ML models with managed MLflow on Amazon SageMaker AI and
 ---
 
-# SageMaker MLflow LangGraph Agent Project
+# AGENT.md
 
-This project demonstrates how to trace and evaluate LangChain LangGraph LLM agents using Amazon SageMaker MLflow. It features a ReAct-type financial assistant agent that integrates with MLflow for enhanced experimentation, management, observability, and evaluation.
+Samples for governing ML models with managed MLflow on Amazon SageMaker AI and
+the SageMaker Model Registry sync (`AutoModelRegistrationEnabled`). Three
+runnable topologies, each a folder with numbered step scripts:
 
-The core functionality includes agent creation (`graph.py`), evaluation utilities (`utils.py`), and MLflow integration for comprehensive agent lifecycle management.
+- `topology-1-single-account/` — governance boundary = IAM role
+- `topology-2-hub-spoke-central/` — hub-owned MLflow app + registry, RAM sharing
+- `topology-3-hub-spoke-hybrid/` — spoke-local everything; approval-triggered
+  copy into the hub as a governance record; deployment stays in the spoke
 
-## Build & Commands
+This file is the validated testing guide (profiles, provisioning, env vars, run
+order, expected outputs, pitfalls, teardown) for both humans and agents.
 
-- Install dependencies: `uv pip sync pyproject.toml`
-- Create virtual environment: `uv venv`
-- Run agent evaluation: `uv run run.py`
-- Alternative with pip: `python run.py`
-- Run Jupyter notebooks: `jupyter notebook`
-- Activate environment: `source .venv/bin/activate`
+## Working conventions
 
-### Development Environment
+- Ask the user for the two profile names (spoke + hub) before provisioning;
+  never guess. Confirm before creating billable infrastructure (MLflow apps,
+  Studio domains, `ml.m5.xlarge` endpoints).
+- Run step scripts from their topology directory with the repo venv
+  (`../.venv/bin/python scripts/NN_*.py`); steps share state via
+  `scripts/.sample_state.json` and must run in order.
+- Long steps (training ~5 min, endpoint ~4 min) should run in the background
+  with output redirected to a log file, then polled.
+- After any deploy step succeeds, run the topology's cleanup step promptly —
+  endpoints bill per instance-hour.
 
-- Python version: >=3.13
-- MLflow tracking server: Amazon SageMaker MLflow
-- AWS Bedrock model: Claude 3.5 Haiku (inference profile)
-- Virtual environment: `.venv/`
-- Configuration: `.env` file (copy from `.env_sample`)
+## Accounts and profiles
 
-## Code Style
+Two AWS CLI profiles are required (any names; the scripts read them from env):
 
-- Python: Type hints with modern Python features (>=3.13)
-- Use descriptive variable/function names following snake_case convention
-- Import organization: Standard library, third-party, local imports
-- Environment variables: Use python-dotenv for configuration management
-- Error handling: Implement proper exception handling for AWS services
-- Documentation: Use docstrings for functions and classes
-- Line length: Follow PEP 8 guidelines (79-88 characters)
-- Use f-strings for string formatting
-- Prefer pathlib for file operations
-- NEVER hardcode AWS credentials or sensitive data
+- **Spoke / development** — where data scientists work. Topology 1 needs only this.
+- **Hub / governance** — owns the central registry. Needed for topologies 2 and 3.
 
-## Testing
+Verify both resolve before doing anything:
 
-- Jupyter notebooks for interactive testing and evaluation
-- MLflow evaluation metrics for agent performance assessment
-- RAGAS integration for comprehensive LLM evaluation
-- Golden dataset: `golden_questions_answer.jsonl` for evaluation
-- Test notebooks: `evaluations.ipynb`, `additional_evaluations_with_ragas.ipynb`
-- Manual testing through `sagemaker_mlflow_strands_agent.ipynb`
+```bash
+aws sts get-caller-identity --profile <spoke-profile>
+aws sts get-caller-identity --profile <hub-profile>
+```
 
-## Architecture
+Region: validated in `us-west-2`. Managed MLflow apps + Model Registry sync are
+not available in every region.
 
-- Agent Framework: LangGraph for stateful, multi-actor applications
-- LLM Provider: AWS Bedrock (Claude 3.5 Haiku)
-- Tracking: Amazon SageMaker MLflow
-- Evaluation: MLflow LLM evaluation + RAGAS metrics
-- Tools: Custom financial data retrieval tools
-- State Management: LangGraph StateGraph with message handling
-- Configuration: Environment-based configuration management
+## Provision (CloudFormation, per account)
 
-## Security
+Each participating account needs one stack from `cfn/sagemaker-studio-mlflow.yaml`
+(Studio domain, execution role, S3 artifact bucket `sagemaker-<region>-<acct>`,
+managed MLflow app with `AutoModelRegistrationEnabled`). No required parameters.
 
-- Use AWS IAM roles and policies for service access
-- Store sensitive configuration in environment variables
-- Never commit `.env` files or AWS credentials to repository
-- Use AWS SDK credential chain for authentication
-- Validate all user inputs in agent tools
-- Follow AWS security best practices for Bedrock and SageMaker
-- Use least privilege principle for AWS permissions
-- Regularly update dependencies for security patches
+Workflow:
 
-## Environment Setup
+1. Verify each profile resolves with `aws sts get-caller-identity --profile <p>`
+   and report the account IDs.
+2. Check whether a `mlflow-governance` stack already exists in each account; if
+   so, skip creation and just read the outputs.
+3. Confirm with the user before creating anything (managed MLflow apps and
+   Studio domains bill while they exist), then deploy per account. Prefer
+   `create-stack` + polling over a blocking wait — the MLflow app takes
+   ~10 minutes per stack.
 
-When setting up the project, configure these environment variables in `.env`:
+```bash
+# Spoke (needed for all topologies)
+aws cloudformation deploy --template-file cfn/sagemaker-studio-mlflow.yaml \
+  --stack-name mlflow-governance --capabilities CAPABILITY_IAM \
+  --parameter-overrides DomainName=mlops-dev-domain MLflowAppName=mlflow-dev \
+  --profile <spoke-profile> --region us-west-2
 
-1. `PROJECT`: Your project identifier
-2. `MLFLOW_URI_SMAI`: SageMaker MLflow tracking server ARN
-3. `MLFLOW_EXPERIMENT_ID`: MLflow experiment identifier
-4. `VERSION`: Project version
-5. `MODELID`: Bedrock model ID (e.g., Claude 3.5 Haiku inference profile)
-6. `AWS_REGION`: AWS region for services
+# Hub (needed for topologies 2 and 3)
+aws cloudformation deploy --template-file cfn/sagemaker-studio-mlflow.yaml \
+  --stack-name mlflow-governance --capabilities CAPABILITY_IAM \
+  --parameter-overrides DomainName=mlops-hub-domain MLflowAppName=mlflow-hub \
+  --profile <hub-profile> --region us-west-2
+```
 
-All configuration keys use UPPERCASE naming and MUST be documented in `.env_sample`.
+- If the bucket `sagemaker-<region>-<acct>` already exists, stack creation
+  fails — delete or adapt first; surface this instead of retrying.
+- When `CREATE_COMPLETE`, read the outputs you need (`MLflowAppArn`,
+  `SageMakerExecutionRoleArn`):
 
-## Agent Components
+```bash
+aws cloudformation describe-stacks --stack-name mlflow-governance \
+  --query "Stacks[0].Outputs[?OutputKey=='MLflowAppArn' || OutputKey=='SageMakerExecutionRoleArn'].[OutputKey,OutputValue]" \
+  --output table --profile <profile> --region us-west-2
+```
 
-- **Graph Definition**: `graph.py` - LangGraph agent implementation
-- **Tools**: `tools.py` - Custom tools for financial data retrieval
-- **Utilities**: `utils.py` - MLflow integration and evaluation functions
-- **Data**: `data.py` - Data handling and processing utilities
-- **Prompts**: `mlflow_prompts.py` - MLflow prompt registry integration
-- **Evaluation**: Jupyter notebooks for comprehensive agent testing
+## Python environment
 
-## MLflow Integration
+Use **Python 3.12** (matches the `py312` scikit-learn container used for training
+and serving). All three topologies share the same pinned `requirements.txt`
+(`sagemaker>=3,<4`, `mlflow<4`, `sagemaker-mlflow>=0.5`, `scikit-learn 1.4.x`):
 
-- Experiment tracking with SageMaker MLflow
-- Agent performance evaluation using MLflow LLM metrics
-- Prompt registry for version control and management
-- Trace logging for agent execution analysis
-- Model registration and deployment capabilities
-- Integration with RAGAS for extended evaluation metrics
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-## Troubleshooting
+Run every step script **from its topology directory** so relative paths resolve.
+Each topology persists progress in `scripts/.sample_state.json` — steps must run
+in order, and a stale state file from a previous run should be deleted before
+step 1.
 
-Common issues and solutions:
-- ROCm library warnings can be safely ignored
-- AttributeError with 'NoneType' rsmi_shut_down can be ignored
-- Ensure AWS credentials are properly configured
-- Verify SageMaker MLflow tracking server is accessible
-- Check Bedrock model access permissions
-- Validate environment variable configuration
+## Run order and env vars per topology
+
+### Topology 1 — single account (spoke only)
+
+```bash
+export AWS_PROFILE=<spoke-profile> AWS_DEFAULT_REGION=us-west-2
+export MLFLOW_APP_ARN=<spoke MLflowAppArn>
+export EXECUTION_ROLE=<spoke SageMakerExecutionRoleArn>
+cd topology-1-single-account
+python scripts/01_train_and_register.py   # ~5 min: real SageMaker Training Job
+python scripts/02_govern_lifecycle.py     # staging OK, production explicitDeny, officer approves
+python scripts/03_deploy_and_invoke.py    # ~4 min: real ml.m5.xlarge endpoint
+python scripts/04_cleanup.py
+```
+
+### Topology 2 — hub-and-spoke central
+
+```bash
+export HUB_PROFILE=<hub-profile> SPOKE_PROFILE=<spoke-profile> AWS_DEFAULT_REGION=us-west-2
+export HUB_MLFLOW_APP_ARN=<hub MLflowAppArn>
+export SPOKE_EXECUTION_ROLE=<spoke SageMakerExecutionRoleArn>
+cd topology-2-hub-spoke-central
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aws-samples/genai-ml-platform-examples](https://github.com/aws-samples/genai-ml-platform-examples) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
