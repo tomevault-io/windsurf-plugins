@@ -104,4 +104,4 @@ and refer to it by that name.
 
 ---
 > Source: [ecmwf/thermofeel](https://github.com/ecmwf/thermofeel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
