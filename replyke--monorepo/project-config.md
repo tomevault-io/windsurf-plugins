@@ -7,73 +7,119 @@ description: This file provides guidance to Claude Code (claude.ai/code) when wo
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+This is the **@sublay/node** package - the official Node.js SDK for Sublay. It's designed for server-side Node.js environments where React is not available or needed, such as server actions, backend APIs, scheduled jobs, webhooks, and CLI tools.
+
+**Package Name**: @sublay/node
+**Version**: 7.12.0
+**Type**: Node.js SDK library (published to npm)
+
 ## Development Commands
 
-### Building
-- `pnpm run build-all` - Builds all packages in the monorepo in dependency order
-- Individual package builds: `pnpm --filter @replyke/[package-name] run build`
-- Each package builds to ESM and CJS formats using TypeScript
+```bash
+# Build the package
+pnpm build
 
-### Publishing
-- `pnpm run publish-prod` - Publishes all packages to production
-- `pnpm run publish-beta` - Publishes all packages with beta tag
+# Whole-project type-check (tsc --noEmit) - catches errors in source files
+# tsup's entry-graph-only build never reaches; emits nothing itself, so it
+# can't clobber build's declaration output
+pnpm build:types
 
-## Architecture Overview
+# Build both (runs before publishing)
+pnpm prepare
 
-This is a **monorepo** for Replyke, an open-source social features framework. The project uses pnpm workspaces and follows a layered architecture:
+# Publishing is done from the monorepo root, not this package directory
+# (run from /monorepo): pnpm node:publish-beta:patch / pnpm node:publish-prod:patch
+# Use the :patch (or :minor) form — see "Publishing to npm" below for why.
+```
 
-### Core Architecture Layers
+## Core Architecture
 
-1. **API Foundation** - All functionality is accessible through REST APIs
-2. **Libraries & SDKs** - TypeScript libraries that wrap the API with hooks and utilities
-3. **UI Components** - Ready-to-use React/React Native components built on the libraries
+### Module Structure
 
-### Package Structure
+The SDK exposes **16 modules** bound on `SublayClient` (camelCase accessor in
+parentheses). Every endpoint is reached with a **service key**; operations that
+act on behalf of a user take an explicit `userId` (or `actingUserId` on the
+nested `users` follow/connection routes and the `chat` target routes), since a
+service key has no implicit session user.
 
-The monorepo is organized into these main packages:
+```
+src/
+├── core/
+│   └── client.ts           # HTTP client with axios instances
+├── interfaces/             # TypeScript type definitions (Entity, Comment, User,
+│                           #   Collection, Connection, Follow, Report, Space, …)
+├── modules/
+│   ├── entities/           # client.entities
+│   ├── events/             # client.events
+│   ├── comments/           # client.comments
+│   ├── users/              # client.users (incl. nested follow/connection actions)
+│   ├── spaces/             # client.spaces
+│   ├── search/             # client.search
+│   ├── auth/               # client.auth
+│   ├── hosted-apps/        # client.hostedApps
+│   ├── collections/        # client.collections      (service-key userId)
+│   ├── connections/        # client.connections      (service-key userId)
+│   ├── follows/            # client.follows          (service-key userId)
+│   ├── reports/            # client.reports          (service-key userId)
+│   ├── app-notifications/  # client.appNotifications (service-key userId)
+│   ├── storage/            # client.storage          (service-key userId)
+│   ├── push/               # client.push             (service-key userIds batch)
+│   └── chat/               # client.chat             (service-key userId / actingUserId)
+└── index.ts                # Main entry point with SublayClient class
+```
 
-- **`@replyke/core`** - Core hooks, context providers, and utilities for both React and React Native
-- **`@replyke/react-js`** - React-specific implementations and re-exports from core
-- **`@replyke/react-native`** - React Native-specific implementations with token management
-- **`@replyke/expo`** - Expo-specific implementations with secure token storage
+> **Not bound (unmounted):** `oauth` only. It's a browser redirect flow with no
+> meaningful server-to-server contract — the directory stays on disk but is not
+> exposed on `SublayClient`.
+>
+> The space-scoped chat endpoints (`getSpaceConversation`, `moderateSpaceChatMessage`,
+> `handleSpaceChatReport`) live on **`client.spaces`** (they're `/spaces/...` routes),
+> not on `client.chat`.
 
-#### UI Packages
-- **`@replyke/ui-core`** - Shared UI utilities and interfaces
-- **`@replyke/ui-core-react-js`** - React-specific UI components (avatars, skeletons, icons)
-- **`@replyke/ui-core-react-native`** - React Native-specific UI components
+### HTTP Client Configuration
 
-#### Comments System
-- **`@replyke/comments-social-core`** - Core styling and configuration for social comments
-- **`@replyke/comments-social-react-js`** - Complete React comment system with modals
-- **`@replyke/comments-social-react-native`** - Complete React Native comment system with sheets
+The SDK uses three axios instances for different API endpoints:
 
-### Key Context Providers
+- **projectInstance**: `https://api.sublay.io/v7/{projectId}` - Main project-scoped API
+- **internalInstance**: `https://api.sublay.io/internal` - Internal operations (verification, admin)
+- **baseInstance**: `https://api.sublay.io` - Base API endpoint
 
-The framework uses React Context for state management:
-- `ReplykeProvider` - Root provider with project configuration
-- `EntityProvider` - Manages individual entities (posts, articles, etc.)
-- `EntityListProvider` - Manages collections of entities with filtering/sorting
-- `CommentSectionProvider` - Manages comment threads and interactions
-- `AuthProvider` - Handles authentication state
-- `ListsProvider` - Manages user-created lists and collections
+**Authentication Headers**:
+- `Authorization: Bearer {apiKey}`
+- `X-Sublay-Project-ID: {projectId}`
+- `X-Sublay-Internal: true` (for internal operations)
 
-### Development Patterns
+### Initialization Pattern
 
-- **Workspace Dependencies**: Packages use `workspace:*` for internal dependencies
-- **Build Process**: Each package compiles to both ESM (`dist/esm`) and CJS (`dist/cjs`) formats
-- **TypeScript**: All packages use TypeScript with separate configs for ESM/CJS builds
-- **Context-Hook Pattern**: UI components get state through context providers and custom hooks
-- **Platform Abstraction**: Shared core logic with platform-specific implementations
+```typescript
+import { SublayClient } from '@sublay/node';
 
-### Usage Flow
+const client = await SublayClient.init({
+    projectId: "your-project-id",
+    apiKey: "your-api-key",
+    isInternal?: boolean  // optional
+});
 
-1. Wrap app in `ReplykeProvider` with project ID and authentication token
-2. Use `EntityProvider` to define the content being discussed
-3. Add social components like `SocialCommentSection` which self-contain all UI and logic
-4. Components automatically handle API calls, state management, and real-time updates
+// Automatically verifies credentials on init via /service/verify endpoint
+```
 
-All social features (comments, votes, follows, lists, notifications) follow this same provider + hooks + components pattern.
+## API Modules & Features
+
+`SublayClient` binds **15 modules**. The source of truth is `src/index.ts` (the `bindModule` calls) and each module's `index.ts`. The full public surface and per-function props/returns are documented in `docs/v7/node-sdk/`.
+
+**Acting on behalf of a user**: the SDK authenticates as the project (service key), not as an end user. So user-scoped functions take an explicit `userId` — the user the operation is performed as. A few routes act on one user *toward another* and take the actor as `actingUserId` while `userId` is the target: the nested follow/connection routes on the `users` module, and `chat.createDirectConversation` / `chat.addMember` / `chat.removeMember` / `chat.changeMemberRole`.
+
+**Intentionally NOT bound**: `oauth` only (a browser redirect flow). The directory exists under `src/modules/` but is not exposed on `SublayClient`; do not document it.
+
+### 1. Entities Module (16 functions)
+
+Core content objects (posts, articles, products, listings, etc.).
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [replyke/monorepo](https://github.com/replyke/monorepo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
