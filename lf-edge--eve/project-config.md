@@ -90,4 +90,4 @@ Use this persona when improving structure without intentionally changing behavio
 
 ---
 > Source: [lf-edge/eve](https://github.com/lf-edge/eve) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
