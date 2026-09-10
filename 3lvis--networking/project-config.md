@@ -74,4 +74,4 @@ Cross-file contracts an agent must hold; the *why* lives in each file's comments
 
 ---
 > Source: [3lvis/Networking](https://github.com/3lvis/Networking) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
