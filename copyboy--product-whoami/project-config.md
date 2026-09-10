@@ -1,203 +1,202 @@
 ---
 trigger: always_on
-description: CursorRIPER Framework - Task Management
+description: > Personal portfolio website combining blog functionality with product showcase capabilities.
 ---
 
-date_created: "2025-06-05"
-last_updated: "2025-06-05"
-framework_component: "task-management"
-priority: "high"
-scope: "development_maintenance"
+# Product Whoami — Agent Instructions
+
+> Personal portfolio website combining blog functionality with product showcase capabilities.
+> Deployed at: https://i.zhangqingdong.cn
+
 ---
-<!-- Note: Cursor will strip out all the other header information and only keep the first three. -->
-# CursorRIPER Framework - Task Management
-# Version 1.0.0
 
-## AI PROCESSING INSTRUCTIONS
-This component manages enterprise-level task iteration and planning within the CursorRIPER Framework. As an AI assistant, you MUST:
-- Only load this component when PROJECT_PHASE is "DEVELOPMENT" or "MAINTENANCE"
-- Follow strict task creation and management protocols
-- Maintain task documentation and progress tracking
-- Never modify active tasks without proper authorization
-- Integrate task management with the RIPER workflow
+## Project Overview
 
-## TASK MANAGEMENT OVERVIEW
+**product_whoami** 是一个基于 Astro 的个人网站，包含以下核心功能：
 
-The Task Management system provides structured iteration tracking for enterprise development projects. It integrates seamlessly with the RIPER workflow to ensure proper planning, execution, and documentation of all development tasks.
+| 模块 | 说明 |
+|------|------|
+| **Blog** | 技术文章、学习笔记、深度研究（MDX 格式） |
+| **Projects** | 作品展示（China Neighbor、Modern Blog Template 等） |
+| **Web3 专栏** | 区块链学习路线图（Bitcoin → Ethereum → DApp → DeFi → DAO） |
+| **Search** | 基于 Fuse.js 的全文搜索 |
+| **i18n** | astro-i18next 多语言支持 |
 
-## TASK DIRECTORY STRUCTURE
+**技术栈：** Astro 4 + React 18 + Tailwind CSS + TypeScript
+
+---
+
+## Tech Stack
+
+| 类别 | 技术 |
+|------|------|
+| 框架 | Astro 4 (`^4.0.0`) |
+| UI | React 18, Tailwind CSS 3.4 |
+| 内容 | MDX + Astro Content Collections |
+| 搜索 | Fuse.js 7 |
+| 图表 | Mermaid 11 |
+| 部署 | Cloudflare Pages |
+
+---
+
+## Project Structure
 
 ```
-.tasks/
-├── active/                    # Currently active tasks
-│   └── YYYY-MM-DD_X_task-name/
-│       ├── task.md           # Task definition and requirements
-│       ├── plan.md           # Detailed implementation plan
-│       ├── progress.md       # Implementation progress tracking
-│       └── notes.md          # Development notes and decisions
-├── completed/                 # Completed tasks
-│   └── YYYY-MM-DD_X_task-name/
-├── archived/                  # Archived tasks
-│   └── YYYY-MM-DD_X_task-name/
-└── templates/                 # Task templates
-    ├── feature.md
-    ├── bugfix.md
-    ├── enhancement.md
-    └── maintenance.md
+src/
+├── components/          # Astro/React 组件
+│   ├── web3/           # Web3 专栏专用组件
+│   ├── islands/         # React islands（交互组件）
+│   └── *.astro         # Astro 组件
+├── content/
+│   ├── blog/           # 博客文章（MDX）
+│   ├── config.ts       # Content Collections schema
+│   └── projects/       # 项目展示（MDX）
+├── data/               # JSON 数据（web3-roadmap-data.json）
+├── icons/              # SVG 图标
+├── layouts/
+│   ├── BaseLayout.astro    # HTML 壳
+│   └── ThreeColumnLayout.astro  # 三栏布局（Nav + Main + Sidebar）
+├── pages/
+│   ├── api/            # API 路由
+│   ├── blog/           # 博客列表/详情
+│   ├── categories/     # 分类页
+│   ├── projects/       # 项目展示
+│   ├── tags/           # 标签页
+│   ├── web3/           # Web3 专栏
+│   │   ├── index.astro         # 主页
+│   │   ├── roadmap.astro       # 学习路线图
+│   │   ├── report.astro        # 深度研究报告
+│   │   ├── concept/[slug].astro  # 概念详情页
+│   │   └── phase/[n].astro    # 阶段详情页
+│   ├── about.astro
+│   ├── index.astro
+│   └── search.astro
+├── styles/
+│   └── global.css
+├── types/
+├── utils/              # 工具函数
+│   ├── config.ts       # 站点配置
+│   ├── web3Concepts.ts  # Web3 概念元数据
+│   └── web3Roadmap.ts  # 路线图工具函数
+└── main.tsx            # React 入口
 ```
 
-## TASK NAMING CONVENTION
+---
 
-Tasks follow the format: `YYYY-MM-DD_X_task-name`
-- YYYY-MM-DD: Creation date
-- X: Sequential number for tasks created on the same date (1, 2, 3, etc.)
-- task-name: Descriptive name using kebab-case
+## Key Conventions
 
-Examples:
-- `2025-06-05_1_fix-jenkins-setting-validation`
-- `2025-06-05_2_add-kubernetes-operator-support`
-- `2025-06-06_1_enhance-devops-pipeline`
+### Content Collections Schema
 
-## TASK LIFECYCLE WORKFLOW
-
-```mermaid
-flowchart TD
-    A[Task Request] --> B{Task Type?}
-    B -->|Feature| C[Create Feature Task]
-    B -->|Bug Fix| D[Create Bug Fix Task]
-    B -->|Enhancement| E[Create Enhancement Task]
-    B -->|Maintenance| F[Create Maintenance Task]
-    
-    C --> G[PLAN Mode]
-    D --> G
-    E --> G
-    F --> G
-    
-    G --> H[Create Task Directory]
-    H --> I[Generate Task Files]
-    I --> J[EXECUTE Mode]
-    J --> K[Implementation]
-    K --> L[Progress Tracking]
-    L --> M{Task Complete?}
-    M -->|No| K
-    M -->|Yes| N[REVIEW Mode]
-    N --> O[Validation]
-    O --> P{Review Pass?}
-    P -->|No| K
-    P -->|Yes| Q[Move to Completed]
-    Q --> R[Update State]
-    R --> S[Archive Task]
+**Blog 文章必需字段：**
+```yaml
+title: string
+description: string
+pubDate: date
+tags: string[]
+categories: string[]
+subject?: string
+location?: string
+heroImage?: string
+draft?: boolean (default: false)
+featured?: boolean (default: false)
 ```
 
-## TASK COMMANDS
+### Web3 学习路线图
 
-### Task Creation Commands
-- `/task create <type> <name>` - Create new task
-- `/task list` - List all tasks
-- `/task active` - Show active tasks
-- `/task switch <task-id>` - Switch to specific task
-- `/task complete` - Mark current task as complete
-- `/task pause` - Pause current task
-- `/task resume <task-id>` - Resume paused task
+路线图数据在 `src/data/web3-roadmap-data.json`，5 个阶段：
 
-### Task Types
-- `feature` - New feature development
-- `bugfix` - Bug fix and troubleshooting
-- `enhancement` - Improvement to existing functionality
-- `maintenance` - Code maintenance and refactoring
+| Phase | 主题 | 状态 |
+|-------|------|------|
+| 1 | Bitcoin — 去中心化价值转移 | 4/4 完成 |
+| 2 | Ethereum — 去中心化计算 | 4/4 完成 |
+| 3 | DApp — 去中心化应用 | 4/4 |
+| 4 | DeFi — 去中心化金融市场 | 4/4 完成 |
+| 5 | DAO — 去中心化组织 | 4/4 |
 
-## TASK TEMPLATE STRUCTURES
+---
 
-### Feature Task Template
-```markdown
-# Feature Task: [Task Name]
+## GitNexus Integration
 
-## Task Information
-- **Task ID**: [YYYY-MM-DD_X_task-name]
-- **Type**: Feature
-- **Priority**: [High/Medium/Low]
-- **Estimated Time**: [X hours/days]
-- **Assignee**: [Name/AI Assistant]
-- **Created**: [Date]
-- **Status**: [PLANNED/ACTIVE/PAUSED/COMPLETED/REVIEWED/ARCHIVED]
+This project is indexed by GitNexus as **product_whoami** (3101 symbols, 3097 relationships, 0 execution flows).
 
-## Requirements
-- [ ] Functional requirement 1
-- [ ] Functional requirement 2
-- [ ] Non-functional requirement 1
+### Always Do
 
-## Acceptance Criteria
-- [ ] Criteria 1
-- [ ] Criteria 2
-- [ ] Criteria 3
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding.
 
-## Dependencies
-- [ ] Dependency 1
-- [ ] Dependency 2
+### Tools Quick Reference
 
-## Technical Considerations
-- Architecture impact
-- Security considerations
-- Performance implications
-- Testing requirements
+| Tool | Command |
+|------|---------|
+| Query by concept | `gitnexus_query({query: "auth validation"})` |
+| Symbol context | `gitnexus_context({name: "validateUser"})` |
+| Blast radius | `gitnexus_impact({target: "X", direction: "upstream"})` |
+| Pre-commit check | `gitnexus_detect_changes({scope: "staged"})` |
+| Safe rename | `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` |
 
-## Implementation Notes
-[Space for implementation details and decisions]
+### Impact Risk Levels
+
+| Depth | Meaning | Action |
+|-------|---------|--------|
+| d=1 | WILL BREAK — direct callers | MUST update these |
+| d=2 | LIKELY AFFECTED — indirect deps | Should test |
+| d=3 | MAY NEED TESTING — transitive | Test if critical path |
+
+### Self-Check Before Finishing
+
+1. `gitnexus_impact` was run for all modified symbols
+2. No HIGH/CRITICAL risk warnings were ignored
+3. `gitnexus_detect_changes()` confirms changes match expected scope
+4. All d=1 (WILL BREAK) dependents were updated
+
+### Keeping Index Fresh
+
+After committing code changes, re-run analyze to update the index:
+
+```bash
+npx gitnexus analyze
 ```
 
-### Bug Fix Task Template
-```markdown
-# Bug Fix Task: [Task Name]
+---
 
-## Task Information
-- **Task ID**: [YYYY-MM-DD_X_task-name]
-- **Type**: Bug Fix
-- **Priority**: [Critical/High/Medium/Low]
-- **Severity**: [Critical/Major/Minor]
-- **Assignee**: [Name/AI Assistant]
-- **Created**: [Date]
-- **Status**: [PLANNED/ACTIVE/PAUSED/COMPLETED/REVIEWED/ARCHIVED]
+## Skill Calling Strategy
 
-## Bug Description
-[Detailed description of the bug]
+This project has 47+ skills available. **Follow the decision flow below.**
 
-## Steps to Reproduce
-1. Step 1
-2. Step 2
-3. Step 3
+### Decision Flow
 
-## Expected Behavior
-[What should happen]
+| 场景 | Skill | 入口命令 |
+|------|-------|----------|
+| 了解代码架构 | `gstack:brainstorming` | `/brainstorm` |
+| 实现功能 / 写代码 | `superpowers:writing-plans` | `/plan` |
+| 调试 Bug / 根因分析 | `gstack:investigate` | `/investigate` |
+| 代码审查 / PR review | `gstack:review` | `/review` |
+| QA 测试 / 找 Bug | `gstack:qa` | `/qa <url>` |
+| 部署上线 | `gstack:ship` | `/ship` |
+| 每日 AI 新闻 | `morning-ai:morning-ai` | `/morning-ai` |
+| 微信文章转 Markdown | `wechat-to-md` | 直接提供 URL |
+| Wiki 知识库 | `wiki:wiki` | `/wiki` |
 
-## Actual Behavior
-[What actually happens]
+### Skill 调用三原则
 
-## Root Cause Analysis
-[Analysis of the root cause]
+1. **基础上下文放 AGENTS.md** — AI 主动使用 skill 的概率低，先在文档里写清楚规则
+2. **Skill 要提供可直接调用的入口** — gstack 类 skill 本身就是入口，通过 `/skill-name` 直接调用
+3. **显式告诉 AI 调哪个函数** — 禁止 AI 自己拼装脚本路径
 
-## Fix Strategy
-[Approach to fix the bug]
+### 高频 Skills 入口速查
 
-## Test Plan
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] Regression tests
+| Skill | 调用方式 |
+|-------|----------|
+| `/investigate` | 四阶段调试流程 |
+| `/review` | PR 审查 |
+| `/qa <url>` | QA 测试并修复 |
+| `/ship` | 部署和创建 PR |
+| `/morning-ai` | 每日 AI 新闻 |
+| wechat-to-md | `convert_article` MCP 工具 |
 
-## Verification Steps
-- [ ] Verification step 1
-- [ ] Verification step 2
-```
+---
 
-## TASK INTEGRATION WITH RIPER WORKFLOW
-
-### RESEARCH Mode + Task Management
-- Analyze existing tasks and their relationships
-- Research similar implementations
-- Gather requirements and constraints
-- Document findings in task notes
-
-### INNOVATE Mode + Task Management
-- Brainstorm implementation approaches
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
