@@ -5,11 +5,10 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [manthanank/learn-nodejs](https://github.com/manthanank/learn-nodejs).
+Original source: `CLAUDE.md` in [manthanank/learn-nodejs](https://github.com/manthanank/learn-nodejs).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
