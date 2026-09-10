@@ -1,124 +1,140 @@
 ---
 trigger: always_on
-description: <!-- OPENSPEC:START -->
+description: Instructions for AI coding assistants using OpenSpec for spec-driven development.
 ---
 
-<!-- OPENSPEC:START -->
 # OpenSpec Instructions
 
-These instructions are for AI assistants working in this project.
+Instructions for AI coding assistants using OpenSpec for spec-driven development.
 
-Always open `@/openspec/AGENTS.md` when the request:
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
+## TL;DR Quick Checklist
 
-Use `@/openspec/AGENTS.md` to learn:
-- How to create and apply change proposals
-- Spec format and conventions
-- Project structure and guidelines
+- Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
+- Decide scope: new capability vs modify existing capability
+- Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
+- Scaffold: `proposal.md`, `tasks.md`, `design.md` (only if needed), and delta specs per affected capability
+- Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
+- Validate: `openspec validate [change-id] --strict` and fix issues
+- Request approval: Do not start implementation until proposal is approved
 
-Keep this managed block so 'openspec update' can refresh the instructions.
+## Three-Stage Workflow
 
-<!-- OPENSPEC:END -->
+### Stage 1: Creating Changes
+Create proposal when you need to:
+- Add features or functionality
+- Make breaking changes (API, schema)
+- Change architecture or patterns  
+- Optimize performance (changes behavior)
+- Update security patterns
 
-# undatum — Agent Guide
+Triggers (examples):
+- "Help me create a change proposal"
+- "Help me plan a change"
+- "Help me create a proposal"
+- "I want to create a spec proposal"
+- "I want to create a spec"
 
-## Project Overview
+Loose matching guidance:
+- Contains one of: `proposal`, `change`, `spec`
+- With one of: `create`, `plan`, `make`, `start`, `help`
 
-**undatum** is a Python command-line tool for data processing and analysis. It provides a unified interface for converting, analyzing, validating, and transforming data across multiple formats with a focus on low memory footprint through streaming.
+Skip proposal for:
+- Bug fixes (restore intended behavior)
+- Typos, formatting, comments
+- Dependency updates (non-breaking)
+- Configuration changes
+- Tests for existing behavior
 
-- **Repository**: https://github.com/datenoio/undatum
-- **Version**: 1.7.0
-- **License**: MIT
-- **Author**: Ivan Begtin <ivan@begtin.tech>
-- **Python requirement**: >= 3.9
+**Workflow**
+1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
+2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
+3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
+4. Run `openspec validate <id> --strict` and resolve any issues before sharing the proposal.
 
-### Key Capabilities
+### Stage 2: Implementing Changes
+Track these steps as TODOs and complete them one by one.
+1. **Read proposal.md** - Understand what's being built
+2. **Read design.md** (if exists) - Review technical decisions
+3. **Read tasks.md** - Get implementation checklist
+4. **Implement tasks sequentially** - Complete in order
+5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
+6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
+7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
 
-- Multi-format I/O: CSV, JSON Lines, BSON, XML, XLS, XLSX, Parquet, AVRO, ORC, YAML, TSV, plus 140+ formats via `iterabledata` (geospatial, lakehouse, scientific; see `docs/docs/formats/index.md`)
-- Compression: ZIP, XZ, GZ, BZ2, ZSTD, LZ4, 7Z (codec profiles `fast`/`balanced`/`max` via iterabledata)
-- Streaming processing for large files via `iterabledata`
-- Automatic encoding, delimiter, and file type detection
-- Data validation with built-in and custom rules
-- Statistics and field analysis (including DuckDB-accelerated stats)
-- Filtering and querying with expressions
-- Schema generation and Frictionless Data Packaging
-- Database ingestion: MongoDB, PostgreSQL, DuckDB, MySQL, SQLite, Elasticsearch
-- AI-powered dataset documentation via multiple LLM providers
-- Optional read-only Data API over files (FastAPI + DuckDB)
-- Extensible plugin system
+### Stage 3: Archiving Changes
+After deployment, create separate PR to:
+- Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
+- Update `specs/` if capabilities changed
+- Use `openspec archive <change-id> --skip-specs --yes` for tooling-only changes (always pass the change ID explicitly)
+- Run `openspec validate --strict` to confirm the archived change passes checks
 
-## Technology Stack
+## Before Any Task
 
-| Layer | Libraries |
-|-------|-----------|
-| CLI framework | `typer`, `click` |
-| Console output | `rich` |
-| Data processing | `pandas`, `duckdb`, `iterabledata` |
-| Serialization | `orjson`, `jsonlines`, `bson`, `xmltodict`, `pyyaml`, `avro`, `pyorc` |
-| Compression | `lz4`, `py7zr`, `pyzstd` |
-| Excel | `openpyxl`, `xlrd`, `xlwt` |
-| Validation | `validators`, `pydantic` |
-| Query/filter | DuckDB SQL (`undatum sql`); comparison `--filter` expressions |
-| AI providers | `requests` (OpenAI, OpenRouter, Ollama, LM Studio, Perplexity) |
-| Testing | `pytest`, `pytest-cov`, `pytest-benchmark` |
-| Linting/formatting | `black`, `ruff`, `pylint`, `mypy` |
+**Context Checklist:**
+- [ ] Read relevant specs in `specs/[capability]/spec.md`
+- [ ] Check pending changes in `changes/` for conflicts
+- [ ] Read `openspec/project.md` for conventions
+- [ ] Run `openspec list` to see active changes
+- [ ] Run `openspec list --specs` to see existing capabilities
 
-## Project Structure
+**Before Creating Specs:**
+- Always check if capability already exists
+- Prefer modifying existing specs over creating duplicates
+- Use `openspec show [spec]` to review current state
+- If request is ambiguous, ask 1–2 clarifying questions before scaffolding
+
+### Search Guidance
+- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
+- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
+- Show details:
+  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
+  - Change: `openspec show <change-id> --json --deltas-only`
+- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+
+## Quick Start
+
+### CLI Commands
+
+```bash
+# Essential commands
+openspec list                  # List active changes
+openspec list --specs          # List specifications
+openspec show [item]           # Display change or spec
+openspec validate [item]       # Validate changes or specs
+openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
+
+# Project management
+openspec init [path]           # Initialize OpenSpec
+openspec update [path]         # Update instruction files
+
+# Interactive mode
+openspec show                  # Prompts for selection
+openspec validate              # Bulk validation mode
+
+# Debugging
+openspec show [change] --json --deltas-only
+openspec validate [change] --strict
+```
+
+### Command Flags
+
+- `--json` - Machine-readable output
+- `--type change|spec` - Disambiguate items
+- `--strict` - Comprehensive validation
+- `--no-interactive` - Disable prompts
+- `--skip-specs` - Archive without spec updates
+- `--yes`/`-y` - Skip confirmation prompts (non-interactive archive)
+
+## Directory Structure
 
 ```
-undatum/
-├── __init__.py           # Package metadata (__version__, __author__)
-├── __main__.py           # CLI entry point (undatum / data commands)
-├── core.py               # Main Typer app and command registration
-├── constants.py          # File type lists, date patterns, EU themes
-├── utils.py              # General utilities
-├── ai/                   # AI provider implementations
-│   ├── base.py           # AIService abstract base and errors
-│   ├── config.py         # AI configuration loading
-│   ├── perplexity.py     # Legacy Perplexity provider
-│   ├── providers.py      # OpenAI, OpenRouter, Ollama, LM Studio providers
-│   └── schemas.py        # Pydantic schemas for AI output
-├── cmds/                 # Individual CLI command implementations (~40 modules)
-│   ├── analyzer.py       # analyze command
-│   ├── api.py            # api subcommands
-│   ├── converter.py      # convert command
-│   ├── db_load.py        # db load command
-│   ├── db_query.py       # db query command
-│   ├── doc.py            # doc command (dataset documentation)
-│   ├── extractor.py      # extract command (PDF/table extraction)
-│   ├── pipeline.py       # pipeline command
-│   ├── statistics.py     # stats command
-│   ├── validator.py      # validate command
-│   └── ...               # Many more commands
-├── common/               # Shared utilities used by commands
-│   ├── chunked_io.py     # Chunked file I/O helpers
-│   ├── db_connection.py  # Database connection management
-│   ├── duckdb_config.py  # DuckDB configuration helpers
-│   ├── engine_selector.py# Processing engine selection
-│   ├── errors.py         # UndatumError hierarchy and error handling
-│   ├── filter.py         # Data filtering logic
-│   ├── functions.py      # Dict helper functions (dot-notation access)
-│   ├── iterable.py       # Iterable data wrappers
-│   ├── masking.py        # Data masking utilities
-│   ├── parallel.py       # Parallel processing helpers
-│   ├── path_utils.py     # Path and S3 URI utilities
-│   ├── pipeline_parser.py# Pipeline DSL parser
-│   ├── progress.py       # Progress bar helpers
-│   ├── s3_iterable.py    # S3-backed iterable data
-│   ├── schema_utils.py   # Schema generation helpers
-│   ├── scheme.py         # URL scheme handlers
-│   └── validation_rules.py# Built-in validation rules
-├── formats/              # Format-specific handlers
-│   ├── docx.py           # Word document I/O
-│   └── s3.py             # S3 writer and client
-├── plugins/              # Plugin system
-│   ├── base.py           # Plugin base classes
-│   ├── manager.py        # Plugin loading and registration
+openspec/
+├── project.md              # Project conventions
+├── specs/                  # Current truth - what IS built
+│   └── [capability]/       # Single focused capability
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [datenoio/undatum](https://github.com/datenoio/undatum) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
