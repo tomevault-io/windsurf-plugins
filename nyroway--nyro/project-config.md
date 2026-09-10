@@ -1,98 +1,138 @@
 ---
 trigger: always_on
-description: <!-- Generated: 2026-05-21 | Updated: 2026-05-21 -->
+description: <!-- This file governs go/ and all of its subdirectories. -->
 ---
 
-<!-- Generated: 2026-05-21 | Updated: 2026-05-21 -->
+<!-- This file governs go/ and all of its subdirectories. -->
+<!-- The repository-root AGENTS.md still applies. These Go-specific rules take precedence on conflict. -->
 
-# Nyro AI Gateway
+# Nyro Go
 
-## Purpose
-Nyro is a Rust workspace for a local AI protocol gateway with a Tauri desktop app, standalone server, and React WebUI. It translates OpenAI / Anthropic / Gemini-compatible client traffic to configured model providers while keeping administration and configuration local.
+## Purpose and current state
 
-## Key Files
+`go/` is the Go implementation of Nyro AI Gateway. It includes the data plane,
+standalone server, control plane, WebUI, configuration management, storage,
+quota, telemetry, and administrative tooling.
 
-| File | Description |
-|------|-------------|
-| `Cargo.toml` | Rust workspace definition for `nyro-core`, `nyro-tools`, `src-tauri`, and `src-server`. |
-| `Cargo.lock` | Locked Rust dependency graph. |
-| `README.md` / `README_CN.md` | User-facing project documentation in English and Chinese. |
-| `Makefile` | Common development and release commands. |
-| `docs/design/architecture.md` | Architecture overview and module layout. |
-| `webui/package.json` | React/Vite WebUI dependencies and scripts. |
+The workload-neutral generation Host and the trusted LLM vertical slice are
+implemented. Current requests use immutable configuration Snapshots, atomic
+typed runtime generations, leases, explicit Protocol and Provider catalogs,
+the fixed LLM pipeline, and generation-owned runtime resources.
 
-## Subdirectories
+Other module migrations are not complete. MCP, cross-domain Integration
+composition, and Image, Audio, and Video workload runtimes are future designs
+only. Do not claim their packages or capabilities exist. Preserve current
+behavior while migrating other vertical slices incrementally.
 
-| Directory | Purpose |
-|-----------|---------|
-| `crates/nyro-core/` | Core Rust library: gateway, proxy, protocol conversion, provider adapters, storage, admin service. |
-| `crates/nyro-tools/` | Rust CLI/tooling crate. |
-| `src-server/` | Standalone server binary exposing proxy/admin HTTP surfaces. |
-| `src-tauri/` | Tauri desktop application shell and IPC integration. |
-| `webui/` | React + TypeScript management console. |
-| `docs/` | Design, server, standalone, and testing documentation. |
-| `tests/` | Python/E2E test assets and shared fixtures. |
-| `scripts/` | Install and release automation. |
+## Architecture principle
 
-## For AI Agents
+> Varying capabilities are explicitly composed behind narrow typed contracts;
+> resource owners have explicit lifecycles; workload-neutral invariants stay in
+> the kernel; workload invariants stay in trusted runtimes.
 
-### Working In This Repository
-- Keep changes focused and reversible; do not mix unrelated cleanup into feature or refactor work.
-- Prefer existing patterns and utilities before adding abstractions or dependencies.
-- Do not edit generated build output such as `webui/dist/` unless the task explicitly requires it.
-- Preserve separate English and Chinese user-facing docs when updating public documentation.
+This is static Go composition, not a dynamic plugin system. Do not use
+`buildmode=plugin`, `.so` loading, or a third-party plugin ABI without a
+separately approved design demonstrating a concrete requirement.
 
-### Multilingual Defaults
-- For any multilingual/i18n-capable value, the default must be English, in both frontend and backend code.
-- This applies to UI labels, fallback strings, seed/default configuration, generated examples, API defaults, and documentation-derived constants.
-- Add localized alternatives explicitly, but keep the canonical fallback/default value in English unless a caller/user setting selects another language.
+The implemented architecture is documented in
+`docs/design/architecture.md`. Keep implementation and that document aligned.
 
-### Testing Requirements
-- Rust core changes: run the narrowest relevant `cargo test -p <crate> ...`, then `cargo check -p <crate>` or `cargo clippy -p <crate> --all-targets` when behavior or public APIs change.
-- WebUI changes: run the relevant package script from `webui/` such as `npm run lint` or `npm run build` when TypeScript/UI behavior changes.
-- Documentation-only changes should still be checked for path/name accuracy.
+## Kernel responsibilities
 
-### Common Patterns
-- `nyro-core` should remain transport-agnostic; desktop IPC and server HTTP layers call into core APIs rather than embedding core business logic.
-- Admin service code should be split by functional responsibility and tested through public APIs where possible; keep private state-machine tests internal instead of exposing private APIs just for tests.
-- Protocol/provider logic should keep protocol conversion boundaries explicit and avoid coupling provider adapters to UI/server transport concerns.
+`internal/kernel` owns only workload-neutral invariants:
 
-## Dependencies
+- component identity and dependency-graph validation;
+- deterministic dependency ordering;
+- lifecycle startup, rollback, retirement, and shutdown;
+- typed Candidate and Host contracts plus atomic runtime-generation activation;
+- leases that keep retiring generations alive until release; and
+- readiness and runtime-generation status.
 
-### Internal
-- `src-tauri/` and `src-server/` depend on `crates/nyro-core/`.
-- `webui/` talks to the desktop IPC/server admin surfaces and should not duplicate core business rules.
-- Documentation in `docs/` should reflect current crate and module boundaries.
+Kernel production code must use only the Go standard library. It must not
+depend on:
 
-### External
-- Rust workspace uses Tokio, Axum, Reqwest, SQLx, Serde, Tauri, and tracing-related crates.
-- WebUI uses React, Vite, TypeScript, Radix UI primitives, TanStack Query, and Zustand.
+- LLM or another workload type;
+- request, response, stream, routing, retry, failover, or error semantics;
+- protocols, providers, configuration parsing, or configuration transport;
+- security, quota, telemetry, storage, Admin, WebUI, or HTTP transport; or
+- global service locators, string-keyed dependency maps, or module discovery.
 
-<!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->
+## Trusted LLM runtime
 
-### Database Changes
+`internal/llm/runtime` owns all LLM-domain invariants: Canonical LLM IR
+execution, mandatory phase order, routing authority, attempt isolation,
+normalized errors, extension ownership, retry and failover, streaming commit,
+health decisions, and trusted terminal delivery.
 
-When modifying the database schema — including changes to `INIT_SQL`, `POSTGRES_INIT_SQL`, `MYSQL_INIT_SQL` constants or the `migrate()` function in any storage backend — you **must** also:
+The phase order is fixed:
 
-1. Update `docs/database/schema.md` to reflect the new table/column definitions.
-2. Regenerate `deploy/schema/postgres.sql` and `deploy/schema/mysql.sql` to match the final post-migration state:
-   ```bash
-   nyro-tools dump-schema --backend postgres > deploy/schema/postgres.sql
-   nyro-tools dump-schema --backend mysql    > deploy/schema/mysql.sql
-   ```
-   These files are the authoritative reference schema for DBAs. They represent the **final state** after all migrations have run (with final table names: `models`, `model_backends`, `api_key_models`).
+```text
+Observe -> Resolve -> Authenticate -> Authorize -> Admit
+        -> optional PreDispatch -> Dispatch -> optional PostResponse
+        -> trusted terminal delivery -> reverse Finalizers
+```
 
-> The SQL files in `deploy/schema/` are derived reference artifacts — do not manually edit them except to update the header comment. Always regenerate from the migration source of truth.
+Optional phases may participate only at `PreDispatch` or `PostResponse`. They
+must not change mandatory order, invoke the next phase, control terminal
+delivery, bypass authorization or admission, or suppress reverse finalization.
+Stream observers observe canonical deltas without controlling stream flow.
 
-### Release Process
+## Explicit composition and catalogs
 
-Local release work (cutting a `release/vX.Y.Z` branch off `master` through pushing it):
+Concrete Protocol Codecs and Provider Drivers are enumerated by
+`internal/bootstrap`. Bootstrap constructs immutable typed catalogs, resolves
+configuration, builds inactive Snapshot-bound runtime candidates and resources,
+and submits their lifecycle graphs to the Kernel Host.
 
-1. Branch: `git checkout master && git pull && git checkout -b release/vX.Y.Z`.
-2. Bump the version in **3 places** (keep identical): `Cargo.toml` `[workspace.package].version`, `src-tauri/tauri.conf.json` `version`, `webui/package.json` `version`. Refresh `Cargo.lock` via `cargo update -w` (never edit it by hand).
+Importing a module package must not register, start, or activate it. Do not use:
+
+- package `init()` for module registration or dependency wiring;
+- blank imports whose purpose is Nyro module registration;
+- mutable global registries populated as an import side effect;
+- hidden discovery based on initialization order; or
+- configuration I/O, goroutine startup, or resource acquisition from `init()`.
+
+The reviewed blank import of `github.com/glebarez/go-sqlite` in
+`internal/platform/database/sqlite` is a `database/sql` driver integration,
+not module registration.
+
+Tests must explicitly assemble the catalogs and dependencies they require.
+Configuration may select only implementations present in an explicitly built
+catalog; it must not cause otherwise unreferenced code to execute.
+
+When adding a varying capability, define the smallest stable typed contract at
+its consumer or in an established contract package. Do not introduce a service
+locator, global container, general plugin framework, or speculative extension
+point.
+
+## LLM protocol and provider boundaries
+
+The implemented request path is:
+
+```text
+Client Wire
+    -> generic HTTP Server
+    -> LLM HTTP Ingress
+    -> Canonical LLM IR
+    -> trusted Runtime Pipeline and Router
+    -> Provider Driver extension
+    -> Egress Codec
+    -> Provider Driver preparation
+    -> generation-owned Provider HTTP Transport
+    -> Upstream
+```
+
+Responses and streams travel in reverse through their corresponding
+boundaries.
+
+### Ingress Codec
+
+An Ingress Codec parses a northbound request, performs protocol-structural
+validation, maps common semantics into the Canonical LLM IR, and encodes
+canonical responses, errors, and stream deltas for its client protocol. It must
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nyroway/nyro](https://github.com/nyroway/nyro) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
