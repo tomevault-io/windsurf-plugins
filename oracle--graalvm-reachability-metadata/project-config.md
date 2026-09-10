@@ -3,22 +3,24 @@ trigger: always_on
 description: Forge treats an agent as a replaceable editing backend behind a small Python
 ---
 
-# AR-agent-api: Forge agent API and Pi implementation
+# AR-agent-api: Forge agent API and backend adapters
 
 Forge treats an agent as a replaceable editing backend behind a small Python
 interface, preserving the boundary in §AR-forge-strategy-agent-boundary.
+§FS-forge-agent-runtime-selection requires every adapter to expose the same
+editing boundary.
 Workflow engines decide what work to do next; agents only send prompts,
 maintain or clear conversation context, report token usage, and run
 agent-visible test commands, with bundles wiring the chosen backend into a
-strategy (§STRAT-forge-predefined-strategy-contract).
+strategy (§FS-forge-predefined-strategy-contract).
 
 ## 1. Agent API
 
-[`ai_workflows/agents/agent.py`](../ai_workflows/agents/agent.py) defines the
+[`ai_workflows/agents/agent.py`](../../ai_workflows/agents/agent.py) defines the
 `Agent` base class and registry. Concrete backends register with
 `@Agent.register("<name>")`, and strategy loading resolves the configured
 backend by the strategy's `agent` field (see
-§STRAT-forge-predefined-strategy-contract).
+§FS-forge-predefined-strategy-contract).
 
 The interface is deliberately narrow:
 
@@ -32,16 +34,23 @@ The interface is deliberately narrow:
 | `graphify(source_dirs)` | Build optional graph context from read-only source directories. |
 | `total_tokens_sent` / `total_tokens_received` / `cached_input_tokens_used` | Expose token accounting for run metrics and cost reporting. |
 
-This API keeps workflow behavior out of backend adapters. A new backend
-(plugging in through §AR-forge-extension-points) should implement the registry
-key, the prompt/session methods, token counters, and test-command bridge, then
-be selected through strategy data (§WF-forge-workflow-strategy-config) instead
+This API keeps workflow behavior out of backend adapters. A new backend should
+implement the registry key, the prompt/session methods, token counters, and
+test-command bridge, then
+be selected through strategy data (§AR-forge-workflow-strategy-config) instead
 of changing workflow drivers or workflow engines.
 
-## 2. Pi Implementation
+## 2. Backend implementations
 
-[`PiAgent`](../ai_workflows/agents/pi_agent.py) registers the `pi` backend and
-drives Pi through [`PiRpcClient`](../ai_workflows/agents/pi_rpc_client.py), a
+The registry exposes `claude-code`, `pi`, `codex`, and `opencode`. Each adapter
+starts its CLI unattended, with the tools that backend provides, so a repair
+step can reproduce the failure it was given rather than editing blind.
+
+`source_context.url_fetch_agent_command` builds the command string for URL-field
+discovery, which Gradle invokes directly instead of through an adapter.
+
+[`PiAgent`](../../ai_workflows/agents/pi_agent.py) registers the `pi` backend and
+drives Pi through [`PiRpcClient`](../../ai_workflows/agents/pi_rpc_client.py), a
 thin subprocess wrapper around `pi --mode rpc`. The client starts Pi in the
 workflow working directory, applies optional `--provider`, `--model`,
 `--session-dir`, and persistent system-prompt flags, sends prompt JSON over
@@ -70,38 +79,28 @@ session path and token baselines so the next prompt starts as an independent Pi
 session.
 
 `PiAgent.run_test_command` delegates Gradle execution to the
-[shared test runner](../utility_scripts/gradle_test_runner.py) instead of
+[shared test runner](../../utility_scripts/gradle_test_runner.py) instead of
 asking Pi to choose shell behavior. That preserves the architecture: the
-workflow engine chooses the gate (§WF-forge-workflow-engine), deterministic
+workflow engine chooses the gate (§AR-forge-workflow-engine), deterministic
 utilities run it, and the agent receives diagnostics for the next edit cycle,
 keeping the strategy/agent boundary intact (§AR-forge-strategy-agent-boundary).
 
-## 3. Why Pi Is The Default Lightweight Backend
+## 3. Runtime roles and defaults
 
-Forge prefers Pi for strategy profiles where it is sufficient because the
-project goal is not maximum model strength on every turn; it is fast, reliable,
-coverage-positive automation that uses the least tokens needed for the task.
-The Forge direction (§GOAL-forge-direction) explicitly calls for runs to be as
-cheap as practical, to prefer lightweight agents such as Pi when sufficient,
-and to reset or clear sessions between independent steps so stale context does
-not consume tokens.
+The three roles are configured from different places. `FORGE_ANALYSIS_AGENT` /
+`FORGE_ANALYSIS_FAMILY` / `FORGE_ANALYSIS_MODEL` / `FORGE_ANALYSIS_PROVIDER`
+select recovery, style, native-test, post-generation, and review work; the
+defaults are Codex with `gpt-5.6-luna` and high reasoning, and Claude Code
+answers to its `sonnet` model alias.
+`FORGE_SETUP_*` selects artifact-URL discovery and the library-preparation
+preflight. The roles do not read each other: what a role leaves unset comes from
+the shared defaults, so retuning one never moves the other. The do-work loop exports
+these values unchanged across its self-update boundary (§AR-do-work-loop).
 
-Pi's RPC mode fits that goal operationally:
+Every backend takes a reasoning effort, in its own spelling: Codex
 
-- strategy data can select Pi without changing workflow code;
-- per-turn session stats feed the same token and cost metrics written by the
-  [metrics utilities](../utility_scripts/metrics_writer.py);
-- `clear_context` makes cheap independent runs explicit;
-- logs preserve enough evidence for maintainers or later Forge runs without
-replaying a large conversation;
-- provider and model flags keep the backend swappable while the Forge workflow
-  contract stays stable.
-
-Codex and other heavier agents remain useful for recovery paths or tasks that
-need stronger autonomous repair, but Pi is the economical default when the
-workflow can stay inside the narrow agent API and deterministic Gradle feedback
-loop, matching §GOAL-forge-direction.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [oracle/graalvm-reachability-metadata](https://github.com/oracle/graalvm-reachability-metadata) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
