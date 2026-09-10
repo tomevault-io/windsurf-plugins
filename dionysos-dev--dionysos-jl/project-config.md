@@ -1,107 +1,102 @@
 ---
 trigger: always_on
-description: Operating guide for AI coding agents (Claude Code) working in **Dionysos.jl**. Read this before
+description: This page is the **single source of truth** for how Dionysos code is written. It exists so that every
 ---
 
-# CLAUDE.md
+# Coding conventions
 
-Operating guide for AI coding agents (Claude Code) working in **Dionysos.jl**. Read this before
-making changes: it explains what the project is, how the code is organized, the one architectural
-contract that matters most (the solver interface), the Julia conventions you must imitate, the exact
-commands to run, and the repo-specific traps to avoid.
+This page is the **single source of truth** for how Dionysos code is written. It exists so that every
+module looks and behaves the same way, so that refactors land against a fixed target, and so that
+contributors (and AI assistants) don't have to reverse-engineer the house style from the surrounding
+code. New code must follow it; code being touched should be migrated toward it.
 
----
+These conventions are enforced softly by review and by [`Aqua`](https://github.com/JuliaTesting/Aqua.jl)
++ [`JuliaFormatter`](https://github.com/domluna/JuliaFormatter.jl) (see [Set up](@ref) and the
+`.JuliaFormatter.toml` at the repo root). Format every file before committing.
 
-## 1. What Dionysos is & why it exists
+## 1. Interfaces and required methods
 
-Dionysos is a **framework for symbolic (abstraction-based) control**. It is the software of the ERC
-project *Learning to Control* (L2C).
-
-**The mission.** Today, controlling a complex system usually means a team of expert engineers, each
-with deep knowledge of the plant, hand-crafting an ad hoc controller over months at significant cost.
-Dionysos aims to change that paradigm into an automatic pipeline:
-
-> **describe the system → select the problem (specification) → pick a solver → Dionysos automatically
-> computes a controller with a certificate (formal guarantee).**
-
-The goal is to make correct-by-construction control synthesis *accessible* — including to small
-companies that have no dedicated controls/IT team — and to drastically cut controller-design time.
-
-**Symbolic control 101.** The system is *abstracted* into a finite-state automaton (a **symbolic
-model**) by discretizing its variables. Working on this finite object lets a computer synthesize
-controllers systematically, even for complex specifications (e.g. LTL), using graph algorithms
-(Dijkstra, A\*, fixed-point iterations). The price:
-
-- **Curse of dimensionality** — the number of abstract states grows exponentially with the state
-  dimension.
-- **Non-determinism from discretization** — over-approximating a cell's dynamics introduces spurious
-  transitions, which can make the abstract problem *infeasible* even when the concrete one is not.
-
-The mitigation, and a core research direction of the toolbox, is **smart / lazy abstractions**: instead
-of an a-priori uniform grid, co-design the abstraction and the controller and compute only the part of
-the abstraction that is actually needed.
-
-**Framing for an agent.** Dionysos is an **ecosystem, not one algorithm**. Its value is a *common
-interface* that lets you swap the solver and then test / compare / benchmark algorithms on the same
-control problem. Preserving that interface is the single most important thing when extending the code.
-
-Background reading: [docs/src/manual/overview.md](docs/src/manual/overview.md) and
-[docs/src/manual/abstraction-based-control.md](docs/src/manual/abstraction-based-control.md).
-
----
-
-## 2. The framework in one paragraph
-
-A control problem is a pair `(𝒮, Σ)`: a **system** `𝒮` (a
-[`MathematicalSystems`](https://juliareach.github.io/MathematicalSystems.jl) or
-[`HybridSystems`](https://github.com/blegat/HybridSystems.jl) object) plus a **specification** `Σ` (a
-`Dionysos.Problem.ProblemType`). It is solved by a **solver** `𝒪` that is a
-`MathOptInterface.AbstractOptimizer`, driven through the JuMP/MOI interface. This MOI contract is the
-architectural keystone: **every algorithm is a swappable `Optimizer`**, so a task can be re-solved,
-compared, and benchmarked by swapping the optimizer rather than rewriting the model. Abstraction-based
-solvers turn the infinite-state system into a finite automaton via discretization, synthesize a
-correct-by-construction controller on it, then *concretize* it back to the original system.
-
----
-
-## 3. Repository map (root level)
-
-| Path | What it is |
-| :--- | :--- |
-| [`src/`](src/) | The `Dionysos` package (all library code). |
-| [`ext/`](ext/) | Package extensions — optional-dependency glue (Plots, Symbolics, Spot, CSV, RigidBodyDynamics). |
-| [`test/`](test/) | Test suite; mirrors `src/` layout. Entry point [`test/runtests.jl`](test/runtests.jl). |
-| [`docs/`](docs/) | Documenter.jl site + Literate.jl examples. Build script [`docs/make.jl`](docs/make.jl). |
-| [`problems/`](problems/) | Reusable **benchmark problem library** (e.g. path planning, DC-DC, pendulum), one folder per problem. |
-| [`examples/`](examples/) (root) | **Runnable example drivers** (user-facing), one folder per problem, mirroring `problems/` — **not** library code. |
-| [`research/`](research/) (root) | Our **paper / experiment sims** (`CDC2024/`, `BisimulationQuotient/` = HSCC 2027, …), superseded work under `research/Deprecated/`. |
-| [`bench/`](bench/) | Benchmarks (BenchmarkTools). |
-| `control_server/`, `BipedRobot/`, `paper/`, `assets/` | Auxiliary app, robot demo, paper artifacts, images. |
-
-> ⚠️ Top-level `examples/` and `research/` hold runnable driver scripts (they were a single
-> `scripts/` folder before, and `utils/` before that) — **not** library code. Don't confuse them with
-> the `src/utils/` module (the `Utils` library).
-
----
-
-## 4. Core architecture — six library modules + the front-end
-
-Top-level module [`src/Dionysos.jl`](src/Dionysos.jl) includes six library submodules **in
-dependency order**, then the JuMP front-end on top of them:
-
-```
-Utils → System → Problem → Mapping → Symbolic → Optim → Wrapper
-```
-
-Reuse these **standard aliases** everywhere (they are established at the top of each module — match
-them exactly):
+Abstract types declare a *contract*: a set of methods each concrete subtype must implement. Declare each
+required method **once**, and make an unimplemented method **fail loudly**. Never leave a silent
+empty-body stub — a method that returns `nothing` when unimplemented turns a missing-method bug into a
+silent wrong-answer bug.
 
 ```julia
-const UT = Utils    # Dionysos.Utils
-const ST = System   # Dionysos.System
+abstract type AbstractWidget end
+
+# Required — every subtype must implement these:
+get_size(w::AbstractWidget) = error("get_size not implemented for $(typeof(w))")
+compute!(w::AbstractWidget) = error("compute! not implemented for $(typeof(w))")
+
+# Derived — implemented once in terms of the required methods:
+is_empty(w::AbstractWidget) = get_size(w) == 0
+```
+
+Rules:
+- Use the message form `error("<name> not implemented for $(typeof(x))")`. Do **not** use empty bodies
+  (`function f(::AbstractWidget) end`), and standardize the wording (not `"implement f"` /
+  `"Not implemented"` / `"not implemented"` mixed together).
+- Document, next to the abstract type, which methods are **required** vs **derived**.
+- If a subtype extends an interface owned by another package (e.g. `HybridSystems.add_state!`), extend
+  *that* function — do not declare a second same-named function in a Dionysos module, or the two will not
+  dispatch to each other.
+
+## 2. Type stability
+
+Type stability is a hard requirement, especially on the abstraction / automaton / nearest-neighbour hot
+paths.
+
+- **No `::Any` struct fields.** Parameterize the struct instead.
+- **No bare `::Function` struct fields.** Make the callable a type parameter (`struct S{F}; f::F; end`);
+  reach for `FunctionWrappers.jl` only when a concrete callable type genuinely cannot be a parameter.
+- **Parametric structs must bind every field type.** `Tree{S}` with `root::Node{S}`, never `Tree` with
+  `root::Node` (an unbound `UnionAll` field forces dynamic dispatch on every access).
+- Avoid `[]` (`Vector{Any}`) accumulators; write `T[]` with a concrete `T`.
+- Prefer `Union{Nothing, T}` only for genuinely optional state; a field that is "always present after
+  construction" should not be nullable.
+- Check hot paths with `@code_warntype` / [`JET.jl`](https://github.com/aviatesk/JET.jl) and cover them
+  with `@inferred` tests.
+
+## 3. Naming
+
+- **Modules**: `CamelCase`. **Concrete types**: `CamelCase`. **Abstract types**: `Abstract`-prefixed
+  (`AbstractMapping`, `AbstractController`).
+- **Functions**: `snake_case`. No `camelCase` — rename on sight (`centerDistance → center_distance`,
+  `kNearestNeighbors → k_nearest_neighbors`, `get_nNodes → get_n_nodes`, `get_max_Node → get_max_node`).
+- Accessors: `get_<noun>` / `get_<noun>_by_<key>`; enumerators: `enum_<plural>`; predicates:
+  `is_<adj>` / `has_<noun>`. Counts: `num_<plural>` (or `get_n_<noun>` — pick one per subsystem and be
+  consistent).
+- **Mutating functions end with `!`**; private helpers start with `_`.
+- **One accessor per concept.** Do not ship both `get_dim` and `get_dims`, or both `volume` and
+  `get_volume`, for the same quantity. If two functions have identical bodies, keep one.
+- Unicode identifiers are idiomatic where they match the maths (`∂`, `Δ`, `α`, `δx`); `∈`/`∉` for
+  membership.
+
+## 4. Verbosity and logging
+
+- **No `print` / `println` in library code.** Use `@info` / `@warn` / `@debug`, or
+  [`ProgressMeter`](https://github.com/timholy/ProgressMeter.jl) (already a dependency) for progress
+  bars. Gate repeated warnings with `maxlog`.
+- **One verbosity knob**: an integer `print_level` (`0` = silent, `1` = default, `2` = detailed) plus
+  support for `MOI.Silent`. Do not introduce `log_level`, `verbose`, `debug`, etc. in new code.
+
+## 5. Modules, imports, and comments
+
+- **`import`, don't `using`.** Prefer `import Module` (or `import ..Utils as UT`) and call through the
+  prefix — `LazySets.dim(x)`, `UT.set_union(v)` — so every name's origin is explicit. Reserve `using`
+  for the rare need to pull in operators/macros that must be unqualified (e.g. `using LinearAlgebra` for
+  `I` and `\`), and keep it to that.
+- **Comment the *why*, not the *what*.** Do not add comments that restate the code; keep only
+  non-obvious rationale, invariants, gotchas, or correctness constraints. Docstrings cover the API.
+
+## 6. Immutability
+
+- Value objects (problems, sets, approximations, trajectories) are **immutable `struct`s**. Build a new
+  object rather than mutating in place.
+- Use `mutable struct` only where in-place mutation is part of the design (incremental builders, indexes,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dionysos-dev/Dionysos.jl](https://github.com/dionysos-dev/Dionysos.jl) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
