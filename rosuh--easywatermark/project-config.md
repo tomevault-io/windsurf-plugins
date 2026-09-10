@@ -73,4 +73,4 @@ Pair every “don’t” with the replacement.
 
 ---
 > Source: [rosuH/EasyWatermark](https://github.com/rosuH/EasyWatermark) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
