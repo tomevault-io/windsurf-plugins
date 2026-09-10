@@ -1,109 +1,90 @@
 ---
 trigger: always_on
-description: Canonical instructions for **all** AI coding agents (Codex, Claude Code, Cursor, Copilot, etc.)
+description: Python package for dimensionality reduction of protein language model (pLM) embeddings, with annotation retrieval and data export for interactive visualization at [protspace.app](https://protspace.app).
 ---
 
-# Agent Instructions — protspace
+# protspace — Python CLI Package
 
-Canonical instructions for **all** AI coding agents (Codex, Claude Code, Cursor, Copilot, etc.)
-working in this repository; tool-specific files (e.g. `.claude/CLAUDE.md`) import it.
+Python package for dimensionality reduction of protein language model (pLM) embeddings, with annotation retrieval and data export for interactive visualization at [protspace.app](https://protspace.app).
 
-## Spec-driven development with OpenSpec (default workflow)
+- **Python:** >=3.12
+- **License:** MIT
+- **PyPI:** `pip install protspace`
+- **GitHub:** https://github.com/tsenoner/protspace
 
-Plan non-trivial work as an [OpenSpec](https://openspec.dev/) spec **before** writing
-implementation code. Proposals, design, spec deltas, and task lists live in
-`openspec/changes/<change-name>/`; do **not** save plans, specs, or design docs under `docs/`,
-scratch files, or other ad-hoc locations.
+## Running Commands
 
-- **Use the workflow commands** — or the equivalent OpenSpec skill, or the `openspec` CLI, when
-  slash commands are unavailable:
-  - `/opsx:propose <idea>` — create a change and its artifacts (proposal, design, specs, tasks)
-  - `/opsx:apply` — implement the change's tasks
-  - `/opsx:archive` — merge spec deltas into `openspec/specs/` and archive the change; run it as
-    the **last commit on the branch, before the merge** — see below
-  - `/opsx:explore` — investigate/clarify before committing to a change
-- **`openspec/specs/` is the source of truth** for current behavior; read the relevant specs first.
-- **Trivial changes** (typo, one-line fix, formatting, dependency bump) do not need a full
-  proposal — use judgment.
-
-### Archive before the merge, not after
-
-Run `/opsx:archive` on the branch, commit the result, and let CI go green on that commit.
-Deferred to "after the merge" it does not happen — the PR is closed and the branch is gone —
-leaving `openspec/specs/` describing behavior the code no longer has, which the next change
-reads as current.
-
-Before archiving, tick off `tasks.md` including anything the review added, and reread
-`proposal.md` / `design.md` against the final diff: rationale written before a review is often
-stale by the end of it, and archiving freezes it.
-
-One-time CLI setup is in [CONTRIBUTING.md](CONTRIBUTING.md#openspec-one-time-per-machine).
-
-## Before committing
-
-Always run `pnpm precommit` before any git commit. It is
-`lint-staged && quality && docs:annotations:check && docs:build`:
-
-- ESLint `--fix` and Prettier `--write`, on staged files only (lint-staged)
-- TypeScript typecheck, Knip, and Knip dependency validation (`pnpm quality`)
-- `docs:annotations:check` — the generated annotation reference must match its source
-- `docs:build`, a full VitePress build (a dead internal link fails it)
-
-**It runs no tests at all.** Run `pnpm test` yourself; `pnpm test:e2e` (below) and
-`pnpm test:contract` are separate again. It is also JS-only — Python workspace members
-have their own CI workflows (see below).
-
-lint-staged only inspects **staged** files, so unstaged work passes `pnpm precommit` and
-still fails CI's `format:check` — also run `pnpm format:check` when anything is unstaged.
-
-### A user-visible change is not done until the docs and the notebooks say so
-
-Move these in the same PR — `pnpm precommit` covers none, and all three have shipped stale:
-
-- **The published docs** (`docs/guide/`), for anything reaching a CLI flag, an option default,
-  or the bundle format. `docs/guide/annotations.md` is generated, so edit its source instead.
-- **The Colab notebooks** (`apps/protspace/notebooks/`), for anything a notebook restates — a
-  model list, an install command, a flag. Prettier and ruff's CI paths both skip them, so
-  nothing tells you when they drift; import from the package rather than retype, as the prep
-  notebook does with `EMBEDDER_MODELS`.
-- **`apps/protspace/CLAUDE.md`**, for a new command, test file, or dependency.
-
-Pin a fact that has to live in two places with a test, not a comment asking the next reader to
-keep them in step — see `apps/protspace/tests/test_docs_extras_sync.py`.
-
-## End-to-end tests (Playwright)
-
-`e2e.yml` alone drives the real app in a browser; the unit suites run in jsdom, which has no
-WebGL. Canvas-dependent wiring — EAT provenance connectors, isolation, dataset swap — is
-exercised nowhere else.
-
-It runs nightly on `main`, and on PRs touching the web app, `packages/`, or the root files
-those resolve through — `e2e.yml` owns the exact list.
-
-Dispatch it by hand when your change could reach the app by a route that list misses — a
-transitive dependency, a shared config, a generated asset — because a wrong `paths:` filter
-does not fail, it silently never runs. Not whenever the filter simply didn't match: a PR with
-no TS/JS and no root-file changes cannot reach the app, and the run costs ~10 min to confirm
-nothing.
+**Always use `uv run` to execute Python commands in this project.** Do not use bare `python` or `python3`.
 
 ```bash
-gh workflow run e2e.yml --ref <branch>   # in CI, any branch
-pnpm test:e2e                            # locally
+# Install with dev deps (once per clone)
+uv sync --group dev
+
+# Git hooks come from husky, installed by `pnpm install` AT THE REPO ROOT — a
+# Python-only setup leaves you with no pre-commit gate. Never set core.hooksPath
+# by hand; husky owns it.
+pnpm install
+
+# Run tests (skip slow) — testpaths covers both protspace + protlabel
+uv run pytest -m "not slow"
+
+# Run all tests
+uv run pytest
+
+# Lint
+uv run ruff check src/ packages/ tests/
+
+# Run CLI
+uv run protspace prepare -i data/sizes/phosphatase.h5:prot_t5 -m pca2 -o output --no-scores
+
+# Run all 6 DR methods on sample data
+uv run protspace prepare -i data/sizes/phosphatase.h5:prot_t5 -m "pca2,tsne2,umap2,pacmap2,mds2,localmap2" -o output --no-scores -v
+
+# Compare UMAP with different parameters in a single run
+uv run protspace prepare -i data/sizes/phosphatase.h5:prot_t5 -m "umap2:n_neighbors=15" -m "umap2:n_neighbors=50" -m pca2 -o output --no-scores
 ```
 
-**Never dismiss a red run as flaky on the strength of local passes.** The regression behind
-this rule failed 6/6 in CI and 0/17 locally. Compare against the nightly's history on `main`
-(`gh run list --workflow=e2e.yml --event=schedule`), not your machine.
+## CLI Commands
 
-## Python workspace members (uv)
+Single entry point: `protspace = protspace.cli.app:app`
 
-The Python packages are uv workspace members (root `[tool.uv.workspace]`) sharing one root
-`uv.lock`. A new **top-level** member needs three things it does not get for free:
+| Command | Purpose |
+|---------|---------|
+| `protspace prepare` | Full pipeline: embed → reduce → annotate → bundle |
+| `protspace embed` | FASTA → HDF5 embeddings (Biocentral API or local GPU/CPU via `--backend local`). Exits non-zero on an incomplete embedding; capability-limited sequences (`--max-length`, GPU OOM) are skipped and named instead |
+| `protspace project` | HDF5 → dimensionality reduction |
+| `protspace annotate` | Fetch protein annotations |
+| `protspace bundle` | Combine projections + annotations → .parquetbundle |
+| `protspace stats` | Compute projection quality statistics (annotation-based cluster-validity + faithfulness) |
+| `protspace serve` | Launch Dash web frontend |
+| `protspace style` | Add annotation colors/styles |
+| `protspace transfer` | Fill missing annotations from nearest reference embeddings (EAT) |
 
-- **Its own workflow** in `.github/workflows/` (GitHub runs workflows only from the repo root),
+### protspace prepare Usage
+
+```bash
+protspace prepare -i <input> -m <methods> -o <output> [options]
+
+# From HDF5: protspace prepare -i embeddings.h5 -m pca2,umap2 -o output
+# From FASTA: protspace prepare -i sequences.fasta -e prot_t5 -m pca2 -o output
+# Local GPU/CPU embedding (offline, needs protspace[local]): protspace prepare -i seq.fasta -e prot_t5 --backend local -m pca2 -o output
+# Multi-model: protspace prepare -i seq.fasta -e prot_t5,esm2_3b -m pca2 -o output
+# All 12 pLMs: protspace prepare -i seq.fasta -e prot_t5,prost_t5,esm2_8m,esm2_35m,esm2_150m,esm2_650m,esm2_3b,ankh_base,ankh_large,ankh3_large,esmc_300m,esmc_600m -m pca2 -o output
+# Combine datasets (same name → union): protspace prepare -i species_a.h5:prot_t5 -i species_b.h5:prot_t5 -m umap2 -o output
+# Multi-embedding (different names → intersection): protspace prepare -i esm2.h5 -i prott5.h5 -m pca2 -o output
+# With similarity: protspace prepare -i emb.h5 -f seq.fasta -s -m pca2,mds2 -o output
+# Name override: protspace prepare -i emb.h5:custom_name -m pca2 -o output
+# Parameter sweep: protspace prepare -i emb.h5 -m "umap2:n_neighbors=15" -m "umap2:n_neighbors=50" -m pca2 -o output
+# Inline params: protspace prepare -i emb.h5 -m "pca2,umap2:n_neighbors=50;min_dist=0.3" -o output
+# Quality stats (opt-in): protspace prepare -i emb.h5 -m pca2,umap2 --stats -o output
+# Quality stats scoped to specific annotations: protspace prepare -i emb.h5 -m pca2 --stats --stats-annotation major_group,ec_number -o output
+```
+
+### protspace stats Usage
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tsenoner/protspace](https://github.com/tsenoner/protspace) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
