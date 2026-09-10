@@ -1,131 +1,110 @@
 ---
 trigger: always_on
-description: FloatingX is an Android library that provides flexible and powerful floating window solutions, supporting system-level, app-level, and local floating windows with JetPack Compose support.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# FloatingX - Android Floating Window Library
+# CLAUDE.md
 
-FloatingX is an Android library that provides flexible and powerful floating window solutions, supporting system-level, app-level, and local floating windows with JetPack Compose support.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+## Project
 
-## Working Effectively
+FloatingX — an Android floating-window (悬浮窗) library published to Maven Central as
+`io.github.petterpx:floatingx-{core,app,scope,system,compose}`. Comments, logs and docs are written
+in Chinese; keep that convention when editing library sources.
 
-### Prerequisites and Setup
-- Install Java 17 (OpenJDK recommended): Required for Android Gradle Plugin 8+
-- Ensure Android SDK is available (minimum SDK 21, target/compile SDK 34)  
-- **CRITICAL**: Ensure internet access to Google Maven and Gradle Plugin repositories
-- **CRITICAL**: Set JVM heap size: `export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g"`
+3.0 is a full rewrite; the 2.x modules (`floatingx/`, `floatingx_compose/`) are gone and the API is
+not backwards compatible (see `docs/MIGRATION.md`).
 
-### Bootstrap, Build, and Test Repository
-**NEVER CANCEL builds or tests - they may take significant time. Use appropriate timeouts.**
+## 模块
+
+所有库模块都用 `build-logic/` 的 `floatingx.library` convention plugin
+（minSdk 21 / compileSdk 36 / Java 17 / `explicitApi()` / `jvmDefault=enable` / maven 坐标 / Robolectric）。
+模块自己的 `build.gradle.kts` 只声明依赖。
+
+| 模块 | 包 | 内容 | 依赖 |
+|---|---|---|---|
+| `floatingx-core` | `com.petterp.floatingx.core` | 状态机 `FxEngine`、锚点定位、手势、feature、`FxControl`、`FloatingX` 注册表、`FxSpStorage` | `androidx.annotation`(api)、`androidx.core` |
+| `floatingx-app` | `com.petterp.floatingx.app` | `AppHost`：跟随前台 Activity 的全局浮窗；黑白名单 / filter | core、`androidx.core` |
+| `floatingx-system` | `com.petterp.floatingx.system` | `SystemHost`：`WindowManager` 窗口、悬浮窗权限、键盘 / 返回键 | core、`androidx.core` |
+| `floatingx-scope` | `com.petterp.floatingx.scope` | `ViewGroupHost` / `FragmentHost` 与 `fxScope {}` 局部浮窗 | core、`androidx.fragment`(**compileOnly**) |
+| `floatingx-compose` | `com.petterp.floatingx.compose` | `compose {}` DSL、归 control 所有的 `FxComposeOwner`、`stateFlow()` / `positionFlow()`（**minSdk 23**） | core、compose-ui(api)、lifecycle 2.10.0、savedstate、coroutines |
+| `app` | `com.petterp.floatingx.demo` | demo + instrumentation 测试工程（minSdk 23） | 以上全部 |
+
+`floatingx-app` 用清单里声明的 `FxAppInitProvider`（ContentProvider）在进程启动时
+`FxActivityTracker.init(application)`，所以 install 写在任何时机都能拿到当前前台 Activity。
+`floatingx-system` 的清单声明了 `SYSTEM_ALERT_WINDOW` 与权限申请页 `FxPermissionActivity`，
+接入方无需自行配置。
+
+依赖边界（CI 有 JUnit 扫描断言）：core 源码不得 import `android.view.WindowManager`、
+`androidx.fragment`、`androidx.compose`、`androidx.lifecycle`、`androidx.appcompat`。
+
+## Build & Commands
+
+Java 17 is required (AGP 8.13.2 / Gradle 8.14.3 / Kotlin 2.2.21). Version catalog:
+`gradle/libs.versions.toml`.
 
 ```bash
-# Grant execute permission (required on fresh clone)
-chmod +x gradlew
-
-# Clean and build all modules - NEVER CANCEL: Takes 3-8 minutes. Set timeout to 15+ minutes.
-./gradlew clean build publishToMavenLocal -PisPublish=false -PversionName=1.0.0
-
-# Run tests - NEVER CANCEL: Takes 2-5 minutes. Set timeout to 10+ minutes.
-./gradlew test
-
-# Run instrumented tests (if device/emulator available) - NEVER CANCEL: Takes 5-15 minutes. Set timeout to 20+ minutes.
-./gradlew connectedAndroidTest
+./gradlew test                                                       # 全部 JVM/Robolectric 单测（CI 必跑）
+./gradlew :floatingx-core:test                                       # 单模块（core 142 / scope 22 / app 32 / system 62 / compose 25 用例）
+./gradlew app:assembleDebug                                          # 构建 demo apk
+./gradlew app:installDebug                                           # 安装 demo
+./gradlew publishToMavenLocal -PisPublish=false -PversionName=3.0.0-SNAPSHOT   # CI 每个 PR 都跑
+./gradlew lint                                                       # android lint
 ```
 
-### Build the Demo Application
+Instrumentation（需要设备 / 模拟器；CI 用 `reactivecircus/android-emulator-runner` api-level 34 跑
+`.github/scripts/instrumentation.sh`——失败自动重跑一次并把 logcat / 截图传成工件；emulator-runner 的
+`script` 逐行 `sh -c` 执行，所以逻辑必须放脚本文件里）：
+
 ```bash
-# Build debug APK - NEVER CANCEL: Takes 2-4 minutes. Set timeout to 10+ minutes.
-./gradlew app:assembleDebug
-
-# Install and run on connected device/emulator
-./gradlew app:installDebug
-adb shell am start -n com.petterp.floatingx.app/.MainActivity
+./gradlew app:installDebug app:installDebugAndroidTest
+adb shell appops set com.petterp.floatingx.app SYSTEM_ALERT_WINDOW allow   # 系统浮窗用例需要
+adb shell settings put global window_animation_scale 0
+adb shell settings put global transition_animation_scale 0
+adb shell settings put global animator_duration_scale 0
+# 跑完 AGP 会卸载 apk，appops 授权随之丢失；留住 apk 才能免去每次重新授权
+./gradlew app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 ```
 
-### Library Publication (Development)
-```bash
-# Publish to local Maven repository - NEVER CANCEL: Takes 3-6 minutes. Set timeout to 15+ minutes.
-./gradlew publishToMavenLocal -PisPublish=false -PversionName=1.0.0-SNAPSHOT
+`ActivityScenario.launch()` 带 `NEW_TASK | CLEAR_TASK`，会把第一页销毁；用例里二级跳页一律用
+`TestUtil.kt` 的 `navigateTo()` + `pressBack()`，不用 `ActivityScenario.launch / close`。
 
-# For release publication (requires signing keys)
-./gradlew publishAllPublicationsToMavenCentralRepository -PisPublish=true -PversionName=X.Y.Z
-```
+**Robolectric 固定 `sdk=35`**（各模块 `src/test/resources/robolectric.properties`）：SDK 36 的沙箱
+要求 JDK 21，而本仓库工具链是 JDK 17。改这个值前先确认工具链。
 
-## Validation Requirements
+Publishing（release workflow，GitHub Release 触发）：
+`./gradlew publishAndReleaseToMavenCentral --no-configuration-cache -PisPublish=true -PversionName=$TAG`
 
-### Manual Testing Scenarios
-Always perform these validation steps after making changes to core library functionality:
+Gradle properties（`settings.gradle` 读进 `rootProject.ext`）：
 
-1. **System Floating Window Test**:
-   - Build and install demo app: `./gradlew app:installDebug`
-   - Launch app and navigate to "System Floating Window" option
-   - Grant SYSTEM_ALERT_WINDOW permission when prompted  
-   - Use `TestActivity` → "进入多浮窗页面(测试多浮窗功能)" for comprehensive testing
-   - Verify floating window appears and is draggable across the screen
-   - Test edge absorption, boundary bounce, and multi-touch
+- `-PversionName` / `-PversionCode` — 默认取 `git describe --tags` 与 `git rev-list HEAD --count`。
+- `-PisPublish` — `true` 时应用 `signAllPublications()`（需要 GPG 环境变量）。
+- `isDev` in `local.properties`（默认 `true`）— `true` 时 `app` 依赖本地 project，`false` 切到已发布产物。
 
-2. **App-Level Floating Window Test**:
-   - Navigate to app-level floating window demo via `MainActivity`
-   - Test local floating windows: "显示局部悬浮窗" button
-   - Verify floating window works within app boundaries
-   - Test rotation, app switching, and lifecycle scenarios
+日志 tag 是 `Fx-<scope>`（`Fx-system` 等）与用户自己传的（demo 用 `Fx-demo`），
+所以用 `adb logcat | grep "Fx-"`。只有配置里调过 `enableLog(tag)` 才会有日志。
 
-3. **Local/Scoped Floating Window Test**:
-   - Use `TestActivity` → "进入局部悬浮窗页面-(测试api功能)" (`ScopeActivity`)
-   - Test Activity, Fragment, and ViewGroup scoped windows
-   - Verify floating windows appear only within their designated containers
-   - Test view lifecycle and cleanup
+## Architecture：Host / Engine / Feature
 
-4. **Compose Integration Test**:
-   - Test Compose floating windows functionality in demo app
-   - Verify `enableComposeSupport()` call is working (see `FxComposeSimple.kt`)
-   - Test Compose UI rendering within floating windows
-   - Check system floating windows with Compose content
+三个正交的角色，取代 2.x 的 Helper → Control → Provider：
 
-5. **Edge Cases and Special Scenarios**:
-   - Test immersive mode: "进入无状态栏页面-(测试状态栏影响)" (`ImmersedActivity`)
-   - Test RecyclerView interaction: "进入recyclerView测试页面" (`SimpleRvActivity`)
-   - Test blacklist functionality: "进入黑名单页面(该页面禁止展示浮窗1)" (`BlackActivity`)
+1. **Host（`core.host.FxHost`）—— 浮窗挂在哪。**
+   `bind(session)` / `createContainer()` / `attach` / `detach` / `bounds()` / `release()`，
+   通过 `FxHostSession` 向 engine 报告 `onHostReady` / `onHostLost` / `onBoundsChanged` / `requestSwap`。
+   - `AppHost`（app）：容器是 `FxLayerContainer`，挂到当前前台 Activity 的 **DecorView**
+     （默认，不是 `R.id.content`，这样拖动才是真正全屏）；换页时把**同一个容器**静默 reparent，
+     engine 状态、feature、动画都不重来。被黑白名单/filter 拒绝的页面上整体卸下。
+   - `SystemHost`（system）：容器是 `FxWindowContainer`，挂到 `WindowManager`；
+     权限三策略 `Auto/Manual/Skip`，被拒时 `requestSwap(fallback)` 降级到 `AppHost`（原 `SYSTEM_AUTO`）。
+   - `ViewGroupHost` / `FragmentHost`（scope）：挂到任意 `ViewGroup` / Fragment 根 view；
+     不进注册表，生命周期归调用方。
 
-**Expected Outcomes**:
-- All floating windows should be draggable and responsive
-- No crashes during permission requests or lifecycle changes
-- Proper cleanup when Activities/Fragments are destroyed
-- Floating windows should respect their scope boundaries
-
-### Build Validation
-Always run before committing changes:
-```bash
-# Lint check - NEVER CANCEL: Takes 1-3 minutes. Set timeout to 5+ minutes.
-./gradlew lint
-
-# Code style check with Detekt (configured in check/detekt/detekt.yml)
-./gradlew detekt
-
-# Full CI validation - NEVER CANCEL: Takes 5-10 minutes. Set timeout to 20+ minutes.
-./gradlew clean build publishToMavenLocal -PisPublish=false -PversionName=1.0
-```
-
-## Project Structure and Navigation
-
-### Key Modules
-- **`app/`** - Demo application showcasing all FloatingX features
-  - Entry point: `com.petterp.floatingx.app.MainActivity`
-  - Test activities: `com.petterp.floatingx.app.TestActivity`
-  - Example implementations in `app/src/main/java/com/petterp/floatingx/app/kotlin/`
-
-- **`floatingx/`** - Core floating window library
-  - Main API: `com.petterp.floatingx.FloatingX`
-  - Core classes: `src/main/java/com/petterp/floatingx/`
-  - **Important**: Always check this module when modifying core functionality
-
-- **`floatingx_compose/`** - JetPack Compose support extension
-  - Compose integration: `src/main/java/com/petterp/floatingx/compose/`
+2. **Engine（`core.engine.FxEngine`）—— 状态机 + 命令队列。**
+   `INSTALLED → ATTACHED → SHOWN`，终态 `CANCELLED`。host 未 ready 时 `show/hide/moveTo` 入队，
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Petterpx/FloatingX](https://github.com/Petterpx/FloatingX) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
