@@ -1,93 +1,88 @@
 ---
 trigger: always_on
-description: `testutil/configtest` and `testutil/fuzzing` are the harness that pins how a seid
+description: provides selection and coordination.
 ---
 
-# Configuration Characterization
+# Version-specific upgrade tests
 
-`testutil/configtest` and `testutil/fuzzing` are the harness that pins how a seid
-node resolves configuration. The suites built on them record the current behavior
-of the legacy configuration path as executable tests, including the parts of that
-behavior nobody would choose on purpose.
+The tests themselves stay in `app`, following the existing naming and helper
+structure:
 
-The surface is worth pinning because it is large and mostly implicit. A value
-reaches running code from four layers (an in-code default, a TOML file, an
-environment variable, a cobra flag), resolved through several viper instances whose
-environment prefixes differ, and it lands in two places the rest of the boot reads,
-a Tendermint config struct and a flat key-value map. None of that was written down
-anywhere a second implementation could be compared against, which is what these
-tests supply. They exist so the SeiConfigManager work (PLT-775) can replace that
-path and prove the replacement resolves every key the same way.
+- `app/upgrade_test.go` and `app/upgrade_orphan_test.go` hold generic checks.
+- `app/upgrade_v67_test.go` holds checks specific to the v6.6 -> v6.7 change.
+- A version-specific file has the matching build tag, such as `upgrade_v67`.
 
-## Standing Rule
+Do not move app upgrade tests into this package. This package only provides the
+small amount of automation needed to select, validate and scaffold those files.
 
-Inside the surface the suite covers, a change to how a configuration value is read,
-defaulted, named, or cast is a change to a pinned contract, so the suite fails. That
-failure is the review prompt. Record the new behavior and put the old and new value in
-the diff, rather than loosening the assertion until it passes.
+## Adding a minor upgrade
 
-What that surface is has to be read alongside the rule, because the rule is
-unconditional only inside it. A key added to a struct field some row already claims is
-not caught, and nothing mechanical will prompt you (`Adding a Key to an Existing
-Section`). A rename fails here and still has to be carried by hand into the app.toml
-template, the flag registration and the documentation (`Renaming a Key`). And whole
-classes of read sit outside the suite (`Out of Scope`). None of that softens the
-paragraph above for the reads the suite does cover: there, the failure is not optional
-and not something to route around.
+Run:
 
-Four ways of making a failure go away are wrong here, because each one turns a
-visible change into an invisible one:
+```bash
+make new-upgrade-test FROM=v6.6 TO=v6.7
+```
 
-1. `t.Skip` on a row whose behavior changed. CI stays green and a skip line in
-   verbose output is what nobody reads.
-2. Widening an assertion to accept both the old and new value.
-3. Deleting a row rather than updating it.
-4. Editing a row's `Cast`, `Unguarded` or `Checked` until it matches a reader you
-   changed, without having intended the behavior change. A row describes the reader,
-   so editing one is correct only alongside a deliberate change to that reader in the
-   same PR.
+The command creates `app/upgrade_v67_test.go`, the separately compiled
+`app/testdata/upgrade_v67_offline_source_test.go` fixture, and
+`app/upgrade_v67_offline_target_test.go`. The main file has the matching
+`upgrade_v67` constraint, the `newV67Chain` / `applyV67` shape, and
+`TestV67CrossVersion` callbacks for the live two-binary path. The source
+fixture lives under `testdata` so current-branch module discovery does not try
+to resolve APIs that the target release removed; the runners copy it into the
+source worktree's `app` package before compiling it. It also has a reopen TODO
+so the runner's third phase has a test to select. Its TODOs fail in the layer
+that reaches them until real assertions replace them.
 
-If a pinned behavior is genuinely wrong and worth fixing, fix it in the production
-reader and update the row in the same PR. The row then records the improvement.
+Appending `v6.7` to `app/tags` makes that pair the current boundary.
+`make upgrade-test` derives the build tag from the embedded list and runs the
+app package with the file enabled. The workflow must not name a version.
 
-## Primitives
+`make upgrade-test-vet` compiles every version-specific app test. It compiles
+historical offline phases in detached worktrees at their release refs and the
+current target phase in the current checkout because those files may use APIs
+available only on one side of the boundary. Ordinary untagged tests and
+`golangci-lint run` do not type-check these build-tagged files.
 
-`CheckRow` is `CheckKey` plus `CheckDeterministic`, so there is one fewer property than there
-are calls. A fuzz target names only `CheckRow` and gets both. The table below is the enumeration,
-and `TestGuideListsEveryPrimitive` holds it to the exported surface.
+Run a real branch boundary with:
 
-| Check | The failure it prevents | Held against |
-|---|---|---|
-| `CheckDefaults` | a declared default moves with nothing independent to compare against | `testdata/<section>.golden` |
-| `CheckKeyNames` | an operator-facing key is renamed while the row and the reader move together | `testdata/<section>.keys.golden` |
-| `CheckKey` | a reader does not resolve `Key` into `Path` through `Cast` | the reader's own empty-`AppOpts` result, with the row's leaf spliced in |
-| `CheckDeterministic` | a reader is not a pure function of its `AppOpts` | a second read of the same input |
-| `CheckAbsent` | an omitted key resolves to something other than the declared default | the declared defaults struct |
-| `CheckManifestCoversEveryField` | a resolved field no row claims | the manifest's `Path` and `AlsoWrites` entries |
-| `CheckEveryRowHasADiscriminatingSeed` | a row whose every seed would also pass against a reader that never looks its key up | the recorded seed corpus |
-| `CheckWiring` | one of the calls above is deleted | `testdata/wiring_coverage.txt` |
+```bash
+make upgrade-test-offline \
+  FROM_REF=release/v6.6 TO_REF=release/v6.7
 
-The third column is the spec, and it is the one to read before wiring anything. Three of these
-compare against a checked-in file, one against the declared defaults, one against the reader's own
-output, one against a second read of the same input, one against the manifest, and one against the
-seeds the target declared. A check whose right-hand side comes from the same place as its left-hand
-side holds for any reader.
+make upgrade-test-cross-version \
+  FROM_REF=release/v6.6 TO_REF=release/v6.7
+```
 
-Two of them read no prediction column, and that is the invariant any new check
-inherits. `CheckKeyNames` is blind to `Path`, `Cast`, `Unguarded` and `Checked`, and
-`CheckEveryRowHasADiscriminatingSeed` to `Cast`, `Unguarded` and `Checked`. A check that
-read the column it exists to hold could be silenced by editing that column, which is
-forbidden move 4 above.
+Both runners build from detached worktrees pinned to resolved commits.
+`upgrade-test-offline` injects the tagged source test into the disposable old
+worktree, writes a committed application database, injects the target test into
+the new worktree to apply the handler, then runs a reopen phase that compiles
+the source test again against the migrated database. `upgrade-test-cross-version`
+starts validators on the source binary, runs the tagged test's `before`
+callback, executes the governance halt and binary replacement, then runs its
+`after` callback against the same node homes.
 
-`CheckKey` compares against the reader's own empty-`AppOpts` result rather than the
-declared defaults, because some readers fill fields from outside the config.
-`CheckAbsent` is what ties that result to the declared defaults, so a section wired for
-rows and not for `CheckAbsent` has an unanchored baseline.
+## Scope
 
-**Before adding one.** Advancing coverage is normally wiring an existing check to another
+Keep the checks in the same direct style as the existing v6.7 file. Use
+`testutil/processblock` for transaction and state assertions, and call
+`ApplyUpgrade` through a version-specific helper.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+`make upgrade-test` is the fast, in-process layer and uses the current checkout
+on both sides. `make upgrade-test-offline` is the persisted, three-phase Go
+layer: it reaches no consensus or node lifecycle code. Its source and target
+files may use APIs available only on their respective branch because each is
+compiled separately. The reopen phase compiles the source file against the
+migrated database the target phase left behind. The target phase also accepts
+`UPGRADE_TEST_SNAPSHOT_HOME` pointing at a node home: when set,
+`TestV67OfflineUpgradeTarget/snapshot` opens that database, applies the
+upgrade, and runs the retained-store and version-map assertions against it.
+When unset the subtest skips; a path that is not a usable node home fails.
+`make upgrade-test-cross-version` owns the full node lifecycle. Keep all
+version-specific definitions in tagged app test files; `upgradetest` only
+provides selection and coordination.
 
 ---
 > Source: [sei-protocol/sei-chain](https://github.com/sei-protocol/sei-chain) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
