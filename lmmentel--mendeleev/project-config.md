@@ -1,48 +1,190 @@
 ---
 trigger: always_on
-description: Pythonic periodic table library. SQLAlchemy models + SQLite db (`mendeleev/elements.db`).
+description: **mendeleev** is a Pythonic periodic table of elements library that provides a convenient Python API for accessing various properties of elements, ions, and isotopes. It integrates with pandas for data access and offers visualization capabilities through bokeh, plotly, and seaborn.
 ---
 
-# AGENTS.md — Mendeleev
+# Mendeleev - Claude Code Assistant Guide
 
-Pythonic periodic table library. SQLAlchemy models + SQLite db (`mendeleev/elements.db`).
+## Project Overview
 
-## Dev commands
+**mendeleev** is a Pythonic periodic table of elements library that provides a convenient Python API for accessing various properties of elements, ions, and isotopes. It integrates with pandas for data access and offers visualization capabilities through bokeh, plotly, and seaborn.
 
-```bash
-poetry install                    # core deps only
-poetry install --with vis         # add bokeh/plotly/seaborn
-poetry install --with vis,docs    # add vis + docs deps (nbsphinx, ipykernel)
-poetry run pytest                 # runs with -n auto (xdist) by default
-poetry run pytest -k "element"    # pattern match
-poetry run pytest tests/test_element.py::test_element  # single test
-poetry run pytest --cov=mendeleev # coverage
-pre-commit run --all-files        # ruff lint + format (must pass before commit)
-cd docs && poetry run make html   # build docs (needs --with docs)
-poetry run inv render-data-docs   # regenerate data reference rst from PropertyMetadata
-poetry run inv export             # dump db tables to csv/json/html/md/sql
+- **Repository**: https://github.com/lmmentel/mendeleev
+- **Documentation**: https://mendeleev.readthedocs.io
+- **License**: MIT
+- **Current Version**: 1.1.0
+
+## Technology Stack
+
+### Core Dependencies
+- **Python**: 3.9 - 3.13
+- **pandas**: Data manipulation and analysis (>=1.1.0)
+- **SQLAlchemy**: Database ORM and data models (>=1.4.0)
+- **pydantic**: Data validation and settings management (^2.9.2)
+- **pint**: Unit conversions and physical quantities (^0.24.4)
+- **numpy**: Numerical computing (^2.0)
+
+### Development Tools
+- **Poetry**: Dependency and environment management
+- **pytest**: Testing framework (with pytest-xdist and pytest-cov)
+- **Sphinx**: Documentation generation (with sphinx-material theme)
+- **pre-commit**: Git hooks for code quality
+- **ruff**: Linting and code formatting
+- **alembic**: Database migrations
+- **invoke**: Task automation
+
+### Optional Visualization Dependencies
+- **bokeh**: Interactive visualizations (^3.0)
+- **plotly**: Interactive plots (^5.0)
+- **seaborn**: Statistical visualizations (>=0.12)
+
+## Project Structure
+
+```
+mendeleev/
+├── mendeleev/           # Main package source code
+│   ├── __init__.py
+│   ├── models.py        # SQLAlchemy data models
+│   ├── fetch.py         # Data fetching utilities
+│   ├── db.py            # Database utilities
+│   ├── econf.py         # Electronic configuration
+│   ├── elements.db      # SQLite database with element data
+│   ├── cli.py           # Command-line interface
+│   ├── vis/             # Visualization modules
+│   │   ├── bokeh.py
+│   │   ├── plotly.py
+│   │   ├── seaborn.py
+│   │   └── utils.py
+│   └── interfaces/      # External data interfaces
+├── tests/               # Test suite
+│   ├── test_element.py
+│   ├── test_isotope.py
+│   ├── test_ion.py
+│   ├── test_fetch.py
+│   ├── test_vis.py
+│   └── test_econf/
+├── docs/                # Sphinx documentation
+│   ├── source/          # Documentation source files
+│   │   ├── conf.py      # Sphinx configuration
+│   │   ├── notebooks/   # Jupyter notebook tutorials
+│   │   └── api/         # API documentation
+│   ├── Makefile         # Documentation build commands
+│   └── build/           # Generated documentation
+├── notebooks/           # Development notebooks (not in docs)
+├── alembic/             # Database migration scripts
+│   └── versions/
+├── tasks.py             # Invoke task definitions
+├── pyproject.toml       # Poetry configuration and dependencies
+└── CONTRIBUTING.md      # Contribution guidelines
 ```
 
-## Architecture
+## Development Setup
 
-- **`mendeleev/mendeleev.py`** — main entrypoint: `element()`, `isotope()`, `get_all_elements()`
-- **`mendeleev/models.py`** — all SQLAlchemy models (Element, Isotope, Ion, etc.)
-- **`mendeleev/db.py`** — creates read-only SQLite engine by default (URI with `?mode=ro`)
-- **`mendeleev/fetch.py`** — `fetch_table()` for pandas access
-- **`mendeleev/__init__.py`** — dynamic `__getattr__` so `from mendeleev import C` works
-- **CLI**: `element.py <symbol|name|number>` via `mendeleev.cli:clielement`
+### Prerequisites
+- Python 3.9 or higher
+- [Poetry](https://python-poetry.org/) for dependency management
+- Git
 
-## Key conventions
+### Initial Setup
 
-- **Ruff only** for linting + formatting (v0.3.3). No typechecker (mypy/pyright) configured.
-- **pre-commit excludes** `alembic/` and `notebooks/`
-- Database is **read-only by default** via URI parameter. Alembic needs write access.
-- Adding a property: update model → alembic revision → upgrade → update PropertyMetadata → `inv render-data-docs`
-- Tests use `-n auto` (pytest-xdist). Set `PYTEST_ADDOPTS=""` to override. **Use pytest-style tests only** — plain functions with `assert`, no `unittest.TestCase` or class-based tests.
-- CI matrix: 3 OS × 5 Python versions (3.10–3.14). Runs ruff (pre-commit) then pytest.
-- Documentation uses **sphinx-immaterial** theme (fork of sphinx-material). Workaround: `object_description_options` disables `generate_synopses` to avoid a sphinx-immaterial KeyError. If upgrading sphinx-immaterial or Sphinx, try removing that workaround first. Notebooks in `docs/source/notebooks/` are rendered by nbsphinx. Dev notebooks in root `notebooks/` are ignored by pre-commit.
-- Package published to PyPI on tags via trusted publishing (no password needed).
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/lmmentel/mendeleev.git
+   cd mendeleev
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Install core dependencies
+   poetry install
+
+   # Install with visualization dependencies
+   poetry install --with vis
+   ```
+
+3. **Activate the virtual environment**
+   ```bash
+   poetry shell
+   ```
+
+## Running Tests
+
+### Basic Test Execution
+
+```bash
+# Run all tests
+poetry run pytest
+
+# Run tests with coverage report
+poetry run pytest --cov=mendeleev
+
+# Run tests in parallel (using pytest-xdist)
+poetry run pytest -n auto
+
+# Run tests with duration reporting (slowest 10 tests)
+poetry run pytest --durations=10
+```
+
+### Run Specific Tests
+
+```bash
+# Run tests in a specific file
+poetry run pytest tests/test_element.py
+
+# Run a specific test function
+poetry run pytest tests/test_element.py::test_function_name
+
+# Run tests matching a pattern
+poetry run pytest -k "element"
+```
+
+### Test Configuration
+
+Tests are configured in `pyproject.toml`:
+```toml
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "--durations=10 -n auto"
+```
+
+## Building Documentation
+
+### Prerequisites
+
+Documentation requires additional dependencies beyond the core package:
+
+```bash
+# Install documentation dependencies (one-time setup)
+poetry run pip install -r docs/requirements.txt
+```
+
+Required packages include:
+- sphinx, nbsphinx (documentation generator)
+- sphinx-material (documentation theme)
+- myst-parser (Markdown support)
+- sphinxcontrib-bibtex (bibliography)
+- bokeh, plotly, seaborn (for visualization examples)
+- ipython, ipykernel (for notebook examples)
+
+### Local Documentation Build
+
+**Prerequisites:**
+
+First, install documentation dependencies (one-time setup):
+```bash
+poetry run pip install -r docs/requirements.txt
+```
+
+This includes:
+- `sphinx` - Documentation builder
+- `sphinx-material` - Material theme
+- `sphinx-design` - Grid and card layouts for modern UI
+- `nbsphinx` - Jupyter notebook support
+- `sphinxcontrib-bibtex` - Bibliography support
+- `myst-parser` - Markdown support
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lmmentel/mendeleev](https://github.com/lmmentel/mendeleev) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
