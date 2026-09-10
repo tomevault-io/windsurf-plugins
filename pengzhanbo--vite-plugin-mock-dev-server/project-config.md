@@ -1,117 +1,41 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: `vite-plugin-mock-dev-server` — a Vite plugin providing an API mock dev server: it intercepts HTTP/WS requests that match user-configured proxy prefixes, matches them against mock files, and responds with mock data. Features include mock-file hot reload, validators, scenes, error simulation, cookies, SSE, WebSocket mocks, request record/replay, CORS, and a build-time generator that emits a standalone mock server.
 ---
 
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Repository Guidelines
 
 ## Project Overview
 
-`vite-plugin-mock-dev-server` is a Vite plugin for mocking API endpoints during development. It intercepts HTTP requests matching configured proxy patterns and returns mocked responses defined in `.mock.ts` files. The repo is a pnpm monorepo with three packages: the plugin itself, an example app, and VitePress docs.
+`vite-plugin-mock-dev-server` — a Vite plugin providing an API mock dev server: it intercepts HTTP/WS requests that match user-configured proxy prefixes, matches them against mock files, and responds with mock data. Features include mock-file hot reload, validators, scenes, error simulation, cookies, SSE, WebSocket mocks, request record/replay, CORS, and a build-time generator that emits a standalone mock server.
 
-## Commands
+Monorepo (pnpm workspaces): the plugin package `vite-plugin-mock-dev-server/` (only published artifact), an `example/` Vite app, and `docs/` (VitePress). All package manifests, `pnpm-workspace.yaml`, and configs live at the repo root.
 
-```bash
-# Build the plugin (tsdown)
-pnpm build
+## Architecture & Data Flow
 
-# Run tests (vitest)
-pnpm test
+Request pipeline: **configure → compile → match → respond**
 
-# Run tests in watch mode
-pnpm test -- --watch
+1. **Configure**: `mockDevServerPlugin(options)` (`vite-plugin-mock-dev-server/src/core/plugin.ts`) returns `[serverPlugin, buildPlugin?]`. `config()` strips `wsPrefix` entries from `server.proxy`, wires request-body recovery, sets up the recorder; `configResolved` merges user options with `server.proxy` keys via `resolvePluginOptions` (`core/options.ts`).
+2. **Compile**: `configureServer` → `initMockMiddlewares` (`core/init.ts`) → `Compiler` (`compiler/compiler.ts`), an `EventEmitter` that globs `include` patterns (default `**/*.mock.{js,ts,cjs,mjs,json,json5}` under `dir` default `mock/`), bundles each mock file (`compile.ts` picks **rolldown if installed, else esbuild**; Vite `define`/alias injection; `vite-plugin-mock-dev-server` imports renamed to the `/helper` subpath), loads via temp-file dynamic `import()`, then normalizes exports through `processRawData` (stamps `__filepath__`) and `processMockData` (groups by pathname, embeds URL query into validators, sorts by validator weight). Chokidar watches mock files + their deps; updates emit `mock:update-end` → optional Vite full-reload and WS mock restart.
+3. **Match**: `createMockMiddleware` (`mockHttp/middleware.ts`) per request: `urlParse` → proxy-prefix gate (`doesProxyContextMatchUrl`) → `matchingWeight` sorts candidate URL rules (static < dynamic < wildcard priority; `priority.global`/`priority.special` overrides) → body parse (`co-body`/formidable, raw body cached for proxy recovery) → `findMockData` (`mockHttp/matcher.ts`): method filter (default `['GET','POST']`), scene match (`activeScene` option or `X-Mock-Scene` header), `isPathMatch`, then validator (function or object-subset). First hit wins. Miss → replay from recordings, else record + `next()`.
+4. **Respond**: CORS (matched requests only) → attach request extras (`query`, `params`, `body`, `getCookie`, …) → optional error simulation (`error.probability`) → status/headers/cookies → body: value, sync/async `body` fn, or `response(req, res, next)` middleware; `delay` number or `[min, max]`. Failures → `logger.error` + 500.
+5. **WebSocket**: `mockWebsocket/server.ts` listens `upgrade`; per-URL `WebSocketServer({ noServer: true })`; mock `setup(wss, { onCleanup })`; HMR restarts affected sockets.
+6. **Record/Replay**: `recorder/` hooks `proxyRes` on non-ws proxies; recordings stored as pretty-printed JSON (`kebabCase(pathname).json`), replayed as synthetic mock items with decompression (gzip/br/zstd).
+7. **Build**: `buildPlugin.buildEnd` → `build/generate.ts` emits `mockServer/` (standalone connect server + bundled mock data + package.json).
 
-# Run a single test file
-pnpm test -- src/__tests__/validator.spec.ts
+## Key Directories
 
-# Lint (ESLint via @pengzhanbo/eslint-config)
-pnpm lint
-
-# Run example dev server
-pnpm dev
-
-# Build example
-pnpm example:build
-
-# Documentation
-pnpm docs:dev
-pnpm docs:build
-pnpm docs:preview
-```
-
-## Architecture
-
-### Plugin System
-
-`mockDevServerPlugin()` in `src/core/plugin.ts` returns up to two Vite plugins:
-
-- **serverPlugin** (`enforce: 'pre'`, `apply: 'serve'`) — intercepts dev server requests and WebSocket upgrades. Also handles `configurePreviewServer` for `vite preview` mode.
-- **buildPlugin** (`enforce: 'post'`, `apply: 'build'`) — generates standalone mock server. Only included when `options.build` is truthy.
-
-### Request Flow
-
-1. `serverPlugin.configureServer()` calls `initMockMiddlewares()`
-2. `initMockMiddlewares()` creates a `Compiler` instance, wires up `mockWebSocket()`, and returns the mock middleware
-3. `Compiler.run()` globs and compiles all mock files, then watches for changes
-4. On each request, `createMockMiddleware()`: filters by proxy prefix → ranks matching URL patterns by priority → finds the first matching `MockHttpItem` → parses body/cookies → evaluates validator → runs response or error simulation → sends response
-
-### Mock Data Structure
-
-After compilation, mock data is stored as `Record<string, MockOptions>` where each key is a URL pattern (e.g., `/api/users/:id`). `MockOptions` is `(MockHttpItem | MockWebsocketItem)[]` — an array of mock definitions for that URL pattern.
-
-`MockHttpItem` has a `ws: false` discriminator, `MockWebsocketItem` has `ws: true`. Matcher (`src/mockHttp/matcher.ts`) filters by method, scene, and optional validator before selecting the first match.
-
-### Path Matching Priority
-
-`matchingWeight.ts` implements a priority algorithm using `path-to-regexp` token analysis. Static rules (no parameters) have highest priority. Dynamic rules are ranked by parameter count and position. Users can customize priority via the `priority` option (global ordering and special-case overrides).
-
-### Scene System
-
-Mock items can have a `scene` field. Only mocks whose scene intersects with `options.activeScene` (or have no scene) are considered. The `X-Mock-Scene` request header can override active scenes per-request.
-
-### Validator System
-
-Multiple mocks can share the same URL pattern. Each can have a `validator` — either a function receiving the parsed request, or an object for subset matching against query/body/params/headers. This allows different responses for the same URL based on request parameters.
-
-### Recorder / Replay
-
-The `Recorder` class hooks into Vite's `server.proxy` configuration, capturing `proxyRes` events to record real backend responses to disk (JSON files in `.recordings/`). When replay is enabled and no mock matches, the middleware tries to replay a recorded response. This is useful for capturing real API traffic for offline development.
-
-### WebSocket Mock
-
-`mockWebSocket()` in `src/mockWebsocket/server.ts` listens for `upgrade` events on the HTTP server. Each unique URL pattern + pathname gets its own `WebSocketServer` instance. On HMR, the WSS is restarted: cleanup functions run, listeners are removed, and `setup()` re-executes. On `server.close()`, all WSS instances are cleaned up.
-
-### Cookie Handling
-
-The `cookies` npm package (pillarjs/cookies) is used for cookie parsing/setting. `MockRequest` exposes `getCookie()` and `MockResponse` exposes `setCookie()`. Configurable via `cookiesOptions` (keys for signed cookies, secure flag).
-
-### Build Output (tsdown)
-
-Configured in `tsdown.config.ts` with 4 entry points, ESM format, minification, and declaration generation:
-
-| Entry    | Source                 | Export path                          |
-| -------- | ---------------------- | ------------------------------------ |
-| `index`  | `src/index.ts`         | `vite-plugin-mock-dev-server`        |
-| `helper` | `src/helpers/index.ts` | `vite-plugin-mock-dev-server/helper` |
-| `server` | `src/server.ts`        | `vite-plugin-mock-dev-server/server` |
-| `types`  | `src/types/index.ts`   | `vite-plugin-mock-dev-server/types`  |
-
-### Key Dependencies
-
-- **`cookies`** (pillarjs/cookies) — cookie get/set with signed cookie support
-- **`ws`** — WebSocket server implementation
-- **`path-to-regexp`** — URL pattern parsing and matching (e.g., `/api/:id`)
-- **`formidable`** — multipart/form-data parsing (file uploads)
-- **`co-body`** — JSON/URL-encoded/text body parsing
-- **`chokidar`** — file watching for HMR
-- **`tinyglobby`** — fast glob matching for discovering mock files
-- **`mime-types`** — MIME type lookup for response content-type
-
+| Path                                             | Purpose                                                                                                                                 |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `vite-plugin-mock-dev-server/src/`               | Plugin source (ESM, `.js` import suffixes, per-dir `index.ts` barrels)                                                                  |
+| `vite-plugin-mock-dev-server/src/core/`          | Plugin lifecycle: `plugin.ts`, `options.ts`, `init.ts`, `define.ts` (Vite define fork), `logger.ts`                                     |
+| `vite-plugin-mock-dev-server/src/compiler/`      | Mock-file bundling/loading/watch: `compiler.ts`, `esbuild.ts`, `rolldown.ts`, `compile.ts`, `processData.ts`                            |
+| `vite-plugin-mock-dev-server/src/mockHttp/`      | HTTP request pipeline: `middleware.ts`, `request.ts`, `response.ts`, `matcher.ts`, `matchingWeight.ts`, `cors.ts`, `requestRecovery.ts` |
+| `vite-plugin-mock-dev-server/src/mockWebsocket/` | WS mock server (`server.ts`)                                                                                                            |
+| `vite-plugin-mock-dev-server/src/helpers/`       | Public helpers: `defineMock.ts`, `defineMockData.ts`, `createSSEStream.ts`                                                              |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pengzhanbo/vite-plugin-mock-dev-server](https://github.com/pengzhanbo/vite-plugin-mock-dev-server) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
