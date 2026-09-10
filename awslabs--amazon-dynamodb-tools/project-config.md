@@ -1,65 +1,96 @@
 ---
 trigger: always_on
-description: Operating manual for AI agents working in `tests/e2e/`. These tests run **real Glue jobs against real DynamoDB tables in a real AWS account**. They are not unit tests — the usual "mock awsglue/pyspark" rules from the parent `AGENTS.md` do not apply here. Read this before adding or changing anything under `tests/e2e/`.
+description: Operating manual for AI agents working in this directory.
 ---
 
-# AGENTS.md — bulk_executor e2e harness
+# AGENTS.md — bulk_executor
 
-Operating manual for AI agents working in `tests/e2e/`. These tests run **real Glue jobs against real DynamoDB tables in a real AWS account**. They are not unit tests — the usual "mock awsglue/pyspark" rules from the parent `AGENTS.md` do not apply here. Read this before adding or changing anything under `tests/e2e/`.
+Operating manual for AI agents working in this directory.
 
-## What lives here
+## Layout
 
 ```
-tests/e2e/
-  conftest.py          Shared: e2e_config fixture (prompts once, caches to .e2e-config), account guard
-  helpers/
-    command_runner.py  Shell out to ./bulk; capture stdout/stderr/exit + scrape job_run_id  (run_command / run_command_raw / CommandResult)
-    assertions.py      assert_glue_succeeded / assert_table_has_items / require_write_capable_job  ← the truthful-assertion layer
-    transient_table.py Context manager: create+PITR a throwaway table, delete in finally
-    capacity.py        fetch_consumed_write_capacity → observed WCU/s from CloudWatch (the rate-enforcement oracle)
-    perf.py            fetch_perf(job_run_id) → JobRunPerf (real DPUSeconds + JobRunState)
-    glue_bucket.py     discover the bootstrap S3 bucket; cleanup.py: orphan sweeper
-  connector/           count/find/sql/load SMOKES against the live DynamoDB DataFrame connector
-  commands/            fill/update/delete/copy/diff SMOKES, each on its own transient table
-  security/            real-bootstrap IAM tests + job_state_guard.py (shared-job snapshot/restore)
-  whole_system/        TRUE end-to-end: real datasets through the full pipeline with behavioral assertions
-  results/             generated smoke reports (gitignored)
+server/src/         Glue-job-side code (runs on Spark workers)
+client/src/         CLI-side code (runs on developer machines)
+tests/server/       Mirrors server/src/ tree
+tests/client/       Mirrors client/src/ tree
+Makefile            Single source of truth for test commands
+pytest.ini          Root config; sets pythonpath so both src trees resolve
+AGENTS.md           This file — the operating manual
+CLAUDE.md           Committed symlink to AGENTS.md; one file, two names
 ```
 
-## Smoke vs. true e2e — they prove different things
+`CLAUDE.md` is a committed **symlink** to `AGENTS.md` (mode `120000`), so tools that
+look for either name read the same content. Always edit `AGENTS.md` — never replace
+the symlink with a copy, or the two silently drift.
 
-Both hit real AWS, but do not conflate them:
+## Running tests
 
-- **Smoke** (`connector/`, `commands/`): early detection. Runs a command with a *small* input and asserts the Glue job reached SUCCEEDED and *something* landed. It proves the wiring doesn't crash and the connector accepts its options. It does **not** prove behavior — a smoke with 10 items passes whether or not a rate limit, ordering guarantee, or type-preservation actually works, because the dataset is too small to exercise the behavior.
-- **True e2e** (`whole_system/`): drives a *realistically sized* dataset through the whole pipeline and asserts the **behavior** the feature promises — round-trip fidelity (every item, exact values, back out), an *observed* rate ceiling from CloudWatch, etc. The fixture must be large enough that the behavior is actually exercised, and the test must **guard against a vacuous pass** (see `test_load_rate_roundtrip.py::_assert_fixture_is_a_real_test`: if the load finished before the rate ceiling could bind, fail loudly instead of green).
-
-When you add coverage for a behavioral guarantee (a rate, a limit, an ordering, a type round-trip), a smoke is not enough — add a `whole_system/` test that observes the guarantee, or you are shipping an assertion with no teeth.
-
-## Running
+Always use the Makefile:
 
 ```sh
-make test-e2e-connector      # ~10 min
-make test-e2e-commands       # ~15 min
-make test-e2e-security       # ~3 min
-make test-e2e-whole-system   # ~7 min (60k load: round-trip + observed rate enforcement)
-make test-e2e-max-rate       # EXPENSIVE, opt-in: prove load beats the old 60k connector ceiling
-make test-e2e-cleanup        # sweep orphaned transient tables
+make install        # First time only; creates .venv
+make test           # All tests + coverage summary
+make test-server    # Server-side only
+make test-client    # Client-side only
+make coverage       # Full term-missing coverage report
 ```
 
-Requires AWS creds + a one-time `./bulk bootstrap`. First run prompts for account/region/test tables → cached in `.e2e-config` (gitignored). **Never run these in tight loops** — each Glue job costs real money and ~2 min of cold start.
+Never invoke `pytest` with `--cov=python_modules`. The two source roots are `server/src` and `client/src` — coverage flags must use those paths.
 
-### The `max_rate` tier is expensive and opt-in
+## AI lint (on-demand, agent-run)
 
-`whole_system/test_load_exceeds_legacy_ceiling.py` proves the DataFrame connector sustains a write rate **above the legacy 60k WCU/s ceiling** (the old connector's 40k-on-demand-assumption × 1.5x percent cap). To *observe* >60k it must write **millions of tiny items** (1 WCU each) across thousands of partition keys into a table **pre-warmed** to the target rate — so it costs real money (order of a few dollars of DynamoDB write + Glue DPU per run) and takes several minutes. It is marked `max_rate` and **excluded from `make test-e2e-whole-system`** (`-m "not max_rate"`); run it deliberately via `make test-e2e-max-rate`. Tune cost/volume with `BULK_E2E_MAXRATE_WCU` / `_ITEMS` / `_PARTITIONS`. It guards against a vacuous pass the same way the round-trip test does: if warm throughput never provisioned or the fixture was too small to fill a hot CloudWatch minute, it fails loudly instead of green.
+`ai_lint/` holds AI-driven checks for invariants that are easy to verify by reading code but very hard to express as a deterministic unit test (e.g. "the README, the role-creation code, and the custom-role validator must all agree on the Glue job's IAM permissions"; "every command that touches DynamoDB must be rate limited").
 
-### Deploying the branch-under-test to Glue first
+There is no runner — **you (the agent) are the engine.** When the user asks to "run the AI lint" (or names a specific rule):
 
-The e2e suites trigger the **deployed** Glue job — whatever code was last uploaded to S3, *not* your working tree. Before running e2e on a branch that changes `server/src/`, you must push that code to the job, or you are testing stale code and calling it a pass:
+1. Read every `ai_lint/rules/*.md`. Each file is one rule: the invariant, where to look, and how to report.
+2. For each rule, inspect the *current* code with your normal tools — glob/grep/read. Rules that say "discover the verbs" mean it: enumerate live so newly added code is covered; never work from a stale hard-coded list.
+3. Report per-rule findings, and state what you verified even when clean (so a pass is trustworthy).
 
-- Full deploy: `./bulk bootstrap --XRole READ-WRITE` (rebuilds + uploads the server zip; also repoints the shared job's role — see invariant #3).
+This is **advisory** — never a merge gate, never part of `make test`. A false alarm is feedback, not failure: if a finding turns out fine, tighten the rule's `.md` so the next run is sharper. Add a rule by dropping a new `rules/<name>.md` (one per file keeps merges clean). See [`ai_lint/README.md`](ai_lint/README.md).
+
+## End-to-end tests (real AWS — opt-in)
+
+`make test` is offline (awsglue/pyspark mocked). The **e2e suites are separate**, hit real Glue + DynamoDB, and never run under `make test`:
+
+```sh
+make test-e2e-connector   # count/find/sql/load via the live DynamoDB connector
+make test-e2e-commands    # fill/update/delete/copy/diff against transient tables
+make test-e2e-security    # documented bootstrap IAM policy actually bootstraps
+```
+
+Before touching the e2e harness, read [`tests/e2e/AGENTS.md`](tests/e2e/AGENTS.md) — it documents the invariants (real-AWS guardrails, the transient-table contract, the shared-Glue-job hazard, what makes a smoke trustworthy vs false-green). The e2e tests require AWS credentials and a one-time `./bulk bootstrap`; they cost real money and run real Glue jobs (~2 min each), so do not run them in tight loops.
+
+## Updating the badges in README.md
+
+The top of `README.md` carries three badges (test count, line coverage, branch coverage). They are static — not auto-generated by CI.
+
+**Do NOT update the badges inside a feature/fix/test PR.** Lines 3-5 of `README.md` are a single hot spot that every PR would touch, so bumping them per-PR guarantees merge conflicts — and because PRs merge in an unpredictable order, the numbers a PR writes are stale by the time it lands anyway. Leave `README.md` out of your change entirely; slightly-stale badges are fine and expected.
+
+Instead, refresh all three **in their own dedicated badge-refresh PR** (touching only `README.md`), done occasionally when someone wants the numbers current — never wired into a substantive change.
+
+When you do a refresh PR:
+
+1. Run `make test` (the full offline suite — **not** `test-client`, `test-server`, or any e2e target; e2e never counts toward the badges). Read the final lines for `<N> passed`, `LINE COVERAGE: <X>%`, `BRANCH COVERAGE: <Y>%`. Use `<N> passed` verbatim — do not add skipped tests to it. The numbers come from this fresh run, never from the badge's current value or a "+N" bump. Also do not use the percentages printed by `make test-client` / `make test-server` / `make coverage` — only the full `make test` totals feed the badges.
+2. Edit lines 3-5 of `README.md`. URL-encode `%` as `%25` and spaces as `%20`.
+3. Pick a color: `brightgreen` for ≥90%, `green` for ≥75%, `yellow` for ≥60%, `orange` for ≥45%, `red` below.
+
+Example (illustrative format only — always use your own fresh `make test` numbers, not these):
+
+```markdown
+![tests](https://img.shields.io/badge/tests-1330%20passing-brightgreen)
+![line coverage](https://img.shields.io/badge/line%20coverage-94.1%25-brightgreen)
+![branch coverage](https://img.shields.io/badge/branch%20coverage-91.7%25-brightgreen)
+```
+
+## Writing tests
+
+Mirror `tests/server/test_fill.py` — it is the canonical pattern.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [awslabs/amazon-dynamodb-tools](https://github.com/awslabs/amazon-dynamodb-tools) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
