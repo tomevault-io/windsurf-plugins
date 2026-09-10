@@ -3,23 +3,27 @@ trigger: always_on
 description: Keep these instructions concise. Only add information here that meaningfully
 ---
 
-# Copilot Instructions for react-nprogress
+# Agent Instructions for react-nprogress
 
 Keep these instructions concise. Only add information here that meaningfully
 changes agent behaviour and cannot be inferred from the codebase or tooling.
 
 ## Project
 
-TypeScript React library providing a slim progress bar primitive via three
-patterns: `useNProgress` hook, `NProgress` render-props component, and
-`withNProgress` HOC. Exports logic only, not rendering. All exports go through
-`src/index.tsx`. Types live in `src/types.ts`.
+TypeScript React library providing a slim progress bar primitive via two
+patterns: `useNProgress` hook and `NProgress` render-props component. Exports
+logic only, not rendering. All exports go through `src/index.tsx`. Types live
+in `src/types.ts`. There are no runtime dependencies: React and React DOM are
+peers.
 
 ## Key Commands
 
 ```bash
-npm test          # full suite: type-check, lint, build, all format tests
-npm run build     # clean + compile + bundle
+npm test          # full suite: format and type checks, lint, build, size
+                  # gate, then every test:* script
+npm run build     # clean, then bundle with tsdown; the postbuild hook runs
+                  # publint and arethetypeswrong over the packed tarball
+npm run test:src  # source-only tests, the loop to use while developing
 npm run format    # fix lint and formatting
 ```
 
@@ -62,9 +66,18 @@ Managed by Renovate (`config:js-lib` preset):
 
 ## Testing
 
-- **100% code coverage** required across all build formats
+- **100% code coverage** of `src` is required. Coverage is collected by
+  `npm run test:src` only. No `coverageThreshold` is configured, so a drop
+  will not fail the run: read the report.
+- `npm run test:cjs` and `npm run test:es` re-run the hook and component
+  specs against `dist/react-nprogress.cjs` and `dist/react-nprogress.mjs`,
+  and `npm run test:bundles` asserts what the build emits, so all three need
+  a build first. `npm test` builds before running them.
+- `test/bundles.spec.ts` is excluded from `config.src.js` so that `test:src`
+  and the React matrix stay runnable without a build. A new spec that reads
+  `dist` belongs in `config.bundles.js`, not alongside the source specs.
 - Always run `npm test` after changes; use `npm run test:src` for quick
-  source-only feedback during development
+  source-only feedback during development.
 - Use `npm run test:react` for the full React version matrix independently.
   It also runs as part of `npm test` (via the `test:*` glob).
 
@@ -73,7 +86,7 @@ Managed by Renovate (`config:js-lib` preset):
 We test boundary versions only: first and last minor of each supported
 major. See `test/react/` for current versions.
 
-Current boundaries: 16.14, 17.0, 18.0, 18.3, 19.0.
+Current boundaries: 16.14, 17.0, 18.0, 18.3, 19.0, 19.2.
 
 React 16.14 is the practical lower bound. Hooks require 16.8 and
 `@testing-library/react-hooks` requires 16.9.
@@ -85,12 +98,20 @@ When adding a new boundary:
    16.x for React 18+). React 16–17 also need
    `@testing-library/react-hooks` (8.x) and `react-test-renderer`.
 2. Replace the previous "latest minor" for that major.
-3. Verify with a single-version run before the full matrix:
+3. Verify with a single-version run before the full matrix. Install inside
+   the version directory, but run jest from the repo root: the config sets
+   `rootDir` to the current working directory.
    ```bash
-   cd test/react/<version> && npm i --no-package-lock --quiet --no-progress
+   (cd test/react/<version> && npm i --no-package-lock --quiet --no-progress)
    REACT_VERSION=<version> npx jest --config ./scripts/jest/config.src.js --coverage false
    ```
 4. Update the boundary list above.
+
+## Packaging
+
+`size-limit` gates the gzipped size of both bundles, configured in
+`package.json`. Treat a limit bump as a decision, not a fix: only raise it
+when the added size is intended.
 
 ## Examples
 
@@ -117,27 +138,10 @@ needed but test on CodeSandbox before merging.
 Do not bump vite, @vitejs/plugin-react, next, or typescript in examples
 beyond the versions in the reference templates.
 
-## Writing Style
+Before a release that changes packaging, smoke-test the examples against the
 
-- Avoid marketing or promotional language. State facts plainly.
-- Follow best practices for technical writing: be clear, direct, and
-  concise.
-- Avoid em dashes. Use colons, commas, or separate sentences instead.
-- Use present tense and active voice where practical.
-- Keep sentences short. One idea per sentence.
-
-## Versioning
-
-Strict semver: no breaking changes without a major version bump, including
-technical refactors.
-
-## Documentation
-
-- After each code change, update all related docs and markdown files
-  (README.md, MIGRATION.md, example READMEs, etc.) in the same pass.
-- Do not manually modify CHANGELOG.md. It is auto-generated during
-  release.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tanem/react-nprogress](https://github.com/tanem/react-nprogress) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
