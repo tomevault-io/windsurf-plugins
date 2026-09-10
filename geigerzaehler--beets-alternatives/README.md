@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [geigerzaehler/beets-alternatives](https://github.com/geigerzaehler/beets-alternatives).
+Original source: `CLAUDE.md` in [geigerzaehler/beets-alternatives](https://github.com/geigerzaehler/beets-alternatives).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
