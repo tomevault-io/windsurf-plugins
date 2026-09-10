@@ -1,138 +1,64 @@
 ---
 trigger: always_on
-description: A guide for AI coding agents working on the Marmot Protocol specification. This will work for most major AI harnesses. The `CLAUDE.md` file in this repo is a symlink to this doc.
+description: Agent operating rules for the app-component surface. Read [`README.md`](README.md) for the full human-facing model
 ---
 
-# AGENTS.md (aka CLAUDE.md)
+# AGENTS.md - app-components
 
-A guide for AI coding agents working on the Marmot Protocol specification. This will work for most major AI harnesses. The `CLAUDE.md` file in this repo is a symlink to this doc.
+Agent operating rules for the app-component surface. Read [`README.md`](README.md) for the full human-facing model
+(component ids, negotiation, common rules, GroupContext update processing, default GroupContext authorization); the
+cross-surface map is in [`../AGENTS.md`](../AGENTS.md).
 
-## Project Overview
+## Scope
 
-Marmot is a secure, decentralized group messaging protocol that combines the [MLS Protocol](https://www.rfc-editor.org/rfc/rfc9420.html) with [Nostr's](https://github.com/nostr-protocol/nostr) decentralized network. The protocol enables end-to-end encrypted group messaging without relying on centralized servers.
+App components own the versioned MLS `app_data_dictionary` component bytes at GroupContext, LeafNode, KeyPackage, and
+GroupInfo locations, plus component-owned `AppEphemeral` and SafeAAD bytes. One component id per file. The rules here
+are mechanical and easy to get wrong, so treat this file as the checklist and the README as the model.
 
-**Key Characteristics:**
+## Read order
 
-- Protocol specification repository (not an implementation)
-- Markdown-based documentation (MIPs - Marmot Implementation Proposals)
-- References MLS RFCs and Nostr NIPs
-- Focus on security, interoperability, and clarity
+1. [`README.md`](README.md) (Component IDs, Negotiation, Common Rules, GroupContext Update Processing, Default
+   GroupContext Authorization).
+2. [`../foundation/registries.md`](../foundation/registries.md) to claim the next free id, then
+   [`../foundation/canonical-encoding.md`](../foundation/canonical-encoding.md) for the byte rules.
+3. The component file you are adding or editing.
 
-## Project Structure
+## Rules
 
-```plaintext
-marmot/
-├── README.md              # Main project overview
-├── AGENTS.md             # This file
-├── 00.md - 04.md         # Marmot Implementation Proposals (MIPs)
-├── threat_model.md       # Security threat analysis
-├── data_flows.md         # Protocol flow diagrams
-├── dependency_reqs.md    # Implementation dependencies
-├── docs/mls/             # Local copies of MLS RFCs
-│   ├── rfc9420.txt       # MLS Protocol spec
-│   ├── rfc9750.txt       # MLS Architecture
-│   └── draft-ietf-mls-extensions-08.txt
-└── assets/               # Images and diagrams
-```
+- Component ids are private-use MLS range `0x8000..0xffff`. To add one, pick the next free id and register it in THREE
+  places in the same change: [`../foundation/registries.md`](../foundation/registries.md), the README "Current Marmot
+  Components" list, and the [`../layout.md`](../layout.md) tree. This trio is the most frequently missed step — for
+  example `avatar-url` (`0x8007`) was once absent from the README list.
+- The component id IS the major version. A breaking change gets a NEW component id and a NEW file; do not add a generic
+  version field to the payload. A component-specific constant retained by an inherited schema is not version
+  negotiation.
+- Each component doc MUST define the full required set: component id, name, every valid entry location, bytes and
+  validation per location, negotiation and presence requirements, lifecycle, mutation authorization, replacement or
+  removal rules, and migration.
+- GroupContext components additionally define state bytes, AppDataUpdate bytes, proposal authorization, commit
+  authorization, and removal. LeafNode, KeyPackage, and GroupInfo components change with their containing MLS object
+  and MUST NOT define AppDataUpdate as their mutation mechanism.
+- Commit-scoped component data uses AppEphemeral. SafeAAD is reserved for component contributions to MLS
+  `authenticated_data`; do not enable it merely to attach data to one Commit.
+- Group-level component proposals and commits are admin-gated by default. A component MAY loosen this, but it MUST say
+  so explicitly, against the admin set in `marmot.group.admin-policy.v1`.
+- Unknown non-required component entries MUST be preserved byte-for-byte; never parse, sort inside, partially copy, or
+  re-encode them.
 
-## Key Documents
+## Verification
 
-### Marmot Implementation Proposals (MIPs)
+- After adding or renaming a component, grep that the id and file appear in
+  [`../foundation/registries.md`](../foundation/registries.md), the README "Current Marmot Components" list, and
+  [`../layout.md`](../layout.md).
+- Confirm the file defines every location-appropriate requirement above.
 
-- **[MIP-00](00.md)**: Credentials & Key Packages (REQUIRED)
-- **[MIP-01](01.md)**: Group Construction & Marmot Group Data Extension (REQUIRED)
-- **[MIP-02](02.md)**: Welcome Events (REQUIRED)
-- **[MIP-03](03.md)**: Group Messages (REQUIRED)
-- **[MIP-04](04.md)**: Encrypted Media (OPTIONAL)
+## Pointers
 
-### Supporting Documentation
-
-- **[threat_model.md](threat_model.md)**: Comprehensive security analysis
-- **[data_flows.md](data_flows.md)**: Protocol flow diagrams and architecture
-- **[dependency_reqs.md](dependency_reqs.md)**: Implementation dependencies
-
-## Protocol Fundamentals
-
-### Core Concepts
-
-1. **MLS (Messaging Layer Security)**: Provides group encryption, forward secrecy, and post-compromise security
-2. **Nostr**: Provides decentralized relay network and identity system
-3. **Marmot Group Data Extension**: Custom MLS extension containing group metadata
-4. **KeyPackages**: Public invitation cards for asynchronous group joins
-5. **Double Encryption**: MLS symmetric encryption + ChaCha20-Poly1305 (key derived from MLS exporter secret) for kind: 445 application messages
-
-### Event Kinds
-
-- `kind: 30443`: KeyPackage events (public invitations, addressable)
-- `kind: 444`: Welcome events (gift-wrapped via NIP-59)
-- `kind: 445`: Group events (messages, proposals, commits)
-- `kind: 10051`: KeyPackage relay list events
-
-### Critical Security Requirements
-
-When working on protocol specifications, ensure these are always addressed:
-
-1. **Credential Validation**: MLS credential identity MUST match Nostr pubkey in KeyPackage events
-2. **Commit/Welcome Ordering**: Commits MUST be confirmed before sending Welcome events
-3. **Ephemeral Keypair Uniqueness**: Fresh keypair for EVERY kind: 445 event
-4. **Unsigned Inner Events**: Inner events MUST NOT be signed (prevents leak publication)
-5. **Admin Authorization**: Commits that are not self-updates or SelfRemove-only MUST verify sender is in admin_pubkeys array (self-update and SelfRemove-only Commits are allowed from any member)
-6. **TLS Serialization**: Exact TLS presentation language format required
-
-## Code Style & Conventions
-
-### Markdown Formatting
-
-- Use clear headings with descriptive names
-- Include code examples in JSON format for Nostr events
-- Reference other MIPs using `[MIP-XX](XX.md)` format
-- Use tables for structured data (event fields, security properties, etc.)
-- Include security notes with ✅ (protections) and ⚠️ (limitations)
-
-### Specification Writing
-
-- **MUST/SHOULD/MAY**: Use RFC 2119 terminology for requirements
-- **CRITICAL**: Mark security-critical requirements explicitly
-- **Examples**: Include complete, valid examples
-- **Edge Cases**: Document race conditions, error handling, and failure modes
-- **Interoperability**: Consider cross-implementation compatibility
-
-### Security Considerations
-
-- Always reference threat_model.md for security context
-- Document observable metadata and privacy limitations
-- Include countermeasures for identified threats
-- Mark security-critical sections with **CRITICAL** labels
-
-## Common Tasks
-
-### Adding a New MIP
-
-1. Create `XX.md` file (next sequential number)
-2. Follow structure of existing MIPs:
-   - Title and status (review/draft)
-   - Required/optional flag
-   - Overview and motivation
-   - Detailed specification
-   - Examples
-   - Security considerations
-   - References to other MIPs
-3. Update README.md MIP table
-4. Update threat_model.md if security implications exist
-
-### Updating Protocol Specifications
-
-1. Read relevant MIPs and MLS RFCs
-2. Check threat_model.md for security implications
-3. Update data_flows.md if protocol flows change
-4. Ensure examples remain valid
-5. Update cross-references between MIPs
-
-### Security Analysis
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Up to the cross-surface map: [`../AGENTS.md`](../AGENTS.md).
+- Features reference components; they do not duplicate them: [`../features/`](../features/README.md).
+- Id source of truth and encodings: [`../foundation/registries.md`](../foundation/registries.md),
+  [`../foundation/canonical-encoding.md`](../foundation/canonical-encoding.md).
 
 ---
 > Source: [marmot-protocol/marmot](https://github.com/marmot-protocol/marmot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
