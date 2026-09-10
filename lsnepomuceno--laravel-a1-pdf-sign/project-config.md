@@ -1,86 +1,110 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Rules about how the code is written, as opposed to what it must do. The rules
 ---
 
-# CLAUDE.md
+# Conventions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Rules about how the code is written, as opposed to what it must do. The rules
+that break the product live in [the invariants](invariants.md); these break the
+codebase slowly instead, which is why they are written down rather than left to
+whoever reviews.
 
-## What this is
+Each is checked at review. Where a rule can be checked by a machine, it is, and
+that is noted.
 
-A standalone Laravel package (not an application) that signs PDF files with A1/x509 certificates, PKCS#12 or PEM, and cryptographically verifies existing PDF signatures. Published on Packagist as `lsnepomuceno/laravel-a1-pdf-sign`.
+---
 
-The invariants are imported rather than summarised, so they are in context for every session instead of being a link someone has to decide to follow:
+# 1. Laravel first
 
-@docs/spec/invariants.md
+**This package is a Laravel package. Before writing a helper, check whether the
+framework already has it, and use that.**
 
-The v1 surface, the global helper functions plus `src/Sign/*` and `src/Entities/*`, is **gone**, not deprecated. `UPGRADE.md` maps every removed API to its replacement.
+The package requires `illuminate/support`, `illuminate/http`, `illuminate/process`
+and `illuminate/filesystem` outright. Everything in them is already installed, already
+tested, already documented, and already familiar to the person reading the code.
+A private reimplementation of any of it is code this project has to maintain,
+test and explain, in exchange for nothing.
 
-Documentation is split by lifecycle, and `tests/Project/SpecTest.php` fails when a reference into it stops resolving:
+This is a rule, not a preference. It is checked at review, and part of it is
+checked by `tests/Project/ArchTest.php`.
 
-| Read | For |
+---
+
+## The rule
+
+1. **Look in the framework first.** `Illuminate\Support\Str`, `Arr`,
+   `Collection`, `Facades\File`, `Facades\Process`, `Facades\Http`,
+   `Facades\Config`, `Facades\Cache`, the `Illuminate\Contracts\*` interfaces.
+2. **If it exists there, use it**, even when the native call is two characters
+   shorter.
+3. **If it does not, write it**, put it in `src/Support/`, and say in the
+   docblock what the framework does not provide. A helper whose docblock cannot
+   answer "why is this not `Str::something`" is a helper that should not exist.
+
+Exceptions are below and they are narrow. Everything not listed there follows
+the rule.
+
+---
+
+## Reach for
+
+| Instead of | Use | Why |
+|---|---|---|
+| `file_get_contents`, `file_put_contents` | `Support\Files::read()`, `File::put()` | `Files::read()` exists because both the native call and `File::get()` return `false`, and that `false` reaching a `string` parameter was this package's most common typing defect |
+| `is_dir`, `mkdir`, `unlink`, `glob` | `File::isDirectory()`, `File::makeDirectory()`, `File::delete()`, `File::glob()` | one filesystem abstraction, fakeable in a host application's tests |
+| `uniqid`, `random_bytes` for a name | `Str::orderedUuid()`, `Str::random()` | already how `Support\TemporaryFile` names its files |
+| `exec`, `shell_exec`, `proc_open` | `Support\ProcessRunner` on `Illuminate\Process` | invariant 8, and `Process::fake()` in a consuming application |
+| `curl_*`, `stream_context_create` + `file_get_contents` | `Illuminate\Support\Facades\Http` | timeouts, retries and `Http::fake()`, instead of a hand-rolled stream context |
+| `array_map` / `array_filter` / `array_merge` chained over one value | `collect()` | one pipeline instead of three nested calls, when it genuinely reads better |
+| a hand-written `get($array, 'a.b.c')` | `Arr::get()` | |
+| reading config with a cast and a default | `Illuminate\Contracts\Config\Repository`, injected | already how the package reads every configuration key |
+| a hand-rolled `toArray()` on a value object | `Illuminate\Contracts\Support\Arrayable` | `Data\BaseData` already implements it |
+
+## Do not reach for
+
+These are the narrow exceptions, and each is load-bearing.
+
+| Keep the native call | Why |
 |---|---|
-| `docs/spec/invariants.md` | the rules that break the product or the project. **Read before touching `src/Signing`, `src/Validation` or the dependency list** |
-| `docs/spec/public-api.md` | what the package exposes, and what changing it costs |
-| `docs/spec/quality-policy.md` | the gates, and why each sits where it does |
-| `docs/spec/conventions.md` | how the code is written. **Read before writing a helper or a class constant** |
-| `docs/decisions/` | why the design is what it is: one numbered file per decision |
-| `docs/history/v2-modernization.md` | why v1 was shaped as it was, and where the build diverged from the plan |
-| `docs/history/decision-log.md` | which questions were put, and when they were answered |
+| **`substr`, `strlen`, `strpos`, `str_replace` on PDF or DER bytes** | **`Str::substr()` and `Str::length()` are multibyte-aware.** Running them over a PDF or a CMS reinterprets binary as UTF-8 and returns the wrong offsets, which in this package means a corrupted signature. Byte work uses byte functions, always |
+| `preg_match`, `preg_match_all` | `Str::match()` returns the match and throws the offsets away, and offsets are what the incremental writer is built on. `Str::isMatch()` is fine where only the boolean is wanted |
+| `openssl_*` | the framework wraps none of it |
+| `pack`, `unpack`, `bin2hex`, `hex2bin`, `gzuncompress` | no framework equivalent, and all byte-exact |
+| `hash(..., binary: true)` | `Hash::` is password hashing, a different thing entirely |
 
-`ARCHITECTURE.md` is the index. When you change behaviour that a decision record justifies, update that record's outcome section too: a record whose outcome is never written back is how the previous document drifted away from the code.
+The first row is the one that matters. If a change swaps a byte-level `substr`
+for `Str::substr`, it will pass every test in this suite on ASCII fixtures and
+corrupt real documents in production.
 
-**A behaviour change is not finished until every surface that describes it says the same thing.** `CONTRIBUTING.md` enumerates them, and the list is enumerated rather than summarised because "and any other relevant documentation" is exactly what let three of them go stale at once: `samples/` sat a release behind, the documentation site stopped at 2.3.1 while 2.4 shipped, and the README never named two facade methods that had been public for a release. Three of those surfaces now have gates (`tests/Conformance/SamplesTest.php`, and two rules in `tests/Project/ArchTest.php` covering docblocks and the README's coverage of the facade); the rest are review.
+*Enforced by* `tests/Project/ArchTest.php`, which fails when `Illuminate\Support\Str` is
+used inside `src/Signing` or `src/Validation` at all: those namespaces are where
+the byte work lives, and the rule is easier to keep as "not here" than as "here,
+but only these methods".
 
-**The documentation site lives on the `docs` branch, not here.** Nothing in a pull request against `main` can check it, and no test on `main` will ever fail because of it. It is updated in its own pull request, on the day a version is tagged, and it deliberately describes only what is installable: a feature merged and not yet tagged does not belong on it.
+---
 
-## Commands
+## Known outstanding
 
-```bash
-composer check          # everything CI runs: pint --test, phpstan, deps, pest
-composer test           # vendor/bin/pest
-composer analyse        # PHPStan level max, no baseline
-composer lint           # Pint (PER-CS); append --test to only check
-composer deps           # unused/shadow dependency report
-composer test:cov       # line coverage (needs pcov or xdebug)
-composer test:types     # type coverage, gated at 100%
-composer test:mutate    # mutation testing over Certificates, Signing and Validation
+`Signing\Cades\HttpTransport` builds its own `stream_context_create` and calls
+`file_get_contents` for the TSA, OCSP and CRL requests. `Http::` is the right
+tool and `guzzlehttp/guzzle` is already in the tree, so this is a gap in the
+rule rather than an exception to it. It is called out here rather than left for
+someone to find, and moving it also makes the network surface fakeable, which is
+the same argument that put `ProcessRunner` on `Illuminate\Process`.
 
-vendor/bin/pest tests/Signing/SigningTest.php                   # single file
-vendor/bin/pest --filter="writes the CAdES sub-filter"   # single test
-vendor/bin/pest --exclude-group=network                  # skip live TSA tests
-vendor/bin/pest --parallel                               # 16 processes here; mutation needs it
-```
+Rationale and alternatives: [0018](../decisions/0018-prefer-the-platforms-own-constructs.md).
 
-Tests run on Orchestra Testbench, not a host app. `openssl` on `PATH` is **not** required to run the suite: `Testing\DebugCertificate` generates throwaway PKCS#12 bundles through the ext-openssl functions. The binary is only needed by `OpenSslCliCertificateReader` and `Validation\SignatureVerifier`.
+---
 
-Tests in the `network` group hit a live timestamp authority (freetsa.org) and fail offline.
+# 2. Enums, not class constants
 
-Helpers shared across test files must live in `tests/Pest.php` (`debugCertificate()`,
-`testCertificate()`, `resource()`). A helper defined inside one test file is invisible to the
-others under `--parallel`, which fails as `Call to undefined function`.
-
-A Husky `pre-commit` hook formats staged PHP files with Pint (`npm install` to enable it). It
-falls back to the Docker service when the local PHP is older than Pint's 8.2 floor.
-
-### Docker
-
-The local floor is PHP 8.4 and the matrix reaches 8.5, so version-specific work goes through `.docker`:
-
-```bash
-docker compose -f .docker/compose.yaml run --rm php85 composer check
-```
-
-Services `php83` / `php` (8.4) / `php85`, each keeping `vendor/` in its own named volume. That volume **masks the host `vendor/`**, which is why PhpStorm reports missing classes after a Docker-only install. Fix it with `composer install --ignore-platform-reqs` on the host (documented in `CONTRIBUTING.md`).
-
-CI (`.github/workflows/main_action.yml`) runs PHP 8.4 and 8.5 against Laravel 13, on pull
-requests to `main` only. Keep it in sync with `composer.json` and the compatibility table in
-`README.md`.
+**A closed set of values is an enum.** A class constant is for the case where
+exactly one value can ever exist, and for nothing else.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lsnepomuceno/laravel-a1-pdf-sign](https://github.com/lsnepomuceno/laravel-a1-pdf-sign) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
