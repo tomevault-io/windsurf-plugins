@@ -131,4 +131,4 @@ After each: `adb logcat -d -b crash | grep -c "FATAL EXCEPTION"` must be `0`.
 
 ---
 > Source: [gatheringhallstudios/MHWorldDatabase](https://github.com/gatheringhallstudios/MHWorldDatabase) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
