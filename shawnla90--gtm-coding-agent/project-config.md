@@ -1,103 +1,74 @@
 ---
 trigger: always_on
-description: You are my agent inside my own repo. This folder is the source of truth for who I am, who I am
+description: You are inside the Moltsets reachability starter. It takes a contact list, asks Apollo whether each person is still at the company, asks Moltsets to grade the email address A through F, and renders a color-coded Google Sheet where every row keeps a channel. A bad grade is a routing decision, not a dead contact.
 ---
 
-# Sam Rivera GTM: Operating Instructions
+# Moltsets Reachability Starter
 
-You are my agent inside my own repo. This folder is the source of truth for who I am, who I am
-building for, what I have shipped, and what broke on the way.
+You are inside the Moltsets reachability starter. It takes a contact list, asks Apollo whether each person is still at the company, asks Moltsets to grade the email address A through F, and renders a color-coded Google Sheet where every row keeps a channel. A bad grade is a routing decision, not a dead contact.
 
-> This is the worked example that ships with the [Student GTM starter](../README.md). Sam Rivera is a
-> fictional student. Your copy of this tree comes from `python3 setup.py` in the starter, which
-> interviews you and writes every file below with your answers in it. This version is what one looks
-> like after six weeks of edits.
->
-> Only `projects/week-01-student-consulting-club/` ships as a real folder here, to keep the example readable.
-> Weeks 03, 05, and 06 are referenced the way a live repo would reference them, and in your copy
-> they are folders like the first one.
+## On "help me set up"
 
-## Identity
+Walk through these checks one at a time:
 
-- **Name:** Sam Rivera
-- **School:** State university, business school
-- **Program:** Business major, marketing concentration
-- **Year:** Junior, graduating May 2028
-- **GitHub:** github.com/sam-builds
-- **Target role:** Sales development at a B2B software company. GTM engineering and revenue
-  operations are the two adjacent seats I would also take.
-- **Timeline:** Summer 2027 internship, full-time after graduation
-- **What I have:** a coding agent, a terminal, a GitHub account, and a campus full of organizations
-  that do things by hand
-- **What I do not have:** an internship, a title, a budget, or a manager
-- **Semester:** Spring 2026, week 06 of the loop
+1. **Moltsets key**: Check for `.env` in this directory. If missing, `cp .env.example .env` and paste the key from app.moltsets.com. `.env` is gitignored and must never be committed. If the user keeps keys in a local secrets vault (a SQLite db outside any repo), do not ask them to paste: `export SECRETS_DB=~/.gtm-vault/vault.db` and the scripts read `secrets(key, value)` from there. See "The secrets-vault explainer" below.
 
-## Your Role
+2. **Apollo key (optional)**: Same file or vault, `APOLLO_API_KEY`. It powers `--employment apollo|both`, a second employment source for comparison. The pipeline runs without it.
 
-Help me build a public track record in go-to-market: one shipped project a week for a real user, a
-gotchas log written the day things break, a portfolio page a hiring manager can verify, and daily
-buyer research that doubles as interview prep.
+3. **Google Sheets auth**: Check for `~/.config/gspread/token.json`. If missing, `python3 setup_oauth.py` and walk them through the consent flow. They need a Google Cloud project with the Sheets and Drive APIs enabled.
 
-Be direct with me. If a draft is thin, say it is thin. If I ask you to make a project sound larger
-than it was, refuse and ask what actually happened instead.
+4. **Dependencies**: `pip install -r requirements.txt`
 
-## Source of Truth
+5. **Contacts**: `sample_contacts.csv` (25 fictional rows on `.example` domains) or their own CSV. The loader accepts the short schema (`first_name,last_name,title,company,domain,email,linkedin_url`) or a raw Apollo people export with its original headers.
 
-Read these before drafting anything that goes out with my name on it.
+6. **Budget first**: `python3 budget.py`. Three free calls. Shows the two record pools, the phone-token balance, and the endpoint catalogue. Do this before any batch.
 
-| Path | What it holds |
-|---|---|
-| `me/profile.md` | Who I am, what I am studying, what I have actually done |
-| `me/skills.md` | What I can do today, rated 1 to 4 on evidence |
-| `me/gaps.md` | What I cannot do yet, ordered by what blocks me soonest |
-| `me/target-roles.md` | The roles and companies I want, why, and the interview table |
-| `signals/config/subreddits.txt` | The rooms where the people who would hire me complain |
-| `signals/config/keywords.txt` | The phrases that mean somebody has a problem I could answer |
-| `projects/week-NN-<slug>/README.md` | Problem, input, output, result. A 90-second read. |
-| `projects/week-NN-<slug>/gotchas.md` | That project's log. Newest entry at the top. |
-| `projects/week-NN-<slug>/transcript.txt` | The build recording, transcribed. My voice sample. |
-| `clients/<org>.md` | The real user, the real problem, the number before and after |
-| `voice/core-voice.md` | How I actually talk, extracted from those transcripts |
-| `portfolio/README.md` | The public front page. The index a hiring manager reads first. |
-| `status.md` | What week I am on, what shipped, what is next |
+7. **Run it**: `bash run.sh` (first pass only) or `bash run.sh my_list.csv --full` (employment check + second pass).
 
-Two things on disk are deliberately absent from git. `recordings/week-NN/` holds the raw screen
-recordings and is too large for a repo. `.gtm-setup.json` holds my answers to the setup interview so
-`setup.py --redo <section>` can re-ask one part without losing the rest. Both are in `.gitignore`,
-which is why neither shows up in this example.
+## The pipeline
 
-The current week is week 06, and `status.md` is the file that says so. Read it before you tell me
-what to do next.
+```
+init_db.py -> grade.py -> score.py -> build_sheet.py
+```
 
-## Rules
+- `init_db.py` loads the CSV into SQLite at `data/reachability.db`. Idempotent. `--country`, `--limit`, `--exclude <file>` filter the load.
+- `grade.py` is the waterfall. Per contact: `reverse_linkedin_lookup` on the LinkedIn URL (still there, or moved? plus the graded address when present; `--employment apollo|both` swaps in or adds Apollo `people/match`) -> Moltsets `reverse_email_lookup` when still ungraded -> on 404 or F, optional `search_business_profile_by_name` by name + company DOMAIN (accept only same-domain A/B; `--second-pass-endpoint people` keeps `search_people`, which went 0 for 181) -> LinkedIn-only rows go to `linkedin_to_best_email` -> optional capped `linkedin_to_mobile_phone` for dead-email rows. If the row carries a verifier verdict, a delta class is written next to the grade. Every call is logged; every row is committed as it finishes.
+- `score.py` computes title relevance x grade multiplier and ranks the top 3 sendable per company with persona diversity.
+- `build_sheet.py` renders up to 11 tabs via the vendored `lib/sheet_engine.py` (Disagreements and Verifier vs Moltsets appear when a verifier verdict exists). Emails obfuscated by default; `--redact-names` for public stills; `--summary-only --share anyone_reader` for a linkable sheet with no rows.
+- `import_graded.py` loads rows graded elsewhere (header aliases: grade, molt_email, still_at_company, zb_status, pool, tier, route, delta_class) into the same database, recomputing routing and deltas where missing, so the sheet can be built without an API call.
+- `REACHABILITY_DB=data/other.db` in front of any script keeps a second list in its own database and URL file.
+- `budget.py` explains the four units that meter Moltsets, using free calls only.
 
-- Read `me/skills.md` and `me/gaps.md` before writing anything public. A post that overstates what I
-  can build is a post I have to walk back in a phone screen.
-- Write in the voice in `voice/core-voice.md`. If a draft reads like a press release, say so and
-  rewrite it from the transcript instead of from the summary.
-- Never invent a result, a client, a user, or a number. Every figure I publish traces to a query, a
-  row count, or a timestamp I can re-run in front of somebody.
-- Every claim in `portfolio/README.md` points at a folder in `projects/`. No claim without an
-  artifact.
-- Secrets come from the environment and get read with `os.environ`. Never write a key, a token, or a
-  password into a file in this repo, and never suggest a script that does.
-- Real people's data stays out of the repo. Commit the script and a sample file I typed myself.
-  `.gitignore` already excludes `data/`, `*.csv`, and `.env*`.
-- A gotchas entry goes at the TOP of that project's `gotchas.md`, on the day it happened, with the
-  real error string and all five fields filled in. Never rewrite an old entry.
-- A project counts as shipped when somebody other than me has used the output. A clean run on my
-  laptop is a checkpoint.
-- One file per job. Standard library first. Add a dependency when the standard library has actually
-  failed, and say in the commit message which line failed.
+## What Moltsets grades mean (from developer.moltsets.com)
 
-## The weekly cadence
+| Grade | Meaning | Action |
+|---|---|---|
+| A | valid: known reply, open, or click | send |
+| B | known send, no bounce | send, smaller batches |
+| C | catch-all domain | your call: small monitored segment |
+| D | hard invalid: bounce, complaint, or spam trap | never send |
+| F | no data | re-verify, or treat like C |
+| 404 | not in the graph | a coverage gap, not a verdict; costs nothing |
 
-| Day | The work | Time | What goes public |
-|-----|----------|------|------------------|
-| Mon | Read the signal queue, answer one thread, pick the week's project from what you read | 30 min | One real answer in a thread |
+The docs' rule: suppress D at the list level; segment C and F away from A/B rather than dropping them. Note the common mix-up: F is "no data", D is the hard invalid. Do not swap them.
+
+## What the route column means
+
+| Route | Who lands here | What to do |
+|---|---|---|
+| `email` | A/B on the company's domain | sequence them |
+| `email_low_volume` | C catch-all | small segment, watch bounces |
+| `linkedin` | not found after the second pass, or no email | connection note first |
+| `linkedin_then_phone` | grade D | never email; LinkedIn, then a mobile if tokens allow |
+| `resource` | Apollo says they moved | find them at the new company; the old email is stale |
+| `second_pass` | 404 or F and the second pass has not run yet | run `grade.py --second-pass` |
+| `hold` | free-mail address, or A/B on a different domain | a human looks |
+
+## Cost model (four units, none interchangeable)
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shawnla90/gtm-coding-agent](https://github.com/shawnla90/gtm-coding-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
