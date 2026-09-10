@@ -12,4 +12,4 @@ Claude Code only auto-loads `CLAUDE.md`, so this file imports it:
 
 ---
 > Source: [RoboVerseOrg/RoboVerse](https://github.com/RoboVerseOrg/RoboVerse) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
