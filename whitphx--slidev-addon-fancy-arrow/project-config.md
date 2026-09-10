@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to coding agents working with code in this repository. `AGENTS.md` is a symlink to it.
 ---
 
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working with code in this repository. `AGENTS.md` is a symlink to it.
 
 ## Project Overview
 
@@ -81,6 +81,35 @@ When modifying the `<FancyArrow>` component interface (props, slots, usage patte
 - `README.md` - User-facing documentation with usage examples
 - `slides.md` - Live demo slides that also serve as documentation
 
+## Deployment
+
+The demo deploys to Cloudflare Pages from the `build-demo` job in `.github/workflows/ci.yml`, which runs `wrangler pages deploy` against the `slidev-addon-fancy-arrow` project through Cloudflare's own `wrangler-action`. A push to `main` updates production at <https://slidev-addon-fancy-arrow.pages.dev/>; every other branch gets a preview of its own, whose URL the job posts as a single comment on the pull request and rewrites on each push.
+
+That needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets. A pull request from a fork cannot read them, so it builds as a check and skips the deploy.
+
+The build takes no `--base`, since Cloudflare serves the demo from the root of its domain rather than a subdirectory.
+
+## Cloud sessions
+
+A cloud session has no browser, so the only way to look at a slide is to render it to a PNG and read the image back.
+
+```bash
+pnpm dev:headless --port 3030 &
+node scripts/screenshot.js 1           # writes screenshots/slide-1.png
+node scripts/screenshot.js 1 --clicks 3
+```
+
+`pnpm dev` is the wrong command here because it passes `--open` and a VM has no browser to open, which is what `dev:headless` exists for. The screenshot script waits for the drawing animations to finish, so a capture shows an arrow in its final state.
+
+`scripts/screenshot.js` finds a browser on its own. The images at claude.ai/code ship Playwright's Chromium at `/opt/pw-browsers/chromium`, which is one of the paths it looks in, so a session there captures slides with no environment setup at all.
+
+The setup script in `.claude/cloud-setup.sh` is a fallback for an image that ships no browser: paste it into the environment's Setup script field, and it installs Chrome. Nothing in the repository runs it. Network access can stay on Trusted either way, since the script pins a Chrome for Testing build rather than looking a channel name up on a host Trusted blocks.
+
+### Exporting a PDF
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
 ---
 > Source: [whitphx/slidev-addon-fancy-arrow](https://github.com/whitphx/slidev-addon-fancy-arrow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
