@@ -32,10 +32,15 @@ Continue, Junie, etc.). This file is a redirect entry point —
 the actual rules live in `.agent/rules/` as the Single Source of Truth.
 
 > **Failure to follow the rules inside `.agent/rules/` and the Lazy-Loading protocol is completely unacceptable.**
-> **Spec Kit AI IDE Integration**
-> This project uses Spec Kit.
-> CRITICAL: If you need to execute workflows or commands, refer to the files in `.agent/workflows/`.
-> CRITICAL: For project governance and rules, refer to `.agent/rules/00-index.md`.
+
+## Slash Commands / Workflows
+
+All AI slash commands and standard operating procedures (SOPs) are located in `.agent/workflows/`. If the user invokes a command like `/speckit.plan`, execute the corresponding markdown file in that directory.
+
+# --- Spec Kit AI IDE Integration ---
+# This project uses Spec Kit.
+# CRITICAL: If you need to execute workflows or commands, refer to the files in `.agent/workflows/`.
+# CRITICAL: For project governance and rules, refer to `.agent/rules/00-index.md`.
 
 ---
 > Source: [snowdreamtech/frp](https://github.com/snowdreamtech/frp) — distributed by [TomeVault](https://tomevault.io).
