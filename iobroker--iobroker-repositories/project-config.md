@@ -1,161 +1,89 @@
 ---
 trigger: always_on
-description: This repository manages the official adapter repositories for the ioBroker IoT platform. It maintains two main repository files:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# GitHub Copilot Instructions for ioBroker.repositories
+# CLAUDE.md
 
-## Repository Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This repository manages the official adapter repositories for the ioBroker IoT platform. It maintains two main repository files:
-- `sources-dist.json` - Latest (beta) repository with the newest adapter versions
-- `sources-dist-stable.json` - Stable repository with tested and approved adapter versions
+## What this repository is
 
-The repository serves as the central hub for:
-- Adding new adapters to latest/stable repositories
-- Managing adapter versions and metadata
-- Automated quality checks and validation
-- Building and distributing repository lists
+Two data files plus the automation that guards them. The data files *are* the product — they are
+served to every ioBroker installation as the adapter repository:
 
-## Project Structure
+- `sources-dist.json` — the **latest** (beta) repository, ~800 adapters.
+- `sources-dist-stable.json` — the **stable** repository, a subset of latest pinned to a version.
 
-```
-├── .github/                    # GitHub Actions workflows and templates
-│   ├── workflows/             # Automated workflows for checking, building, validation
-│   └── PULL_REQUEST_TEMPLATE/ # PR templates
-├── lib/                       # Core functionality modules
-│   ├── build.js              # Repository building and processing
-│   ├── check.js              # Adapter validation and PR checking
-│   ├── scripts.js            # Core scripts for repo management
-│   └── tools.js              # Utility functions
-├── test/                      # Test files
-├── sources-dist.json          # Latest repository (beta adapters)
-├── sources-dist-stable.json   # Stable repository (production adapters)
-├── tasks.js                   # Build tasks runner
-└── package.json              # Dependencies and scripts
-```
+Everything in `src/` and `lib/` exists to validate, mutate or publish those two files. Most of it runs
+as a GitHub Action against a pull request, not on a developer machine.
 
-## Development Setup
+The code is split **by author**, on purpose - do not migrate one side into the other:
 
-1. **Prerequisites**: Node.js ≥12
-2. **Install dependencies**: `npm install`
-3. **Available scripts**:
-   - `npm test` - Run comprehensive adapter validation tests
-   - `npm run check` - Check adapter changes in PRs
-   - `npm run addToLatest -- --name <adapter> --type <type>` - Add adapter to latest
-   - `npm run addToStable -- --name <adapter> --version <version>` - Add to stable
-   - `npm run sort` - Sort repository entries alphabetically
+- `src/*.mts` - Bluefox's scripts (`scripts`, `tools`, `build`, `common`, `check`, `test/testRepo`).
+  TypeScript, executed **directly** by Node's built-in type stripping: `node src/<x>.mts`. Nothing is
+  ever compiled - there is no `build/`, no `prepare` step, and `tsc` is only the type checker
+  (`npm run typecheck`). This needs Node >= 22.19 (`engines` in package.json).
+- `lib/*.js` + `test/checkRepository.test.js` - Martin's (mcm1957) workflow scripts. Plain CommonJS
+  JavaScript, run directly (`node lib/<x>.js`), kept in their original style: not type-checked, not
+  linted. Their only link to the TypeScript side is `require('../src/common.mts')` for the GitHub API
+  wrappers - Node loads that ES module through `require()`, so the same Node >= 22.19 applies to them.
 
-## Code Style and Patterns
+## Commands
 
-### ESLint Configuration
-- **Indentation**: 4 spaces
-- **Quotes**: Single quotes preferred, template literals allowed
-- **Semicolons**: Required
-- **Variables**: Use `const`/`let`, no `var`
-- **ES Version**: ES2022
-
-### Common Patterns
-- **Error handling**: Callback-style with `(err, data)` pattern
-- **Async operations**: Primarily callback-based, some Promise usage
-- **File operations**: Synchronous `fs` operations for JSON files
-- **HTTP requests**: Using `axios` library
-- **Logging**: `console.log`/`console.error` for output
-
-### Repository Entry Format
-```javascript
-{
-  "adapter-name": {
-    "meta": "https://raw.githubusercontent.com/owner/repo/master/io-package.json",
-    "icon": "https://raw.githubusercontent.com/owner/repo/master/admin/icon.png",
-    "type": "adapter-category",
-    "version": "1.0.0",  // Only in stable repo
-    "published": "2024-01-01T00:00:00.000Z"  // Only in stable repo
-  }
-}
-```
-
-## Key Components
-
-### Main Scripts (`lib/scripts.js`)
-- `addToLatest()` - Adds adapter to latest repository
-- `addToStable()` - Adds adapter to stable repository  
-- `sort()` - Sorts repository entries alphabetically
-- `nodates()` - Removes versionTime attributes
-
-### Validation (`lib/check.js`)
-- Detects changed adapters in PRs
-- Runs `@iobroker/repochecker` validation
-- Posts validation results as PR comments
-- Checks npm package existence and ownership
-
-### Build System (`lib/build.js`)
-- Processes repository JSON files
-- Generates statistics and download counts
-- Creates HTML lists and badge images
-- Handles repository publishing
-
-## Testing Framework
-
-### Test Types
-- **Repository validation**: Validates JSON structure and adapter entries
-- **Adapter checking**: Uses `@iobroker/repochecker` for comprehensive validation
-- **NPM validation**: Checks package existence and ioBroker ownership
-
-### Running Tests
 ```bash
-npm test              # Full test suite (takes 10+ minutes)
-npm run check         # Quick PR validation
+npm i                 # dependencies only - there is no build step
+npm run typecheck     # tsc -p tsconfig.json (noEmit); run it before committing changes to src/
+npm run lint          # eslint . - covers src/ only, lib/ and test/ are ignored on purpose
+
+# Mutating the repo files — always go through these, never hand-edit the JSON
+npm run addToLatest  -- --name <adapter> --type <type>      # discovers GitHub repo/branch/icon itself
+npm run addToStable  -- --name <adapter> [--version x.y.z]  # must already be in latest + on npm
+npm run updateStable -- --name <adapter> [--version x.y.z]  # bump an existing stable pin
+npm run sort                                                # re-sort + re-normalize both files
+npm run nodates                                             # strip versionTime/versionDate
+
+# Tests
+npm test                                                   # mocha over src/test/*.mts + test/*.js — SLOW (see below)
+npx mocha test/checkRepository.test.js --exit              # offline unit tests only, ~instant
+npx mocha src/test/testRepo.mts --exit --grep "reserved"   # one case from the network suite
+
+# Structural validators — each is a standalone CLI that exits non-zero on failure (plain JS, no dependencies)
+node lib/checkRepository_checkJsonFormatting.js sources-dist.json
+node lib/checkRepository_checkLatestAttributes.js
+node lib/checkRepository_checkAdapterRepositoryFiles.js   # network; wants OWN_GITHUB_TOKEN
 ```
 
-### Test Environment Variables
-- `OWN_GITHUB_TOKEN` - GitHub token for API access
-- `IOBBOT_GITHUB_TOKEN` - Bot token for automated operations
+`npm test` loads `src/test/testRepo.mts`, which fetches every `meta` URL in both files with a 1 s delay
+between requests — it takes 15+ minutes and needs `OWN_GITHUB_TOKEN` to avoid rate limits. Prefer the
+single-file / `--grep` forms while iterating.
 
-## GitHub Actions Workflows
+`npm run check` only works inside a GitHub Action: it reads `GITHUB_REF` / `GITHUB_EVENT_PATH` to find
+the PR number and posts comments back. Each such script has a commented-out block near the bottom
+(`// process.env.GITHUB_REF = ...`, `event.json`) that is the intended way to run it locally; `event.json`
+is gitignored for that purpose. Without those variables the scripts abort with "Reference not found"
+before touching the network, which makes `node src/check.mts` a safe smoke test.
 
-### Pull Request Validation (`.github/workflows/check.yml`)
-- **Trigger**: PR opened/edited/reopened, issue comments
-- **Actions**: 
-  - Detects changed adapters
-  - Runs validation checks
-  - Posts results as PR comments
-- **Security**: Uses `pull_request_target` for secret access
+## TypeScript layout
 
-### Other Workflows
-- `checkNpm.yml` - Validates NPM packages
-- `checkArchived.yml` - Checks for archived repositories  
-- `setStableTag.yml` - Manages stable version tags
-- `readyForStable.yml` - Identifies adapters ready for stable
-
-## Adapter Requirements
-
-### Latest Repository Requirements
-- GitHub repo named `ioBroker.<adaptername>`
-- Valid `io-package.json` with required fields
-- README.md with documentation
-- NPM package published
-- `iobroker` organization as NPM owner
-- Basic GitHub Actions testing
-- Admin3 configuration dialog
-
-### Stable Repository Requirements
-- Already in latest repository
-- Forum testing feedback
-- Discovery implementation (if applicable)
-- Version stability validation
-
-## Common Tasks
-
-### Adding New Adapter to Latest
-```bash
-npm run addToLatest -- --name myAdapter --type hardware
-```
-
-### Adding Adapter to Stable
+- `tsconfig.json` is the single source of truth and is **type-check only** (`noEmit`). `module`/
+  `moduleResolution` are `nodenext`, `allowImportingTsExtensions` permits the `.mts` extensions Node
+  needs in relative imports, `erasableSyntaxOnly` rejects anything type stripping cannot erase (`enum`,
+  `namespace`, parameter properties), and `verbatimModuleSyntax` forces explicit `import type` so no
+  stripped import ends up referencing a type-only export at runtime.
+- The sources are `.mts`, not `.ts`, on purpose: package.json must not get `"type": "module"` (Martin's
+  `lib/*.js` are CommonJS), and a plain `.ts` with `import`/`export` is then parsed twice by Node with a
+  `MODULE_TYPELESS_PACKAGE_JSON` warning. `.mts` is unconditionally an ES module. Consequences inside
+  `src/`: `import.meta.dirname` / `import.meta.filename` instead of `__dirname`, no bare `require`
+  (`createRequire(import.meta.url)` where a CommonJS package must be loaded that way), and relative
+  imports carry the `.mts` extension.
+- Every workflow runs `npm i` before its script, for dependencies only. The nine `checkRepository.yml`
+  jobs skip even that — those scripts have no dependencies at all. `node-version: 22` in the workflows
+  resolves to the newest 22.x, which satisfies the >= 22.19 requirement.
+- `@iobroker/eslint-config` only targets `**/*.ts`; `eslint.config.mjs` widens every such block to
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ioBroker/ioBroker.repositories](https://github.com/ioBroker/ioBroker.repositories) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
