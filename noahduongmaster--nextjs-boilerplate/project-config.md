@@ -104,4 +104,4 @@ Run these before declaring any task complete. CI runs exactly the same gates.
 
 ---
 > Source: [NoahDuongMaster/nextjs-boilerplate](https://github.com/NoahDuongMaster/nextjs-boilerplate) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
