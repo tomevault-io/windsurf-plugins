@@ -1,102 +1,103 @@
 ---
 trigger: always_on
-description: This is an Electron-based desktop application that simulates Roku devices for BrightScript development. It wraps the `brs-engine` library (imported as `brs-engine` npm package) and provides a complete Roku device simulator with networking services.
+description: handles `dev.zip`/`dev.bpk` upload and screenshots via `busboy`.
 ---
 
-# BrightScript Simulator Desktop - AI Coding Instructions
+# CLAUDE.md
 
-## Project Overview
-This is an Electron-based desktop application that simulates Roku devices for BrightScript development. It wraps the `brs-engine` library (imported as `brs-engine` npm package) and provides a complete Roku device simulator with networking services.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Architecture
+## Project
 
-### Electron Process Structure
+`brs-desktop` is an Electron desktop wrapper around the **`brs-engine`** npm package (the BrightScript
+simulation engine) plus **`brs-scenegraph`** (SceneGraph XML extension, alpha). Its job is to turn the
+engine into a full Roku *device* simulator: network services (ECP/SSDP, web installer, telnet debugger),
+device settings/persistence, menus, and an integrated Monaco-based code editor + console.
 
-#### Main Process (`src/main.js`)
-- **Application Lifecycle**: Electron app initialization, window creation, global state management
-- **Device Information**: Creates unified `deviceInfo` object with Roku device specs, network config, localization
-- **Server Orchestration**: Initializes and manages ECP, Installer, and Telnet servers
-- **Menu System**: Platform-specific menu creation and IPC event routing
-- **Settings Integration**: Loads/applies user preferences from JSON storage
-- **Command Line Processing**: Handles startup arguments (devtools, console, files, etc.)
-- **Global Shared State**: `globalThis.sharedObject` for cross-process data sharing
+Language/runtime issues (BrightScript semantics, `roXXX` components) belong to `brs-engine`, not this repo.
 
-#### Main Process Helper Modules (`src/helpers/`)
-- **`settings.js`**: ElectronPreferences integration, device configuration, UI themes
-- **`window.js`**: Window management (create, focus, aspect ratio, screenshot, fullscreen)
-- **`files.js`**: File loading (ZIP/BPK packages, BRS source), recent files management
-- **`console.js`**: Telnet server integration, debug message routing
-- **`dialog.js`**: Native file dialogs (open packages, save screenshots)
-- **`about.js`**: About window with version information
-- **`util.js`**: Network utilities (local IPs, gateway detection)
-- **`roku.js`**: Peer Roku device communication via ECP
+## Commands
 
-#### Main Process Menu System (`src/menu/`)
-- **`menuService.js`**: Central menu management, recent files, context menus
-- **`*MenuTemplate.js`**: Platform-specific menu definitions (File, Edit, Device, View, Help)
-- **`macOSMenuTemplate.js`**: macOS-specific application menu structure
+```bash
+npm install            # postinstall runs electron-builder install-app-deps
+npm run start          # dev mode: webpack watch (build/start.js) + spawns electron on first successful build
+npm run build          # webpack dev build into app/
+npm run release        # webpack production build into app/ (what CI runs)
+npm run dist           # production build + electron-builder installers for the current platform -> dist/<version>/
+npm run clean          # wipe app/
+npm test               # vitest run — unit + service integration tests
+npm run test:watch     # vitest watch mode
+npm run test:coverage  # v8 coverage into coverage/
+npm run lint           # eslint (flat config in eslint.config.mjs)
+npm run lint:fix       # eslint --fix
+npm run prettier       # prettier --check
+npm run prettier:write # prettier --write
+```
 
-#### Renderer Process (`src/app/app.js`)
-- **BRS Engine Interface**: Global `brs` object initialization and event subscription
-- **Device Simulation UI**: Display management, stats overlay, theme handling
-- **App Lifecycle Events**: Handles loaded/started/closed/error events from engine
-- **Input Management**: Keyboard/gamepad mapping, custom key bindings
-- **IPC Communication**: Main ↔ Renderer messaging via preload bridge
-- **Debug Integration**: Micro debugger support, console redirection
+**Always run `npm run lint` and `npm run prettier` before committing**, and fix what they report —
+CI runs both, and a formatting-only diff on a later PR re-attributes untouched code to that PR's new
+code in SonarCloud (see below). `npm run lint:fix` and `npm run prettier:write` handle most of it.
 
-#### Renderer Process Modules (`src/app/`)
-- **`preload.js`**: Secure contextBridge API for main ↔ renderer communication
-- **`statusbar.js`**: Bottom status bar (file info, services, resolution, audio)
-- **`editor.js`**: CodeMirror-based BrightScript code editor window
-- **`brightscript.js`**: CodeMirror syntax highlighting for BrightScript language
-- **`codemirror.js`**: CodeMirror configuration and theme management
+Other `dist-*` scripts target Windows / Linux (appimage, deb, arm). Installers must be built on their
+native OS.
 
-### Core Components
+CLI args can be appended to `npm run start` (e.g. `npm run start -- --devtools --console -m hd`); see
+`docs/how-to-use.md` for the full list (`-o/-f/-m/-e/-r/-w/-p/-c/-d`).
 
-#### BRS Engine Integration
-- **Global `brs` Object**: Exposes `initialize()`, `subscribe()`, `deviceData`, `getVersion()`, `getSerialNumber()`
-- **Event System**: Engine publishes events (loaded, started, closed, error, debug, redraw, control)
-- **Device Data Sync**: `brs.deviceData` properties sync with main process settings
-- **Custom Key Mapping**: Supports Roku remote buttons + game controller inputs
-- **Performance Stats**: Optional overlay showing FPS, memory, draw calls
+## Tests
 
-#### Network Services (All run in main process)
-- **ECP Server** (`src/server/ecp.js`, port 8060): 
-  - REST API: `/query/device-info`, `/query/apps`, `/keypress/*`, `/launch/*`
-  - ECP-2 WebSocket API for mobile app compatibility
-  - SSDP discovery service for device detection
-  - Observer pattern for event distribution
-- **Web Installer** (`src/server/installer.js`, default port 80):
-  - HTTP digest authentication (username: rokudev)
-  - File upload interface for ZIP/BPK deployment
-  - Screenshot capture and download
-  - Channel deletion and management
-- **Telnet Server** (`src/server/telnet.js`, port 8085):
-  - Remote console access for debugging
-  - Command execution and output streaming
-  - Micro debugger integration
-  - Multi-client support with observer pattern
+Tests run on **Vitest** (`test/**/*.spec.js`, config in `vitest.config.mjs`). Two layers:
 
-#### Settings Architecture
-- **Storage**: JSON file in `app.getPath("userData")/brs-settings.json`
-- **UI**: `@lvcabral/electron-preferences` with custom CSS themes
-- **Structure**: Nested sections (simulator, services, device, display, remote, audio, localization, captions)
-- **Dot Notation Access**: `settings.value("device.deviceModel")` for nested properties
-- **Live Updates**: Settings changes trigger IPC events to update running simulation
+- `test/unit/**` mirrors the `src/` tree and covers pure logic.
+- `test/integration/**` boots the real ECP, web installer, telnet and debug servers in-process on
+  **ephemeral ports** against a fake window, and drives them over real sockets.
 
-### Build System
-- **Webpack**: Multi-config build in `build/webpack.app.config.js` 
-  - Main entry: Creates `app/main.js` from `src/main.js`
-  - App entry: Creates `app/app.js` from `src/app/app.js` 
-  - Editor entry: Creates `app/editor.js` from `src/app/editor.js`
-- **Development**: `npm run start` runs `build/start.js` with webpack watch + electron spawn
-- **Release**: `npm run dist` builds production bundles + electron-builder packages
+There is **no E2E/Playwright layer**. Window behaviour, menus and anything visual still have to be
+verified by running the app — `npm test` passing does not mean the UI works.
 
-## Key Patterns
+**Electron is never loaded.** `vitest.config.mjs` aliases `electron`, `@electron/remote`,
+`@lvcabral/electron-preferences`, `@lvcabral/node-ssdp`, `network`, `electron-prompt` and
+`electron-about-window` to stubs in `test/mocks/`. Mocking SSDP is what keeps UDP multicast out of CI.
+`test/setup/global.js` polyfills `process.getSystemVersion()`, points `app.getPath("userData")` at a
+temp dir, and installs a fresh `globalThis.sharedObject` before each test.
 
+Two traps worth knowing:
+
+- Several modules register `ipcMain` handlers **at module-evaluation time** and can never re-register.
+  Do not call `ipcMain.removeAllListeners()` in a shared hook — it silently disables the code under
+  test. Drive those handlers with `ipcMain.emit(channel, {}, payload)`.
+- Routes that read bundled assets via `path.join(__dirname, …)` resolve to `src/` under vite-node
+  rather than the webpack bundle's `app/`, so they fail in tests only. Those cases are marked.
+
+When adding an IPC channel, a `gen*Xml` builder, or a debug command, add the matching test — the
+whitelist-parity, XML and command-shell specs are the guardrails for those three contracts.
+
+### Static analysis (SonarCloud)
+
+Every PR is gated on SonarCloud's **new code** Quality Gate: A ratings for security, reliability and
+maintainability, and hotspots 100% reviewed. The project key is `lvcabral_brs-emu-app`, which does not
+match the repo name. Query findings with `resolved=false`, or already-closed issues come back too and
+the list looks far worse than it is:
+
+```bash
+gh pr checks <PR>
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys=lvcabral_brs-emu-app&pullRequest=<PR>&resolved=false&ps=100"
+```
+
+**Moving code re-attributes it to new code**, so an extraction can pull an existing finding onto your
+PR without you having written anything new. Check what a finding points at before assuming you caused it.
+
+Rules this codebase trips most often, worth writing to up front:
+
+| Rule | What it wants |
+| --- | --- |
+| S4790 | No weak hashes (MD5, SHA-1). Where a wire protocol mandates one, route every call through a single helper carrying the justification, so there is one documented exemption instead of many. |
+| S5443 | No fixed path under a shared temp directory. Use `fs.mkdtempSync(path.join(os.tmpdir(), …))` — unique and owner-only. |
+| S1313 | No hardcoded IP addresses. In fixtures and docs use the RFC 5737 ranges (`192.0.2.0/24`); loopback and subnet masks are fine. |
+| S2699 | Every test needs at least one explicit `expect()`. A helper that throws on timeout does not count — assert the outcome after awaiting it. Empty `it.skip` bodies are flagged too; a comment explaining the gap says more. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lvcabral/brs-desktop](https://github.com/lvcabral/brs-desktop) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
