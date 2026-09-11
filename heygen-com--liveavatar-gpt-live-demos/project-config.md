@@ -1,0 +1,113 @@
+---
+trigger: always_on
+description: Operational map for coding agents (and fast-moving humans). Product overview
+---
+
+# AGENTS.md
+
+Operational map for coding agents (and fast-moving humans). Product overview
+lives in [README.md](README.md); design rationale in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Shape
+
+pnpm workspace, TypeScript everywhere, deliberately few dependencies.
+
+```
+shared/     The contract. messages.ts (wire protocol) + tools.ts (tool registry).
+            NOT a package — both sides import it by relative path.
+server/     Orchestrator. Node + ws only. `pnpm dev` = tsx watch.
+            prompts/*.md is the persona (Japanese tutor by default) — the
+            intended customization point. src/prompts.ts loads it and holds the
+            non-negotiable delegation/tool mechanics prompts.
+web/        Browser client. Vite + livekit-client + @hyperframes/player.
+```
+
+`pnpm dev` at the root runs both. Vite (:5173) proxies `/api` and `/ws` to the
+server (:8787), so the browser sees one origin. Config is one `.env` at the
+repo root (see `.env.example`); only the server reads it.
+
+## Commands
+
+```bash
+pnpm install
+pnpm run setup    # interactive: collects + live-verifies API keys, writes .env
+pnpm dev          # both processes (preflights required env via scripts/check-env.mjs)
+pnpm typecheck    # tsc --noEmit in server and web (both include ../shared)
+pnpm build        # web/dist — the server serves it in production
+```
+
+`pnpm run setup`, not `pnpm setup` — the bare form is pnpm's own built-in.
+`dev`/`start` fail fast through `scripts/check-env.mjs` when required vars are
+missing; its required list mirrors `missingConfig()` in `server/src/config.ts`
+— change one, change both.
+
+## Invariants — do not "fix" these
+
+- **One continuous utterance.** The avatar never gets a per-turn `speak_end`
+  or interrupt. GPT-Live owns turn-taking; the orchestrator only moves audio,
+  in arrival order. (v3 audio deltas carry no timeline, so there is nothing to
+  reconstruct silence from — the wall clock is the only timing.)
+- **Turns are projected, not received.** v3 has no turn events, only timed
+  transcript deltas. `server/src/turns.ts` groups them per speaker with a gap
+  timeout (`TURN_GAP_MS`). A user turn *opening* there is the barge-in signal;
+  an assistant turn *closing* is the review-break moment. Tune the gap, don't
+  bypass the projector.
+- **No VAD in the browser.** `micCapture.ts` streams every frame, silence
+  included. Turn detection belongs to the model, which hears the same audio
+  with the conversation as context.
+- **Barge-in is two-step.** A user turn opening only *starts a watch*
+  (`session.ts`); the buffer is cleared only if the model actually stops
+  producing audio. Acting on the turn alone cuts the avatar off on every
+  "mm-hmm" — and the model, believing it said the rest, never repeats it.
+- **Every tool call gets a result AND a continue** (`gptlive.ts`). Tool calls
+  are driven only from the nested `response.output_item.done` (the one event
+  carrying `call_id`), deduped by `call_id`, answered with
+  `response.item.create`, then resumed with `response.create` — the result
+  alone does nothing in v3, and an unanswered call blocks every later
+  delegation. Tools in `shared/tools.ts` still keep a **distinct set of
+  required parameter names** so `inferToolName` can recover a name-less call
+  (`server/src/tools.ts`) should the API ever send one.
+- **The greeting is gated on the media socket** (`session.ts`). Audio sent
+  before the media leg is up is dropped with no replay; start GPT-Live early
+  and the avatar's opening line is silently lost. The greeting itself is a
+  `session.instructions.append` (OpenAI's tested speak-first path), not
+  commentary.
+- **Append kinds mean what v3 says they mean** (`bridge.append`).
+  `instructions` = directive to follow; `commentary` = information to SAY;
+  `thinking` = silent context. v2's silent "commentary" channel is v3
+  `thinking` — mapping by the word speaks progress text aloud.
+- **Model output is untrusted.** The dispatcher clamps it
+  (`server/src/tools.ts`); compositions render it with `textContent` only.
+- **Staging is per-widget, client-decided** (`web/src/overlays/index.ts`) —
+  never a tool argument. The recap widget sets PiP; the term card does not.
+- **The recap list is server state.** Term cards are recorded on the session;
+  `show_learned_words` renders from that store. Don't let the model supply the
+  word list — it will misremember it.
+
+## Recipe: add a front-end component
+
+Full walkthrough — the Hyperframes composition contract and every hook
+(`shared/tools.ts` → `server/src/tools.ts` → `shared/messages.ts` →
+`web/src/overlays/`) — lives in
+[docs/ADDING_FRONTEND_COMPONENTS.md](docs/ADDING_FRONTEND_COMPONENTS.md).
+Follow it; the invariants above are restated there in context.
+
+Callable ≠ called: a registered tool that never fires in a live session is
+the expected failure, not a wiring bug — GPT-Live delegates on capability
+gaps, not prose. The trigger patterns that actually work (server-side
+transcript push, prod + fallback, explicit-request directives) and the
+debugging ladder live in
+[docs/MAKING_VISUALS_FIRE.md](docs/MAKING_VISUALS_FIRE.md).
+
+Test without a session: `window.__ui({ widget: ..., props: ... })` in the
+browser console.
+
+## Repurposing (new persona / domain)
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [heygen-com/liveavatar-gpt-live-demos](https://github.com/heygen-com/liveavatar-gpt-live-demos) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
