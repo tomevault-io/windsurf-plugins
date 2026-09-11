@@ -1,15 +1,17 @@
 # TorchRef
 
-> Tome by [HatPdotS](https://github.com/HatPdotS/TorchRef) — distributed by [TomeVault](https://tomevault.io)
+> Tome by [HatPdotS](https://github.com/HatPdotS/TorchRef), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
+
+A PyTorch-based crystallographic refinement library
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [HatPdotS/TorchRef](https://github.com/HatPdotS/TorchRef).
+Original source: `AGENTS.md` in [HatPdotS/TorchRef](https://github.com/HatPdotS/TorchRef).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
