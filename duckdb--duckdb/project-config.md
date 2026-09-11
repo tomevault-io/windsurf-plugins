@@ -1,177 +1,66 @@
 ---
 trigger: always_on
-description: This file provides guidance to coding agents when working with code in this repository.
+description: This file applies to work in `.github/patches/extensions`. Read it before adapting an out-of-tree extension to a DuckDB change, updating an extension's pinned revision, or adding, changing, or removing an extension patch.
 ---
 
-# AGENTS.md
+# Out-of-Tree Extension Patches
 
-This file provides guidance to coding agents when working with code in this repository.
+This file applies to work in `.github/patches/extensions`. Read it before adapting an out-of-tree extension to a DuckDB change, updating an extension's pinned revision, or adding, changing, or removing an extension patch.
 
-## Overview
+## Establish the Patch Base
 
-DuckDB is a high-performance analytical database system designed to be fast, reliable, portable, and easy to use. It is an analytical database management system with a rich SQL dialect, vectorized execution engine, and columnar storage format.
+- Find the extension's `duckdb_extension_load` declaration under `.github/config` and use its exact `GIT_URL` and `GIT_TAG`. Do not create a patch against another branch, tag, or checkout.
+- Work from a clean checkout of that `GIT_TAG`. Apply every existing patch for the extension in lexicographic filename order before making a new change. A new patch must be based on the result of all patches that precede it.
+- Patch paths are relative to the root of the extension repository, not the DuckDB repository. Generate a raw unified diff with `a/` and `b/` paths that works with both `patch -p1` and `git apply`. Do not use `git format-patch` or include its mail headers.
+- Keep each patch focused on one coherent compatibility change. Exclude unrelated formatting, generated-file churn, build artifacts, and other working-tree changes.
 
-## Build Commands
+## Name and Place Patches
 
-### Basic Build
-```bash
-make debug                   # Builds debug version with sanitizers and assertions
-make reldebug                # Builds optimized release version with debug symbols
-FORCE_DEBUG=1 make relassert # Builds optimized version with sanitizers and assertions
+- Store patches in `.github/patches/extensions/<extension>/`.
+- Name every new patch `NNNN-short-description.patch`, where `NNNN` is a four-digit, zero-padded sequence number such as `0001` or `0012`.
+- Patches are applied in lexicographic filename order. Normally choose the next number after the highest existing numeric prefix so the new patch is applied last. Ensure any dependent patches sort after their prerequisites.
+- Use a unique, descriptive filename. Do not imitate legacy unnumbered names or names prefixed with `zzz`; those predate the numbered convention.
+- Do not put README files, notes, or any other auxiliary files inside an individual extension directory. The patch application script rejects every entry there that does not end in `.patch`. This `AGENTS.md` belongs in the shared parent directory for that reason.
+
+## Enable Patch Application
+
+- When adding the first patch for an extension, add `APPLY_PATCHES` to the relevant `duckdb_extension_load` declaration. Without it, the patch directory is ignored.
+- Keep `APPLY_PATCHES` present for as long as the extension has patches. When removing the final patch, remove `APPLY_PATCHES` as part of the same change. `make extension-patch-check` rejects both patches without the flag and the flag without patches.
+- If the extension has multiple configuration branches or load declarations, ensure every applicable declaration that can fetch the patched revision enables patching.
+
+## Supported Local Workflow
+
+The sync workflow keeps existing patches as commits on top of the configured `GIT_TAG` and can export those commits back to patch files:
+
+```shell
+BUILD_EXTENSIONS=<extension> make sync_out_of_tree_extensions
+cd extension/external/<extension>
+# Make and verify one focused change.
+git add -A
+git commit -m 'NNNN-short-description.patch'
+cd ../../..
+EXPORT_EXTENSION_PATCHES=1 BUILD_EXTENSIONS=<extension> make sync_out_of_tree_extensions
 ```
 
-## Testing
+- Add `APPLY_PATCHES` before the initial sync when creating an extension's first patch.
+- The commit subject must exactly match the intended patch filename: one word, ending in `.patch`, unique among the patch commits, and lexicographically later than the preceding commit subject. Use one commit per patch.
+- The export rewrites each patch from its corresponding commit. Review all exported files and confirm that earlier patches did not change unexpectedly.
+- As an alternative, clone `GIT_URL`, check out `GIT_TAG`, apply existing patches in sorted order, make the focused change, and write the clean `git diff` to the new patch path.
 
-### Running Tests
-```bash
-build/reldebug/test/unittest # Fast unit tests
-```
+`FORCE_APPLY_PATCHES=1` hard-resets and cleans the synced extension checkout before reapplying patches. It discards local extension work, so use it only when that destruction is intended. `DUCKDB_SKIP_APPLYING_PATCHES=1` is a temporary local debugging bypass; it is not a fix and must not be used to declare the patch work complete.
 
-### Running Specific Tests
-```bash
-# Run specific test file
-build/reldebug/test/unittest test/sql/order/test_limit.test
+## Update or Retire Patches
 
-# Run all tests including slow tests
-build/reldebug/test/unittest "*"
-```
+- When changing `GIT_TAG`, start from the new pinned revision and reapply every remaining patch in filename order. Rebase or regenerate patches that no longer apply cleanly.
+- Delete patches whose changes are included upstream. Preserve the relative order of patches that remain and remove `APPLY_PATCHES` if no patches remain.
+- Do not squash or regenerate unrelated existing patches merely to add a new one.
 
-It is recommended to use `make reldebug` and `build/reldebug/test/unittest` unless a good reason exists to use the debug build - the debug build is much slower than the reldebug build.
+## Validate the Change
 
-### Test File Format
-Tests use the sqllogictest format (`.test` files). Example structure:
-```sql
-# name: test/sql/order/test_limit.test
-# description: Test LIMIT keyword
-# group: [order]
-
-statement ok
-CREATE TABLE test (a INTEGER, b INTEGER);
-
-query I
-SELECT a FROM test LIMIT 1
-----
-11
-
-statement error
-SELECT a FROM test LIMIT a
-----
-<REGEX>:Binder Error:.*not found.*
-```
-
-Test directives:
-- `statement ok` - Statement should succeed
-- `statement error` - Statement should fail
-- `query I` - Query returning INTEGER column
-- `query II` - Query returning two columns
-- `----` - Separates query from expected results
-- `<REGEX>:` - Expected error message pattern
-- `require-env VAR` - Test requires environment variable
-
-Slow tests should use `.test_slow` extension instead of `.test`.
-
-## Code Formatting
-
-```bash
-make format-fix        # Format all code (clang-format + black)
-make generate-files    # Generate files + format all code
-```
-
-Ensure you run formatting before committing.
-
-## Extensive Testing / Making CI Work
-
-Below is a set of tests that should be run in order to make sure a changeset passes extensive tests in CI. If the user is asking you to fix CI make sure that the below commands succeed.
-
-```bash
-make allunit
-FORCE_DEBUG=1 FORCE_ASSERT=1 make reldebug && build/reldebug/test/unittest
-make test_configs
-make test_vector
-```
-
-
-## Architecture
-
-### Query Execution Pipeline
-
-```
-SQL String
-    ↓
-[PARSER] - Uses a PEG parser to parse SQL into AST
-    ↓
-SQLStatement tree (ParsedExpression, TableRef objects)
-    ↓
-[PLANNER/BINDER] - Binds symbols to catalog, creates logical plan
-    ↓
-Logical Plan (LogicalOperator tree with bound Expressions)
-    ↓
-[OPTIMIZER] - Applies rule-based and cost-based optimizations
-    ↓
-Optimized Logical Plan
-    ↓
-[PHYSICAL PLAN GENERATOR] - Converts to physical operators
-    ↓
-Physical Plan (PhysicalOperator tree)
-    ↓
-[EXECUTOR] - Executes with vectorized, parallel pipelines
-    ↓
-Results
-```
-
-### Core Components
-
-**Parser** (`src/parser/`)
-- Converts SQL strings to Abstract Syntax Tree (AST)
-- Uses a PEG-based parser
-- The grammar is located in `*.gram` files and generated using `scripts/build_grammar.sh`
-- Outputs: `SQLStatement`, `ParsedExpression`, `TableRef` objects
-- Key subdirectories: `expression/`, `statement/`, `tableref/`, `peg/`
-
-For more details on adding new grammar, see the README located at `src/parser/peg/README.md`. 
-Each new grammar rule must have a corresponding transformer rule, located at `peg/transformer`.
-
-**Planner** (`src/planner/`)
-- Binds symbols to catalog entries and resolves types
-- Creates logical query execution plan
-- Key classes: `Binder`, `LogicalOperator`, bound `Expression` types
-- Subdirectories: `binder/`, `expression/`, `subquery/`
-
-**Optimizer** (`src/optimizer/`)
-- Transforms logical plans without changing semantics
-- Applies predicate pushdown, join ordering, expression rewriting, etc.
-- Subdirectories: `join_order/`, `statistics/`, `rule/`, `pushdown/`
-
-**Execution Engine** (`src/execution/`)
-- Converts logical plan to physical plan and executes
-- Push-based vectorized execution model
-- Processes data in batches (typically 2048 rows)
-- Key subdirectories: `operator/` (scan, join, filter, aggregate, etc.), `expression_executor/`
-
-**Storage** (`src/storage/`)
-- Manages persistent data storage and buffer management
-- Block-based storage with compression
-- Includes WAL (Write-Ahead Log) for durability
-- Subdirectories: `buffer/`, `compression/`, `checkpoint/`, `table/`
-
-**Catalog** (`src/catalog/`)
-- Metadata management for tables, schemas, functions, types, etc.
-- Single source of truth for database metadata
-- Key classes: `Catalog`, `CatalogEntry`, `SchemaCatalogEntry`
-
-**Transaction Manager** (`src/transaction/`)
-- ACID transaction management with MVCC
-- Coordinates concurrent access to data
-- Key files: `transaction_manager.cpp`, `undo_buffer.cpp`, `wal_write_state.cpp`
-
-**Parallel Execution** (`src/parallel/`)
-- Multi-threaded execution with task scheduling
-- Pipeline-based parallelism
-- Key files: `executor.cpp`, `pipeline_executor.cpp`, `task_scheduler.cpp`
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Build the touched extension and run its relevant tests against the patched checkout. With the synced checkout, a typical targeted build starts with `DUCKDB_NEW_EXTENSION_BUILD=1 BUILD_EXTENSIONS=<extension> make reldebug`.
+- Run `make extension-patch-check`.
+- Run `git diff --check` and inspect every changed or newly generated patch before finishing.
 
 ---
 > Source: [duckdb/duckdb](https://github.com/duckdb/duckdb) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
