@@ -7,12 +7,12 @@ Dimina 小程序开发工具集：桌面 DevTools、编译、H5 预览与可嵌�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [EchoTechFE/dimina-kit](https://github.com/EchoTechFE/dimina-kit).
+Original source: `CLAUDE.md` in [EchoTechFE/dimina-kit](https://github.com/EchoTechFE/dimina-kit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
