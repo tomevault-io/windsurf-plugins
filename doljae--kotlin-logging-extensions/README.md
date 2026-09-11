@@ -7,11 +7,11 @@ Elegant kotlin-logging extensions for zero-boilerplate logger generation in Kotl
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [doljae/kotlin-logging-extensions](https://github.com/doljae/kotlin-logging-extensions).
+Original source: `AGENTS.md` in [doljae/kotlin-logging-extensions](https://github.com/doljae/kotlin-logging-extensions).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
