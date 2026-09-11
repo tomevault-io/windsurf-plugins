@@ -7,13 +7,13 @@ Lunch Buddy is a progressive web app (PWA) that visualises your Lunch Money budg
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [astiskala/lunch-buddy](https://github.com/astiskala/lunch-buddy).
+Original source: `CLAUDE.md` in [astiskala/lunch-buddy](https://github.com/astiskala/lunch-buddy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
