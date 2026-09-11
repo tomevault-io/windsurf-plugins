@@ -7,11 +7,11 @@ Fast, unofficial Plex client for LG webOS TVs — native 60 fps UI, 4K HEVC/Dolb
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [GLinnik21/plx-native](https://github.com/GLinnik21/plx-native).
+Original source: `AGENTS.md` in [GLinnik21/plx-native](https://github.com/GLinnik21/plx-native).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
