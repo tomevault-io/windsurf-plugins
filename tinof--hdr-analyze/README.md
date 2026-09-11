@@ -7,11 +7,11 @@ Convert any HDR10, HLG, or HDR10+ video to dynamic metadata
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [tinof/hdr-analyze](https://github.com/tinof/hdr-analyze).
+Original source: `AGENTS.md` in [tinof/hdr-analyze](https://github.com/tinof/hdr-analyze).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
