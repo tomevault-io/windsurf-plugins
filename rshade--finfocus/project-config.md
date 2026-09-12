@@ -1,271 +1,94 @@
 ---
 trigger: always_on
-description: Auto-generated from all feature plans. Last updated: 2026-01-12
+description: FinFocus is a CLI tool for calculating cloud infrastructure costs from Pulumi infrastructure definitions. It uses a plugin-based architecture to query multiple cost data sources via gRPC.
 ---
 
-# finfocus Development Guidelines
+# FinFocus Development Instructions
 
-Auto-generated from all feature plans. Last updated: 2026-01-12
+FinFocus is a CLI tool for calculating cloud infrastructure costs from Pulumi infrastructure definitions. It uses a plugin-based architecture to query multiple cost data sources via gRPC.
 
-## Active Technologies
-- Go 1.25.6 + `github.com/spf13/cobra` (CLI), `github.com/spf13/viper` (Config), `github.com/rshade/finfocus-spec` (renamed from `finfocus-spec`) (113-rebrand-to-finfocus)
-- Filesystem (`~/.finfocus/config.yaml`, `~/.finfocus/plugins/`) (113-rebrand-to-finfocus)
-- Filesystem (Plugin directories) (115-v021-dx-improvements)
-- Markdown (GFM), Mermaid (for diagrams) + Jekyll (for site generation), mermaid.js (for rendering diagrams) (118-e2e-plugin-docs)
-- Go 1.25.6 + `github.com/charmbracelet/lipgloss`, `golang.org/x/term`, `github.com/spf13/viper` (existing config), `github.com/spf13/cobra` (existing CLI) (001-cli-budget-alerts)
-- Local filesystem (`~/.finfocus/config.yaml`) (001-cli-budget-alerts)
-- Go 1.25.6 + `github.com/charmbracelet/bubbletea`, `github.com/charmbracelet/lipgloss`, `github.com/rshade/finfocus/internal/engine` (510-tui-detail-recommendations)
+## Build, Test, and Lint Commands
 
-- Markdown, Go 1.25.6 (for code verification) + Jekyll (for docs site), GitHub Pages (010-sync-docs-codebase)
-- Git repository (docs folder) (010-sync-docs-codebase)
-- Pulumi Analyzer integration (finfocus analyzer serve)
-- Plugin management commands (finfocus plugin init/install/update/remove)
-- GitHub Actions, `gh` CLI, OpenCode CLI/API (019-nightly-failure-analysis)
-- Go 1.25.6 + `github.com/stretchr/testify` (assertions), `net/http/httptest` (mocking) (021-plugin-integration-tests)
-- Filesystem (mocked via `t.TempDir()`) (021-plugin-integration-tests)
-- Go 1.25.6 + `github.com/spf13/cobra` (CLI), `github.com/spf13/pflag` (023-add-cli-filter-flag)
-- Pure Go (no external dependencies for filter logic) (023-add-cli-filter-flag)
-- Go 1.25.6 + `github.com/Masterminds/semver/v3` (001-latest-plugin-version)
-- Filesystem (`~/.finfocus/plugins/`) (001-latest-plugin-version)
-- Go 1.25.6 + github.com/rshade/finfocus-spec v0.4.14, github.com/Masterminds/semver/v3 (112-plugin-info-discovery)
+```bash
+make build                              # Build binary to bin/finfocus
+make build-all                          # Build binary + all plugins (recorder, Pulumi tool)
+make clean                              # Remove build artifacts
 
-- Local Pulumi state (ephemeral), no persistent DB (Stateless operation). (008-e2e-cost-testing, 009-analyzer-plugin, 112-plugin-info-discovery)
+make test                               # Run unit tests (fast, default)
+go test ./internal/cli/...              # Test specific package
+go test -run TestName ./...             # Run single test by name
+go test -v -run TestName ./internal/engine/...  # Single test in one package
 
-- Go 1.25.6
-- `github.com/rshade/finfocus-spec`
-- `google.golang.org/grpc` (002-implement-supports-handler)
+make test-race                          # Run with race detector
+make test-integration                   # Integration tests (slower)
+make test-e2e                           # E2E tests (requires AWS credentials)
 
-## Project Structure
+make lint                               # golangci-lint v2.9.0 + markdownlint + actionlint
+make validate                           # go mod tidy -diff + go vet
+make docs-lint                          # Lint documentation only
+
+go test -coverprofile=coverage.out ./...  # Coverage report
+go tool cover -html=coverage.out
+```
+
+**Always run `make lint` and `make test` before committing.**
+
+## Architecture
 
 ```text
-cmd/
-internal/ (now includes analyzer package)
-pkg/
-test/
-testdata/
+Pulumi JSON → Ingestion → Resource Descriptors → Router → Engine → Plugins (gRPC) / Specs (YAML) → Output
 ```
 
-## Commands
+### Dual-Mode Binary
 
-```bash
-# Build
-make build
+The `finfocus` binary runs as both a standalone CLI and a Pulumi tool plugin. Mode is detected via binary name (`pulumi-tool-finfocus`) or `FINFOCUS_PLUGIN_MODE=true`. This changes the `Use` string and examples but shares all subcommands.
 
-# Test
-make test
+### Core Components
 
-# Lint
-make lint
+1. **CLI** (`internal/cli/`) — Cobra commands: `overview`, `cost projected|actual|recommendations|budget|estimate`, `plugin *`, `config *`, `analyzer serve`
+2. **Engine** (`internal/engine/`) — Orchestrates cost calculation. Tries plugins first, falls back to local YAML specs in `specs/`. Uses `hoursPerMonth = 730`. Supports table, JSON, NDJSON output. Includes batch processing (threshold: 100 resources), caching, and budget forecasting.
+3. **Router** (`internal/router/`) — Routes resource types to the correct plugin based on provider patterns, priority rules, and config-driven routing from `~/.finfocus/config.yaml`.
+4. **Proto Adapter** (`internal/proto/`) — Bridge between engine and plugins. Converts `ResourceDescriptor` to protobuf requests, performs pre-flight validation via `pluginsdk`, extracts SKU/Region from resource `Inputs`, and aggregates errors with `CostResultWithErrors`.
+5. **Plugin Host** (`internal/pluginhost/`) — gRPC plugin lifecycle. `ProcessLauncher` (TCP) and `StdioLauncher` (stdin/stdout). 10-second timeout, 100ms retry. **Always call `cmd.Wait()` after `Kill()` to prevent zombies.**
+6. **Registry** (`internal/registry/`) — Discovers plugins at `~/.finfocus/plugins/<name>/<version>/`. Optional `plugin.manifest.json` validation.
+7. **Ingestion** (`internal/ingest/`) — Parses `pulumi preview --json`. **Must inspect `newState` to extract `Inputs`** — without this, property extraction fails and plugins return `InvalidArgument`.
+8. **Analyzer** (`internal/analyzer/`) — Implements `pulumirpc.AnalyzerServer` for zero-click cost estimation during `pulumi preview`. Prints ONLY port number to stdout (Pulumi handshake). All logs go to stderr. ADVISORY enforcement only.
+9. **Config** (`internal/config/`) — Manages `~/.finfocus/config.yaml` including plugin routing rules, budget definitions, and dismissed recommendation state (`~/.finfocus/dismissed.json`).
+10. **TUI** (`internal/tui/`) — Bubble Tea + Lip Gloss with adaptive color schemes.
 
-# Run
-make run
+### Plugin Communication
 
-# Plugin Management
-finfocus plugin init
-finfocus plugin install
-finfocus plugin update
-finfocus plugin remove
-
-# Analyzer
-finfocus analyzer serve
-```
-
-## Code Style
-
-Go 1.25.6: Follow standard conventions
-
-## Documentation Standards
-
-- Run `make docs-lint` before committing documentation changes
-- Use frontmatter YAML with `title`, `description`, and `layout` fields
-- **CRITICAL**: Files with frontmatter must NOT have duplicate H1 - the frontmatter
-  `title` serves as the page H1, content should start with H2 or text
-
-## Testing Infrastructure
-
-### Fuzz Tests
-
-Parser resilience testing using Go's native fuzzing (Go 1.25+):
-
-```bash
-# JSON parser fuzzing
-go test -fuzz=FuzzJSON$ -fuzztime=30s ./internal/ingest
-
-# YAML parser fuzzing
-go test -fuzz=FuzzYAML$ -fuzztime=30s ./internal/spec
-```
-
-**Locations:**
-
-- `internal/ingest/fuzz_test.go` - JSON parser fuzz tests
-- `internal/spec/fuzz_test.go` - YAML spec fuzz tests
-
-### Performance Benchmarks
-
-Scalability testing with synthetic data:
-
-```bash
-# Run all benchmarks
-go test -bench=. -benchmem ./test/benchmarks/...
-
-# Scale tests (1K, 10K, 100K resources)
-go test -bench=BenchmarkScale -benchmem ./test/benchmarks/...
-```
-
-**Locations:**
-
-- `test/benchmarks/scale_test.go` - Scale benchmarks
-- `test/benchmarks/generator/` - Synthetic data generator
-
-**Performance targets:**
-
-- 1K resources: < 1s (actual: ~13ms)
-- 10K resources: < 30s (actual: ~167ms)
-- 100K resources: < 5min (actual: ~2.3s)
-
-### Validation Tests
-
-Configuration validation with >85% coverage:
-
-- `internal/config/validation_test.go` - Table-driven validation tests
-
-### Error Path Testing
-
-**Always test error conditions when writing new code:**
-
-1. Test every error return path
-2. Validate error messages are descriptive
-3. Test boundary conditions (empty, nil, invalid ranges)
-4. Test partial failures in batch operations
-5. Test resource cleanup on errors
-
-**Pattern**: Use table-driven tests with `wantErr` and `errContains` fields.
-
-**Priority paths**: File I/O, network, validation, resource exhaustion, concurrency.
-
-### Testify Assertion Standards
-
-**CRITICAL**: All Go tests MUST use testify's `require` and `assert` packages.
-NEVER use manual `if x != y { t.Errorf(...) }` patterns.
-
-**Required Imports**:
+Plugins communicate via gRPC using protocol buffers from [finfocus-spec](https://github.com/rshade/finfocus-spec). Always use `pluginsdk` constants for environment variables and metadata keys:
 
 ```go
-import (
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-)
+pluginsdk.EnvPort              // "FINFOCUS_PLUGIN_PORT"
+pluginsdk.EnvLogLevel          // "FINFOCUS_LOG_LEVEL"
+pluginsdk.EnvLogFormat         // "FINFOCUS_LOG_FORMAT"
+pluginsdk.TraceIDMetadataKey   // "x-finfocus-trace-id" (gRPC metadata)
 ```
 
-**When to Use `require.*` (stops test on failure)**:
+Trace IDs propagate automatically: `TraceInterceptor()` in pluginhost injects them into outgoing gRPC calls; plugins extract via `pluginsdk.TracingUnaryServerInterceptor()`.
 
-- Setup operations that must succeed for test to be valid
-- Error checks where continuing would cause panics or misleading failures
-- Non-nil checks for required objects before using them
+### Pre-Flight Validation Pattern
 
-**When to Use `assert.*` (continues test on failure)**:
+The proto adapter validates requests before making gRPC calls. Invalid resources get a `$0` placeholder with `"VALIDATION: ..."` notes (distinct from plugin errors prefixed `"ERROR:"`):
 
-- Value comparisons after setup is complete
-- Multiple property checks on a result
-- Non-critical validations where seeing all failures is helpful
+```go
+if err := pluginsdk.ValidateProjectedCostRequest(protoReq); err != nil {
+    log.Warn().Str("resource_type", resource.Type).Err(err).Msg("pre-flight validation failed")
+    result.Results = append(result.Results, &CostResult{
+        Currency: "USD", MonthlyCost: 0,
+        Notes: fmt.Sprintf("VALIDATION: %v", err),
+    })
+    continue
+}
+```
 
-**Common Assertion Conversions**:
-
-| Manual Pattern                                   | Testify Replacement           |
-| ------------------------------------------------ | ----------------------------- |
-| `if err != nil { t.Fatal(err) }`                 | `require.NoError(t, err)`     |
-| `if err == nil { t.Error("expected error") }`    | `require.Error(t, err)`       |
-| `if x != y { t.Errorf("got %v, want %v", x, y) }`| `assert.Equal(t, y, x)`       |
-| `if len(x) != n { t.Errorf(...) }`               | `assert.Len(t, x, n)`         |
-| `if !strings.Contains(s, sub) { t.Errorf(...) }` | `assert.Contains(t, s, sub)`  |
-| `if x == nil { t.Fatal("nil") }`                 | `require.NotNil(t, x)`        |
-
-### CI Integration
-
-- PRs: 30-second fuzz smoke tests, benchmark smoke tests
-- Nightly: 6-hour deep fuzzing, full benchmark suite, cross-platform matrix
-
-<!-- MANUAL ADDITIONS START -->
-
-## Workflow Restrictions
-
-- **NEVER COMMIT**: Do not execute `git commit`. Always stop after `git add` and ask the user to review/commit.
-<!-- MANUAL ADDITIONS END -->
-
-## Integration & Testing
-
-- **E2E Testing**: Uses `pulumi preview --json` against real AWS infrastructure (ephemeral stacks). Project fixtures are located in `test/e2e/fixtures/`.
-- **Pulumi Plan JSON**: The structure of `pulumi preview --json` output nests resource state under `newState` (for creates/updates). Ingest logic MUST check `newState` to correctly extract `Inputs` and `Type`.
-- **Resource Type Compatibility**: Plugins must handle Pulumi-style resource types (e.g., `aws:ec2/instance:Instance`) or Core must normalize them. Currently, plugins are expected to handle the mapping.
-- **Property Extraction**: Core (`adapter.go`) relies on populated `Inputs` to extract SKU and Region. If `Inputs` are empty (due to ingest issues), pricing lookup fails.
-
-## Recent Changes
-- 510-tui-detail-recommendations: Added Go 1.25.6 + `github.com/charmbracelet/bubbletea`, `github.com/charmbracelet/lipgloss`, `github.com/rshade/finfocus/internal/engine`
-- 001-cli-budget-alerts: Added Go 1.25.6 + `github.com/charmbracelet/lipgloss`, `golang.org/x/term`, `github.com/spf13/viper` (existing config), `github.com/spf13/cobra` (existing CLI)
-- 118-e2e-plugin-docs: Added Markdown (GFM), Mermaid (for diagrams) + Jekyll (for site generation), mermaid.js (for rendering diagrams)
+### Recorder Plugin
 
 
-  plus Jekyll (for docs site), GitHub Pages
-  plan JSON.
-
-## Session Analysis - Recommended Updates
-
-Based on recent development sessions, consider adding:
-
-### Go Version Management
-
-- **Version Consistency**: When updating Go versions, update both `go.mod` and ALL markdown files simultaneously
-- **Search Pattern**: Use `grep "Go.*1\." --include="*.md"` to find all version references in documentation
-- **Files to Check**: go.mod, all .md files in docs/, specs/, examples/, and root-level documentation
-- **Docker Images**: Update Docker base images (e.g., `golang:1.24` → `golang:1.25.6`) in documentation examples
-
-### Systematic Version Updates
-
-- **Process**: 1) Update go.mod first, 2) Find all references with grep, 3) Update each file systematically, 4) Verify with final grep search
-- **Common Patterns**: Update both specific versions (1.24.10 → 1.25.6) and minimum requirements (Go 1.24+ → Go 1.25.6+)
-- **CI Workflows**: Update GitHub Actions go-version parameters in documentation examples
-
-This ensures complete version consistency across the entire codebase and documentation.
-
-## AI Agent File Maintenance
-
-This file (GEMINI.md) provides guidance for Gemini AI assistants. To maintain its effectiveness:
-
-### Update Requirements:
-
-- **Review regularly** when significant codebase changes occur
-- **Update version information** immediately when technologies change
-- **Document new active technologies** as they are introduced
-- **Update workflow restrictions** if development processes change
-- **Maintain current project structure** documentation
-- **Keep build and test commands** accurate and functional
-
-### When to Update:
-
-- New technologies are adopted
-- Build processes change
-- Project structure evolves
-- Workflow restrictions change
-- New dependencies are added
-- Testing frameworks change
-
-### Integration with GitHub Copilot:
-
-- This file is automatically read by GitHub Copilot via `.github/instructions/ai-agent-files.instructions.md`
-- Use it as reference for Gemini AI assistants
-- Follow the documented workflow restrictions
-- Keep information current for consistent AI assistance
-
-### Maintenance Checklist:
-
-- [ ] Active technologies list is current
-- [ ] Project structure reflects reality
-- [ ] Build commands work as documented
-- [ ] Workflow restrictions are accurate
-- [ ] Integration and testing information is up to date
-- [ ] Recent changes section is maintained
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/rshade)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/rshade)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [rshade/finfocus](https://github.com/rshade/finfocus) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-12 -->
