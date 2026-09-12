@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Use this rule when asked to do any frontend or UI design
+description: When asked to design UI & frontend interface
 ---
 
 When asked to design UI & frontend interface
