@@ -1,0 +1,98 @@
+---
+trigger: always_on
+description: These instructions apply to the entire repository unless a nested `AGENTS.md` or `AGENTS.override.md` supplies narrower rules.
+---
+
+# Repository Working Guide
+
+## Scope and required reading
+
+These instructions apply to the entire repository unless a nested `AGENTS.md` or `AGENTS.override.md` supplies narrower rules.
+
+Before v2, builder, Nuvio schema, or export work, read:
+
+- `README.md`
+- `docs/v2/BUILDER_KNOWLEDGE.md`
+- the relevant GitHub issue
+
+Before v2 product, UX, startup, template, recipe, Search/Add, presentation, or project-workflow work, also read:
+
+- `docs/v2/BUILDER_PRODUCT_PLAN.md`
+- `docs/v2/PROJECT_WORKFLOW.md`
+
+Before hierarchy creation or a new hierarchy-family issue, also read:
+
+- `docs/v2/BUILDER_HIERARCHY_CREATION.md`
+- the focused document for every existing family being reused or changed
+
+`BUILDER_PRODUCT_PLAN.md` is the durable product-direction source. `PROJECT_WORKFLOW.md` is the durable Dave/ChatGPT/Codex process. Repository implementation, deterministic tests, and confirmed manual evidence override obsolete plans. Do not silently treat an open product decision as a confirmed requirement.
+
+## Product boundaries
+
+- v1 is the stable TMDB ID lookup and Nuvio JSON export application at the repository root.
+- v2 is the active, isolated mobile-first visual Nuvio Collection Builder under `/builder/`, powered primarily by TMDB. It is not yet advertised as a released replacement for v1.
+- Existing lookup and copy-ID workflows remain part of the product.
+- Do not rewrite or remove stable v1 features merely to modernise the code.
+- React/Vite under `/builder/` is the confirmed builder direction; keep domain, parsing, validation, migration, serialization, and ID logic framework-independent.
+- Trakt integration is outside the current project scope unless explicitly approved in a future issue.
+
+## Git and issue workflow
+
+- Never work directly on `main`.
+- Discussion, discovery, comparison, and read-only investigation do not require a GitHub issue.
+- Before making a meaningful repository change, create or approve one focused GitHub issue and one dedicated branch from updated `main`.
+- A substantial investigation may use an issue for durable tracking when helpful, but an issue is not required merely to explore an idea.
+- Use one issue per branch. Inspect unexpected main commits, including legitimate automated maintenance, before synchronising them into task work.
+- Keep work limited to the approved issue; do not include unrelated cleanup.
+- Do not open a pull request unless Dave asks.
+- After Dave authorises it, a pull request is the normal final review gate for meaningful v2 work.
+- Meaningful V2 pull requests use a normal merge commit by default unless Dave explicitly chooses another method. Do not squash, rebase, or force-push unless specifically authorised. Use issue-closing syntax where applicable so the focused issue closes through the merged pull request.
+- Do not merge, close the issue, or delete the branch until Dave explicitly approves after review and testing.
+- After a successful merge, verify required checks and automatic Pages publication before performing approved local/remote branch cleanup and returning to synchronized `main`.
+- Stop and report conflicts, unexpected local changes, or ambiguous scope.
+- Use clear commits and report the final commit hash.
+
+## Production safeguards
+
+- Preserve existing export behaviour unless the issue explicitly changes it.
+- Preserve imported unknown/community JSON fields wherever possible.
+- Do not invent or guess unsupported Nuvio source types.
+- Do not represent direct movie, direct series, or season sources as supported unless current Nuvio evidence confirms them.
+- Never commit API keys, bearer tokens, credentials, or private data. TMDB credentials remain behind the Cloudflare Worker.
+- Do not broaden Worker routes, CORS, CSP, or external hosts without explicit issue scope.
+- Codex never deploys the production Cloudflare Worker. Worker changes stop at the separately authorised owner-deployment gate described in `docs/v2/PROJECT_WORKFLOW.md` and `cloudflare-worker/README.md`.
+- Do not add production dependencies without explicit approval.
+- Check the licence before reusing external code. Studying patterns is not permission to copy code.
+
+## Nuvio source rules
+
+The currently supported native TMDB source types are:
+
+- `LIST`
+- `COLLECTION`
+- `COMPANY`
+- `NETWORK`
+- `DISCOVER`
+- `PERSON`
+- `DIRECTOR`
+
+For future builder work:
+
+- `sources` is the authoritative current source representation.
+- `catalogSources` is a compatibility projection/fallback for addon-backed sources.
+- Native TMDB sources do not belong in `catalogSources`.
+- Addon-backed sources may have matching projections in both arrays when compatibility output requires them.
+- Do not change existing v1 output merely to enforce a future canonical policy.
+- Source and folder ordering is meaningful.
+- Preserve imported opaque/community sources without guessing them into known types.
+- Keep detailed evidence in `docs/v2/BUILDER_KNOWLEDGE.md`.
+
+## Architecture and design
+
+- Keep framework-independent source, validation, parsing, migration, serialization, and ID logic outside UI components.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [davecollections/tmdb-id-lookup](https://github.com/davecollections/tmdb-id-lookup) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-12 -->
