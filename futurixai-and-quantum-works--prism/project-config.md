@@ -1,10 +1,9 @@
 ---
 trigger: always_on
-description: Required workflow for implementation, commits, and review
+description: - Use `/poteto-mode` for every implementation phase.
 ---
 
-
-# Implementation workflow
+# Repository workflow
 
 - Use `/poteto-mode` for every implementation phase.
 - Run `/deslop` before every commit.
