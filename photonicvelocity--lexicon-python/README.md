@@ -7,12 +7,12 @@ Python client for the Lexicon DJ API
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [PhotonicVelocity/lexicon-python](https://github.com/PhotonicVelocity/lexicon-python).
+Original source: `copilot-instructions.md` in [PhotonicVelocity/lexicon-python](https://github.com/PhotonicVelocity/lexicon-python).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
