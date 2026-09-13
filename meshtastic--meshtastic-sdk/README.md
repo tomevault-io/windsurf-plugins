@@ -7,11 +7,11 @@ Kotlin Multiplatform SDK for Meshtastic mesh radios. Connect over BLE, TCP, or U
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [meshtastic/meshtastic-sdk](https://github.com/meshtastic/meshtastic-sdk).
+Original source: `CLAUDE.md` in [meshtastic/meshtastic-sdk](https://github.com/meshtastic/meshtastic-sdk).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
