@@ -1,121 +1,156 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - **PHP** ^8.5, **Laravel** ^13.0, **Laravel Octane** ^2.0
 ---
 
-# CLAUDE.md
+# Liberu CRM — AI Agent Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Stack
 
-## Shape of this repository
+- **PHP** ^8.5, **Laravel** ^13.0, **Laravel Octane** ^2.0
+- **Vite** ^8.0 + **Tailwind CSS** ^4.3 + **PostCSS**
+- **Filament** ^5.0 (admin panel), **Livewire** ^4.0, **Alpine.js**
+- **MySQL** 8.0 / **SQLite** / **PostgreSQL**, **Redis** 7
+- **Jetstream** (Livewire stack) + **Socialstream** (social auth)
+- **stancl/tenancy** ^3.10 (multi-tenancy)
+- **Laravel Reverb** ^1.0 (WebSockets), **Laravel Horizon** ^5.0 (queues)
 
-This is a **composition host**, not an application. `app/` holds exactly five files:
+## Key Directories
 
-```
-app/Models/User.php                            the one host model
-app/Filament/ModulePlugins.php                 composes panel plugins from enabled modules
-app/Support/ThemeColors.php                    maps the site theme to a Filament palette
-app/Providers/Filament/AdminPanelProvider.php
-app/Providers/Filament/AppPanelProvider.php
-```
-
-Everything else — search, theming, localization, settings, roles and permissions,
-observability — lives in **40 `liberu-module` packages** under `modules/` and
-**4 `liberu-theme` packages** under `themes/`. Both directories are Composer install
-targets *and* tracked in Git (`.gitignore` negates them explicitly).
-
-Before assuming a class lives in `app/`, search `modules/`. Almost nothing is in `app/`.
-
-### Where a package is edited
-
-**Each package's own repository is the source of truth, and `modules/`, `themes/` are Composer
-output.** A change made directly under `modules/<name>/` survives exactly until the next
-`composer update`, which fetches from the remote and overwrites it.
-
-So a package is edited in a **clone**, at `~/code/<repo>` — cloned when needed rather than kept as a
-permanent 44-repo workspace. `scripts/fleet` drives that:
-
-```bash
-scripts/fleet status                          # what is checked out, dirty, unpushed
-scripts/fleet clone --only search             # ensure a repository is present
-scripts/fleet run 'vendor/bin/pest'           # fan a command across all of them
-scripts/fleet commit -m 'Fix the thing'       # stage, commit, push main
-scripts/fleet tag 1.2.0 --only search         # explicit list required; humans tag
-```
-
-**The runner deliberately stops short of tagging.** A push is recoverable; a tag is what Packagist
-publishes and what `ModuleValidator` pins the host to, so an unattended bad wave would be 44
-revert-tags. `tag` also refuses a dirty worktree, a non-`main` branch, or unpushed commits.
-
-A wave lands in the host with one commit: `composer update`, then `modules/` and `composer.lock`
-together. `modules/` stays **tracked**, and CI fails on an uncommitted diff — that check is what
-caught 48-of-48 divergence between the tracked tree and the published packages.
-
-Packagist names drop the `module-` prefix that the GitHub repositories carry:
-`liberusoftware/module-search` on GitHub is `liberusoftware/search` on Packagist.
-
-> `scripts/publish-components` rsynced this monorepo *into* the package repositories, which is
-> the opposite direction. It was **removed** once the coverage-ratchet wave proved a fleet-wide
-> change could be released through `fleet` alone — see `docs/CONFORMANCE.md` §5, step 9.
+| Path | Purpose |
+|------|---------|
+| `app/Actions/` | Action classes (Fortify, Jetstream, Socialstream) |
+| `app/Console/` | Artisan commands |
+| `app/Events/` | Event classes |
+| `app/Filament/` | Filament admin panel (Admin, App, Pages, Resources, Widgets) |
+| `app/Helpers/` | Helper/utility functions |
+| `app/Http/` | Controllers, Middleware, Requests, Livewire |
+| `app/Jobs/` | Queued jobs |
+| `app/Livewire/` | Livewire components |
+| `app/Models/` | Eloquent models (~60) |
+| `app/Modules/` | Modular architecture (BaseModule, ModuleManager) |
+| `app/Notifications/` | Notifications |
+| `app/Observers/` | Model observers |
+| `app/Policies/` | Authorization policies |
+| `app/Providers/` | Service providers (12) |
+| `app/Services/` | Service classes (~40: Twilio, Facebook, Google, LinkedIn, MailChimp, etc.) |
+| `app/Settings/` | Filament settings plugin |
+| `app/Traits/` | Reusable traits |
+| `app/View/` | View composers/components |
+| `config/` | 26 config files |
+| `database/migrations/` | 88 migration files |
+| `database/factories/` | Model factories |
+| `database/seeders/` | Seeders |
+| `resources/views/` | Blade templates |
+| `routes/` | api.php, web.php, console.php, channels.php, socialstream.php |
+| `tests/Unit/` | Unit tests (24) |
+| `tests/Feature/` | Feature tests (49) |
+| `tests/Browser/` | Browser tests |
+| `docs/` | Documentation |
 
 ## Commands
 
 ```bash
-composer install && npm install
+# Tests
+php artisan test                              # Run all tests (SQLite :memory:)
+php artisan test --coverage-clover            # Run with coverage
+php artisan test --filter=SomeTestClass
 
-composer test                  # vendor/bin/pest
-vendor/bin/pest tests/Feature/SearchTest.php
-vendor/bin/pest --filter=SearchTest
-vendor/bin/pint                # --test to check without writing
-vendor/bin/phpstan analyse     # app/ only, at the level app/ passes
+# Static analysis
+./vendor/bin/phpstan analyse
+composer analyse                              # Alias for phpstan
 
-npm run dev                    # vite
-npm run build                  # required once, to compile the theme bundles
+# Code style
+./vendor/bin/pint                             # Laravel Pint (PSR-12 + Laravel conventions)
 
+# Refactoring
+./vendor/bin/rector process --dry-run         # Dry run
+./vendor/bin/rector process                   # Apply Rector rules
+
+# Artisan
 php artisan migrate
-php artisan migrate:fresh --seed
+php artisan db:seed
+php artisan make:model ModelName -mf
+php artisan make:filament-resource ResourceName
+php artisan make:livewire ComponentName
 
-php artisan horizon
-php artisan reverb:start
-php artisan octane:start --server=roadrunner
-
-php artisan filament:upgrade
-php artisan shield:generate
-
-# A single package's own suite, standalone:
-cd modules/search && composer update && vendor/bin/pest
+# Dependencies
+composer install
+composer update
+npm install && npm run build
 ```
 
-## Architecture
+## Coding Conventions
 
-### Module system
+### PHP
+- **Laravel Pint** defaults (PSR-12 + Laravel conventions). No custom pint config.
+- **PHPStan** level 2, analyzes `app/`. Baseline at `phpstan-baseline.neon`.
+- **Rector** enabled with CODE_QUALITY, DEAD_CODE, TYPE_DECLARATION sets (PHP 8.4).
+- PSR-4 autoloading: `App\` → `app/`, `Database\Factories\` → `database/factories/`, `Tests\` → `tests/`.
+- Use type hints, return types, and strict types where possible.
+- Avoid `dd()`, `dump()`, `var_dump()` in committed code.
+- Name migrations with Laravel's default timestamp format.
 
-`ModuleManagerServiceProvider` (first entry in `bootstrap/providers.php`) discovers packages
-from `config('modules.paths')` and reads each `module.json` — provider class, capabilities,
-required packages and capabilities, `default_enabled`, and any Filament plugins.
-`ModuleRegistry::resolve($enabled, $disabled)` validates constraints with `Semver` and returns
-providers in dependency order.
+### Models
+- Located in `app/Models/`.
+- Use `HasFactory`, `HasRoles` (Spatie), `HasSlug`, etc. as traits.
+- Define `$fillable`, `$casts`, relationships, and query scopes.
 
-Installation never implies boot: no package declares `extra.laravel.providers`, so Laravel's
-auto-discovery finds nothing to register, and an architecture rule asserts that stays true.
-Enablement is a separate, explicit decision.
+### Controllers
+- Keep thin — delegate business logic to service classes (`app/Services/`).
+- Use Form Requests for validation (`app/Http/Requests/`).
 
-**A manifest's own `default_enabled` is what boots it** — true for 37 of the 40, false for
-`analytics-google`, `analytics-meta` and `localization-mymemory`, which need third-party
-credentials and so ship installed but off. `config/modules.php` names no modules at all; it holds
-only `MODULES_ENABLED` and `MODULES_DISABLED`, both empty by default. `MODULES_ENABLED` adds
-modules their manifests leave off, `MODULES_DISABLED` removes modules their manifests turn on, and
-**disabled beats both**. Adding a module to a composition is therefore installing it; there is no
-second list to remember.
+### Services
+- One class per external integration (Twilio, Facebook, Google, LinkedIn, etc.).
+- Inject dependencies via constructor.
 
-Disabling a module something else requires is a `DependencyResolutionFailed`, not a quiet omission.
-Two architecture rules pin all of this, including that config stays list-free.
+### Livewire
+- Components in `app/Livewire/`.
+- Views in `resources/views/livewire/`.
+- Follow standard Livewire lifecycle (`mount`, `render`, `updated`, actions).
 
-Domain packages stay presentation-agnostic. Filament UI lives in companion `*-filament`
-packages whose manifests declare `admin` and/or `app` plugin classes; `App\Filament\ModulePlugins`
+### Filament
+- Resources in `app/Filament/App/Resources/` (tenant-scoped) or `app/Filament/Admin/Resources/`.
+- Pages, Widgets follow same pattern.
+
+### Modules
+- Custom modular system in `app/Modules/`.
+- Each module extends `BaseModule` and is registered via `ModuleServiceProvider`.
+
+### Tests
+- **PHPUnit** ^13.0 with **Mockery** ^1.6 + **FakerPHP** ^1.23.
+- Database: SQLite `:memory:` for tests.
+- Cache driver: `array`, Session: `array`, Queue: `sync`.
+- Follow Laravel testing conventions: `Unit` for isolated logic, `Feature` for HTTP/workflow tests.
+- Use model factories for test data.
+
+### Database
+- Default driver: MySQL (configurable via `DB_CONNECTION`).
+- Multi-tenancy via `stancl/tenancy` v3.10.
+- 88 migrations, timestamped naming.
+
+### Frontend
+- Vite build with `laravel-vite-plugin`.
+- Tailwind CSS v4 with `@tailwindcss/forms`, `@tailwindcss/typography` plugins.
+- PostCSS with `postcss-nesting`.
+- Preline UI components.
+- JS entry: `resources/js/app.js`.
+
+## CI / Quality Gates
+
+- **GitHub Actions**: tests, install, Docker build, security scan (PHPCPD, PHP Insights, security checker).
+- **Codecov** coverage upload.
+- **Dependabot**: daily updates for Composer, npm, Actions.
+- **Docker**: multi-stage build (PHP 8.5 Alpine + Octane/RoadRunner) with `docker-compose.yml`.
+
+## Testing Locally
+
+```bash
+# Copy env and configure
+cp .env.example .env
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [liberu-crm/crm-laravel](https://github.com/liberu-crm/crm-laravel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-13 -->
