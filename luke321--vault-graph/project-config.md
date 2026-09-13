@@ -1,66 +1,83 @@
 ---
 trigger: always_on
-description: **`CLAUDE.md` is the brief — read it first and treat it as the single source.** This file exists
+description: An Obsidian plugin (and a standalone exporter used for testing) that draws a vault as one
 ---
 
-# AGENTS.md
+# Vault Graph — read this first
 
-**`CLAUDE.md` is the brief — read it first and treat it as the single source.** This file exists
-so an agent that looks for `AGENTS.md` by convention finds its way there instead of guessing, and
-it deliberately does not restate the laws: two copies of a rule become two different rules.
+An Obsidian plugin (and a standalone exporter used for testing) that draws a vault as one
+disc: notes packed into folder wedges on a fixed lattice, animated by a cascade. The repo
+is **public**. The recurring failure mode here is reasoning about the code instead of
+measuring it: serve the page, drive it, read the numbers.
 
-Five things are worth knowing before you touch anything, all expanded in `CLAUDE.md`:
+**Because the repo is public, this file carries only what is true for anyone who clones it.**
+Absolute paths, session identity and naming, the session manager's commands, which physical
+display a harness seizes, and anything about the maintainer's own setup live in an untracked
+`CLAUDE.local.md` next to this one. If you are working on the machine that has one, it is
+imported below; if you are a contributor, its absence is normal and nothing here depends on it.
 
-- **Measure, don't reason.** The recurring failure here is arguing about the code instead of
-  driving it: serve the page, drive it, read the numbers. `node scripts/smoke.mjs --only
-  "<substring>"` is the iteration loop.
-- **Two things may not run twice at once**, and they are different resources. A **screen** —
-  `record-demo.ps1` grabs a region of the desktop, and spike tests and the suite also take over
-  displays — so the lock is named after the monitor, not the job. And the **shared fixture store**,
-  which a regenerating suite run deletes out from under a concurrent one. One machine-wide mutex,
-  shared by every worktree:
+@CLAUDE.local.md
+
+## Laws — every one has a check in `scripts/smoke.mjs` and a section in `.ai-context/invariants.md`
+
+- **The serpentine survives.** Nothing between a note's link weight and its position may step.
+- **The rings are independent**, and their thickness is locked; a filter re-packs inside them.
+- **The hub is a fraction of the disc, never a radius.** A row-0 dot may not eat into it.
+- **The resting disc is on the lattice**, and a settled dot is the size a fresh relayout gives it.
+- **`settle()` is a no-op**: the cascade converges before it lands; a jump at the end is a bug.
+- **A zero-weight member costs nothing**: a fading note changes no plan, no row, no room.
+- **A dot never outgrows its two resting sizes** while a cascade walks; a fade never reverses. With
+  **Size dots from the frame** on (a view setting, on by default; `?nofit` turns it off on the page) a
+  walking dot may also be held *below* them by its clearance on the frame being drawn, never above.
+- **Only depth-1 subfolders with their own tint slot are pushed**; a sub-wedge earns a slot only if it can fill one.
+- **The page is scoped**: every CSS rule under `.vault-graph`, every id through `$()`; nothing shipped reaches the network.
+- **The layout matches its golden snapshot** on all three fixtures — never regenerate a golden to make a check pass.
+
+## How to work here
+
+- `node scripts/smoke.mjs --only "<substring>"` is the iteration loop. The full suite runs on
+  the push to `develop` whose tree it has not measured yet (the pre-push hook; see
+  `scripts/suite-stamp.mjs`); do not run it by hand unless asked.
+- **Two things may not run twice at once, and `scripts/lock.mjs` is how you know.** Several
+  agents work this repo in parallel worktrees, and they collide over two different resources.
+
+  **A screen.** `record-demo.ps1` captures with `gdigrab -i desktop` — it copies a *region of the
+  display*, so anything else drawn there lands in the take and ruins it silently: the file exists
+  and looks plausible. A recording is not the only claimant — `smoke.mjs` parks every Chrome
+  window it opens on one fixed display, and `spike-check.mjs` puts Obsidian there — so the
+  lock is named after the **screen**, not the job: `screen-left`, `screen-right`,
+  `screen-primary`. **Every harness that places a window takes its own screen lock and releases
+  it on every way out** — `smoke.mjs`, `spike-check.mjs`, `record-demo.ps1` — so you do not have
+  to remember, and so the claim names the physical display rather than the activity (github#87).
+
+  **The shared fixture store.** Two full-suite runs do *not* fight over ports — ports are
+  allocated free and each run gets its own Chrome profile. They fight over `.fixtures/`: a run that
+  regenerates deletes every `<name>-*` directory there, including the one a concurrent run is
+  reading. That is the `suite` lock, and **it is only about `.fixtures/`** — the display is a
+  separate claim under its own name. It bites only when a fixture is stale, which is why it is
+  rare and reads as a regression in your branch.
+
+  Keeping them separate is what lets `pre-push` hold `suite` while the `smoke.mjs` it spawns
+  holds `screen-left`: two names, two resources, no nesting. Aliasing the two instead — which
+  this repo tried first — deadlocks that exact pair, because `aliasHold` blocks on whoever holds
+  the alias, the asker included. A sister plugin hit the same deadlock and reached the same design
+  independently.
 
   ```powershell
-  node scripts/lock.mjs acquire screen-right --owner "<who you are>"  # exit 1 = give up
-  node scripts/lock.mjs release screen-right --owner "<who you are>"  # always, even on failure
-  node scripts/lock.mjs status
+  node scripts/lock.mjs acquire screen-right --owner "#77 palette"   # blocks; exit 1 = give up
+  node scripts/lock.mjs release screen-right --owner "#77 palette"   # always, even on failure
+  node scripts/lock.mjs status                                       # who holds what
   ```
 
-  Names: `screen-left`, `screen-right`, `screen-primary` for the displays, `suite` for
-  `.fixtures/` — separate claims, deliberately not aliased, so `pre-push` can hold `suite` while
-  the `smoke.mjs` it spawns holds `screen-left`. All three window-placing harnesses take their
-  own screen lock now (`smoke.mjs`, `spike-check.mjs`, `record-demo.ps1`), so you only do this by
-  hand for something else that seizes a display — never wrap one of the three, or its own
-  acquire waits out your hold. The root is shared with a sister Obsidian plugin, so if you work on
-  both, their jobs contend. `make-hero.ps1` needs no lock — it transcodes a file. Screenshots need none —
-  `shoot.mjs` goes over CDP — but pass your own `--port`. Never wrap a `git push` in an outer
-  acquire/release of either name, or the hook's own attempt blocks on yours and the push hangs.
-- **A vault Obsidian has not been told to trust opens in restricted mode.** A fixture or generated vault puts
-  up "Trust author and enable plugins?" on first open, and until it is confirmed the plugin does
-  not load at all -- which reads as a broken plugin rather than as an unconfirmed dialog. Over
-  CDP, `app.plugins.setEnable(true)` then `enablePluginAndSave(id)`; never judge the plugin before
-  `getPlugin(id)` is truthy.
-- **Never serve Chrome unlabeled.** Any page you open in Chrome from this worktree —
-  `smoke.mjs`, `shoot.mjs`, a manual review build — carries its own top-left title as
-  `<worktree/feature> — <what it's showing>`, e.g. `tag-grouping — demo vault`. Patch
-  `window.VAULT_DATA`'s `vault` field in the built HTML, not the product.
-- **`git push`, merging into `develop`, and a full-suite run are each a separate ask, every
-  time.** None of them is implied by permission to do the work, or by how the last one went. A
-  dispatched ticket worktree stops at its own branch regardless — only the orchestrator pushes to
-  `develop` or cuts a release. **The checkout decides which of the two you are, not the task**: the
-  primary checkout is the orchestrator, any other worktree is a worker, and
-  `git rev-parse --show-toplevel` settles it. An orchestrator dispatches a ticket into its own
-  worktree rather than implementing it, and stops spawning new ones at the ceiling — past it,
-  parallel sessions starved CPU and disk enough to force a hard restart once already.
+  You need those two by hand only for something that seizes a display and is **not** one of the
+  three harnesses — a manual Chrome you are driving yourself, say. Never wrap one of the three:
+  `smoke.mjs` takes `screen-left` itself, so an outer hold makes its own acquire wait out your
+  stale window. `--no-lock` exists for the one caller that legitimately already holds it.
 
-**This repo is public, so both this file and `CLAUDE.md` stay machine-agnostic.** Absolute paths,
-session identity and naming, the session manager's own commands, which display a harness seizes,
-and the maintainer's personal workflow live in an untracked `CLAUDE.local.md`. If that file is
-present, read it too — it is the other half of the brief on this machine. If it is absent you are
-on a clone, that is normal, and nothing above depends on it.
+  The lock lives in the OS temp dir, not the worktree, so **every worktree shares one** — and the
+  root (`obsidian-vault-locks`) is shared with a sister Obsidian plugin, so if you work on both,
 
-`.ai-context/README.md` maps the design records; `.ai-context/code-map.md` and `code-index.md` are
-generated and let you jump to a line range instead of reading an 8,700-line file top to bottom.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [luke321/vault-graph](https://github.com/luke321/vault-graph) — distributed by [TomeVault](https://tomevault.io).
