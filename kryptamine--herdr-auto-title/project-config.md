@@ -3,11 +3,27 @@ trigger: always_on
 description: Herdr Auto Title — a Herdr plugin, written in Go, that generates tab titles from
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 Herdr Auto Title — a Herdr plugin, written in Go, that generates tab titles from
 each tab's current context. Long-running process that polls the Herdr session,
 no LLM and no external service.
+
+## Repository layout
+
+```
+cmd/herdr-auto-title  the binary
+internal/app          the poll loop and the reads it spends, configuration
+internal/herdr        the socket client; herdrtest beside it is its stub
+internal/state        a session snapshot turned into what each tab is doing
+internal/resolver     that state turned into a title, one source at a time
+internal/claude       what a Claude Code session is about, from its transcript
+internal/git          what a repository has checked out, read from .git
+scripts/              the Python probes
+docs/architecture/    how the plugin works and why
+```
+
+Each package's doc comment says the rest.
 
 ## Language rule (mandatory)
 
@@ -35,6 +51,22 @@ Scope is a package or area (`resolver`, `state`, `herdr`, `app`).
 - One logical change per commit.
 - Never add a co-author trailer.
 
+## Branches and pull requests (mandatory)
+
+**Never commit to `main`.** Branch from it first, named `<type>/<kebab-summary>`
+with the types the commits use: `feat/optional-agent-name`,
+`docs/security-policy`, `chore/tighten-the-linter-set`.
+
+- **Pull requests are merged by rebase.** Merge commits and squashing are both
+  disabled, and each broke something: GitHub puts the conventional PR title into
+  a merge commit, so release-please counted every change twice, and a squash
+  collapses a pull request into one changelog line, losing the granularity that
+  "one logical change per commit" exists to produce.
+- **`CHANGELOG.md`, the tags and the version in `herdr-plugin.toml` belong to
+  release-please.** Never edit one by hand.
+- Keep a pull request to one thing. A refactor, a feature and a formatting sweep
+  are three pull requests.
+
 ## Type rule (mandatory)
 
 **A struct field exists only if code reads it.** Herdr's wire objects carry far
@@ -61,24 +93,13 @@ library.
 
 ## Comment rule (mandatory)
 
-**A comment is at most three lines.** That is a hard cap, in every language in
-the repository. It is not a style preference: a comment long enough to need a
-fourth line is explaining something the code cannot hold, and that explanation
-belongs in [docs/architecture](docs/architecture/) where it can be read by
-someone who is not already staring at the function.
+**A comment is at most three lines**, in every language in the repository, and
+it says what is surprising rather than what is visible. A decision that needs a
+paragraph goes in [docs/architecture](docs/architecture/), with one line in the
+code pointing at it.
 
-Comment what is **surprising**, never what is visible:
-
-- **Delete it** if it restates the code, names what a well-named identifier
-  already names, or records where a value came from (which schema, which
-  ticket, which measurement session). Provenance is what `git log` and
-  `docs/architecture` are for.
-- **Keep it** if a reader would otherwise "fix" the code and break it: a
-  measured constant, a constraint the API imposes, an ordering that matters, a
-  case that looks unhandled and is not.
-
-When a decision genuinely needs a paragraph, write the paragraph in
-`docs/architecture` and leave one line in the code pointing at it.
+The rule in full, in Go terms and with worked examples of what to keep and what
+to delete, is in [.claude/rules/comments.md](.claude/rules/comments.md).
 
 ## Commands
 
@@ -96,31 +117,14 @@ make watch-tabs # ...refreshed every second
 make probe-snapshot # the session snapshot the plugin polls
 ```
 
-`go test -race` is the gate, not `go test`: the poll loop and the change history
-it keeps are exercised concurrently in tests, and a future reset action will
-touch that history from outside the loop.
+`go test -race` is the gate, not `go test`: the state a poll carries between
+polls is shared, two tests still run the loop in a goroutine of its own, and a
+future reset action will touch that state from outside the loop.
 
 The linter lives in `tools/go.mod`, a module of its own, so its dependency tree
-stays out of the plugin's: the main module keeps two dependencies and still
-builds on Go 1.24, which is what Herdr needs at install time. `errcheck` is off
-— the places that swallow an error say why they do.
-
-## Herdr socket API — verified facts
-
-The originating specification is wrong on several protocol details. These were
-verified against Herdr 0.8.2, protocol 20. **Probe before assuming anything not
-listed here** (`make probe-*`, `scripts/probe.py`).
-
-- NDJSON over the socket at `HERDR_SOCKET_PATH`. Requests are
-  `{"id","method","params"}` — `params` is required even when empty.
-- **One request per connection.** Herdr closes the connection after answering,
-  so every `Call` dials its own. Auto Title uses three methods and no others:
-  `session.snapshot`, `pane.process_info` and `tab.rename`.
-- **The event stream is not used, on purpose.** `events.subscribe` replays a
-  backlog before anything live — about the last 95 revisions of *every* pane at
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kryptamine/herdr-auto-title](https://github.com/kryptamine/herdr-auto-title) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-13 -->
