@@ -7,11 +7,11 @@ Meshtastic Client for TrimUI Brick
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mcereal/mesh-client](https://github.com/mcereal/mesh-client).
+Original source: `CLAUDE.md` in [mcereal/mesh-client](https://github.com/mcereal/mesh-client).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
