@@ -9,14 +9,14 @@ Pi-SmartRead is the Pi coding agent's code-intelligence extension — unified fi
 
 ## `/Users/rhinesharar/Pi-Workspace-Protocol`
 
-- **Package:** `@rhinos0608/pi-workspace-protocol` (pinned in `package.json` as `github:rhinos0608/Pi-Workspace-Protocol#v0.3.0`).
+- **Package:** `@rhinos0608/pi-workspace-protocol` (pinned in `package.json` as `github:rhinos0608/Pi-Workspace-Protocol#v0.4.0`).
 - **Purpose:** Versioned TypeScript contracts, SHA-256/id helpers, runtime validators, and an event-bus RPC layer for the SmartRead/SmartEdit inspect+patch protocol.
 - **What Pi-SmartRead consumes:**
-  - `src/inspect.ts` imports `PROTOCOL_SCHEMA_VERSION`, `hashSessionFilePath`, `inspectionIdFor`, `resourceIdFor`, `canonicalizeWorkspaceRoot`, `WorkspaceEvidenceEnvelope`, `InspectedResource`, `InspectMode` to build schema-3 evidence envelopes.
-  - `src/workspace-evidence-resolver.ts` imports `PROTOCOL_SCHEMA_VERSION`, `validateInspectionEnvelope`, `hashSessionFilePath`, `WorkspaceEvidenceEnvelope` to validate and cache published envelopes.
-  - `src/read-many.ts` imports `canonicalizeWorkspaceRoot`, `hashSessionFilePath`, `inspectionIdFor`, `PROTOCOL_SCHEMA_VERSION`, `InspectedResource`, `WorkspaceEvidenceEnvelope` to build batch workspace-evidence envelopes from multi-file reads.
+  - `src/inspect/inspect.ts` imports `PROTOCOL_SCHEMA_VERSION`, `hashSessionFilePath`, `inspectionIdFor`, `resourceIdFor`, `canonicalizeWorkspaceRoot`, `WorkspaceEvidenceEnvelope`, `InspectedResource`, `InspectMode` to build schema-3 evidence envelopes.
+  - `src/evidence/workspace-evidence-resolver.ts` imports `PROTOCOL_SCHEMA_VERSION`, `validateInspectionEnvelope`, `hashSessionFilePath`, `WorkspaceEvidenceEnvelope` to validate and cache published envelopes.
+  - `src/read/read-many.ts` imports `canonicalizeWorkspaceRoot`, `hashSessionFilePath`, `inspectionIdFor`, `PROTOCOL_SCHEMA_VERSION`, `InspectedResource`, `WorkspaceEvidenceEnvelope` to build batch workspace-evidence envelopes from multi-file reads.
   - `src/mcp-registry.ts` imports `RPC_CHANNELS` to create the evidence resolver on the `inspectPatch` channel.
-  - `src/path-evidence.ts` imports `sha256OfString` for per-file content hashing in path-mode evidence.
+  - `src/evidence/path-evidence.ts` imports `sha256OfString` for per-file content hashing in path-mode evidence.
   - `src/index.ts` receives evidence from the wrapped `read`, `inspect`, and `grep` tools, publishing envelopes into the shared `EvidenceResolver`.
 
 ## `/Users/rhinesharar/Pi-SmartEdit`
@@ -24,16 +24,16 @@ Pi-SmartRead is the Pi coding agent's code-intelligence extension — unified fi
 - **Package:** Pi-SmartEdit (the `edit`/`write` extension).
 - **Purpose:** Provides the `edit` and `write` tools; validates edits against workspace-evidence envelopes produced by Pi-SmartRead.
 - **What Pi-SmartRead provides for Pi-SmartEdit:**
-  - **RPC evidence resolver** (`src/workspace-evidence-resolver.ts`): Answers `resolve_evidence` RPC requests on `RPC_CHANNELS.inspectPatch`. Pi-SmartEdit's `patch.ts` sends a request with `inspectionId`/`sessionFilePath`/`workspaceRoot`, and the resolver returns the cached `WorkspaceEvidenceEnvelope`. The resolver cache is rebuilt from `tool_result` events (`pi.tool_result.inspect`, `pi.tool_result.read`, and `pi.tool_result.grep`) seen on the event bus — tool result details are the durable source of truth.
-  - **Inspect tool** (`src/inspect-tool.ts`, `src/inspect.ts`): Two modes — directory (ranked repo map plus clusters, layers, boundaries, routes, hotspots, graphSchema, deadCode) and file (structural facts + quality signals plus callDepth/callDirection, impact, deadCode, diff, hotspots, routes, graphSchema). Directory mode returns envelope mode `map` with zero resources (no file authorization). File mode returns envelope mode `symbol` with per-referenced-symbol `coverage: "search-match"` (weak evidence; must read before editing). Query/symbol/action modes removed; use `grep` tool for code search.
-  - **Grep tool** (`src/grep-tool.ts`): Primary code search — BM25 ranking + AST symbol matching + embedding semantic fallback behind a grep-shaped interface, with optional graph-aware filtering (`graphFilter` param). Returns envelope mode `query` with `coverage: "search-match"` per hit. `tool_result.grep` events feed the resolver cache.
-  - **Read tool wrapper** (`src/index.ts:432-436`, `src/hook.ts`): Owns single-file provenance plus `{ paths: [...] }`, `{ query }`, and `{ symbol }` dispatch. `symbol` param resolves qualified symbol names via LSP or the context graph. Query mode uses the shared semantic index, then reads selected files through the same evidence-emitting single-read path.
-  - **Read-many batch** (`src/read-many.ts`): Internal packing engine for multi-file/query-selected reads. `read_files` is no longer registered. Batch evidence includes only complete file blocks actually rendered; partial and omitted blocks are not authorized.
-  - **Semantic index** (`src/semantic-index.ts`, `src/semantic-index-registry.ts`): Startup-warmed, ignore-aware, model-fingerprinted SQLite vector cache with independent incremental file state. Query ranking fuses whole-corpus BM25 and embedding ranks with RRF; grep+AST is availability/error fallback only.
-  - **Context hygiene** (`src/context-hygiene.ts`): Tracks read results, marks stale context after mutations. Pi-SmartEdit's edit results trigger hygiene events via the event bus.
+  - **RPC evidence resolver** (`src/evidence/workspace-evidence-resolver.ts`): Answers `resolve_evidence` RPC requests on `RPC_CHANNELS.inspectPatch`. Pi-SmartEdit's `patch.ts` sends a request with `inspectionId`/`sessionFilePath`/`workspaceRoot`, and the resolver returns the cached `WorkspaceEvidenceEnvelope`. The resolver cache is rebuilt from `tool_result` events (`pi.tool_result.inspect`, `pi.tool_result.read`, and `pi.tool_result.grep`) seen on the event bus — tool result details are the durable source of truth.
+  - **Inspect tool** (`src/inspect/inspect-tool.ts`, `src/inspect/inspect.ts`): Two modes — directory (ranked repo map plus clusters, layers, boundaries, routes, hotspots, graphSchema, deadCode) and file (structural facts + quality signals plus callDepth/callDirection, impact, deadCode, diff, hotspots, routes, graphSchema). Directory mode returns envelope mode `map` with zero resources (no file authorization). File mode returns envelope mode `symbol` with per-referenced-symbol `coverage: "search-match"` (weak evidence; must read before editing). Query/symbol/action modes removed; use `grep` tool for code search.
+  - **Grep tool** (`src/search/grep-tool.ts`): Primary code search — BM25 ranking + AST symbol matching + embedding semantic fallback behind a grep-shaped interface, with optional graph-aware filtering (`graphFilter` param). Returns envelope mode `query` with `coverage: "search-match"` per hit. `tool_result.grep` events feed the resolver cache.
+  - **Read tool wrapper** (`src/index.ts` `registerExtension` activation path, `src/hook.ts`): Owns single-file provenance plus `{ paths: [...] }`, `{ query }`, and `{ symbol }` dispatch. `symbol` param resolves qualified symbol names via LSP or the context graph. Query mode uses the shared semantic index, then reads selected files through the same evidence-emitting single-read path.
+  - **Read-many batch** (`src/read/read-many.ts`): Internal packing engine for multi-file/query-selected reads. `read_files` is no longer registered. Batch evidence includes only complete file blocks actually rendered; partial and omitted blocks are not authorized.
+  - **Semantic index** (`src/indexing/semantic-index.ts`, `src/indexing/semantic-index-registry.ts`): Startup-warmed, ignore-aware, model-fingerprinted SQLite vector cache with independent incremental file state. Query ranking fuses whole-corpus BM25 and embedding ranks with RRF; grep+AST is availability/error fallback only.
+  - **Context hygiene** (`src/runtime/context-hygiene.ts`): Tracks read results, marks stale context after mutations. Pi-SmartEdit's edit results trigger hygiene events via the event bus.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rhinos0608/Pi-SmartRead](https://github.com/rhinos0608/Pi-SmartRead) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-13 -->
