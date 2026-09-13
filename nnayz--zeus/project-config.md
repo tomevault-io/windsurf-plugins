@@ -1,57 +1,89 @@
 ---
 trigger: always_on
-description: These instructions apply to the whole repository. The active architecture decision baseline for remote work is `zeus/REMOTE_PORT.md`; read it before changing remote session behavior, SSH handling, PTYs, holders, terminal state, or packaging.
+description: Every session is a PTY. The agent catalog is data: one JSON manifest per CLI,
 ---
 
-# Zeus repository instructions
+# Agents and status
 
-## Scope
+Every session is a PTY. The agent catalog is data: one JSON manifest per CLI,
+describing how to spawn it, how to resume it, which keys approve or deny a
+prompt, and the screen rules that decide whether it is working, waiting, or
+done.
 
-These instructions apply to the whole repository. The active architecture decision baseline for remote work is `zeus/REMOTE_PORT.md`; read it before changing remote session behavior, SSH handling, PTYs, holders, terminal state, or packaging.
+Zeus never installs an agent for you. Put the binary on `PATH`, sign in the
+way that CLI expects, then launch it from Zeus.
 
-## Completed remote architecture baseline
+## What you can launch
 
-- The remote refactor is complete. Maintain the bootstrapped Remote PTY Holder as Zeus's only remote session transport; future remote work extends this architecture rather than reopening the transport migration.
-- Implement and maintain remote behavior entirely in the Rust workspace under `zeus/`.
-- The product is Rust-only. Do not reintroduce Swift sources, a Swift daemon, or a Swift CLI.
-- `zeus/crates/zeus-engine/manifests` is the Agent catalog. A missing manifest does not error at runtime — it silently downgrades that agent to a bare login shell. Never shrink the catalog.
-- Existing Rust behavior is the implementation baseline. Historical comments about Swift compatibility do not create new requirements.
-- The former Rust SSH + `tmux` transport has been deleted. Never reintroduce it as `legacy_tmux`, a feature flag, a migration path, or a runtime fallback. Missing, corrupt, unsupported, or capability-incompatible Helper artifacts must fail closed with a structured error; an unavailable packaged transport reports `remote_transport_unavailable`.
-- When implementation and `zeus/REMOTE_PORT.md` disagree, stop and resolve the design mismatch explicitly instead of silently choosing one.
+The launcher, sidebar **New Agent**, `⌘N`, `⌘T`, and the command palette all
+read the same readiness catalog. First-class entries (when the CLI is
+installed) include:
 
-## Rust workspace map
+Claude Code, Codex, Cursor, Grok, OpenCode, Gemini, Aider, Amp, Copilot,
+and the rest of the manifests shipped in the Engine.
 
-- `zeus/crates/zeus-engine`: authoritative local session engine, PTY/holder lifecycle, status reduction, host orchestration, and remote bootstrap/SSH seam.
-- `zeus/crates/zeus-proto`: shared Rust data models and wire codecs. `remote_pty` is the authoritative versioned Remote Helper protocol; companion access is not part of the current remote transport.
-- `zeus/crates/zeus-client`: local app-to-engine client. It should not execute SSH directly.
-- `zeus/crates/zeus-term`: GPUI terminal renderer and client-side terminal interaction.
-- `zeus/crates/zeus-app`: desktop UI. It requests remote actions through the local Engine.
-- `zeus/crates/zeus-cli`: shipped `zeus` automation CLI (hooks, notify, MCP backend, session/worktree commands).
-- `zeus/crates/zeus-node`: optional enhanced node mode. It is not a dependency of the default SSH bootstrap path.
-- `zeus/crates/zeus-terminal-state`: shared headless terminal parser/Grid/Snapshot/Diff implementation used by the local Engine and remote Holder.
-- `zeus/crates/zeus-remote`: minimal remote Helper binary. Keep it independent of GPUI, `zeus-app`, `zeus-client`, and `zeus-node`.
+A missing binary is not a crash. The row stays visible with an install hint
+and, when the manifest has one, a setup URL.
 
-The Rust toolchain is pinned by `zeus/rust-toolchain.toml` to Rust 1.95.0, edition 2024.
+`⌘T` always does something useful. If your saved default agent disappeared,
+Zeus falls through to another installed first-class agent, then to a login
+shell.
 
-## Remote architecture invariants
+## Status you can leave the room on
 
-- SSH is the authenticated encrypted byte transport. Use `ssh -T` for Helper protocol channels; SSH must not own the Agent PTY.
-- The current baseline must not require remote `tmux`, `screen`, `zellij`, Node.js, Python, `socat`, `nc`, `curl`, `wget`, or a preinstalled Zeus service.
-- Reuse OpenSSH configuration and a finite-lived ControlMaster for performance only. A ControlMaster must never be required for session survival.
-- Bootstrap is idempotent: probe platform, select an exact local artifact, upload to a nonce temp path, verify, then atomically rename. Versioned binaries coexist by protocol and Build ID.
-- Never overwrite a live Helper version in place. GC must retain every Build ID referenced by a session.
-- Never construct Agent launches by concatenating shell strings. Send structured `argv`, `cwd`, and environment over the protocol and exec the argv directly inside the remote PTY child.
-- Bootstrap shell commands must be fixed and internally generated. Validate every path component before interpolation and do not follow untrusted symlinks.
-- Capture the remote login/cwd environment on the remote host. Do not copy the local process environment wholesale or propagate local secrets and socket paths.
-- The remote Holder owns only the PTY, Agent process tree, current terminal grid/modes/cursor, bounded output, exit facts, and controller lease.
-- The local Rust Engine owns `SessionRecord`, manifests, status reduction, project/worktree state, GUI events, orchestration, lifecycle policy, and host management.
-- Use exactly one independent Holder process and Unix socket per Session; do not add a multi-session Zeus Supervisor to the current baseline.
-- A Holder may spawn one minimal liveness guard for its Agent process group. The guard may only wait for Holder pipe closure and kill that one process group; it must not own a PTY, socket, state, or orchestration.
-- The app and client must verify the local Engine's explicit Rust identity during `Hello`; fail closed on missing, old, or unknown daemon identities.
-- Agent manifests used by the Rust Engine are Rust-owned resources under `zeus-engine`; remote launch must not load Swift resource bundles or fall back to a Swift Holder.
+Zeus reads the grid, the title, progress, hooks, and process facts. It
+reduces them to a small vocabulary:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+| State | Meaning |
+|-------|---------|
+| **Working** | The agent is doing something. In the workflow tree the mark wears a spinner. |
+| **Needs input** | It is blocked on you: a permission, a question, a confirm. Destructive prompts get a sharper color. |
+| **Done** | It finished work you have not opened yet. |
+| **Idle** | Quiet, and you have already seen it. |
+| **Hibernated** | Frozen to save memory. Opening the session wakes it in place. |
+| **Ended** | The process exited. Resume if the agent supports it. |
+
+Claude Code and Codex have the richest rules (working, blocked-permission,
+blocked-question, idle, exited) plus resume. Other catalog agents get
+whatever their manifest knows. If Zeus cannot name a blocker it will not
+invent one. A lying spinner is worse than a quiet row.
+
+`⌘⇧J` walks every session that needs input. Gentle status chimes (Settings →
+General) are optional and stay quiet on mere token activity.
+
+## Resume
+
+Closing Zeus does not end the process. Closing a *session* might, after a
+confirm if you left that setting on.
+
+Agents that support resume can pick up a conversation after a clean exit or
+after you reopen a still-running PTY. Codex and Claude Code are the ones to
+trust here. Others may come back as a fresh CLI in the same folder.
+
+Archiving (`⌘⇧W`) is for history, not resume.
+
+## Hosted vs a bare shell
+
+A **hosted** agent is one Zeus launched from a manifest. Those sessions get
+Zeus MCP injected automatically (see [Orchestration](orchestration.md)).
+
+A **plain terminal** (`⌥⌘T`) is your login shell. It still has a sidebar
+row and running/exited status. It does not get agent MCP, resume, or a
+branded mark.
+
+## Marks in the tree
+
+The workflow tree draws unbadged brand marks for Codex, Claude, Grok,
+OpenCode, and Cursor. Other kinds use a terminal glyph. Working sessions
+get a ring around the mark. Titles sit in a caption chip under the icon so
+the rails never run through the name.
+
+## Default agent
+
+Settings → General → **Default agent** is what `⌘T` and Quick Open launch.
+Pick the CLI you reach for first. Everything else stays one `⌘N` or `⌘K`
+away.
 
 ---
 > Source: [nnayz/zeus](https://github.com/nnayz/zeus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-13 -->
