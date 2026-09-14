@@ -1,131 +1,111 @@
 ---
 trigger: always_on
-description: This file is the repository-wide operating contract for coding agents. It
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md - Pingclair
+# CLAUDE.md
 
-This file is the repository-wide operating contract for coding agents. It
-applies regardless of which agent, editor, or development environment is
-used. Keep it actionable: failure history, reproductions, and subsystem
-archaeology belong in `docs/guardrails/`, not here. `CLAUDE.md` spells the
-same rules out in more depth and adds the cross-crate picture; where the two
-overlap, this file wins.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🧰 Tools first
+## Read these first
 
-Use the repository's intended tools before falling back to slower generic
-workflows. If a common development tool required by this repository is
-missing, install it rather than silently replacing the workflow with a worse
-one.
+`AGENTS.md` is the operating manual and takes precedence over this file wherever
+they overlap. It covers the ghost-process trap, editing discipline (comment
+style, emoji conventions, commit subjects), architecture constraints per
+subsystem, and documentation ownership. This file adds the command details and
+the cross-crate picture that only emerge from reading several files at once.
 
-### Canonical command interface
+These documents own distinct things, and the project treats mixing them as a
+defect:
 
-`just` owns repository workflows. CI runs the same recipes a developer runs
-locally, so a green push is the same evidence as a green edit loop. Do not
-duplicate long Cargo command lines in prose when a `just` recipe owns the
-behavior.
+| Document | Owns |
+| --- | --- |
+| GitHub issues | Everything outstanding: the plan, defects found and left alone, compatibility gaps. One item, one issue, one place. Templates and labels are in `CONTRIBUTING.md`; `Closes #123` in a PR is what closes the item. **Replaced `docs/TODO.md` and `TRIAGE.md` in August 2026** — a stale copy of either in a checkout is history, not the answer. |
+| `docs/STATUS.md` | Which public claim has evidence behind it, and where. Three levels: code exists, local tests pass, verified on clean Linux. 🔒 Local only. |
+| `docs/guardrails/{testing,config,tls,proxy}.md` | Environment constraints and implementation rules, one file per subsystem. Every entry is a failure that already happened. `docs/GUARDRAILS.md` is the index over them, nothing more. |
+| `benchmarks/README.md` | Performance claims and methodology. Raw per-run evidence stays local under `benchmarks/results/`, never committed. |
+| `CHANGELOG.md` | What changed between releases, for someone upgrading. Written the same day as the change. |
 
-The canonical gate is `just ci`, which runs formatting, Clippy, cargo-shear,
-repository lint, documentation lint, the full nextest suite, and a benchmark
-smoke run. Focused recipes:
+Two more are 🔒 local reference rather than working documents:
+`docs/CADDYFILE_COMPATIBILITY_MASTER.md` answers "does Pingclair support this
+Caddy directive"; the other `docs/CADDYFILE_*.md` files are frozen 2026-08-01
+audit records, deliberately excluded from `documentation.rs` because they are
+full of configurations that must *not* compile. Do not read any of them as
+current behavior — check the code.
 
-```text
-just fmt              # format Rust sources in place
-just fmt-check        # fail when formatting differs
-just clippy           # workspace clippy, -D warnings
-just test -p <crate>  # nextest for one crate (accepts nextest args)
-just lint             # fmt-check + clippy + shear + repo-lint + docs-lint
-just check            # lint + test
-just ci               # check + bench-smoke; the exact CI gate
-just shear            # unused-dependency check
-just repo-lint        # mechanical repository invariants
-just docs-lint        # codespell + markdownlint
-just bench / bench-smoke
-just h3               # the three HTTP/3 verification scripts
-just disk / cache-report
-just install          # install the pinned local tooling
-```
+Implemented is not verified. The verification ledger deliberately separates
+"code exists", "local tests pass", and "verified on Linux/VPS"; never promote
+an item between those without evidence under
+`benchmarks/results/<date>_<commit>/` (kept locally, not committed).
 
-### General CLI
+When the maintainer planning files are present, run
+`scripts/snapshot-sensitive-plans.sh start` before and `end` after a session;
+a snapshot validation failure blocks handoff.
 
-- Prefer `rg` over `grep -R`, `fd` over `find`, `bat` over `cat`, `jq` for
-  JSON, and `gsed` when GNU `sed` behavior is required.
-- Respect `.gitignore`. Do not search generated directories such as
-  `target/`, persistent build caches, benchmark result caches, or vendored
-  trees unless the task specifically concerns them.
-- Avoid relying on macOS BSD command behavior in scripts intended for Linux
-  CI, and remember that zsh does not word-split unquoted variables.
-- Be patient with long Rust builds; never kill cargo or rustc by PID. The
-  Cargo lock is expected to make builds slow.
+## Commands
 
-### Development environment
-
-Installed and preferred tools include `rg`, `fd`, `bat`, `jq`, `gsed`,
-`cargo-nextest`, `cargo-watch`, and `just`. When a task is inefficient with
-the available tools, prefer a specialized tool and install it when
-appropriate: Homebrew for macOS system tools, `cargo install` for Rust
-CLIs, npm for Node CLIs, official installers when required. `cargo-watch`
-is for continuous checking during development.
-
-## 🦀 Rust toolchain is exact
-
-CI validation uses Rust **1.97.1**; the workspace declares
-`rust-version = "1.97"`. Use `cargo +1.97.1` for formatting checks, Clippy,
-formal builds, CI-parity tests, and release validation — `+1.97.1` is not
-decoration. Different compilers produce different inference, warnings, and
-rustfmt line breaking; all-green locally followed by all-red in CI has
-happened in both directions (newer-than-CI on 2026-07-29, an older toolchain
-in the release image on 2026-08-02).
-
-## 🧪 Local tests use nextest
-
-`cargo-nextest` is the default local and CI test runner. Use `just test`
-instead of `cargo test` while iterating; `cargo test` is reserved for
-doctests, Cargo-harness-specific behavior, and reproducing a failure known
-only in that harness.
-
-When only one crate or test binary changed, run it first:
+The canonical gate is `just ci` — fmt-check, clippy, cargo-shear, repo-lint,
+docs-lint, the full nextest suite, and bench smoke — and CI runs the same
+recipes. **`+1.97.1` is not decoration**: the workspace declares
+`rust-version = "1.97"` and CI pins 1.97.1. A different local compiler —
+newer or older — has different inference and rustfmt line breaking;
+all-green locally followed by all-red in CI has already happened in both
+directions (newer-than-CI on 2026-07-29, an older toolchain in the release
+image on 2026-08-02).
 
 ```bash
-just test -p pingclair-proxy
+just ci
+```
+
+Narrower runs:
+
+```bash
+just test -p pingclair-proxy                               # one crate
 cargo +1.97.1 nextest run -p pingclair --test integration --no-fail-fast
+cargo +1.97.1 nextest run -p pingclair --test integration test_name -- --nocapture
+cargo +1.97.1 nextest run -p pingclair-proxy --test h3_end_to_end --no-fail-fast
 ```
 
-Run the full suite before handoff when shared crates, configuration, or
-policy code changed. When Rust documentation examples change, run the
-relevant doctests explicitly (`cargo +1.97.1 test --doc`), because nextest
-does not run them.
+`pingclair/tests/integration.rs` spawns the real compiled binary and makes real
+localhost requests. It is the main end-to-end gate, not a mocked test — so a
+stale listener on a test port produces misleading failures. Read the
+ghost-process section of `AGENTS.md` before debugging a suspicious localhost
+failure.
 
-## 💾 Persistent build caches
+Some integration tests are load-sensitive rather than flaky in isolation.
+Reproduce with several concurrent full suites, not repeated single runs:
 
-Expensive Rust builds must reuse persistent build state. Keep primary Cargo
-target directories out of disposable containers and short-lived build
-directories. Use stable architecture-specific caches:
-
-```text
-~/.cache/pingclair-build/
-├── macos-aarch64/
-├── linux-aarch64/
-└── linux-x86_64/
+```bash
+cargo +1.97.1 build --tests -p pingclair
+BIN=$(find target/debug/deps -maxdepth 1 -name 'integration-*' -type f -perm -u+x ! -name '*.d' -exec ls -t {} + | head -1)
+for i in $(seq 1 6); do "$BIN" > /tmp/full_$i.log 2>&1 & done; wait
 ```
 
-Use `sccache` when available for repeated compatible builds, and do not copy
-target trees between incompatible architectures. Before concluding that a
-full rebuild is required, check whether the target dir, target triple,
-toolchain, feature set, profile, `RUSTFLAGS`, linker, build environment, or
-cache path changed — a path change alone can turn a warm build cold.
+### H3 verification
 
-### Build-cache disk budget
+macOS unit tests do not validate linking or QUIC behavior. After any change to
+H3 or the TLS dependency tree, run `just h3` (the three maintained scripts)
+and the Linux half:
 
-Observe cache size with `just disk`. The normal budget is about **80 GiB**;
-crossing **100 GiB** is a stop condition unless the artifacts are deliberately
-required for an active benchmark, comparison, or release. Do not reflexively
-run `cargo clean`: measure what is large, identify the architecture and
-profile, preserve caches required by current work, and remove stale trees
-selectively. Do not delete Cargo registry or git caches merely because a
-target tree is large.
+```bash
+scripts/test-h3-day28-local.sh              # SNI, Alt-Svc, body sizes, POST, 413, keepalive
+scripts/test-h3-cancellation-local.sh       # SSE, downstream cancellation, trailer rejection
+scripts/test-h3-client-auth-local.sh        # mutual TLS, and the SNI/:authority rule that protects it
+```
 
+Both need a curl built with HTTP/3 (`brew install curl` provides one; the system
+curl does not). CI runs the Linux half post-merge on `ubuntu-24.04`; a manual
+Linux box can use `rust:1.97-bookworm`, which needs `cmake` for BoringSSL and
+`clang`/`libclang-dev` for bindgen — without them `boring-sys` fails in its
+build script.
+
+macOS has a system proxy on `127.0.0.1:1082`. Reqwest test clients must use
+`.no_proxy()`; curl needs `--noproxy '*'`.
+
+## CI (two-layer)
+
+The merge gate is `blocking-ci.yml`: it runs the fast `rust-ci` (path-aware
+`just ci` plus the known-flaky retry policy), the Docker image build and
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
