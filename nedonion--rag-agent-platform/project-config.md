@@ -1,164 +1,199 @@
 ---
 trigger: always_on
-description: - 优先遵循系统、开发者和用户的直接指令；子目录中更具体的 `AGENTS.md` 只覆盖对应目录。
+description: Agent 模块是 RAG Agent Platform 的核心智能体系统，负责智能对话、工具调用、任务编排与执行追踪。基于 LangChain4j 框架，实现了可配置、可扩展、可追踪的智能体生命周期管理。
 ---
 
-# RAG Agent Platform Agent 工程规范
+# Agent 模块技术文档
 
-## 适用范围与优先级
+## 1. 模块概述
 
-- 本文件适用于整个仓库。
-- 优先遵循系统、开发者和用户的直接指令；子目录中更具体的 `AGENTS.md` 只覆盖对应目录。
-- 只修改当前任务需要的文件，交付范围最小、行为正确且**经过验证**的变更。
-- **不把设计、计划或建议描述成已实现的功能。** 文档里写「支持 X」必须对应仓库里真实存在
-  且能跑通的代码；只是想做的，写在「待办」或「优化方向」里，并明确标注未实现。
+Agent 模块是 RAG Agent Platform 的核心智能体系统，负责智能对话、工具调用、任务编排与执行追踪。基于 LangChain4j 框架，实现了可配置、可扩展、可追踪的智能体生命周期管理。
 
----
+### 1.1 核心能力
 
-## 一、文档记录要求（强制）
+- **智能体生命周期管理**: Agent 创建、版本发布、启用/禁用、删除
+- **版本化机制**: 支持多版本管理，草稿编辑、审核发布、版本回滚
+- **工具集成**: 集成 MCP 工具，支持动态工具加载与调用
+- **RAG 增强**: 集成知识库检索，支持检索增强生成
+- **执行链路追踪**: 完整记录每次 Agent 执行的详细过程
+- **多模态支持**: 支持文本、图像等多模态输入与处理
+- **会话管理**: 管理用户与 Agent 的多轮对话会话
+- **任务编排**: 支持复杂任务的分解与并行执行
 
-**任何功能新增、行为修改、缺陷修复、配置变更、依赖升级，都必须同步更新文档。
-没有文档记录的改动视为未完成，不允许提交。**
+### 1.2 技术栈
 
-这条不是形式主义。这个项目已经出现过两次文档与代码脱节：README 宣称有「Guava
-RateLimiter 限流」但全仓库搜不到任何 `RateLimiter` 用法；`docs/INDEX.md` 索引了 12 篇
-文档而实际只有 5 篇存在。文档一旦失信，读者就得回去读代码，那文档就白写了。
-
-### 改了什么 → 更新哪里
-
-| 改动类型 | 必须更新 |
-| --- | --- |
-| 业务模块的行为、流程、数据流 | `docs/modules/<模块>.md` |
-| 分层结构、技术选型、基础设施组件 | `docs/architecture/overview.md` 或 `infrastructure.md` |
-| 新增/修改 HTTP 接口、请求响应结构 | `docs/reference/api.md` |
-| 建表、加字段、改索引、改约束 | `docs/reference/database.md` + `docs/sql/` |
-| **新增或修改环境变量** | `.env.example` + `docker-compose.yml` + `docs/operations/deployment.md` |
-| 部署拓扑、CI/CD、回滚方式 | `docs/operations/deployment.md` |
-| 认证、授权、加密、多租户隔离 | `docs/operations/security.md` |
-| 性能相关的调优或退化 | `docs/operations/performance.md` |
-| 线上故障的排查过程与结论 | `docs/operations/troubleshooting-log.md` |
-| 本地开发流程、构建命令、测试方式 | `docs/development/local-setup.md` |
-
-一次改动命中多行就都要改。新增文档时同步在 `docs/README.md` 的导航中登记，
-**不允许留下指向不存在文件的链接**。
-
-### 安全与遗留问题的记录方式
-
-- `docs/operations/security.md` 的**问题台账**必须反映真实状态。修复后不要删除条目，
-  改成 `✅ 已修复（日期）` 并保留问题描述——安全问题的处置过程需要留痕。
-- 区分「**已消除**」和「**已缓解**」。例如换掉泄露的加密算法 ≠ 已泄露的明文被挽回；
-  后者要单独列为未完成项，不能因为代码改好了就整条划掉。
-- 已知未修复的问题**必须写进文档**并标注级别（P0/P1/P2），不允许因为「以后再说」而略过。
-
-### 状态标记
-
-描述能力时使用明确的状态词，不要让读者猜：
-
-| 标记 | 含义 |
-| --- | --- |
-| `已实现` | 当前 `main` 上的真实行为，有代码可查 |
-| `已实现 / 无测试覆盖` | 代码存在但没有回归保护，改动风险高 |
-| `已验证` | 有测试或有脱敏的真实运行证据 |
-| `计划中 / 未实现` | 只有设计，**不得在特性列表中宣传** |
-
-### 写文档时
-
-- 先读同目录已有文档，沿用其结构与语气（每篇开头有「💬 一句话人话」）。
-- 文件名用小写英文，目录层级已表达分类，文件名不再重复（`modules/rag.md`，不是 `RAG_MODULE.md`）。
-- 引用代码时给出真实路径与类名，不要贴不存在的示例代码。
-- 改完检查仓库内是否还有指向旧内容的链接或锚点。
+- **核心框架**: LangChain4j (Agent 编排框架)
+- **模型调用**: 统一 LLM 调用接口 (支持多模型提供商)
+- **工具协议**: MCP (Model Context Protocol)
+- **存储**: PostgreSQL (Agent 配置与执行记录)
+- **消息队列**: RabbitMQ (异步任务处理)
 
 ---
 
-## 二、项目事实
+## 2. 核心功能
 
-- 后端 Java 17 + Spring Boot 3.2.3，包根 `org.lucas`，DDD 四层：
-  `interfaces` → `application` → `domain` → `infrastructure`。
-- 前端 Next.js 15 App Router + React 19，包管理用 **pnpm**（`pnpm-lock.yaml` 为
-  lockfileVersion 6.0，对应 pnpm 8），位于 `frontend/`。
-- 数据库 PostgreSQL + PGVector；消息队列 RabbitMQ；对象存储走 S3 协议（七牛 KODO）。
-- 持久化用 MyBatis-Plus，逻辑删除字段 `deleted_at`。
-- 文档以 `docs/README.md` 为总入口，目录约定见该文件。
-- 部署与 CI/CD 的权威说明是根目录 `DEPLOY.md` 与 `docs/operations/deployment.md`。
+### 2.1 Agent 生命周期
 
-### 测试现状（如实）
+#### 2.1.1 Agent 创建与配置
 
-仓库**长期没有测试**，目前只有 `src/test/java/org/lucas/infrastructure/utils/EncryptUtilsTest.java`
-一个测试类（16 个用例）。其余 570 个 Java 文件、以及整个前端，**都没有回归保护**。
+Agent 由以下核心配置组成:
 
-因此：**修复缺陷时先写能复现的测试**；新增关键路径逻辑时补测试。这是当前性价比最高的改进。
-
----
-
-## 三、常用命令
-
-```bash
-# 后端编译
-mvn -B compile -DskipTests
-
-# 后端测试
-mvn test
-
-# 只跑加解密测试
-mvn test -Dtest=EncryptUtilsTest
-
-# 前端依赖与构建
-cd frontend && pnpm install --frozen-lockfile && pnpm build
-
-# Nginx 配置校验（server 块需挂进 conf.d/）
-docker run --rm -v "$PWD/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
-  nginx:alpine nginx -t
+```
+Agent 配置结构
+├── 基础信息
+│   ├── name: Agent 名称
+│   ├── avatar: Agent 头像
+│   └── description: Agent 描述
+├── 提示词配置
+│   ├── system_prompt: 系统提示词 (定义 Agent 角色与行为)
+│   └── welcome_message: 欢迎消息
+├── 能力配置
+│   ├── tool_ids: 可使用的工具列表 (MCP 工具)
+│   ├── knowledge_base_ids: 关联的知识库 (RAG 功能)
+│   ├── tool_preset_params: 工具预设参数
+│   └── multi_modal: 是否支持多模态
+└── 版本控制
+    ├── published_version: 当前发布的版本ID
+    └── enabled: Agent 启用状态
 ```
 
-CI（`.github/workflows/ci.yml`，PR 触发）跑的就是上面这三组：`mvn test`、`pnpm build`、
-`nginx -t`。**提交前在本地跑一遍**，不要用 CI 当编译器。
+**设计要点**:
+- **分离草稿与发布**: `agents` 表存储当前工作草稿，`agent_versions` 表存储已发布的不可变版本
+- **多租户隔离**: 每个 Agent 关联 `user_id`，实现租户级隔离
+- **工具与知识库解耦**: 通过 JSON 数组引用外部资源ID，支持动态配置
 
-部署由 `.github/workflows/deploy.yml` 负责（仅 push main 触发），两者职责严格分离。
+#### 2.1.2 版本发布流程
 
----
+```
+版本发布状态流转
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│ 草稿编辑 │────→│ 提交审核 │────→│ 审核通过 │────→│ 已发布   │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+                       │                                  │
+                       ├─────────┐                        │
+                       │ 审核拒绝 │                        │
+                       └─────────┘                        │
+                                                          │
+                       ┌──────────┐                       │
+                       │ 已下架   │←──────────────────────┘
+                       └──────────┘
 
-## 四、修改前要求
+状态说明:
+- 1-审核中 (Pending Review)
+- 2-已发布 (Published)
+- 3-拒绝 (Rejected)
+- 4-已下架 (Unpublished)
+```
 
-- 先运行 `git status --short`，识别并**保护用户已有的未提交修改**——不要用
-  `git checkout`、`git restore` 或覆盖写入丢弃你没有确认过的改动。
-- 阅读相关实现、同模块文档和 `pom.xml` / `package.json`，沿用现有模式。
-- 明确预期行为、边界条件和验证方式。
-- 涉及数据格式变更时，**优先设计成不需要停机迁移**（例如新旧格式并存、读时兼容），
-  并在文档里写清兼容边界与最终清理条件。
+**版本化优势**:
+- **不可变性**: 已发布版本不可修改，确保线上稳定性
+- **快速回滚**: 切换 `published_version` 即可回滚到历史版本
+- **变更追踪**: `change_log` 记录每个版本的更新内容
+- **A/B 测试**: 不同用户可使用不同版本进行灰度发布
 
-## 五、验证要求
+### 2.2 Agent 执行引擎
 
-- 声称「修好了」之前必须有证据：跑通的测试、编译输出、或可复现的手工验证步骤。
-- **验证要覆盖失败路径**，不只是 happy path。例如给配置加校验，就要实际制造一次
-  「配置缺失」确认它真的失败；给 CI 加一个检查步骤，就要确认坏输入能让它以非 0 退出码红掉。
-  永远绿灯的门禁比没有门禁更危险。
-- 测试不得依赖开发者本机的环境变量、网络或真实外部服务。环境相关的用例用
-  `Assumptions` 条件跳过，而不是让它在别人机器上变红。
-- 报告结果要如实：跳过了什么、没覆盖什么、哪部分只是编译通过没有实际运行，都要说明。
+#### 2.2.1 执行链路架构
 
-## 六、安全红线
+```
+用户输入
+   │
+   ▼
+┌─────────────────────────────────────────────────────────┐
+│                   Agent 执行引擎                          │
+├─────────────────────────────────────────────────────────┤
+│  1. 会话上下文加载                                         │
+│     - 加载历史消息 (messages 表)                           │
+│     - 构建上下文窗口 (滑动窗口 + Token 管控)                │
+│  ─────────────────────────────────────────────────────  │
+│  2. RAG 检索 (如果配置了知识库)                            │
+│     - 向量检索相关文档片段                                  │
+│     - 注入到 System Prompt 或 User Message                │
+│  ─────────────────────────────────────────────────────  │
+│  3. LLM 推理                                              │
+│     - 使用配置的模型进行推理                                │
+│     - 支持多模态输入 (文本 + 图片)                          │
+│     - 生成响应或工具调用指令                                │
+│  ─────────────────────────────────────────────────────  │
+│  4. 工具调用 (如果 LLM 返回 Tool Call)                     │
+│     - 解析工具名称与参数                                    │
+│     - 通过 MCP 协议调用工具                                 │
+│     - 记录调用耗时、成功率                                  │
+│  ─────────────────────────────────────────────────────  │
+│  5. 多轮迭代 (ReAct 模式)                                  │
+│     - 将工具结果返回给 LLM                                  │
+│     - LLM 决定继续调用工具或生成最终答案                     │
+│     - 最多迭代 N 轮 (防止死循环)                            │
+│  ─────────────────────────────────────────────────────  │
+│  6. 响应返回                                              │
+│     - 保存消息到 messages 表                               │
+│     - 更新会话元数据                                        │
+│     - 记录 Token 消耗与成本                                 │
+└─────────────────────────────────────────────────────────┘
+   │
+   ▼
+用户收到响应
+```
 
-- **绝不把真实密钥写进任何会被 git 追踪的文件**，包括 `application.yml` 的
-  `${VAR:默认值}` 形式。本地真实值放 `.env` 或 `src/main/resources/application-local.yml`
-  （两者均已在 `.gitignore` 中）。
-- 生产配置**不要给凭据类变量设默认值**。漏配时应当启动失败，而不是静默连上错误的服务。
-- 发现密钥已进入仓库或已在本地明文留存时，除了清理，还必须提示**轮换**——
-  清理代码挽回不了已经泄露的凭证。
-- 部署工作流（`deploy.yml`）**绝不能加 `pull_request` 触发**。这是公开仓库，
-  fork 的 PR 一旦能触发部署，任何人都能在服务器上执行任意代码。详见 `DEPLOY.md`。
-- `docker.sock` 挂载等同于宿主机 root 权限。任何关于工具沙箱安全性的判断，上限都是这一条。
+#### 2.2.2 执行追踪设计
 
-## 七、代码风格
+**双表追踪模型**:
 
-- 沿用所在文件既有的注释密度、命名与惯用法，不要引入与周围不一致的风格。
-- 注释解释**为什么**，不复述代码在做什么。非显而易见的约束、坑和历史包袱值得写。
-- 不要留下未被调用的死代码——它会让后来者误以为那是「正确的那一套」。
-- 异常不要吞掉；日志用 SLF4J，不要用 `System.out.println` 或 `printStackTrace`。
-- **不要打印整个对象或序列化结果**。`JsonUtils` 曾因此把用户的服务商 API Key 明文写进
-  stdout 与 `logs/agent-x.log`，使落库加密失去意义。需要排查时打印标识字段，不打印内容。
-- **不要引入第二个 SLF4J provider**。`spring-boot-starter-logging` 已提供 logback-classic；
-  再加一个（如 tinylog）会让 SLF4J 告警并任选其一，另一套配置静默失效。
-  只依赖 `slf4j-api` 的库不需要额外 provider。
+1. **汇总表 (agent_execution_summary)**:
+   - 记录每次完整执行的汇总信息
+   - `trace_id` 唯一标识一次执行
+   - 统计总耗时、Token 消耗、工具调用次数、总成本
+
+2. **详情表 (agent_execution_details)**:
+   - 记录每个执行步骤的详细信息
+   - 与汇总表通过 `trace_id` 关联
+   - `sequence_no` 保证步骤顺序
+
+**追踪数据结构**:
+
+```sql
+-- 汇总表示例数据
+trace_id: "trace-abc123"
+user_id: "user-001"
+session_id: "session-xyz"
+agent_id: "agent-456"
+execution_start_time: "2025-12-08 10:30:00"
+execution_end_time: "2025-12-08 10:30:15"
+total_execution_time: 15000  -- 15秒
+total_input_tokens: 500
+total_output_tokens: 800
+total_tokens: 1300
+tool_call_count: 2
+total_tool_execution_time: 3000  -- 工具调用耗时3秒
+total_cost: 0.0026
+execution_success: true
+
+-- 详情表示例数据 (同一 trace_id 的多条记录)
+-- Step 1: 用户消息
+{
+  trace_id: "trace-abc123",
+  sequence_no: 1,
+  step_type: "USER_MESSAGE",
+  message_content: "帮我查一下明天的天气",
+  message_type: "USER_MESSAGE"
+}
+
+-- Step 2: LLM 决定调用工具
+{
+  trace_id: "trace-abc123",
+  sequence_no: 2,
+  step_type: "TOOL_CALL",
+  tool_name: "weather_api",
+  tool_request_args: '{"city": "北京", "date": "2025-12-09"}',
+  tool_response_data: '{"temp": "5°C", "weather": "晴"}',
+  tool_execution_time: 1200,
+  tool_success: true,
+  model_id: "Qwen/Qwen2.5-72B-Instruct",
+  message_tokens: 50
+}
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [NEDONION/rag-agent-platform](https://github.com/NEDONION/rag-agent-platform) — distributed by [TomeVault](https://tomevault.io).
