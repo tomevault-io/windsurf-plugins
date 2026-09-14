@@ -1,144 +1,123 @@
 ---
 trigger: always_on
-description: Every domain module lives in `packages/core/src/<parent>/` as either a top-level namespace or a nested sub-module:
+description: Open-source cloud gaming: a control plane and the guest components that run
 ---
 
-# `packages/core` — domain modules
+# nestri
 
-## Structure
+Open-source cloud gaming: a control plane and the guest components that run
+inside a box. **This repository is public.** That is the single most important
+fact about it and most of the rules below follow from it.
 
-Every domain module lives in `packages/core/src/<parent>/` as either a top-level namespace or a nested sub-module:
+## Layout
+
+Split by *what a thing is*, not by what language it is written in.
 
 ```
-src/<parent>/
-  ├── <parent>.sql.ts        # (optional) Drizzle table for the parent entity
-  ├── index.ts               # Parent namespace (e.g. User, Game, Team)
-  ├── <child>.sql.ts         # Sub-module table (e.g. fingerprint.sql.ts)
-  └── <child>.ts             # Sub-module namespace (e.g. export namespace Fingerprint)
+apps/       what runs        api, auth (TS) · nescope, neswire, nescapture, neshub (Rust, guest-side)
+                            nesdoctor (Rust, runs on the user's own machine)
+crates/     shared Rust      nesprotocol
+packages/   shared TS        core, auth
+docs/       long-form        deploy.md · dns.md
 ```
 
-### Sub-modules nested under parents
+Both toolchains live at the root: `package.json` is the Bun workspace,
+`Cargo.toml` the Cargo one.
 
-| File                    | Namespace       | Why                                   |
-| ----------------------- | --------------- | ------------------------------------- |
-| `user/linked-account.*` | `LinkedAccount` | A user's OAuth/gaming identities      |
-| `user/fingerprint.*`    | `Fingerprint`   | SSH key fingerprints                  |
-| `game/download.*`      | `GameDownload`  | Per-host game depot downloads         |
-| `user/library.*`        | `Library`       | User's owned games with playtime      |
-| `team/member.*`         | `Member`        | Team membership with role             |
-| `game/depot.*`          | `Depot`         | Platform-specific game content depots |
-| `steam/enrolment.*`     | `Enrolment`     | Which host holds a Steam token for whom |
+| | |
+|---|---|
+| `bun install` | dependencies |
+| `bun dev` | both control-plane apps locally, under the Workers runtime |
+| `cargo build --workspace` · `cargo test --workspace` | the Rust half |
+| `bun run deploy:sandbox` | deploy a stage |
 
-Existing top-level modules: `user/`, `team/`, `game/`, `pairing-code/`, `steam/`, `auth/`, `db/`.
+## Three rules that are not style preferences
 
-A parent may own no table of its own and still have sub-modules that do: `steam/index.ts` is reusable `fn()` functions with no `.sql.ts` beside it, while `steam/enrolment.*` is a full pair.
+### 1. THIS REPO IS PUBLIC. Write nothing that only makes sense to us.
 
-## Pattern: `.sql.ts` (Drizzle Table)
+**Read this before writing a single comment, docstring or commit message.** It
+has been violated twice, both times by someone who knew the repo was public,
+both times about ten occurrences deep before anyone noticed. Being careful is
+demonstrably not enough, so the rules below are mechanical.
+
+**Never, anywhere in this repo:**
+
+| ✗ | why |
+|---|---|
+| **Any relative path that escapes this tree** into an internal repo, or the filename of an internal document | A filename plus a title tells a reader exactly what to ask for |
+| A quotation from an internal document, even one phrase | Restate the requirement in this repo's own words |
+| The name of a component with no public surface | It discloses the shape of the system, which is the part deliberately kept |
+| Anything of the above in a **commit message** | History is permanent here and is deliberately never rewritten — a message cannot be fixed by a later commit |
+| Anything of the above in **published output** — an OpenAPI `description`, an error message, CLI text, a README | A docstring that becomes an API description reaches people who never open the source. Check where a string *goes*, not what file it is in |
+
+**The one sanctioned exception**, and the only way to cite internal reasoning:
 
 ```ts
-// src/<module>/<module>.sql.ts
-import { pgTable, text, boolean, jsonb, uniqueIndex, index, pgEnum } from 'drizzle-orm/pg-core';
-
-import { id, timestamps, ulid } from '../db/types.js';
-
-// Enum (only if needed — co-located with its table)
-export const SomeEnum = pgEnum('some_enum', ['a', 'b']);
-
-// FK imports — use the sql.ts files, never the index.ts (avoids circular deps)
-import { UserTable } from '../user/user.sql.js';
-
-export const SomeTable = pgTable(
-	'some_table',
-	{
-		...id, // char(30) PK, prefix: som_
-		...timestamps, // time_created, time_updated, time_deleted (all utc)
-
-		// FK column — always use ulid() + .references()
-		userId: ulid('user_id')
-			.notNull()
-			.references(() => UserTable.id, { onDelete: 'cascade' }),
-
-		// Scalar columns
-		name: text('name').notNull(),
-		email: text('email'), // nullable = omit .notNull()
-		flag: boolean('flag').notNull().default(false),
-		metadata: jsonb('metadata').$type<{}>(), // JSON blob
-
-		// Enum column
-		provider: SomeEnum('provider').notNull()
-	},
-	(t) => [
-		uniqueIndex('some_table_provider_unique').on(t.provider, t.providerAccountId),
-		index('some_table_sync_idx')
-			.on(t.userId)
-			.where(sql`${t.localValue} is distinct from ${t.remoteValue}`),
-		index('some_table_user_idx').on(t.userId)
-	]
-);
+// A size tier sets vCPU, RAM and the output geometry. ref(d-0021)
 ```
 
-### DB types (`src/db/types.ts`)
+`ref(d-NNNN)` · `todo(d-NNNN)` · `fixme(d-NNNN)`, in **source comments only**.
+Note `d-NNNN` and never `d/NNNN` — a slash reads as a path.
 
-| Helper       | Output                                                          |
-| ------------ | --------------------------------------------------------------- |
-| `ulid(name)` | `char(30)` — for PKs and FKs                                    |
-| `id`         | `{ id: ulid('id').primaryKey().notNull() }` — spread as `...id` |
-| `utc(name)`  | `timestamp with time zone`                                      |
-| `timestamps` | `{ timeCreated, timeUpdated (auto), timeDeleted }`              |
+**The test that makes it decidable — apply it to every sentence:**
 
-### Naming conventions
+> Delete the marker. Does the comment still say something true and useful about
+> *this* code?
 
-- Table name: `snake_case` (e.g. `linked_account`, `team_member`)
-- Column name: `snake_case` (e.g. `user_id`, `provider_account_id`, `time_created`)
-- TypeScript field names: `camelCase` matching the column (drizzle maps them)
-- Index names: `{table}_{column(s)}_unique` / `{table}_{column}_idx`
+If yes, it belongs. If the sentence collapses without the reference, it was
+describing our topology rather than this component, and the fix is to state the
+**requirement** instead of who set it. In practice a category noun does it —
+*the caller*, *the host agent*, *an orchestrator*, *the control plane* — and the
+result is a better sentence, because it says what is needed rather than who
+happens to satisfy it. Every single case fixed so far got shorter and clearer.
 
----
+**A name a user types is not a leak.** `nessh` appears throughout this repo on
+purpose: the product *is* `ssh nestri.io`, so hiding it would mean hiding what
+we sell. The test narrows to: does this name appear because a **user**
+encounters it, or because a **component** does?
 
-## Pattern: `index.ts` (Domain Namespace)
+If you are unsure whether a name is internal, do not guess and do not grep for
+permission — write the category noun. It is never wrong.
 
-```ts
-// src/<module>/index.ts
-import { eq, and, isNull, sql } from 'drizzle-orm';
-import z from 'zod';
+### 2. Nothing closed may enter this repo.
 
-import { Database } from '../db/index.js';
-import { Examples } from '../examples.js';
-import { fn } from '../fn.js';
-import { SomeTable, SomeEnum } from './<module>.sql.js';
+Not source, not a dependency, not a directory that "looked convenient". Before
+adding a top-level directory, know which component it is and that the component
+is open. This has already been caught once, in a commit that was never pushed.
 
-export namespace SomeModule {
-  // ── Info schema ─────────────────────────────────────────────────────
-  // Single source of truth for the entity shape.
-  // Every field typed here; .meta() adds OpenAPI metadata.
-  // When a field changes here, TypeScript catches every usage.
-  export const Info = z
-    .object({
-      id: z.string().meta({
-        description: '…',
-        example: Examples.SomeModule.id,
-      }),
-      // For enum fields, use z.enum(SomeEnum.enumValues) to stay in sync:
-      provider: z.enum(SomeEnum.enumValues).meta({ … }),
-      // Nullable + optional for JSON-blob / optional fields:
-      metadata: z.record(z.string(), z.unknown()).nullable().optional().meta({ … }),
-    })
-    .meta({
-      ref: 'SomeModule',
-      description: '…',
-      example: Examples.SomeModule,
-    });
+### 3. Versions are pinned once, centrally.
 
-  export type Info = z.infer<typeof Info>;
+A Cargo member writes `tokio.workspace = true` and never a version; a TS package
+uses the root `catalog`. Two packages in one tree must not disagree about a
+dependency.
 
-  // ── create ───────────────────────────────────────────────────────────
-  // Use Info.pick({…}) for the schema — keeps fields in sync with Info.
-  // Input is the parsed object.
-  // Use Database.use() for single-operation writes.
-  export const create = fn(
+## Where the detail is
+
+These load automatically when you work in the directory they describe — read
+them there rather than duplicating them here.
+
+- [`packages/core/CLAUDE.md`](packages/core/CLAUDE.md) — domain modules: the
+  `.sql.ts` / `index.ts` pair, `fn()`, the serialization boundary, ids, the
+  actor model, the error type, auth flow.
+- [`apps/api/CLAUDE.md`](apps/api/CLAUDE.md) — route modules, registration,
+  `.meta()` vs `.openapi()`, error flow.
+- [`docs/deploy.md`](docs/deploy.md) — the two ways each control-plane app
+  runs (Workers via `wrangler`, and a container), the settings each needs, and
+  what is shared between them.
+- [`docs/dns.md`](docs/dns.md) — every hostname, what it is for, and the one
+  rule about their shape.
+
+## Things worth knowing before you start
+
+**This tree is mid-rewrite.** The Rust components arrived recently, one commit
+each, imported as trees rather than as history — so `git log` on them starts at
+the import and their own past is not here. Docs for that half are thin and
+being written.
+
+**The TypeScript half predates the Rust half**, so the guides above describe it
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nestrilabs/nestri](https://github.com/nestrilabs/nestri) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-14 -->
