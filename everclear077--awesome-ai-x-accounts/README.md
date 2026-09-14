@@ -7,14 +7,14 @@ A categorized directory of X accounts covering AI, LLMs, agents, and technology,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [everclear077/awesome-ai-x-accounts](https://github.com/everclear077/awesome-ai-x-accounts).
+Original source: `GEMINI.md` in [everclear077/awesome-ai-x-accounts](https://github.com/everclear077/awesome-ai-x-accounts).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 From [everclear077/awesome-ai-x-accounts](https://github.com/everclear077/awesome-ai-x-accounts) — a repo with 8+ stars on GitHub.
