@@ -7,11 +7,11 @@ A llama.cpp fork with TurboQuant/TCQ KV cache, fused Qwen MTP speculative decodi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [VeroFess/llama.cpp_3090x2_qwen3.8_q8_opt](https://github.com/VeroFess/llama.cpp_3090x2_qwen3.8_q8_opt).
+Original source: `AGENTS.md` in [VeroFess/llama.cpp_3090x2_qwen3.8_q8_opt](https://github.com/VeroFess/llama.cpp_3090x2_qwen3.8_q8_opt).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
