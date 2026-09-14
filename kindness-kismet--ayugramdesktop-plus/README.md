@@ -7,11 +7,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Kindness-Kismet/AyuGramDesktop-Plus](https://github.com/Kindness-Kismet/AyuGramDesktop-Plus).
+Original source: `AGENTS.md` in [Kindness-Kismet/AyuGramDesktop-Plus](https://github.com/Kindness-Kismet/AyuGramDesktop-Plus).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
