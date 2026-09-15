@@ -1,13 +1,13 @@
 ---
 trigger: always_on
-description: Discover CEP-managed content already present in a target repo (What/How layer docs, compiled guidelines, context packages, decision ledger) via existence checks against layout-slots-registry.yaml-resolved paths, then write one canonical root AGENTS.md onboarding index plus thin per-tool pointer stubs (.github/copilot-instructions.md, CLAUDE.md, .cursor/rules/onboarding.mdc) that link into it. All writes are marked-block or existence-gated and non-destructive, including install.sh's own AGENTS.md
+description: Register, resolve, and validate where a project's path-slots actually live via .layout-slots.yaml markers, so relocating a slot needs zero SKILL.md edits. Do NOT use for single-file lookups.
 ---
 
 
-# ult-onboarding-index
+# ult-repo-layout
 
 This repository packages its capabilities as portable skills for AI
-coding agents. Read `.github/skills/ult-onboarding-index/SKILL.md` and follow it
+coding agents. Read `.github/skills/ult-repo-layout/SKILL.md` and follow it
 when this rule applies.
 
 ---
