@@ -1,13 +1,13 @@
 ---
 trigger: always_on
-description: Distill decisions, reasoning, and rejected alternatives from PRs, design docs, and postmortems into the project's decision_ledger, so ult-context-generate's trip-wire can surface institutional memory before new work quietly repeats settled ground. Do NOT use to query the ledger against new work or decide revise/proceed/escalate -- that's ult-context-generate/SKILL.md Step 7.7's job.
+description: Discover CEP-managed content already present in a target repo (What/How layer docs, compiled guidelines, context packages, decision ledger) via existence checks against layout-slots-registry.yaml-resolved paths, then write one canonical root AGENTS.md onboarding index plus thin per-tool pointer stubs (.github/copilot-instructions.md, CLAUDE.md, .cursor/rules/onboarding.mdc) that link into it. All writes are marked-block or existence-gated and non-destructive, including install.sh's own AGENTS.md
 ---
 
 
-# Distilling Institutional Memory (Trip-Wire)
+# ult-onboarding-index
 
 This repository packages its capabilities as portable skills for AI
-coding agents. Read `.github/skills/ult-institutional-memory-distill/SKILL.md` and follow it
+coding agents. Read `.github/skills/ult-onboarding-index/SKILL.md` and follow it
 when this rule applies.
 
 ---
