@@ -33,10 +33,10 @@ Residual risks: DNS rebinding, Chromium DNS TOCTOU, redirects, and debug-server 
 ### Event-bus trust boundary
 The leaf-runtime `LeafEventBus` (`src/runtime/leaf-runtime-client.ts`) is an in-process seam for trusted co-installed extension modules only (provider registered via `setLeafRuntimeProvider`, wired in `src/index.ts` when `PI_NORTHSTAR_LEAF_MODEL` is set) — it is not an authenticated channel. The `RuntimeCorrelationV1` metadata (`owner: 'northstar'`, bounded ASCII `correlationId`/`stage`, bounded `queryIndex`/`attempt`, closed role set) is routing/observability metadata with exact-keys validation, not auth: unknown fields reject, but nothing in it proves caller identity.
 
-### Python child processes MUST use the shared env allowlist
+### Leaf-runtime correlation v2 (negotiate-gated, non-auth routing metadata)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rhinos0608/Pi-Northstar](https://github.com/rhinos0608/Pi-Northstar) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-15 -->
