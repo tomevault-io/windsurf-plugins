@@ -7,11 +7,11 @@ My (mostly vibe-coded) attempt at https://berghain.challenges.listenlabs.ai/
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [brandonmanke/berghain_challenge](https://github.com/brandonmanke/berghain_challenge).
+Original source: `AGENTS.md` in [brandonmanke/berghain_challenge](https://github.com/brandonmanke/berghain_challenge).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
