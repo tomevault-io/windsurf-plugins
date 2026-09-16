@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [formiat/px4-ros2-drone-nav](https://github.com/formiat/px4-ros2-drone-nav).
+Original source: `AGENTS.md` in [formiat/px4-ros2-drone-nav](https://github.com/formiat/px4-ros2-drone-nav).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
