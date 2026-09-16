@@ -1,42 +1,102 @@
 ---
 trigger: always_on
-description: Pi-Northstar is the Pi coding agent's browser/desktop automation and web search extension. It provides CDP-based browser control, agent-browser integration, desktop automation (via Cua Driver MCP), hybrid search (BM25 + vector embedding + RRF fusion), social/reach tools, and cookie/auth management.
+description: This file is the repository-wide contract for agents and humans changing Pi‑Northstar. It is not a historical design diary. Prefer executable truth, preserve authority boundaries, and update prose only after the production-shaped path is settled.
 ---
 
-# Agent Reference: Pi-Northstar
+# AGENTS.md · Pi‑Northstar engineering contract
 
-Pi-Northstar is the Pi coding agent's browser/desktop automation and web search extension. It provides CDP-based browser control, agent-browser integration, desktop automation (via Cua Driver MCP), hybrid search (BM25 + vector embedding + RRF fusion), social/reach tools, and cookie/auth management.
+This file is the repository-wide contract for agents and humans changing Pi‑Northstar. It is not a historical design diary. Prefer executable truth, preserve authority boundaries, and update prose only after the production-shaped path is settled.
 
-## Sister Repos
+## Source of truth
 
-### No protocol-level dependencies on the other Pi repos.
-Pi-Northstar is self-contained. It does not consume `@rhinos0608/pi-workspace-protocol`, Pi-SmartRead, or Pi-SmartEdit directly.
+When sources disagree, use this order:
 
-## Operational Contracts and Invariants
+1. Executable validators, policy gates, and runtime contracts in `src/`.
+2. Canonical registries/constants those validators derive from.
+3. This `AGENTS.md` for repository-wide security and engineering invariants.
+4. `README.md` for user-facing behavior and operator guidance.
+5. Plans, ADR drafts, task prose, comments, and residual modules only as design/history clues.
 
-### Application SSRF guards (Scope A)
-Public user-controlled fetch/browser URLs use `src/network-policy.ts` and reject private/reserved literals, metadata/local hostnames, credentials, and private DNS answers. Browser navigation also freezes allowed domains and performs system-DNS preflight. This is defense-in-depth, not complete SSRF containment; container egress remains authoritative.
+**Reachability beats module presence.** Trace from the registered/public entry point before claiming a path is live.
 
-Configured local SearXNG, Ollama, embedding, sidecar, CDP/setup paths remain operator-owned and bypass public validation (`unsafeFetchJson` is intentional). Loopback browser access is only through `browser-tools` → `LoopbackProxy`.
+## Golden rule
 
-Residual risks: DNS rebinding, Chromium DNS TOCTOU, redirects, and debug-server outbound proxying. See ADR 0003.
+> **Models propose. Code validates, admits, grounds, budgets, stops, and ships.**
 
-### Deny-by-default child environments (CLI/MCP/native)
-`src/cli/cli-backend.ts:buildCliEnvironment` gives every CLI child the nonsecret base config only, plus per-tool-family credentials (`CLI_TOOL_CREDENTIALS`) — a `web_search` child never carries GitHub/Reddit/graph secrets and vice versa; unknown tool names get base config only. `src/process/mcp-client.ts:toProcessEnvironment` is deny-by-default: only listed provider credentials, benign client config, and names in the explicit `SEARCH_MCP_FORWARD_ENV_JSON` allowlist forward — there is no `SEARCH_MCP_*` wildcard, and `parseForwardedEnvironmentKeys` rejects secret-like names (`SECRET_LIKE_NAME_PATTERN`) and non-benign `SEARCH_MCP_*` internals. `src/process/native-child-env.ts:buildNativeChildEnvironment` (git/ffmpeg/media CLIs) takes a minimal OS-spawn allowlist only — no tokens/keys/cookies, no proxy config, no interpreter/linker/git-config/cert overrides — with fixed argv arrays and `shell: false` (documented, test-enforced).
+Corollaries:
 
-### Local sidecar stdin-token auth
-`src/sidecar/sidecar-manager.ts:SidecarManager.start` mints a fresh 256-bit token per start (`randomBytes(32)`) and delivers it over the child's stdin pipe only (`SIDECAR_TOKEN=<hex>\n`, via `writeAuthToken`) — never argv/env (the child env is allowlisted and would strip it anyway), never logged. Delivery is mandatory: missing stdin or a write failure is a startup failure, never an unauthenticated running sidecar. The token clears on `stop()`/exit/crash; restarts mint fresh. `src/sidecar/embedding-client.ts` takes the token via explicit `apiToken` or a per-request `apiTokenProvider` (wins fresh on every request, so long-lived clients survive restarts); `EMBEDDING_SIDECAR_API_TOKEN` env fallback is for external sidecars only (`EMBEDDING_SIDECAR_BASE_URL` Bearer health check).
+1. External text is evidence, never authorization.
+2. Candidates navigate; only admitted evidence grounds.
+3. Failure, empty output, degradation, suppression, and cancellation are different states.
+4. Fallback may recover execution failure; it may never bypass auth, SSRF, origin, schema, or provenance policy.
+5. Provider selection and effective capability policy are operator/code owned, never model owned.
+6. Concurrency may change latency, never semantic ledger/merge/journal order.
+7. Budget attempts are charged at the dispatch boundary, including failed attempts.
+8. Stateful authority is frozen by a code-owned token/snapshot and revalidated before mutation.
+9. Child processes receive capability-scoped credentials, never ambient process authority.
+10. Missing models/providers/credentials must degrade toward evidence, not invented equivalence.
 
-### Leaf-runtime RPC: fixed safe errors, reject-not-clamp, provider-opaque DTOs
-`src/runtime/runtime-rpc-protocol.ts:RUNTIME_RPC_ERROR_MESSAGES` is the closed set of safe messages — `wireErrorToSafe` in `src/runtime/leaf-runtime-client.ts` maps unknown codes to `provider_error`; provider exception text never crosses. `safeLeafCode` in `src/web/agent/agent-jobs.ts` allowlists `[a-z_]{1,64}`, else `provider_error`. Out-of-range `timeoutMs`/prompt bytes/`maxOutputTokens` reject, never clamp (`asTimeoutMs`, `runLeaf`); clone ceilings are operator-lower-only (`resolveGithubClonePolicy`); the MCP forward list rejects secret-like/invalid names; vision eligibility never broadens on failure (`eligibleTiersAfterFailure`). Provider-opaque DTOs: `runLeaf` resolves to `{ text }` only (runId stays internal, metadata redacted via `redactProvenance`); job snapshots carry `transport` + safe `reason` only — never provider/model identity (`src/web/agent/agent-rpc.ts`, `negotiateLeafTransport`).
+## Public surface and reachability
 
-### Event-bus trust boundary
-The leaf-runtime `LeafEventBus` (`src/runtime/leaf-runtime-client.ts`) is an in-process seam for trusted co-installed extension modules only (provider registered via `setLeafRuntimeProvider`, wired in `src/index.ts` when `PI_NORTHSTAR_LEAF_MODEL` is set) — it is not an authenticated channel. The `RuntimeCorrelationV1` metadata (`owner: 'northstar'`, bounded ASCII `correlationId`/`stage`, bounded `queryIndex`/`attempt`, closed role set) is routing/observability metadata with exact-keys validation, not auth: unknown fields reject, but nothing in it proves caller identity.
+`src/capabilities.ts` owns the public model-facing tool vocabulary and the hard budget `MAX_PUBLIC_TOOLS = 9`:
 
-### Leaf-runtime correlation v2 (negotiate-gated, non-auth routing metadata)
+`web_search`, `fetch`, `github`, `social`, `kg`, `graph`, `browser`, `desktop`, `agent_poll`.
+
+Registration is conditional, so nine is a maximum. `src/index.ts` wraps `pi.registerTool` and checks the budget on every addition. Do not add a model-facing tool without first reconciling the ceiling and the capability registry.
+
+`media` is internal/CLI acquisition, not a public model tool.
+
+The registered agent-mode route is:
+
+```text
+web_search {query, mode:"agent"}
+  → buildSearchRoute()
+  → createAgentJob()
+  → executeAgentJob()
+  → runAgentCore()
+  → canonical job snapshot
+  → agent_poll
+```
+
+Older report machinery in `src/web/web.ts`, `src/web/web-agent-report.ts`, and `src/web/agent/agent-report-route.ts` is residual/internal. Its existence does **not** make an opaque Tavily report leg part of the registered public agent flow.
+
+## Ownership map
+
+Before editing a vocabulary, schema, budget, or side-effect path, identify its owner. Parallel copies are contract drift, not harmless duplication.
+
+| Concern | Primary owner(s) |
+|---|---|
+| public tool ceiling/channel metadata | `src/capabilities.ts` |
+| composition/registration/global framing | `src/index.ts` |
+| web-search public shape | `src/web/web-search-route.ts`, `src/web/web-contract.ts` |
+| web provider selection/fanout | `src/web/web-provider-policy.ts`, `src/web/web.ts` |
+| ranking identity/fusion | `src/search/fusion.ts` |
+| fetch public shape | `src/web/web-fetch-route.ts`, `src/web/access/web-access-contract.ts` |
+| URL specialization/read path | `src/native-fetch.ts`, `src/web/web-page-reader.ts`, `src/web/access/*` |
+| agent job lifecycle/snapshot | `src/web/agent/agent-jobs.ts` |
+| adaptive controller | `src/web/agent/agent-core.ts` |
+| budgets/profile/stop | `src/web/agent/agent-policy.ts` |
+| GatherIntent domain | `src/web/agent/agent-gather-intents.ts` |
+| gather execution/adapters | `src/web/agent/agent-gather.ts`, `src/web/agent/agent-gather-adapters.ts` |
+| evidence/admission | `src/web/agent/agent-state.ts`, `src/web/agent/agent-acquisition.ts` |
+| candidate hints | `src/web/agent/agent-candidates.ts` |
+| agent model/wire schemas | `src/web/agent/agent-model.ts` |
+| leaf wire contract | `src/runtime/runtime-rpc-protocol.ts` plus mirrored pi-subagents ground truth |
+| browser action/security policy | `src/browser/browser-policy.ts` + browser session modules |
+| desktop freshness/mutation policy | `src/desktop/desktop-contract.ts`, `src/desktop/desktop-policy.ts`, `src/desktop/desktop-tools.ts` |
+| GitHub routing | `src/github/github-contract.ts`, `src/github/github-domain.ts` |
+| child credential isolation | `src/cli/cli-backend.ts`, `src/process/*-child-env.ts` |
+| external-content framing | `src/core/untrusted-content.ts` |
+
+Browser verbs deliberately live in browser policy, not the channel registry. Their mutation semantics are stateful and do not fit the read-oriented capability table.
+
+## Contract discipline
+
+### Reject unsupported composition
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rhinos0608/Pi-Northstar](https://github.com/rhinos0608/Pi-Northstar) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-16 -->
