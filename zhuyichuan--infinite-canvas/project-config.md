@@ -1,0 +1,97 @@
+---
+trigger: always_on
+description: 本文档用于约束本项目中的 AI / 自动化开发行为。开发时优先遵循本文件，其次遵循用户当前消息。
+---
+
+# AGENTS.md
+
+本文档用于约束本项目中的 AI / 自动化开发行为。开发时优先遵循本文件，其次遵循用户当前消息。
+
+## 基本原则
+
+- 先读现有代码，再动手修改，优先沿用项目已有结构和写法。
+- 写代码保持最少行数，能简单实现就不要引入复杂抽象。
+- 标准格式、协议、解析、压缩、加密、日期等通用能力优先使用成熟稳定的库，不要手写底层实现，除非用户明确要求或项目已有实现必须沿用。
+- 不要为了“兼容更多场景”写大量分支，只实现当前明确需要的功能。
+- 项目尚未上线，不需要兼容旧数据；本地存储结构调整时直接按新设计修改，不写旧字段兼容或数据迁移兜底，除非用户明确要求。
+- 每次写完代码，不需要检查语法，不需要执行构建，用户会自己做。
+- 不要改无关文件，不要顺手重构。
+- 如果工作区已有用户改动，不要回滚，不要覆盖；只在必要范围内追加修改。
+- 每次改动代码都进去 `git commit`,并写上详情的 message
+
+## 反复提醒沉淀
+
+- 如果开发过程中总是遇到某个问题，或者用户反复提醒同一个注意事项，需要把该注意事项补充到本文件。
+- 补充时写成明确、可执行的规则，避免只写模糊描述。
+- 新规则应放到最相关的章节；找不到合适章节时放到“项目注意事项”。
+
+## 前端规范
+
+- 前端使用 Vite、React、React Router、TypeScript、Ant Design、Tailwind、Zustand。
+- 编写 Ant Design 相关代码时，参考 https://ant.design/llms-full.txt 理解组件 API、示例和设计规范，并优先结合项目当前 antd 版本与既有写法。
+- 外部服务请求统一放在 `web/src/services/api/`，由浏览器前端直连，不假设存在项目后端。
+- 全局或跨页面状态优先放在 `web/src/stores/`。
+- 已经放在全局 store 或全局 hook 中的状态/动作，组件需要时直接使用对应 store/hook，不要为了“纯组件”层层透传 props；避免一个组件传递过多参数。
+- 全局组件、全局常量、全局配置等全局性质的内容不要作为 props 或参数层层传递；哪里需要就在哪里直接从对应全局入口获取。
+- 多个页面重复出现的 UI 副作用动作，例如复制文本并提示、下载并提示、统一确认弹窗，优先抽成 `web/src/hooks/` 下的全局 hook；不要放进 store，除非它确实是需要共享/订阅的状态。
+- 路由页面放在 `web/src/pages/`，页面布局放在 `web/src/layouts/`，路由配置放在 `web/src/router.tsx`。
+- 画布页面放在 `web/src/pages/canvas/`，画布组件放在 `web/src/components/canvas/`，画布状态放在 `web/src/stores/canvas/`，画布工具函数放在 `web/src/lib/canvas/`。
+- 页面按目录组织，例如 `web/src/pages/image/index.tsx`；页面里只有一个主业务组件时直接写在对应页面入口中，不要单独拆 `Manager` 组件再传一堆 props。
+- 不要新增只做简单转发的组件，例如只 `return <X>{children}</X>` 或只换个名字透传 props；直接在使用处使用真实组件或把逻辑写进当前文件。
+- 页面私有 hook 放在对应页面目录下，例如 `admin/assets/use-admin-assets.ts`；只有多个页面真实复用的 hook 才放到外层 `hooks/`。
+- 管理后台页面私有组件放到各自页面目录的 `components/` 下，例如 `admin/assets/components/`、`admin/prompts/components/`；不要为了单页面使用放到 `admin/components/` 共享目录。
+- 管理后台主题、背景、卡片阴影、表格配色等统一在 `web/src/lib/app-theme.ts`、`AppProviders` 或必要的全局 CSS 作用域中配置；页面私有组件不要自己写 `dark ? ...` 主题分支。
+- Ant Design 的 Dropdown、Menu、Select、Cascader、TreeSelect 等弹层背景、悬停态和选中态颜色统一通过 `web/src/lib/app-theme.ts` 的全局 Alias Token 与组件 Token 配置；不要在业务组件内为单个弹层覆盖颜色。
+- 组件优先使用函数组件和现有 hooks，不新增大型状态管理方案。
+- UI 图标优先使用 `lucide-react` 或项目已经使用的 Ant Design 图标。
+- 页面文案保持中文。
+- 不要在组件里堆太多无关逻辑；复杂逻辑优先抽成同目录工具函数或小组件。
+- 样式优先由组件自己管理；组件私有样式优先使用 Tailwind className 或少量内联 style，不要为单个组件新增大量全局 CSS。
+- 全局 CSS 只放基础变量、全局重置、跨页面通用样式和少量第三方组件必要覆盖；不要在 `globals.css` 堆页面私有样式。
+- 代码尽量短小直接，少拆不必要组件，少做多层 props 传递，避免为了抽象堆出更多代码。
+- 前端业务数据需要浏览器本地持久化时，默认使用 `localforage`；`localStorage` 只用于极小的简单配置，不要用来保存业务列表、生成记录、图片、base64 或大 JSON。
+
+## 画布 UI 规范
+
+- 做 canvas 前端 UI 时必须遵循当前画布主题。
+- 优先使用 `canvasThemes`、`useThemeStore` 或 Ant Design `ConfigProvider` token。
+- 不要硬编码黑白、stone、slate 等颜色导致浅色/深色主题不一致。
+- 新增画布按钮、弹窗、浮层时，尽量复用已有工具栏、节点面板、Modal 的视觉风格。
+- 画布顶部工具栏和状态信息优先采用极简扁平风格：无边框、无阴影、无胶囊背景，融入整体背景，弱化按钮感，仅保留轻微 hover 反馈，保持简洁现代、低视觉重量。
+- 左侧画布面板等列表里的节点/元素缩略图容器，非图片类型（文本、配置、视频、音频等）不要使用 `theme.node.fill`（`#e7e5df`/`#292524`）这类灰色背景，图标直接无背景展示，尽量不要给多余底色，保持干净。
+- 画布内的操作按钮（如面板里的「添加」「导出」「选择」等）默认用扁平无底色样式：透明背景、仅 `hover:bg-black/5 dark:hover:bg-white/10` 轻微反馈，靠图标+文字表达，不要用 `theme.toolbar.activeBg`（`#e7e5df`/`#3a3631`）或 `theme.node.fill` 之类的灰色作为按钮填充底色。灰色 `activeBg` 只允许用于「选中态」等需要表达状态的高亮，不要当普通装饰底色。
+- 图片节点尺寸逻辑要尊重原始比例，除非功能明确要求自由变形。
+- 批量生成、多图展示、助手面板等画布交互要尽量简洁，不要占用过多画布空间。
+
+## 画布节点系统架构
+
+- 画布节点系统完整架构、数据模型、连接流图与扩展开发指南参见：`docs/content/docs/development/canvas-node-system.zh-CN.mdx`。
+- 修改、扩展或调试画布节点（图片、文本、视频、音频、配置、组节点及插件节点）时，优先参考该文档中的数据结构契约、连接调度规则与 7 步扩展清单。
+- 节点业务数据与生成参数严格保存在 `metadata` 扁平对象中，保持纯数据与渲染视图彻底分离。
+- 组节点（Group）为虚拟容器，其自身不存子节点数组，子节点通过 `metadata.groupId` 反向关联；组节点向外连线时通过 `expandGroupResourceNodes` 动态解包为批量资源包。
+- 节点高频拖拽/连线/视口变动在 `project.tsx` 本地 React State + Ref 内部运行以保障 60fps，不要在拖拽过程中直接高频触发 Zustand 全量 store 更新。
+- 对接自建 ComfyUI 时的工作流标准、槽位词汇表（prompt, seed, width, height, ref_image_01..09, ref_mask 等）、`_meta.title` 标注约定与解析契约参见：`docs/content/docs/development/comfyui-workflow-standard.zh-CN.mdx`。
+- 用户向 ComfyUI 工作流配置指南与 `_meta.title` 标注范例参见：`docs/COMFYUI_WORKFLOW_GUIDE.md`。
+- 原生 ComfyUI 8188 直连接口契约与调试踩坑经验参见：`Comfy/Comfy-Experience/experience.md`。
+
+## ComfyUI 与工作流规范
+
+- 本项目生成渠道全面收敛为仅支持本地自建 ComfyUI 原生 API（默认端口 8188，早期 `comfy-api-proxy` 代理已彻底废弃移除），前端浏览器直连 ComfyUI 官方 REST/WebSocket 端点，彻底移除了 OpenAI、Gemini 等外部商用大模型 API；禁止再引入或保留外部闭源模型调用逻辑或中间代理层分支。
+- 严格遵循 `docs/content/docs/development/comfyui-workflow-standard.zh-CN.mdx` 定义的 6 大能力矩阵、槽位词汇表（`prompt`, `seed`, `width`, `height`, `duration`, `ref_image_01..09`, `first_frame`, `last_frame`, `ref_mask` 等）、`_meta.title` 标注约定与输入候选名探测规则。
+- 节点解析 ComfyUI 输入槽位时，不得使用硬编码的 `class_type` 白名单，必须通过目标输入的候选名称列表（如 `prompt` 找 `value`/`text`/`prompt`）动态探测匹配。
+- 工作流驱动 UI 原则：画布节点参数不得使用固定的通用大模型表单；UI 必须由工作流实际解析出的槽位动态自适应渲染（“未标记 = 不可用、UI 不显示”），未标记的尺寸、时长或参考槽位严禁展示在节点上。
+- 预设工具化原则：ComfyUI 工作流逐步向“专用预设卡片/独立工具节点”演进，复杂底层参数（采样器、步数、模型）在后台锁死，节点卡片仅暴露工作流真正需要的入参端口，实现一处配置好、全局直接拖拽使用。
+- 严格校验与防呆（Fail-loud）：工作流上传或执行时，若缺少保留槽位、存在重复标题或输入不兼容，必须即时显式报错并指导修正，严禁静默丢弃参考资源或静默失败。
+- 全能参考视频生成（MiniMax H3）需求规格、尺寸硬件锁死与多模态 FIFO 路由参见：`docs/content/docs/development/multimodal-video-workflow-spec.zh-CN.mdx`。
+- 多模态参考资源连线支持最多 9 图 + 3 视频 + 3 音频；未连满的插槽及其级联桥接节点（如 `GetVideoComponents`）必须在提交前自动抹除；连线超出上限时必须 Fail-loud 报错拦截。
+- 视频生成尺寸严禁开放手动数字输入，必须严格收敛为 16:9 与 9:16 对称对调，且锁定在 0.2M~0.98M 的 9 档硬件对齐预设中，上限严格锁死在 0.98 MP。
+- 运行本项目工作流所必须安装的 5 大 ComfyUI 核心插件（克隆至 ComfyUI 的 `custom_nodes/` 目录）：
+  1. `https://github.com/zhiwendesign/Comfyui-kktools`（文本生成/反推）
+  2. `https://github.com/kijai/ComfyUI-KJNodes`（全能参考视频及组件处理）
+  3. `https://github.com/M1kep/ComfyLiterals`（首尾帧/全能视频字面量与基础常数）
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ZhuYichuan/infinite-canvas](https://github.com/ZhuYichuan/infinite-canvas) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-16 -->
