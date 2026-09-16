@@ -1,0 +1,110 @@
+---
+trigger: always_on
+description: <!-- Copilot / AI agent instructions for N64FlashcartMenu -->
+---
+
+<!-- Copilot / AI agent instructions for N64FlashcartMenu -->
+# N64FlashcartMenu — Practical instructions for AI coding agents (Copilot, ChatGPT, etc.)
+
+This file contains focused, actionable knowledge to help an AI assistant become productive in this repository with minimal guesswork.
+
+---
+
+## Purpose
+- High-level: a libdragon-based Nintendo 64 flashcart menu project that builds into one or more ROM images under `output/`.
+- Key goal for contributors: build the ROM, run it in an emulator or on hardware, and modify menu behavior or flashcart-specific functionality.
+- Primary areas of change:
+  - Menu logic and UI: `src/menu/`
+  - Flashcart drivers: `src/flashcart/`
+  - Ensure compatibility and functionality with real hardware using only a Jumper Pak accounting for memory stack and heap pressure and inform the user if features are unavailable, though allow availability of features that may require the use of Expansion Pak if the system supports it.
+- Non-goals:
+  - No PC-side UI, installer, or runtime configuration system.
+  - No external scripting, plugins, or dynamic content loading at runtime.
+  - All behavior is compiled into the ROM.
+
+---
+
+## AI Efficiency Rules (Minimize Credits)
+- Keep analysis and responses concise unless the user explicitly requests detail.
+- Read only the files you need. Avoid broad scans of `libdragon/` and `build/` unless required.
+- Prefer targeted searches (`rg` with file globs) over whole-repo reads.
+- Do not run full clean rebuilds by default.
+  - First choice for code-only edits: build only once with `make -j2` in the devcontainer.
+  - Rebuild libdragon/toolchain only when toolchain files or submodules changed.
+- On Windows hosts, do not use local `make`; use the devcontainer/docker workflow.
+- Validate the smallest scope first:
+  - Check compile status for touched files.
+  - Run full `make all` only when requested or when packaging/output behavior changed.
+- Prefer minimal diffs over refactors. Keep function signatures and behavior stable unless asked.
+- Reuse existing helpers/patterns instead of introducing new abstractions.
+- Batch related edits in a single patch when safe.
+- If uncertainty is high, ask one focused question before making large changes.
+
+### Recommended Devcontainer Build Flow
+1. Ensure image exists: `docker build --progress=plain -t n64flashcartmenu-sc64deployer -f .devcontainer/flashcart/Dockerfile.sc64deployer .`
+2. Build project (normal case):
+   `docker run --rm -v "${PWD}:/workspaces/N64FlashcartMenu" -w /workspaces/N64FlashcartMenu n64flashcartmenu-sc64deployer bash -lc "cd ./libdragon && make install tools-install -j && cd .. && make -j2"`
+3. Use full bootstrap only when needed (submodule/toolchain issues):
+   `docker run --rm -v "${PWD}:/workspaces/N64FlashcartMenu" -w /workspaces/N64FlashcartMenu n64flashcartmenu-sc64deployer bash -lc "git submodule update --init && cd ./libdragon && make clobber -j && make libdragon tools -j && make install tools-install -j && cd .. && make all -j2"`
+
+---
+
+## Before making changes
+- Identify which flashcart(s) are affected (64drive, EverDrive64, SummerCart64).
+- Locate the relevant menu view or flashcart driver before editing.
+- Check the Makefile for existing patterns before adding new build rules, flags, or constants.
+- Prefer small, localized changes over large refactors.
+
+---
+
+## How to build (practical)
+- Primary build: run `make` from repository root.
+  - Produces `output/N64FlashcartMenu.n64` and several vendor-specific copies:
+    - `output/menu.bin`
+    - `output/OS64.v64`, `output/OS64P.v64`
+    - `output/sc64menu.n64`
+- Useful targets:
+  - `make all` — full build + copies for 64drive / ED64 / SC64
+  - `make run` — builds then deploys via `remotedeploy.sh` (or `localdeploy.bat` on Windows)
+  - `make run-debug`, `make run-debug-upload`, `make run-debug-reboot` — debug deploy helpers (serial output enabled)
+  - `make clean` — removes build and output directories
+  - `make format` — runs `clang-format` on `src/` (excludes `src/libs`)
+
+### Host environment notes
+- Primary development environment: Linux.
+- Windows users typically use WSL or the provided `.bat` deployment helpers.
+- Shell scripts (`*.sh`) assume a POSIX-compatible shell.
+
+---
+
+## Toolchain / environment
+- The Makefile depends on `N64_INST` (libdragon installation path) and includes:
+  - `$(N64_INST)/include/n64.mk`
+- Ensure `N64_INST` points to a valid libdragon toolchain directory, or use the libdragon Docker image described in `libdragon/README.md`.
+- Asset conversion tools used by the build:
+  - `N64_MKFONT`
+  - `N64_AUDIOCONV`
+  - `N64_MKSPRITE`
+- Source assets live under `assets/`.
+- These tools are invoked automatically by Makefile rules, which are generated from the source assets:
+  - Fonts → `filesystem/*.font64`
+  - Audio → `filesystem/*.wav64`, `filesystem/*.xm64`
+  - Images → `filesystem/*.sprite`
+- Documentation site is generated using DocFX:
+  - `docfx docfx.json --serve`
+  - Sources live in `docs/`
+
+**Important:**  
+Do not invoke libdragon tools directly unless debugging the build system. Prefer modifying Makefile rules instead.
+
+---
+
+## External resources & references
+- **libdragon**  
+  https://github.com/DragonMinded/libdragon/tree/preview  
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [john-steinmeyer/sc64-savestates](https://github.com/john-steinmeyer/sc64-savestates) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-16 -->
