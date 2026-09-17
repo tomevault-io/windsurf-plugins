@@ -7,11 +7,11 @@ Coleta, revisão em Storyboard e entrega segura de B-rolls para macOS e Windows.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [engenheirodevideo/get-brolls](https://github.com/engenheirodevideo/get-brolls).
+Original source: `CLAUDE.md` in [engenheirodevideo/get-brolls](https://github.com/engenheirodevideo/get-brolls).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
