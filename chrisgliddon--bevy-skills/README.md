@@ -7,11 +7,11 @@ Unofficial open source AI skills for Bevy, inspired by PixiJS Skills. These skil
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [chrisgliddon/bevy-skills](https://github.com/chrisgliddon/bevy-skills).
+Original source: `AGENTS.md` in [chrisgliddon/bevy-skills](https://github.com/chrisgliddon/bevy-skills).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
