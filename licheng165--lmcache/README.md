@@ -7,11 +7,11 @@ LMCache: Supercharge Your LLM with the Fastest KV Cache Layer
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [licheng165/LMCache](https://github.com/licheng165/LMCache).
+Original source: `AGENTS.md` in [licheng165/LMCache](https://github.com/licheng165/LMCache).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
