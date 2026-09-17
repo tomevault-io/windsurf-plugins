@@ -7,11 +7,11 @@ Databricks renamed it again. Here's what it's called now.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [aig/rebricked](https://github.com/aig/rebricked).
+Original source: `AGENTS.md` in [aig/rebricked](https://github.com/aig/rebricked).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
