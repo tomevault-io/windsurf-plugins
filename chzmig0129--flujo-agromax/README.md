@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [chzmig0129/FLUJO-AGROMAX](https://github.com/chzmig0129/FLUJO-AGROMAX).
+Original source: `AGENTS.md` in [chzmig0129/FLUJO-AGROMAX](https://github.com/chzmig0129/FLUJO-AGROMAX).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
