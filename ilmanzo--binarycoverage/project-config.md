@@ -1,0 +1,114 @@
+---
+trigger: always_on
+description: This file provides guidance to coding agents when working with code in this repository.
+---
+
+# AGENTS.md
+
+This file provides guidance to coding agents when working with code in this repository.
+
+## What This Is
+
+**funkoverage** — function-level code coverage via native eBPF (uprobe_multi). No source code needed, no recompilation. Installs a self-contained Go ELF shim in place of the original binary; at runtime, the shim attaches uprobes via `cilium/ebpf` to every enumerated function and emits a CALLED log used to build HTML/XML/text coverage reports.
+
+For full architecture details, see [docs/design.md](docs/design.md).
+
+## Build
+
+```bash
+./build.sh          # produces: funkoverage, funkoverage-shim
+```
+
+Incremental:
+```bash
+go build -o funkoverage ./cmd/
+go build -o funkoverage-shim ./cmd/shim_binary/
+cd tests/sample && make    # compile 100-function C++ test binary
+```
+
+The repo ships pre-generated BPF bindings for x86_64 and ARM64 (`cmd/shim_binary/tracer_{x86,arm64}_bpfel.{go,o}`); a normal build needs only Go ≥1.27. Build tags ensure the correct variant is compiled for each architecture. To regenerate after editing `cmd/shim_binary/bpf/tracer.bpf.c`:
+
+```bash
+REGEN_BPF=1 ./build.sh    # needs clang, llvm-strip, bpftool, libbpf-devel
+```
+
+## Tests
+
+```bash
+./run_unit_tests.sh                            # Go unit tests
+
+# Single Go test
+go test -v -run TestIsELF ./cmd/
+
+# E2E (requires root or a shim binary with CAP_BPF)
+sudo python3 tests/e2e/test_coverage.py
+
+# E2E with system binary tests
+sudo FUNKOVERAGE_SYSTEM_TEST=1 python3 tests/e2e/test_coverage.py
+
+# E2E system binary tests (run as root on openSUSE, standalone)
+sudo bash tests/e2e/test_bzip2.sh
+sudo bash tests/e2e/test_squid.sh
+sudo bash tests/e2e/test_openssl.sh
+```
+
+## Architecture
+
+Two binaries work together:
+
+**1. `funkoverage` CLI (`./cmd/`)**
+Commands: `setup`, `install`, `uninstall`, `trace`, `enumerate`, `report`, `version`.
+All commands that enumerate functions (`install`, `trace`, `enumerate`) accept `--include RE` and `--exclude RE` to filter functions by demangled name regex.
+- `setup`: validates the eBPF environment (kernel ≥6.6, BTF available, log/bin dirs writable). Capabilities are applied per-shim at install time, NOT here.
+- `install <binary>`: moves real binary to `$SAFE_BIN_DIR/<basename>`, enumerates functions → `_functions.log` and `<basename>.funcs.json` sidecar, copies shim to original path, runs `setcap cap_bpf,cap_perfmon,cap_dac_read_search+ep` on the copy.
+- `uninstall <binary>`: reverses install (removes sidecars, restores original).
+- `enumerate <binary>`: lists discovered functions to stdout (debug aid).
+- `report <logdir> <outdir>`: reads `_functions.log` + `_called.log` files, writes coverage reports.
+
+**2. `funkoverage-shim` (`./cmd/shim_binary/`)**
+Installed transparently in place of the real binary. When invoked:
+1. Detects recursion via a per-binary `FUNKOVERAGE_ACTIVE_<NAME>` env var (if set, exec real binary directly — already covered by an existing tracer).
+2. Forks a background helper process, then blocks on a pipe waiting for it to signal "attached".
+3. The helper loads the embedded BPF program (`tracer_x86_bpfel.go`), reads `<safePath>.funcs.json`, attaches all uprobes against the main image + libraries via `link.UprobeMulti` (single syscall per image), seeds the watched-pid set with the *original* process's TGID (fork tracepoint propagates to children), starts the ringbuf reader goroutine, then signals ready.
+4. The original process `syscall.Exec()`s the real binary **in itself** — same pid throughout, so supervisors that check process identity (systemd's `LISTEN_PID`/`NotifyAccess=main`, pg_ctl's `postmaster.pid`) see the real daemon exactly where they expect it (issue #152).
+5. Ringbuf reader goroutine (in the helper) drains kernel events → demangle → `_called.log`.
+6. When the traced process exits, the helper (notified via `PR_SET_PDEATHSIG` — since it can't `waitpid()` its own parent — backed up by a 5s `kill(pid, 0)` liveness poll, since PDEATHSIG is scoped to a specific OS thread and can miss) detaches links, flushes, and closes the log.
+
+See docs/design.md's "Process identity, signal handling, and sd_notify" section for why this replaced an earlier fork-a-child-and-relay design.
+
+**Test binary**: `tests/sample/` — 100 C++ functions in 4 groups (`str_*`, `math_*`, `arr_*`, `util_*`). CLI: `--strings`, `--math`, `--arrays`, `--utils`, `--all`.
+
+### Data Flow
+
+```
+install:  ELF binary → SAFE_BIN_DIR/<name>  +  shim copied to original path
+                     → SAFE_BIN_DIR/<name>.funcs.json  (per-image symbol list, runtime input)
+                     → SAFE_BIN_DIR/<name>.libs.json   (library paths, runtime input)
+                     → LOG_DIR/<name>_*_functions.log  (textual enumeration, report input)
+run:      shim → uprobe_multi (kernel) → ringbuf → LOG_DIR/<name>_*_called.log
+report:   _functions.log + _called.log → coverage → HTML/XML/text
+```
+
+### Log Formats
+
+`_functions.log` (written at install time, used by report):
+```
+FUNC /path/to/image funcname
+```
+
+`_called.log` (written by shim at runtime, demangled, used by report):
+```
+CALLED /path/to/image funcname
+```
+
+### Key Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LOG_DIR` | `/var/coverage/data` | Where runtime logs are written |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ilmanzo/BinaryCoverage](https://github.com/ilmanzo/BinaryCoverage) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-17 -->
