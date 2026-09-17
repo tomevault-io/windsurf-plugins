@@ -7,11 +7,11 @@ PortalForge is a 3D level editor and reverse-engineering toolkit for Skylanders 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [DEX-zha/PortalForge](https://github.com/DEX-zha/PortalForge).
+Original source: `CLAUDE.md` in [DEX-zha/PortalForge](https://github.com/DEX-zha/PortalForge).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
