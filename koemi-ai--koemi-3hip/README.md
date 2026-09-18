@@ -7,11 +7,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Koemi-AI/Koemi-3HIP](https://github.com/Koemi-AI/Koemi-3HIP).
+Original source: `AGENTS.md` in [Koemi-AI/Koemi-3HIP](https://github.com/Koemi-AI/Koemi-3HIP).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
