@@ -7,11 +7,11 @@ Espejo de github.com/cjpais/hf-hub, rama cancellable-downloads, fijado para Spec
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [OctavioCriollo/hf-hub](https://github.com/OctavioCriollo/hf-hub).
+Original source: `AGENTS.md` in [OctavioCriollo/hf-hub](https://github.com/OctavioCriollo/hf-hub).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
