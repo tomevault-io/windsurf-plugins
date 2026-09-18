@@ -1,271 +1,63 @@
 ---
 trigger: always_on
-description: Hermes Desktop domain rules for Cursor. Defines product boundaries, domain vocabulary, module ownership, profile runtime rules, Web Operator rules, Windows deployment rules, and implementation guardrails.
+description: 代码计划或功能实现完成后，同步更新 AGENTS.md 与 docs/ 文档（含 docs/renderer/）
 ---
 
 
-# 005 - Hermes Desktop Domain Rules
+# Post-Implementation Docs Sync
 
-## 1. Product Identity
+当**代码计划全部阶段完成**、**功能实现收尾**、或用户明确要求更新文档时：
 
-This project is Hermes Desktop / Portal Desktop.
+1. **立即加载并执行** skill：`.agents/skills/sync-project-docs/SKILL.md`
+2. 基于 `git diff` / 本次变更文件，按 skill 内 [doc-map.md](.agents/skills/sync-project-docs/doc-map.md) 与 [doc-tree.md](.agents/skills/sync-project-docs/doc-tree.md) **增量**更新相关段落
 
-It is an Electron desktop shell for operating, configuring, observing, and extending a local or remote Python-based `hermes-agent`.
+## 必查文档（按变更类型选子集，非每次全改）
 
-It is not the LLM runtime.
-It is not the tool execution engine.
-It is not the memory engine.
-It is not the Hermes Gateway protocol implementation.
+### 核心层
 
-The desktop app owns:
+- `AGENTS.md` — 版本、目录地图、Preload API、路由、**文档体系**、按功能跳转
+- `docs/INDEX.md` — 版本特性、核心目录、**Renderer 文档**链接
+- `docs/READING_GUIDE.md` — 分阶段阅读链、功能域阅读小节
+- `docs/ARCHITECTURE.md` — 进程模型、布局演进、数据流（摘要不重复 IPC 全表）
+- `docs/API_CONTRACTS.md` — IPC 单一事实源（新/改 channel 必改）
 
-- Electron window lifecycle
-- Renderer UI
-- Preload bridge
-- IPC routing
-- Local configuration UX
-- Local filesystem orchestration
-- Local process management
-- Gateway lifecycle control
-- Profile runtime control plane
-- Web Operator desktop bridge
-- Installer / bootstrap / diagnostics UI
-- Windows desktop deployment experience
+### Renderer 层（`src/renderer/**` 或 workspace 路由变更时）
 
-The Python `hermes-agent` owns:
+- `docs/renderer/INDEX.md` — registry 启用状态、顶层结构
+- `docs/renderer/screens/INDEX.md` + `docs/renderer/screens/<Screen>.md` — Screen 详情
+- `docs/renderer/screens/web-operator/*.md` — WebOperator 子域
+- `docs/renderer/workspace/*.md` — registry / secondary-nav / 分发
+- 按需：`APP_STARTUP.md`、`MAIN_LAYOUT.md`、`WORKSPACE_ROUTING.md`、`COMPONENTS.md`、`HOOKS.md`、`PRELOAD_API_USAGE.md`
 
-- LLM inference routing
-- Tool execution
-- Memory retrieval
-- Skill execution
-- Gateway API behavior
-- `/v1/chat/completions`
-- agent-side reasoning and orchestration
+## 执行步骤
 
-Do not move Python backend responsibilities into Electron.
-
----
-
-## 2. Core Process Boundary
-
-The system has four runtime layers:
-
-```text
-Renderer Process
-  React UI only
-  No Node.js access
-  Calls window.hermesAPI only
-
-Preload Bridge
-  Exposes typed hermesAPI
-  Security boundary
-  No business UI
-
-Main Process
-  Node.js privileged layer
-  Owns IPC handlers
-  Owns filesystem/process/SQLite/gateway lifecycle
-
-Python Gateway
-  External process
-  Treated as black box
-  Accessed through local HTTP/SSE or CLI fallback
+```
+git --no-pager diff --stat && git --no-pager diff --name-only
+→ 勾选 skill 内变更分类 checklist
+→ 查 doc-map「变更类型 → 最低更新集」
+→ 增量编辑（禁止凭记忆编造 IPC / 路径 / 版本号）
+→ 自检：路径存在、IPC 与源码一致、AGENTS 与 INDEX 版本对齐
+→ 输出「文档同步摘要」
 ```
 
-Hard rules:
+文档更新是实现的**最后一步**，与 typecheck / test 同级；未完成文档同步不得宣告任务完成。
 
-- Renderer must never import `electron`, `fs`, `path`, `child_process`, `better-sqlite3`, `os`, or Node-only modules.
-- Renderer must never call `ipcRenderer` directly.
-- Renderer must only use `window.hermesAPI`.
-- Preload is the only bridge.
-- Main Process is the only place for filesystem, SQLite, local process, Git, Python, NSIS, PATH, and installer operations.
-- Python Gateway must be treated as an external service, not as in-process code.
+## 跳过条件
 
----
+- 仅 typo / 注释 / 格式化，无行为或契约变化
+- 用户明确说「不要改文档」
 
-## 3. Domain Vocabulary
+## 默认不同步（除非用户明确要求）
 
-Use these domain names consistently.
+- `docs/MODULES.md`
+- `docs/code-assets/`、`docs/memory-bank/`、`docs/specs/`、`docs/superpowers/`
+- 大段复制粘贴源码到文档
 
-### App / Shell
+## 禁止
 
-- `Hermes Desktop`
-- `Portal Desktop`
-- `Desktop Shell`
-- `Desktop Runtime`
-- `Desktop Control Plane`
-
-### Backend
-
-- `hermes-agent`
-- `Python Gateway`
-- `Hermes Gateway`
-- `Gateway Runtime`
-
-### Profile
-
-- `default profile`
-- `specialist profile`
-- `profile runtime`
-- `profile home`
-- `profile workspace`
-- `profile gateway`
-- `profile runtime db`
-
-### Workspace
-
-- `Portal Home`
-- `Profile Workspace`
-- `Runtime Center`
-- `Web Operator`
-- `Observability`
-- `Local Install`
-- `Settings`
-
-### Automation
-
-- `Desktop Tool Bridge`
-- `BrowserController`
-- `WebContentsView`
-- `Browser IPC`
-- `Web Operator Action`
-- `Sensitive Action Confirmation`
-- `DOM Snapshot`
-- `Screenshot History`
-
-### Windows Deployment
-
-- `NSIS assisted installer`
-- `Install Directory`
-- `Runtime Root`
-- `User PATH`
-- `System PATH`
-- `Bootstrap`
-- `Local Doctor`
-- `Install Log`
-
-Do not invent alternative domain names unless explicitly requested.
-
----
-
-## 4. Module Ownership
-
-Respect the existing module responsibilities.
-
-### `src/main/index.ts`
-
-Single IPC registration hub.
-
-Add new IPC handlers here only after implementing the domain logic in a separate `src/main/*.ts` module.
-
-Pattern:
-
-```ts
-ipcMain.handle("domain:action", async (_, input) => {
-  return domainAction(input);
-});
-```
-
-Do not place large business logic directly inside `setupIPC()`.
-
----
-
-### `src/preload/index.ts`
-
-Authoritative renderer API surface.
-
-Every Renderer capability must be declared here first.
-
-Pattern:
-
-```ts
-const hermesAPI = {
-  getRuntimeStatus: () =>
-    ipcRenderer.invoke("runtime:get-status"),
-};
-```
-
-Every long-lived event listener must return an unsubscribe function.
-
-Pattern:
-
-```ts
-onInstallProgress: (callback) => {
-  const listener = (_event, payload) => callback(payload);
-  ipcRenderer.on("install-progress", listener);
-  return () => ipcRenderer.removeListener("install-progress", listener);
-};
-```
-
----
-
-### `src/preload/index.d.ts`
-
-Runtime contract for the Renderer.
-
-Every new `window.hermesAPI` method must have a matching TypeScript declaration.
-
-Do not use `any`.
-Use shared types from `src/shared/**`.
-
----
-
-### `src/main/hermes.ts`
-
-Gateway lifecycle module.
-
-Allowed responsibilities:
-
-- `startGateway`
-- `stopGateway`
-- `restartGateway`
-- gateway health polling
-- send message to Gateway
-- SSE stream handling
-- CLI fallback
-- Gateway config injection before start
-
-Do not put UI state here.
-Do not put Renderer concerns here.
-Do not modify profile runtime DB here unless explicitly part of gateway lifecycle.
-
----
-
-### `src/main/installer.ts`
-
-One-time installation and local environment bootstrap.
-
-Allowed responsibilities:
-
-- detect install status
-- create Python venv
-- install dependencies
-- run doctor
-- run update
-- read installer logs
-- manage bootstrap progress
-- import/export backup
-
-Do not put profile runtime governance here unless it belongs to initial bootstrap.
-
----
-
-### `src/main/config.ts`
-
-Profile-aware `.env` and `config.yaml` management.
-
-Allowed responsibilities:
-
-- model config
-- provider config
-- API key references
-- local / remote mode
-- platform toggles
-- toolset toggles
-- config cache
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- 凭记忆编造 IPC channel、文件路径或版本号
+- 把 Renderer Screen 细节全部灌进 ARCHITECTURE（应写 `docs/renderer/`）
+- 因文档同步而改业务代码
 
 ---
 > Source: [loudon84/ai-os-desktop](https://github.com/loudon84/ai-os-desktop) — distributed by [TomeVault](https://tomevault.io).
