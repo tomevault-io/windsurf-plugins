@@ -7,11 +7,11 @@ Virtualized, sectioned and native reorder and drag-and-drop library for React Na
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [thiagobrez/react-native-reorderable](https://github.com/thiagobrez/react-native-reorderable).
+Original source: `AGENTS.md` in [thiagobrez/react-native-reorderable](https://github.com/thiagobrez/react-native-reorderable).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
