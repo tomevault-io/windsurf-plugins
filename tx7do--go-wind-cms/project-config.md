@@ -1,165 +1,149 @@
 ---
 trigger: always_on
-description: 基于 Vue 3 + Vite + TypeScript 的中后台管理系统脚手架（Vben Admin 配置型框架），面向二开场景。
+description: > 本文件是 `frontend/app/flutter_app` 子项目的 AI 编码规范单一事实源，适用于所有支持 AGENTS.md 的 AI 编码工具。Claude Code 通过同级 `CLAUDE.md` 中的 `@AGENTS.md` 引用加载。
 ---
 
-# CLAUDE.md — 脚手架项目二次开发指南
+# AGENTS.md — Flutter 全平台前端开发指南
+
+> 本文件是 `frontend/app/flutter_app` 子项目的 AI 编码规范单一事实源，适用于所有支持 AGENTS.md 的 AI 编码工具。Claude Code 通过同级 `CLAUDE.md` 中的 `@AGENTS.md` 引用加载。
 
 ## 项目概览
 
-基于 Vue 3 + Vite + TypeScript 的中后台管理系统脚手架（Vben Admin 配置型框架），面向二开场景。
+基于 **Flutter** 的全平台 CMS 内容展示前端，一套 Dart 代码编译为 iOS / Android / Web / macOS / Windows / Linux。
 
-**核心技术栈**: Vue 3.5, Ant Design Vue 4.2, Tailwind CSS, Shadcn-ui, Pinia, Vue Router, Vue Query, VxeTable, i18n, Axios
+**核心技术栈**：Flutter 3.x (Dart 3.12+) + flutter_bloc/Cubit（状态管理）+ GoRouter（路由）+ GetIt（IoC）+ Dio + Retrofit（HTTP）+ swagger_parser（API 生成）+ cached_query（缓存）+ flutter_screenutil（响应式）+ flutter_intl（i18n）+ flutter_widget_from_html/flutter_markdown（内容渲染）+ Material 3
 
-**应用入口**: `apps/admin/src/`
+**代码生成工具链**：swagger_parser（API 模型）+ intl_utils（i18n）+ build_runner + freezed + json_serializable + retrofit_generator
 
-## Vben 框架核心机制
+## 关键架构认知
 
-本项目基于 Vben Admin **配置型框架**，通过配置而非编码来完成大部分开发工作。
-
-### 组件注册机制（不要绕过）
-
-框架有 **两套组件注册体系**：
-
-**1. VbenForm 组件（schema 中使用）** — 定义在 `adapter/component/index.ts`，通过 `globalShareState.setComponents()` 注册。`schema` 的 `component` 字段 **只能使用这些注册过的名称**：
+### Feature-First 模块化架构
 
 ```
-Input, InputNumber, InputPassword, Select, ApiSelect, TreeSelect,
-ApiTreeSelect, RadioGroup, Checkbox, CheckboxGroup, Switch, DatePicker,
-RangePicker, TimePicker, Textarea, Upload, Editor, IconPicker, AutoComplete,
-Mentions, Rate, Divider, Space, DefaultButton, PrimaryButton, ApiTree
+lib/
+├── main.dart                    # 入口（init + MultiBlocProvider）
+├── src/
+│   ├── app.dart                 # CMSApp（ScreenUtilInit + MaterialApp.router）
+│   ├── init.dart                # 应用初始化（环境变量、传输层、仓库）
+│   ├── app_router/              # GoRouter 路由配置 + 路由名称常量
+│   ├── core/                    # 核心基础设施
+│   │   ├── config/              #   environments.dart（环境变量）
+│   │   ├── constants/           #   breakpoints / router_paths
+│   │   ├── preference/          #   UserPreferenceCache（SharedPreferences）
+│   │   ├── repositories/        #   user_auth_cache（登录态 + Token）
+│   │   ├── services/            #   base_service（统一错误处理）+ pagination_query
+│   │   ├── themes/              #   cubit/（AppThemeCubit）+ light/dark_theme
+│   │   ├── transport/http/      #   Dio + 拦截器 + status
+│   │   ├── utils/               #   responsive_utils（响应式）
+│   │   └── widgets/             #   responsive_layout / web_shell_layout / 底部导航栏
+│   └── features/                # ★ Feature-First 业务模块
+│       ├── auth/                #   pages/ + services/
+│       └── cms/
+│           ├── pages/           #   home/explore/post_detail/post_list/category_list/tag_feed/search/profile/bookmarks/settings/...
+│           ├── services/        #   post/category/tag/comment/navigation_service
+│           └── widgets/         #   post_card/featured_carousel/content_viewer/tag_chip
+├── generated/                   # [自动生成] l10n.dart + api/ + intl/
+└── l10n/                        # i18n ARB 文件（intl_zh_CN.arb / intl_en_US.arb）
 ```
 
-**2. Template 全局组件（template 中使用）** — 定义在 `registerGlobComp.ts`，通过 `app.use()` 全局注册。在 template 中 **直接用 `a-*` 前缀**：
+### 响应式布局（三级断点）
+
+| 设备 | 屏宽 | 布局策略 |
+|------|------|----------|
+| 手机 Mobile | < 600 dp | 纵向单栏瀑布流 + 底部导航栏 |
+| 平板 Tablet | 600~1024 dp | 双栏布局 |
+| 网页 Web | > 1024 dp | 三栏/居中 + 持久化顶部导航栏 |
+
+```dart
+ResponsiveLayout(
+  mobileBody: _buildMobileView(),
+  webBody: _buildWebView(),
+)
+ResponsiveUtils.isMobile(context)        // 判断设备
+ResponsiveUtils.postGridColumns(ctx)     // 网格列数（1/2/3）
+```
+
+**Web 端 ShellRoute 持久化导航**：Web 端通过 `ShellRoute` + `WebShellLayout` 实现贯穿所有页面的顶部导航栏。
+
+### 三层 API 架构
 
 ```
-<a-button>, <a-tag>, <a-popconfirm>, <a-input>, <a-select>,
-<a-tree>, <a-table>, <a-dropdown>, <a-menu>, <a-card>, <a-space>,
-<a-switch>, <a-tabs>, <a-divider>, <a-layout>
+lib/generated/api/               # [自动生成] swagger_parser 产出（RestClient + 各 ServiceClient + models）
+lib/src/features/cms/services/   # [服务封装] 继承 BaseService，封装业务 + Query/Mutation
 ```
 
-> **禁止**: `import { Tag, Button } from 'ant-design-vue'` 然后在 template 中用 `<Tag>` 或 `<Button>`。
+```dart
+class PostService extends BaseService {
+  PostServiceClient get _api => GetIt.instance<RestClient>().postService;
 
-### 配置驱动模式（不要自己写逻辑）
+  Future<dynamic> list([PaginationQuery? query]) async {
+    try {
+      return await _api.postServiceList(page: q.page, pageSize: q.pageSize, query: q.queryString);
+    } on DioException catch (e) {
+      return handleDioError(e);  // 统一错误转换
+    }
+  }
 
-| 场景 | 配置方式 | 不要做 |
-|---|---|---|
-| 表格列日期格式化 | `formatter: 'formatDateTime'` | Slot 中用 dayjs 格式化 |
-| 表单必填校验 | `rules: 'required'` / `'selectRequired'` | 用 Zod 或自定义校验函数 |
-| 列表数据加载 | `proxyConfig.ajax.query` | 手动 watch + ref + async function |
-| 分页 | `pagerConfig: {}` | 手动管理分页状态 |
-| 表格刷新 | `gridApi.reload()` | 手动重新请求数据 |
-| 表单赋值/取值 | `baseFormApi.setValues()` / `baseFormApi.getValues()` | 直接操作 DOM 或 ref |
-| 表单校验 | `baseFormApi.validate()` | 手动检查每个字段 |
+  Query<ListPostResponse> listQuery([PaginationQuery? query]) { /* 缓存查询 */ }
+  Mutation<Post, Post> createMutation() { /* 写操作 + 自动失效缓存 */ }
+}
+```
 
-## 目录结构
+页面直接实例化 Service 调用，不额外封装 Hook。
+
+### Dio + Retrofit + GetIt（HTTP 通信）
+
+Dio 全局单例（通过 GetIt 注册），拦截器链：Token 注入 → Locale → 日志 / 响应：数据解构 → 401 认证 → 错误消息。`BaseService.handleDioError` 统一把 `DioException` 转 `Status`。
+
+### 状态管理 — BLoC / Cubit
+
+`AppThemeCubit` 管理全局状态（主题模式 / 主题色 / 语言），页面局部状态用 `StatefulWidget` + `setState`。登录状态通过 `UserAuthCache`（GetIt 单例）+ `ValueNotifier` 响应式。
+
+### 主题系统（Material 3 + ColorScheme.fromSeed）
+
+```dart
+ThemeData getLightTheme({Color? seedColor}) {
+  final colorScheme = ColorScheme.fromSeed(seedColor: seedColor ?? kDefaultSeedColor, brightness: Brightness.light);
+  return ThemeData(colorScheme: colorScheme, useMaterial3: true);
+}
+```
+
+支持 `light`/`dark`/`system` 三种模式 + 8 种预设主题色，Cubit 管理状态，SharedPreferences 持久化。
+
+### 国际化（flutter_intl + ARB）
 
 ```
-apps/admin/src/
-├── api/                  # API 层（两层架构）
-│   ├── generated/        # ← protobuf 自动生成，禁止手动编辑
-│   ├── client.ts         # ← ApiClient 单例（ClientTransport 适配器）
-│   └── composables/      # ← Vue Query hooks 层：use*/fetch*/枚举工具
-├── adapter/              # VbenForm + VxeTable 适配器配置
-├── router/routes/modules/# ← 路由模块（按功能拆分）
-├── stores/               # Pinia 状态管理
-├── views/app/            # 业务页面（按功能模块组织）
-├── locales/langs/        # i18n 国际化文件（zh-CN/en-US: enum.json, menu.json, page.json, ui.json）
-└── transport/rest/       # HTTP 传输层（PaginationQuery, requestApi）
+lib/l10n/intl_zh_CN.arb / intl_en_US.arb   # 翻译源
+lib/generated/l10n.dart                     # [生成] S 类
 ```
+
+```dart
+Text(S.of(context).appName)              // 获取翻译
+Text(S.of(context).postsCount(5))        // 带参数
+```
+
+多语言内容获取用 `translation_helpers.dart` 辅助函数（`getPostTitle(post)` 等）。
 
 ## 关键约定（必须遵守）
 
-### 数据层约定
+1. **Service 必须继承 `BaseService`** — 用 `handleDioError` 统一处理 `DioException`
+2. **分页用 `PaginationQuery`** — 不要手动拼接 query 字符串
+3. **禁止手改 `lib/generated/`** — swagger_parser / intl_utils / build_runner 自动生成
+4. **响应式用 `ResponsiveLayout`** — 不要在一个 build 方法混用 mobile/web 视图
+5. **Web 端禁止 `.w`/`.h`/`.sp`** — Web 端 ScreenUtil designSize 设为视窗尺寸（1:1），用固定值；手机端可用
+6. **断点用 `Breakpoints` 常量** — 不要硬编码屏宽数值
+7. **路由用 `context.go()`（顶级切换）/ `context.push()`（子页面）** — 返回用 `AppBackButton`（内置 canPop 检查）
+8. **路由路径集中管理** — `router_paths.dart` + `route_names.dart`
+9. **多语言内容用辅助函数** — `getPostTitle(post)` 等，不直接访问 `translations`
 
-1. **禁止直接引用 `#/api/generated/` 路径** — 业务层通过 `#/api` 统一入口导入
-2. **composables 直接使用 `apiClient`** — 导入 `apiClient` from `#/api/client`，调用 `apiClient.xxxService.Method()`
-3. **组件内用 `use*` hooks，组件外（Store/路由守卫）用 `fetch*` 函数**
-4. **更新操作只传变化字段** — `useUpdate*` 内部自动生成 `updateMask`
-5. **Pinia Store 中不可依赖 `useRouter()`** — Store 初始化时路由可能未就绪
-6. **所有列表查询统一使用 `PaginationQuery`**
+## 代码生成（改后必须重新生成）
 
-### Vben 框架强规约
-
-6. **表单组件必须使用注册名** — `schema` 中 `component` 只能用 `adapter/component/index.ts` 中注册的名称（如 `Input`、`Select`、`ApiSelect`），不要用 `AInput`、`ASelect` 或原生 HTML 标签
-7. **Template 中使用 `a-*` 前缀** — Ant Design Vue 组件已全局注册，直接用 `<a-button>`、`<a-tag>`、`<a-popconfirm>` 等
-8. **图标在 `:icon` prop 中必须用 `h()` 渲染** — `:icon="h(LucideFilePenLine)"`，图标从 `@vben/icons` 导入
-9. **日期列用 `formatter: 'formatDateTime'`** — 不要在 Slot 中用 dayjs 手动格式化
-10. **表单校验用内置规则名** — `rules: 'required'` 或 `rules: 'selectRequired'`，不要用 Zod 表达式
-11. **删除操作必须二次确认** — 使用 `<a-popconfirm>`，不要用 `window.confirm` 或直接删除
-12. **页面必须用 `<Page auto-content-height>` 包裹** — 不要用 `<div>` 替代
-13. **消息提示用 `notification`** — 从 `ant-design-vue` 导入，不要用 `alert()` 或 `ElMessage`
-
-### 通用约定
-
-14. **国际化文本不硬编码** — 使用 `$t()` 引用 locales 文件中的 key
-15. **使用严格相等运算符 `===`** — 禁止使用 `==`
-
-## 导入路径约定
-
-```typescript
-// API 导入 — 统一通过 #/api 入口
-import { useListUsers, PaginationQuery, userStatusToName } from '#/api';
-import { type identityservicev1_User as User } from '#/api';
-
-// 适配器导入
-import { useVbenForm } from '#/adapter/form';
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
-
-// 布局与通用组件
-import { Page, useVbenDrawer } from '@vben/common-ui';
-
-// 国际化
-import { $t } from '@vben/locales';
-
-// 图标（lucide）
-import { LucideFilePenLine, LucideTrash2 } from '@vben/icons';
-
-// 消息提示
-import { notification } from 'ant-design-vue';
-```
-
-## 新建业务模块 Checklist
-
-```
-- [ ] Step 1: 确认 generated 层已有类型（protobuf 已生成）
-- [ ] Step 2: 创建 composables 层（src/api/composables/xxx.ts）
-- [ ] Step 3: 注册导出（composables/index.ts）
-- [ ] Step 4: 添加 i18n 翻译（zh-CN + en-US 的 enum.json, menu.json, page.json）
-- [ ] Step 5: 创建路由模块（router/routes/modules/app/xxx.ts）
-- [ ] Step 6: 创建视图页面（views/app/xxx/）
-```
-
-## API 两层架构模板
-
-### client.ts — ApiClient 单例
-
-生成的 `ApiClient` 通过 `ClientTransport` 接口发送请求，`client.ts` 将 `requestApi` 适配为 `ClientTransport`：
-
-```typescript
-import { type ClientTransport, createApiClient } from '#/api/generated/admin/service/v1';
-import { requestApi } from '#/transport/rest';
-
-const transport: ClientTransport = {
-  unary(path, method, body, _meta) { return requestApi({ body, method, path }); },
-  serverStream(path, _meta) { throw new Error(`serverStream not supported: ${path}`); },
-  duplexStream(path, _meta) { throw new Error(`duplexStream not supported: ${path}`); },
-};
-export const apiClient = createApiClient(transport);
-```
-
-ApiClient 提供的 Service Client：`apiClient.userService`、`apiClient.roleService`、`apiClient.authenticationService` 等。
-
-### composables 层模板 (src/api/composables/xxx.ts)
-
-```typescript
-import type {
-  xxxservicev1_GetXxxRequest,
-  xxxservicev1_ListXxxResponse,
-  xxxservicev1_Xxx,
+| 修改内容 | 命令 |
+|---|---|
+| OpenAPI 定义 / Freezed 模型 / Retrofit 接口 | `dart run build_runner build --delete-conflicting-outputs` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tx7do/go-wind-cms](https://github.com/tx7do/go-wind-cms) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
