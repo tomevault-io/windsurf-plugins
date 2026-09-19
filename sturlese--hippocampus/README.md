@@ -7,11 +7,11 @@ A deliberately lite personal brain: Obsidian to browse, Claude Code or Codex for
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sturlese/hippocampus](https://github.com/sturlese/hippocampus).
+Original source: `CLAUDE.md` in [sturlese/hippocampus](https://github.com/sturlese/hippocampus).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
