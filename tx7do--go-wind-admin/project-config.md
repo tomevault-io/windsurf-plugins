@@ -1,226 +1,159 @@
 ---
 trigger: always_on
-description: GoWind React Admin 是基于 React 19 的企业级后台管理脚手架。
+description: 本文件定义此项目的编码约定和架构规范，供 AI Agent 在生成和修改代码时遵循。
 ---
 
-# GoWind React Admin 脚手架开发指南
+# AGENTS.md — 脚手架项目二次开发指南 (Vue3 + Vben Admin)
 
-## 项目概述
+本文件定义此项目的编码约定和架构规范，供 AI Agent 在生成和修改代码时遵循。
 
-GoWind React Admin 是基于 React 19 的企业级后台管理脚手架。
+## 项目概览
 
-## 技术栈
+基于 Vue 3 + Vite + TypeScript 的中后台管理系统脚手架（Vben Admin 配置型框架），面向二开场景。**通过配置而非编码来完成大部分开发工作。**
 
-- React 19 + TypeScript 6
-- Ant Design v6 + ProComponents 2
-- Vite 8 (SWC)
-- Zustand 5 + TanStack React Query 5
-- React Router v6
-- i18next + react-i18next
-- Less + UnoCSS
-- Iconify (lucide 图标集)
-- pnpm
+**核心技术栈**: Vue 3.5, Ant Design Vue 4.2, Tailwind CSS, Shadcn-ui, Pinia, Vue Router, Vue Query (TanStack Query), VxeTable, i18n, Axios
+
+**应用入口**: `apps/admin/src/`
+
+## Vben 框架核心机制
+
+### 组件注册机制（不要绕过）
+
+框架有 **两套组件注册体系**：
+
+**1. VbenForm 组件（schema 中使用）** — 定义在 `adapter/component/index.ts`，通过 `globalShareState.setComponents()` 注册。`schema` 的 `component` 字段 **只能使用这些注册过的名称**：
+
+```
+Input, InputNumber, InputPassword, Select, ApiSelect, TreeSelect,
+ApiTreeSelect, RadioGroup, Checkbox, CheckboxGroup, Switch, DatePicker,
+RangePicker, TimePicker, Textarea, Upload, Editor, IconPicker, AutoComplete,
+Mentions, Rate, Divider, Space, DefaultButton, PrimaryButton, ApiTree
+```
+
+**2. Template 全局组件（template 中使用）** — 定义在 `registerGlobComp.ts`，通过 `app.use()` 全局注册。在 template 中 **直接用 `a-*` 前缀**：
+
+```
+<a-button>, <a-tag>, <a-popconfirm>, <a-input>, <a-select>,
+<a-tree>, <a-table>, <a-dropdown>, <a-menu>, <a-card>, <a-space>,
+<a-switch>, <a-tabs>, <a-divider>, <a-layout>
+```
+
+> **禁止**: `import { Tag, Button } from 'ant-design-vue'` 然后在 template 中用 `<Tag>` 或 `<Button>`。
+
+### 配置驱动模式（不要自己写逻辑）
+
+| 场景 | 配置方式 | 不要做 |
+|---|---|---|
+| 表格列日期格式化 | `formatter: 'formatDateTime'` | Slot 中用 dayjs 格式化 |
+| 表单必填校验 | `rules: 'required'` / `'selectRequired'` | 用 Zod 或自定义校验函数 |
+| 列表数据加载 | `proxyConfig.ajax.query` | 手动 watch + ref + async function |
+| 分页 | `pagerConfig: {}` | 手动管理分页状态 |
+| 表格刷新 | `gridApi.reload()` | 手动重新请求数据 |
+| 表单赋值/取值 | `baseFormApi.setValues()` / `baseFormApi.getValues()` | 直接操作 DOM 或 ref |
+| 表单校验 | `baseFormApi.validate()` | 手动检查每个字段 |
 
 ## 目录结构
 
 ```
-src/
-├── api/                    # API 层（两层架构）
-│   ├── generated/          # 自动生成代码（禁止手动修改）
-│   ├── client.ts           # apiClient 单例（懒加载各 Service）
-│   └── hooks/              # Hooks 层 - React Query 集成
-├── core/                   # 核心模块（access/i18n/preferences/router/storage/transport）
-├── hooks/                  # 业务 Hooks
-├── layouts/                # 布局组件
-├── locales/                # 翻译资源（zh-CN/en-US）
-├── pages/                  # 页面（app/ 业务，core/ 系统）
-├── router/                 # 路由配置（config/guards/modules）
-├── stores/                 # Zustand Stores
-├── styles/                 # 全局样式
-└── utils/                  # 工具函数
+apps/admin/src/
+├── api/                  # API 层（两层架构）
+│   ├── generated/        # ← protobuf 自动生成，禁止手动编辑
+│   ├── client.ts         # ← ApiClient 单例（ClientTransport 适配器）
+│   └── composables/      # ← Vue Query hooks 层：use*/fetch*/枚举工具
+├── adapter/              # VbenForm + VxeTable 适配器配置
+├── router/routes/modules/# ← 路由模块（按功能拆分）
+├── stores/               # Pinia 状态管理
+├── views/app/            # 业务页面（按功能模块组织）
+├── locales/langs/        # i18n 国际化文件（zh-CN/en-US: enum.json, menu.json, page.json, ui.json）
+└── transport/rest/       # HTTP 传输层（PaginationQuery, requestApi）
 ```
+
+## 导入路径约定
+
+```typescript
+// API 导入 — 统一通过 #/api 入口
+import { useListUsers, PaginationQuery, userStatusToName } from '#/api';
+import { type identityservicev1_User as User } from '#/api';
+
+// 适配器导入
+import { useVbenForm } from '#/adapter/form';
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
+
+// 布局与通用组件
+import { Page, useVbenDrawer } from '@vben/common-ui';
+
+// 国际化
+import { $t } from '@vben/locales';
+
+// 图标（lucide）
+import { LucideFilePenLine, LucideTrash2 } from '@vben/icons';
+
+// 消息提示
+import { notification } from 'ant-design-vue';
+```
+
+## 关键约定（必须遵守）
+
+### 数据层约定
+
+1. **禁止直接引用 `#/api/generated/` 路径** — 业务层通过 `#/api` 统一入口导入
+2. **composables 直接使用 `apiClient`** — 导入 `apiClient` from `#/api/client`，调用 `apiClient.xxxService.Method()`
+3. **组件内用 `use*` hooks，组件外（Store/路由守卫）用 `fetch*` 函数**
+4. **更新操作只传变化字段** — `useUpdate*` 内部自动生成 `updateMask`
+5. **Pinia Store 中不可依赖 `useRouter()`** — Store 初始化时路由可能未就绪
+6. **所有列表查询统一使用 `PaginationQuery`**
+
+### Vben 框架强规约
+
+7. **表单组件必须使用注册名** — `schema` 中 `component` 只能用 `adapter/component/index.ts` 中注册的名称（如 `Input`、`Select`、`ApiSelect`），不要用 `AInput`、`ASelect` 或原生 HTML 标签
+8. **Template 中使用 `a-*` 前缀** — Ant Design Vue 组件已全局注册，直接用 `<a-button>`、`<a-tag>`、`<a-popconfirm>` 等
+9. **图标在 `:icon` prop 中必须用 `h()` 渲染** — `:icon="h(LucideFilePenLine)"`，图标从 `@vben/icons` 导入
+10. **日期列用 `formatter: 'formatDateTime'`** — 不要在 Slot 中用 dayjs 手动格式化
+11. **表单校验用内置规则名** — `rules: 'required'` 或 `rules: 'selectRequired'`，不要用 Zod 表达式
+12. **删除操作必须二次确认** — 使用 `<a-popconfirm>`，不要用 `window.confirm` 或直接删除
+13. **页面必须用 `<Page auto-content-height>` 包裹** — 不要用 `<div>` 替代
+14. **消息提示用 `notification`** — 从 `ant-design-vue` 导入，不要用 `alert()` 或 `ElMessage`
+15. **国际化文本不硬编码** — 使用 `$t()` 引用 locales 文件中的 key
+16. **使用严格相等运算符 `===`** — 禁止使用 `==`
+
+---
 
 ## API 两层架构
 
 ```
-Generated (自动生成类型和 Service Client) → Hooks (通过 apiClient 直调，React Query 集成)
+generated/  +  client.ts  →  composables/  →  views/stores
+(自动生成)     (ApiClient 单例)   (Vue Query hooks)
 ```
 
-`apiClient`（`src/api/client.ts`）是单例，以懒加载 getter 聚合所有 Service Client。Hooks 层直接通过 `apiClient.xxxService.Method()` 调用。
+**依赖方向**: `views/stores → composables → apiClient.xxxService → transport.unary → requestApi`
 
-### 使用规则
+### client.ts — ApiClient 单例
 
-| 场景 | 方式 |
-|------|------|
-| React 组件 | `useXxx()` Hook（`api/hooks/`） |
-| Zustand Store / 路由守卫 / 工具函数 | `fetchXxx()` 方法（`api/hooks/`） |
-
-### 命名规范
-
-- Hooks 层：`useListXxx()`, `useGetXxx()` + `fetchListXxx()`, `fetchXxx()`
-
-### Hooks 层模板
+生成的 `ApiClient` 通过 `ClientTransport` 接口发送请求，`client.ts` 将 `requestApi` 适配为 `ClientTransport`（保留 token 注入、错误拦截、自动刷新等逻辑）：
 
 ```typescript
-import { useMutation, useQuery, type UseMutationOptions, type UseQueryOptions } from '@tanstack/react-query';
-import { apiClient } from '@/api/client';
-import { type PaginationQuery, queryClient } from '@/core';
+import { type ClientTransport, createApiClient } from '#/api/generated/admin/service/v1';
+import { requestApi } from '#/transport/rest';
 
-export function useListXxx(query: PaginationQuery, options?: UseQueryOptions<...>) {
-  return useQuery({
-    queryKey: ['listXxx', query],
-    queryFn: () => apiClient.xxxService.List(query.toRawParams()),
-    ...options,
-  });
-}
-export async function fetchListXxx(params: PaginationQuery) {
-  return queryClient.fetchQuery({
-    queryKey: ['listXxx', params], queryFn: () => apiClient.xxxService.List(params.toRawParams()), retry: 0,
-  });
-}
+const transport: ClientTransport = {
+  unary(path, method, body, _meta) { return requestApi({ body, method, path }); },
+  serverStream(path, _meta) { throw new Error(`serverStream not supported: ${path}`); },
+  duplexStream(path, _meta) { throw new Error(`duplexStream not supported: ${path}`); },
+};
+export const apiClient = createApiClient(transport);
 ```
 
-## 路由系统
+ApiClient 提供的 Service Client：`apiClient.userService`、`apiClient.roleService`、`apiClient.authenticationService`、`apiClient.menuService`、`apiClient.positionService`、`apiClient.orgUnitService` 等（protobuf 重新生成后自动包含新 getter）。
 
-`src/router/modules/*.tsx` 通过 `import.meta.glob` 自动导入。
-
-### 路由配置模板
-
-```tsx
-import type { AppRouteObject } from '@/core/router/types';
-import { createLazyRoute } from '@/core/router';
-
-export const myModuleRoutes: AppRouteObject[] = [
-  {
-    name: 'my-module',
-    path: 'my-module',
-    meta: {
-      title: 'routes:myModule',
-      icon: 'lucide:some-icon',
-      order: 10,
-      authority: ['sys:my_module:view'],
-    },
-    children: [
-      {
-        name: 'my-module-list',
-        path: 'list',
-        element: createLazyRoute(() => import('@/pages/app/my-module')),
-        meta: { title: 'routes:myModuleList' },
-      },
-    ],
-  },
-];
-export default myModuleRoutes;
-```
-
-### Route Meta 关键字段
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `title` | `string` | `'routes:xxx'` 格式的 i18n 翻译键 |
-| `icon` | `string` | Iconify 图标名 |
-| `order` | `number` | 菜单排序 |
-| `authority` | `string[]` | 角色码和权限码混合数组 |
-| `hideInMenu` | `boolean` | 隐藏菜单项 |
-| `hideInTab` | `boolean` | 隐藏标签页 |
-| `keepAlive` | `boolean` | 缓存页面 |
-
-### 权限模式
-
-- `frontend`（默认）：前端路由 + `meta.authority` 过滤
-- `backend`：后端返回菜单 + `pageMap` 动态匹配
-
-## 权限系统
-
-### 数据来源（分离存储）
-
-- 角色码 → `useUserStore.userRoles`
-- 权限码 → `useUserStore.accessCodes`
-- `meta.authority` → 角色码和权限码混合数组
-
-### 三种鉴权方式
-
-```tsx
-// 1. useAccess Hook（推荐）
-const { hasAccessByCodes, hasAccessByRoles } = useAccess();
-{hasAccessByCodes(['sys:user:create']) && <Button>新建</Button>}
-
-// 2. AccessControl 组件
-<AccessControl codes={['sys:user:create']} type="code">
-  <Button>新建</Button>
-</AccessControl>
-
-// 3. 非组件场景
-const { hasAccessByCodes } = getAccessStatic();
-```
-
-- 权限码格式：`模块:资源:操作`（如 `sys:user:create`）
-- 超级管理员角色：`*:*:*`，自动通过所有检查
-
-## 状态管理
-
-| Store | 文件 | 用途 | 持久化 |
-|-------|------|------|--------|
-| `useAuthStore` | `stores/auth.ts` | Token、登录/登出 | token |
-| `useUserStore` | `stores/user.ts` | 用户信息、角色码、权限码 | userInfo |
-| `usePreferencesStore` | `core/preferences/store/` | 偏好设置 | 全部 |
+### composables 层模板 (`src/api/composables/xxx.ts`)
 
 ```typescript
-// React 组件中 — selector 精确订阅
-const token = useAuthStore((s) => s.accessToken);
-
-// 非组件环境
-const token = useAuthStore.getState().accessToken;
-```
-
-## 国际化
-
-### 命名空间
-
-| 类别 | 目录 | 示例 |
-|------|------|------|
-| 核心 | `_core/` | `common`, `auth`, `routes`, `editor` |
-| 业务 | `_modules/` | `user`, `role`, `dashboard` 等 |
-
-### 使用方式
-
-```tsx
-import { useI18n } from '@/core/i18n';
-const { t } = useI18n('user');     // 指定命名空间
-t('username');                      // 查找 user 命名空间
-```
-
-### 新增翻译
-
-在 `src/locales/zh-CN/_modules/` 和 `en-US/_modules/` 创建同名 JSON，自动收集。
-
-### 翻译键规则
-
-- 插值用 `{{var}}`，**不是** `#{var}`
-- 路由标题用 `'routes:xxx'` 格式
-- 硬编码文本必须提取到翻译文件
-
-## 代码风格
-
-- Prettier: 单引号、分号、尾逗号 `all`、行宽 100、2 空格缩进、LF 换行
-- 路径别名: `@/` → `src/`，`#/` → `types/`
-- ESLint: TypeScript 严格模式，React Hooks 规则强制
-- 提交: Conventional Commits
-
-## 关键注意事项
-
-1. **PaginationQuery 必须用 new**: `new PaginationQuery({ page, pageSize })`
-2. **非组件环境禁用 useXxx Hook**: 只能用 `fetchXxx()` 或 `apiClient` 直调
-3. **国际化插值**: `{{var}}` 而非 `#{var}`
-4. **meta.title 格式**: `'routes:xxx'`
-5. **禁止修改 generated 目录**: 由工具自动生成
-6. **DrawerForm 用 formRef**: 没有 `useForm`
-7. **antd v6**: `items` 替代 `TabPane`，Alert 用 `title` 替代 `message`
-8. **ProTable scroll.y**: 初始值必须是像素值（数字）
-9. **角色码和权限码分离**: `userRoles` + `accessCodes`，不混合
+import type {
+  xxxservicev1_GetXxxRequest,
+  xxxservicev1_ListXxxResponse,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tx7do/go-wind-admin](https://github.com/tx7do/go-wind-admin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
