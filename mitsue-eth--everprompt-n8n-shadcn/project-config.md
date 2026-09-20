@@ -1,241 +1,237 @@
 ---
 trigger: always_on
-description: Detailed implementation plan with phases, priorities, and milestones
+description: Incremental development approach with always-working builds and controlled changes
 ---
 
 
-# EverPrompt Implementation Plan
-
-## Strategic Overview
-
-### 1. **Market Positioning**
-
-- **Primary Market**: n8n community (automation developers)
-- **Secondary Market**: AI prompt enthusiasts and content creators
-- **Tertiary Market**: General prompt management users
-
-### 2. **Competitive Advantages**
-
-- **n8n-First Design**: Built specifically for automation workflows
-- **Minimalist UI**: Distraction-free prompt crafting experience
-- **Community-Driven**: Curated content from n8n experts
-- **Extensible Architecture**: Plugin system for future growth
-
-### 3. **Success Metrics**
-
-- **User Growth**: 1,000 users in first 3 months
-- **Community Engagement**: 100+ community prompts in first month
-- **Retention**: 70% monthly retention rate
-- **Revenue**: €1,000 MRR by month 6 (200 paid users at €5/month)
-- **Cost Control**: <€200/month infrastructure costs
-
-## Phase 1: Foundation (Weeks 1-4)
-
-### Week 1: Project Setup & Core Infrastructure
-
-**Goals**: Establish development environment and basic architecture
-
-**Tasks**:
-
-- [ ] Set up Next.js 15 with App Router
-- [ ] Configure TypeScript, ESLint, Prettier
-- [ ] Set up Tailwind CSS 4 with custom theme
-- [ ] Implement basic authentication with Clerk
-- [ ] Set up Neon PostgreSQL database
-- [ ] Configure Prisma ORM with initial schema
-- [ ] Set up Vercel deployment pipeline
-
-**Deliverables**:
-
-- Working development environment
-- Basic authentication flow
-- Database schema implementation
-- CI/CD pipeline
-
-### Week 2: Core UI Components
-
-**Goals**: Build essential UI components for prompt management
-
-**Tasks**:
-
-- [ ] Create PromptEditor component with autosave
-- [ ] Implement ArcLabels navigation component
-- [ ] Build LabelSheet side panel
-- [ ] Add dark/light mode toggle
-- [ ] Implement responsive design
-- [ ] Add keyboard shortcuts
-
-**Deliverables**:
-
-- Functional prompt editor
-- Label navigation system
-- Mode switching capability
-- Mobile-responsive design
-
-### Week 3: Data Layer & API
-
-**Goals**: Implement core data operations and API endpoints
-
-**Tasks**:
-
-- [ ] Create prompt CRUD operations
-- [ ] Implement label management
-- [ ] Build workspace management
-- [ ] Add user authentication middleware
-- [ ] Implement data validation with Zod
-- [ ] Add error handling and logging
-
-**Deliverables**:
-
-- Complete API for prompts and labels
-- Data validation system
-- Error handling framework
-- User management system
-
-### Week 4: Integration & Testing
-
-**Goals**: Integrate all components and ensure stability
-
-**Tasks**:
-
-- [ ] Connect UI to API endpoints
-- [ ] Implement real-time saving
-- [ ] Add comprehensive error handling
-- [ ] Write unit and integration tests
-- [ ] Performance optimization
-- [ ] Accessibility improvements
-
-**Deliverables**:
-
-- Fully functional MVP
-- Test coverage >80%
-- Performance benchmarks
-- Accessibility compliance
-
-## Phase 2: n8n Integration (Weeks 5-8)
-
-### Week 5: n8n API Integration
-
-**Goals**: Connect EverPrompt with n8n workflows
-
-**Tasks**:
-
-- [ ] Research n8n API capabilities
-- [ ] Implement n8n authentication
-- [ ] Build workflow import/export
-- [ ] Create prompt injection system
-- [ ] Add n8n-specific prompt types
-- [ ] Implement variable system
-
-**Deliverables**:
-
-- n8n API client
-- Workflow integration
-- Prompt injection system
-- Variable management
-
-### Week 6: Community Library
-
-**Goals**: Build community-driven prompt sharing
-
-**Tasks**:
-
-- [ ] Create public prompt library
-- [ ] Implement prompt sharing system
-- [ ] Add rating and review system
-- [ ] Build search and filtering
-- [ ] Create prompt categories
-- [ ] Add community guidelines
-
-**Deliverables**:
-
-- Public prompt library
-- Sharing system
-- Community features
-- Search functionality
-
-### Week 7: Template System
-
-**Goals**: Create reusable prompt templates
-
-**Tasks**:
-
-- [ ] Design template structure
-- [ ] Implement template creation
-- [ ] Add template marketplace
-- [ ] Create template categories
-- [ ] Build template versioning
-- [ ] Add template documentation
-
-**Deliverables**:
-
-- Template system
-- Marketplace interface
-- Version control
-- Documentation system
-
-### Week 8: Analytics & Optimization
-
-**Goals**: Add analytics and optimize performance
-
-**Tasks**:
-
-- [ ] Implement usage analytics
-- [ ] Add performance monitoring
-- [ ] Create user dashboards
-- [ ] Optimize database queries
-- [ ] Add caching layer
-- [ ] Implement rate limiting
-
-**Deliverables**:
-
-- Analytics dashboard
-- Performance monitoring
-- Optimized queries
-- Caching system
-
-## Phase 3: Extensibility (Weeks 9-12)
-
-### Week 9: Plugin System
-
-**Goals**: Create extensible plugin architecture
-
-**Tasks**:
-
-- [ ] Design plugin API
-- [ ] Implement plugin registry
-- [ ] Create plugin lifecycle management
-- [ ] Add plugin configuration
-- [ ] Build plugin marketplace
-- [ ] Add plugin documentation
-
-**Deliverables**:
-
-- Plugin system
-- Registry management
-- Configuration system
-- Marketplace
-
-### Week 10: Advanced Features
-
-**Goals**: Add advanced prompt management features
-
-**Tasks**:
-
-- [ ] Implement prompt versioning
-- [ ] Add collaborative editing
-- [ ] Create prompt collections
-- [ ] Build advanced search
-- [ ] Add AI-powered suggestions
-- [ ] Implement prompt optimization
-
-**Deliverables**:
-
-- Version control
-- Collaboration features
-- Collections system
-- AI integration
-
+# Incremental Development Strategy
+
+## Core Development Principles
+
+### 1. **Always-Working Builds**
+
+- `pnpm run dev` must always work
+- Never break the development server
+- Incremental changes only
+- Test each change before proceeding
+
+### 2. **Controlled Development**
+
+- One feature at a time
+- Small, focused commits
+- Easy rollback capability
+- Clear progress tracking
+
+### 3. **Domain Strategy**
+
+- **Primary Domain**: everprompt.ai
+- **Development**: localhost:3000
+- **Staging**: staging.everprompt.ai (future)
+- **Production**: everprompt.ai
+
+## Development Workflow
+
+### **Git Strategy for Solo Developer**
+
+#### **Primary: Main Branch Development**
+
+```bash
+# Work directly on main branch
+git checkout main
+# Make incremental changes
+git add .
+git commit -m "feat: add dark/light mode toggle"
+git push origin main
+```
+
+#### **Rollback Points Strategy**
+
+```bash
+# Create rollback points after each working feature
+git tag v0.1.0-working-basic-layout
+git tag v0.2.0-working-theme-toggle
+git tag v0.3.0-working-prompt-editor
+
+# Rollback if needed
+git checkout v0.2.0-working-theme-toggle
+```
+
+#### **Feature Branches (Only for Major Features)**
+
+```bash
+# Only for complex features or experiments
+git checkout -b feature/prompt-editor
+# Make changes
+git add .
+git commit -m "feat: implement prompt editor"
+git push origin feature/prompt-editor
+# Merge when ready
+git checkout main
+git merge feature/prompt-editor
+git push origin main
+```
+
+#### **When to Use Feature Branches:**
+
+- **Major experiments** (e.g., trying a new UI approach)
+- **Complex features** that might break the app
+- **Integration work** (e.g., adding authentication)
+- **Refactoring** that affects multiple files
+- **When you're unsure** if the approach will work
+
+#### **When to Use Main Branch:**
+
+- **Small, incremental changes**
+- **UI tweaks and improvements**
+- **Bug fixes**
+- **Documentation updates**
+- **Configuration changes**
+- **Most development work**
+
+### **Phase 1: Foundation (Always Working)**
+
+```bash
+# Start with basic Next.js app
+pnpm run dev  # Must work immediately
+
+# Incremental changes:
+1. Basic layout ✅
+2. Dark/light mode toggle ✅
+3. Simple prompt editor ✅
+4. Basic label system ✅
+5. n8n JSON parser ✅
+```
+
+### **Phase 2: Core Features (One at a Time)**
+
+```bash
+# Each step must work before next:
+1. Authentication (Clerk) ✅
+2. Database setup (Neon + Prisma) ✅
+3. Prompt CRUD operations ✅
+4. Label management ✅
+5. Workflow collection system ✅
+```
+
+### **Phase 3: Advanced Features (Controlled)**
+
+```bash
+# Build on working foundation:
+1. Search and filtering ✅
+2. Public sharing ✅
+3. Payment integration (Stripe) ✅
+4. API endpoints ✅
+5. Mobile optimization ✅
+```
+
+## Commit Strategy
+
+### **Commit After Each Working Feature**
+
+```bash
+# Example commit pattern:
+git add .
+git commit -m "feat: add dark/light mode toggle
+
+- Implement theme switcher component
+- Add CSS variables for theme colors
+- Update layout to support theme switching
+- Test: pnpm run dev works ✅"
+```
+
+### **Major Milestone Commits**
+
+```bash
+# After completing major features:
+git commit -m "feat: complete MVP prompt editor
+
+- Working prompt editor with autosave
+- Dark/light mode toggle
+- Basic label system
+- n8n JSON parser integration
+- Ready for authentication phase
+
+Test: pnpm run dev works ✅
+Next: Add Clerk authentication"
+```
+
+## Development Checklist
+
+### **Before Each Change**
+
+- [ ] `pnpm run dev` works
+- [ ] No TypeScript errors
+- [ ] No console errors
+- [ ] Current feature is complete
+
+### **After Each Change**
+
+- [ ] `pnpm run dev` still works
+- [ ] Feature works as expected
+- [ ] No breaking changes
+- [ ] Commit the change
+
+### **Before Major Commits**
+
+- [ ] All features working
+- [ ] No linting errors
+- [ ] TypeScript compilation successful
+- [ ] Test in browser
+- [ ] Write descriptive commit message
+
+## File Organization
+
+### **Incremental File Structure**
+
+```
+everprompt-n8n/
+├── app/
+│   ├── page.tsx              # Home page (start here)
+│   ├── layout.tsx            # Root layout
+│   └── globals.css           # Global styles
+├── components/
+│   ├── ui/                   # Basic UI components
+│   ├── features/             # Feature components
+│   └── layout/               # Layout components
+├── lib/
+│   ├── utils.ts              # Utility functions
+│   ├── n8n-parser.ts         # n8n JSON parser
+│   └── db.ts                 # Database utilities
+└── .cursor/rules/            # Development rules
+```
+
+### **Component Development Order (shadcn/ui)**
+
+1. **Basic UI Components** (shadcn/ui Button, Input, Card, etc.)
+2. **Layout Components** (Header, Sidebar, etc.)
+3. **Feature Components** (PromptEditor with shadcn/ui Card, ArcLabels, etc.)
+4. **Page Components** (Home, Dashboard, etc.)
+5. **Integration Components** (Auth, Database, etc.)
+
+## Testing Strategy
+
+### **Development Testing**
+
+```bash
+# Always test these before committing:
+pnpm run dev          # Must work
+pnpm run build        # Must build successfully
+pnpm run lint         # Must pass linting
+pnpm run type-check   # Must pass TypeScript checks
+```
+
+### **Feature Testing**
+
+- **Manual testing** in browser
+- **Console error checking**
+- **Responsive design testing**
+- **Cross-browser compatibility**
+
+## Rollback Strategy
+
+### **Git Rollback Points**
+
+```bash
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
