@@ -1,205 +1,226 @@
 ---
 trigger: always_on
-description: Cost control and scaling strategy for EverPrompt
+description: Development workflow, coding standards, and project organization
 ---
 
 
-# Cost Control & Scaling Strategy
+# Development Workflow & Standards
 
-## Core Principles
+## Project Structure
 
-### 1. **Start Small, Scale Smart**
+```
+everprompt-n8n/
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # Auth route group
+│   ├── (dashboard)/              # Dashboard route group
+│   ├── api/                      # API routes
+│   ├── globals.css               # Global styles
+│   ├── layout.tsx                # Root layout
+│   └── page.tsx                  # Home page
+├── components/                   # Reusable components
+│   ├── ui/                       # Base UI components
+│   ├── features/                 # Feature-specific components
+│   └── layout/                   # Layout components
+├── lib/                          # Utility functions
+│   ├── auth.ts                   # Authentication utilities
+│   ├── db.ts                     # Database utilities
+│   ├── utils.ts                  # General utilities
+│   └── validations.ts            # Zod schemas
+├── hooks/                        # Custom React hooks
+├── store/                        # Zustand stores
+├── types/                        # TypeScript type definitions
+├── constants/                    # Application constants
+├── styles/                       # Additional styles
+└── public/                       # Static assets
+```
 
-- Free tier with generous limits
-- Paid tier at €5/month for supporters
-- No LLM usage for core features
-- Database-first approach with minimal external APIs
+## Coding Standards
 
-### 2. **Cost Control from Day 1**
+### 1. **TypeScript Configuration**
 
-- All costs must be predictable and controllable
-- No surprise bills
-- Clear usage limits and alerts
-- Regular cost monitoring
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true
+  }
+}
+```
 
-### 3. **Data Ownership & Backup**
+### 2. **ESLint Configuration**
 
-- Full database backups daily
-- User data export capabilities
-- No vendor lock-in
-- Easy migration options
+```javascript
+// eslint.config.mjs
+export default [
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "react-hooks/exhaustive-deps": "error",
+      "prefer-const": "error",
+      "no-var": "error",
+    },
+  },
+];
+```
 
-## Free Tier Strategy
+### 3. **Prettier Configuration**
 
-### **Free Tier Limits (Generous but Controlled)**
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false
+}
+```
 
-- **Prompts**: 100 prompts per workspace
-- **Labels**: 20 labels per workspace
-- **Workflows**: 10 workflow collections
-- **Storage**: 10MB total (text only)
-- **API Calls**: 1000 per month
-- **Workspaces**: 1 per user
+## Component Standards
 
-### **What's Free**
-
-- Core prompt management
-- n8n workflow JSON parsing (no LLM needed)
-- Basic label system
-- Public prompt sharing
-- Community library access
-- Basic search and filtering
-
-## Paid Tier Strategy (€5/month)
-
-### **Paid Tier Benefits**
-
-- **Unlimited prompts** (10,000+ prompts)
-- **Unlimited labels** (100+ labels)
-- **Unlimited workflows** (100+ collections)
-- **30-day money-back guarantee** (no questions asked)
-- **Advanced features** (versioning, collaboration)
-- **Export capabilities** (JSON, CSV, PDF)
-- **Custom themes** (dark/light mode customization)
-- **API access** (for power users)
-
-### **Value Proposition**
-
-- "Support EverPrompt development"
-- "Unlock unlimited potential"
-- "30-day money-back guarantee"
-- "Help build the n8n community"
-
-### **Solo Developer Messaging**
-
-**Transparent Communication:**
-
-- "Built by a solo developer passionate about n8n automation"
-- "Your support helps fund development and server costs"
-- "We hope for your understanding as we grow together"
-- "Community-driven development with your feedback"
-
-### **Money-Back Guarantee Strategy**
-
-- **30-day money-back guarantee** (no questions asked)
-- **Solo developer project** - hope for understanding
-- **Community support** (Discord/Forum) for all users
-- **Comprehensive documentation** and tutorials
-- **Export capabilities** - users can always take their data
-- **Transparent communication** about project status
-
-## Cost Structure
-
-### **Infrastructure Costs (Monthly)**
-
-- **Vercel Pro**: €20/month (unlimited bandwidth)
-- **Neon Database**: €19/month (1GB storage, 100GB transfer)
-- **Vercel Blob**: €5/month (100GB storage)
-- **Error Tracking**: €0/month (Vercel Analytics + custom logging)
-
-**Free Error Tracking Alternatives:**
-
-- **Vercel Analytics**: Built-in error tracking and performance monitoring
-- **Custom Error Logging**: Simple console.error + database logging
-- **LogRocket Free Tier**: 1,000 sessions/month (if needed later)
-- **Bugsnag Free Tier**: 7,500 errors/month (if needed later)
-- **Total**: ~€44/month
-
-### **Revenue Targets**
-
-- **Break-even**: 9 paid users (€44/month)
-- **Sustainable**: 25 paid users (€125/month)
-- **Growth**: 200+ paid users (€1000+/month)
-
-## No-LLM Architecture
-
-### **JSON Parser (Pure JavaScript)**
+### 1. **Component Structure**
 
 ```typescript
-// No LLM needed - pure regex and parsing
-class N8nWorkflowParser {
-  parseWorkflow(json: string): ParsedWorkflow {
-    // Pure JSON parsing - no AI needed
-    const workflow = JSON.parse(json);
-    return this.validateWorkflow(workflow);
-  }
+// components/features/PromptEditor.tsx
+import React, { useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
-  extractPrompts(workflow: ParsedWorkflow): ExtractedPrompt[] {
-    // Regex-based extraction - no AI needed
-    const prompts: ExtractedPrompt[] = [];
+interface PromptEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSave?: () => void;
+  className?: string;
+}
 
-    workflow.nodes.forEach((node) => {
-      if (this.isAINode(node)) {
-        prompts.push(...this.extractFromNode(node));
+export function PromptEditor({
+  value,
+  onChange,
+  onSave,
+  className,
+}: PromptEditorProps) {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = useCallback(async () => {
+    if (!onSave) return;
+
+    setIsSaving(true);
+    try {
+      await onSave();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [onSave]);
+
+  return (
+    <div className={cn("prompt-editor", className)}>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-full resize-none bg-transparent border-none outline-none"
+        placeholder="Start crafting your prompt..."
+      />
+      {onSave && (
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="save-button"
+        >
+          {isSaving ? "Saving..." : "Save"}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+### 2. **Hook Standards**
+
+```typescript
+// hooks/usePromptEditor.ts
+import { useState, useCallback, useEffect } from "react";
+import { debounce } from "lodash-es";
+
+interface UsePromptEditorOptions {
+  initialValue?: string;
+  onSave?: (value: string) => Promise<void>;
+  debounceMs?: number;
+}
+
+export function usePromptEditor({
+  initialValue = "",
+  onSave,
+  debounceMs = 1000,
+}: UsePromptEditorOptions = {}) {
+  const [value, setValue] = useState(initialValue);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  const debouncedSave = useCallback(
+    debounce(async (newValue: string) => {
+      if (!onSave) return;
+
+      setIsSaving(true);
+      try {
+        await onSave(newValue);
+        setLastSaved(new Date());
+      } catch (error) {
+        console.error("Failed to save prompt:", error);
+      } finally {
+        setIsSaving(false);
       }
-    });
+    }, debounceMs),
+    [onSave, debounceMs]
+  );
 
-    return prompts;
-  }
+  const handleChange = useCallback(
+    (newValue: string) => {
+      setValue(newValue);
+      debouncedSave(newValue);
+    },
+    [debouncedSave]
+  );
+
+  return {
+    value,
+    setValue,
+    handleChange,
+    isSaving,
+    lastSaved,
+  };
 }
 ```
 
-### **Prompt Categorization (Rule-Based)**
+### 3. **API Route Standards**
 
 ```typescript
-// Rule-based categorization - no LLM needed
-class PromptCategorizer {
-  categorizePrompt(prompt: ExtractedPrompt): string[] {
-    const categories: string[] = [];
+// app/api/prompts/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getServerSession } from "next-auth";
+import { db } from "@/lib/db";
 
-    // Node type categorization
-    if (prompt.nodeType.includes("perplexity")) categories.push("search");
-    if (prompt.nodeType.includes("openai")) categories.push("generation");
-    if (prompt.nodeType.includes("chatgpt")) categories.push("conversation");
+const CreatePromptSchema = z.object({
+  title: z.string().min(1).max(255),
+  content: z.string().min(1),
+  labelIds: z.array(z.string().uuid()).optional(),
+  isPublic: z.boolean().optional().default(false),
+});
 
-    // Content-based categorization
-    if (prompt.content.includes("summarize")) categories.push("summarization");
-    if (prompt.content.includes("translate")) categories.push("translation");
-    if (prompt.content.includes("analyze")) categories.push("analysis");
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    return categories;
-  }
-}
-```
+    const body = await request.json();
+    const data = CreatePromptSchema.parse(body);
 
-## Database Strategy
-
-### **PostgreSQL-Only Approach**
-
-- **Primary DB**: Neon PostgreSQL
-- **Full-text search**: PostgreSQL built-in
-- **Caching**: Redis (optional, can start without)
-- **File storage**: Vercel Blob (for future attachments)
-
-### **Backup Strategy**
-
-```sql
--- Daily automated backups
-pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
-
--- Weekly full backups
-pg_dump --format=custom $DATABASE_URL > weekly_backup_$(date +%Y%m%d).dump
-```
-
-### **Data Export**
-
-```typescript
-// User data export
-interface UserDataExport {
-  prompts: Prompt[];
-  labels: Label[];
-  workflows: WorkflowCollection[];
-  settings: UserSettings;
-  exportDate: Date;
-  version: string;
-}
-```
-
-## Scaling Strategy
-
-### **Phase 1: MVP (0-100 users)**
-
-- **Cost**: €70/month
-- **Revenue**: €0-500/month
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
