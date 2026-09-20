@@ -1,208 +1,205 @@
 ---
 trigger: always_on
-description: System architecture and extensibility patterns for EverPrompt
+description: Cost control and scaling strategy for EverPrompt
 ---
 
 
-# EverPrompt Architecture Guidelines
+# Cost Control & Scaling Strategy
 
-## Core Architecture Principles
+## Core Principles
 
-### 1. **Plugin-First Design**
+### 1. **Start Small, Scale Smart**
 
-- Every feature should be implementable as a plugin
-- Core system handles only: prompts, labels, workspaces, users
-- Extensions: tools, categories, attachments, sharing, analytics
-- Plugin registry for community contributions
+- Free tier with generous limits
+- Paid tier at €5/month for supporters
+- No LLM usage for core features
+- Database-first approach with minimal external APIs
 
-### 2. **API-First Development**
+### 2. **Cost Control from Day 1**
 
-- RESTful API with GraphQL for complex queries
-- OpenAPI specification for community integrations
-- Webhook system for real-time updates
-- Rate limiting and usage tracking
+- All costs must be predictable and controllable
+- No surprise bills
+- Clear usage limits and alerts
+- Regular cost monitoring
 
-### 3. **Multi-Tenant by Design**
+### 3. **Data Ownership & Backup**
 
-- Workspace isolation at database level
-- Resource-based access control (RBAC)
-- Tenant-specific customizations
-- Cross-workspace sharing capabilities
+- Full database backups daily
+- User data export capabilities
+- No vendor lock-in
+- Easy migration options
 
-## System Components
+## Free Tier Strategy
 
-### Core Services
+### **Free Tier Limits (Generous but Controlled)**
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Auth Service  │    │  Prompt Service │    │  Label Service  │
-│   (Clerk)       │    │   (Core)        │    │   (Core)        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │  Workspace      │
-                    │  Service        │
-                    │  (Core)         │
-                    └─────────────────┘
-                                 │
-         ┌───────────────────────┼───────────────────────┐
-         │                       │                       │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Plugin         │    │  Sharing        │    │  Analytics      │
-│  Registry       │    │  Service        │    │  Service        │
-│  (Extensible)   │    │  (Extensible)   │    │  (Extensible)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+- **Prompts**: 100 prompts per workspace
+- **Labels**: 20 labels per workspace
+- **Workflows**: 10 workflow collections
+- **Storage**: 10MB total (text only)
+- **API Calls**: 1000 per month
+- **Workspaces**: 1 per user
 
-### Database Architecture
+### **What's Free**
 
-- **Primary DB**: Neon PostgreSQL (multi-tenant)
-- **Cache**: Redis for session management and frequent queries
-- **Search**: PostgreSQL full-text search initially, Elasticsearch later
-- **Files**: Vercel Blob for attachments, S3 for production
+- Core prompt management
+- n8n workflow JSON parsing (no LLM needed)
+- Basic label system
+- Public prompt sharing
+- Community library access
+- Basic search and filtering
 
-## Extensibility Patterns
+## Paid Tier Strategy (€5/month)
 
-### 1. **Plugin System**
+### **Paid Tier Benefits**
+
+- **Unlimited prompts** (10,000+ prompts)
+- **Unlimited labels** (100+ labels)
+- **Unlimited workflows** (100+ collections)
+- **30-day money-back guarantee** (no questions asked)
+- **Advanced features** (versioning, collaboration)
+- **Export capabilities** (JSON, CSV, PDF)
+- **Custom themes** (dark/light mode customization)
+- **API access** (for power users)
+
+### **Value Proposition**
+
+- "Support EverPrompt development"
+- "Unlock unlimited potential"
+- "30-day money-back guarantee"
+- "Help build the n8n community"
+
+### **Solo Developer Messaging**
+
+**Transparent Communication:**
+
+- "Built by a solo developer passionate about n8n automation"
+- "Your support helps fund development and server costs"
+- "We hope for your understanding as we grow together"
+- "Community-driven development with your feedback"
+
+### **Money-Back Guarantee Strategy**
+
+- **30-day money-back guarantee** (no questions asked)
+- **Solo developer project** - hope for understanding
+- **Community support** (Discord/Forum) for all users
+- **Comprehensive documentation** and tutorials
+- **Export capabilities** - users can always take their data
+- **Transparent communication** about project status
+
+## Cost Structure
+
+### **Infrastructure Costs (Monthly)**
+
+- **Vercel Pro**: €20/month (unlimited bandwidth)
+- **Neon Database**: €19/month (1GB storage, 100GB transfer)
+- **Vercel Blob**: €5/month (100GB storage)
+- **Error Tracking**: €0/month (Vercel Analytics + custom logging)
+
+**Free Error Tracking Alternatives:**
+
+- **Vercel Analytics**: Built-in error tracking and performance monitoring
+- **Custom Error Logging**: Simple console.error + database logging
+- **LogRocket Free Tier**: 1,000 sessions/month (if needed later)
+- **Bugsnag Free Tier**: 7,500 errors/month (if needed later)
+- **Total**: ~€44/month
+
+### **Revenue Targets**
+
+- **Break-even**: 9 paid users (€44/month)
+- **Sustainable**: 25 paid users (€125/month)
+- **Growth**: 200+ paid users (€1000+/month)
+
+## No-LLM Architecture
+
+### **JSON Parser (Pure JavaScript)**
 
 ```typescript
-interface EverPromptPlugin {
-  id: string;
-  name: string;
+// No LLM needed - pure regex and parsing
+class N8nWorkflowParser {
+  parseWorkflow(json: string): ParsedWorkflow {
+    // Pure JSON parsing - no AI needed
+    const workflow = JSON.parse(json);
+    return this.validateWorkflow(workflow);
+  }
+
+  extractPrompts(workflow: ParsedWorkflow): ExtractedPrompt[] {
+    // Regex-based extraction - no AI needed
+    const prompts: ExtractedPrompt[] = [];
+
+    workflow.nodes.forEach((node) => {
+      if (this.isAINode(node)) {
+        prompts.push(...this.extractFromNode(node));
+      }
+    });
+
+    return prompts;
+  }
+}
+```
+
+### **Prompt Categorization (Rule-Based)**
+
+```typescript
+// Rule-based categorization - no LLM needed
+class PromptCategorizer {
+  categorizePrompt(prompt: ExtractedPrompt): string[] {
+    const categories: string[] = [];
+
+    // Node type categorization
+    if (prompt.nodeType.includes("perplexity")) categories.push("search");
+    if (prompt.nodeType.includes("openai")) categories.push("generation");
+    if (prompt.nodeType.includes("chatgpt")) categories.push("conversation");
+
+    // Content-based categorization
+    if (prompt.content.includes("summarize")) categories.push("summarization");
+    if (prompt.content.includes("translate")) categories.push("translation");
+    if (prompt.content.includes("analyze")) categories.push("analysis");
+
+    return categories;
+  }
+}
+```
+
+## Database Strategy
+
+### **PostgreSQL-Only Approach**
+
+- **Primary DB**: Neon PostgreSQL
+- **Full-text search**: PostgreSQL built-in
+- **Caching**: Redis (optional, can start without)
+- **File storage**: Vercel Blob (for future attachments)
+
+### **Backup Strategy**
+
+```sql
+-- Daily automated backups
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
+
+-- Weekly full backups
+pg_dump --format=custom $DATABASE_URL > weekly_backup_$(date +%Y%m%d).dump
+```
+
+### **Data Export**
+
+```typescript
+// User data export
+interface UserDataExport {
+  prompts: Prompt[];
+  labels: Label[];
+  workflows: WorkflowCollection[];
+  settings: UserSettings;
+  exportDate: Date;
   version: string;
-  hooks: {
-    onPromptCreate?: (prompt: Prompt) => void;
-    onPromptUpdate?: (prompt: Prompt) => void;
-    onLabelCreate?: (label: Label) => void;
-  };
-  components?: {
-    promptEditor?: React.ComponentType;
-    labelRenderer?: React.ComponentType;
-  };
-  api?: {
-    endpoints: ApiEndpoint[];
-  };
 }
 ```
 
-### 2. **Metadata System**
+## Scaling Strategy
 
-- JSONB fields for extensible data
-- Schema validation with Zod
-- Type-safe metadata accessors
-- Migration system for metadata changes
+### **Phase 1: MVP (0-100 users)**
 
-### 3. **Event System**
-
-```typescript
-interface EverPromptEvent {
-  type: "prompt.created" | "prompt.updated" | "label.assigned";
-  workspaceId: string;
-  userId: string;
-  payload: Record<string, any>;
-  timestamp: Date;
-}
-```
-
-## n8n Community Focus
-
-### 1. **n8n-Specific Features**
-
-- **Workflow Integration**: Direct n8n workflow import/export
-- **Node Templates**: Pre-built prompt templates for common n8n nodes
-- **Community Library**: Curated prompts from n8n community
-- **Version Control**: Git-like versioning for prompt evolution
-
-### 2. **Integration Points**
-
-- **n8n API**: Direct integration with n8n instances
-- **Webhook Triggers**: Auto-sync prompts with n8n workflows
-- **Template Marketplace**: Community-driven prompt templates
-- **Usage Analytics**: Track prompt effectiveness in n8n workflows
-
-### 3. **Community Features**
-
-- **Prompt Sharing**: Public/private prompt sharing
-- **Rating System**: Community-driven prompt quality
-- **Comments & Forks**: Collaborative prompt development
-- **Collections**: Curated prompt collections by topic
-
-## Performance Considerations
-
-### 1. **Caching Strategy**
-
-- Redis for frequently accessed data
-- CDN for static assets
-- Database query optimization
-- Client-side caching with SWR
-
-### 2. **Scalability**
-
-- Horizontal scaling with read replicas
-- Microservices architecture
-- Queue system for background jobs
-- Rate limiting and resource quotas
-
-### 3. **Security**
-
-- Row-level security (RLS) in PostgreSQL
-- API authentication with JWT
-- Input validation and sanitization
-- Audit logging for compliance
-
-## Development Phases
-
-### Phase 1: Core MVP (Weeks 1-4)
-
-- Basic prompt CRUD
-- Label system
-- Simple UI with arc navigation
-- Authentication with Clerk
-- Basic sharing
-
-### Phase 2: n8n Integration (Weeks 5-8)
-
-- n8n workflow import/export
-- Community library
-- Template system
-- Basic analytics
-
-### Phase 3: Extensibility (Weeks 9-12)
-
-- Plugin system
-- Advanced sharing
-- Search and discovery
-- Mobile optimization
-
-### Phase 4: Community (Weeks 13-16)
-
-- Public marketplace
-- Collaboration features
-- Advanced analytics
-- Enterprise features
-
-## Technology Decisions
-
-### Frontend
-
-- **Next.js 15** with App Router for SSR/SSG
-- **React 19** with Server Components
-- **Tailwind CSS 4** for styling
-- **Framer Motion** for animations
-- **Zustand** for client state
-
-### Backend
-
-- **Next.js API Routes** for simplicity
-- **Prisma** for database ORM
-- **Zod** for validation
-- **Redis** for caching
-- **Vercel** for deployment
-
-### Database
-
+- **Cost**: €70/month
+- **Revenue**: €0-500/month
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
