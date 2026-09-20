@@ -1,226 +1,303 @@
 ---
 trigger: always_on
-description: Simple, cost-effective implementation approach for EverPrompt
+description: UI implementation strategy and component architecture
 ---
 
 
-# Simple Implementation Guide
+# UI Implementation Strategy
 
-## Core Philosophy
+## Design Philosophy
 
-### 1. **Start Simple, Scale Smart**
+### 1. **Minimalism First**
 
-- No LLM usage for core features
-- Pure JavaScript parsing
-- Minimal external dependencies
-- Predictable costs from day 1
+- **Black Canvas**: Pure black background (#000000) for focus
+- **White Mode**: Clean white background (#FFFFFF) with subtle shadows
+- **Mode Toggle**: Elegant switch between dark/light modes
+- **Distraction-Free**: Only essential UI elements visible
 
-### 2. **n8n Community First**
+### 2. **Crafting-Focused Design**
 
-- JSON workflow parser (no AI needed)
-- Prompt extraction and organization
-- Community sharing and discovery
-- Perfect for YouTube content
+- **Large Text Area**: 80% of screen real estate for prompt editing
+- **Minimal Toolbar**: Only essential actions (Save, Copy, Share)
+- **Contextual UI**: UI appears only when needed
+- **Keyboard Shortcuts**: Power user efficiency
 
-## MVP Features (Weeks 1-4)
+## UI Architecture Decision
 
-### **Core Functionality**
+### **Recommendation: HTML/CSS with React Components**
 
-- [ ] **Prompt Editor**: Large textarea with autosave
-- [ ] **Label System**: Visual arc navigation
-- [ ] **n8n JSON Parser**: Extract prompts from workflows
-- [ ] **Dark/Light Mode**: Simple theme toggle
-- [ ] **Basic Authentication**: Clerk integration
+**Why NOT Canvas/Figma:**
 
-### **No-LLM JSON Parser**
+- **Performance**: HTML/CSS is faster for text editing
+- **Accessibility**: Better screen reader support
+- **SEO**: Searchable content for public prompts
+- **Extensibility**: Easier to add features and plugins
+- **Mobile**: Better responsive behavior
+- **Development Speed**: Faster iteration and debugging
+
+**Why HTML/CSS:**
+
+- **Text Editing**: Superior text input and selection
+- **Copy/Paste**: Native browser functionality
+- **Search**: Built-in find functionality
+- **Accessibility**: Full keyboard navigation
+- **Performance**: Hardware-accelerated rendering
+- **Flexibility**: Easy to extend and customize
+
+## Component Architecture
+
+### 1. **Core Components**
 
 ```typescript
-// Pure JavaScript - no AI costs
-class N8nWorkflowParser {
-  parseWorkflow(json: string): ParsedWorkflow {
-    const workflow = JSON.parse(json);
-    return {
-      name: workflow.name,
-      nodes: workflow.nodes,
-      connections: workflow.connections,
-      metadata: {
-        nodeCount: workflow.nodes.length,
-        connectionCount: Object.keys(workflow.connections).length,
-      },
-    };
-  }
+// Main layout component
+<EverPromptApp>
+  <PromptEditor />
+  <ArcLabels />
+  <LabelSheet />
+  <ModeToggle />
+</EverPromptApp>
 
-  extractPrompts(workflow: ParsedWorkflow): ExtractedPrompt[] {
-    const prompts: ExtractedPrompt[] = [];
+// Prompt editing component
+<PromptEditor>
+  <PromptTextarea />
+  <PromptToolbar />
+  <PromptMetadata />
+</PromptEditor>
 
-    workflow.nodes.forEach((node) => {
-      if (this.isAINode(node)) {
-        const extracted = this.extractFromNode(node);
-        prompts.push(...extracted);
-      }
-    });
+// Label navigation component
+<ArcLabels>
+  <LabelDot />
+  <LabelCaption />
+  <MoreButton />
+</ArcLabels>
 
-    return prompts;
-  }
+// Label management component
+<LabelSheet>
+  <LabelHeader />
+  <PromptList />
+  <SearchBar />
+  <SortControls />
+</LabelSheet>
+```
 
-  private isAINode(node: WorkflowNode): boolean {
-    const aiNodeTypes = [
-      "n8n-nodes-base.perplexity",
-      "@n8n/n8n-nodes-langchain.openAi",
-      "n8n-nodes-base.chatGpt",
-      "n8n-nodes-base.anthropic",
-    ];
-    return aiNodeTypes.includes(node.type);
-  }
+### 2. **State Management**
 
-  private extractFromNode(node: WorkflowNode): ExtractedPrompt[] {
-    const prompts: ExtractedPrompt[] = [];
-    const params = node.parameters;
+```typescript
+interface AppState {
+  // UI State
+  mode: "dark" | "light";
+  currentPrompt: Prompt | null;
+  selectedLabel: string | null;
+  labelSheetOpen: boolean;
 
-    // Extract from messages array
-    if (params.messages?.message) {
-      params.messages.message.forEach((msg: any) => {
-        prompts.push({
-          nodeId: node.id,
-          nodeName: node.name,
-          nodeType: node.type,
-          promptType: msg.role === "system" ? "system" : "user",
-          content: msg.content,
-          variables: this.extractVariables(msg.content),
-          position: node.position,
-        });
-      });
-    }
+  // Data State
+  prompts: Prompt[];
+  labels: Label[];
+  workspace: Workspace;
 
-    // Extract from values array (LangChain format)
-    if (params.messages?.values) {
-      params.messages.values.forEach((msg: any) => {
-        prompts.push({
-          nodeId: node.id,
-          nodeName: node.name,
-          nodeType: node.type,
-          promptType: msg.role === "system" ? "system" : "user",
-          content: msg.content,
-          variables: this.extractVariables(msg.content),
-          position: node.position,
-        });
-      });
-    }
+  // Editor State
+  editorContent: string;
+  isSaving: boolean;
+  lastSaved: Date | null;
+}
 
-    return prompts;
-  }
-
-  private extractVariables(content: string): string[] {
-    const variables: string[] = [];
-
-    // Extract n8n expressions like {{ $json.field }}
-    const expressionRegex = /\{\{\s*\$([^}]+)\s*\}\}/g;
-    let match;
-
-    while ((match = expressionRegex.exec(content)) !== null) {
-      variables.push(match[1].trim());
-    }
-
-    return [...new Set(variables)]; // Remove duplicates
-  }
+// shadcn/ui Integration
+interface ShadcnUIState {
+  theme: "light" | "dark" | "system";
+  components: {
+    button: ButtonVariant;
+    card: CardVariant;
+    input: InputVariant;
+  };
 }
 ```
 
-## Free Tier Strategy
+## Visual Design System
 
-### **Generous Free Limits**
+### 1. **Color Palette**
 
-- **100 prompts** per workspace
-- **20 labels** per workspace
-- **10 workflow collections**
-- **1 workspace** per user
-- **10MB storage** (text only)
+```css
+/* Dark Mode */
+:root {
+  --bg-primary: #000000;
+  --bg-secondary: #111111;
+  --text-primary: #ffffff;
+  --text-secondary: #888888;
+  --accent: #00ff88;
+  --border: #333333;
+}
 
-### **What's Free**
+/* Light Mode */
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --text-primary: #000000;
+  --text-secondary: #666666;
+  --accent: #0066cc;
+  --border: #e1e5e9;
+}
+```
 
-- Core prompt management
-- n8n workflow parsing
-- Basic label system
-- Public prompt sharing
-- Community library access
+### 2. **Typography**
 
-## Paid Tier (€5/month)
+```css
+/* Primary Font */
+.font-primary {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  line-height: 1.6;
+}
 
-### **Unlimited Everything**
+/* Monospace for Code */
+.font-mono {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-weight: 400;
+  line-height: 1.5;
+}
 
-- **Unlimited prompts** (10,000+)
-- **Unlimited labels** (100+)
-- **Unlimited workflows** (100+)
-- **30-day money-back guarantee** (no questions asked)
-- **Export capabilities**
-- **API access**
+/* Sizes */
+.text-xs {
+  font-size: 0.75rem;
+}
+.text-sm {
+  font-size: 0.875rem;
+}
+.text-base {
+  font-size: 1rem;
+}
+.text-lg {
+  font-size: 1.125rem;
+}
+.text-xl {
+  font-size: 1.25rem;
+}
+.text-2xl {
+  font-size: 1.5rem;
+}
+```
 
-### **Value Proposition**
+### 3. **Spacing System**
 
-- "Support EverPrompt development"
-- "Unlock unlimited potential"
-- "Help build the n8n community"
+```css
+/* Consistent spacing scale */
+.space-1 {
+  margin: 0.25rem;
+}
+.space-2 {
+  margin: 0.5rem;
+}
+.space-3 {
+  margin: 0.75rem;
+}
+.space-4 {
+  margin: 1rem;
+}
+.space-6 {
+  margin: 1.5rem;
+}
+.space-8 {
+  margin: 2rem;
+}
+.space-12 {
+  margin: 3rem;
+}
+.space-16 {
+  margin: 4rem;
+}
+```
 
-## Cost Structure
+## Responsive Design
 
-### **Monthly Infrastructure Costs**
+### 1. **Breakpoints**
 
-- **Vercel Pro**: €20 (unlimited bandwidth)
-- **Neon Database**: €19 (1GB storage)
-- **Vercel Blob**: €5 (100GB storage)
-- **Error Tracking**: €0 (Vercel Analytics + custom logging)
-- **Total**: €44/month
+```css
+/* Mobile First Approach */
+@media (min-width: 640px) {
+  /* sm */
+}
+@media (min-width: 768px) {
+  /* md */
+}
+@media (min-width: 1024px) {
+  /* lg */
+}
+@media (min-width: 1280px) {
+  /* xl */
+}
+@media (min-width: 1536px) {
+  /* 2xl */
+}
+```
 
-### **Break-Even Point**
+### 2. **Layout Adaptations**
 
-- **9 paid users** (€44/month)
-- **Target**: 200 paid users (€1,000/month)
+```typescript
+// Mobile: Stack vertically
+<MobileLayout>
+  <PromptEditor />
+  <ArcLabels />
+</MobileLayout>
 
-## Database Schema (Simple)
+// Tablet: Side-by-side with collapsible arc
+<TabletLayout>
+  <PromptEditor />
+  <CollapsibleArcLabels />
+</TabletLayout>
 
-### **Core Tables**
+// Desktop: Full arc with side panel
+<DesktopLayout>
+  <PromptEditor />
+  <ArcLabels />
+  <LabelSheet />
+</DesktopLayout>
+```
 
-```sql
--- Users (Clerk integration)
-CREATE TABLE users (
-  id UUID PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  name TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+## Animation & Interactions
 
--- Workspaces
-CREATE TABLE workspaces (
-  id UUID PRIMARY KEY,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  user_id UUID REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT NOW()
-);
+### 1. **Micro-Interactions**
 
--- Labels
-CREATE TABLE labels (
-  id UUID PRIMARY KEY,
-  name TEXT NOT NULL,
-  color TEXT,
-  workspace_id UUID REFERENCES workspaces(id),
-  created_at TIMESTAMP DEFAULT NOW()
-);
+```css
+/* Smooth transitions */
+.transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
--- Prompts
-CREATE TABLE prompts (
-  id UUID PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  workspace_id UUID REFERENCES workspaces(id),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+/* Hover effects */
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
 
--- Prompt-Label junction
-CREATE TABLE prompt_labels (
-  prompt_id UUID REFERENCES prompts(id),
-  label_id UUID REFERENCES labels(id),
+/* Focus states */
+.focus-ring:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+```
+
+### 2. **Loading States**
+
+```typescript
+// Skeleton loading for prompts
+<PromptSkeleton>
+  <div className="h-4 bg-gray-200 rounded animate-pulse" />
+  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+</PromptSkeleton>
+
+// Saving indicator
+<SavingIndicator>
+  <div className="flex items-center gap-2">
+    <Spinner size="sm" />
+    <span>Saving...</span>
+  </div>
+</SavingIndicator>
+```
+
+## Accessibility
+
+### 1. **Keyboard Navigation**
+
+```typescript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
