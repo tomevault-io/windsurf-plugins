@@ -1,37 +1,18 @@
 ---
 trigger: always_on
-description: n8n community integration and workflow-specific features
+description: n8n workflow JSON parser and prompt extraction strategy
 ---
 
 
-# n8n Community Integration Guidelines
+# n8n Workflow Parser & Prompt Extraction
 
-## n8n Community Focus Strategy
+## Core Concept
 
-### 1. **Target Audience Analysis**
+**Simple User Flow**: User completes n8n workflow → uploads JSON → EverPrompt extracts prompts → creates organized collection
 
-- **Primary**: n8n workflow developers and automation creators
-- **Secondary**: AI automation enthusiasts and content creators
-- **Tertiary**: General prompt management users
+## Workflow Parser Architecture
 
-### 2. **Community Needs Assessment**
-
-- **System Prompts**: Complex, reusable system prompts for LLM nodes
-- **User Prompts**: Dynamic user input prompts for workflows
-- **Template Library**: Pre-built prompt templates for common use cases
-- **Version Control**: Track prompt evolution and effectiveness
-- **Sharing**: Community-driven prompt sharing and collaboration
-
-### 3. **No-LLM Approach**
-
-- **JSON Parser**: Pure JavaScript parsing - no AI costs
-- **Rule-Based Categorization**: Regex and pattern matching
-- **Cost Control**: Predictable, low-cost operation
-- **Fast Processing**: Instant prompt extraction
-
-## n8n-Specific Features
-
-### 1. **Workflow JSON Parser**
+### 1. **JSON Parser Interface**
 
 ```typescript
 interface N8nWorkflowParser {
@@ -49,144 +30,202 @@ interface ParsedWorkflow {
   connections: WorkflowConnection[];
   metadata: WorkflowMetadata;
 }
+
+interface WorkflowNode {
+  id: string;
+  name: string;
+  type: string;
+  position: [number, number];
+  parameters: Record<string, any>;
+  credentials?: Record<string, any>;
+}
 ```
 
-### 2. **Prompt Types for n8n**
-
-- **System Prompts**: Instructions for AI behavior
-- **User Prompts**: Dynamic prompts with variables
-- **Template Prompts**: Reusable prompt structures
-- **Validation Prompts**: Input validation and error handling
-- **Response Prompts**: Output formatting and processing
-
-### 3. **Variable System**
+### 2. **Prompt Extraction Logic**
 
 ```typescript
-interface PromptVariable {
-  name: string;
-  type: "string" | "number" | "boolean" | "array" | "object";
-  required: boolean;
-  defaultValue?: any;
-  description: string;
-  validation?: {
-    min?: number;
-    max?: number;
-    pattern?: string;
-    enum?: string[];
+interface ExtractedPrompt {
+  nodeId: string;
+  nodeName: string;
+  nodeType: string;
+  promptType: "system" | "user" | "template";
+  content: string;
+  variables: string[];
+  position: [number, number];
+  metadata: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    credentials?: string;
   };
 }
+
+class N8nPromptExtractor {
+  extractFromNode(node: WorkflowNode): ExtractedPrompt[] {
+    const prompts: ExtractedPrompt[] = [];
+
+    // Extract from different node types
+    switch (node.type) {
+      case "n8n-nodes-base.perplexity":
+        prompts.push(...this.extractPerplexityPrompts(node));
+        break;
+      case "@n8n/n8n-nodes-langchain.openAi":
+        prompts.push(...this.extractOpenAIPrompts(node));
+        break;
+      case "n8n-nodes-base.chatGpt":
+        prompts.push(...this.extractChatGPTPrompts(node));
+        break;
+      // Add more node types as needed
+    }
+
+    return prompts;
+  }
+}
 ```
 
-## n8n Community Features
+## Supported Node Types
 
-### 1. **Community Library**
-
-- **Curated Collections**: Best prompts for specific n8n use cases
-- **Category System**:
-  - Data Processing
-  - Content Generation
-  - Email Automation
-  - Social Media
-  - E-commerce
-  - Customer Support
-  - Analytics & Reporting
-
-### 2. **Template Marketplace**
-
-- **Free Templates**: Basic prompt templates for common tasks
-- **Premium Templates**: Advanced, tested templates with documentation
-- **Community Submissions**: User-contributed templates with moderation
-- **Expert Collections**: Curated by n8n experts and influencers
-
-### 3. **Integration Features**
-
-- **n8n API Integration**: Direct sync with n8n instances
-- **Webhook Support**: Real-time prompt updates in workflows
-- **Import/Export**: Seamless workflow integration
-- **Version Control**: Track prompt changes and rollback
-
-## n8n-Specific UI Components
-
-### 1. **Workflow Context Panel**
+### 1. **Perplexity Nodes**
 
 ```typescript
-interface WorkflowContextPanel {
+extractPerplexityPrompts(node: WorkflowNode): ExtractedPrompt[] {
+  const prompts: ExtractedPrompt[] = [];
+  const params = node.parameters;
+
+  if (params.messages?.message) {
+    params.messages.message.forEach((msg: any, index: number) => {
+      prompts.push({
+        nodeId: node.id,
+        nodeName: node.name,
+        nodeType: 'perplexity',
+        promptType: msg.role === 'system' ? 'system' : 'user',
+        content: msg.content,
+        variables: this.extractVariables(msg.content),
+        position: node.position,
+        metadata: {
+          model: params.model,
+          temperature: params.temperature,
+          searchRecency: params.options?.searchRecency
+        }
+      });
+    });
+  }
+
+  return prompts;
+}
+```
+
+### 2. **OpenAI/LangChain Nodes**
+
+```typescript
+extractOpenAIPrompts(node: WorkflowNode): ExtractedPrompt[] {
+  const prompts: ExtractedPrompt[] = [];
+  const params = node.parameters;
+
+  if (params.messages?.values) {
+    params.messages.values.forEach((msg: any, index: number) => {
+      prompts.push({
+        nodeId: node.id,
+        nodeName: node.name,
+        nodeType: 'openai',
+        promptType: msg.role === 'system' ? 'system' : 'user',
+        content: msg.content,
+        variables: this.extractVariables(msg.content),
+        position: node.position,
+        metadata: {
+          model: params.modelId?.value,
+          temperature: params.temperature,
+          maxTokens: params.maxTokens
+        }
+      });
+    });
+  }
+
+  return prompts;
+}
+```
+
+### 3. **ChatGPT Nodes**
+
+```typescript
+extractChatGPTPrompts(node: WorkflowNode): ExtractedPrompt[] {
+  const prompts: ExtractedPrompt[] = [];
+  const params = node.parameters;
+
+  if (params.messages?.message) {
+    params.messages.message.forEach((msg: any, index: number) => {
+      prompts.push({
+        nodeId: node.id,
+        nodeName: node.name,
+        nodeType: 'chatgpt',
+        promptType: msg.role === 'system' ? 'system' : 'user',
+        content: msg.content,
+        variables: this.extractVariables(msg.content),
+        position: node.position,
+        metadata: {
+          model: params.model,
+          temperature: params.temperature,
+          maxTokens: params.maxTokens
+        }
+      });
+    });
+  }
+
+  return prompts;
+}
+```
+
+## Variable Extraction
+
+### 1. **n8n Expression Parser**
+
+```typescript
+extractVariables(content: string): string[] {
+  const variables: string[] = [];
+
+  // Extract n8n expressions like {{ $json.field }}
+  const expressionRegex = /\{\{\s*\$([^}]+)\s*\}\}/g;
+  let match;
+
+  while ((match = expressionRegex.exec(content)) !== null) {
+    variables.push(match[1].trim());
+  }
+
+  // Extract function calls like =function()
+  const functionRegex = /=\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+  while ((match = functionRegex.exec(content)) !== null) {
+    variables.push(match[1]);
+  }
+
+  return [...new Set(variables)]; // Remove duplicates
+}
+```
+
+### 2. **Variable Types**
+
+```typescript
+interface N8nVariable {
+  name: string;
+  type: "json" | "function" | "constant";
+  path?: string; // For JSON variables like $json.field
+  functionName?: string; // For function calls
+  description?: string;
+}
+```
+
+## Collection Creation
+
+### 1. **Workflow Collection**
+
+```typescript
+interface WorkflowCollection {
+  id: string;
+  name: string;
+  description: string;
   workflowId: string;
-  nodeId: string;
-  availablePrompts: Prompt[];
-  selectedPrompt: Prompt | null;
-  variables: PromptVariable[];
-  onPromptSelect: (prompt: Prompt) => void;
-  onVariableChange: (variable: PromptVariable, value: any) => void;
-}
-```
-
-### 2. **Prompt Preview with Variables**
-
-- Real-time preview with sample data
-- Variable substitution testing
-- Output format validation
-- Token count estimation
-
-### 3. **n8n Node Integration**
-
-- **LLM Node Integration**: Direct prompt injection
-- **HTTP Request Node**: API prompt templates
-- **Function Node**: Code generation prompts
-- **Switch Node**: Conditional prompt logic
-
-## Community Engagement Strategy
-
-### 1. **Content Strategy**
-
-- **YouTube Integration**: Direct integration with your automation channel
-- **Tutorial Prompts**: Step-by-step automation guides
-- **Best Practices**: Community-driven prompt optimization
-- **Case Studies**: Real-world automation examples
-
-### 2. **Community Features**
-
-- **Prompt Ratings**: Community-driven quality assessment
-- **Comments & Discussions**: Collaborative prompt development
-- **Fork & Merge**: Git-like prompt collaboration
-- **Collections**: User-curated prompt collections
-
-### 3. **Gamification**
-
-- **Contribution Points**: Reward community contributions
-- **Badges**: Recognition for prompt quality and usage
-- **Leaderboards**: Top contributors and most-used prompts
-- **Challenges**: Monthly prompt creation contests
-
-## Technical Integration
-
-### 1. **n8n API Integration**
-
-```typescript
-interface N8nApiClient {
-  getWorkflows(): Promise<Workflow[]>;
-  getWorkflow(id: string): Promise<Workflow>;
-  updateNodePrompt(nodeId: string, prompt: string): Promise<void>;
-  getNodeData(nodeId: string): Promise<NodeData>;
-  executeWorkflow(id: string): Promise<ExecutionResult>;
-}
-```
-
-### 2. **Webhook System**
-
-- **Prompt Update Webhooks**: Notify n8n when prompts change
-- **Workflow Execution Webhooks**: Track prompt usage
-- **Community Update Webhooks**: Notify about new community content
-
-### 3. **Data Synchronization**
-
-- **Bidirectional Sync**: Keep prompts and workflows in sync
-- **Conflict Resolution**: Handle simultaneous updates
-- **Offline Support**: Work with prompts offline, sync when online
-- **Version Management**: Track changes and maintain history
-
-## Community Content Strategy
-
+  workflowName: string;
+  prompts: ExtractedPrompt[];
+  metadata: {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
