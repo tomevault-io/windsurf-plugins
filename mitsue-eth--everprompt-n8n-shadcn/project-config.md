@@ -1,233 +1,99 @@
 ---
 trigger: always_on
-description: n8n workflow JSON parser and prompt extraction strategy
+description: Everprompt is a prompt management and sharing platform designed for AI tool users, particularly content creators. The application allows users to create, organize, and share prompts with flexible storage options and privacy controls. The prompts then can be reused across different platforms and resultss of the usage of the prompts can be also stored in the library and comprared between themselves. Prompts in the beginning include only text, maybe in markdown format, but later may be enlarged to 
 ---
 
 
-# n8n Workflow Parser & Prompt Extraction
+# Everprompt Project Guidelines and Requirements
 
-## Core Concept
+## Project Overview
 
-**Simple User Flow**: User completes n8n workflow → uploads JSON → EverPrompt extracts prompts → creates organized collection
+Everprompt is a prompt management and sharing platform designed for AI tool users, particularly content creators. The application allows users to create, organize, and share prompts with flexible storage options and privacy controls. The prompts then can be reused across different platforms and resultss of the usage of the prompts can be also stored in the library and comprared between themselves. Prompts in the beginning include only text, maybe in markdown format, but later may be enlarged to images attachments, audio attachments, and maybe even video attachments.
 
-## Workflow Parser Architecture
+Full minimalism. I would like the UI to be really minimal with ideally just a black or white screen and user crafting the prompt. Some clever button should be available to switch between the modes. Crafting mode should be the best one.
 
-### 1. **JSON Parser Interface**
+I see users crafting the prompt and story for 5-10 minutes in order to have a good start for the LLM request. Better prepare long and then run fast.
 
-```typescript
-interface N8nWorkflowParser {
-  parseWorkflow(json: string): ParsedWorkflow;
-  extractPrompts(workflow: ParsedWorkflow): ExtractedPrompt[];
-  createCollection(
-    prompts: ExtractedPrompt[],
-    workflowName: string
-  ): PromptCollection;
-}
+I foresee that this service will become popular and I will have more options added to the app, so that I want to design the schema of the database in a way which is easily extendable.
 
-interface ParsedWorkflow {
-  name: string;
-  nodes: WorkflowNode[];
-  connections: WorkflowConnection[];
-  metadata: WorkflowMetadata;
-}
+The starting audience for the prompt will be n8n community. This is a community which creates workflows and automations. Since there is a lot of LLM calls involved now, they need a lot of system prompts or user prompts. I would like Everprompt to be really good fit to this community where users will be able to store the text prompt. At later stage maybe not only text prompts, but first just text.
 
-interface WorkflowNode {
-  id: string;
-  name: string;
-  type: string;
-  position: [number, number];
-  parameters: Record<string, any>;
-  credentials?: Record<string, any>;
-}
-```
+Free version of the app will be powerful. Paid version will just have more storage possible. This is to begin with.
 
-### 2. **Prompt Extraction Logic**
+I will use the app in my youtube videos. I have AI automation channel in youtube where I show how to create n8n workflows. This is a good place not just to promote it, but also to see how it works and how it can be improved.
 
-```typescript
-interface ExtractedPrompt {
-  nodeId: string;
-  nodeName: string;
-  nodeType: string;
-  promptType: "system" | "user" | "template";
-  content: string;
-  variables: string[];
-  position: [number, number];
-  metadata: {
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-    credentials?: string;
-  };
-}
+I foresee that this service will become popular and I will have more options added to the app, so that I want to design the schema of the database in a way which is easily extendable.
 
-class N8nPromptExtractor {
-  extractFromNode(node: WorkflowNode): ExtractedPrompt[] {
-    const prompts: ExtractedPrompt[] = [];
+## Tech Stack
 
-    // Extract from different node types
-    switch (node.type) {
-      case "n8n-nodes-base.perplexity":
-        prompts.push(...this.extractPerplexityPrompts(node));
-        break;
-      case "@n8n/n8n-nodes-langchain.openAi":
-        prompts.push(...this.extractOpenAIPrompts(node));
-        break;
-      case "n8n-nodes-base.chatGpt":
-        prompts.push(...this.extractChatGPTPrompts(node));
-        break;
-      // Add more node types as needed
-    }
+- **Frontend**: Next.js 15+ with App Router, React 19, TypeScript
+- **UI Framework**: shadcn/ui components with Tailwind CSS 4
+- **Authentication**: Clerk
+- **Database**: Neon (PostgreSQL) with Prisma ORM
+- **Deployment**: Vercel
+- **Domain**: everprompt.ai
+- **State Management**: React Server Components + Client Components, Zustand
+- **Styling**: Tailwind 4 CSS with custom themes
+- **Development Tools**: TypeScript, ESLint, Prettier
+- **Validation Library**: Zod
+- **n8n Integration**: n8n API client for workflow integration
+- **Community Features**: Public prompt library with sharing
 
-    return prompts;
-  }
-}
-```
+## Development Approach
 
-## Supported Node Types
+- **Incremental Development**: Always-working builds with `pnpm run dev`
+- **Controlled Changes**: One feature at a time, easy rollback
+- **Commit Strategy**: After each working feature, major milestone commits
+- **Domain Strategy**: everprompt.ai for production, localhost:3000 for development
 
-### 1. **Perplexity Nodes**
+## Key Features
 
-```typescript
-extractPerplexityPrompts(node: WorkflowNode): ExtractedPrompt[] {
-  const prompts: ExtractedPrompt[] = [];
-  const params = node.parameters;
+### Core Functionality
 
-  if (params.messages?.message) {
-    params.messages.message.forEach((msg: any, index: number) => {
-      prompts.push({
-        nodeId: node.id,
-        nodeName: node.name,
-        nodeType: 'perplexity',
-        promptType: msg.role === 'system' ? 'system' : 'user',
-        content: msg.content,
-        variables: this.extractVariables(msg.content),
-        position: node.position,
-        metadata: {
-          model: params.model,
-          temperature: params.temperature,
-          searchRecency: params.options?.searchRecency
-        }
-      });
-    });
-  }
+- **Prompt Management**: Create, edit, version, and organize prompts
+- **Label System**: Flexible categorization with visual arc navigation
+- **Workspace Support**: Multi-tenant architecture for teams
+- **Real-time Sync**: Autosave and collaborative editing
 
-  return prompts;
-}
-```
+### n8n Community Focus
 
-### 2. **OpenAI/LangChain Nodes**
+- **Workflow Integration**: Direct n8n workflow import/export
+- **Template Library**: Curated prompts for automation use cases
+- **Variable System**: Dynamic prompt variables for n8n workflows
+- **Community Sharing**: Public library of community-contributed prompts
 
-```typescript
-extractOpenAIPrompts(node: WorkflowNode): ExtractedPrompt[] {
-  const prompts: ExtractedPrompt[] = [];
-  const params = node.parameters;
+### Extensibility
 
-  if (params.messages?.values) {
-    params.messages.values.forEach((msg: any, index: number) => {
-      prompts.push({
-        nodeId: node.id,
-        nodeName: node.name,
-        nodeType: 'openai',
-        promptType: msg.role === 'system' ? 'system' : 'user',
-        content: msg.content,
-        variables: this.extractVariables(msg.content),
-        position: node.position,
-        metadata: {
-          model: params.modelId?.value,
-          temperature: params.temperature,
-          maxTokens: params.maxTokens
-        }
-      });
-    });
-  }
+- **Plugin System**: Extensible architecture for future features
+- **API-First**: RESTful API with GraphQL for complex queries
+- **Webhook Support**: Real-time updates and integrations
+- **Metadata System**: JSONB fields for extensible data
 
-  return prompts;
-}
-```
+## User Interface
 
-### 3. **ChatGPT Nodes**
+### Design Philosophy
 
-```typescript
-extractChatGPTPrompts(node: WorkflowNode): ExtractedPrompt[] {
-  const prompts: ExtractedPrompt[] = [];
-  const params = node.parameters;
+- **Minimalist**: Black/white canvas with focus on content
+- **Crafting-Focused**: Large text area for prompt development
+- **Contextual UI**: UI appears only when needed
+- **Keyboard Shortcuts**: Power user efficiency
 
-  if (params.messages?.message) {
-    params.messages.message.forEach((msg: any, index: number) => {
-      prompts.push({
-        nodeId: node.id,
-        nodeName: node.name,
-        nodeType: 'chatgpt',
-        promptType: msg.role === 'system' ? 'system' : 'user',
-        content: msg.content,
-        variables: this.extractVariables(msg.content),
-        position: node.position,
-        metadata: {
-          model: params.model,
-          temperature: params.temperature,
-          maxTokens: params.maxTokens
-        }
-      });
-    });
-  }
+### UI Approach: HTML/CSS with React
 
-  return prompts;
-}
-```
+**Why NOT Canvas/Figma:**
 
-## Variable Extraction
+- Better performance for text editing
+- Superior accessibility support
+- Native browser functionality (copy/paste, search)
+- Easier mobile responsiveness
+- Faster development iteration
 
-### 1. **n8n Expression Parser**
+**Why HTML/CSS:**
 
-```typescript
-extractVariables(content: string): string[] {
-  const variables: string[] = [];
-
-  // Extract n8n expressions like {{ $json.field }}
-  const expressionRegex = /\{\{\s*\$([^}]+)\s*\}\}/g;
-  let match;
-
-  while ((match = expressionRegex.exec(content)) !== null) {
-    variables.push(match[1].trim());
-  }
-
-  // Extract function calls like =function()
-  const functionRegex = /=\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
-  while ((match = functionRegex.exec(content)) !== null) {
-    variables.push(match[1]);
-  }
-
-  return [...new Set(variables)]; // Remove duplicates
-}
-```
-
-### 2. **Variable Types**
-
-```typescript
-interface N8nVariable {
-  name: string;
-  type: "json" | "function" | "constant";
-  path?: string; // For JSON variables like $json.field
-  functionName?: string; // For function calls
-  description?: string;
-}
-```
-
-## Collection Creation
-
-### 1. **Workflow Collection**
-
-```typescript
-interface WorkflowCollection {
-  id: string;
-  name: string;
-  description: string;
-  workflowId: string;
-  workflowName: string;
-  prompts: ExtractedPrompt[];
-  metadata: {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Hardware-accelerated rendering
+- Better SEO for public prompts
+- Easier extensibility and customization
+- Superior text input and selection
 
 ---
 > Source: [mitsue-eth/everprompt-n8n-shadcn](https://github.com/mitsue-eth/everprompt-n8n-shadcn) — distributed by [TomeVault](https://tomevault.io).
