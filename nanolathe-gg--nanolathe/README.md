@@ -7,11 +7,11 @@ Total Annihilation engine reimplementation in Go.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [nanolathe-gg/nanolathe](https://github.com/nanolathe-gg/nanolathe).
+Original source: `CLAUDE.md` in [nanolathe-gg/nanolathe](https://github.com/nanolathe-gg/nanolathe).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
