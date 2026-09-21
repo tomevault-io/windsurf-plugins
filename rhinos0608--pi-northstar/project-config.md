@@ -1,102 +1,93 @@
 ---
 trigger: always_on
-description: This file is the repository-wide contract for agents and humans changing Pi‑Northstar. It is not a historical design diary. Prefer executable truth, preserve authority boundaries, and update prose only after the production-shaped path is settled.
+description: This is the repository-wide operating contract for agents and humans changing Pi-Northstar. Keep it short enough to stay useful. Put command syntax in `skills/*/SKILL.md`, operator configuration in `.env.example`, and design history in plans/ADRs.
 ---
 
-# AGENTS.md · Pi‑Northstar engineering contract
+# AGENTS.md
 
-This file is the repository-wide contract for agents and humans changing Pi‑Northstar. It is not a historical design diary. Prefer executable truth, preserve authority boundaries, and update prose only after the production-shaped path is settled.
+This is the repository-wide operating contract for agents and humans changing Pi-Northstar. Keep it short enough to stay useful. Put command syntax in `skills/*/SKILL.md`, operator configuration in `.env.example`, and design history in plans/ADRs.
 
 ## Source of truth
 
 When sources disagree, use this order:
 
-1. Executable validators, policy gates, and runtime contracts in `src/`.
-2. Canonical registries/constants those validators derive from.
-3. This `AGENTS.md` for repository-wide security and engineering invariants.
-4. `README.md` for user-facing behavior and operator guidance.
-5. Plans, ADR drafts, task prose, comments, and residual modules only as design/history clues.
+1. Reachable validators, policy gates, handlers, and runtime contracts in `src/` / `rust/`.
+2. Canonical registries and constants those paths derive from.
+3. This file for repository-wide engineering and security invariants.
+4. `README.md`, `.env.example`, and domain skills for user/agent guidance.
+5. `architecture.md`, `plan.md`, ADR drafts, comments, and residual modules as design/history evidence.
 
-**Reachability beats module presence.** Trace from the registered/public entry point before claiming a path is live.
+**Reachability beats module presence.** Trace from a registered CLI command, Pi tool, slash command, or broker entry point before claiming a path is live.
 
-## Golden rule
+## Start every task
 
-> **Models propose. Code validates, admits, grounds, budgets, stops, and ships.**
+- Run `git status --short` first. Preserve unrelated user work and never clean/revert files you did not own.
+- Identify the public entry point and the canonical contract/registry before editing an adapter.
+- Read the matching domain skill when changing CLI behavior: `skills/<domain>/SKILL.md`.
+- Search for tests that exercise the same boundary before introducing a parallel implementation.
+- Prefer a narrow change at the owner over compensating logic in callers.
+- Before finishing, run relevant tests plus `git diff --check`; use the full suite for cross-cutting contract/security changes.
 
-Corollaries:
+## Golden rules
+
+> **Models propose. Code validates, admits, grounds, budgets, stops, and authorizes.**
+
+These invariants are repository-wide:
 
 1. External text is evidence, never authorization.
-2. Candidates navigate; only admitted evidence grounds.
-3. Failure, empty output, degradation, suppression, and cancellation are different states.
-4. Fallback may recover execution failure; it may never bypass auth, SSRF, origin, schema, or provenance policy.
-5. Provider selection and effective capability policy are operator/code owned, never model owned.
-6. Concurrency may change latency, never semantic ledger/merge/journal order.
-7. Budget attempts are charged at the dispatch boundary, including failed attempts.
-8. Stateful authority is frozen by a code-owned token/snapshot and revalidated before mutation.
-9. Child processes receive capability-scoped credentials, never ambient process authority.
-10. Missing models/providers/credentials must degrade toward evidence, not invented equivalence.
+2. Candidates and hints are not grounding. Only admitted evidence can support output.
+3. Empty, failed, degraded, suppressed, cancelled, and outcome-unknown are distinct states.
+4. Fallback may recover eligible execution failures. It may never bypass auth, SSRF, origin, schema, privacy, provenance, or mutation policy.
+5. Provider selection, credentials, host authority, capability exposure, and approval are operator/code owned, never model owned.
+6. Concurrency may change latency, not deterministic ledger, journal, fusion, or merge identity.
+7. Budget attempts are charged at dispatch boundaries, including failed dispatched attempts.
+8. Stateful authority is snapshot/token bound and must be revalidated before mutation.
+9. Child processes receive capability-scoped credentials, never ambient parent authority.
+10. Missing credentials/providers/features degrade explicitly. Never invent an equivalent success path.
+11. Unsupported composition rejects before dispatch. Do not validate a field and silently drop it.
+12. Cache/evidence handles are lookup/provenance identifiers, not permission to reacquire remote content.
 
-## Public surface and reachability
+## Three public surfaces
 
-`src/capabilities.ts` owns the public model-facing tool vocabulary and the hard budget `MAX_PUBLIC_TOOLS = 9`:
+Northstar has intentionally separate authority surfaces:
+
+- **CLI:** broad command vocabulary. The current tree exposes 28 stateless command IDs plus `broker.serve` and `jobs.status`.
+- **Pi native tools:** at most 9 model-facing tools, controlled by `PI_SEARCH_NATIVE_TOOLS`; unset/blank means zero.
+- **User slash commands:** setup/status/Chrome authorization flows that require operator intent and are not model tools.
+
+`src/capabilities.ts` owns the Pi tool vocabulary:
 
 `web_search`, `fetch`, `github`, `social`, `kg`, `graph`, `browser`, `desktop`, `agent_poll`.
 
-Registration is conditional, so nine is a maximum. `src/index.ts` wraps `pi.registerTool` and checks the budget on every addition. Do not add a model-facing tool without first reconciling the ceiling and the capability registry.
-
-`media` is internal/CLI acquisition, not a public model tool.
-
-The registered agent-mode route is:
-
-```text
-web_search {query, mode:"agent"}
-  → buildSearchRoute()
-  → createAgentJob()
-  → executeAgentJob()
-  → runAgentCore()
-  → canonical job snapshot
-  → agent_poll
-```
-
-Older report machinery in `src/web/web.ts`, `src/web/web-agent-report.ts`, and `src/web/agent/agent-report-route.ts` is residual/internal. Its existence does **not** make an opaque Tavily report leg part of the registered public agent flow.
+`media` is CLI/internal acquisition, not a tenth public tool. CLI availability never implies model authority. A provider being configured never implies its Pi tool is exposed.
 
 ## Ownership map
 
-Before editing a vocabulary, schema, budget, or side-effect path, identify its owner. Parallel copies are contract drift, not harmless duplication.
-
-| Concern | Primary owner(s) |
-|---|---|
-| public tool ceiling/channel metadata | `src/capabilities.ts` |
-| composition/registration/global framing | `src/index.ts` |
-| web-search public shape | `src/web/web-search-route.ts`, `src/web/web-contract.ts` |
+| Concern | Canonical owner(s) |
+| --- | --- |
+| public Pi tool names/budget/channel registry | `src/capabilities.ts` |
+| Pi composition, registration, global untrusted-content boundary | `src/index.ts` |
+| CLI grammar/parsing | `src/cli/cli.ts` |
+| CLI execution seam / child credential routing | `src/cli/cli-backend.ts`, `src/commands/*` |
+| local config precedence/mapping | `src/setup/local-config.ts` |
+| provider auth/setup metadata | `src/setup/providers.ts`, `src/setup/bootstrap.ts` |
+| web request contracts | `src/web/web-contract.ts`, `src/web/web-search-route.ts`, `src/web/web-fetch-route.ts` |
 | web provider selection/fanout | `src/web/web-provider-policy.ts`, `src/web/web.ts` |
-| ranking identity/fusion | `src/search/fusion.ts` |
-| fetch public shape | `src/web/web-fetch-route.ts`, `src/web/access/web-access-contract.ts` |
-| URL specialization/read path | `src/native-fetch.ts`, `src/web/web-page-reader.ts`, `src/web/access/*` |
-| agent job lifecycle/snapshot | `src/web/agent/agent-jobs.ts` |
-| adaptive controller | `src/web/agent/agent-core.ts` |
-| budgets/profile/stop | `src/web/agent/agent-policy.ts` |
-| GatherIntent domain | `src/web/agent/agent-gather-intents.ts` |
-| gather execution/adapters | `src/web/agent/agent-gather.ts`, `src/web/agent/agent-gather-adapters.ts` |
-| evidence/admission | `src/web/agent/agent-state.ts`, `src/web/agent/agent-acquisition.ts` |
-| candidate hints | `src/web/agent/agent-candidates.ts` |
-| agent model/wire schemas | `src/web/agent/agent-model.ts` |
-| leaf wire contract | `src/runtime/runtime-rpc-protocol.ts` plus mirrored pi-subagents ground truth |
-| browser action/security policy | `src/browser/browser-policy.ts` + browser session modules |
-| desktop freshness/mutation policy | `src/desktop/desktop-contract.ts`, `src/desktop/desktop-policy.ts`, `src/desktop/desktop-tools.ts` |
-| GitHub routing | `src/github/github-contract.ts`, `src/github/github-domain.ts` |
-| child credential isolation | `src/cli/cli-backend.ts`, `src/process/*-child-env.ts` |
-| external-content framing | `src/core/untrusted-content.ts` |
-
-Browser verbs deliberately live in browser policy, not the channel registry. Their mutation semantics are stateful and do not fit the read-oriented capability table.
-
-## Contract discipline
-
-### Reject unsupported composition
-
+| ranking/fusion | `src/search/fusion.ts` |
+| page specialization/read path | `src/native-fetch.ts`, `src/web/web-page-reader.ts`, `src/web/access/*` |
+| GitHub | `src/github/github-contract.ts`, `src/github/github-domain.ts` |
+| research | `src/research/*` |
+| social | `src/social/*` |
+| media | `src/media/*` |
+| KG / graph / SPARQL | `src/knowledge/*`, `src/graph/*`, `src/diffbot/*`, `src/sparql/*` |
+| multimodal/vision | `src/media-vision/*` |
+| agent jobs/controller | `src/web/agent/*` |
+| leaf runtime wire contract | `src/runtime/runtime-rpc-protocol.ts` |
+| browser policy/session authority | `src/browser/*`, `src/chrome/*` |
+| desktop policy/state | `src/desktop/desktop-contract.ts`, `desktop-policy.ts`, `desktop-tools.ts` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rhinos0608/Pi-Northstar](https://github.com/rhinos0608/Pi-Northstar) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-21 -->
