@@ -7,11 +7,11 @@ CBT-MAN — Aplikasi Computer-Based Test untuk pendidikan (TanStack Start + Reac
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [mannnrachman/cbt-man](https://github.com/mannnrachman/cbt-man).
+Original source: `AGENTS.md` in [mannnrachman/cbt-man](https://github.com/mannnrachman/cbt-man).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
