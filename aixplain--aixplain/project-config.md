@@ -1,146 +1,176 @@
 ---
 trigger: always_on
-description: Python SDK for building, deploying, and governing AI agents on the aiXplain platform.
+description: Validates conversation history for agent sessions.
 ---
 
-# aiXplain SDK
 
-Python SDK for building, deploying, and governing AI agents on the aiXplain platform.
+Agent module for aiXplain v2 SDK.
 
-- License: Apache 2.0
-- Python: >=3.9, <4
-- Package config: `pyproject.toml` (PEP 621, setuptools backend)
+### ConversationMessage Objects
 
----
-
-## Primary Goal
-
-- Keep the SDK stable for existing users while improving the current `development` branch.
-- Default to the `v2` SDK surface for new work.
-- Preserve backward compatibility for the legacy `v1` surface and legacy import paths.
-
----
-
-## Source of Truth
-
-- Package metadata and dependencies live in `pyproject.toml`.
-- Formatting and docstring rules live in `ruff.toml`.
-- Pre-commit behavior lives in `.pre-commit-config.yaml`.
-- CI behavior lives in `.github/workflows/`.
-- Public package bootstrapping and legacy import compatibility live in `aixplain/__init__.py` and `aixplain/_compat.py`.
-
-If this file conflicts with code, tests, or CI, follow the code and tests and update this file in the same change when appropriate.
-
----
-
-## Setup and Commands
-
-```bash
-# Install (development)
-pip install -e .
-
-# Install (production)
-pip install aixplain
-
-# Install with test dependencies
-pip install -e ".[test]"
+```python
+class ConversationMessage(TypedDict)
 ```
 
-### Environment
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L45)
 
-The SDK supports either `TEAM_API_KEY` or `AIXPLAIN_API_KEY`. New code must not assume only one of those environment variables exists. `BACKEND_URL` defaults to production (`https://platform-api.aixplain.com`).
+Type definition for a conversation message in agent history.
 
-Additional environment variables for execution URLs:
-- `MODELS_RUN_URL`
-- `PIPELINES_RUN_URL`
+**Attributes**:
 
-In `v2`, prefer instance-scoped configuration through `Aixplain(...)` and its context rather than new global state.
+- `role` - The role of the message sender, either &#x27;user&#x27; or &#x27;assistant&#x27;
+- `content` - The text content of the message
+- `attachments` - Optional attachments — hosted-URL/local-path strings or dicts
+  with ``url`` or ``path`` (plus optional type/name/mimeType).
+- `files` - Deprecated. Local file paths to upload — pass through ``attachments``.
 
-### Test
+#### validate\_history
 
-```bash
-# Unit tests
-python -m pytest tests/unit
-
-# Functional / integration tests
-python -m pytest tests/functional
-
-# Unit tests with coverage (same as pre-commit hook)
-coverage run --source=. -m pytest tests/unit
+```python
+def validate_history(history: List[Dict[str, Any]]) -> bool
 ```
 
-### Lint and Format
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L62)
 
-Ruff is the sole linter and formatter.
+Validates conversation history for agent sessions.
 
-```bash
-ruff check .            # Lint
-ruff check --fix .      # Lint with auto-fix
-ruff format .           # Format
+This function ensures that the history is properly formatted for agent conversations,
+with each message containing the required &#x27;role&#x27; and &#x27;content&#x27; fields and proper types.
+
+**Arguments**:
+
+- `history` - List of message dictionaries to validate
+  
+
+**Returns**:
+
+- `bool` - True if validation passes
+  
+
+**Raises**:
+
+- `ValueError` - If validation fails with detailed error messages
+  
+
+**Example**:
+
+  &gt;&gt;&gt; history = [
+  ...     \{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello&quot;},
+  ...     \{&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;Hi there!&quot;}
+  ... ]
+  &gt;&gt;&gt; validate_history(history)  # Returns True
+
+### OutputFormat Objects
+
+```python
+class OutputFormat(str, Enum)
 ```
 
-### Pre-commit
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L120)
 
-```bash
-pre-commit install
+Output format options for agent responses.
+
+### ContextOverflowStrategy Objects
+
+```python
+class ContextOverflowStrategy(str, Enum)
 ```
 
-Hooks run: trailing-whitespace, end-of-file-fixer, check-merge-conflict, check-added-large-files, ruff (lint + format for `aixplain/v2/`), and unit tests with coverage.
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L128)
 
----
+Strategy applied when input messages exceed the model&#x27;s context window.
 
-## Coding Conventions
+**Attributes**:
 
-- **Line length**: 120 characters.
-- **Indentation**: 4 spaces.
-- **Quotes**: Double quotes for strings.
-- **Docstrings**: Google style (enforced by ruff `pydocstyle`). Docstring rules are **not** enforced in `tests/`.
-- **Type hints**: Required on all public functions. Use `typing` (`Optional`, `Union`, `List`, `Dict`, `TypeVar`, generics).
-- **Naming**: `PascalCase` for classes, `snake_case` for functions and methods, `UPPER_SNAKE_CASE` for constants.
-- **Exceptions**: Use the custom hierarchy in `aixplain/exceptions/` (`AixplainBaseException` and subclasses). Never raise bare `Exception`. Preserve useful context in error messages and include status or response details when available.
-- **Imports**: Use `from __future__ import annotations` or `TYPE_CHECKING` guards to break circular imports. Use conditional imports for optional dependencies. Do not add a new dependency unless it is necessary and justified by the repository's existing design.
-- **Validation**: Pydantic for runtime validation. `dataclasses-json` for JSON serialization.
-- **License header**: Include the Apache 2.0 license header at the top of every source file.
+- `TRUNCATE` - Remove the oldest chat-history messages until the context fits.
+- `SUMMARIZE` - Replace the full chat history with an LLM-generated summary.
 
----
+### AgentRunParams Objects
 
-## Architecture
+```python
+class AgentRunParams(BaseRunParams)
+```
 
-### Dual API Surface
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L230)
 
-The SDK exposes two API layers maintained in parallel:
+Parameters for running an agent.
 
-| Aspect | V1 | V2 |
-|---|---|---|
-| Style | Factory pattern with class methods | Resource-based with dataclasses and mixins |
-| Entry point | `aixplain.factories.*Factory` | `aixplain.v2.*` |
-| Serialization | Manual dict handling | `dataclasses-json` (camelCase API to snake_case Python) |
+**Attributes**:
 
-### Package Layout
+- `session` - Conversation thread to run within. A
+  :class:`~aixplain.v2.session.Session` instance or a session id
+  string. Omit for a one-shot, stateless run. Replaces the removed
+  ``via_session`` flag and id-only ``session_id``.
+- `query` - The query to run
+- `variables` - Variables to replace \{\{variable}} placeholders in instructions and description.
+  The backend performs the actual substitution.
+- `tasks` - List of tasks for the agent
+- `prompt` - Custom prompt override
+- `~aixplain.v2.session.Session`0 - Conversation history
+- `~aixplain.v2.session.Session`1 - Execution parameters (maxTokens, etc.). Passing
+  ``max_iterations`` here is deprecated; set ``agent.budget.max_iterations``
+  instead. A deprecated value is folded into ``budget.max_iterations``
+  (the agent&#x27;s budget wins on conflict) and the standalone key is not
+  emitted.
+- `~aixplain.v2.session.Session`8 - Criteria for evaluation
+- `~aixplain.v2.session.Session`9 - Evolution parameters
+- ``0 - Inspector configurations
+- ``1 - Whether to run response generation. Defaults to False.
+- ``2 - Multimodal attachments for the turn.
+  Each entry is a hosted-URL/local-path string or a dict with ``url`` or
+  ``path`` (plus optional ``type``/``name``/``mimeType``). Local paths are
+  uploaded to aiXplain storage automatically.
+- ``3 - Deprecated. Local file paths to upload — pass through ``attachments`` instead.
+- ``6 - Display format - &quot;status&quot; (single line) or &quot;logs&quot; (timeline).
+  If None (default), progress tracking is disabled.
+- ``7 - Detail level - 1 (minimal), 2 (thoughts), 3 (full I/O)
+- ``8 - Whether to truncate long text in progress display
 
-| Directory | Purpose |
-|---|---|
-| `aixplain/v2/` | Current SDK surface. Prefer this for new features and fixes unless the task is explicitly about legacy behavior. |
-| `aixplain/v1/` | Legacy SDK implementation. Touch this for compatibility fixes, bug fixes, or explicitly requested v1 work. |
-| `aixplain/_compat.py` | Legacy import redirector. Existing imports like `aixplain.modules` and `aixplain.factories` must continue to work. |
-| `aixplain/modules/` | Domain objects (Agent, Model, Pipeline, TeamAgent, tools) |
-| `aixplain/factories/` | V1 factory classes for creating and managing resources |
-| `aixplain/enums/` | Enumerations (Function, Supplier, Language, Status, etc.) |
-| `aixplain/exceptions/` | Custom exception hierarchy with error codes and categories |
-| `aixplain/utils/` | Shared helpers (config, HTTP requests, file utilities, caching) |
-| `aixplain/base/` | Base parameters |
-| `aixplain/decorators/` | Decorators (e.g., API key checker) |
-| `aixplain/processes/` | Data onboarding workflows |
+### Budget Objects
 
-### Key Design Patterns
+```python
+@dataclass_json
 
-- **Factory**: `AgentFactory`, `ModelFactory`, `PipelineFactory`, etc. for resource creation (V1).
-- **Mixin**: `SearchResourceMixin`, `GetResourceMixin`, `RunnableResourceMixin`, `ToolableMixin` for composable behavior (V2).
-- **Hook**: `before_save` / `after_save` lifecycle hooks on resources (V2).
-- **Builder**: `build_run_payload()` / `build_save_payload()` methods.
+@dataclass
+class Budget()
+```
+
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L285)
+
+Budget caps governing an agent run (cost / duration / iterations).
+
+Every :class:`Agent` owns a ``budget`` (defaulting to an empty ``Budget()``),
+mutated in place via attribute access — mirroring ``model.inputs``::
+
+    agent.budget.max_cost = 0.5
+    agent.budget.max_iterations = 10
+
+The same object serves two roles: ``agent.save()`` persists it as the agent&#x27;s
+default budget, and ``agent.run(...)`` sends its current state as the run-time
+budget (the backend merges the run-time budget field-by-field over the
+persisted default). The Python API is snake_case; serialization produces the
+agreed camelCase wire keys (``maxCost`` / ``maxDurationSeconds`` /
+``maxIterations``). All fields are optional and ``None`` fields are dropped
+from ``to_dict()``.
+
+### AgentResponseData Objects
+
+```python
+@dataclass_json
+
+@dataclass
+class AgentResponseData()
+```
+
+[[view_source]](https://github.com/aixplain/aiXplain/blob/main/aixplain/v2/agent.py#L319)
+
+Data structure for agent response.
+
+#### \_\_post\_init\_\_
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aixplain/aiXplain](https://github.com/aixplain/aiXplain) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
