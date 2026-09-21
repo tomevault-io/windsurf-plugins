@@ -15,7 +15,7 @@ When sources disagree, use this order:
 2. Canonical registries and constants those paths derive from.
 3. This file for repository-wide engineering and security invariants.
 4. `README.md`, `.env.example`, and domain skills for user/agent guidance.
-5. `architecture.md`, `plan.md`, ADR drafts, comments, and residual modules as design/history evidence.
+5. `docs/architecture.md`, `docs/roadmap-ledger.md`, `docs/plans/`, ADR drafts, comments, and residual modules as design/history evidence.
 
 **Reachability beats module presence.** Trace from a registered CLI command, Pi tool, slash command, or broker entry point before claiming a path is live.
 
@@ -51,7 +51,7 @@ These invariants are repository-wide:
 
 Northstar has intentionally separate authority surfaces:
 
-- **CLI:** broad command vocabulary. The current tree exposes 28 stateless command IDs plus `broker.serve` and `jobs.status`.
+- **CLI:** broad command vocabulary. The current tree exposes 28 stateless command IDs plus the local/development stateful IDs `broker.serve`, `jobs.start`, `jobs.status`, `jobs.result`, and `jobs.cancel`.
 - **Pi native tools:** at most 9 model-facing tools, controlled by `PI_SEARCH_NATIVE_TOOLS`; unset/blank means zero.
 - **User slash commands:** setup/status/Chrome authorization flows that require operator intent and are not model tools.
 
@@ -82,9 +82,7 @@ Northstar has intentionally separate authority surfaces:
 | KG / graph / SPARQL | `src/knowledge/*`, `src/graph/*`, `src/diffbot/*`, `src/sparql/*` |
 | multimodal/vision | `src/media-vision/*` |
 | agent jobs/controller | `src/web/agent/*` |
-| leaf runtime wire contract | `src/runtime/runtime-rpc-protocol.ts` |
-| browser policy/session authority | `src/browser/*`, `src/chrome/*` |
-| desktop policy/state | `src/desktop/desktop-contract.ts`, `desktop-policy.ts`, `desktop-tools.ts` |
+| leaf runtime wire contract | `src/runtime/runtime-rpc-protocol.ts` (Northstar consumer mirror); `../pi-subagents/src/api/runtime-rpc.ts` (producer ground truth when co-installed) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
