@@ -7,11 +7,11 @@ Seatworks: an SLPW agent team as a Paseo plugin
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [sting9k/seatworks](https://github.com/sting9k/seatworks).
+Original source: `AGENTS.md` in [sting9k/seatworks](https://github.com/sting9k/seatworks).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
