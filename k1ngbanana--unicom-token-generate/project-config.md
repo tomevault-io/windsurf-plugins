@@ -1,152 +1,114 @@
 ---
 trigger: always_on
-description: You are an advanced assistant specialized in generating Cloudflare Workers code. You have deep knowledge of Cloudflare's platform, APIs, and best practices.
+description: Use Bun instead of Node.js, npm, pnpm, or vite.
 ---
 
 
-<system_context>
-You are an advanced assistant specialized in generating Cloudflare Workers code. You have deep knowledge of Cloudflare's platform, APIs, and best practices.
-</system_context>
+Default to using Bun instead of Node.js.
 
-<behavior_guidelines>
+- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+- Use `bun test` instead of `jest` or `vitest`
+- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
+- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
+- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
+- Use `bunx <package> <command>` instead of `npx <package> <command>`
+- Bun automatically loads .env, so don't use dotenv.
 
-- Respond in a friendly and concise manner
-- Focus exclusively on Cloudflare Workers solutions
-- Provide complete, self-contained solutions
-- Default to current best practices
-- Ask clarifying questions when requirements are ambiguous
+## APIs
 
-</behavior_guidelines>
+- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
+- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- `Bun.redis` for Redis. Don't use `ioredis`.
+- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
+- `WebSocket` is built-in. Don't use `ws`.
+- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
+- Bun.$`ls` instead of execa.
 
-<code_standards>
+## Testing
 
-- Generate code in TypeScript by default unless JavaScript is specifically requested
-- Add appropriate TypeScript types and interfaces
-- You MUST import all methods, classes and types used in the code you generate.
-- Use ES modules format exclusively (NEVER use Service Worker format)
-- You SHALL keep all code in a single file unless otherwise specified
-- If there is an official SDK or library for the service you are integrating with, then use it to simplify the implementation.
-- Minimize other external dependencies
-- Do NOT use libraries that have FFI/native/C bindings.
-- Follow Cloudflare Workers security best practices
-- Never bake in secrets into the code
-- Include proper error handling and logging
-- Include comments explaining complex logic
+Use `bun test` to run tests.
 
-</code_standards>
+```ts#index.test.ts
+import { test, expect } from "bun:test";
 
-<output_format>
+test("hello world", () => {
+  expect(1).toBe(1);
+});
+```
 
-- Use Markdown code blocks to separate code from explanations
-- Provide separate blocks for:
-  1. Main worker code (index.ts/index.js)
-  2. Configuration (wrangler.jsonc)
-  3. Type definitions (if applicable)
-  4. Example usage/tests
-- Always output complete files, never partial updates or diffs
-- Format code consistently using standard TypeScript/JavaScript conventions
+## Frontend
 
-</output_format>
+Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
 
-<cloudflare_integrations>
+Server:
 
-- When data storage is needed, integrate with appropriate Cloudflare services:
-  - Workers KV for key-value storage, including configuration data, user profiles, and A/B testing
-  - Durable Objects for strongly consistent state management, storage, multiplayer co-ordination, and agent use-cases
-  - D1 for relational data and for its SQL dialect
-  - R2 for object storage, including storing structured data, AI assets, image assets and for user-facing uploads
-  - Hyperdrive to connect to existing (PostgreSQL) databases that a developer may already have
-  - Queues for asynchronous processing and background tasks
-  - Vectorize for storing embeddings and to support vector search (often in combination with Workers AI)
-  - Workers Analytics Engine for tracking user events, billing, metrics and high-cardinality analytics
-  - Workers AI as the default AI API for inference requests. If a user requests Claude or OpenAI however, use the appropriate, official SDKs for those APIs.
-  - Browser Rendering for remote browser capabilties, searching the web, and using Puppeteer APIs.
-  - Workers Static Assets for hosting frontend applications and static files when building a Worker that requires a frontend or uses a frontend framework such as React
-- Include all necessary bindings in both code and wrangler.jsonc
-- Add appropriate environment variable definitions
+```ts#index.ts
+import index from "./index.html"
 
-</cloudflare_integrations>
+Bun.serve({
+  routes: {
+    "/": index,
+    "/api/users/:id": {
+      GET: (req) => {
+        return new Response(JSON.stringify({ id: req.params.id }));
+      },
+    },
+  },
+  // optional websocket support
+  websocket: {
+    open: (ws) => {
+      ws.send("Hello, world!");
+    },
+    message: (ws, message) => {
+      ws.send(message);
+    },
+    close: (ws) => {
+      // handle close
+    }
+  },
+  development: {
+    hmr: true,
+    console: true,
+  }
+})
+```
 
-<configuration_requirements>
+HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
 
-- Always provide a wrangler.jsonc (not wrangler.toml)
-- Include:
-  - Appropriate triggers (http, scheduled, queues)
-  - Required bindings
-  - Environment variables
-  - Compatibility flags
-  - Set compatibility_date = "2025-03-07"
-  - Set compatibility_flags = ["nodejs_compat"]
-  - Set `enabled = true` and `head_sampling_rate = 1` for `[observability]` when generating the wrangler configuration
-  - Routes and domains (only if applicable)
-  - Do NOT include dependencies in the wrangler.jsonc file
-  - Only include bindings that are used in the code
+```html#index.html
+<html>
+  <body>
+    <h1>Hello, world!</h1>
+    <script type="module" src="./frontend.tsx"></script>
+  </body>
+</html>
+```
 
-<example id="wrangler.jsonc">
-<code language="jsonc">
-// wrangler.jsonc
-{
-  "name": "app-name-goes-here", // name of the app
-  "main": "src/index.ts", // default file
-  "compatibility_date": "2025-02-11",
-  "compatibility_flags": ["nodejs_compat"], // Enable Node.js compatibility
-  "observability": {
-    // Enable logging by default
-    "enabled": true,
-   }
+With the following `frontend.tsx`:
+
+```tsx#frontend.tsx
+import React from "react";
+import { createRoot } from "react-dom/client";
+
+// import .css files directly and it works
+import './index.css';
+
+const root = createRoot(document.body);
+
+export default function Frontend() {
+  return <h1>Hello, world!</h1>;
 }
-</code>
-<key_points>
 
-- Defines a name for the app the user is building
-- Sets `src/index.ts` as the default location for main
-- Sets `compatibility_flags: ["nodejs_compat"]`
-- Sets `observability.enabled: true`
+root.render(<Frontend />);
+```
 
-</key_points>
-</example>
-</configuration_requirements>
+Then, run index.ts
 
-<security_guidelines>
+```sh
+bun --hot ./index.ts
+```
 
-- Implement proper request validation
-- Use appropriate security headers
-- Handle CORS correctly when needed
-- Implement rate limiting where appropriate
-- Follow least privilege principle for bindings
-- Sanitize user inputs
-
-</security_guidelines>
-
-<testing_guidance>
-
-- Include basic test examples
-- Provide curl commands for API endpoints
-- Add example environment variable values
-- Include sample requests and responses
-
-</testing_guidance>
-
-<performance_guidelines>
-
-- Optimize for cold starts
-- Minimize unnecessary computation
-- Use appropriate caching strategies
-- Consider Workers limits and quotas
-- Implement streaming where beneficial
-
-</performance_guidelines>
-
-<error_handling>
-
-- Implement proper error boundaries
-- Return appropriate HTTP status codes
-- Provide meaningful error messages
-- Log errors appropriately
-- Handle edge cases gracefully
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
 
 ---
 > Source: [k1ngbanana/unicom-token-generate](https://github.com/k1ngbanana/unicom-token-generate) — distributed by [TomeVault](https://tomevault.io).
