@@ -1,96 +1,146 @@
 ---
 trigger: always_on
-description: React/JSX coding standards for resources/app
+description: This file is based on `.cursor/rules/` but the PHP and React sections have
 ---
 
+# Project Instructions for Claude
 
-# React Coding Standards
+This file is based on `.cursor/rules/` but the PHP and React sections have
+been re-derived from the actual codebase (not just copied from the `.mdc`
+files), so they reflect real conventions rather than stale ones — e.g. the
+frontend moved from `.jsx` to TypeScript, and the PHP `@since`/`final` rules
+didn't match what the code actually does. Section 1 (behavioral guidelines)
+is a direct mirror of `karpathy-guidelines.mdc`. If the codebase's conventions
+change, re-derive rather than trusting `.cursor/rules/` at face value.
 
-Apply these conventions to all JSX files under `resources/app/`, including legacy code being edited.
+---
 
-## Files and Folders
+## 0. Testing / Verification
 
-- Folders and files: **lowercase**, words separated by **dashes**
-- Examples: `pages/`, `app-dialogs/`, `active-filters.jsx`
-- Do not use barrel files like `component-name/index.jsx`
-- Use `component-name/component-name.jsx` instead
+Do not use the Browser tool (or any dev-server preview) to test or verify
+changes in this project. Skip the browser-based verification workflow
+entirely — rely on typecheck (`npm run typecheck`), lint, and the test suite
+(`npm test` in `resources/app/`) instead. If a change genuinely needs visual
+confirmation, say so and let the user check it themselves rather than
+opening a browser preview.
 
-## Components
+---
 
-- Component names: **PascalCase** (`ActiveFilters`, `AppDialog`)
-- Define as arrow functions, export default at the bottom:
+## 1. Behavioral Guidelines (always apply)
 
-```jsx
-const ActiveFilters = () => {
-  return <div />;
-};
+Source: `.cursor/rules/karpathy-guidelines.mdc`
 
-ActiveFilters.displayName = 'ActiveFilters';
+Behavioral guidelines to reduce common LLM coding mistakes.
 
-export default ActiveFilters;
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+### Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: every changed line should trace directly to the user's request.
+
+### Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-- Multiple components in one file: default export the main component; named export the rest
-- `forwardRef` / `memo`: assign `displayName` on the wrapped const
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-```jsx
-const Button = forwardRef((props, ref) => {
-  return <span ref={ref} />;
-});
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-Button.displayName = 'Button';
+---
 
-export default Button;
-```
+## 1a. Planning Workflow
 
-## Control Flow
+When entering plan mode in this project, always use the **OpenSpec workflow**
+instead of writing a freeform plan. Reach for the `openspec-*` / `opsx:*`
+skills:
 
-Never use inline returns for conditional statements — always wrap the body in braces:
+- `opsx:explore` — think through the problem before committing to a change
+- `opsx:propose` — generate a full proposal (spec deltas, design, tasks)
+- `opsx:apply` — implement tasks from an existing change
+- `opsx:sync` — sync delta specs into main specs
+- `opsx:archive` — finalize and archive a completed change
 
-```jsx
-// ❌ BAD
-if (condition) return true;
+Before implementing tasks from an existing change always ask me to run the command `opsx:apply` manually
+by myself instead of applying automatically.
 
-// ✅ GOOD
-if (condition) {
-  return true;
-}
-```
+Note: Whenever I start a new session make sure to follow the **OpenSpec workflow** by default.
 
-## Strings and i18n
+---
 
-- JavaScript strings: single quotes `'value'` or backticks for template literals — never double quotes
-- JSX prop string values: double quotes (`type="primary"`, `size="large"`)
-- User-facing static text: use `__()` from `@/wpi18n` with domain `kirki-ecommerce`
+## 2. PHP Coding Standards
 
-```jsx
-import { __ } from '@/wpi18n';
+Derived from analyzing the actual code in `app/` and `database/` (404 PHP files).
+Applies to: `app/**/*.php`, `database/**/*.php`.
 
-<Button text={__('Save changes', 'kirki-ecommerce')} type="primary" />;
-```
+**Do not use `vendor/libraries/framework/src/` as a style reference, and do not
+hand-edit it.** It is the `themeum/framework` package, relocated there from
+`vendor/themeum/framework` and namespace-rewritten by the `composer scope`
+script (`php-scoper` stages the prefixed output, then `bin/scope-framework.php`
+swaps it in). Any edit is lost on the next `composer install`. Its conventions
+belong to the upstream package, not this project.
 
-## Imports
+Target PHP **7.4** (see `composer.json` `config.platform.php`). Follow PSR-4 file naming.
 
-Group imports in this order, separated by blank lines:
+### WordPress.org Plugin Directory Requirements
 
-1. External packages (`react`, `react-router`, etc.)
-2. Internal aliases (`@/molecules`, `@/wpi18n`, `@/conf`, etc.)
-3. Relative imports (`./active-filters.scss`)
+This plugin targets wordpress.org submission. Apply the required-for-approval
+subset of WordPress coding standards (escaping, sanitization/unslashing,
+nonces, i18n, ABSPATH guards, WP-version compatibility, no global PHP state
+mutation) to every PHP change, in every session — not just when a task is
+explicitly about submission readiness. This is narrower than full
 
-Always use the `@/` alias for internal paths — avoid deep relative imports when an alias exists.
-
-```jsx
-import { useNavigate } from 'react-router';
-
-import { Button, Container } from '@/molecules';
-import { __ } from '@/wpi18n';
-
-import './not-found.scss';
-```
-
-## Comments
-
-Do not add comments to describe code. Use meaningful variable and function names so the code reads clearly on its own.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [themeum/kirki-ecommerce](https://github.com/themeum/kirki-ecommerce) — distributed by [TomeVault](https://tomevault.io).
