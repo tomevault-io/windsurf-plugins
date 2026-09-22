@@ -7,11 +7,11 @@ Evidence-backed reference for AI capabilities, pricing tiers, availability, and 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [snapsynapse/ai-tool-watch](https://github.com/snapsynapse/ai-tool-watch).
+Original source: `AGENTS.md` in [snapsynapse/ai-tool-watch](https://github.com/snapsynapse/ai-tool-watch).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
