@@ -7,11 +7,11 @@ The ultimate JARVIS for agentic swarm development with a mobile first on-the-go 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [LupusDei/adjutant](https://github.com/LupusDei/adjutant).
+Original source: `AGENTS.md` in [LupusDei/adjutant](https://github.com/LupusDei/adjutant).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
