@@ -1,0 +1,101 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Netwrix product documentation site — 27+ security products, built with Docusaurus. Hosted on Azure, deployed from `main`. Writing standards and doc-specific guidance are in `docs/CLAUDE.md` (loaded automatically when working in `docs/`).
+
+## Commands
+
+```bash
+# Development (requires Node >=22)
+npm install              # Install dependencies
+npm run start            # Dev server on port 4500 (auto-copies KB first)
+npm run start-chok       # Dev server with polling (for network drives)
+npm run build            # Production build (auto-copies KB first)
+npm run serve            # Serve production build on port 8080
+npm run clear            # Clear Docusaurus cache (fixes stale build issues)
+
+# Linting
+vale <file>              # Run Vale style checker on a markdown file
+/dale <file>             # Run Dale linter (Claude skill) on a markdown file
+
+# Install Vale (if not already installed)
+# macOS:
+brew install vale
+# Linux:
+sudo snap install vale
+# Windows:
+choco install vale
+# Manual (any platform) — download binary from GitHub releases:
+# https://github.com/errata-ai/vale/releases
+
+# KB management
+npm run kb:clean         # Remove copied KB files from versioned folders
+npm run kb:dry           # Dry run of KB copy script
+
+# Single-product builds (faster iteration — only generates plugins/routes for one product)
+DOCS_PRODUCT=pingcastle npm run build
+DOCS_PRODUCT=pingcastle npm run start
+```
+
+The build requires 16GB heap (`NODE_OPTIONS=--max-old-space-size=16384`, set automatically by npm scripts). Markdown links and anchors always throw build errors. `onBrokenLinks` also throws, except it's relaxed to `'warn'` for `DOCS_PRODUCT` single-product builds, since those intentionally filter out other products' pages (cross-product links 404 on purpose).
+
+## Architecture
+
+### Central configuration
+
+`src/config/products.js` is the single source of truth. It defines every product's ID, name, versions, categories, and paths. Docusaurus plugins, routes, navbar dropdowns, and sidebars are all auto-generated from this file. To add a product or version, edit this file — don't manually create plugin entries in `docusaurus.config.js`.
+
+Setting the `DOCS_PRODUCT` environment variable (matching a product's `id`) scopes plugin generation, navbar, homepage, redirects, and KB copy down to that single product, speeding up local builds and dev server startup. Set `DOCS_PRODUCT_LATEST_ONLY=true` to also build only that product's latest version (default: all versions). See `getActiveProducts()`/`getActiveVersions()` in `src/config/products.js`.
+
+### Versioning
+
+- Multi-version products: `docs/<product>/<version>/` (e.g., `docs/accessanalyzer/12.0/`)
+- Single-version (SaaS) products: `docs/<product>/` with `version: "current"`
+- URLs convert dots to underscores: `12.0` becomes `/docs/accessanalyzer/12_0/`
+- Sidebars: `sidebars/<product>/<version>.js` — auto-generated, rarely need manual editing
+- Edits to one version do not propagate to others
+
+### Knowledge Base
+
+`docs/kb/` is the canonical source for Knowledge Base (KB) articles. The `scripts/copy-kb-to-versions.mjs` script copies KB content into versioned product folders at build time (runs as `prestart`/`prebuild`). Never manually copy KB files — they're gitignored in versioned folders. `kb_allowlist.json` is a generated artifact (written by the copy script) that records which products received KB content; do not edit it manually.
+
+### Static assets
+
+Images go in `static/images/<product>/` as `.webp` files, organized by version and section (e.g., `static/images/passwordreset/3.3/administration/`). Reference with absolute paths: `/images/<product>/<version>/<image>.webp`. Some products share images across product boundaries (e.g., passwordreset images under `passwordpolicyenforcer/`).
+
+## Branch Workflow
+
+PRs target `dev`. Never commit directly to `dev` or `main`. The `sync-dev-to-main` workflow merges `dev` to `main` daily at 8 AM PST if the build passes. Production deploys from `main` to Azure Blob Storage.
+
+## CI/CD Workflows
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `build-and-deploy.yml` | Push to main/dev, PRs to dev | Build and deploy to Azure |
+| `vale-autofix.yml` | PRs with `.md` changes | Auto-fix Vale + Dale issues (script + AI), post summary comment |
+| `claude-doc-pr.yml` | PRs to dev with `docs/` changes | Editorial review; `@claude` follow-up |
+| `claude-documentation-reviewer.yml` | PRs with `.md` changes | AI review with inline suggestions |
+| `claude-documentation-fixer.yml` | `@claude` comment on PR | Apply fixes and push |
+| `claude-issue-labeler.yml` | Issues opened/edited | Security screening, CoC check, auto-labeling, content fix automation |
+| `sync-dev-to-main.yml` | Daily 8 AM PST | Auto-merge dev to main |
+| `reindex-algolia.yml` | After main deploy | Refresh search index |
+
+## Skills and Agents
+
+Skills (`.claude/skills/`) are invoked with `/skill-name`. Agents (`.claude/agents/`) are autonomous workers launched via the Agent tool.
+
+When a user asks for help with documentation, always use the appropriate tool:
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [netwrix/docs](https://github.com/netwrix/docs) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-22 -->
