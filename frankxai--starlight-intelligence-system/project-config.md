@@ -1,7 +1,8 @@
 ---
 trigger: always_on
-description: <!-- STARLIGHT-EDITORIAL:START -->
+description: Portfolio brand and editorial contract
 ---
+
 
 <!-- STARLIGHT-EDITORIAL:START -->
 ## Editorial contract
