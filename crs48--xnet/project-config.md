@@ -1,0 +1,112 @@
+---
+trigger: always_on
+description: xNet is a local-first, CRDT-backed workspace: your data, synced everywhere,
+---
+
+# AGENTS.md — xNet coding agent guidelines
+
+xNet is a local-first, CRDT-backed workspace: your data, synced everywhere,
+owned by you. This file is loaded every session — keep it small. Surface-specific
+conventions live in nested `AGENTS.md` files that load only when you read files
+there.
+
+## Skills
+
+Invoke with the Skill tool. Repo-local skills live in `.claude/skills/`
+(`.agents/skills` symlinks to it for Codex and Copilot).
+
+| Skill                            | Read it when                                        |
+| -------------------------------- | --------------------------------------------------- |
+| `babysit-pr`                     | Driving a PR to green                               |
+| `changelog`                      | You shipped something a user would notice           |
+| `changeset`                      | You edited a publishable `packages/*` library       |
+| `electron-prototype`             | Building or testing anything in `apps/electron`     |
+| `explore`                        | Researching a topic into `docs/explorations/`       |
+| `humanize`                       | Prose reads as machine-written; editing blog essays |
+| `implement`                      | Executing an exploration's checklist                |
+| `mvp-followup`                   | Deciding what to close out after a feature pass     |
+| `verification-before-completion` | Before claiming done, or writing `[x]`              |
+| `visual-exploration`             | An exploration is about UI and prose cannot show it |
+| `writing-agent-instructions`     | Editing any `AGENTS.md` or `SKILL.md`               |
+
+## Nested instructions
+
+| Path                      | Covers                                   |
+| ------------------------- | ---------------------------------------- |
+| `apps/web/AGENTS.md`      | Playwright, test auth bypass, viewport   |
+| `apps/electron/AGENTS.md` | Prototyping ladder, ports, preload       |
+| `apps/expo/AGENTS.md`     | Expo/EAS, no Node APIs                   |
+| `packages/AGENTS.md`      | Barrels, changesets, `TaggedError`, seed |
+| `packages/hub/AGENTS.md`  | Roles, wire format, authorization        |
+
+<!-- Nested files are NOT re-injected after /compact; anything that must hold
+     for a whole session belongs in this file, not a nested one. -->
+
+## Build & test
+
+```bash
+pnpm install                      # install
+pnpm build                        # build all packages
+pnpm test                         # all tests (~2400)
+pnpm --filter @xnetjs/data test   # one package
+pnpm typecheck                    # turbo run typecheck
+pnpm lint
+```
+
+Vitest resolves the **root** config: `pnpm --filter <pkg> test` runs every
+project. Target one with `pnpm exec vitest run --project <name> <path>`.
+
+## Project structure
+
+`packages/*` are the libraries, `apps/*` the surfaces (`web`, `electron`,
+`expo`, `cloud`, `demos`), `site/` the Astro marketing + docs site, `tests/*`
+the e2e and reliability suites. `site/` installs with `--ignore-workspace` — it
+cannot import `@xnetjs/*`.
+
+## Spelling the brand: `xNet`
+
+Lowercase x, uppercase N — in **everything a human reads**: prose, doc titles,
+code comments, UI strings, CLI help, package descriptions, commit messages.
+Never `XNet`, `Xnet` or `XNET`. Sentence-initial is still `xNet`; recast the
+sentence rather than capitalising the mark.
+
+Lowercase everywhere a machine reads: `@xnetjs/*`, the `xnet` bin, `xnet://`
+URIs, file and database names.
+
+| Where                                                 | Form                                    |
+| ----------------------------------------------------- | --------------------------------------- |
+| Prose, comments, UI strings, commits                  | `xNet`                                  |
+| npm packages, bins, URLs, DB/file names, env prefixes | all lowercase                           |
+| Identifiers already named `XNet*`                     | leave as-is (`XNetProvider`, `useXNet`) |
+| Mermaid node ids, `SCREAMING_SNAKE` constants         | leave as-is (`XNET_HUB_URL`)            |
+
+**Existing identifiers keep their casing** — renaming one is a breaking change,
+not a copy fix. The line is identifier vs copy, and it does not follow file
+type: code samples inside markdown are code. When sweeping, match on a word
+boundary (`\bXNet\b`) and skip fenced code blocks — `docs/plans/` and
+`docs/explorations/` quote an `XNet` SDK class that an unbounded replace
+silently corrupts.
+
+## Code style
+
+- **Imports**: named over default; type-only imports use `import type`.
+- **Naming**: `camelCase` values, `PascalCase` types and components,
+  `SCREAMING_SNAKE` consts.
+- **TypeScript**: no `any` in new code; prefer inference over annotation.
+- **Exports**: see `packages/AGENTS.md` for the sub-barrel policy.
+- **Comments**: match the surrounding density. Explain _why_, not _what_.
+- **React**: hooks at the top, no conditional hooks, prefer composition.
+- **Styling**: prefer Tailwind over custom CSS.
+- **Errors**: a `catch`, default, or coercion that returns a value callers
+  cannot distinguish from success is a bug, not a guard. "Absent" and
+  "unreadable" must be different values; a truncated run is not a completed one.
+  Prefer a loud, typed failure over a plausible-looking normal state.
+
+## Testing
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [crs48/xNet](https://github.com/crs48/xNet) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-22 -->
