@@ -88,4 +88,4 @@ Northstar has intentionally separate authority surfaces:
 
 ---
 > Source: [rhinos0608/Pi-Northstar](https://github.com/rhinos0608/Pi-Northstar) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-22 -->
