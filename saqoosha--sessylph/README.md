@@ -7,11 +7,11 @@ A native macOS wrapper for Claude Code with tabbed terminal sessions, tmux persi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Saqoosha/Sessylph](https://github.com/Saqoosha/Sessylph).
+Original source: `AGENTS.md` in [Saqoosha/Sessylph](https://github.com/Saqoosha/Sessylph).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
