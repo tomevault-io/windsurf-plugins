@@ -84,4 +84,4 @@ src/
 
 ---
 > Source: [MarcusXavierr/cata-centavo](https://github.com/MarcusXavierr/cata-centavo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
