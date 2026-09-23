@@ -3,7 +3,7 @@ trigger: always_on
 description: Run `make help` for all available targets. Key commands:
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 ## Commands
 
@@ -74,4 +74,4 @@ After modifying handler input/output types or route registrations, run `make ope
 
 ---
 > Source: [isola-run/isola](https://github.com/isola-run/isola) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
