@@ -1,159 +1,87 @@
 ---
 trigger: always_on
-description: 本文件定义此项目的编码约定和架构规范，供 AI Agent 在生成和修改代码时遵循。
+description: 本文件是 monorepo 总入口：定位布局、指路各端规范、声明全仓铁律。**深入开发前必读对应端的 AGENTS.md**。
 ---
 
-# AGENTS.md — 脚手架项目二次开发指南 (Vue3 + Vben Admin)
+# AGENTS.md — go-wind-admin Monorepo 开发指南（AI Agent 入口）
 
-本文件定义此项目的编码约定和架构规范，供 AI Agent 在生成和修改代码时遵循。
+本文件是 monorepo 总入口：定位布局、指路各端规范、声明全仓铁律。**深入开发前必读对应端的 AGENTS.md**。
 
-## 项目概览
-
-基于 Vue 3 + Vite + TypeScript 的中后台管理系统脚手架（Vben Admin 配置型框架），面向二开场景。**通过配置而非编码来完成大部分开发工作。**
-
-**核心技术栈**: Vue 3.5, Ant Design Vue 4.2, Tailwind CSS, Shadcn-ui, Pinia, Vue Router, Vue Query (TanStack Query), VxeTable, i18n, Axios
-
-**应用入口**: `apps/admin/src/`
-
-## Vben 框架核心机制
-
-### 组件注册机制（不要绕过）
-
-框架有 **两套组件注册体系**：
-
-**1. VbenForm 组件（schema 中使用）** — 定义在 `adapter/component/index.ts`，通过 `globalShareState.setComponents()` 注册。`schema` 的 `component` 字段 **只能使用这些注册过的名称**：
+## 仓库布局
 
 ```
-Input, InputNumber, InputPassword, Select, ApiSelect, TreeSelect,
-ApiTreeSelect, RadioGroup, Checkbox, CheckboxGroup, Switch, DatePicker,
-RangePicker, TimePicker, Textarea, Upload, Editor, IconPicker, AutoComplete,
-Mentions, Rate, Divider, Space, DefaultButton, PrimaryButton, ApiTree
+backend/                    Go + Kratos + Ent（DI 手写装配 wiring_*.go，已弃用 Wire；HTTP :7788，SSE 网关 :7789）
+frontend/admin/
+├── react/                  React 19 + antd 6 + ProComponents + TanStack Query + zustand
+├── vue-element/            Vue 3 + Element Plus + vxe-table + TanStack vue-query + Pinia
+└── vue-vben/               Vben Admin 5.x monorepo（apps/admin + packages/*）+ Ant Design Vue
+docs/                       文档体系（总入口 docs/README.md：教程层 docs/tutorial/ + 参考层专题文档）
 ```
 
-**2. Template 全局组件（template 中使用）** — 定义在 `registerGlobComp.ts`，通过 `app.use()` 全局注册。在 template 中 **直接用 `a-*` 前缀**：
+## 三端门禁（必须保持全绿）
 
-```
-<a-button>, <a-tag>, <a-popconfirm>, <a-input>, <a-select>,
-<a-tree>, <a-table>, <a-dropdown>, <a-menu>, <a-card>, <a-space>,
-<a-switch>, <a-tabs>, <a-divider>, <a-layout>
-```
-
-> **禁止**: `import { Tag, Button } from 'ant-design-vue'` 然后在 template 中用 `<Tag>` 或 `<Button>`。
-
-### 配置驱动模式（不要自己写逻辑）
-
-| 场景 | 配置方式 | 不要做 |
+| 端 | 命令（在各自目录下） | dev 端口 |
 |---|---|---|
-| 表格列日期格式化 | `formatter: 'formatDateTime'` | Slot 中用 dayjs 格式化 |
-| 表单必填校验 | `rules: 'required'` / `'selectRequired'` | 用 Zod 或自定义校验函数 |
-| 列表数据加载 | `proxyConfig.ajax.query` | 手动 watch + ref + async function |
-| 分页 | `pagerConfig: {}` | 手动管理分页状态 |
-| 表格刷新 | `gridApi.reload()` | 手动重新请求数据 |
-| 表单赋值/取值 | `baseFormApi.setValues()` / `baseFormApi.getValues()` | 直接操作 DOM 或 ref |
-| 表单校验 | `baseFormApi.validate()` | 手动检查每个字段 |
+| react | `npm run typecheck` | 5888 |
+| vue-element | `npx vue-tsc --noEmit`（或 `npm run type-check`） | 5777 |
+| vue-vben | `pnpm run check:type` | 5666 |
 
-## 目录结构
+2026-09-07 起三端 typecheck 全部 0 错误。**门禁出现任何新报错，一律当作自己引入的 bug 修复**，不存在"可忽略的既有错误"。改完代码先跑门禁再声称完成。
 
-```
-apps/admin/src/
-├── api/                  # API 层（两层架构）
-│   ├── generated/        # ← protobuf 自动生成，禁止手动编辑
-│   ├── client.ts         # ← ApiClient 单例（ClientTransport 适配器）
-│   └── composables/      # ← Vue Query hooks 层：use*/fetch*/枚举工具
-├── adapter/              # VbenForm + VxeTable 适配器配置
-├── router/routes/modules/# ← 路由模块（按功能拆分）
-├── stores/               # Pinia 状态管理
-├── views/app/            # 业务页面（按功能模块组织）
-├── locales/langs/        # i18n 国际化文件（zh-CN/en-US: enum.json, menu.json, page.json, ui.json）
-└── transport/rest/       # HTTP 传输层（PaginationQuery, requestApi）
-```
+## 全仓铁律
 
-## 导入路径约定
+1. **不吞错**：任何 catch 至少二选一——`console.error/warn` 带出**原始错误对象**，或重新抛出。用户可见的通知/Message ≠ 日志（只有翻译文案）。合法裸 catch 仅限纯本地 best-effort 兜底且注释写明原因。历史教训：认证链路静默吞错曾让 bug 排查耗时数日。
+2. **vue-vben 工具链版本已钉死**（catalog 精确版本 + packageManager 匹配本机 pnpm）：禁止改回 `^` 范围、禁止顺手升级 vue/typescript/vue-tsc/pnpm。原因与升级流程见 `frontend/admin/vue-vben/AGENTS.md`「工具链与已知坑」。
+3. **搜索条件一律 contains 而非 EQ**、ID 类字段不进模糊搜索；CRUD 请求体必须包 `{ data: {...} }`，但**仅限 CRUD**——`body: "*"` 的自定义 RPC（如 `internal-message/send`）收的是扁平请求体，多包一层 `data` 会被 protojson 当未知字段丢掉，接口照样 200、字段全为空。细节见 `.zcode/skills/add-crud-module/SKILL.md`。
 
-```typescript
-// API 导入 — 统一通过 #/api 入口
-import { useListUsers, PaginationQuery, userStatusToName } from '#/api';
-import { type identityservicev1_User as User } from '#/api';
+## 开发策略：react 先行，其余移植
 
-// 适配器导入
-import { useVbenForm } from '#/adapter/form';
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
+新功能/新模块以 **react 端为行为基准先实现**，验证通过后再移植到 vue-element / vue-vben。移植是"有参照的翻译"，远比三端并行首创便宜；vue-vben 框架变体语料薄，直接首创容易产出框架级错误（详见其 AGENTS.md）。
 
-// 布局与通用组件
-import { Page, useVbenDrawer } from '@vben/common-ui';
+**CRUD 模块**：使用 `/add-crud-module` skill（后端 + 前端端到端流程）。
 
-// 国际化
-import { $t } from '@vben/locales';
+**代码生成器**：配套工具 [go-wind-toolkit/gowind-uiapp](https://github.com/tx7do/go-wind-toolkit/tree/main/gowind-uiapp)（桌面 GUI + CLI，从数据库表/SQL 生成前后端代码，含简单表单）。CLI（`gowind-cli`）非交互、JSON 输出，适合 Agent 调用。工具产物仍须按本仓铁律与约定验收补齐（`{ data: {...} }` 包裹、contains 搜索、已部署实例的新端点走管理页「接口同步」登记进 Api 表、`make ts` 生成三端 TS 等）。
 
-// 图标（lucide）
-import { LucideFilePenLine, LucideTrash2 } from '@vben/icons';
+> 系统默认数据（admin 用户、角色、菜单、权限、语言等）由服务启动时在 Go 侧自动播种（`pkg/constants/default_data.go` + 各 service 的 count==0 守卫；Api 表仅在空表时于启动期自动同步，**已部署实例新增端点须在管理页「接口同步」手动触发全量重建**，否则租户闸门 fail-closed 403；「接口同步」重建读的是**打进二进制的** `cmd/server/assets/openapi.yaml`，所以新 proto 必须先 `make openapi` 再重启进程，否则同步"成功"而新端点依旧不在表里。新菜单同理：`count==0` 守卫意味着老库要靠各端「菜单同步」(MERGE) 才会多出这一行），**不要**找 SQL 种子脚本，`backend/sql/` 下只剩演示数据。
 
-// 消息提示
-import { notification } from 'ant-design-vue';
-```
+## 后端任务：gow 优先，make 兜底
 
-## 关键约定（必须遵守）
+后端的运行与代码生成统一走 [gow CLI](https://github.com/tx7do/go-wind-toolkit/tree/main/gowind)（安装：`go install github.com/tx7do/go-wind-toolkit/gowind/cmd/gow@latest`），在 `backend/` 下执行。**接手后不要上来就用 Makefile 的 make 命令**：Windows 无原生 make、嵌套 Makefile 需要跨目录 cd，而 gow 自动发现 `app/*/service`，行为一致：
 
-### 数据层约定
+| 任务 | gow 命令 |
+|---|---|
+| 运行服务 | `gow run admin` |
+| Ent 生成 | `gow ent`（全部服务）/ `gow ent admin` |
+| Proto / API Go 代码 | `gow api` |
+| 从数据库表生成 CRUD | `gow generate`（DSN 驱动；`--proto-only` 仅出 proto） |
 
-1. **禁止直接引用 `#/api/generated/` 路径** — 业务层通过 `#/api` 统一入口导入
-2. **composables 直接使用 `apiClient`** — 导入 `apiClient` from `#/api/client`，调用 `apiClient.xxxService.Method()`
-3. **组件内用 `use*` hooks，组件外（Store/路由守卫）用 `fetch*` 函数**
-4. **更新操作只传变化字段** — `useUpdate*` 内部自动生成 `updateMask`
-5. **Pinia Store 中不可依赖 `useRouter()`** — Store 初始化时路由可能未就绪
-6. **所有列表查询统一使用 `PaginationQuery`**
+项目已弃用 Wire（DI 为手写 `wiring_*.go`），不要运行 `gow wire`，也不要在新代码里引入 wire 依赖。
 
-### Vben 框架强规约
+gow 未覆盖的任务（三端 TS 生成 `make ts`、OpenAPI `make openapi`、`make test/lint` 等）才退回 Makefile（`backend/` 根目录执行）。
 
-7. **表单组件必须使用注册名** — `schema` 中 `component` 只能用 `adapter/component/index.ts` 中注册的名称（如 `Input`、`Select`、`ApiSelect`），不要用 `AInput`、`ASelect` 或原生 HTML 标签
-8. **Template 中使用 `a-*` 前缀** — Ant Design Vue 组件已全局注册，直接用 `<a-button>`、`<a-tag>`、`<a-popconfirm>` 等
-9. **图标在 `:icon` prop 中必须用 `h()` 渲染** — `:icon="h(LucideFilePenLine)"`，图标从 `@vben/icons` 导入
-10. **日期列用 `formatter: 'formatDateTime'`** — 不要在 Slot 中用 dayjs 手动格式化
-11. **表单校验用内置规则名** — `rules: 'required'` 或 `rules: 'selectRequired'`，不要用 Zod 表达式
-12. **删除操作必须二次确认** — 使用 `<a-popconfirm>`，不要用 `window.confirm` 或直接删除
-13. **页面必须用 `<Page auto-content-height>` 包裹** — 不要用 `<div>` 替代
-14. **消息提示用 `notification`** — 从 `ant-design-vue` 导入，不要用 `alert()` 或 `ElMessage`
-15. **国际化文本不硬编码** — 使用 `$t()` 引用 locales 文件中的 key
-16. **使用严格相等运算符 `===`** — 禁止使用 `==`
+## 本地验证要点
 
----
+- 后端起在 `:7788`（`gow run admin`；启动方式见 `docs/windows-startup-guide.md` / `docs/backend_deploy.md`）；前端 dev 端口见上表，代理已配置好 API 转发。
+- 登录账号：全新环境播种为 `admin / Abcd@1234`（`pkg/constants/default_data.go` 的 `DefaultUserPassword`）；本机 `gwa` 库实测（2026-09-20）即为此值，历史备注的 `admin / admin` 已失效（登录返回 `INVALID_PASSWORD`）。图形验证码的答案可在 Redis 中按 `gowind:captcha:<captchaId>` 直接读取，便于自动化验证。
+- vue-element 在 dev 下若见 router-view 塌空/白屏：先重启 dev server 再下结论（vite 依赖优化竞态已做遏制与自愈，见其 AGENTS.md「dev 白屏处置」）。
+- `go test ./...` 偶发 `fork/exec %TEMP%\go-build...\x.test.exe: Access is denied.`（Windows 上对刚链接好的测试二进制执行被拦，疑似安全策略/杀软实时扫描）：属环境问题、**不是代码失败**。复验办法是绕开 Temp 执行——`go test -c -o <工作区内路径>/x.test.exe ./pkg/x` 后直接跑该 exe；判成"测试挂了"之前先这样确认一次。
 
-## API 两层架构
+## 文档索引
 
-```
-generated/  +  client.ts  →  composables/  →  views/stores
-(自动生成)     (ApiClient 单例)   (Vue Query hooks)
-```
-
-**依赖方向**: `views/stores → composables → apiClient.xxxService → transport.unary → requestApi`
-
-### client.ts — ApiClient 单例
-
-生成的 `ApiClient` 通过 `ClientTransport` 接口发送请求，`client.ts` 将 `requestApi` 适配为 `ClientTransport`（保留 token 注入、错误拦截、自动刷新等逻辑）：
-
-```typescript
-import { type ClientTransport, createApiClient } from '#/api/generated/admin/service/v1';
-import { requestApi } from '#/transport/rest';
-
-const transport: ClientTransport = {
-  unary(path, method, body, _meta) { return requestApi({ body, method, path }); },
-  serverStream(path, _meta) { throw new Error(`serverStream not supported: ${path}`); },
-  duplexStream(path, _meta) { throw new Error(`duplexStream not supported: ${path}`); },
-};
-export const apiClient = createApiClient(transport);
-```
-
-ApiClient 提供的 Service Client：`apiClient.userService`、`apiClient.roleService`、`apiClient.authenticationService`、`apiClient.menuService`、`apiClient.positionService`、`apiClient.orgUnitService` 等（protobuf 重新生成后自动包含新 getter）。
-
-### composables 层模板 (`src/api/composables/xxx.ts`)
-
-```typescript
-import type {
-  xxxservicev1_GetXxxRequest,
-  xxxservicev1_ListXxxResponse,
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **文档总入口（两层索引：教程层 + 参考层）**：`docs/README.md`；渐进教程系列（面向采用者的 9 章学习路径）在 `docs/tutorial/`
+- 各端规范：`frontend/admin/{react,vue-element,vue-vben}/AGENTS.md`
+- 后端：`docs/backend_project_struct.md`、`docs/backend_deploy.md`、`docs/audit-log-producer-design.md`
+- 前端权限模型：`docs/frontend_authority.md`
+- 查询/分页规则：`docs/list_query_rule.md`
+- 脚本系统：`docs/script_system.md`（Lua/JS 脚本级插件：钩子点/定时任务/HTTP 出站/安全模型；改钩子点或模块先读它）
+- 认证与令牌链路：`docs/authentication.md`（登录全流程/令牌与刷新轮换/MFA/限流策略/会话吊销/已知问题；改登录、令牌、刷新、MFA、限流或登录策略前先读它）
+- 多租户隔离：`docs/tenant_isolation.md`（上下文链路/HTTP 闸门/数据层读写隔离/套餐联动/覆盖边界与排障；改隔离层、Api 表、套餐门禁或给新表接租户前先读它）
+- 套餐与计费管控：`docs/plan_billing.md`（三档到期策略全链路/模块白名单/配额与用量计量/租户数据清理；改套餐、配额、到期处置或排租户 403 前先读它）
+- 任务调度系统：`docs/task_system.md`（配置与启动链/任务数据模型/调度生命周期/系统级常驻任务/脚本任务桥/多租户语义与排障；加任务类型、排"任务没跑"或接新调度需求前先读它）
+- SSE 推送架构：`docs/sse_architecture.md`（服务端配置与生命周期/流鉴权与 streamID 语义/事件生产/三端消费/部署与排障；改推送链路、加事件类型或排"收不到通知"前先读它）
+- 数据权限范围：`docs/data_scope_design.md`（角色级行数据范围：语义/聚合/接入步骤/运维边界；新表接入数据范围或改聚合规则先读它）
+- 设计语言规范：`docs/design-language.md`（三端视觉唯一权威值表，改颜色/圆角/布局尺寸先改这里再同步三端）
 
 ---
 > Source: [tx7do/go-wind-admin](https://github.com/tx7do/go-wind-admin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
