@@ -1,17 +1,83 @@
 ---
 trigger: always_on
-description: A design system for building internal tools and products.
+description: Astryx is a public design-system repository. Never commit internal links,
 ---
 
-# XDS
+# Astryx repository guidance
 
-A design system for building internal tools and products.
+Astryx is a public design-system repository. Never commit internal links,
+identifiers, service names, private operational instructions, or other
+Meta-only context.
+
+## Instruction surface
+
+This `AGENTS.md` is the canonical, tool-agnostic instruction surface for the
+repository. Add or change shared agent guidance here rather than duplicating it
+in tool-specific instruction files. Put genuinely path-specific guidance in a
+nested `AGENTS.md`.
+
+## Start here
+
+- Product builders: use `astryx docs`, component `{Name}.doc.mjs` files, and
+  `packages/cli/assets/docs/`.
+- Contributors: read `CONTRIBUTING.md` and the relevant guidance linked from
+  `docs/README.md`.
+- Pull requests: choose one primary intent and use its template under
+  `.github/PULL_REQUEST_TEMPLATE/`; read `docs/contributing/pull-requests.md`
+  before opening or reviewing a mixed change.
+- Component work: derive the review's semantic triggers, load matching `current`
+  global baseline claims with `node scripts/review-global-baselines.mjs
+--authority-commit <base-sha> --review-head <head-sha> --triggers
+<comma-separated-triggers>`, then read
+  the component's `{Name}.spec.md` when one exists and any `module:*` records it
+  lists. Load global records before narrower owners, but resolve the direct
+  component or family owner first when it governs the exact delta. A global
+  route exposes only the listed claim; it never makes the whole record govern
+  the component or change. Preserve each matched record, claim, trigger, and
+  match reason in the review receipt.
+- Cross-component work: read the relevant contract under `docs/families/`,
+  applicable design spec under `docs/design/`, and current architecture under
+  `docs/architecture/`.
+- Consequential shared-system changes: use a record under `docs/specs/`.
+
+## Authority
+
+Knowledge records declare `authority`:
+
+- `draft`: not authoritative; may still need evidence or owner review;
+- `current`: explicitly approved and authoritative;
+- `archived`: context only, with a reason such as `superseded`, `withdrawn`,
+  or `historical` and a replacement link when one exists.
+
+Only `current` records govern implementation and review. Never infer approval
+from merged code, silence, an old review, or an existing wiki page.
+
+## Judgment boundary
+
+Resolve checkable behavior from code, tests, and browser evidence. Ask a human
+only when a stable public API, theme contract, ownership boundary, compatibility
+policy, or genuinely subjective visual direction remains undecided. Ask one
+question at a time.
+
+Before drafting, reviewing, or implementing a proposed outcome, search current
+records and open pull requests using the proposed canonical owner/id, affected
+paths and exported symbols, and the behavior's semantic terms. Extend or project
+the existing canonical owner by default. Create a new record only for a distinct
+fact boundary, and state why the existing owner cannot contain it. Do not create
+new policy for work that is already complete, owned, or superseded.
+
+## Validation
+
+Run `pnpm check:knowledge` after editing knowledge records or templates. A
+material template-shape change requires a schema-version bump and migration of
+active records; changing template guidance alone does not rewrite accepted
+history.
 
 ## Custom Commands
 
 ### `/vibe-test [count]` - Run vibeability tests
 
-Tests how well AGENTS.md helps LLMs generate correct XDS component code.
+Tests how well AGENTS.md helps LLMs generate correct Astryx component code.
 
 **Usage:**
 
@@ -26,7 +92,7 @@ Tests how well AGENTS.md helps LLMs generate correct XDS component code.
 1. Run `pnpm -F @astryxdesign/vibe-tests interactive --sample <count>` to set up iteration
 2. Spawn parallel subagents (one per test prompt) to:
    - Read the task file from `results/<iteration>/tasks/{promptId}.json`
-   - Generate code for the prompt using XDS components (AGENTS.md auto-injected)
+   - Generate code for the prompt using Astryx components (AGENTS.md auto-injected)
    - Self-evaluate for success/escape hatches
    - Write `.tsx` result to `results/<iteration>/results/{promptId}.tsx`
    - Write `.json` metadata to `results/<iteration>/results/{promptId}.json`
@@ -53,65 +119,13 @@ Probes at turns 0, 6, 8, 10 to measure quality degradation. Results show a line 
 }
 ```
 
+Runners may also write an optional `<promptId>.provenance.json` sidecar beside the result metadata. The versioned, executor-neutral contract and fallback behavior are documented in `internal/vibe-tests/docs/execution-provenance.md`.
+
 ## AI Context
 
-For architectural context, decisions, and research, see the **[GitHub Wiki](https://github.com/facebookexperimental/xds/wiki)**:
-
-- **Decisions** — API Conventions, Why StyleX, StyleX Distribution
-- **Architecture** — System Architecture, Component Authoring Guide
-- **Research** — AI + Design Systems, AI Model Trajectory, Swizzle Ergonomics
-- **Future** — Animation System, RSC Utilities, Distribution Strategy
-
-For component-specific documentation, see the `{Name}.doc.mjs` file in each component directory under `packages/core/src/` (e.g. `Button/Button.doc.mjs`). These are plain JS files with JSDoc type annotations exporting a `ComponentDoc` object (typed via `packages/core/src/docs-types.ts`).
-
-## Documentation Standard
-
-Documentation lives in two places:
-
-1. **File Headers** — Each source file has a structured JSDoc header with `@input`, `@output`, `@position`
-2. **Component Docs** — `{Name}.doc.mjs` files in each component directory (props, features, examples)
-
-**Update Protocol**: When modifying code, update the file's header comment. Look for `SYNC:` comments as reminders.
-
-## Quick Reference
-
-- **Package manager**: pnpm 10 (via corepack — see CONTRIBUTING.md)
-- **Testing**: Vitest (colocated tests)
-- **Components**: `packages/core/`
-- **Storybook**: `apps/storybook/`
-
-## JSDoc Conventions
-
-- **`@example` code fences must use plain ` ``` `, not ` ```tsx `.**
-  Storybook's autodocs parser doesn't handle language-tagged fences in JSDoc correctly — the code block won't render as a proper code block. Always use untagged fences in `@example` blocks.
-
-<!-- STYLEX-CAPS:START -->
-
-[StyleX v0.17.5 CSS Support]|Use CSS-native solutions. Don't build JS workarounds for supported features.
-|AT-RULES: @media, @supports, @container (+named), @starting-style, @scope — YES
-|AT-RULES: @layer, @property (explicit) — NO (compiles but invalid CSS output)
-|PSEUDO-CLS: :hover, :focus, :focus-visible, :focus-within, :active, :disabled — YES
-|PSEUDO-CLS: :first-child, :last-child, :nth-child(), :where(), :is(), :has(), :not() — YES
-|PSEUDO-CLS: :placeholder-shown, :checked, :empty, :modal, :user-valid, :user-invalid — YES
-|PSEUDO-EL: ::before, ::after, ::placeholder, ::selection, ::backdrop, ::marker, ::view-transition-_ — YES
-|COMPOUND: ::backdrop+condition, RTL :is([dir="rtl"] _), nested @media+pseudo — YES
-|VALUES: var(), calc(), clamp(), light-dark(), color-mix(), container-type/name — YES
-|ANIM: transition (shorthand+individual), transitionBehavior:allow-discrete, animation, stylex.keyframes — YES
-|WHEN: stylex.when.ancestor(':hover'/':focus-within'/':active'/':disabled') — YES
-|WHEN: stylex.when.descendant(':hover'), siblingBefore(':checked'), siblingAfter(':checked'), anySibling(':hover') — YES
-|WHEN: stylex.when.ancestor('[data-attr]') — NO (pseudo selectors only, must start with ":")
-|NESTING: CSS nesting with & — NO (use stylex.when.ancestor/descendant/sibling for parent-child state)
-|API: stylex.firstThatWorks() for CSS fallbacks (e.g. display: grid with flex fallback) — YES
-|API: stylex.positionTry() for anchor positioning @position-try — YES
-|API: stylex.types.color/length/etc for typed CSS variables in defineVars — YES
-|API: stylex.defineConsts() for compile-time constants — YES
-|DYNAMIC: Functions in stylex.create for runtime values — YES
-|VARS: stylex.defineVars, stylex.createTheme (require .stylex.ts files) — YES
-|LAYOUT: grid, flex+gap, aspect-ratio, overscrollBehavior, scrollbar-gutter/width — YES
-|PATTERN: dialog entry animation -> @starting-style (not useState+rAF)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [facebook/astryx](https://github.com/facebook/astryx) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
