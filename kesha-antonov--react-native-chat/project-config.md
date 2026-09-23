@@ -1,122 +1,111 @@
 ---
 trigger: always_on
-description: The most complete chat UI for React Native & Web. This is a TypeScript React Native component library with example applications demonstrating usage across React Native, React Native Web, and Expo platforms.
+description: Guidance for AI coding agents working **inside this repository**.
 ---
 
-# React Native Chat
+# AGENTS.md
 
-The most complete chat UI for React Native & Web. This is a TypeScript React Native component library with example applications demonstrating usage across React Native, React Native Web, and Expo platforms.
+Guidance for AI coding agents working **inside this repository**.
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+If you are instead helping someone *use* this library in their own app, read
+[`llms.txt`](llms.txt) - it is a compact integration guide and does not require the checkout.
 
-## Working Effectively
+## What this is
 
-### Bootstrap and build the repository:
-- `yarn install` -- NEVER CANCEL: takes 58 seconds. Set timeout to 120+ seconds.
-- `yarn build` -- builds TypeScript library, takes 3 seconds. Set timeout to 30+ seconds.
-- `yarn lint` -- lints source code, takes 3 seconds. Currently has warnings but no errors. Set timeout to 30+ seconds.
-- `yarn test` -- NEVER CANCEL: runs Jest test suite, takes 9 seconds. Set timeout to 60+ seconds.
+`@kesha-antonov/react-native-chat` is a chat UI component library for React Native and
+Web - a maintained continuation of `react-native-gifted-chat`. It ships as compiled
+JavaScript plus type definitions; there is no native code in this package.
 
-### Full validation before publishing:
-- `yarn prepublishOnly` -- NEVER CANCEL: runs lint + build + test, takes 11 seconds total. Set timeout to 60+ seconds.
+## Setup
 
-### Known Issues:
-- If tests fail due to snapshot mismatches after fresh dependency install, run `yarn test -u` to update snapshots
-- Snapshot tests may need updates when React Native or dependency versions change
+Requires **Node >= 20** and **Yarn 4** (pinned via `packageManager`; use `yarn`, never `npm`).
 
-### Example app development:
-- `cd example && yarn install` -- NEVER CANCEL: takes 38 seconds. Set timeout to 90+ seconds.
-- Install Expo CLI globally: `npm install -g @expo/cli` or use `npx expo` commands
-- Native development: `cd example && npx expo start`
-- Web development: `cd example && npx expo start --web` (requires additional dependencies)
-- The example app starts Metro bundler on http://localhost:8081
-- Expect dependency version warnings in offline/CI mode - these are normal
+```bash
+yarn install          # library
+cd example && yarn install && cd ..   # example app - a SEPARATE yarn project
+```
 
-### Type checking and development:
-- `yarn tsc:watch` -- runs TypeScript compiler in watch mode for development
-- `yarn tsc:write` -- compiles TypeScript and writes output to /lib directory
+The repo is **not** a Yarn workspace. `example/` has its own `package.json`, its own
+`yarn.lock`, and its own `node_modules`, and depends on the library via `link:..`. Installing
+at the root does not install the example, and vice versa.
 
-## Requirements and Setup
+## Commands
 
-### System Requirements:
-- Node.js >= 18 (tested with 20.19.4)
-- Yarn package manager 1.22.22+ (do NOT use npm for this project)
-- TypeScript compiler (included in devDependencies)
+Run these from the repo root:
 
-### Dependencies are already installed if yarn.lock exists
-The repository includes both package-lock.json and yarn.lock but ALWAYS use yarn commands, never npm commands.
+| Command | What it does |
+| --- | --- |
+| `yarn test` | Jest suite, run under `TZ=Europe/Paris` (snapshots contain formatted times, so the timezone is pinned). Must stay green. |
+| `yarn test:watch` / `yarn test:coverage` | Same suite, watching or with coverage. |
+| `yarn typecheck` | `tsc --noEmit` over `src/`. Must stay clean. |
+| `yarn lint` | ESLint over **both** `src/` and `example/`. Must report 0 errors and 0 warnings. |
+| `yarn lint:fix` | Auto-fix what ESLint can. |
+| `yarn build` | `rm -rf lib && tsc` - emits `lib/`, which is gitignored and is what gets published. |
+| `yarn prepublishOnly` | lint + test + build, i.e. the full gate. |
 
-## Validation
+Inside `example/`: `yarn lint` and `yarn typecheck` cover the example app on its own. Note
+that the root `yarn lint` also lints `example/`, under **stricter** rules than the example's
+own `expo lint` - so a change that passes `cd example && yarn lint` can still fail at the root.
+Always run the root `yarn lint` before you finish.
 
-### Always run full validation before completing changes:
-1. `yarn lint` -- check for code style issues (warnings are acceptable, errors are not)
-2. `yarn build` -- verify TypeScript compilation succeeds
-3. `yarn test` -- NEVER CANCEL: ensure all 19 test suites and 29 tests pass. Takes 31 seconds.
+A husky `pre-commit` hook runs `lint-staged`. Its glob is `src/*.{json,js,jsx,ts,tsx}`, which
+matches only the **top level** of `src/` - a change under `src/MessagesContainer/` or
+`src/components/` is committed without `lint:fix` touching it. Do not rely on the hook; run
+the root `yarn lint` yourself.
 
-### Manual validation scenarios:
-After making code changes, you should test basic functionality by:
-1. Building the library: `yarn build`
-2. Running the test suite: `yarn test`
-3. For UI changes: Start the example app with `cd example && npx expo start --web` (if web dependencies are installed) or `npx expo start` for native development
-4. ALWAYS test that the TypeScript declarations in /lib are correctly generated
+## Layout
 
-### Testing approach:
-- All tests are located in `src/__tests__/` directory
-- Tests use Jest with React Test Renderer
-- Test coverage can be viewed with `yarn test:coverage`
-- Snapshot tests are used extensively (27 snapshots)
+```
+src/                     library source - the only thing published (as compiled lib/)
+  Chat/                  the top-level <Chat> component
+  MessagesContainer/     list engine (FlatList / FlashList), day header, scroll handling
+  Bubble/ Message/       a single message row and its bubble
+  Day/                   the date separator; the animated floating header lives in
+                         MessagesContainer/components/DayAnimated
+  Reactions/ Reply/      emoji reactions, swipe-to-reply
+  TypingIndicator/       the three-dot bubble
+  components/            shared leaf components (Icon, TouchableOpacity, markdown, voice…)
+  hooks/                 useTheme, useLabels, useStreamingMessages, …
+  locales/ i18n.ts       15 built-in UI translations, one file per language; en is the default
+  Theme.ts Icons.ts      theme tokens and the overridable icon registry
+  rtl.ts                 RTL detection and position mirroring
+  linkParser.tsx         URL / phone / email / mention / hashtag matching for MessageText
+  logging.ts             branded warning() / error() helpers
+  Models.ts              IMessage, User, QuickReplies, MessageReaction - the public data model
+  index.ts types.ts      public API surface; anything not exported here is internal
+  __tests__/             Jest tests, colocated with the source they cover
+tests/setup.ts           global Jest mocks (reanimated, worklets, safe-area, keyboard)
+example/                 Expo demo app - separate yarn project, consumes the built lib/
+expoSnack/               single-file demo for snack.expo.dev; not linted or built by CI
+docs/                    MIGRATION.md, STREAMING.md
+```
 
-## Project Structure
+A day separator is rendered by the list itself (`MessagesContainer/components/Item`), guarded
+by `isSameDay`, *around* whatever `renderMessage` returns. A custom `renderMessage` must not
+render its own `<Day>` - it would print a pill above every message.
 
-### Key directories:
-- `/src` -- main library source code (TypeScript)
-- `/lib` -- compiled JavaScript output (generated by `yarn build`, do not edit manually)
-- `/example` -- example React Native app demonstrating library usage
-- `/src/__tests__` -- Jest test files
-- `/.github/workflows/main.yml` -- CI/CD pipeline (tests Node 18 and 20)
+## Conventions
 
-### Important files:
-- `package.json` -- main project configuration and scripts
-- `tsconfig.json` -- TypeScript compiler configuration
-- `jest.config.cjs` -- Jest test configuration
-- `.eslintrc.cjs` -- ESLint linting rules
-- `babel.config.cjs` -- Babel transformation configuration
-- `example/package.json` -- example app dependencies
+Style is enforced by ESLint (`@stylistic`), so run `yarn lint:fix` rather than matching by eye:
 
-### Build output:
-The `yarn build` command generates JavaScript files and TypeScript declaration files in the `/lib` directory. This directory should not be edited manually and is ignored by git but included in npm package.
-
-## Common Tasks
-
-### Making code changes:
-1. Edit source files in `/src` directory
-2. Run `yarn lint` to check style
-3. Run `yarn build` to compile TypeScript
-4. Run `yarn test` to verify tests pass
-5. Test manually with example app if UI changes
-
-### Adding or modifying tests:
-- Tests are in `src/__tests__/` directory
-- Follow existing test patterns using React Test Renderer
-- Update snapshots if needed with `yarn test -u`
-- Ensure all tests pass with `yarn test`
-
-### Working with the example app:
-- Example app uses Expo and demonstrates library functionality
-- Install dependencies: `cd example && yarn install`
-- Start development server: `npx expo start`
-- For web: `npx expo start --web` (requires react-native-web and @expo/metro-runtime)
-
-## CI/CD Integration
-
-The repository uses GitHub Actions (`.github/workflows/main.yml`) that:
-- Tests on Node.js versions 18 and 20
-- Runs `yarn install` and `yarn build`
-- Build typically takes 1-2 minutes on CI
+- **no semicolons**, single quotes, 2-space indent, single quotes in JSX
+- a space before a function's parameter list: `export function useThemeColor (props) {`
+- **no braces around a single-statement block**, and the statement goes on the next line
+  (`curly: multi` + `nonblock-statement-body-position: below`):
+  ```ts
+  if (!currentMessage?.createdAt || isSameDay(currentMessage, previousMessage))
+    return null
+  ```
+- trailing commas on multiline arrays/objects/imports, none on function args; arrow params
+  are unparenthesised when there is exactly one (`arrow-parens: as-needed`)
+- imports are sorted by `perfectionist/sort-imports` - `yarn lint:fix` will reorder them
+- comments explain *why*, not *what*; several existing ones cite the issue they fix
+- user-visible diagnostics go through `logging.ts` (`warning`, `error`), which prefixes them
+  with the package name, rather than a bare `console.*`
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kesha-antonov/react-native-chat](https://github.com/kesha-antonov/react-native-chat) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
