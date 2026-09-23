@@ -1,91 +1,73 @@
 ---
 trigger: always_on
-description: Cheat Engine MCP Server — a C# plugin that exposes Cheat Engine functionality as MCP tools over Streamable HTTP using the official [Model Context Protocol C# SDK](https://github.com/modelcontextprotocol/csharp-sdk).
+description: `ce-mcp` builds `ce-mcp.dll`, an x64 Cheat Engine 7.6.2+ plugin that hosts a stateless MCP server over Streamable HTTP. It exposes process control, memory/pointer/scan, assembly/analysis, symbol/RTTI, Structure Dissect, cheat-table, injection, debugger, optional DBVM, address-list, conversion, and Lua operations. The plugin targets `net10.0-windows`, uses WPF for configuration, and embeds managed dependencies into one DLL.
 ---
 
-# Project Guidelines
+# Repository Guidelines
 
 ## Project Overview
 
-Cheat Engine MCP Server — a C# plugin that exposes Cheat Engine functionality as MCP tools over Streamable HTTP using the official [Model Context Protocol C# SDK](https://github.com/modelcontextprotocol/csharp-sdk).
+`ce-mcp` builds `ce-mcp.dll`, an x64 Cheat Engine 7.6.2+ plugin that hosts a stateless MCP server over Streamable HTTP. It exposes process control, memory/pointer/scan, assembly/analysis, symbol/RTTI, Structure Dissect, cheat-table, injection, debugger, optional DBVM, address-list, conversion, and Lua operations. The plugin targets `net10.0-windows`, uses WPF for configuration, and embeds managed dependencies into one DLL.
 
-**Key Architecture**:
-- **MCP Server**: ASP.NET Core app on `http://127.0.0.1:6300` with Streamable HTTP at `/`
-- **CE Plugin Host**: Runs inside Cheat Engine process, manages server lifecycle via menu
-- **CESDK Submodule**: C# wrapper for CE's Lua API (git submodule dependency)
-- **Single DLL**: All dependencies embedded, copy to CE plugins folder to deploy
+## Architecture & Data Flow
 
-## Cheat Engine Lua API Reference
+1. Cheat Engine loads the plugin through `CESDK`, which initializes shared Lua/native state and calls `McpPlugin.OnEnable`.
+2. `src/Plugin.cs` installs the `MCP` menu, loads `%APPDATA%\CeMCP\config.json`, applies `MCP_HOST`/`MCP_PORT` overrides, and starts the WPF configuration UI or server.
+3. `src/McpServer.cs` builds the ASP.NET Core host, registers tool classes, and maps the stateless Streamable HTTP endpoint.
+4. A method in `src/Tools/` validates an MCP request, marshals Cheat Engine work to the main GUI thread, and calls a typed `CESDK` facade.
+5. `CESDK/src/Classes/` calls the CE Lua API through `LuaUtils`/`LuaNative`; tools return JSON-visible `{ success = true, ... }` or `{ success = false, error }` objects.
 
-The full CE Lua API documentation is at `C:\Program Files\Cheat Engine\celua.txt`. Always consult this file when:
-- Adding new CESDK wrapper methods or tools
-- Verifying correct Lua function names, parameters, and return types
-- Understanding CE object models (MemScan, FoundList, AddressList, MemoryRecord, etc.)
+Dependency direction is `MCP tool -> CESDK typed facade -> LuaUtils/LuaNative -> Cheat Engine`. ASP.NET Core may handle concurrent requests, but CE Lua state and engine objects are not thread-safe: serialize CE-facing work with `ToolThread.OnMainThread(...)`. Keep process-attached checks and the subsequent operation in the same main-thread block.
 
-## Build and Test
+State is deliberately centralized: static `ServerConfig`, shared `PluginContext.Lua`, server fields on `McpPlugin`/`McpServer`, and named scanner state in `ScanTool`. Scanner/found-list lifecycles are order-sensitive: deinitialize old results, run the scan, call `WaitTillDone()`, initialize results, then read them.
 
-```bash
-# Initialize submodule (first time only)
+## Key Directories
+
+- `src/`: plugin lifecycle, MCP host, schema transforms, configuration, and WPF application code.
+- `src/Tools/`: client-facing MCP tool adapters grouped by CE capability.
+- `src/Models/`, `src/Views/`: WPF configuration state and UI.
+- `CESDK/src/`: submodule-provided native plugin bootstrap, Lua interop, and typed CE wrappers compiled into the plugin.
+- `tests/CeMCP.Tests/Unit/`: deterministic tests that do not require Cheat Engine.
+- `tests/CeMCP.Tests/Live/`: opt-in tests against a running CE-hosted MCP server.
+- `CESDK/tests/`: separate CE-loaded live-test plugin and report-validating MSTest host.
+- `skills/ce-mcp/`: distributable AI skill that must track the public MCP surface.
+- `.github/workflows/`: Windows build/artifact and SonarCloud pipelines.
+
+## Development Commands
+
+Run from the repository root in PowerShell:
+
+```powershell
 git submodule update --init --recursive
-
-# Build Debug
+dotnet restore
 dotnet build
-
-# Build Release
+dotnet test --filter "TestCategory!=Live"
 dotnet build -c Release
 ```
 
-**Deploy**: Copy `ce-mcp.dll` from `bin/x64/Debug/net10.0-windows/` (or Release) to Cheat Engine plugins directory, enable in CE, use "MCP" → "Start MCP Server" menu.
+CI-equivalent build sequence:
 
-**Requirements**: .NET 10.0 SDK, CE 7.6.2+, ASP.NET Core 10.0 runtime. CE must have `ce.runtimeconfig.json` set to .NET 10.0 (see README).
+```powershell
+dotnet restore
+dotnet build -c Debug --no-restore
+dotnet test -c Debug --no-restore --no-build --filter "TestCategory!=Live"
+dotnet build -c Release --no-restore
+```
 
-## Architecture
+Debug output is `bin/x64/Debug/net10.0-windows/ce-mcp.dll`; Release uses the corresponding `Release` directory. There is no repository lint or formatter command. SonarCloud is the configured static-analysis gate.
 
-### Core Components
+Manual run: copy the built DLL to Cheat Engine's plugins directory, restart CE, enable the plugin, choose `MCP` -> start server, and connect to `http://localhost:6300/` by default. This is a plugin, not a standalone application.
 
-- **Plugin.cs** — Main CE plugin entry point (`McpPlugin : CheatEnginePlugin`). Manages MCP server lifecycle, registers Lua functions for CE menu integration (`toggle_mcp_server`, `show_mcp_config`), provides WPF config UI. Handles assembly resolution for WPF components.
-- **McpServer.cs** — MCP server using `ModelContextProtocol.AspNetCore`. Registers all tools via `WithTools<T>()`, resources via `WithResources<T>()`, and maps endpoints with `MapMcp()`. Runs ASP.NET Core with minimal logging in background task.
-- **ServerConfig.cs** — Configuration management (host/port/name). Loads from `%APPDATA%\CeMCP\config.json` with env var overrides (`MCP_HOST`, `MCP_PORT`). Uses source-generated JSON serialization.
-- **ThemeHelper.cs** — Cross-platform dark mode detection (Windows registry, macOS `defaults`, Linux GTK settings)
+## Code Conventions & Common Patterns
 
-### Tools (`src/Tools/`)
-
-All tools use `[McpServerToolType]` on the class and `[McpServerTool(Name = "tool_name")]` + `[Description]` on methods. Tools are `public class` with a `private Constructor() {}` and static methods (not `static class` — required for MCP SDK DI). Each returns anonymous objects with `success` boolean and either result data or `error` message.
-
-- **ProcessTool** — Process and thread management (list/open processes, get current process ID)
-- **MemoryTool** — Memory read and write (bytes, int8/16/32/64, float, double, string, AOB patterns)
-- **ScanTool** — Memory scanning (first scan, next scan, reset, AOB scan) using MemScan/FoundList
-- **AssemblyTool** — Disassembly and address resolution (symbol lookups)
-- **AutoAssemblyTool** — Single-instruction assembly, Auto Assembler script execution and syntax checking
-- **MemoryViewTool** — Memory view operations: disassemble ranges, navigate code backwards, enumerate memory regions, query protections, set comments
-- **SymbolTool** — Symbol/module management: enumerate loaded modules, symbol lookup, enable Windows/kernel symbols, pointer size management
-- **AddressListTool** — Cheat table CRUD operations (get/add/update/delete/clear records)
-- **LuaExecutionTool** — Execute arbitrary Lua scripts in CE with stack management
-- **ConversionTool** — String format conversion (MD5, ANSI/UTF8)
-
-### Resources (`src/Resources/`)
-
-> **Not yet implemented** — `src/Resources/` does not exist yet. Resources use `[McpServerResourceType]` on class and `[McpServerResource(UriTemplate = "scheme://path")]` + `[Description]` on methods. Resources are read-only state/data (vs tools which perform actions). Return JSON strings.
-
-### SDK Layer (`CESDK/`)
-
-Git submodule — C# wrapper around Cheat Engine's Lua API. Key classes: `MemoryAccess`, `Process`, `AOBScanner`, `Assembler`, `Disassembler`, `AddressResolver`, `MemScan`, `FoundList`, `AddressList`, `ThreadList`, `Converter`, `Speedhack`, `Debugger`, `SymbolWaiter`, `SymbolManager`, `MemoryRegions`.
-
-### Views (`src/Views/`)
-
-- **ConfigWindow.xaml/.cs** — WPF config window. Supports dark/light theme via `ThemeHelper`. Runs in STA thread with dispatcher for cross-thread UI updates.
-
-## Adding New Tools
-
-1. Create a new file in `src/Tools/` with `[McpServerToolType]` class attribute
-2. Add static methods with `[McpServerTool(Name = "tool_name")]` and `[Description("...")]`
-3. Use `[Description]` on parameters for MCP schema generation
-4. Return anonymous objects: `new { success = true, ... }` or `new { success = false, error = "..." }`
-5. Register in `McpServer.cs` via `.WithTools<Tools.YourTool>()`
-6. Consult `C:\Program Files\Cheat Engine\celua.txt` for correct Lua function signatures
+- Use C# with 4-space indentation, nullable reference types, warnings as errors, and the existing brace style. Add XML summaries to public wrapper APIs; keep comments focused on CE/Lua edge cases.
+- MCP tool containers are `public class` types with `[McpServerToolType]` and a private constructor. Tool methods are synchronous static `object` methods decorated with `[McpServerTool(Name = "snake_case")]`; describe every public parameter.
+- Register every tool class explicitly in `McpServer.Start` with `WithToolsAndSchemaTransform<T>()`. Never use plain `WithTools<T>()`: `SchemaTransform` removes nullable type arrays and oversized numeric schema keywords that break some MCP clients.
+- Validate required inputs before native calls. Return anonymous structured objects with `success` and result fields, or `success = false` plus `error`. Catch operational exceptions at the tool boundary; CESDK wrappers translate lower-level failures to domain-specific exceptions.
+- Use `ToolThread.OnMainThread(...)` for new CE-facing tool bodies. Follow a subsystem's established pattern when modifying older scan, address-list, Lua, or debugger code; do not casually move CE work onto HTTP worker threads.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ShadowNineX/ce-mcp](https://github.com/ShadowNineX/ce-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
