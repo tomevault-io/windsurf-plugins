@@ -16,7 +16,7 @@ These instructions are for making changes in the LittleJS repo safely. Optimize 
   - Make changes in `src/` (and `plugins/` when appropriate), then run the build.
 - **Match surrounding style.** Follow the conventions in the files you touch.
 - **Avoid breaking public APIs.** If a change could break users, call it out clearly and offer a compatible alternative.
-- **Keep agent-generated working files under `.claude/`.** `docs/` is the published JSDoc API site — do not write into it. Superpowers plans go in `.claude/superpowers/plans/` and specs in `.claude/superpowers/specs/` (overrides the skill defaults). The `.claude/` folder is gitignored.
+- **Keep agent-generated working files under `.claude/`.** `docs/` is the published JSDoc API site and is fully generated — never hand-edit it, and don't regenerate it unless asked (see Documentation below). Superpowers plans go in `.claude/superpowers/plans/` and specs in `.claude/superpowers/specs/` (overrides the skill defaults). The `.claude/` folder is gitignored.
 
 If anything in this doc conflicts with the actual repo behavior, follow the repo behavior and update this doc.
 
@@ -32,6 +32,7 @@ LittleJS is a modular HTML5 game engine with:
 
 - **Core engine**: `src/engine*.js` (main loop, objects, rendering, physics, input, etc.)
 - **Plugins**: `plugins/*.js` (optional features like Box2D, post-processing, UI, audio helpers, etc.)
+- **3D**: `plugins/math3d.js` (Vector3, Matrix4, Ray3D, 3D collision and raycasts) and `plugins/render3d.js` (the 3D renderer: meshes, builders, lights, shadows, EngineObject3D, cameras, particles). Both are plugins in the same bundle, and `plugins/threejs.js` is the alternative that renders with Three.js.
 - **Build system**: `src/engineBuild.mjs` (concatenates modules into distributable bundles)
 
 ## Repo structure and file types
@@ -59,13 +60,16 @@ Prefer adding new optional features as plugins when it keeps the core simpler.
 - `examples/starter/` - Plain JavaScript global usage via `<script>` (recommended starting point)
 - `examples/module/` - ES module import pattern
 - `examples/typescript/` - TypeScript example usage
-- `examples/shorts/*.js` - Single-file demos loaded by the shorts harness
+- `examples/shorts/*.js` - Single-file demos loaded by the shorts harness; the 3D ones are `render3d*.js`
+- `examples/3d/` - The 3D plugin in one scene; `examples/threejs/` - the same idea rendered with Three.js
 
 ### Short examples (`examples/shorts/*.js`)
 Short examples are special:
 - Pure JS code file, no HTML
 - No imports, do not use LJS namespace - engine APIs are available globally
 - Override hooks: `gameInit()`, `gameUpdate()`, `gameUpdatePost()`, `gameRender()`, `gameRenderPost()`
+- Lines stay within 80 columns, and colors are written with `hsl(...)`, never `rgb(...)`
+- Each short is listed in `examples/shorts.js` with a name, a short description and search keywords
 
 ## Coding conventions
 
@@ -99,37 +103,16 @@ isNumber(n)   // true if number and not NaN
 isStringLike(s) // true if stringifiable (has toString returning a string)
 isArray(a)    // true if array
 isVector2(v)  // true if valid Vector2
+isVector3(v)  // true if valid Vector3 (3D math plugin)
 isColor(c)    // true if valid Color
 ```
 
-### Math aliases
-Engine source exposes short aliases for common `Math.*` calls — prefer them
-over `Math.X` in engine and plugin code:
+A field that starts as `undefined` reaches `dist/littlejs.d.ts` as `any`, because tsc infers field types from their assignments. Give it a `@type` tag beside its `@property` tag, the way `fogColor` and `obj.shader` do:
 ```javascript
-abs, floor, ceil, round, min, max, sign, hypot, log2, sin, cos, tan, atan2, PI
-```
-For things without an alias (e.g. `Math.trunc`, `Math.SQRT2`), use `Math.*` as normal.
-
-### Global variables
-- Engine time: `time`, `timeReal`, `frame`, `timeDelta`
-- Camera: `cameraPos`, `cameraScale`, `cameraAngle`
-- Input: `mousePos`, `mousePosScreen`, `mouseWheel`
-- State: `paused`, `debug`, `debugOverlay`
-- Settings are in `engineSettings.js` with corresponding setter functions
-
-## Common patterns
-
-### Game structure
-```javascript
-function gameInit() { }       // Called once after engine starts
-function gameUpdate() { }     // Called every frame for game logic
-function gameUpdatePost() { } // Called after physics, even when paused
-function gameRender() { }     // Called before objects render
-function gameRenderPost() { } // Called after objects render
-
+/** @property {Shader|undefined} - Custom shader to render with
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [KilledByAPixel/LittleJS](https://github.com/KilledByAPixel/LittleJS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
