@@ -7,12 +7,12 @@ Public repository of skills for people or LLMs to read off
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [skyciv/skyciv-ai-skills](https://github.com/skyciv/skyciv-ai-skills).
+Original source: `CLAUDE.md` in [skyciv/skyciv-ai-skills](https://github.com/skyciv/skyciv-ai-skills).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
