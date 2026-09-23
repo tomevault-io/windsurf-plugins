@@ -3,7 +3,7 @@ trigger: always_on
 description: > Project memory for AI coding agents. Keep terse and concrete.
 ---
 
-# CLAUDE.md — pineforge-engine
+# AGENTS.md — pineforge-engine
 
 > Project memory for AI coding agents. Keep terse and concrete.
 
@@ -12,19 +12,43 @@ description: > Project memory for AI coding agents. Keep terse and concrete.
 Both C++ unit tests and full corpus verification must pass.
 
 ```bash
-# 1. Build and run unit tests (ctest)
-cmake -B build -S . \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DPINEFORGE_BUILD_TESTS=ON \
-    -DPINEFORGE_BUILD_CORPUS_STRATEGIES=ON
-cmake --build build -j$(nproc 2>/dev/null || echo 4)
-ctest --test-dir build --output-on-failure
+# Fast workflow/source checks first (requires actionlint 1.7.12 + ShellCheck).
+# This does not replace either verification step below.
+python3 scripts/ci_preflight.py
+
+# 1. Run the same complete verification profile as CI
+python3 scripts/ci_verify.py release --build-dir build --jobs 4
+# Relevant additional profiles: debug, sanitizers, native (see docs/ci.md)
 
 # 2. Run full validation corpus sweep (against TV exported trades)
 ./scripts/run_corpus.sh
 ```
 
+> **Stale-test-binary trap:** `cmake --build build --target pineforge` rebuilds
+> ONLY the static lib. Test executables are separate targets that statically
+> link it, and `ctest` does not rebuild anything — after a lib-only build,
+> ctest runs STALE test binaries and can falsely pass. Always run a full
+> `cmake --build build` (all targets) before `ctest` when runtime values
+> changed. Before trusting any result, `build/lib/libpineforge.a` must be
+> newer than every working-tree file in `src/`, `include/`, and
+> `CMakeLists.txt` (uncommitted edits count) — else the conclusion is a
+> stale-build artifact.
+
 If `scripts/run_corpus.sh` reports any parity drift or failures, investigate the underlying cause. No regressions are allowed unless a resolved bug was previously masking a divergence.
+
+## Concurrency
+
+- `scripts/derive_corpus_feeds.py` (`ensure_derived()`) is a cheap no-op when
+  `corpus/data/derived/` is fresh, but a REBUILD is not concurrent-safe: it
+  writes through a fixed `*.csv.new` tmp then renames, so two processes
+  materializing simultaneously race and can corrupt the derived feeds. Run it
+  once to freshness BEFORE fanning out parallel consumers.
+- Never run `scripts/run_corpus.sh` while any external harness that links
+  `build/lib/libpineforge.a` or reads `corpus/data/derived/` is running:
+  run_corpus.sh re-materializes the derived feeds and rebuilds the lib
+  (`--target corpus_strategies` links `pineforge`), clobbering both under the
+  concurrent run. External sweeps may run in parallel with each other over
+  disjoint work sets, but never overlapped with run_corpus.sh.
 
 ## Build Commands
 
@@ -66,6 +90,28 @@ they are codegen-emitted; the checker enforces exactly that split.
 - Keep helper functions inline or in clean namespaces.
 - Do not add external dependencies without explicit user request.
 
+## Refactor workers (native-engine programme, R4 and later)
+
+Applies to any agent — Claude, Codex, OpenCode — implementing a slice of the
+native-engine refactor in this repository. The campaign repo's standing
+orders (`pineforge-workflow/AGENTS.md`, "Roles and dispatch") govern who
+dispatches, reviews and measures; this section is what binds you here.
+
+- You work in the worktree and branch your brief names, on the files it
+  lists as yours, and nowhere else. A need in another file is reported to the
+  supervisor, never edited quietly. You never push; the supervisor opens the
+  PR after the one campaign sweep.
+- A neutral refactor never opens the measured sources
+  (`src/engine_strategy_commands.cpp`, `engine_fills.cpp`, `engine_orders.cpp`,
+  `engine_risk.cpp`, `engine_run.cpp`, `engine_market_admission.cpp`) and
+  never edits the frozen native headers the settlement ABI checker names; the
+  fixed parity population must stay byte-identical by construction, which the
+  supervisor proves with the sweep, not you.
+- C++17 only (`rg 'bit_cast|<bit>' src include tests scripts` = 0). Every
+  added durable state is hashed. Existing numeric assertions and fixture
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
 ---
 > Source: [pineforge-4pass/pineforge-engine](https://github.com/pineforge-4pass/pineforge-engine) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
