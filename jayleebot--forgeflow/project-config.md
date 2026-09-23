@@ -3,7 +3,7 @@ trigger: always_on
 description: Before making any changes, read README.md and docs/ to understand what ForgeFlow is building.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 ## 0. Read Product Context First
 Before making any changes, read README.md and docs/ to understand what ForgeFlow is building.
@@ -76,4 +76,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 > Source: [JayleeBot/ForgeFlow](https://github.com/JayleeBot/ForgeFlow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
