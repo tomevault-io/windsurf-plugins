@@ -1,130 +1,190 @@
 ---
 trigger: always_on
-description: Modern UI Component Building Standards - Comprehensive guidelines for building accessible, composable, and maintainable UI components
+description: Stagehand browser automation - AI-powered act, extract, and observe methods for Playwright with autonomous agent capabilities
 ---
 
 
-# Modern UI Component Building Standards
+# Stagehand Project
 
-## 🚨 CRITICAL REQUIREMENTS (Must Follow)
+This is a project that uses [Stagehand](https://github.com/browserbase/stagehand), which amplifies Playwright with AI-powered `act`, `extract`, and `observe` methods added to the Page class.
 
-### Accessibility (NON-NEGOTIABLE)
+`Stagehand` is a class that provides configuration and browser automation capabilities with:
+- `stagehand.page`: A StagehandPage object (extends Playwright Page)
+- `stagehand.context`: A StagehandContext object (extends Playwright BrowserContext)
+- `stagehand.agent()`: Create AI-powered agents for autonomous multi-step workflows
+- `stagehand.init()`: Initialize the browser session
+- `stagehand.close()`: Clean up resources
 
-- **ALWAYS** use semantic HTML elements appropriate to the component's role
-- **ALWAYS** ensure keyboard navigation and focus management
-- **ALWAYS** provide proper ARIA roles/states and test with screen readers
-- **NEVER** create components that aren't accessible - this is a baseline requirement
-- **ALWAYS** start with semantic HTML first, then augment with ARIA if needed
+`Page` extends Playwright's Page class with AI-powered methods:
+- `act()`: Perform actions on web elements using natural language
+- `extract()`: Extract structured data from pages using schemas
+- `observe()`: Plan actions and get selectors before executing
 
-### TypeScript Standards (MANDATORY)
+`Agent` provides autonomous Computer Use Agent capabilities:
+- `execute()`: Perform complex multi-step tasks using natural language instructions
 
-- **ALWAYS** extend native HTML attributes: `React.ComponentProps<"div">`
-- **ALWAYS** export component prop types: `export type ComponentNameProps`
-- **ALWAYS** support both controlled and uncontrolled state
-- **ALWAYS** wrap a single HTML element per component
-- **NEVER** create components that wrap multiple elements
+`Context` extends Playwright's BrowserContext class for browser session management.
 
-### Composition Patterns (ESSENTIAL)
+Use the following rules to write code for this project.
 
-- **ALWAYS** favor composition over inheritance
-- **ALWAYS** expose clear APIs via props/slots for customization
-- **ALWAYS** make components composable and reusable
-- **ALWAYS** use `asChild` pattern for flexible element types
-- **ALWAYS** support polymorphism with `as` prop when appropriate
+- To plan an instruction like "click the sign in button", use Stagehand `observe` to get the action to execute.
 
-## 🎯 HIGH PRIORITY PATTERNS
+```typescript
+const results = await page.observe("Click the sign in button");
+```
 
-### Framework Standards (shadcn/ui + Radix UI)
+You can also pass in the following params:
 
-- **MUST** use `@radix-ui/react-*` primitives for behavior and accessibility
-- **MUST** use `class-variance-authority` (CVA) for component variants
-- **MUST** use `@radix-ui/react-slot` for `asChild` pattern
-- **MUST** use `@radix-ui/react-use-controllable-state` for state management
-- **MUST** follow shadcn/ui component structure and naming conventions
-- **MUST** use `cn()` utility combining `clsx` and `tailwind-merge`
-- **MUST** export both component and variant functions (e.g., `Button, buttonVariants`)
+```typescript
+await page.observe({
+  instruction: "the instruction to execute",
+  returnAction: true 
+});
+```
 
-### Project-Specific Dependencies
+- The result of `observe` is an array of `ObserveResult` objects that can directly be used as params for `act` like this:
+  ```typescript
+  const results = await page.observe({
+    instruction: "the instruction to execute",
+    returnAction: true, // return the action to execute
+  });
 
-- **MUST** use `@radix-ui/react-icons` for icons (not Lucide React for UI components)
-- **MUST** use `lucide-react` for application icons and illustrations
-- **MUST** use `framer-motion` for animations and transitions
-- **MUST** use `next-themes` for theme management
-- **MUST** use `tailwindcss-animate` for CSS animations
-- **MUST** use `sonner` for toast notifications
-- **MUST** use `embla-carousel-react` for carousels
-- **MUST** use `react-resizable-panels` for resizable layouts
+  await page.act(results[0]);
+  ```
+  
+- When writing code that needs to extract data from the page, use Stagehand `extract`. Explicitly pass the following params by default:
 
-### State Management
+```typescript
+const { someValue } = await page.extract({
+  instruction: "the instruction to execute",
+  schema: z.object({
+    someValue: z.string(),
+  }), // The schema to extract
+});
+```
 
-- **MUST** support both controlled and uncontrolled modes
-- **MUST** use `useControllableState` pattern for state merging
-- **MUST** provide `defaultValue` and `onValueChange` props
-- **MUST** allow parent to control state or component to manage internally
+## Initialize
 
-### Styling with Tailwind
+```typescript
+import { Stagehand, Page, BrowserContext } from "@browserbasehq/stagehand";
 
-- **MUST** use `cn()` utility combining `clsx` and `tailwind-merge`
-- **MUST** follow class order: base → variants → conditionals → user overrides
-- **MUST** use `data-state` for visual states: `data-state="open|closed"`
-- **MUST** use `data-slot` for component identification: `data-slot="button"`
-- **MUST** define variants outside components to avoid recreation
+const stagehand = new Stagehand({
+  env: "BROWSERBASE"
+});
 
-### Data Attributes (REQUIRED)
+await stagehand.init();
 
-- **ALWAYS** use `data-state` for component states (open/closed, loading, etc.)
-- **ALWAYS** use `data-slot` for component identification
-- **ALWAYS** use kebab-case naming: `data-slot="form-field"`
-- **ALWAYS** enable parent-aware styling with `has-[]` selectors
+const page = stagehand.page; // Playwright Page with act, extract, and observe methods
 
-## 📋 STANDARD PRACTICES
+const context = stagehand.context; // Playwright BrowserContext
+```
+### Configuration Options
+```typescript
+const StagehandConfig = {
+  env: "BROWSERBASE" | "LOCAL", // Environment to run in
+  apiKey: process.env.BROWSERBASE_API_KEY, // Browserbase API key
+  projectId: process.env.BROWSERBASE_PROJECT_ID, // Browserbase project ID
+  debugDom: true, // Enable DOM debugging features
+  headless: false, // Run browser in headless mode
+  domSettleTimeoutMs: 30_000, // Timeout for DOM to settle
+  enableCaching: true, // Enable action caching
+  modelName: "gpt-4o", // AI model to use
+  modelClientOptions: {
+    apiKey: process.env.OPENAI_API_KEY, // OpenAI API key
+  },
+};
+```
+## Act
 
-### Component Architecture
+You can act directly with string instructions:
 
-- **Primitive**: Unstyled, behavior-focused building blocks
-- **Component**: Styled, immediately usable UI units
-- **Pattern**: Documented solutions for common problems
-- **Block**: Production-ready compositions
+```typescript
+await page.act("Click the sign in button");
+```
 
-### API Design
+Use variables for dynamic form filling:
 
-- **Props API**: Stable, typed, documented with defaults
-- **Children/Slots**: Support implicit and named slots
-- **Render Props**: Use function-as-child when parent owns data
-- **Provider/Context**: Top-level components for shared state
-- **Portal**: For layering/stacking context with a11y
+```typescript
+await page.act({
+  action: `Enter the following information:
+    Name: %name%
+    Email: %email%
+    Phone: %phone%`,
+  variables: {
+    name: "John Doe",
+    email: "john@example.com", 
+    phone: "+1-555-0123"
+  }
+});
+```
 
-### Styling and Theming
+**Best Practices:**
+- Cache the results of `observe` to avoid unexpected DOM changes
+- Keep actions atomic and specific (e.g., "Click the sign in button" not "Sign in to the website")
+- Use variable substitution for dynamic data entry
 
-- **Design Tokens**: Named, platform-agnostic values
-- **Headless vs Styled**: Choose based on use case
-- **Variants**: Discrete style/behavior permutations via props
-- **Class Variance Authority**: For complex variant management
+Act `action` should be as atomic and specific as possible, i.e. "Click the sign in button" or "Type 'hello' into the search input".
+AVOID actions that are more than one step, i.e. "Order me pizza" or "Send an email to Paul asking him to call me".
 
-## 🔧 IMPLEMENTATION GUIDELINES
+## Extract
 
-### TypeScript Best Practices (shadcn/ui Pattern)
+### Simple String Extraction
 
-```tsx
-// ✅ CORRECT: shadcn/ui component structure
-import { cva, type VariantProps } from "class-variance-authority";
-import { Slot } from "@radix-ui/react-slot";
-import { cn } from "@/lib/utils";
+```typescript
+const signInButtonText = await page.extract("extract the sign in button text");
+```
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+### Structured Extraction with Schema (Recommended)
+
+Always use Zod schemas for structured data extraction:
+
+```typescript
+import { z } from "zod";
+
+const data = await page.extract({
+  instruction: "extract the sign in button text",
+  schema: z.object({
+    text: z.string(),
+  }),
+});
+```
+
+### Array Extraction
+
+To extract multiple items, wrap the array in a single object:
+
+```typescript
+const data = await page.extract({
+  instruction: "extract the text inside all buttons",
+  schema: z.object({
+    buttons: z.array(z.string()),
+  })
+});
+```
+
+### Complex Object Extraction
+
+For more complex data structures:
+
+```typescript
+const productData = await page.extract({
+  instruction: "extract product information from this page",
+  schema: z.object({
+    title: z.string(),
+    price: z.number(),
+    description: z.string(),
+    features: z.array(z.string()),
+    availability: z.boolean(),
+  }),
+});
+```
+
+### Schema Validation
+
+```typescript
+import { validateZodSchema } from "./utils.js";
+import { z } from "zod";
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
