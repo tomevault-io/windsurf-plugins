@@ -1,0 +1,115 @@
+---
+trigger: always_on
+description: Flutter app for Disting NT Eurorack module: preset management, algorithm loading, parameter control via MIDI SysEx.
+---
+
+# nt_helper - Disting NT MIDI Helper
+
+Flutter app for Disting NT Eurorack module: preset management, algorithm loading, parameter control via MIDI SysEx.
+
+**Platforms:** Linux, macOS, iOS, Android, Windows
+**Modes:** Demo (no hardware), Offline (cached), Connected (live MIDI)
+
+## Architecture
+
+- **State:** Cubit pattern with delegate decomposition (`lib/cubit/disting_cubit.dart`)
+- **MIDI:** Interface-based with mock/offline/live implementations (`lib/domain/i_disting_midi_manager.dart`)
+- **Database:** Drift ORM (`lib/db/database.dart`)
+- **MCP:** Model Context Protocol server (`lib/services/mcp_server_service.dart`)
+
+### DistingCubit Delegates
+
+The main cubit is decomposed into delegates and mixins for maintainability.
+
+**Rule of thumb**: keep `lib/cubit/disting_cubit.dart` as an orchestration/facade layer. Add new non-trivial behavior in a delegate or an existing ops mixin.
+
+| File | Type | Purpose |
+|------|------|---------|
+| `*_connection_delegate.dart` | Delegate | MIDI device connection |
+| `*_parameter_fetch_delegate.dart` | Delegate | Parameter loading with retry |
+| `*_parameter_refresh_delegate.dart` | Delegate | Live parameter polling |
+| `*_parameter_value_delegate.dart` | Delegate | Parameter value writes + verification |
+| `*_parameter_string_delegate.dart` | Delegate | Parameter value-string reads/writes |
+| `*_mapping_delegate.dart` | Delegate | CV/MIDI/i2c/performance mappings |
+| `*_slot_state_delegate.dart` | Delegate | Slot state updates + routing refresh |
+| `*_slot_maintenance_delegate.dart` | Delegate | Slot repair/refresh/reset helpers |
+| `*_state_refresh_delegate.dart` | Delegate | Refresh state from MIDI manager |
+| `*_state_helpers_delegate.dart` | Delegate | Routing + offline metadata helpers |
+| `*_algorithm_library_delegate.dart` | Delegate | Algorithm library refresh/rescan |
+| `*_plugin_delegate.dart` | Delegate | Plugin installation |
+| `*_sd_card_delegate.dart` | Delegate | SD card preset listing/scanning |
+| `*_lua_reload_delegate.dart` | Delegate | Lua reload with state preservation |
+| `*_offline_demo_delegate.dart` | Delegate | Demo/offline mode |
+| `*_hardware_commands_delegate.dart` | Delegate | Screenshot/display/reboot/remount |
+| `*_monitoring_delegate.dart` | Delegate | CPU monitoring + USB video |
+| `*_refresh_delegate.dart` | Delegate | Refresh/cancelSync orchestration |
+| `*_algorithm_ops.dart` | Mixin | Algorithm operations |
+| `*_preset_ops.dart` | Mixin | Preset operations |
+| `*_slot_ops.dart` | Mixin | Slot operations |
+
+All use `part of 'disting_cubit.dart'` for private access. See `docs/architecture/coding-standards.md` for pattern details and guardrails.
+
+## Routing System
+
+OO framework in `lib/core/routing/` for data-driven routing visualization.
+
+- `AlgorithmRouting.fromSlot()` creates routing from live Slot data
+- `ConnectionDiscoveryService` discovers connections via bus assignments (1-12 inputs, 13-20 outputs)
+- `RoutingEditorCubit` orchestrates state; `RoutingEditorWidget` displays only
+- ES-5 algorithms (clck, eucp, clkm, clkd, pycv) support direct output routing via `Es5DirectOutputAlgorithmRouting`
+
+## Key Files
+
+| Area | Path |
+|------|------|
+| State | `lib/cubit/disting_cubit.dart` (+ delegates/mixins) |
+| Routing | `lib/core/routing/algorithm_routing.dart` |
+| Main UI | `lib/ui/synchronized_screen.dart` |
+| Routing UI | `lib/ui/widgets/routing/routing_editor_widget.dart` |
+| Metadata | `lib/services/algorithm_metadata_service.dart` |
+
+## Graphify Codebase Graph
+
+`nt_helper` is indexed in Substrate's registered `graphify-mcp` graph. Invoke
+the `graphify` skill for graph search, architecture discovery, relationship
+tracing, ownership/adjacency checks, or PR impact work. The skill is the source
+of truth for live service discovery and tool routing.
+
+Route every Graphify service lookup and tool call through `mcp__substrate`.
+Use the `graphify-mcp__*` tools mapped by Substrate, or
+`mcp__substrate.invoke_tool` when the compatibility wrapper is required. Never
+connect to or invoke a standalone Graphify MCP server directly.
+
+Use Graphify to find existing behavior before introducing a new helper,
+delegate, service, or parallel implementation.
+
+1. Start with the smallest useful query: `query_graph` for orientation,
+   `get_node`/`get_neighbors` for a specific symbol, and `shortest_path` for a
+   relationship between concepts.
+2. For architecture or impact work, inspect the relevant communities rather
+   than stopping at Community 0, which is only the largest cluster.
+3. Treat Graphify as a map, not source truth. Confirm important findings with
+   `rg` and the actual files in this checkout before editing.
+
+Follow the skill's Substrate-registered service workflow rather than using
+generic knowledge search, an external Graphify install, or a local graph
+rebuild. Prefer plain `rg` for a simple exact text/file lookup. Use PR-impact
+tools only for PR/merge work, and corroborate current GitHub status separately.
+
+## Commands
+
+```
+flutter analyze          # Must pass with zero warnings
+flutter test             # Run before commits
+flutter run -d macos --print-dtd   # Run with DTD URL for MCP connection
+```
+
+## Updating Flutter (fvm)
+
+```
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [No-Such-Device/nt_helper](https://github.com/No-Such-Device/nt_helper) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-22 -->
