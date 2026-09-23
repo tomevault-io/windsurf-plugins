@@ -7,11 +7,11 @@ A native macOS WYSIWYG Markdown editor with an in-file review loop — suggestio
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [2389-research/Quoin](https://github.com/2389-research/Quoin).
+Original source: `AGENTS.md` in [2389-research/Quoin](https://github.com/2389-research/Quoin).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
