@@ -1,72 +1,111 @@
 ---
 trigger: always_on
-description: You are **Master Agent MoAI** — the master orchestrator whose mission is the user's successful agentic coding. MoAI is the Strategic Orchestrator for Claude Code. All tasks must be delegated to specialized agents.
+description: Every clause here binds a turn regardless of which agent harness drives it. The file is
 ---
 
-# MoAI Execution Directive
+# AGENTS.md — standing contract for agents in this repository
 
-## 1. Core Identity
+Every clause here binds a turn regardless of which agent harness drives it. The file is
+**self-sufficient**: it assumes no other instruction file is loaded, and no nested `AGENTS.md`
+exists anywhere in this repository.
 
-You are **Master Agent MoAI** — the master orchestrator whose mission is the user's successful agentic coding. MoAI is the Strategic Orchestrator for Claude Code. All tasks must be delegated to specialized agents.
+**Budget warning.** A personal `~/.codex/AGENTS.md` joins the same merged chain and is consumed
+**before** this file, narrowing what the project's contract can carry. Overflow is dropped from the
+**tail**, silently — no warning, no stderr, exit 0. Clauses below are ordered most-critical-first
+for that reason.
 
-### HARD Rules (Mandatory)
-
-- [ZONE:Evolvable] [HARD] Language-Aware Responses: All user-facing responses MUST be in user's conversation_language
-- [ZONE:Evolvable] [HARD] Parallel Execution: Execute all independent tool calls in parallel when no dependencies exist
-- [ZONE:Evolvable] [HARD] User Response Format: Use plain Markdown for all user-facing responses (XML tags are reserved for internal agent-to-agent data transfer)
-- [ZONE:Evolvable] [HARD] Markdown Output: Use Markdown for all user-facing communication
-- [ZONE:Frozen] [HARD] AskUserQuestion-Only Interaction: ALL questions directed at the user MUST go through AskUserQuestion (See Section 8)
-- [ZONE:Frozen] [HARD] Deferred Tool Preload: AskUserQuestion, TaskCreate/Update/List/Get are deferred tools — schema is NOT loaded at session start. Call ToolSearch BEFORE first use to load schemas. Calling without schema produces InputValidationError. (See Section 8 Deferred Tool Preload Protocol)
-- [ZONE:Evolvable] [HARD] Context-First Discovery: Conduct Socratic interview via AskUserQuestion when context is insufficient before executing non-trivial tasks (See Section 7)
-- [ZONE:Evolvable] [HARD] Approach-First Development: Explain approach and get approval before writing code (See Section 7)
-- [ZONE:Evolvable] [HARD] Multi-File Decomposition: Split work when modifying 3+ files (See Section 7)
-- [ZONE:Evolvable] [HARD] Post-Implementation Review: List potential issues and suggest tests after coding (See Section 7)
-- [ZONE:Evolvable] [HARD] Reproduction-First Bug Fix: Write reproduction test before fixing bugs (See Section 7)
-
-Core principles (1-4) and six Agent Core Behaviors (consolidated cross-cutting rules) are defined in .claude/rules/moai/core/moai-constitution.md. Development safeguards (5-9) are detailed in Section 7.
-
-### Recommendations
-
-- Agent delegation recommended for complex tasks requiring specialized expertise
-- Direct tool usage permitted for simpler operations
-- Appropriate Agent Selection: Optimal agent matched to each task
+Obligations are carried from `.claude/rules/moai/**` and `CLAUDE.md`, which remain the source of
+truth; compression removed rationale and incident records, never an obligation. Claude-only
+mechanisms (the question channel, subagent spawning, skills, session handoff) stay there.
 
 ---
 
-## 2. Request Processing Pipeline
+## 1. Evidence and verification claims
 
-**Analyze-First** is the default main-session orchestration behavior: every request — in any input language (any `conversation_language`), with or without a `/moai` subcommand — flows through one ordered pipeline. It begins with intent analysis: classify meaning, language-independent, never gated on English keyword matching. The structured Intent Router (P1 subcommand fast-path + P3 semantic classification) lives in the `/moai` skill (`.claude/skills/moai/SKILL.md`); this section defines the pipeline the router plugs into.
+**No unobserved claim.** An actor MUST NOT assert a verification, a completion, **a defect / debt /
+drift, OR the premise underlying a recommendation** it did not actually verify with the domain's
+mechanical tooling. Evidence absent is not evidence of success — nor of failure. The absence of a
+failure signal never establishes that a check passed; a text-pattern inference is a hypothesis, not
+a verified defect; a reference existing does not establish that the referenced capability is still
+live. Reachability is not justification.
 
-Five ordered stages:
+**Baseline-integrity attribution.** Every verification claim MUST be attributed to an
+actually-measured baseline — the command that was run plus the output observed, in this run,
+against this tree. A figure carried over from another package, tree, or point in time is not a
+baseline; using it as a fresh measurement violates this. Anything unattributed is a Gap, not a
+Claim.
 
-- ① **Intent analysis** — classify the request's intent regardless of input language (any `conversation_language`; language-independent, not keyword-gated). Technology signals are context for stage ③ only, never the routing gate.
-- ② **Context-sufficiency check** — when context is insufficient, run the Rule 5 Context-First Discovery `AskUserQuestion` rounds (§7) before proceeding.
-- ③ **Execution-plan composition** — compose the skill / agent / dynamic-workflow chain and select the Phase 0.95 orchestration mode (unchanged; see `.claude/rules/moai/workflow/orchestration-mode-selection.md`). The composed plan MUST name which skills will be loaded and which agents will be spawned in what order, and this skill/agent invocation plan is surfaced to the user before execution for non-trivial tasks (Approach-First, §7 Rule 1).
-- ④ **Approval gates** — unchanged, including the **Implementation Kickoff Approval** human gate at the plan→run boundary (§8); the gate also offers an autonomous-vs-semi-autonomous progression-mode axis (a post-approval progression choice, never a gate bypass).
-- ⑤ **Execute → verify → iterate** — run the plan, verify against acceptance criteria, iterate; when a goal is armed (`/goal`, `/moai goal`), the goal evaluator is the termination judge.
-
-Report: consolidate agent results and format the response in the user's `conversation_language`.
-
----
-
-## 3. Command Reference
-
-### Unified Skill: /moai
-
-Single entry point for all MoAI development workflows.
-
-Subcommands: plan, run, sync, project, fix, loop, mx, feedback, review, clean, codemaps, gate, e2e, harness
-Default (natural language): Routes to autonomous workflow (plan -> run -> sync pipeline)
-
-`/moai loop` and `/moai fix` are goal-preset siblings built on the goal engine: `/moai loop` is the goal preset for a bounded project-wide improvement sweep (scan a finite issue queue, then delegate iterate-until-done to the goal engine), and `/moai fix` is the one-shot turn-based preset.
+**Evidence-bearing report format.** Verification and completion reports SHOULD carry five sections,
+on every report and not only the first: **Claim** (what is asserted); **Evidence** (the command run
+plus its verbatim output — a summary is not evidence); **Baseline-attribution** (what it was
+measured against, in this run); **Gaps** (what was explicitly NOT observed — an empty Gaps section
+asserts nothing was left unobserved, which must itself be true); **Residual-risk** (what could
+still be wrong despite what was observed).
 
 ---
 
-## 4. Agent Catalog
+## 2. Git, branches, and the shared checkout
 
+The primary checkout is shared — several sessions may work in it at once, and branch state there is
+global.
+
+**Never change branch state in the primary checkout.** Forbidden there: `git checkout <branch>` /
+`git switch` (relocates every concurrent session's tree); `git checkout -b` / `git switch -c` /
+`git branch` (same, plus an unexpected branch); `git reset --hard` / `git checkout -- <path>`
+(discards work of unknown provenance); `git stash` (repository-global — it silently absorbs another
+session's uncommitted changes); `git rebase` / `git merge` onto the checked-out branch (rewrites or
+advances shared history mid-operation). Read-only inspection, `git fetch`, commits to the
+already-checked-out branch, and pushing it are permitted.
+
+**Re-read branch and commit state immediately before any commit or push** — never a value read
+earlier in the turn, never the branch reported at session start:
+
+```bash
+git rev-parse --short HEAD
+git branch --show-current
+```
+
+A difference from what the turn assumed means another actor is writing the same tree: stop and
+report the divergence instead of proceeding.
+
+**Never sweep-stage.** In the primary checkout, never `git add -A`, `git add .`, or
+`git commit -a`. Stage by explicit pathspec and re-read `git status --short` immediately before
+staging, so another session's files are visible and excluded. This binds **even when no foreign
+session was detected** — one can arrive after the check, and the sweep is what turns its presence
+into lost work.
+
+**Detect parallel sessions before a non-trivial direct edit** to a shared path (`.claude/`,
+`.moai/`, `internal/`, `pkg/`, `cmd/`, repo-root config), and surface any divergence:
+
+```bash
+git fetch origin main 2>&1
+git rev-list --count --left-right origin/main...HEAD
+```
+
+`0 0` or `0 N` proceeds; `N 0` or `N M` means resolve before editing. Where another live session
+shares the checkout, isolate into a worktree rather than editing in the shared tree. The check
+decays — re-run it before any commit and after a long pause.
+
+---
+
+## 3. Worktrees
+
+**Work inside a worktree, entered through the launcher** (`moai cc -w <name>`,
+`moai cc -w <name> --spawn` for a new window, `EnterWorktree(<path>)` to re-enter); never create one
+with a bare `git worktree add`. Leave with `ExitWorktree`. Drive a worktree with `git -C <path>`,
+not `cd`.
+
+**`moai worktree done` closes L2 trees only.** A tree under `.claude/worktrees/` is L1, is absent
+from the registry, and is disposed by the session-end prompt or by `git worktree unlock` +
+`git worktree remove`.
+
+**A card's branch is unpushed, so its worktree holds the only copy of the work.** Dispose of no
+worktree — L1 or L2 — until the branch is integrated and the remote merge has landed.
+
+**Start a new card in a new worktree.** Exit any previous worktree back to the primary checkout
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [modu-ai/moai-cowork](https://github.com/modu-ai/moai-cowork) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
