@@ -7,11 +7,11 @@ New results and AI-powered research on the square packing problem
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [jlevy/squares](https://github.com/jlevy/squares).
+Original source: `AGENTS.md` in [jlevy/squares](https://github.com/jlevy/squares).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
