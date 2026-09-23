@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: Guidance for Claude Code working in this repo.
+description: Guidance for Codex working in this repo.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for Claude Code working in this repo.
+Guidance for Codex working in this repo.
 
 ## What this is
 
@@ -26,8 +26,8 @@ src/spark_doctor/
   cli.py              # Typer entrypoint
   models.py           # Pydantic: ScanReport, Finding, MetricSample, etc.
   shell.py            # run() — safe subprocess wrapper
-  collectors/         # os_info, firmware, gpu, memory, docker_runtime, processes, network, logs
-  rules/              # engine + power, thermal, memory, runtime, backend
+  collectors/         # os_info, firmware, gpu, memory, docker_runtime, processes, network, logs, cuda_env
+  rules/              # engine + power, thermal, memory, runtime, backend, cuda_env, kv_cache
   recipes/            # schema, validator, known_registry.yaml
   reports/            # console, markdown, forum, github
   privacy/redact.py
@@ -70,4 +70,4 @@ spark-doctor doctor --from tests/fixtures/power_limited_14w.json
 
 ---
 > Source: [joeynyc/spark-doctor](https://github.com/joeynyc/spark-doctor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
