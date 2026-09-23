@@ -3,9 +3,14 @@ trigger: always_on
 description: > OS-independent Python library for parsing offline Windows registry hives
 ---
 
-# CLAUDE.md - regipy
+# AGENTS.md - regipy
 
 > OS-independent Python library for parsing offline Windows registry hives
+>
+> This file is the canonical agent-instructions file for the repo (supersedes
+> CLAUDE.md). It documents how to build, test, type-check, and — critically — how
+> the CI pipeline works and the non-obvious gotchas that will bite you if you
+> touch the workflow or add code that must run on the full Python 3.9–3.13 matrix.
 
 ## Project Overview
 
@@ -57,10 +62,10 @@ The main entry point. Handles hive parsing, key navigation, and value retrieval.
 ```python
 from regipy.registry import RegistryHive
 
-reg = RegistryHive('/path/to/NTUSER.DAT')
+reg = RegistryHive("/path/to/NTUSER.DAT")
 
 # Navigate to a key
-key = reg.get_key(r'Software\Microsoft\Windows\CurrentVersion\Run')
+key = reg.get_key(r"Software\Microsoft\Windows\CurrentVersion\Run")
 
 # Get values
 values = key.get_values(as_json=True)
@@ -74,7 +79,7 @@ for entry in reg.recurse_subkeys(as_json=True):
     print(entry)
 
 # Control sets (SYSTEM hive)
-for path in reg.get_control_sets(r'Control\ComputerName\ComputerName'):
+for path in reg.get_control_sets(r"Control\ComputerName\ComputerName"):
     # Yields: ControlSet001\Control\..., ControlSet002\Control\..., etc.
     pass
 ```
@@ -82,6 +87,7 @@ for path in reg.get_control_sets(r'Control\ComputerName\ComputerName'):
 ### Plugin System
 
 Plugins inherit from `Plugin` base class and define:
+
 - `NAME`: Snake_case identifier
 - `DESCRIPTION`: Human-readable description  
 - `COMPATIBLE_HIVE`: Hive type constant from `hive_types.py`
@@ -91,14 +97,15 @@ Plugins inherit from `Plugin` base class and define:
 from regipy.hive_types import NTUSER_HIVE_TYPE
 from regipy.plugins.plugin import Plugin
 
+
 class MyPlugin(Plugin):
-    NAME = 'my_plugin'
-    DESCRIPTION = 'Extract something useful'
+    NAME = "my_plugin"
+    DESCRIPTION = "Extract something useful"
     COMPATIBLE_HIVE = NTUSER_HIVE_TYPE
-    
+
     def run(self):
         try:
-            key = self.registry_hive.get_key(r'Software\MyKey')
+            key = self.registry_hive.get_key(r"Software\MyKey")
             for value in key.get_values(as_json=self.as_json):
                 self.entries.append(value)
         except RegistryKeyNotFoundException:
@@ -122,9 +129,9 @@ timestamp = convert_wintime(key.header.last_modified, as_json=True)
 from regipy.recovery import apply_transaction_logs
 
 apply_transaction_logs(
-    hive_path='/path/to/NTUSER.DAT',
-    transaction_log_path='/path/to/NTUSER.DAT.LOG1',
-    restored_hive_path='/path/to/recovered.DAT'
+    hive_path="/path/to/NTUSER.DAT",
+    transaction_log_path="/path/to/NTUSER.DAT.LOG1",
+    restored_hive_path="/path/to/recovered.DAT",
 )
 ```
 
@@ -133,7 +140,7 @@ apply_transaction_logs(
 Defined in `hive_types.py`:
 
 | Constant | Typical Files |
-|----------|---------------|
+| ---------- | --------------- |
 | `NTUSER_HIVE_TYPE` | NTUSER.DAT |
 | `SYSTEM_HIVE_TYPE` | SYSTEM |
 | `SOFTWARE_HIVE_TYPE` | SOFTWARE |
@@ -151,17 +158,9 @@ Defined in `hive_types.py`:
 - `regipy-diff` - Compare two hives, output differences to CSV
 - `regipy-process-transaction-logs` - Apply transaction logs to recover dirty hive
 
-## Development Guidelines
-
-### Adding a New Plugin
-
-1. Create file in appropriate `plugins/<hive_type>/` directory
-2. Inherit from `Plugin`, set `NAME`, `DESCRIPTION`, `COMPATIBLE_HIVE`
-3. Implement `run()` method - append results to `self.entries`
-4. Use try/except for `RegistryKeyNotFoundException` (key may not exist)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mkorman90/regipy](https://github.com/mkorman90/regipy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
