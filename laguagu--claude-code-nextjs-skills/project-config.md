@@ -1,143 +1,142 @@
 ---
 trigger: always_on
-description: A composable component for displaying AI agent configuration with model, instructions, tools, and output schema.
+description: > This standalone guide is compiled from `SKILL.md` and its reference files
 ---
 
-# Agent
+# React View Transitions
 
-A composable component for displaying AI agent configuration with model, instructions, tools, and output schema.
+**Version 1.0.0**
+Vercel Engineering
 
-The `Agent` component displays an interface for showing AI agent configuration details. It's designed to represent a configured agent from the AI SDK, showing the agent's model, system instructions, available tools (with expandable input schemas), and output schema.
+> **Note:**
+> This standalone guide is compiled from `SKILL.md` and its reference files
+> for agents that consume a single `AGENTS.md` document. Edit the source
+> files, not this compiled copy.
 
-See `scripts/agent.tsx` for this example.
+---
 
-## Installation
+Animate between UI states using the browser's native `document.startViewTransition`. Declare *what* with `<ViewTransition>`, trigger *when* with `startTransition` / `useDeferredValue` / `Suspense`, control *how* with CSS classes. Unsupported browsers skip animations gracefully.
 
-```bash
-npx ai-elements@latest add agent
+## When to Animate
+
+Every `<ViewTransition>` should communicate a spatial relationship or continuity. If you can't articulate what it communicates, don't add it.
+
+Implement **all** applicable patterns from this list, in this order:
+
+| Priority | Pattern | What it communicates |
+|----------|---------|---------------------|
+| 1 | **Shared element** (`name`) | "Same thing — going deeper" |
+| 2 | **Suspense reveal** | "Data loaded" |
+| 3 | **List identity** (per-item `key`) | "Same items, new arrangement" |
+| 4 | **State change** (`enter`/`exit`) | "Something appeared/disappeared" |
+| 5 | **Route change** (page-level) | "Going to a new place" |
+
+This is an implementation order, not a "pick one" list. Implement every pattern that fits the app. Only skip a pattern if the app has no use case for it.
+
+### Choosing Animation Style
+
+| Context | Animation | Why |
+|---------|-----------|-----|
+| Hierarchical navigation (list → detail) | Type-keyed `nav-forward` / `nav-back` | Communicates spatial depth |
+| Lateral navigation (tab-to-tab) | Bare `<ViewTransition>` (fade) or `default="none"` | No depth to communicate |
+| Suspense reveal | `enter`/`exit` string props | Content arriving |
+| Revalidation / background refresh | `default="none"` | Silent — no animation needed |
+
+Reserve directional slides for hierarchical navigation (list → detail) and ordered sequences (prev/next photo, carousel, paginated results). For ordered sequences, the direction communicates position: "next" slides from right, "previous" from left. Lateral/unordered navigation (tab-to-tab) should not use directional slides — it falsely implies spatial depth.
+
+---
+
+## Availability
+
+- **Next.js:** Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
+- **Without Next.js:** Install `react@canary react-dom@canary` (`ViewTransition` is not in stable React).
+- Browser support: Chromium 125+ (React needs the v2 object form of `startViewTransition`), Firefox 144+, Safari 18.2+. Graceful degradation on unsupported browsers.
+
+---
+
+## Implementation Workflow
+
+When adding view transitions to an existing app, **follow [references/implementation.md](references/implementation.md) step by step.** Start with the audit — do not skip it. Use [references/css-recipes.md](references/css-recipes.md) for the applicable CSS and adapt it to the app.
+
+---
+
+## Core Concepts
+
+### The `<ViewTransition>` Component
+
+```jsx
+import { ViewTransition } from 'react';
+
+<ViewTransition>
+  <Component />
+</ViewTransition>
 ```
 
-## Usage with AI SDK
+React auto-assigns a unique `view-transition-name` and calls `document.startViewTransition` behind the scenes. Never call `startViewTransition` yourself.
 
-Display an agent's configuration alongside your chat interface. Tools are displayed in an accordion where clicking the description expands to show the input schema.
+### Animation Triggers
 
-```tsx title="app/page.tsx"
-"use client";
+| Trigger | When it fires |
+|---------|--------------|
+| **enter** | `<ViewTransition>` first inserted during a Transition |
+| **exit** | `<ViewTransition>` first removed during a Transition |
+| **update** | DOM mutations inside a `<ViewTransition>`, or the boundary itself changing size/position due to an immediate sibling. With nested VTs, mutation applies to the innermost one |
+| **share** | Named VT unmounts and another with same `name` mounts in the same Transition |
 
-import { tool } from "ai";
-import { z } from "zod";
-import {
-  Agent,
-  AgentContent,
-  AgentHeader,
-  AgentInstructions,
-  AgentOutput,
-  AgentTool,
-  AgentTools,
-} from "@/components/ai-elements/agent";
+Only `startTransition`, `useDeferredValue`, or `Suspense` activate VTs. Regular `setState` does not animate.
 
-const webSearch = tool({
-  description: "Search the web for information",
-  inputSchema: z.object({
-    query: z.string().describe("The search query"),
-  }),
-});
+### Critical Placement Rule
 
-const readUrl = tool({
-  description: "Read and parse content from a URL",
-  inputSchema: z.object({
-    url: z.string().url().describe("The URL to read"),
-  }),
-});
+`<ViewTransition>` only activates enter/exit if it appears **before any DOM nodes**:
 
-const outputSchema = `z.object({
-  sentiment: z.enum(['positive', 'negative', 'neutral']),
-  score: z.number(),
-  summary: z.string(),
-})`;
+```jsx
+// Works
+<ViewTransition enter="auto" exit="auto">
+  <div>Content</div>
+</ViewTransition>
 
-export default function Page() {
-  return (
-    <Agent>
-      <AgentHeader
-        name="Sentiment Analyzer"
-        model="anthropic/claude-sonnet-4-6"
-      />
-      <AgentContent>
-        <AgentInstructions>
-          Analyze the sentiment of the provided text and return a structured
-          analysis with sentiment classification, confidence score, and summary.
-        </AgentInstructions>
-        <AgentTools>
-          <AgentTool tool={webSearch} value="web_search" />
-          <AgentTool tool={readUrl} value="read_url" />
-        </AgentTools>
-        <AgentOutput schema={outputSchema} />
-      </AgentContent>
-    </Agent>
-  );
-}
+// Broken — div wraps the VT, suppressing enter/exit
+<div>
+  <ViewTransition enter="auto" exit="auto">
+    <div>Content</div>
+  </ViewTransition>
+</div>
 ```
 
-## Features
+---
 
-- Model badge in header
-- Instructions rendered as markdown
-- Tools displayed as accordion items with expandable input schemas
-- Output schema display with syntax highlighting
-- Composable structure for flexible layouts
-- Works with AI SDK `Tool` type
+## Styling with View Transition Classes
 
-## Props
+### Props
 
-### `<Agent />`
+Values: `"auto"` (browser cross-fade), `"none"` (disabled), `"class-name"` (custom CSS), or `{ [type]: value }` for type-specific animations.
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `...props` | `React.ComponentProps<` | - | Any props are spread to the root div. |
+```jsx
+<ViewTransition default="none" enter="slide-in" exit="slide-out" share="morph" />
+```
 
-### `<AgentHeader />`
+If `default` is `"none"`, all triggers are off unless explicitly listed.
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `name` | `string` | Required | The name of the agent. |
-| `model` | `string` | - | The model identifier (e.g.  |
-| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
+### CSS Pseudo-Elements
 
-### `<AgentContent />`
+- `::view-transition-old(.class)` — outgoing snapshot
+- `::view-transition-new(.class)` — incoming snapshot
+- `::view-transition-group(.class)` — container
+- `::view-transition-image-pair(.class)` — old + new pair
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
+See [references/css-recipes.md](references/css-recipes.md) for ready-to-use animation recipes.
 
-### `<AgentInstructions />`
+---
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `children` | `string` | Required | The instruction text. |
-| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
+## Transition Types
 
-### `<AgentTools />`
+Tag transitions with `addTransitionType` so VTs can pick different animations based on context. Call it multiple times to stack types — different VTs in the tree react to different types:
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `...props` | `React.ComponentProps<typeof Accordion>` | - | Any other props are spread to the Accordion component. |
+```jsx
+startTransition(() => {
 
-### `<AgentTool />`
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `tool` | `Tool` | Required | The tool object from the AI SDK containing description and inputSchema. |
-| `value` | `string` | Required | Unique identifier for the accordion item. |
-| `...props` | `React.ComponentProps<typeof AccordionItem>` | - | Any other props are spread to the AccordionItem component. |
-
-### `<AgentOutput />`
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `schema` | `string` | Required | The output schema as a string (displayed with syntax highlighting). |
-| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [laguagu/claude-code-nextjs-skills](https://github.com/laguagu/claude-code-nextjs-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
