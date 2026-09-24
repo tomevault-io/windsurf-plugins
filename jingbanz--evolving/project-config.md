@@ -1,74 +1,79 @@
 ---
 trigger: always_on
-description: Guide for any Claude session working in this repo. Read this first.
+description: Conventions for maintaining this wiki. Read before editing any file under `wiki/`.
 ---
 
-# CLAUDE.md
+# wiki/CLAUDE.md
 
-Guide for any Claude session working in this repo. Read this first.
+Conventions for maintaining this wiki. Read before editing any file under `wiki/`.
 
-## What Evolving is
+The root `CLAUDE.md` describes the project; this file describes how we keep the project's documentation healthy as it grows. For the current list of pages, see [`index.md`](./index.md) — keep it in sync whenever you add or rename a page.
 
-A CLI tool that runs a fixed **Scout → Worker → Gatekeeper** pipeline in a loop to autonomously iterate on a codebase toward a user-defined goal. Every cycle ends in `keep`, `discard`, or `idle` — a kept cycle is one git commit; everything else leaves no trace. Humans evolve the agent prompts; agents evolve the project.
+## Principles
 
-**Status:** draft specification. Implementation has started (`src/`) but is early — currently a CLI entry point, a loop detector primitive, and the surrounding cycle scaffolding.
+The wiki is a **living knowledge base** — the project's current model of itself — not a historical archive of past ideas. Two failure modes to avoid:
 
-## Repo layout
+- **Fossilization.** Dated filenames, "v1" / "v2" copies, append-only specs. Git already stores history; the wiki stores *what is true now*.
+- **Fragmentation.** Ten micro-pages that drift apart. A single well-organized page beats a directory of stubs.
 
-```
-CLAUDE.md         You are here. Project identity + universal rules.
-README.md         Public-facing project description.
-LICENSE           Apache-2.0.
-src/              Implementation.
-  cli.ts          CLI entry point.
-  agent-runtime/  Agent runtime primitives (prompts, history, loop detector, crash learnings).
-wiki/             Living project documentation. See wiki/index.md for the page list.
-```
+Everything below is in service of those two principles.
 
-## Working rules
+## Conventions
 
-These apply to all work in this repo, not just documentation.
+### 1. Edit in place. Do not append dated copies.
 
-### Run `bun run gate` before pushing — and never pipe `bun test` to `tail`.
+If the design changes, update `architecture.md` or `specification.md` directly. Do not create `architecture-2026-05.md` or `specification-v2.md`. The git log is the history; the wiki is the present.
 
-The pre-push hook runs the full test suite with the 95% per-file coverage threshold. To match it locally, run **`bun run gate`** (= `check && typecheck && bun test` with no piping). This is the single canonical pre-push validation.
+### 2. Read the full page before editing it.
 
-**Never** wrap `bun test` in `| tail -N` during dev iteration. The pipe replaces bun's exit code with tail's, so a coverage-threshold failure (exit 1) silently shows up as "all green" — you see "411 pass" and miss that bun was already failing the gate. If you want a shorter view, use `bun test 2>&1; echo "exit=$?"` instead, or just run `bun run gate` and trust the chain.
+Before changing a wiki page, read it end to end. The spec is dense and cross-referential — local edits that contradict a distant section are a common failure mode. Non-negotiable for any substantive edit.
 
-### Write Conventional Commit messages — they drive releases.
+### 3. Capture non-obvious choices as ADRs under `decisions/`.
 
-Every commit subject MUST follow [Conventional Commits](https://www.conventionalcommits.org/): `type(optional-scope): summary`, e.g. `feat(cli): add --json flag` or `fix: reject empty patterns`. Use the types already in the log — `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`, `build`, `perf`.
+When you make a design decision that a future reader could reasonably question ("why didn't you do X instead?"), add an ADR under `wiki/decisions/`. Format and when-to-write rules are in `wiki/decisions/README.md`.
 
-This is not cosmetic. Releases are automated with release-please ([ADR 031](./wiki/decisions/031-release-please-automation.md)), which **parses commit subjects** to compute the next version and generate `CHANGELOG.md`. Consequences you must respect:
+**The split:** core wiki pages describe *what the system is and how it works*; ADRs describe *why we chose this approach over the alternatives*. A reader asking "how does X work?" should always find the answer in a core page, not in an ADR.
 
-- `feat:` and `fix:` are the only types that trigger a release (both bump the patch digit while the project is pre-1.0). `refactor`/`docs`/`chore`/`test`/etc. are hidden by release-please's defaults — they neither bump the version nor appear in the changelog (so a Release PR won't visibly update until a `feat:`/`fix:` lands), though the commits still ride along in whatever release ships.
-- A **breaking change** must be marked with `!` after the type (`feat!:`) or a `BREAKING CHANGE:` footer — that's what bumps the minor digit pre-1.0. Never ship a breaking change under a plain `feat:`.
-- A subject that doesn't parse as a Conventional Commit is **silently dropped** from the changelog and the version calculation. A malformed release-relevant commit is therefore worse than a verbose one.
+Two directions this rule cuts:
 
-Full release flow is in [`CONTRIBUTING.md` → Releasing](./CONTRIBUTING.md#releasing). When a cycle produces a `keep` commit, its message is held to this same standard.
+- **Don't bury decision rationale in core pages.** Alternatives and rejected reasons belong in ADRs, not scattered through `architecture.md`, `specification.md`, or other core pages.
+- **Don't use ADRs as primary documentation.** If an ADR's "Decision" section is describing the chosen thing in more than a sentence or two — invocation shapes, full APIs, module layouts — that content belongs in a core page. The ADR states what was chosen and links out.
 
-### Keep `src/` and `wiki/` in sync.
+Concrete test for the second direction: if you deleted the ADR file tomorrow, would a contributor still be able to understand how the system works by reading the wiki? If no, the ADR is carrying load that belongs in the wiki.
 
-The wiki describes the contract; the code implements it. Implementation is allowed to be a superset — internal helpers, performance tweaks, refactor scaffolding, and other private details deliberately don't appear in the spec. The hard rule is that `src/` must never **contradict** the wiki at the contract level (e.g., agent outputs, log entries, CLI surface, tools, runtime guarantees).
+### 4. Default to extending existing pages. Promote to a new page only when earned.
 
-- If `src/` changes the contract and the spec is stale → update the spec.
-- If the spec changes and `src/` is stale → update the code (open an ADR first if the change is non-obvious).
-- If a `src/` change is purely internal (no contract-visible effect) → no wiki edit needed.
-- Never write code that contradicts the spec without updating the spec first, or flagging the conflict to the human.
+Pre-decomposition is the failure mode — creating `worker.md`, `gatekeeper.md`, `safety-model.md` before any of them has enough content to stand alone. Fragmentation is harder to unwind than consolidation.
 
-### Check the spec before adding new agents, tools, or commands.
+Start with a section inside `architecture.md` or `specification.md`. Promote that section into its own wiki page **only when at least one of these is true**:
 
-New agent roles, new tools, new CLI commands, and new log entry types are all defined in `wiki/specification.md`. Extend the existing schemas; don't invent parallel ones. If the spec doesn't cover what you need, say so explicitly rather than improvising.
+- **The section is drowning its host page.** A subsection has grown past roughly 20% of the parent page, or has significantly more depth than sections around it.
+- **Multiple other sections link into it.** Three or more places reference "see the X discussion below" — X has earned its own page and a stable link target.
+- **A genuinely new concept arrives.** A new agent role, a new subsystem, a new top-level product surface. Not a refinement of something that already exists.
 
-### Match the repo's existing conventions before adding files.
+**Concrete-noun test:** can you complete "X is a ___" with a non-generic answer? "Retrospector is a read-only agent that proposes prompt edits from log patterns" → yes, page-worthy. "Good error handling is important" → no, not page-worthy.
 
-Before creating a new file or choosing where code lives, find where similar code already lives and mirror it — directory layout, file granularity, naming, and error-handling idioms. Do not impose a pattern the repo doesn't already use.
+**No pre-created directories.** The wiki stays flat (`wiki/*.md`) until flat stops working. Don't invent `wiki/agents/` before there's enough per-agent content to warrant it. Taxonomy emerges from the material; don't impose it in advance.
 
-One convention that's easy to miss because it isn't enforced by a failing test:
+**Whenever you add, rename, or remove a page, update [`index.md`](./index.md) in the same edit.** The index is the navigation layer — a page not in the index is effectively invisible. If you forget, the next page-add will compound the drift.
+
+### 5. Don't create empty pages.
+
+If you can't write at least three meaningful sentences about a topic, don't create a page for it. A stub with a `TODO` is worse than a missing page: the stub gets indexed and read; the missing page prompts you to add it where it belongs. Applies to ADRs too — don't file an ADR for a decision that's still in flux.
+
+### 6. Cross-reference, don't duplicate.
+
+If `architecture.md` describes principle #5 and `specification.md` needs to refer to it, **link to it** — don't restate it. Duplication causes drift: when one copy updates and the other doesn't, the wiki lies.
+
+### 7. Write in the present. Don't narrate refactors.
+
+The wiki describes the system *as it is now*, not *how it got here*. After a refactor, the core pages should read as if the removed concept never existed. A fresh reader should not be able to tell whether a concept was removed yesterday or never existed.
+
+Anti-patterns to delete on sight in `architecture.md`, `specification.md`, `README.md`, and the root `CLAUDE.md`:
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [JINGBANZ/evolving](https://github.com/JINGBANZ/evolving) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
