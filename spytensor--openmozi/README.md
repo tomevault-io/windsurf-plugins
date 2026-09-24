@@ -2,8 +2,6 @@
 
 > Tome by [spytensor](https://github.com/spytensor/openmozi), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
-A custom Agent OS built to be hackable, heavily inspired by OpenClaw.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
