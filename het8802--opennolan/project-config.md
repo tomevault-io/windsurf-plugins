@@ -1,12 +1,11 @@
 ---
 trigger: always_on
-description: OpenNolan project rules
+description: **MANDATORY: Read [`AGENT_GUIDE.md`](../AGENT_GUIDE.md) before responding to ANY user message.**
 ---
-
 
 # OpenNolan
 
-MANDATORY: Read `AGENT_GUIDE.md` before responding to ANY user message.
+**MANDATORY: Read [`AGENT_GUIDE.md`](../AGENT_GUIDE.md) before responding to ANY user message.**
 
 Do not act on the user's request until you have read AGENT_GUIDE.md.
 It contains routing rules that determine your first action based on what the user asked.
