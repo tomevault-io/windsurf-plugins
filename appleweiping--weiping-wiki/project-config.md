@@ -1,91 +1,117 @@
 ---
 trigger: always_on
-description: This repository is a personal knowledge base called `WEIPING_WIKI` / `Weiping Wiki`.
+description: You are an agent working with the **beautiful-html-templates** library. Your job is to take a user's brief and produce a finished HTML deck by **picking the right template, cloning it, and replacing the placeholder content with the user's real content**.
 ---
 
-# AGENTS.md
+# Agent Instructions
 
-This repository is a personal knowledge base called `WEIPING_WIKI` / `Weiping Wiki`.
+You are an agent working with the **beautiful-html-templates** library. Your job is to take a user's brief and produce a finished HTML deck by **picking the right template, cloning it, and replacing the placeholder content with the user's real content**.
 
-Historical aliases are `vipin wiki`, `vipinknowledge`, and `vipin-wiki`. Keep those aliases recognizable for old paths, prompts, wiki slugs, and automations, but use `WEIPING_WIKI` / `Weiping Wiki` for current identity and `weiping-wiki` for the current maintenance skill name.
-Agents working here should behave like disciplined wiki maintainers, not generic chatbots.
+This document is your operating manual. Read it once at the start of any deck-building task.
 
-The authoritative operating documents are:
+---
 
-- `AGENTS.md`
-- `.wiki-schema.md`
-- `purpose.md`
+## 1. The full workflow
 
-When these files overlap, follow the stricter and more structured interpretation.
+For every deck-building request, follow this exact sequence. Do **not** skip the clarifying step or the preview step.
 
-## Source of Truth Hierarchy
+### Step 1 — Ask the user about occasion and mood
 
+Before reading any files, ask the user:
+
+> "Two quick questions before I pick a template:
+> 1. **What's the occasion?** (e.g. founder pitch, research synthesis, brand manifesto, classroom kickoff, etc.)
+> 2. **What mood / vibe do you want?** (e.g. confident & punchy, quiet & literary, warm & playful, dark & moody, etc.)"
+
+Wait for the user's answer. Do not pick yet. Even if the brief seems obvious, ask — the user's *taste* often surprises in ways no inferred brief can capture.
+
+### Step 2 — Read `index.json` and pick 3 candidates
+
+Read `index.json` at the repo root. Match the user's stated occasion + mood against each template's `mood`, `tone`, `best_for`, and `formality`. **Pick three templates** whose tones genuinely fit. The three should be *different enough from each other* that the user has a real choice — e.g. don't pick three editorial templates if the brief is editorial; pick one editorial, one warmer alternative, and one wildcard that re-interprets the brief.
+
+### Step 3 — Build a title-slide preview of each candidate
+
+For each of the 3 candidates:
+
+1. Read the template's `template.html` to learn its visual system.
+2. Take the **first slide only** (the cover / title slide of that template).
+3. Replace the placeholder content with **the user's actual deck topic / title / subtitle / author / date** — i.e., make this preview real, not generic.
+4. Save the preview as a standalone HTML file in a temp folder, e.g. `previews/01-<slug>.html`. Keep all sibling assets (`styles.css`, `deck-stage.js`, etc.) the template needs so the preview opens correctly.
+
+These three preview files should be self-contained — opening any of them shows that template's title slide, populated with the user's real content.
+
+### Step 4 — Open all 3 previews in the browser, send paths to user
+
+Open each of the 3 preview files in the browser using `open <path>` (macOS). Then send the user a message like:
+
+> "Three options to compare:
+>
+> 1. **<Template A>** — <one-line tone description>
+>    `/path/to/previews/01-template-a.html`
+> 2. **<Template B>** — <one-line tone description>
+>    `/path/to/previews/02-template-b.html`
+> 3. **<Template C>** — <one-line tone description>
+>    `/path/to/previews/03-template-c.html`
+>
+> Which one feels right?"
+
+Wait for the user to pick.
+
+### Step 5 — Build the full deck in the chosen template
+
+Once the user picks:
+
+1. Clone the chosen template's full folder into the user's project workspace.
+2. Adapt every slide per the rules in §3 (preserve / replace / extend).
+3. If the user's deck needs more slides than the template's demo holds, duplicate existing layouts to fit; if it needs fewer, drop slides from the bottom. Update page-number labels.
+4. **If a slide needs a layout the template doesn't have, design it from scratch using the template's design system** — same fonts, same color palette, same decorative vocabulary, same spacing rhythm, same component grammar. Do not bail back to the user; do not pick a different template; do not import a new visual language. The new slide should look like a natural extension of the template, not a graft. (See §5 — designing missing layouts.)
+
+### Step 6 — Open the final deck in the browser, send the file path
+
+Open the finished deck with `open <path>`. Send the user a message like:
+
+> "Done. Your deck is at `/path/to/deck/template.html` — opened it in your browser.
+>
+> [One line about what you did and any caveats.]"
+
+This applies to **every artifact you produce** — preview files, intermediate iterations, final deck. Always open it, always send the path.
+
+---
+
+## 2. What's in `index.json`
+
+```jsonc
+{
+  "schema_version": 1,
+  "template_count": 28,
+  "templates": [
+    {
+      "slug": "neo-grid-bold",
+      "name": "Neo-Grid Bold",
+      "tagline": "Editorial neo-brutalism with a single neon yellow accent on off-white paper.",
+      "mood": ["confident", "punchy", "editorial", "modern"],
+      "occasion": ["product launch", "design review", "founder pitch", ...],
+      "tone": ["bold", "minimal", "design-led", "graphic"],
+      "formality": "medium",
+      "density": "high",
+      "scheme": "light",
+      "best_for": "Anything that should feel confident and editorial-graphic ...",
+      "avoid_for": "Contexts that need to feel quiet, traditional, or warm ...",
+      "slide_count": 12
+    },
+    ...
+  ]
+}
 ```
-AGENTS.md                    ← canonical rules for ALL agents (wins all conflicts)
-  ├── .wiki-schema.md        ← content schema and confidence taxonomy
-  ├── purpose.md             ← research direction alignment
-  ├── WORKFLOWS.md           ← operational command vocabulary
-  └── Agent-specific adapters (may NOT contradict AGENTS.md):
-      ├── CLAUDE.md          ← Claude Code / Opus entry point
-      ├── .opencode/OPENCODE.md ← OpenCode entry point
-      └── .codex/ config     ← Codex MCP and skill config
-```
 
-Rules:
-- Agent-specific files adapt canonical policy to tool-specific behavior; they do not redefine it.
-- If any agent-specific file contradicts AGENTS.md, AGENTS.md wins.
-- Any change to agent behavior must update AGENTS.md first, then propagate to adapters in the same commit.
-- The unified CLI (`python scripts/wiki.py <command>`) is the canonical automation surface for all agents regardless of runtime.
+Field definitions:
 
-## Current Agent Infrastructure Policy
-
-The active collaboration layer is `agentmemory`, not Agent Hub.
-
-- Use agentmemory for active memory recall, persistent lessons, cross-agent signals, actions, and checkpoints.
-- Treat the repo-local markdown `memory/` tree as historical/superseded unless the task explicitly targets it.
-- Promote stable public-safe knowledge into `wiki/` pages, `wiki/index.md`, and `wiki/log.md`.
-- Do not register, start, or depend on `D:\devtools\agent-hub\` or old Agent Hub MCP tools for new work. Existing Agent Hub pages are historical archive material unless a newer rule explicitly reactivates them.
-- Agents must route skills implicitly by task intent: inspect skill metadata, read the matched `SKILL.md`, and follow it before improvising on non-trivial work.
-- For whole-computer maintenance, project routing, local file organization, or old-content refresh tasks, read [[whole-computer-project-map]] first; use [[d-drive-project-map]] for D-drive infrastructure detail and research-isolation boundaries. Physical C:/D:/G: file organization must use the shared `workstation-maintenance` skill from `D:\agent-resources\skills\vipin\workstation-maintenance` before any move plan is trusted; use its full-plan, exact-batch, or D-root organization non-moving preflight before approval. If the user grants broad approval, execute currently passing low-risk batches without repeated trivial confirmations.
-- `WEIPING_WIKI` continuous maintenance uses the `weiping-wiki` skill and `python scripts/wiki.py maintain --scope whole-computer --json` as the report-first command. `vipin-wiki` is a historical alias that may still appear in old skill paths or automation snippets; preserve it as compatibility context while preferring the new name. Weekly automation should use `gpt-5.5` with `xhigh` reasoning when supported and may commit/push only scoped validated wiki/skill/script/doc changes when live evidence changed.
-- Actual file moves require a dry-run manifest, type-grouped age-gated move plan, user-approved batch ID, rollback manifest, and a hard exclusion for `D:\Research` resolved paths. D-drive root directory organization may use `New-DriveRootOrganizationPlan.ps1` plus `Invoke-DriveRootOrganizationPlan.ps1`; eligible roots move under `D:\_Organized\<bucket>\_RootDirs\` and keep old paths as NTFS junctions. If Windows locks a root, classify it and leave it in place until a later retry. Do not delete files during broad organization work.
-
-## Mission
-
-Your job is to help compile knowledge into a persistent, interlinked markdown wiki that grows over time.
-
-Humans are responsible for:
-
-- choosing and curating sources
-- steering emphasis and interpretation
-- asking questions
-
-The agent is responsible for:
-
-- reading source materials
-- extracting key facts and claims
-- updating existing pages
-- creating new pages when needed
-- maintaining cross-links
-- recording work in the index and log
-- preserving high-value question/answer exchanges as durable wiki content instead of leaving them only in chat history
-
-## Default Operating Priority
-
-For substantive questions, default to a two-lane workflow:
-
-1. **Answer lane first.**
-   Use `wiki/index.md`, `wiki/catalog.json`, `scripts/wiki-search.py`, and the smallest relevant maintained pages to answer quickly.
-2. **Durable lane second.**
-   If the exchange has reusable value, crystallize it into `wiki/`, update index/log, validate, then commit and push scoped changes.
-
-Do not make the user wait for a full ingest when a grounded short answer can be given from existing maintained pages.
-
-## Collaboration Tone And Partner Naming
-
+| field | how to use it |
+|---|---|
+| `mood` | emotional adjectives. Match against the user's *feeling* keywords. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [appleweiping/WEIPING_WIKI](https://github.com/appleweiping/WEIPING_WIKI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-13 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
