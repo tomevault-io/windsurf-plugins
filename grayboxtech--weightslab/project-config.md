@@ -1,134 +1,127 @@
 ---
 trigger: always_on
-description: This file is a **portable context for AI coding agents** (Claude Code, etc.) and
+description: Portable context for AI coding agents (and their humans) to **install, run,
 ---
 
 # WeightsLab — agent context for users & debugging
 
-This file is a **portable context for AI coding agents** (Claude Code, etc.) and
-the humans driving them. Its job is to let you — or an agent helping you —
-**install, configure, run, and debug WeightsLab and Weights Studio** without
-having to reverse-engineer the system first.
+Portable context for AI coding agents (and their humans) to **install, run,
+integrate, and debug WeightsLab / Weights Studio** without reverse-engineering
+the system first. Covers two repos: **weightslab** (Python backend — training
+instrumentation, data ledger, gRPC service, shared proto) and **weights_studio**
+(browser frontend that inspects/edits a *running* experiment).
 
-It deliberately covers only the two shipped repositories:
-
-- **weightslab** — the Python backend / core (training instrumentation, data
-  ledger, gRPC service, the shared proto).
-- **weights_studio** — the browser frontend (the studio UI that inspects and
-  edits a *running* experiment).
-
-> File/line references drift as the code evolves — treat them as starting points
-> and verify against the current source before relying on them. Environment
-> variable names and defaults are the most stable thing here; when in doubt the
-> authoritative reference is `weightslab/docs/configuration.rst`.
+> File/line refs drift — verify against current source. Env var names/defaults
+> are stable; authoritative reference is `weightslab/docs/configuration.rst`.
 
 ---
 
-## 0. How to load this guide into Claude Code
+## 0. Loading this guide into Claude Code
 
-So an agent actually *has* this context when you ask it for help:
-
-- **Working inside a checkout of the repo** (`git clone`): this guide is
-  committed as `AGENTS.md`; the repo keeps a gitignored `CLAUDE.md` copy of it at
-  the root so Claude Code auto-loads it every session. Nothing to do. (Claude
-  Code also loads `~/.claude/CLAUDE.md` global memory and any parent-dir
-  `CLAUDE.md`.)
-- **You only ran `pip install weightslab`** (no checkout — the package lives in
-  `site-packages`): absolute `@import` paths are fragile because the path
-  changes per venv/OS. The robust pattern is a small **skill** that locates the
-  installed file at runtime. Create `~/.claude/skills/weightslab/SKILL.md`:
+- **Repo checkout:** committed as `AGENTS.md`; a gitignored `CLAUDE.md` copy at
+  the root gets auto-loaded every session. Nothing to do.
+- **`pip install weightslab` only** (no checkout): absolute paths are fragile
+  across venvs/OS. Use a skill that locates the installed copy at runtime —
+  `~/.claude/skills/weightslab/SKILL.md`:
 
   ```yaml
   ---
   name: weightslab
-  description: Load the WeightsLab debugging & configuration guide when helping with weightslab or weights_studio problems (connection, TLS, env vars, training hangs, rendering).
+  description: Load the WeightsLab debugging & integration guide for weightslab/weights_studio problems (connection, TLS, env vars, training hangs, rendering, wl.* integration).
   ---
   !`python -c "import weightslab, os; print(open(os.path.join(os.path.dirname(weightslab.__file__), 'AGENTS.md')).read())"`
 
-  Use the guide above to diagnose the user's weightslab / weights_studio issue.
+  Use the guide above to diagnose or implement the user's request.
   ```
 
-  Then run `/weightslab` (or let Claude auto-invoke it). This requires the guide
-  to be **shipped as package data** inside the installed package (see §7); the
-  copy at the repo root is for contributors working in a checkout.
-- **Quick-and-dirty:** copy this file to `~/.claude/WEIGHTSLAB.md` and add
-  `@~/.claude/WEIGHTSLAB.md` to your `~/.claude/CLAUDE.md`.
+  Requires the guide shipped as package data (`weightslab/weightslab/AGENTS.md` — see §7).
+- **Quick-and-dirty:** copy this file to `~/.claude/WEIGHTSLAB.md`, `@`-import it
+  from `~/.claude/CLAUDE.md`.
 
 ---
 
-## 1. What it is and how the pieces connect
+## 1. What it is, how the pieces connect
 
-A user wraps their own PyTorch training script with WeightsLab so a running
-experiment becomes inspectable/editable; Weights Studio is the UI for that.
-
-**Wire path (the thing that breaks most often):**
+A user wraps their PyTorch training script with WeightsLab so a running
+experiment becomes inspectable/editable; Weights Studio is the UI.
 
 ```
 Browser  →  weightslab start :8080 (grpc-web → grpc proxy)  →  Python gRPC servicer  →  training loop
 ```
 
-- `weightslab start` is a pure-Python HTTP server that serves the bundled SPA
-  and translates grpc-web (browser) to raw gRPC (backend). No Docker, no Envoy.
-  If `weightslab start` is not running, the browser has no UI to load.
-- The gRPC servicer and the training loop run in the **same process, different
-  threads**, coordinated by locks in
-  `weightslab/weightslab/components/global_monitoring.py`.
-- One proto is the single source of truth:
-  `weightslab/weightslab/proto/experiment_service.proto`.
+- `weightslab start`: pure-Python HTTP server, serves the bundled SPA and
+  translates grpc-web↔gRPC. No Docker, no Envoy. Not running ⇒ no UI to load.
+- gRPC servicer and training loop share **one process, different threads**,
+  coordinated by locks in `weightslab/weightslab/components/global_monitoring.py`.
+- Proto is the single source of truth: `weightslab/weightslab/proto/experiment_service.proto`.
 
 ---
 
-## 2. Install & run (the happy path)
+## 2. Install & run
 
 ```bash
 pip install weightslab
 ```
 
-In your training script:
-
 ```python
 import weightslab as wl
-# wrap your objects so the studio can see/edit them (see §3), then:
-wl.serve(serving_grpc=True, serving_cli=True)   # background threads, same process
-# ... your training loop ...
-wl.keep_serving()                                # keep the process alive for the UI
+# wrap objects so the studio can see/edit them (§3), then:
+wl.serve(serving_grpc=True, serving_cli=True)
+# ... training loop ...
+wl.keep_serving()   # keep process alive for the UI
 ```
-
-Then start the UI in another terminal and open it in a browser:
 
 ```bash
-weightslab start   # serves at http://localhost:8080 by default
+weightslab start   # http://localhost:8080 by default
 ```
 
-Working starting points live in
-`weightslab/weightslab/examples/{PyTorch,Lightning,Usecases}/<usecase>/`
-(each is a `main.py` + `config.yaml`) — find the closest example and mirror it.
+For a new script, pick the closest match in
+`weightslab/weightslab/examples/{PyTorch,Lightning,Ultralytics,Usecases}/<usecase>/main.py`
+via the decision table in §3.9, then copy its `wl.*` calls — §3 documents that
+whole API surface (reactive signals, group signals, the Ultralytics mixin,
+etc. aren't in the `.rst` docs; the examples are the primary source).
 
-UI deployment details (port, TLS, certs) are documented in
-`weightslab/docs/weights_studio.rst`. TLS is opt-in: run `weightslab se` once,
-then `weightslab start --certs`.
+TLS/UI deploy details: `weightslab/docs/weights_studio.rst`. TLS is opt-in:
+`weightslab se` once, then `weightslab start --certs`.
 
 ---
 
 ## 3. The integration API (`import weightslab as wl`)
 
-How a user's script plugs in. Wrap each training object with
-`wl.watch_or_edit(obj, flag=...)`; the returned tracked proxy is registered in
-the global ledger (`weightslab/weightslab/backend/ledgers.py`,
-`GLOBAL_LEDGER` — the hub everything reads/mutates through).
+How to wire a new training script correctly with no docs access — every verb
+and kwarg here is real, taken from a shipping example under
+`weightslab/weightslab/examples/` and checked against `weightslab/src.py`.
 
-- `flag="hyperparameters"` (dict), `flag="model"` (nn.Module, `device=…`),
-  `flag="optimizer"`, `flag="data"` (Dataset → tracked DataLoader: `loader_name`,
-  `batch_size`, `is_training`, `collate_fn`, …), `flag="loss"` (a
-  `reduction="none"` criterion, called with `(preds_raw, targets, batch_ids=ids,
-  preds=preds)`), `flag="metric"`.
+### 3.1 Lifecycle
 
-Conventions that matter for correctness:
+```python
+import weightslab as wl
 
-- Wrap the train step in `with guard_training_context:` and eval in
-  `with guard_testing_context:` (from
-  `weightslab.components.global_monitoring`). This is how pause/resume and
-  train/test separation work — **skip it and pause/resume or stats will misbehave.**
+wl.watch_or_edit(..., flag=...)                            # register objects (§3.2)
+wl.serve(serving_grpc=True, serving_cli=True)    # background threads, same process
+wl.start_training(timeout=3)                     # let UI/CLI attach before stepping
+# ... training loop, guarded (§3.5) ...
+wl.keep_serving()                                # block so the process/UI survives
+```
+
+- Register every object with `watch_or_edit` **before** `wl.serve`, using the parameter flag to define which object category it is.
+- `timeout=0` skips the pre-start wait entirely.
+- Skip `keep_serving()` for a script that should exit after writing a report
+  (`Usecases/*signals*` examples); include it otherwise.
+- Tabular examples (`wl-fraud-detection`, `wl-ads-recommendation`) pass only
+  `serving_grpc=` to `serve` — no `serving_cli`.
+
+### 3.2 `wl.watch_or_edit(obj, flag=..., **kwargs)`
+
+Registers/wraps `obj` in the global ledger (`backend/ledgers.py`,
+`GLOBAL_LEDGER`) and returns a live proxy. `flag` matches by substring
+(case-insensitive).
+
+| flag | wraps | key kwargs |
+|---|---|---|
+| `"hyperparameters"` | plain `dict` | `defaults=parameters`, `poll_interval=1.0`, optional `name=` |
+| `"model"` | `nn.Module` | `device=`; `compute_dependencies=False` (skip arch-op dependency graph when not editing architecture); `forced_model_wrapping=True` (Ultralytics only — load current object, not a checkpoint) |
+| `"optimizer"` | `torch.optim.Optimizer` | none typically; build from the **watched** model's `.parameters()` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
