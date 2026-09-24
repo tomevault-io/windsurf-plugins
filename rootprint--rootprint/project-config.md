@@ -1,124 +1,59 @@
 ---
 trigger: always_on
-description: Guidance for autonomous coding agents working in `rootprint`.
+description: Hono backend on Bun. Responsibilities: log ingest (NDJSON + OTLP), search proxy to Quickwit, user/auth, admin operations, and API keys (ingest, personal, and service-account).
 ---
 
-# AGENTS.md
+# apps/api — Agent Guide
 
-Guidance for autonomous coding agents working in `rootprint`.
+## About
 
-## Project Snapshot
+Hono backend on Bun. Responsibilities: log ingest (NDJSON + OTLP), search proxy to Quickwit, user/auth, admin operations, and API keys (ingest, personal, and service-account).
 
-Rootprint is a Bun-workspace monorepo. Workspaces live under `apps/`. The Hono backend in `apps/api` is the API layer. The SvelteKit log-viewer UI lives in `apps/web` and talks to `apps/api` over HTTP.
+The frontend in `apps/web` calls this API over HTTP.
 
-## Workspace Map
+For repo-wide rules (Bun, Prettier, TS strict, tests policy), see the root `AGENTS.md`.
 
-| Path       | Purpose                                      | Stack                                          | AGENTS.md            |
-| ---------- | -------------------------------------------- | ---------------------------------------------- | -------------------- |
-| `apps/api` | Backend service (ingest, search proxy, auth) | Hono, Drizzle, Better Auth, valibot, pino, buf | `apps/api/AGENTS.md` |
-| `apps/web` | Log viewer UI                                | SvelteKit (Svelte 5), Tailwind v4, DaisyUI     | `apps/web/AGENTS.md` |
+## Stack
 
-## Source of Truth
+- Runtime: Bun
+- HTTP framework: Hono 4
+- ORM: Drizzle + `pg` (PostgreSQL)
+- Auth: Better Auth
+- Validation: Valibot
+- Quickwit client: `quickwit-js`
+- Protobuf codegen: buf + `@bufbuild/protoc-gen-es`
 
-- Toolchain and root scripts: `package.json`.
-- Formatting: `.prettierrc`.
-- TS base config: `tsconfig.base.json` (every workspace extends it).
-- CI: `.github/workflows/ci.yml`.
-- Stack-specific rules: each workspace's `AGENTS.md`.
-
-## Install and Run
+## Run, Build, Check
 
 ```bash
-bun install
-cp .env.example .env
-docker compose up -d db quickwit
-bun --filter api db:migrate
-bun run dev:api        # or: bun --filter <workspace> dev
+bun --filter api dev         # hot-reload via `bun --hot`
+bun --filter api build       # bundle to dist/
+bun --filter api start       # run dist/app.js
+bun --filter api check       # tsc --noEmit
+bun --filter api lint        # oxlint
 ```
 
-Root convenience scripts: `dev:api`, `build:api`, `start:api`, `check`, `lint`, `format`, `format:check`. Workspace-specific scripts run via `bun --filter <workspace> <script>`.
+Root convenience: `bun run dev:api`, `bun run build:api`, `bun run start:api`.
 
-## Shared Rules (all workspaces)
+## Source Layout
 
-- Bun only. Engine-strict (`bun >= 1.0.0`). Do not use npm/pnpm/yarn.
-- TypeScript is strict. Every workspace extends `tsconfig.base.json`. Avoid `any` unless unavoidable.
-- Prettier config is at the repo root: tabs, single quotes, no trailing commas, line width ~100.
-- Automated tests cover authentication only. `apps/api/tests/` runs with `bun --filter api test`. Any change to sign-in, sessions, API keys, invites, provider settings or boot must add or update a scenario there. Do not add tests for other areas unless asked.
-- The suite needs the shared infrastructure running: `docker compose up -d --wait db quickwit`.
-- For stack-specific rules (Hono routing, Svelte 5 patterns), see the relevant workspace's `AGENTS.md`.
+| Path               | Purpose                                                                                                                                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app.ts`       | Hono app composition, middleware mount, error handler, SPA static serving, boot (`main()`)                                                                                                                                                              |
+| `src/config.ts`    | Resolved runtime config object                                                                                                                                                                                                                          |
+| `src/env.ts`       | Hono context types: `AppEnv` (`requestId`, `session?`, `apiKey?`), `AuthedEnv`, `KeyedEnv`                                                                                                                                                              |
+| `src/types.ts`     | Public, pure-type surface re-exported via `exports['./types']`                                                                                                                                                                                          |
+| `src/index.ts`     | Workspace package entry                                                                                                                                                                                                                                 |
+| `src/routes/`      | One file per resource (`api-keys`, `auth`, `exports`, `health`, `indexes`, `monitoring`, `service-accounts`, `settings`, `shares`, `traces`, `users`, `views`); `routes/admin/` (`activity`, `cluster`, `metrics`); `routes/ingest/` (`ndjson`, `otlp`) |
+| `src/services/`    | `*.service.ts` — business logic called from routes                                                                                                                                                                                                      |
+| `src/middleware/`  | `request-context`, `require-user`, `require-admin`, `require-api-key`, `require-user-or-personal-key`, `with-index-config`, `with-index-meta`                                                                                                           |
+| `src/schemas/`     | Valibot request schemas per resource; response schemas under `schemas/responses/`                                                                                                                                                                       |
+| `src/db/`          | Drizzle schemas (`schema.ts`, `auth.schema.ts`) and DB client (`index.ts`)                                                                                                                                                                              |
+| `src/lib/`         | Cross-cutting clients and IO: `auth`, `db`, `quickwit`, `quickwit-proxy`, `quickwit-metrics`, `secret`, `openapi/`, `query/`                                                                                                                            |
+| `src/utils/`       | Pure helpers: `http-error`, `quickwit-error`, `otlp-response`, `bearer`, `params`, `valibot`, `require-env`, `db`                                                                                                                                       |
+| `src/gen/`         | Generated protobuf code — **do not edit**                                                                                                                                                                                                               |
 
-## CI Parity Before Merge
-
-```bash
-bun --filter '*' check
-bun run lint
-bun run format:check
-bun --filter api build
-bun --filter api test
-```
-
-## Database and Auth Commands (apps/api)
-
-```bash
-bun --filter api db:generate     # generate migration from schema diff
-bun --filter api db:migrate      # apply migrations
-bun --filter api db:studio       # open Drizzle Studio
-```
-
-## Formatting and Style
-
-- Tabs (not spaces) for indentation.
-- Single quotes.
-- No trailing commas.
-- Line width around 100 chars.
-- Let Prettier and (in Svelte workspaces) `prettier-plugin-svelte` normalize formatting.
-- `static/`, and `drizzle/` are ignored by Prettier.
-
-## TypeScript Guidelines
-
-- Strict TS; avoid `any` unless unavoidable.
-- Prefer `unknown` in catches and narrow with `instanceof` / type guards.
-- Export explicit input/output types for shared helpers/services.
-- Use `import type` for type-only imports.
-- Use Valibot for runtime validation; infer types from schemas where possible.
-- Shared backend types live in `apps/api/src/types.ts`; app-local frontend types in `apps/web/src/lib/types.ts`.
-- Cross-workspace types: import from `api/types` (re-exported via `exports['./types']` in `apps/api/package.json`).
-- `types.ts` files hold pure types only — no runtime exports.
-
-## Import Conventions
-
-- Keep imports at top of file.
-- In Svelte workspaces, prefer SvelteKit aliases (`$lib`, `$app`, `$env`) over deep relative paths.
-- In `apps/api`, relative imports use `.js` extensions (NodeNext module resolution).
-- Add new imports to the nearest logical group instead of reordering entire files.
-
-## Naming and File Conventions
-
-- Components: PascalCase `.svelte` (e.g. `LogDetailDrawer.svelte`).
-- Utilities: kebab-case `.ts` (e.g. `query-params.ts`).
-- API services: `*.service.ts` in `apps/api/src/services`.
-- API routes: one file per resource in `apps/api/src/routes`.
-- API schemas: Valibot schemas per concern, colocated near routes/services.
-- Variables/functions: camelCase. Constants: UPPER_SNAKE_CASE.
-
-## Error Handling Conventions
-
-- `apps/api`: throw `HttpError` from `src/utils/http-error.ts`; the central `app.onError` translates it to JSON or OTLP. Never return raw 500s with internals.
-- `apps/web` (when wired up): use SvelteKit `error(status, message)` and `redirect(...)`; validate form input with Valibot.
-- Do not silently swallow errors unless fallback behavior is intentional.
-
-## Cursor and Copilot Rules
-
-- `.cursor/rules/`: not present.
-- `.cursorrules`: not present.
-- `.github/copilot-instructions.md`: not present.
-
-## Agent Workflow Checklist
-
-- Read the relevant workspace's `AGENTS.md` first.
-- Make minimal, localized changes that match existing patterns.
-- Run CI parity checks before handing off major changes.
-- If schema or proto contracts change, run the relevant generation commands (`db:generate`, `proto:gen`).
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rootprint/rootprint](https://github.com/rootprint/rootprint) — distributed by [TomeVault](https://tomevault.io).
