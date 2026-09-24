@@ -1,17 +1,15 @@
 # saev
 
-> Tome by [Imageomics](https://github.com/Imageomics/saev) — distributed by [TomeVault](https://tomevault.io)
-
-Sparse autoencoders for vision
+> Tome by [Imageomics](https://github.com/Imageomics/saev), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Imageomics/saev](https://github.com/Imageomics/saev).
+Original source: `AGENTS.md` in [Imageomics/saev](https://github.com/Imageomics/saev).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
