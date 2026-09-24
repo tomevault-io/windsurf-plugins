@@ -1,0 +1,66 @@
+---
+trigger: always_on
+description: Revit 2025/2026/2027 add-in: an extensible command platform with a Vue frontend (WebView2),
+---
+
+# AnalyseTool — instructions for AI assistants working on this repo
+
+Revit 2025/2026/2027 add-in: an extensible command platform with a Vue frontend (WebView2),
+an MCP server for AI agents, and a public SDK for third-party extensions.
+
+## Architecture (the dependency contract)
+
+```
+[callers]                      [platform]              [callees]
+WebView2 (App), Mcp.Bridge ──► CommandQueue in Core ──► Tools commands, user extensions
+```
+
+| Project | References | Role |
+| --- | --- | --- |
+| `AnalyseTool.Sdk` | nothing | THE public contract (`IRevitTask`, `IRevitContext`, `RevitPayload`, `[RevitCommand]`). SemVer'd, packed to NuGet. |
+| `AnalyseTool.Core` | Sdk | Platform: `CommandQueue` (single entry point for ALL transports), `CommandDispatcher`, extension loader (collectible ALC, type-identity sharing), Roslyn scripting, `CoreServices`. **Headless — no WPF, no dialogs; errors go to Serilog + `ExtensionDiagnostics`.** |
+| `AnalyseTool.Tools` | Sdk **only** | Built-in feature commands, organized as **vertical slices**: `Actions/`, `Ai/`, `Elements/` (Family Manager left the platform for an extension on 2026-09-01) — each slice owns everything of its feature, split inside into `Features/` (the `IRevitTask` commands) and `Infrastructure/` (services + models). `Shared/` holds the few cross-slice types (`ParameterData`, `ParameterOrigin`, `ParameterExtensions`). Namespace = `AnalyseTool.Tools.<Slice>` (subfolders don't add segments). New feature code goes INTO its slice — never into a central Infrastructure. Lives on the same rails as third-party extensions — if a command needs more than the Sdk offers, that is a deliberate Sdk contract decision, never a ProjectReference. |
+| `AnalyseTool.Mcp.Bridge` | Core, Sdk | In-Revit MCP transport: TCP bridge that enqueues into the `CommandQueue`. The reference pattern for new transports (e.g. a future SignalR remote): ProjectReference on Core + one `InternalsVisibleTo` line — zero Core changes. |
+| `AnalyseTool.Mcp` | none (links `McpWire.cs`) | Out-of-process stdio MCP exe launched by the AI client. Never loads Revit/Core. Wire contract shared with the bridge via the linked `McpWire.cs`. |
+| `AnalyseTool.App` | Core, Tools, Mcp.Bridge, Sdk | Host: windows, ribbon (`RibbonHost`), dock pane, `WebView2Transport`, `UserDialogUtils`, bootstrap (`AnalyseToolBootstrap` = stateless composition root; all state lives in `CoreServices`). |
+| `AnalyseTool.Launcher` | App (+ Mcp build-order) | Thin Revit entry: loads `AnalyseTool.App.dll` into an isolated ALC, builds the ribbon **via reflection by type name** — when renaming/moving `RibbonHost` or `AnalyseToolCommand`, update the FQN strings in `Launcher/App.cs` and `Launcher/RevitCommands/`. |
+
+Hard rules:
+- **Never** add a ProjectReference that violates the table — `src/build/Check-Boundaries.ps1` fails CI.
+- **Core and Tools stay headless**: no `UseWPF`, no `System.Windows`, no `MessageBox`. UI commands (folder pickers etc.) belong to App.
+- Commands touch the Revit model **only** inside `IRevitContext.RunInRevitAsync`. Core code gets the Revit version from `CoreServices.RevitVersion`, never from an ambient `Context`.
+- Transports never talk to `CommandDispatcher`; they enqueue `CommandRequest`s into `CoreServices.Queue` (carries command, payload, source, ct, progress, optional pre-execution gate).
+- `SharedData/ToolData` is compiled into several assemblies and must stay `internal` (a public copy causes CS0433).
+- Namespaces follow project names (`AnalyseTool.Core.*`, `AnalyseTool.Tools.*`, `AnalyseTool.App.*`).
+
+## Building
+
+```powershell
+# Full plugin chain (Debug deploys to %AppData%\Autodesk\Revit\Addins\<year>\ automatically!)
+dotnet build src/AnalyseTool.Launcher/AnalyseTool.Launcher.csproj -c "Debug R25"   # or R26 / R27
+
+# Static checks (the same two scripts CI runs first)
+powershell -File src/build/Check-Boundaries.ps1
+powershell -File src/build/Check-Schemas.ps1
+```
+
+- Configurations: `Debug|Release R25/R26/R27` → TFM `net8.0-windows` (R25/26) / `net10.0-windows` (R27), from `src/AnalyseTool.Sdk/build/AnalyseTool.Extension.props`.
+- NuGet versions are centralized in `src/Directory.Packages.props` (CPM). `samples/` is deliberately OUTSIDE CPM — it simulates an external extension author. Floating Revit API versions use `VersionOverride`.
+- Shared MSBuild deploy logic (MCP exe + clientapp/dist copying) lives in `src/PluginAssets.targets`.
+- Releases go through NUKE (`src/build`, run `src/build.cmd`) — targets: BuildClientApp → BuildLauncher → CreateInstaller/CreateBundle → PublishGitHub.
+
+## Testing
+
+Three tiers, split by what they need — and the split is the point: a test that needs Revit is a test
+nobody runs in CI.
+
+| Tier | Project | Needs | Runs |
+| --- | --- | --- | --- |
+| 1 — Revit-free | `src/AnalyseTool.Tests` (TUnit) | nothing; the plugin assemblies load because the Revit API is compile-only | CI, every push (`RunTests` in NUKE, part of `Ci`) |
+| 2 — MCP without Revit | same project, `Mcp/`: a fake bridge on `McpWire` + the exe driven over stdio (tools/list, structuredContent, error text, `list_changed`, progress notifications, cancellation, job handles via `GetJobResult`) | nothing | CI |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Nikola1Davydov/AnalyzeTool](https://github.com/Nikola1Davydov/AnalyzeTool) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
