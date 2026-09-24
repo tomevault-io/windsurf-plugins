@@ -1,103 +1,113 @@
 ---
 trigger: always_on
-description: > This guide covers the whole monorepo. Sections marked **apps/scream-code** are app-specific; the rest apply to all workspace packages.
+description: - **FullCompaction**: compress the history into a summary when the context
 ---
 
-# scream-code Development Guide
+# compaction — Context Compaction (Full & Micro)
 
-> This guide covers the whole monorepo. Sections marked **apps/scream-code** are app-specific; the rest apply to all workspace packages.
+## Responsibility
+- **FullCompaction**: compress the history into a summary when the context
+  exceeds its budget (`applyCompaction` folds + writes `context.snapshot`);
+  the worker retries (5 attempts, honors Retry-After via `computeDelayMs`)
+- **MicroCompaction**: incremental folding (`micro_compaction.apply` advances a
+  cutoff), deferred until a tool exchange closes
+- Trigger strategy: `compaction/strategy.ts` (threshold + circuit breaker +
+  watermarks + per-turn limit)
+- Token basis: `tokensBefore/tokensAfter` = system prompt + tool schemas +
+  messages (full-request basis, consistent with the measured anchors)
+- After a successful compaction, scan the summary for a skill-candidate
+  marker; emit `skill_candidate` so the UI can offer to save the reusable
+  process (separate, isolated step after memory-memo extraction)
 
-## Table of Contents
+## Trigger thresholds (retuned for 256K–1M windows)
+- `triggerRatio 0.85` — proactive compaction at 85% of the window
+- `blockRatio 0.90` — block the turn at 90%, leaving headroom for the
+  compaction request itself and output buffering on a 1M window
+- Reserved-context rule (`shouldUseReservedContextSize`): when
+  `usedSize + reservedSize(20K) >= maxSize`, treat as "compact now"
+- Small-window models are no longer the design target
 
-1. [Workspace Overview](#workspace-overview)
-2. [Code Quality & Style](#code-quality--style)
-3. [TUI Sanitization](#tui-sanitization)
-4. [Testing Guidance](#testing-guidance)
-5. [Commands & Workflow](#commands--workflow)
-6. [TUI File Layout (apps/scream-code)](#tui-file-layout-apps-scream-code)
-7. [Module Responsibilities (apps/scream-code)](#module-responsibilities-apps-scream-code)
-8. [ScreamTUI Internal Sections (apps/scream-code)](#screamtui-internal-sections-apps-scream-code)
-9. [Where New Features Go (apps/scream-code)](#where-new-features-go-apps-scream-code)
-10. [TUI Coding Conventions (apps/scream-code)](#tui-coding-conventions-apps-scream-code)
-11. [How to Set Themes (apps/scream-code)](#how-to-set-themes-apps-scream-code)
-12. [MCP (apps/scream-code)](#mcp-apps-scream-code)
-13. [Slash Commands (apps/scream-code)](#slash-commands-apps-scream-code)
-14. [Agent-Core Mechanisms](#agent-core-mechanisms)
-15. [General Coding Requirements](#general-coding-requirements)
+## Retention contract (what survives a compaction)
+- Verbatim tail: 24 recent messages (12 user) with an absolute 30K-token
+  budget, in addition to the relative ratio cap
+- Mandatory `Key Decisions` and `Next Steps` sections in the compaction
+  instruction so the summary preserves task continuity
+- `readFiles`/`modifiedFiles` persist on `CompactionResult` and merge with the
+  previous round's lists, so file context survives repeated compactions
+  (lists are capped; stale file sections are stripped on iterative updates)
 
----
+## Dependencies
+- Depends on: `Agent` (hub; reads context.history, tools.loopTools,
+  getRuntimeSystemPrompt)
+- Depended on by: `Agent` (turn loop triggers it),
+  `AgentServices.fullCompaction/microCompaction`
 
-## Workspace Overview
+## Boundaries
+- Does NOT: mutate the wire history (folding only affects memory and produces a
+  summary record)
+- Compaction request: reuse the real system prompt + sorted tools (hits the
+  provider prefix cache) — do NOT substitute a custom prompt
+- `apply_compaction` resets the micro cutoff and triggers
+  `injection.onContextCompacted`
 
-### Packages
+## Retry semantics
+- Only retryable errors (`isRetryableGenerateError`) consume the retry budget
+  (5 attempts) and back off with `computeDelayMs` (Retry-After preferred over
+  fixed backoff); non-retryable errors throw immediately
+- Context-overflow/truncation is a LOCAL shrink, not a server failure: each
+  overflow shrinks the slice (`reduceCompactOnOverflow`) and retries
+  immediately WITHOUT consuming the server-retry budget; the split point
+  descends monotonically so it cannot loop
+- At the minimum safe split, fall back to re-summarizing the input in halves
+  and merging (`summarizeWithFallback`) instead of throwing the compaction
+- A still-possible shrink is never discarded at the budget edge
 
-| Package | Path | Responsibility |
-| ----------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------- |
-| `agent-core` | `packages/agent-core/` | Agent runtime: turn loop, session, tools, MCP client, compaction, memory, goal/wolfpack |
-| `ltod` | `packages/ltod/` | Multi-provider LLM client with streaming support |
-| `jian` | `packages/jian/` | Execution environment abstractions (filesystem, process, sandbox) |
-| `node-sdk` | `packages/node-sdk/` | Node.js SDK (`ScreamHarness`, `Session`) consumed by the app |
-| `memory` | `packages/memory/` | Cross-session memory store and scoring |
-| `telemetry` | `packages/telemetry/` | Telemetry, crash reporting, usage metrics |
-| `config` | `packages/config/` | Platform configuration, identity, model aliases |
-| `migration-legacy` | `packages/migration-legacy/` | Legacy data migration — **deprecated, do not expand** |
-| `apps/scream-code` | `apps/scream-code/` | CLI and terminal UI application (`scream` command) |
+## Reactive overflow recovery
+- When the main request hits `APIContextOverflowError`, `handleOverflowError`
+  starts a compaction and AWAITS it (via `block()`, bounded by the 120s block
+  timeout) before the turn retries the request — recovery never races the
+  un-compacted context against the provider
+- User aborts propagate; a compaction that fails or times out surfaces the
+  original overflow error
+- Reactive recovery runs once per turn (`reactiveAttempted`)
 
-### Terminology
+## Worker identity (stale-run guard)
+- The worker is owner-tagged; a worker whose abort signal was ignored by the
+  provider and finishes late must NOT: cancel a newer compaction, clear its
+  `compacting` record, consume its `compactionTimedOut` flag, mutate its
+  circuit-breaker counter, apply its result to live context, or misread the
+  newer history as a `/revoke`
+- The `this.compacting !== owner` check runs BEFORE the history-change
+  `/revoke` check on the success path
 
-- When the user says **"agent"** or **"session"**, they mean the `packages/agent-core` runtime (`Session`, `Agent`, turn loop), not the assistant.
-- **"app"** / **"TUI"** / **"CLI"** refers to `apps/scream-code`.
-- **"SDK"** refers to `@scream-cli/scream-code-sdk` exported from `packages/node-sdk`.
-- **"LLM layer"** refers to `packages/ltod`.
-- **"memory"** refers to `packages/memory` task-experience records.
+## Watermarks & model switches
+- `lowWaterMark` = post-compaction effective tokens × 1.1; it gates the
+  proactive trigger so compaction doesn't run twice back-to-back
+- The watermark is measured against the model's context window: switching the
+  model alias resets it (`resetLowWaterMark` on `modelAlias` change), so a
+  stale mark from a large model cannot mask the overflow threshold of a
+  smaller model
 
-### Cross-package Import Rules
+## Skill-candidate marker semantics
+- The compaction instruction mandates at most one `[[skill-candidate:
+  name|purpose|evidence]]` marker as the FINAL line of the response; `none`
+  is an explicit "no candidate" verdict
+- The last effective marker wins: a `none` marker CLEARS any candidate parsed
+  earlier (e.g. stale markers carried over into an update summary), and a
+  candidate parsed after a `none` still wins
 
-- `apps/scream-code` must use core capabilities **only through `@scream-cli/scream-code-sdk`**. Never import `@scream-cli/agent-core` directly in app code.
-- `packages/agent-core` must not depend on `apps/scream-code`.
-- Prefer package-local imports. When crossing packages, import from the package's public `index.ts` or documented subpaths.
-- For Node built-ins, prefer namespace imports: `import * as fs from 'node:fs/promises'`, `import * as path from 'node:path'`.
+## Dependencies (unchanged)
+- Does NOT depend on the loop engine; the turn loop drives compaction via
+  `fullCompaction.beforeStep/afterStep` hooks
 
----
-
-## Code Quality & Style
-
-### TypeScript
-
-- Avoid `any`. If unavoidable, add a short comment explaining why.
-- Do **not** introduce new `ReturnType<>` usage for new code; prefer explicit type names. Existing uses (e.g., timer IDs) should migrate to named aliases when touched.
-- Avoid inline type imports such as `import('pkg').Type` or `import('./module').Type`. Use top-level imports.
-- Optional object properties: pass `undefined` directly — do not use conditional spread.
-- Internal methods with only a single parameter should not be turned into options objects just for stylistic uniformity.
-- Except for a package's own public `index.ts`, internal `index.ts` barrels should prefer `export * from './module'`.
-
-### Classes
-
-- The current codebase uses `private readonly` for internal class state. Keep this style within a file; do not mix `private readonly` and native `#private` fields in the same component.
-- Constructor parameter properties are fine (e.g., `constructor(private readonly host: Host)`).
-- Leave externally accessible members bare (no `public` keyword).
-
-### Promises & Async
-
-- New code should prefer `Promise.withResolvers()` when it simplifies control flow. Do not refactor existing `new Promise` code purely for style.
-- In Bun contexts, prefer `await Bun.sleep(ms)` over `new Promise(r => setTimeout(r, ms))`.
-
-### Prompts & Static Copy
-
-- Tool descriptions and system prompts live in `.md` files next to the code that uses them.
-- Import them through the project's raw-text loader, e.g.:
-  ```ts
-  import DESCRIPTION from './tool.md';
-  ```
-  Do not inline multi-line prompts as template literals.
-- UI copy, option labels, help text, and dialog titles should stay next to the component or command that uses them. Do not centralize them into a global "copy constants" module.
-
-### Logging
-
-- **Never use `console.log` / `console.warn` / `console.error` in TUI components or render paths** — it corrupts terminal rendering.
+## Extension points
+- New compaction strategy: implement the `CompactionStrategy` interface
+  (full/micro are the current two)
+- Tune triggering: adjust thresholds/circuit-breaker params in
+  `compaction/strategy.ts`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [LIUTod/scream-code](https://github.com/LIUTod/scream-code) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
