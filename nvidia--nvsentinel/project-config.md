@@ -1,153 +1,91 @@
 ---
 trigger: always_on
-description: NVSentinel is a GPU Node Resilience System for Kubernetes that automatically detects, classifies, and remediates hardware and software faults in GPU nodes. It's designed for high-performance computing environments running NVIDIA GPUs.
+description: This file provides guidance to Claude Code, Codex, Cursor and other coding agents working in this repository. It is the canonical agent instruction file — `.github/copilot-instructions.md` points here rather than duplicating it.
 ---
 
-# GitHub Copilot Instructions for NVSentinel
+# AGENTS.md
+
+This file provides guidance to Claude Code, Codex, Cursor and other coding agents working in this repository. It is the canonical agent instruction file — `.github/copilot-instructions.md` points here rather than duplicating it.
+
+## Local Overlay
+
+If present, also read `AGENTS.local.md` at the repo root. It is gitignored, so personal overlays stay local — check the exact path directly (`Read` or `cat`), not via ignore-respecting tools such as `rg`, `fd`, or `git ls-files`. Follow it where it does not conflict with this file.
+
+## Role & Expertise
+
+Act as a Principal Engineer working on production Kubernetes infrastructure in Go. NVSentinel takes GPU nodes out of service and reboots them in live clusters, so a wrong decision here evicts real customer workloads. Favour correctness and operational safety over cleverness. All code must be production-grade, not illustrative.
 
 ## Project Overview
 
-NVSentinel is a GPU Node Resilience System for Kubernetes that automatically detects, classifies, and remediates hardware and software faults in GPU nodes. It's designed for high-performance computing environments running NVIDIA GPUs.
+NVSentinel is a GPU node resilience system for Kubernetes. It detects, classifies and remediates hardware and software faults on GPU nodes.
 
-**Status**: Experimental/Preview Release - APIs and configurations may change.
+**Pipeline:** Detect → Ingest → Act
 
-## Architecture & Technologies
-
-### Core Technologies
-- **Language**: Go 1.25+ (primary), Python 3.10+ (monitoring tools)
-- **Container Platform**: Kubernetes 1.25+
-- **Deployment**: Helm 3.0+, Tilt (development)
-- **Storage**: MongoDB (event store with change streams)
-- **Communication**: gRPC with Protocol Buffers
-- **GPU Monitoring**: NVIDIA DCGM (Data Center GPU Manager)
-
-### Project Structure
-```
-├── health-monitors/          # Pluggable health detection modules
-│   ├── gpu-health-monitor/   # DCGM-based GPU monitoring (Python)
-│   ├── csp-health-monitor/   # Cloud provider health checks (Go)
-│   └── syslog-health-monitor/ # System log analysis (Go)
-├── health-events-analyzer/   # Event classification and routing
-├── fault-quarantine/  # Node isolation (cordon)
-├── node-drainer/      # Workload eviction
-├── fault-remediation/ # Break-fix automation
-├── labeler/           # Node labeling (DCGM version, driver status, Kata detection)
-├── janitor/                  # State cleanup and maintenance
-├── platform-connectors/      # CSP integration (GCP, AWS, Azure)
-├── commons/                  # Shared utilities
-├── data-models/             # Protocol Buffer definitions
-├── store-client/        # MongoDB client library
-└── distros/kubernetes/      # Helm charts
+```text
+ Health Monitors             Ingestion                 Fault Management
+┌───────────────────┐                            ┌───────────────────────┐
+│ GPU (DCGM)        │                            │ Fault Quarantine      │
+│ Syslog            │  gRPC   ┌──────────────┐   │  (cordon / taint)     │
+│ CSP               │────────▶│   Platform   │   │ Node Drainer          │
+│ NIC               │         │  Connectors  │   │  (evict)              │
+│ Kubernetes Object │         └───────┬──────┘   │ Fault Remediation     │
+│ Health Events     │                 │ persist  │  (creates maint. CR)  │
+│   Analyzer        │                 ▼          └───────────┬───────────┘
+└───────────────────┘      ┌────────────────────┐      ▲     │ maintenance
+                           │    Event Store     │──────┘     │     CR
+                           │ MongoDB/PostgreSQL │  reconcile ▼
+                           └────────────────────┘   ┌──────────────────┐
+                                                    │ Janitor          │
+                                                    │  (reset/reboot)  │
+                                                    └──────────────────┘
 ```
 
-## Coding Standards
+**Every health monitor is peer to every other one.** GPU, syslog, CSP, NIC, Kubernetes Object Monitor and the Health Events Analyzer are all just health monitors — the analyzer detects patterns across events rather than reading a device, but it has no special status in the pipeline and publishes over the same gRPC interface as the rest. Treat "add a monitor" as the same shape of task regardless of which one you are looking at.
 
-### Go Code Guidelines
+Platform-connectors persists events to the store (MongoDB with change streams, or PostgreSQL) and updates node conditions on the Kubernetes API. Fault Quarantine, Node Drainer and Fault Remediation reconcile from the store and act on the cluster. Janitor is driven differently — it reconciles the maintenance CRs that Fault Remediation creates, via the Kubernetes API rather than the store.
 
-#### Module Organization
-- Each service is a separate Go module with its own `go.mod`
-- Use semantic import versioning
-- Keep dependencies minimal and up-to-date
-- Use `commons/` for shared utilities across modules
+**No module calls another module directly.** Coordination happens through the shared event store and the Kubernetes API. A change that introduces a direct call between two modules is almost certainly wrong — check [docs/designs/](docs/designs/) before proposing one.
 
-#### Code Style
-- Follow standard Go conventions (gofmt, golint)
-- Use structured logging via `log/slog`
-- Error handling: wrap errors with context using `fmt.Errorf("context: %w", err)`
-- Within `retry.RetryOnConflict` blocks, return errors **without wrapping** to preserve retry behavior
-- Use meaningful variable names (`synced` over `ok` for cache sync checks)
+**Tech stack:** Go 1.27.0, Python 3.10+ (Poetry), Kubernetes, gRPC + protobuf, MongoDB / PostgreSQL, Helm, DCGM. Tool versions are pinned in `.versions.yaml` — that file is the single source of truth; read it with `make show-versions`, never hardcode a version elsewhere.
 
-#### Kubernetes Integration
-- Use `client-go` for Kubernetes API interactions
-- Prefer informers over direct API calls for watching resources
-- Use `envtest` for testing Kubernetes controllers (not fake clients)
-- Implement proper shutdown handling with context cancellation
+## Commands
 
-#### Testing Requirements
-- Use `testify/assert` and `testify/require` for assertions
-- Write table-driven tests when testing multiple scenarios
-- Use `envtest` for integration tests with real Kubernetes API
-- Test coverage: aim for >80% on critical paths
-- Name tests descriptively: `TestFunctionName_Scenario_ExpectedBehavior`
-
-### Python Code Guidelines
-- Use Poetry for dependency management
-- Follow PEP 8 style guide
-- Use Black for formatting
-- Type hints required for all functions
-- Use dataclasses for structured data
-
-### Protobuf Guidelines
-- Define messages in `data-models/protobufs/`
-- Use semantic versioning for breaking changes
-- Include comprehensive comments for all fields
-- Generate code with: `make protos-generate`
-
-## Development Workflows
-
-### Building & Testing
 ```bash
-# Lint and test all modules
-make lint-test-all
+# THE gate. Run this before every PR — it is what CI runs.
+make lint-test-all   # protos-lint + license-headers-lint + gomod-lint + all Go/Python/Helm/shell lint+test
 
-# Lint specific module
-cd labeler && make lint
+# Individual module (every Go module has the same interface via make/go.mk)
+make -C labeler lint-test    # vet + lint + test for one module
+make -C labeler vet          # go vet ./...
+make -C labeler lint         # golangci-lint with the repo .golangci.yml
+make -C labeler test         # gotestsum, race detector on
+make -C labeler coverage     # coverage report
 
-# Test specific module
-cd health-events-analyzer && make test
+# Single test
+cd labeler && go test -race -run TestKataLabelDetection ./...
 
-# Build container images (uses ko)
-make images
+# Local cluster (ctlptl-managed Kind + registry, driven by Tilt)
+make dev-env         # create cluster + start Tilt
+make dev-env-clean   # stop Tilt + delete cluster
+make dev-restart     # restart Tilt without recreating the cluster
+make e2e-test        # end-to-end suite against the local cluster
 
-# View all make targets
-make help
+# Codegen and hygiene — run after touching protobufs or go.mod
+make protos-generate      # regenerate Go + Python protobuf bindings
+make dependencies-sync    # sync deps across modules via the Go workspace
+make go-mod-tidy-all      # go mod tidy in every module
+make license-headers-lint # Apache 2.0 headers on all source files
+
+# Images
+make ko-build     # Go images (ko — no Dockerfile involved)
+make docker-all   # Dockerfile-based images (Python, shell, CUDA/DCGM-based)
+
+make help         # every target
 ```
 
-### Version Management
-- All tool versions centralized in `.versions.yaml`
-- Use `yq` to read versions in scripts
-- Update versions in one place, propagates everywhere
-- Check versions: `make show-versions`
-
-### Local Development with Tilt
-```bash
-cd tilt
-tilt up  # Start local development environment
-```
-
-## Kata Containers Detection
-
-The labeler implements Kata Containers detection:
-
-### Detection Architecture
-- **Input labels** (on nodes): `katacontainers.io/kata-runtime` (default) + optional custom label
-- **Output label** (set by labeler): `nvsentinel.dgxc.nvidia.com/kata.enabled: "true"|"false"`
-- **Truthy values**: `"true"`, `"enabled"`, `"1"`, `"yes"` (case-insensitive)
-- **Lifecycle separation**: Pod events → DCGM/driver labels, Node events → kata labels
-
-### DaemonSet Variants
-- Separate DaemonSets for kata vs regular nodes
-- Selection via `nodeAffinity` based on kata.enabled label
-- Different volume mounts:
-  - Regular: `/var/log` (file-based logs)
-  - Kata: `/run/log/journal` and `/var/log/journal` (systemd journal)
-
-## Important Patterns
-
-### Error Handling in Retry Loops
-```go
-// ✅ CORRECT - Return error as-is for retry logic
-err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-    _, err := client.Update(ctx, obj, metav1.UpdateOptions{})
-    return err  // Don't wrap!
-})
-
-// ❌ WRONG - Wrapping breaks retry detection
-err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-    _, err := client.Update(ctx, obj, metav1.UpdateOptions{})
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [NVIDIA/NVSentinel](https://github.com/NVIDIA/NVSentinel) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
