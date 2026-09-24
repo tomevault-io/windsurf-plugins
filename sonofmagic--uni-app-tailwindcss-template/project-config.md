@@ -1,0 +1,55 @@
+---
+trigger: always_on
+description: This repository is a `pnpm` workspace containing the publishable create CLI and its registered uni-app templates. The default `uni-app + Vite + Vue 3 + Tailwind CSS` application lives in `packages/template/`; put its routes under `packages/template/src/pages/`, shared UI under `packages/template/src/components/`, Pinia stores under `packages/template/src/stores/`, and static files under `packages/template/src/static/`. The initializer lives in `packages/create-uni-app-tailwindcss/`, while `templ
+---
+
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+This repository is a `pnpm` workspace containing the publishable create CLI and its registered uni-app templates. The default `uni-app + Vite + Vue 3 + Tailwind CSS` application lives in `packages/template/`; put its routes under `packages/template/src/pages/`, shared UI under `packages/template/src/components/`, Pinia stores under `packages/template/src/stores/`, and static files under `packages/template/src/static/`. The initializer lives in `packages/create-uni-app-tailwindcss/`, while `templates.json` is the shared source of truth for CLI bundling, root scripts, and CI matrices. Template tooling is defined in [`packages/template/vite.config.ts`](packages/template/vite.config.ts) and [`packages/template/eslint.config.mjs`](packages/template/eslint.config.mjs), with Tailwind v4 configuration in [`packages/template/src/tailwind.css`](packages/template/src/tailwind.css).
+
+## Build, Test, and Development Commands
+
+Use `pnpm install` to install dependencies. `weapp-tailwindcss@5` handles Tailwind generation at build time, so no install-time Tailwind hook is required.
+
+- `pnpm dev:mp-weixin`: start WeChat Mini Program development build.
+- `pnpm dev:h5`: run the H5 dev server.
+- `pnpm build:mp-weixin`: create a production Mini Program build in `dist/build/mp-weixin`.
+- `pnpm build:h5`: create an H5 production build.
+- `pnpm create:build`: build the initializer and bundle every registered template.
+- `pnpm test:e2e`: verify scaffolding and the generated H5 application with Playwright.
+- `pnpm test:e2e:daily`: run the full candidate and npm-latest user lifecycle; use `-- --source candidate|latest|all` to select sources.
+- `pnpm test:e2e:daily:unit`: verify source parsing, fingerprint comparison, coverage, and status aggregation.
+- `pnpm test:daily:runtime`: create candidate/latest projects and run their H5, WeChat, iOS, Android, and scheduled GitHub lanes; reports use exit codes 0/1/2 for pass/fail/blocked.
+- `pnpm test:hmr:artifact:<target>`: run the headless App or Mini Program artifact HMR check used by CI; supported targets are `app`, `mp-weixin`, `mp-alipay`, and `mp-toutiao`.
+- `pnpm test:hmr:h5`: verify H5 HMR in a real browser and write evidence under `packages/template/.hmr-artifacts/`.
+- `pnpm test:hmr:mp-weixin`: verify HMR against a logged-in WeChat DevTools runtime.
+- `pnpm test:app-css:artifact`: verify App CSS compatibility from an existing `build:app` output without rebuilding it.
+- `pnpm template @default open:dev`: open WeChat DevTools for the default template.
+- `pnpm lint`: run the default template's ESLint checks.
+- `pnpm lint:fix`: auto-fix lint issues in the default template.
+- `pnpm update:deps`: interactively update regular template dependencies while excluding the uni-app compatibility set.
+- `pnpm update:uni-app`: update the DCloud-managed uni-app compiler dependencies together through UVM.
+- `pnpm release`: record a pnpm native change intent for a publishable package.
+- `pnpm release:status`: preview pending package versions without modifying files.
+- `pnpm repo:doctor`: validate the repoctl and release configuration.
+
+## Coding Style & Naming Conventions
+
+Follow `.editorconfig`: 2-space indentation, LF line endings, UTF-8. Prefer Vue 3 SFCs with TypeScript. Use PascalCase for component filenames such as `HeroShowcase.vue`, camelCase for store and utility modules such as `counter.ts`, and keep page directories route-aligned, for example `packages/template/src/pages/index/index.vue`. ESLint uses `@icebreakers/eslint-config` with Vue, Tailwind, and WeChat rules; run `pnpm lint` before opening a PR.
+
+## Testing Guidelines
+
+Playwright tests live in `packages/create-uni-app-tailwindcss/tests/` and cover project scaffolding plus the generated H5 page. Treat `pnpm lint`, `pnpm create:build`, and `pnpm test:e2e` as the minimum create-package quality gate. Template runtime changes should also run the affected target build and, for WeChat behavior, `pnpm dev:mp-weixin` plus WeChat DevTools. Keep new TypeScript tests under the owning package with `*.spec.ts` naming.
+
+### HMR Verification Notes
+
+Use the matching `pnpm test:hmr:artifact:<target>` script for the deterministic headless CI path. It applies the shared probe fixture atomically, verifies transformed template/script/style artifacts before and after an incremental compile, and restores the source even after interruption.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [sonofmagic/uni-app-tailwindcss-template](https://github.com/sonofmagic/uni-app-tailwindcss-template) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
