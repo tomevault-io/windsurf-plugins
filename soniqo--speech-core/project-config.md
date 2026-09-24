@@ -88,4 +88,4 @@ target_link_libraries(my_app PRIVATE speech_core speech_core_models_litert) # + 
 
 ---
 > Source: [soniqo/speech-core](https://github.com/soniqo/speech-core) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
