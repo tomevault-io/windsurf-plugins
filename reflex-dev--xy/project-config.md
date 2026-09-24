@@ -1,128 +1,94 @@
 ---
 trigger: always_on
-description: <!-- reflex managed begin (do not edit inside this block; add custom content outside the markers) -->
+description: A high-performance charting engine. The authoritative design is
 ---
 
-<!-- reflex managed begin (do not edit inside this block; add custom content outside the markers) -->
-# Agents
+# xy / xy
 
-This project uses the **Reflex agent skills** — up-to-date knowledge for building full-stack Python web apps with [Reflex](https://reflex.dev). Install them first, then use them as described below.
+A high-performance charting engine. The authoritative design is
+`spec/design-dossier.md` — **read the relevant § before changing behavior**;
+code comments cite dossier sections (e.g. §16 = deep-zoom re-centering).
 
-## Installing the Skills
+The entire `spec/` directory is the source of truth for intended behavior,
+architecture, compatibility, benchmarks, release readiness, and contributor
+contracts. Keep it current with every relevant code, configuration, build, and
+release change. A change is incomplete while its affected specification is
+missing, stale, or inconsistent with the implementation; resolve discrepancies
+instead of treating the implementation alone as authoritative.
 
-Before working on this project, make sure the Reflex skills are available to you.
+## Product North Star
 
-### Claude Code
+XY is being built to outperform every competing charting library and become
+the best overall charting system for Python. That goal spans every chart type
+and every data scale, from a handful of values to billions of rows, across the
+two dimensions users should not have to trade off: performance and
+customization.
 
-If the skills are not already available, install them yourself by running these shell commands:
+Treat every competitor lead as a concrete product gap. Work that affects a
+user-visible capability should:
 
-```bash
-claude plugin marketplace add reflex-dev/agent-skills
-claude plugin install reflex@reflex-agent-skills
-```
+- compare XY with the relevant leaders, including Matplotlib, Seaborn, Plotly,
+  Bokeh, Altair, Datashader, HoloViews/hvPlot, and emerging alternatives;
+- add or extend reproducible evidence across small, medium, large, and massive
+  data, covering startup, build and render time, interaction, memory, payload
+  and export size, and multi-chart applications where applicable;
+- update the capability matrix and visual examples when the improvement is
+  about chart breadth or customization rather than timing; and
+- commit the environment, raw results, output contracts, and reproduction
+  commands needed to inspect the win and catch regressions.
 
-Newly installed plugins load on the next session. After installing, tell the user to restart the session so the skills auto-load; until then, read the skill files directly from `~/.claude/plugins/` when you need them.
+The goal is not to win one large-scatter benchmark. XY should become the
+library users choose for ordinary charts, massive data, every chart family,
+notebooks, applications, static output, performance, and complete design
+control.
 
-### Other agents (Cursor, OpenCode, Codex, Pi)
+## Layout
 
-```
-npx skills add reflex-dev/agent-skills
-```
-
-Or clone https://github.com/reflex-dev/agent-skills and copy the `skills/` folders into your agent's skill directory (see the repo README for paths).
-
-### Verifying
-
-Before writing or editing any Reflex code, confirm these three skills are available: `reflex-docs`, `setup-python-env`, and `reflex-process-management`. If they are not, STOP and run the install step above — do not proceed without them.
-
-## Using the Skills
-
-### Reflex documentation
-
-For anything about Reflex APIs — components, state management, events, styling, database, routing, authentication — use the **reflex-docs** skill rather than relying on memory. It carries current, version-accurate docs.
-
-### Initializing a new Reflex project
-
-When starting a new Reflex project or setting up a development environment, you **must** follow the **setup-python-env** skill before doing anything else.
-
-Do not skip any steps. Do not assume a virtual environment or Reflex is already available — always verify first by following the skill's instructions in order.
-
-After the environment is ready and Reflex is installed, run:
-
-```bash
-reflex init
-```
-
-Then proceed with the user's request.
-
-### Managing a Reflex process
-
-When you need to compile, run, reload, or debug a Reflex application, follow the **reflex-process-management** skill for the correct sequence and error investigation steps.
-<!-- reflex managed end -->
-
-# XY Documentation App
-
-This nested project is the public XY documentation site. It is a Reflex app
-mounted at `/docs/xy` and intentionally follows the official Reflex docs
-structure and presentation.
-
-## Project layout
-
-```text
-xy_docs/                 # App entry point and XY-specific site composition
-  config.py              # Public Markdown discovery and navigation order
-  navbar.py              # XY branding using the shared docs shell
-  sidebar.py             # Memoized XY navigation
-  footer.py              # XY wrapper around the shared Reflex footer
-scripts/                 # Post-build sitemap, Markdown, and HTML validators
-tests/                   # Docs, links, live-preview, and integration tests
-../                      # Public Markdown sources
-../../spec/              # Internal project docs; never published
-```
-
-## Commands
-
-Run app commands from `docs/app` unless a command explicitly uses
-`--project docs/app`:
-
-```bash
-uv sync --frozen --group dev
-uv run --no-sync reflex run
-uv run --no-sync reflex run --env prod
-uv run --no-sync pytest tests
-uv run --no-sync ruff check .
-uv run --no-sync ruff format --check .
-uv run --no-sync codespell .
-```
-
-See `README.md` for the post-build validators and commands that run from the
-repository root.
-
-## Conventions
-
-- Render documentation through Python and Reflex. Do not introduce generated
-  HTML pages or iframe-based examples.
-- Public pages are Markdown files discovered through `DocsSiteConfig`. Add
-  routes and sidebar order to `DOCS_NAVIGATION`; do not add ordering
-  frontmatter to individual files.
-- Leaf pages that own public callable APIs declare them in ordered
-  `components:` frontmatter, using exported `xy.*` or `reflex_xy.*` names. The
-  docs app appends the same generated API Reference to HTML, per-page Markdown,
-  and `llms-full.txt`; do not author that section manually. Invalid, duplicate,
-  private, or non-callable entries fail docs compilation. Overview and general
-  guide pages should omit this key when a focused component or reference page
-  already owns the API.
-- Use `python demo exec` fences for code with a live preview. All public demos
-  render in shared Preview/Code tabs. Add `# --- chart ---` after a hardcoded
-  data section only when it exceeds 10 nonblank lines so the renderer adds a
-  separate Data tab. Reserve `python demo-only exec` for intentionally hidden
-  duplicate code. Demos must compile into real `reflex_xy.chart` components and
-  static `.xyf` payloads.
-- Preserve `/docs/xy` in internal links, canonical URLs, generated Markdown
-  aliases, and sitemap entries.
-- Reuse `reflex-site-shared` for the docs shell, Markdown renderer, styles,
-  Algolia search, breadcrumbs, footer, and responsive drawers. Keep XY branding,
-  navigation data, `rxconfig.py`, and small consumer-specific wrappers local.
+- `src/` — Rust core, **minimal external crates** (C ABI; one cdylib per
+  platform serves every CPython version). Dependencies are allowed when they
+  pay for themselves (measured win, small tree, well-maintained) — minimize,
+  don't prohibit. Caveat: crates.io is unreachable from the dev sandbox, so a
+  required crate must be vendored (`cargo vendor`) or the sandbox loses the
+  ability to build/test the core; prefer feature-gated optional deps. Bump
+  `ABI_VERSION` in `src/lib.rs` *and* `python/xy/_native.py` together
+  on any signature change.
+- `python/xy/` — package. `_native.py` (ctypes) binds the required
+  Rust core; there is no NumPy fallback — `kernels.py` raises a clear
+  ImportError if the native core can't load. `components.py`
+  is the Reflex-flavored composition API (`scatter_chart`/`line_chart` + marks/
+  axes) — the **only public chart-building surface**; keep it dependency-free
+  (no `reflex` import). `_figure.py` is the internal scene/engine object
+  (`Figure`) that composed charts compile to via `Chart.figure()`; it is not
+  exported from `xy` (only `Selection` is public from it).
+  `marks.py` is the declarative mark core: the single implementation of every
+  chart kind, bound onto the internal `Figure` (one body, one signature, one
+  set of defaults — parity is identity, not convention).
+  `channels.py` resolves scatter color/size encodings. `channel.py` (singular)
+  is the transport-agnostic message dispatcher (widget comm today, Reflex
+  routes later) — it must never import the widget stack.
+- `python/xy/pyplot/` — the matplotlib shim, fully contained
+  (one-way dependency onto the public composition API; guardrails in
+  `tests/pyplot/test_boundaries.py`). Corpus-defined compatibility:
+  `tests/pyplot/corpus/` + `spec/matplotlib/compat.md`.
+- `python/reflex_xy/` — the bundled Reflex integration (import namespace
+  `reflex_xy`; design: `spec/design/reflex-integration.md`). Chart
+  data rides the app's own websocket as a second socket.io namespace;
+  figures live in a per-process registry rebuilt from Reflex state on miss.
+  The source ships in every `xy` artifact; the `xy[reflex]` extra selects the
+  supported Reflex floor while plain `xy` keeps no Reflex runtime dependency.
+  The core `python/xy` package must never import Reflex. The render client is
+  linked out of that package at app compile (no second copy to drift).
+  Tests: `tests/reflex_adapter/` (skip unless Reflex is installed).
+- `js/src/*.ts` — the render client as TypeScript ES modules (one module per
+  former concat part; `60_entries.ts` is the entry and the only public export
+  surface). `node js/build.mjs` typechecks (`js/tsconfig.json`), lints the
+  shaders, and has vite bundle + minify into `python/xy/static/index.js`
+  (anywidget ESM) and `standalone.js` (IIFE, `window.xy`). Those bundles are a
+  **generated artifact, git-ignored, not committed** (§33): `hatch_build.py`
+  builds them and force-includes them into the wheel/sdist at packaging time
+  (exactly as it does the Rust core), so published distributions carry them
+  prebuilt. From a source checkout run `npm ci && node js/build.mjs` once so the
+  widget, HTML export, and tests have the bundles on disk. npm devDependencies
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
