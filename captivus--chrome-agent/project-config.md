@@ -51,4 +51,4 @@ An agent does two things in a loop: it **senses** the page and it **acts** on it
 
 ---
 > Source: [captivus/chrome-agent](https://github.com/captivus/chrome-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
