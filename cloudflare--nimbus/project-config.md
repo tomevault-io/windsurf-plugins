@@ -1,83 +1,111 @@
 ---
 trigger: always_on
-description: > Read this first if you're an AI agent picking up work on the Nimbus codebase. Sister file [`CLAUDE.md`](./CLAUDE.md) mirrors this content — keep them in sync.
+description: > Agent-facing context. If you're picking up work on this site, start here.
 ---
 
-# Nimbus — agent context
+# This Nimbus docs site
 
-> Read this first if you're an AI agent picking up work on the Nimbus codebase. Sister file [`CLAUDE.md`](./CLAUDE.md) mirrors this content — keep them in sync.
+> Agent-facing context. If you're picking up work on this site, start here.
 
-## What this project is
+Astro-based docs site. The `nimbus-docs` package provides the integration, content schemas, navigation/sidebar/TOC computation, MDX→markdown rendering, build hooks, and the `nimbus` CLI. Everything you see in `src/` is user-owned and yours to edit.
 
-Nimbus builds documentation sites on Astro. The architecture splits into three tiers:
-
-- **User-owned starter files** — visible UI components, layouts, and styling. Copied into the user's repo by `create-nimbus-docs` and edited freely from then on.
-- **`nimbus-docs` npm package** — invisible plumbing (data helpers, validation, integration wiring, behavior primitives). Imported, not forked.
-- **Registry** — optional components, utilities, and agent-handoff features installed on demand via `nimbus-docs add <slug>`.
-
-Cloudflare is a first-class deploy target (the scaffolder defaults to it and ships `wrangler.jsonc`), but the framework is deploy-target agnostic — static output runs anywhere.
-
-## Repo layout
+## File layout
 
 ```
-monorepo/
-├── packages/
-│   ├── nimbus-docs/                       framework — integration, helpers, schemas, types, `nimbus` CLI
-│   ├── nimbus-starter-source/             canonical source — fat tree; doubles as kitchen-sink dev app
-│   │   ├── src/                           components, layouts, pages (incl. pages/dev/), demo content
-│   │   ├── templates/                     per-variant content overrides (empty/, …)
-│   │   └── starter.manifest.mjs           declarative generation policy (registry-only slugs, dev-only paths, variants)
-│   └── create-nimbus-docs/                scaffolder (`pnpm create @cloudflare/nimbus-docs`) — CLI only, no templates
-│       └── scripts/copy-template.mjs      generator: canonical source + manifest → variant dirs (--out)
-├── apps/
-│   └── www/                               docs site + registry hosting
-│       └── registry/                      manifests.ts (source), components/, features/, registry.json
-├── examples/
-│   └── local/                             local sandbox (not drift-mirrored)
-├── scripts/
-│   ├── release.mjs                        release orchestration (detect → generate → verify → sync+tag → publish)
-│   ├── sync-templates-repo.mjs            sync generator output to the orphan templates branch + tag templates-v<version> (idempotent)
-│   ├── templates-check.mjs                PR CI: generate + scaffold + build
-│   ├── check-no-major.mjs / freshness-guard.mjs  release guards
-│   ├── local.mjs / local-add.mjs          local sandbox helpers
-├── .generated/                            gitignored generator output (templates); scratch for local/CI/release
-├── pnpm-workspace.yaml
-└── tsconfig.base.json
+astro.config.ts                # imports `nimbus` and `defineNimbusConfig` — site config lives inline here
+nimbus.config.ts               # (alternative) some projects split the Nimbus config into its own file
+src/
+├── components.ts              # MDX globals registry — every component used in .mdx files must be listed here
+├── components/                # repo-owned components
+│   ├── AgentDirective.astro   # ships an agent-readable hint into every doc page; do not remove
+│   ├── Header.astro
+│   ├── Render.astro           # partial loader — <Render file="..." />
+│   └── ui/                    # registry-installed UI components (badge, dialog, sidebar, search, etc.)
+├── content/
+│   ├── docs/*.mdx             # docs content
+│   └── partials/*.mdx         # partials referenced via <Render file="..." />
+├── content.config.ts          # docsCollection() and partialsCollection() are registered here
+├── layouts/
+│   ├── BaseLayout.astro       # renders <NimbusHead /> + <AgentDirective />; wraps every page
+│   └── DocsLayout.astro       # docs page chrome — sidebar, TOC, breadcrumbs, pagination
+├── lib/
+│   └── cn.ts                  # Tailwind className merger (clsx + tailwind-merge)
+├── pages/
+│   ├── index.astro            # landing
+│   ├── [...slug].astro        # docs catch-all
+│   ├── [...slug]/index.md.ts  # per-page markdown alternate (the .md sibling of every doc URL)
+│   ├── llms.txt.ts            # /llms.txt
+│   ├── og.png.ts              # site-level OG image
+│   ├── og/
+│   │   ├── _renderer.ts       # shared OG card renderer (underscore = not a route)
+│   │   └── [...slug].ts       # per-page OG image
+│   └── robots.txt.ts          # /robots.txt
+└── styles/
+    ├── globals.css
+    └── prose.css
 ```
 
-## Build / dev / test
+For Cloudflare deploys, also: `wrangler.jsonc` at project root.
 
-```sh
-pnpm -r build                                    # build all packages and apps
-pnpm --filter nimbus-docs build                  # framework only
-pnpm --filter nimbus-docs typecheck              # tsc --noEmit
-pnpm --filter nimbus-starter-source build        # build the canonical source (kitchen-sink)
-pnpm --filter nimbus-starter-source dev          # run kitchen-sink dev server (every component visible)
-pnpm dev                                         # alias for the above
-pnpm build:templates                             # generate template variants into .generated/templates
-pnpm templates:check                             # generate + scaffold + build one variant (CI runs on relevant PRs)
-pnpm local                                       # spin up the local sandbox (generates + scaffolds offline)
+## Writing docs
+
+Frontmatter must validate against `docsSchema` from `nimbus-docs/schemas`. Required: `title`. The schema includes optional fields for description, sidebar overrides, drafts, dates, edit-link suppression — read the schema for the full shape.
+
+```mdx
+---
+title: My page
+description: One-line summary.
+---
+
+# My page
+
+Content here.
 ```
 
-Root `build` runs at default concurrency; `pnpm -r` topo order builds `nimbus-docs` first. `apps/www`'s `build` no longer builds `nimbus-docs`, so a bare `pnpm --filter @nimbus/www build` on a clean checkout fails — deploy via `pnpm run deploy` (its `predeploy` builds the framework) or root `pnpm build`.
+**MDX components must be PascalCase and registered.** Every component used in a `.mdx` file (`<Steps>`, `<Card>`, etc.) must appear in `src/components.ts`. A pre-build validator catches typos and unregistered components with `file:line:column` and a "did you mean" hint.
 
-## The boundary test (read before adding any file)
+**Partials use `<Render />`.** Don't import `.mdx` files directly. Put shared content in `src/content/partials/<slug>.mdx`, then reference with `<Render file="<slug>" />`. The `Render` component emits a "did you mean" diagnostic for unknown slugs.
 
-The architecture splits into three tiers, one test per tier:
+**Icons render via `astro-icon` + Phosphor.** Use `<Icon name="ph:<glyph>" class="w-4 h-4" />` from `astro-icon/components`. Don't reintroduce inline `<svg>` blocks for icons. Browse glyphs at [phosphoricons.com](https://phosphoricons.com).
 
-| Tier | Lives in | Test |
-|---|---|---|
-| **Framework** | `packages/nimbus-docs/` | *"If I edit this, am I changing taste or fixing a bug?"* Bug = framework. |
-| **Starter source** | `packages/nimbus-starter-source/` | *"Do edits change Tailwind classes or layout, or do they change call signatures?"* Tailwind/layout = starter source. |
-| **Registry** | `apps/www/registry/` | *"Does every docs site need this on day 1?"* No = registry, install via `nimbus-docs add`. |
+**`AgentDirective` renders in `BaseLayout.astro`.** It writes an agent-readable hint at the top of every doc and markdown alternate pointing at `/llms.txt`. Don't remove it.
 
-**When in doubt, default to framework; the starter should grow slowly.**
+## Adding things
 
-## Derived templates
+| Goal | Action |
+|---|---|
+| New doc page | Create `src/content/docs/<slug>.mdx` with valid frontmatter. The sidebar picks it up automatically. |
+| New partial | Create `src/content/partials/<slug>.mdx`. Use via `<Render file="<slug>" />`. |
+| New UI component from the registry | `pnpm exec nimbus-docs add <slug>`. Resolves dependencies and writes files into `src/components/ui/<slug>/`. Remember to import + register the component in `src/components.ts` if it's used in MDX. |
+| New feature (e.g. custom 404, AI surface) | `pnpm exec nimbus-docs add <feature-slug>`. Prints an agent brief; pipe it to your coding agent. |
+| New custom page route | Add a file under `src/pages/`. |
+| Custom OG card style | Edit `src/pages/og/_renderer.ts`. |
 
+List installable items with `pnpm exec nimbus-docs list`.
+
+## Audit this site
+
+When asked to check or audit the site, walk the categories below. For each finding, emit a bullet:
+
+```
+- [error|warn|info] FILE:LINE — what's wrong + why it matters + recommended fix.
+```
+
+End the report with: `Summary: N errors, N warnings.`
+
+### Config
+- `astro.config.ts` imports `nimbus` and calls it with the result of `defineNimbusConfig({ ... })`.
+- `site` is a non-empty URL. Watch for trailing-slash mismatches against page URLs.
+- `editPattern` (if set) includes the literal `{path}` placeholder.
+- Every sidebar reference resolves to a real content entry.
+- Astro `output:` matches the deploy target (`static` for static deploys).
+
+### Content collections
+- `src/content.config.ts` registers `docsCollection()` from `nimbus-docs/content`. Register `partialsCollection()` too if `src/content/partials/` exists.
+- Every `.mdx` file lives inside a registered collection. Loose `.mdx` under `src/content/` outside a registered collection won't be picked up.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cloudflare/nimbus](https://github.com/cloudflare/nimbus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
