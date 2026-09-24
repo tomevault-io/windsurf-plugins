@@ -6,7 +6,7 @@ description: - This file applies to all the files in `charts/admission-controlle
 # AGENTS.md — the Helm chart
 
 - This file applies to all the files in `charts/admission-controller/`. The
-  root [`AGENTS.md`](../../AGENTS.md) holds the rules for the full monorepo.
+  root [`AGENTS.md`](../AGENTS.md) holds the rules for the full monorepo.
 - This is the single unified chart. It installs the controller, the audit
   scanner and the defaults of the policy server.
 
@@ -77,4 +77,4 @@ description: - This file applies to all the files in `charts/admission-controlle
 
 ---
 > Source: [kubewarden/adm-controller](https://github.com/kubewarden/adm-controller) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
