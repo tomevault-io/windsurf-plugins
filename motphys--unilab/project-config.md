@@ -1,106 +1,126 @@
 ---
 trigger: always_on
-description: This file contains repository facts and durable constraints. Codex loads it from
+description: 这个文件规范 agent 在 `docs/sphinx/` 下撰写和修改文档内容的行为。仓库顶层
 ---
 
-# UniLab Agent Guide
+# docs/sphinx Agent Guide
 
-This file contains repository facts and durable constraints. Codex loads it from
-the repository root; a more specific `AGENTS.md` or `AGENTS.override.md` may add
-or override rules for its subtree. Keep this file short and update it when the
-architecture changes.
+这个文件规范 agent 在 `docs/sphinx/` 下撰写和修改文档内容的行为。仓库顶层
+`AGENTS.md` 适用于此目录；本文件在其基础上补充 Sphinx 文档写作规则。同目录或更深
+目录的 instruction file 可覆盖两者。
 
-## Working agreement
+## Ground Truth
 
-- Start by inspecting the relevant owner layer, callers, tests, and config. State
-  assumptions when repository evidence is incomplete.
-- Infer the requested scope and carry it through to a reviewable result. Ask a
-  focused question only when the answer materially changes the outcome; continue
-  all independent, authorized work while waiting.
-- For a complex task, use parallel subagents for independent read-heavy
-  exploration, test/log analysis, or review when that improves the result.
-  Keep one writer for an overlapping file set and consolidate evidence before
-  editing or reporting.
-- Make the smallest complete change that satisfies the requested outcome. Keep
-  scripts as orchestration; put durable behavior in its owner module, registry,
-  backend adapter, or config.
-- Use `rg` for search and `apply_patch` for manual edits. Run Python through
-  `uv run`; do not invoke `python` directly.
-- Preserve unrelated work in a dirty tree. Do not reset, checkout, or rewrite
-  other people's changes.
-- Before finishing, report changed files, commands run, results, and any
-  unresolved limitation. A failed check is evidence to investigate, not a reason
-  to claim success.
+- 文档基础设施、构建和部署：`docs/sphinx/README.md`
+- 本地完整构建并发布到 UniLab-doc：`docs/sphinx/README.md#本地发布到-unilab-doc`
+- Sphinx 配置：`docs/sphinx/source/conf.py`
+- 架构标准：`docs/sphinx/source/zh_CN/4-developer_guide/0-index.md`
+- ADR：`docs/sphinx/source/adr/ADR-0000-index.md`
+- 术语表：`docs/sphinx/source/glossary.md`
+- 文档检查：`tests/scripts/doc_checks.py`、`tests/scripts/test_check_docs.py`
 
-## Architecture contracts
-
-- UniLab provides environments and adapters. `uni_rl` owns the APPO and
-  off-policy algorithm runners, learners, collectors, IPC, and training logs;
-  `uni_rl` must not import UniLab. `uni_rl` is an optional dependency (extra
-  `uni_rl`, kept in the dev group): the PPO path is a direct rsl-rl
-  integration owned by `unilab.rl` (VecEnv adapter and
-  distributed helpers; runner and algorithm are upstream rsl-rl) and must
-  stay importable and functional without uni_rl for single-process runs;
-  only multi-GPU launch delegates lazily to `uni_rl.ipc`. The env factory
-  must be a pickleable `EnvFactory` for spawn collectors.
-- Environment reset returns `(obs_dict, info_dict)` and `NpEnvState.obs` is a
-  dict. Keep `obs_groups_spec` and policy dimensions consistent with wrappers
-  and learners.
-- The Manager-Based runtime is the sole task runtime; do not restore legacy
-  `EnvCfg -> NpEnv` factories or compatibility seams.
-- Manager-Based event terms negotiated through `SimBackend` capabilities are
-  the sole DR lifecycle; do not reintroduce a DR manager/provider protocol, and
-  unsupported capabilities fail closed.
-- Backend-specific behavior belongs behind the declared `unisim.backend.base.SimBackend`
-  interface. Extend that interface before consuming a capability in an env;
-  never probe or call backend-private methods from env or training code.
-- Task, reward, and backend selection belongs in Hydra owner YAML and registries.
-  Select a backend with the task owner config/CLI; do not use
-  `training.sim_backend` as a standalone backend switch.
-- Asset/XML metadata is cold-path work only: init, materialization, or cache.
-  Step/reset/randomization must not parse assets or branch on asset metadata.
-  Robot meshes and textures come from the registered asset hub and stay out of
-  git. Task keyframes belong in task/scene XML fragments, never `robot.xml`.
-- Do not add new owner logic to `src/unilab/utils/`; those modules are transition
-  shims. Keep cross-cutting changes in the owning package.
-
-## Sim2Sim contract
-
-`src/unilab/utils/sim2sim.py` is the runtime source of truth. DENYLIST fields
-must match across backends (strict by default), WARNING_LIST differences are
-reported, and ALLOWLIST fields may vary. Training snapshots the contract in
-`run_config.json`; play entrypoints validate before environment construction and
-guard checkpoint dimensions. Update the contract and its tests together when a
-policy-I/O or network-shape field changes.
-
-## Validation
-
-Use the smallest relevant check while iterating, then run the complete gate for
-the final change:
+## Source Structure
 
 ```text
-make check                 # formatting and type checks
-make test                  # non-slow tests
-make test-all              # required before creating/updating a PR
+source/
+├── index.md                 # root redirect → en/0-index.html (no language picker)
+├── en/                      # English tree (site root, shown in sidebar nav)
+├── zh_CN/                   # Chinese tree (hidden from sidebar, via switcher only)
+├── adr/                     # shared ADR, one set
+├── api_reference/           # shared autodoc output from src/ docstrings
+├── glossary.md
+├── changelog.md
+├── _static/
+└── _templates/
+    ├── sidebar/
+    │   └── lang_switcher.html   # language dropdown in sidebar
+    └── autosummary/
 ```
 
-Use focused tests for contract, IPC/runner, config, backend, asset, or docs
-changes. Docs-only validation is defined in `docs/sphinx/AGENTS.md`. Record the
-exact commands and outcomes in the PR. Do not run expensive benchmarks unless
-the requested result or acceptance criteria needs them.
+`source/en/` is the **default site root**. Visitors land on `/en/0-index.html`
+directly (root `index.md` is a redirect). The sidebar navigation tree only
+shows the **active language root subtree** — when viewing an English page the
+sidebar contains only `en/...` pages; when viewing a Chinese page it contains
+only `zh_CN/...`. Shared resources (`adr/`, `api_reference/`, `glossary.md`,
+`changelog.md`) **do not appear directly in the sidebar** because they live
+outside both language roots.
 
-## Collaboration and review
+`source/en/` and `source/zh_CN/` are parallel language roots, but they are
+**not currently a strict 1:1 path mirror**. Both roots use numbered section
+directories and numbered Markdown files, while some sections exist only in one
+language. The language switcher uses an explicit path map in `conf.py`
+(`_LANGUAGE_PATH_FORWARD`) to handle the mismatch — **when adding a new English
+page, add a corresponding entry to that map** so the switcher lands somewhere
+sensible (or omit the entry to fall back to the zh_CN index).
 
-The single source for issue, roadmap, branch, PR, ADR, and CI policy is
-`docs/sphinx/source/en/4-developer_guide/5-contributing_workflow.md`; the Chinese
-page is its maintained translation. Read that page before changing workflow
-policy. In brief: define a reviewable outcome, choose the PR base before coding,
-link the driving issue, validate the final head, and wait for current-head remote
-CI only when the PR base is `main`.
+Do not add per-page language button blocks or hand-written cross-language
+navigation. The sidebar language switcher handles language changes globally.
 
-When a change crosses runtime, backend, config, registry, or other public
-contracts, link the relevant ADR. Add an ADR only for a new structural decision.
-Treat new public contracts, lifecycle/protocol changes, routine CI, support
+### Section indexes and shared resources
+
+Every multi-page section under a language root has a section index page that
+introduces the section and contains a hidden toctree of its sibling pages.
+Existing unnumbered sections use `index.md` recursively:
+`en/3-deployment/0-index.md`, `en/3-deployment/1-sim_to_real/0-index.md`,
+`en/4-developer_guide/1-architecture/0-index.md`, `en/2-user_guide/7-tooling/0-index.md`,
+etc. Ordered sections may use numbered filenames, such as
+`en/1-getting_started/0-index.md`, `1-quick_demo.md`, and `2-installation.md`.
+When a section uses numbered filenames, keep the file numbers and toctree order
+aligned. Adding a new section means adding its section index page and including
+the section in the parent index's toctree.
+
+Shared resources are reached through **language-local wrapper pages**, not by
+including the shared docs directly in a language toctree. Example: instead of
+
+```markdown
+<!-- BAD: would pull /glossary into the sidebar tree -->
+```{toctree}
+/glossary
+```
+```
+
+the English reference section uses
+
+```markdown
+<!-- GOOD: links via {doc} without inserting the shared page into the
+     sidebar subtree -->
+- {doc}`Shared glossary </glossary>`
+```
+
+See `en/5-reference/4-adr.md`, `en/5-reference/2-glossary.md`, `en/5-reference/3-changelog.md`
+for the established pattern. The wrapper page is what shows up in the
+language sidebar; the actual shared content remains accessible via the
+language-independent absolute path.
+
+## Core Principles
+
+1. **Evidence only**: only document facts that can be verified in `src/`,
+   `src/unilab/conf/`, `tests/`, `scripts/`, ADRs, or generated support data.
+2. **Code is the source of truth**: names, signatures, defaults, Hydra keys, and
+   commands follow the repository, not memory.
+3. **Owner layer first**: scripts assemble; contracts live in backend, env,
+   registry/config, runner/IPC, or algorithm owner layers.
+4. **Link, do not duplicate**: English developer pages should summarize and link
+   to ADRs or the development standard instead of copying the full Chinese
+   standard.
+5. **Config first**: backend/task/reward behavior belongs in Hydra owner YAMLs
+   and registries where possible.
+6. **API reference is autodoc**: `source/api_reference/` pages should contain
+   autodoc/autosummary directives. Improve API prose in `src/unilab/**/*.py`
+   docstrings.
+7. **Use canonical commands**: user-facing examples use the top-level CLI:
+   `uv run train --algo <algo> --task <task> --sim <backend>`,
+   `uv run eval ...`, or `uv run demo`. Script paths such as
+   `src/unilab/scripts/train_rsl_rl.py` may be named as implementation evidence, but they
+   are not the primary command shape for docs readers.
+
+## Before Writing
+
+1. Decide the language root: `source/en/` or `source/zh_CN/`.
+2. Locate the topic in `user_guide`, `developer_guide`, `transfer`, or `agents`.
+3. Search first with `rg` / `rg --files`; update an existing page instead of
+   creating a duplicate.
+4. Gather evidence near the claim:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
