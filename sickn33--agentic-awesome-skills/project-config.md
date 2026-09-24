@@ -1,58 +1,115 @@
 ---
 trigger: always_on
-description: This repository publishes an installable library of agent skills and plugin bundles. Canonical skill sources live in `skills/<skill-id>/SKILL.md`; use lowercase, hyphenated skill IDs. Mirrored plugin distributions live under `plugins/`. Contributor and user docs live in `docs/`; localized docs live in `docs_zh-CN/` and `docs/vietnamese/`. Maintenance scripts and tests are in `tools/scripts/` and `tools/scripts/tests/`. The hosted catalog app is in `apps/web-app/`. Registry outputs such as `CATAL
+description: > This document is optimized for AI agents and LLMs. Rules are prioritized by performance impact.
 ---
 
-# Repository Guidelines
+# Postgres Best Practices
 
-## Project Structure & Module Organization
+**Version 1.0.0**
+Supabase
+January 2026
 
-This repository publishes an installable library of agent skills and plugin bundles. Canonical skill sources live in `skills/<skill-id>/SKILL.md`; use lowercase, hyphenated skill IDs. Mirrored plugin distributions live under `plugins/`. Contributor and user docs live in `docs/`; localized docs live in `docs_zh-CN/` and `docs/vietnamese/`. Maintenance scripts and tests are in `tools/scripts/` and `tools/scripts/tests/`. The hosted catalog app is in `apps/web-app/`. Registry outputs such as `CATALOG.md`, `skills_index.json`, and `data/*.json` are generated artifacts.
+> This document is optimized for AI agents and LLMs. Rules are prioritized by performance impact.
 
-## Build, Test, and Development Commands
+---
 
-- `npm ci`: install root dependencies for scripts and validation.
-- `npm run validate`: validate skill frontmatter, required sections, and schema rules.
-- `npm run security:docs`: run safety checks for command, install, credential, and network guidance.
-- `npm run test`: run the repository script test suite.
-- `npm run build`: regenerate core indexes and build the catalog data.
-- `npm run app:install`: install `apps/web-app` dependencies.
-- `npm run app:dev`: start the local Vite catalog app.
-- `npm run app:build`: build and prerender the catalog app.
+## Abstract
 
-Before PRs, run `npm run validate && npm run test && npm run security:docs`.
+Comprehensive Postgres performance optimization guide for developers using Supabase and Postgres. Contains performance rules across 8 categories, prioritized by impact from critical (query performance, connection management) to incremental (advanced features). Each rule includes detailed explanations, incorrect vs. correct SQL examples, query plan analysis, and specific performance metrics to guide automated optimization and code generation.
 
-## Coding Style & Naming Conventions
+---
 
-Use Markdown for skills and docs, JavaScript/Node for most tooling, and Python for audits and sync helpers. Keep skill directories lowercase with hyphens, for example `skills/my-awesome-skill/SKILL.md`. Start new skills from `docs/contributors/skill-template.md`; include frontmatter, `## When to Use`, examples, and limitations. Keep generated-file edits out of community PRs unless doing maintainer release or sync work.
+## Table of Contents
 
-## Testing Guidelines
+1. [Query Performance](#query-performance) - **CRITICAL**
+   - 1.1 [Add Indexes on WHERE and JOIN Columns](#11-add-indexes-on-where-and-join-columns)
+   - 1.2 [Choose the Right Index Type for Your Data](#12-choose-the-right-index-type-for-your-data)
+   - 1.3 [Create Composite Indexes for Multi-Column Queries](#13-create-composite-indexes-for-multi-column-queries)
+   - 1.4 [Use Covering Indexes to Avoid Table Lookups](#14-use-covering-indexes-to-avoid-table-lookups)
+   - 1.5 [Use Partial Indexes for Filtered Queries](#15-use-partial-indexes-for-filtered-queries)
 
-Tests live mainly in `tools/scripts/tests/` and use Node assertions or Python `unittest`. Name new tests after the behavior under test, for example `installer_filters.test.js` or `test_validate_skills_strict.py`. Run targeted tests during development, then run the relevant npm scripts above. Web app changes should also run `npm run app:test` or `npm run app:test:coverage`.
+2. [Connection Management](#connection-management) - **CRITICAL**
+   - 2.1 [Configure Idle Connection Timeouts](#21-configure-idle-connection-timeouts)
+   - 2.2 [Set Appropriate Connection Limits](#22-set-appropriate-connection-limits)
+   - 2.3 [Use Connection Pooling for All Applications](#23-use-connection-pooling-for-all-applications)
+   - 2.4 [Use Prepared Statements Correctly with Pooling](#24-use-prepared-statements-correctly-with-pooling)
 
-## Commit & Pull Request Guidelines
+3. [Security & RLS](#security-rls) - **CRITICAL**
+   - 3.1 [Apply Principle of Least Privilege](#31-apply-principle-of-least-privilege)
+   - 3.2 [Enable Row Level Security for Multi-Tenant Data](#32-enable-row-level-security-for-multi-tenant-data)
+   - 3.3 [Optimize RLS Policies for Performance](#33-optimize-rls-policies-for-performance)
 
-History uses conventional-style subjects such as `feat: add ...`, `fix: refresh ...`, `docs: add ...`, and `chore: release ...`. Keep commits focused. PRs must use the default template, include the Quality Bar Checklist, link an issue when applicable, and allow maintainer edits. Source PRs should avoid generated registry artifacts; CI enforces this source-only contract.
+4. [Schema Design](#schema-design) - **HIGH**
+   - 4.1 [Choose Appropriate Data Types](#41-choose-appropriate-data-types)
+   - 4.2 [Index Foreign Key Columns](#42-index-foreign-key-columns)
+   - 4.3 [Partition Large Tables for Better Performance](#43-partition-large-tables-for-better-performance)
+   - 4.4 [Select Optimal Primary Key Strategy](#44-select-optimal-primary-key-strategy)
+   - 4.5 [Use Lowercase Identifiers for Compatibility](#45-use-lowercase-identifiers-for-compatibility)
 
-## Agent-Specific Instructions
+5. [Concurrency & Locking](#concurrency-locking) - **MEDIUM-HIGH**
+   - 5.1 [Keep Transactions Short to Reduce Lock Contention](#51-keep-transactions-short-to-reduce-lock-contention)
+   - 5.2 [Prevent Deadlocks with Consistent Lock Ordering](#52-prevent-deadlocks-with-consistent-lock-ordering)
+   - 5.3 [Use Advisory Locks for Application-Level Locking](#53-use-advisory-locks-for-application-level-locking)
+   - 5.4 [Use SKIP LOCKED for Non-Blocking Queue Processing](#54-use-skip-locked-for-non-blocking-queue-processing)
 
-Respect deeper `AGENTS.md` files inside skill subtrees. When changing canonical skill content that is mirrored under `plugins/agentic-awesome-skills/` or `plugins/agentic-awesome-skills-claude/`, check whether mirrors must be synchronized. For release work, follow the scripted `release:prepare` and `release:publish` flow rather than hand-editing version surfaces.
+6. [Data Access Patterns](#data-access-patterns) - **MEDIUM**
+   - 6.1 [Batch INSERT Statements for Bulk Data](#61-batch-insert-statements-for-bulk-data)
+   - 6.2 [Eliminate N+1 Queries with Batch Loading](#62-eliminate-n1-queries-with-batch-loading)
+   - 6.3 [Use Cursor-Based Pagination Instead of OFFSET](#63-use-cursor-based-pagination-instead-of-offset)
+   - 6.4 [Use UPSERT for Insert-or-Update Operations](#64-use-upsert-for-insert-or-update-operations)
 
-### Current-Base Instruction Guard
+7. [Monitoring & Diagnostics](#monitoring-diagnostics) - **LOW-MEDIUM**
+   - 7.1 [Enable pg_stat_statements for Query Analysis](#71-enable-pgstatstatements-for-query-analysis)
+   - 7.2 [Maintain Table Statistics with VACUUM and ANALYZE](#72-maintain-table-statistics-with-vacuum-and-analyze)
+   - 7.3 [Use EXPLAIN ANALYZE to Diagnose Slow Queries](#73-use-explain-analyze-to-diagnose-slow-queries)
 
-Repository instructions must match the exact Git base used for the task. After creating a clean clone, worktree, or topic branch, re-read that base's `AGENTS.md`, `.github/MAINTENANCE.md`, canonical maintainer skill, and `package.json`; those files supersede instructions inherited from the checkout that launched the task.
+8. [Advanced Features](#advanced-features) - **LOW**
+   - 8.1 [Index JSONB Columns for Efficient Querying](#81-index-jsonb-columns-for-efficient-querying)
+   - 8.2 [Use tsvector for Full-Text Search](#82-use-tsvector-for-full-text-search)
 
-Every command, script, reviewer, or gate described as mandatory must exist on the current task base. If it is absent, do not recover or execute it from another branch, worktree, stash, installed copy, or historical commit. Treat the mismatch as evidence that the procedure may have been retired, inspect `origin/main` and the relevant removal history, then follow the current-base contract or report the unresolved conflict.
+---
 
-### Mandatory Maintainer Workflow
+## 1. Query Performance
 
-For every repository maintenance sweep, PR merge batch, maintainer-side PR repair, canonical synchronization, combined Security/Quality cleanup and merge, or tag/release request, **always invoke and follow the `antigravity-maintainer-batch-release` skill before triage or mutation**. If the client has not installed or discovered that skill, read and follow the repository-canonical copy at `skills/antigravity-maintainer-batch-release/SKILL.md`. This is a hard gate, including when the user asks for direct merges or a direct update to `main`; do not substitute a generic Git or GitHub workflow.
+**Impact: CRITICAL**
 
-Treat `main` as pull-request-only. Perform maintainer edits on a topic branch or in a clean temporary clone, merge accepted source PRs with `npm run merge:batch`, and let the protected canonical-sync PR own generated state and contributor-credit drift. Never retry a rejected direct push to `main` and never use a generic push helper for releases.
+Slow queries, missing indexes, inefficient query plans. The most common source of Postgres performance issues.
+
+### 1.1 Add Indexes on WHERE and JOIN Columns
+
+**Impact: CRITICAL (100-1000x faster queries on large tables)**
+
+Queries filtering or joining on unindexed columns cause full table scans, which become exponentially slower as tables grow.
+
+**Incorrect (sequential scan on large table):**
+
+```sql
+-- No index on customer_id causes full table scan
+select * from orders where customer_id = 123;
+
+-- EXPLAIN shows: Seq Scan on orders (cost=0.00..25000.00 rows=100 width=85)
+```
+
+**Correct (index scan):**
+
+```sql
+-- Create index on frequently filtered column
+create index orders_customer_id_idx on orders (customer_id);
+
+select * from orders where customer_id = 123;
+
+-- EXPLAIN shows: Index Scan using orders_customer_id_idx (cost=0.42..8.44 rows=100 width=85)
+-- Index the referencing column
+create index orders_customer_id_idx on orders (customer_id);
+
+select c.name, o.total
+from customers c
+join orders o on o.customer_id = c.id;
+```
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sickn33/agentic-awesome-skills](https://github.com/sickn33/agentic-awesome-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
