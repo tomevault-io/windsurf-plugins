@@ -1,52 +1,136 @@
 ---
 trigger: always_on
-description: This is the Tons of Skills Claude Code plugin marketplace. Author plugins under `plugins/<category>/<plugin-name>/`; a plugin commonly contains `skills/`, `commands/`, `.claude-plugin/plugin.json`, and a README. The editable catalog is `.claude-plugin/marketplace.extended.json`; its `marketplace.json`, generated plugin `package.json` files, and the README table of contents are derived. Shared tooling lives in `scripts/`, workspace packages in `packages/`, Python regression tests in `tests/`, and
+description: How agent definitions work in Claude Code plugins — creating specialized AI personas with capabilities, tool restrictions, and autonomous multi-step workflows using agents/*.md files.
 ---
 
-# Repository Guidelines
 
-## Project Structure
+Agents are specialized AI personas defined within Claude Code plugins. Where skills teach Claude *what* to do in a specific domain, agents define *who* Claude becomes when tackling a particular class of problem. An agent carries a distinct identity with its own capabilities, tool restrictions, and behavioral parameters -- making it suitable for complex, autonomous, multi-step workflows.
 
-This is the Tons of Skills Claude Code plugin marketplace. Author plugins under `plugins/<category>/<plugin-name>/`; a plugin commonly contains `skills/`, `commands/`, `.claude-plugin/plugin.json`, and a README. The editable catalog is `.claude-plugin/marketplace.extended.json`; its `marketplace.json`, generated plugin `package.json` files, and the README table of contents are derived. Shared tooling lives in `scripts/`, workspace packages in `packages/`, Python regression tests in `tests/`, and the Astro site in `marketplace/`.
+## When to Use Agents vs Skills
 
-## Build, Test, and Development
+The distinction between agents and skills is fundamental to designing effective plugins. Choosing the wrong abstraction leads to either overly constrained workflows (using skills where agents are needed) or unnecessarily broad permissions (using agents where skills would suffice).
 
-Use Node 20+ and pnpm 9.15.9+ at the repository root; `marketplace/` deliberately uses npm.
+| Characteristic | Skills | Agents |
+|---------------|--------|--------|
+| **Activation** | Auto-activates based on context | Explicitly delegated or invoked |
+| **Tool model** | Allowlist (`allowed-tools`) | Denylist (`disallowedTools`) |
+| **Scope** | Focused, single-task | Broad, multi-step workflows |
+| **Autonomy** | Follows instructions within one turn | Can iterate autonomously over multiple turns |
+| **Identity** | Adds knowledge to Claude | Gives Claude a specialized persona |
+| **Typical length** | 500-2,000 words | 200-1,000 words (directives, not procedures) |
 
-```bash
-pnpm install
-./scripts/quick-test.sh                 # fast repository sanity check
-pnpm test && pnpm typecheck && pnpm lint
-pnpm run verify                         # CI-equivalent verification pipeline
-pnpm run sync-marketplace               # regenerate catalog-derived files
-cd marketplace && npm run dev           # local Astro site, port 4321
-cd marketplace && npx playwright test   # website end-to-end tests
+**Use a skill when:**
+
+- The task is focused and well-defined (e.g., "write tests for this component")
+- You want auto-activation based on context matching
+- You need precise tool restrictions (only allow specific tools)
+- The instruction set is procedural: step 1, step 2, step 3
+
+**Use an agent when:**
+
+- The task requires autonomous exploration and decision-making
+- Multiple tool categories are needed, with only a few excluded
+- The agent needs to iterate (try, evaluate, adjust) over multiple turns
+- You want Claude to adopt a specific professional persona (security auditor, UX researcher, etc.)
+- The work involves judgment calls that vary based on what the agent discovers
+
+## Agent File Structure
+
+Agent definitions live in the `agents/` directory of a plugin. Each agent is a single markdown file with YAML frontmatter:
+
+```
+my-plugin/
+└── agents/
+    ├── security-auditor.md
+    ├── performance-analyst.md
+    └── code-archaeologist.md
 ```
 
-Do not hand-edit generated catalog artifacts. Run `pnpm run sync-marketplace` before committing catalog or plugin changes. Validate skill metadata with `python3 scripts/validate-skills-schema.py --marketplace --verbose`; use `python3 scripts/validate-unicode-hygiene.py` for changed skill content.
+### Complete Agent Example
 
-## Style and Naming
+```markdown
+---
+name: security-auditor
+description: "Security-focused code reviewer specializing in OWASP Top 10, dependency vulnerabilities, and secrets detection"
+capabilities:
+  - "Static analysis of source code for security vulnerabilities"
+  - "Dependency audit using npm audit and Snyk patterns"
+  - "Secrets and credential detection in code and configuration"
+  - "OWASP Top 10 compliance checking"
+model: sonnet
+effort: high
+maxTurns: 15
+disallowedTools:
+  - "WebFetch"
+  - "WebSearch"
+expertise_level: expert
+activation_priority: high
+---
 
-Follow the existing file’s style; use Prettier for JavaScript, TypeScript, JSON, YAML, and Markdown (`pnpm run format:check`) and ESLint (`pnpm lint`) for code. Use two-space indentation in JS/TS and JSON. Name plugin folders lowercase kebab-case (for example, `plugins/mcp/example-plugin`) and skills as `skills/<skill-name>/SKILL.md`. Keep frontmatter compliant with the schema validator rather than inventing local variants.
+You are a senior application security engineer conducting a thorough security
+review. Your primary objective is to identify vulnerabilities before code
+reaches production.
 
-## Tests
+## Review Methodology
 
-Add or update focused tests beside the affected package or in `tests/`; Python tests use `test_*.py` and TypeScript tests commonly use `*.test.ts`. Run the narrowest relevant test first, then the commands above. Changes to validators, schemas, or catalog generation require their targeted regression suite plus the marketplace schema validation.
+1. **Reconnaissance**: Map the attack surface by identifying entry points
+   (API routes, form handlers, file uploads, WebSocket endpoints).
 
-## Commits and Pull Requests
+2. **Dependency Analysis**: Check `package.json`, `requirements.txt`, or
+   equivalent for known vulnerable dependencies. Flag any package with
+   a critical or high severity CVE.
 
-Use Conventional Commit-style subjects visible in history, such as `fix(ci): harden validation` or `docs(contributing): clarify workflow`. Keep each commit scoped. PRs should explain the user-facing change, link the beads issue, include screenshots for visual site changes, and include regenerated derived files when applicable. Use `bd` for task tracking: run `bd ready`, claim the issue, and close it when complete. Before finishing, commit, pull/rebase, run `bd sync`, push, and confirm `git status` is up to date.
+3. **Code Analysis**: Systematically review for:
+   - SQL injection and NoSQL injection
+   - Cross-site scripting (XSS) in rendered output
+   - Insecure deserialization
+   - Hardcoded secrets, API keys, or credentials
+   - Missing authentication or authorization checks
+   - Path traversal vulnerabilities
+   - Server-side request forgery (SSRF)
 
-## Merge gates (do not weaken)
+4. **Configuration Review**: Check for insecure defaults in:
+   - CORS policies
+   - Cookie settings (HttpOnly, Secure, SameSite)
+   - TLS configuration
+   - Error handling (information leakage)
 
-Required branch-protection contexts on `main`: **`ci-required`**, **`gitleaks`**, **`skill-conform`**.
+5. **Report**: Categorize findings by severity (Critical, High, Medium, Low)
+   with specific file locations, code snippets, and remediation guidance.
 
-- `skill-conform` is a **separate** always-report workflow (`audit-harness conform --strict`). Never add it (or any path-scoped / provider-dependent job) to `ci-required`'s `needs:`.
-- Behavioral skill eval (`skill-eval-advisory.yml`) is **advisory only** until explicitly graduated.
-- Full gate architecture, validator SSoT rules, and non-negotiables: see `CLAUDE.md`.
-- Which document owns which fact class: blueprint `000-docs/727` § 11 (the authority map),
-  indexed publicly by `STANDARDS.md § Canonical documents`. Point at owners; don't restate.
+## Output Format
+
+Present findings as a structured security report:
+
+- **Finding ID**: SEC-001, SEC-002, etc.
+- **Severity**: Critical / High / Medium / Low
+- **Category**: OWASP category (e.g., A03:2021 Injection)
+- **Location**: File path and line number
+- **Description**: What the vulnerability is
+- **Impact**: What an attacker could do
+- **Remediation**: Specific code changes to fix it
+```
+
+## Frontmatter Fields
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique agent identifier within the plugin (kebab-case) |
+| `description` | string | 20-200 character summary of the agent's specialty |
+
+### Optional Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `capabilities` | array | [] | List of capabilities the agent provides |
+| `model` | string | (default) | LLM model override: `sonnet`, `haiku`, or `opus` |
+| `effort` | string | medium | Reasoning effort level: `low`, `medium`, or `high` |
+| `maxTurns` | number | (default) | Maximum iterations in the agentic loop |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jeremylongshore/tons-of-skills-marketplace](https://github.com/jeremylongshore/tons-of-skills-marketplace) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
