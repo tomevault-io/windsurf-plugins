@@ -1,71 +1,137 @@
 ---
 trigger: always_on
-description: 이 레포는 URL과 수집 항목을 받아 사이트를 정찰·대량수집하고 엑셀로 내보내는 범용 웹 크롤링 에이전트다. **`CLAUDE.md`와 `.codex/skills/web-crawler/SKILL.md`가 *어떻게*에 대한 SSOT다.** 이 파일은 Codex용 **실행 계약**이다 — Claude Code는 Skill 런타임으로 같은 규율을 자동 적용받지만, Codex는 Skill 런타임이 없으므로 이 파일이 대신 강제한다.
+description: 이 프로젝트는 사용자가 URL과 수집 항목을 자연어로 설명하면, 자동으로 해당 웹사이트를 정찰하고 데이터를 대량 수집하여 엑셀 파일로 정리해주는 에이전트입니다.
 ---
 
-# AGENTS.md — web-crawler (Codex / Claude Code dual-host)
+# 범용 웹 크롤링 에이전트
 
-이 레포는 URL과 수집 항목을 받아 사이트를 정찰·대량수집하고 엑셀로 내보내는 범용 웹 크롤링 에이전트다. **`CLAUDE.md`와 `.codex/skills/web-crawler/SKILL.md`가 *어떻게*에 대한 SSOT다.** 이 파일은 Codex용 **실행 계약**이다 — Claude Code는 Skill 런타임으로 같은 규율을 자동 적용받지만, Codex는 Skill 런타임이 없으므로 이 파일이 대신 강제한다.
+## 프로젝트 개요
 
-## 최초 환경 셋업 (클론 직후 1회)
+이 프로젝트는 사용자가 URL과 수집 항목을 자연어로 설명하면, 자동으로 해당 웹사이트를 정찰하고 데이터를 대량 수집하여 엑셀 파일로 정리해주는 에이전트입니다.
 
-수집 전에 환경을 준비한다. **한 명령**으로 단계별 설치+검증을 하고, 이미 된 단계는 skip한다:
+---
+
+## 최초 환경 셋업 (클론 직후 1회, 수집 전 확인)
+
+수집 시도 전에 환경을 준비한다. **한 명령**으로 단계별 설치+검증(이미 된 단계는 skip):
 
 ```powershell
-# Windows (PowerShell) — 실행 정책 우회가 표준
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1     # Windows (venv 자동 생성)
 ```
 ```bash
-# macOS / Linux
-python -m venv .venv && . .venv/bin/activate && python scripts/bootstrap.py
+python -m venv .venv && . .venv/bin/activate && python scripts/bootstrap.py   # macOS/Linux
 ```
 
-단계: ① Python deps → ② 브라우저(Chromium) → ③ agent-browser(표준 정찰 도구) → ④ preflight 검증.
-실패하면 "다음에 실행할 정확한 명령"이 출력된다. 모드: 기본 full(표준) / `--core-only`(agent-browser 제외) / `--skip-browser` / `-VerbosePip`(pip 상세 로그).
-
-**`py` 런처 깨짐 자동 처리**: `setup.ps1`은 `py -3`/`python`/`python3`를 실제 실행해 3.10+를 확인하고 성공하는 쪽으로 venv를 만든다. `py -3`가 `No installed Python found!`로 실패하면 자동으로 `python`으로 fallback한다. 그래도 venv가 안 생기면 직접: `python -m venv .venv` → `.\.venv\Scripts\python.exe scripts\bootstrap.py`.
-
-**수동/디버깅 시 실제 동작하는 명령 (Windows)**:
-```powershell
-python --version ; py -3 --version       # 어느 쪽이 동작하는지 먼저 확인 (py 깨졌으면 python 사용)
-python -m venv .venv ; .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt --progress-bar off    # 멈춘 듯하면 끝에 -v 추가
-scrapling install                        # Chromium 1회 설치 (내부에서 playwright install chromium 수행 — 따로 또 X)
-npm.cmd install -g agent-browser ; agent-browser.cmd install   # PowerShell은 .cmd 사용
-python scripts\preflight.py              # 검증: core / agent-browser 분리 PASS·WARN·FAIL
+수동/디버깅 시 실제 동작 명령:
+```bash
+pip install -r requirements.txt          # scrapling[fetchers] 포함 — fetcher 런타임 일괄
+scrapling install                        # Chromium 1회 (내부에서 playwright install chromium 수행 — 따로 또 X)
+npm.cmd install -g agent-browser ; agent-browser.cmd install   # 표준 정찰 도구 (PowerShell은 .cmd)
+python scripts/preflight.py              # 검증: core / agent-browser 분리 PASS·WARN·FAIL
 ```
+
 - `python -m scrapling`은 동작 안 함 → `scrapling install`(venv 활성화) 또는 `.\.venv\Scripts\scrapling.exe install`.
-- pip이 진행 없이 멈춘 듯하면 정상(대용량 휠 다운로드). 진행 확인: `.\.venv\Scripts\python.exe -m pip install -r requirements.txt --progress-bar off -v`.
-- 검증은 `scripts/preflight.py`가 담당: **core(Python/Scrapling/Playwright)**와 **agent-browser**를 분리 보고. core 통과·agent-browser 실패면 "전체 설치 미완료"(종료코드 1). 전체 가이드는 `README.md` "처음 설치하기".
+- 검증은 `scripts/preflight.py`(설치 안 함). core 통과·agent-browser 실패면 "전체 설치 미완료"(exit 1).
+- 전체 가이드(비개발자용 포함)는 `README.md`의 "처음 설치하기" 참조.
 
-## 스킬 소스 (생성 미러)
+---
 
-- **`.claude/skills/`가 정본. `.codex/skills/`는 생성 미러**다 — 텍스트 안의 `.claude/skills` 경로만 `.codex/skills`로 치환된 것 외엔 byte-identical.
-- **`.codex/skills/`를 직접 수정하지 말 것.** `.claude/skills/`를 고친 뒤 `python scripts/sync_codex_mirror.py`를 실행해 미러를 재생성한다. (어긋남 확인: `python scripts/sync_codex_mirror.py --check`)
-- **문서의 "알려진 도메인" 목록도 생성물**이다 — `fingerprints/*/profile.json`이 SSOT. 새 프로필을 추가했으면 `python scripts/sync_domain_list.py`로 CLAUDE.md/README.md를 재생성한다. (어긋남 확인: `python scripts/sync_domain_list.py --check` / 테스트: `scripts/test_sync_domain_list.py`)
+## ★ 절대 규칙 0: 도메인 히스토리 우선 (모든 수집의 시작)
 
-## 크롤링 요청을 받으면 — 필수 절차
+새 수집 요청을 받으면 **정찰하기 전에 반드시** 이 두 가지를 먼저 본다:
 
-사용자가 "크롤링/스크래핑/수집/~를 모아줘/입찰공고 수집" 등을 요청하면:
+1. **`fingerprints/<sanitized_domain>/profile.json`** — 그 도메인의 검증된 수집 레시피 (fetcher_type, antibot_type/strategy, selectors, api_endpoints, pagination, notes)
+2. **`output/<도메인>/`** — 그 도메인에서 이전에 실행된 수집 작업 폴더들 (그 안의 `crawl_script.py`/`raw_data.json`은 profile.json에 안 박힌 미세 디테일의 보조 reference)
 
-1. **즉흥 처리 금지.** `.codex/skills/web-crawler/SKILL.md`를 단계대로 실행한다. 절차를 요약하고 임의로 구현하지 않는다. **폴백 재구현 금지** — `requests`/`urllib`/`httpx`/`BeautifulSoup`로 직접 수집하거나 인라인으로 긁지 않는다. 수집은 항상 생성한 `crawl_script.py` 안의 **Scrapling 또는 Playwright**로만 한다.
+### 운영 흐름
 
-2. **절대 규칙 0 — 도메인 히스토리 우선.** 정찰하기 전에 반드시 `fingerprints/<sanitized_domain>/profile.json`과 `output/<도메인>/`을 먼저 본다. 프로필이 있으면 `notes`/`fetcher_type`/`antibot_strategy`를 그대로 채택하고 정찰을 건너뛰어 Step 3으로 점프한다. profile.json이 있는데 무시하고 정찰부터 다시 하는 것은 금지(5~20분 비싼 작업 반복). 알려진 도메인 목록은 `CLAUDE.md` 의 생성 블록 참조.
+```
+[수집 요청] → 도메인 추출 → fingerprints/<sanitized_domain>/profile.json 조회
+                                    │
+                ┌───────────────────┴───────────────────┐
+                │ 프로필 있음                            │ 프로필 없음
+                ▼                                       ▼
+       ┌────────────────────────┐         ┌─────────────────────────┐
+       │ 1. notes 먼저 읽고     │         │ 정찰 (Step 2) 부터 시작 │
+       │    전략에 반영          │         │ — 모든 단계 풀 실행      │
+       │ 2. fetcher_type/       │         └─────────────────────────┘
+       │    antibot_strategy     │
+       │    그대로 채택          │
+       │ 3. selectors/endpoints │
+       │    재사용 시도          │
+       │ 4. last_used가 3개월+  │
+       │    오래됐거나 사용자가  │
+       │    "최신 구조로"를      │
+       │    명시했으면 정찰 추가  │
+       │ 5. 검증 실패하면 셀렉터/│
+       │    엔드포인트만 정찰    │
+       └────────────────────────┘
+                │
+                ▼
+       채택한 값이 사다리 B(4단 이상)인가?
+                │
+        ┌───────┴────────┐
+        │ 아니오(1~3단)   │ 예 — consent 기록이 있나?
+        ▼                ├── 있음 → 통지 없이 진행 (sticky)
+   그대로 진행            └── 없음 → **이번이 최초 통과다. 그대로 통지한다**
+        │                          (프로필 재사용은 이음매 면제가 아니다)
+        ▼
+       정찰 스킵하고 Step 3 (수집 전략 수립)으로 점프
+```
 
-3. **프로필 게이트.** Step 1-A(프로필 있으면 load) ↔ Step 5-A(수집 성공 직후 save/갱신, `notes` 필드 필수). Step 5-A를 빠뜨리면 수집 결과가 살아있어도 **"파이프라인 미완료"**로 보고한다.
+> **프로필이 있다는 사실 자체는 게이트를 면제하지 않는다.** 면제하는 것은 `consent` 기록이다.
+> `antibot_strategy` 가 4단 이상인데 `consent` 가 없는 프로필은 "이 사용자는 아직 통지받은 적이
+> 없다" 는 뜻이다 — 그대로 실행하면 통지 없이 사다리 B 를 돌게 되고, 수집이 다 끝난 뒤
+> `save()` 가 `ConsentRequired` 로 막아 있지도 않았던 통지를 기록하도록 떠밀린다.
+>
+> **그래서 통지는 도메인당 1회가 아니라 이음매를 통과할 때마다 1회다.** 사다리 A 로 내려간
+> 수집에서 프로필이 배포 대상이 되면 `save()` 가 `consent` 를 지운다 — 사용자의 통지 이력을
+> 배포되는 프로필에 담아 내보낼 수 없기 때문이다. 그 도메인이 나중에 새 보호를 걸면 들고 있는
+> 기록이 없으므로 다시 통지한다. **사이트가 새로 막은 것은 달라진 상황이니 그게 맞다.**
 
-## 정찰 도구 — agent-browser가 표준 (양 host 공통)
+### 절대 안 되는 것
 
-- 정찰(Step 2)의 **표준·기본 도구는 `agent-browser`**다. 선택 기능이 아니다 — 워크플로상 정찰 단계에서는 **단순 정적 사이트를 긁더라도 agent-browser를 먼저 사용**한다. vercel-labs의 독립 CLI(`npm install -g agent-browser`)라 **Claude Code·Codex 모두 동일하게** 쓴다(Claude 전용 아님). 양 host 모두 정찰 시작 전 우선 `agent-browser skills get core --full`로 사용법을 로드한다. 설치된 구버전이 `Unknown command: skills`를 반환하면 `agent-browser --help`의 snapshot/network 명령을 로드한다. 이 오류만으로 agent-browser 자체가 불능이라고 판정하거나 폴백으로 내려가지 않는다.
-- **정찰 폴백 티어 (agent-browser를 못 쓸 때만).** 위에서부터 내려간다. 어느 티어를 썼는지 profile.json `notes`에 남긴다.
-  - **폴백 1 (Claude): Claude in Chrome** (`mcp__claude-in-chrome__*`) — **Claude 계열 host 전용**(Claude Code / Cowork). 사용자의 실제 Chrome을 조종해서 **실제 쿠키·실제 IP**가 그대로 붙는 게 최대 장점. Step 2 정찰 항목 5개는 전부 대체된다(검증 완료). 단 네트워크 감시에 제약이 있으니 반드시 SKILL.md Step 2 "Claude in Chrome 폴백" 절차를 따를 것.
-  - **폴백 1 (Codex): ChatGPT Chrome 플러그인 Browser Use** (`chrome:control-chrome`) — **Codex 세션에 Chrome 스킬이 있고 사용자의 ChatGPT Chrome 확장이 연결될 때만** 쓴다. 사용자의 실제 Chrome을 조종하므로 실제 브라우저 상태·세션·IP를 활용할 수 있다(쿠키·스토리지를 직접 읽지는 않는다). Step 2 정찰 항목 5개는 대체한다(2026-08-19 `books.toscrape.com` 실측). 단 일반 XHR/fetch 요청과 응답 헤더·본문을 직접 캡처하는 API는 없으므로, API 네트워크 감시가 필요하면 폴백 2의 Playwright `sync_api`를 네트워크 보조 수단으로 쓴다. 반드시 SKILL.md Step 2 "ChatGPT Chrome Browser Use 폴백" 절차를 따를 것. Chrome 확장이 연결되지 않으면 이 티어를 건너뛴다.
-  - **폴백 2 (공통): Scrapling `DynamicFetcher`** 또는 **Playwright `sync_api`**(`page.on("response")`로 XHR/API 캡처) — 양 host 공통, Python 의존성에 포함돼 항상 가능. (SKILL.md 규칙 1 예외와 동일.)
-  - **host별 경로를 섞지 않는다.** Claude Code/Cowork는 `agent-browser → Claude in Chrome → 폴백 2`, Codex는 `agent-browser → ChatGPT Chrome Browser Use(연결 시) → 폴백 2`다. Codex에서 Claude in Chrome을 찾지 않는다.
-  어느 경우든 가능하면 `agent-browser.cmd install`로 표준 경로 복구를 먼저 시도한다.
+- profile.json이 있는데 그걸 무시하고 정찰부터 다시 하기 — 5~20분의 비싼 작업을 매번 반복하는 행위
+- profile.json의 `notes` 필드를 읽지 않고 전략 세우기 — notes에는 LLM이 자동으로 못 알아내는 결정적 메타 정보가 박혀 있다 ("리스트는 SSR HTML, 상세는 XHR JSON — 2단으로 충분", "review API는 JSON 아니라 HTML 반환" 등)
+- 수집 성공 후 profile.json 저장/갱신을 빠뜨리기 — Step 5-A 필수 게이트. 누락 시 "파이프라인 미완료" 보고
+
+<!-- BEGIN GENERATED: domain-list -->
+<!-- 이 블록은 scripts/sync_domain_list.py 가 생성한다. 직접 수정하지 말 것. -->
+
+### 알려진 도메인 (14개 profile commit됨)
+
+`books.toscrape.com`, `builtini.co.kr`, `celimax.co.kr`, `data.seoul.go.kr`, `db.itkc.or.kr`, `g2b.go.kr`, `guesskorea.com`, `made-in-china.com`, `wanted.co.kr`, `www.11st.co.kr`, `www.fss.or.kr`, `www.gsmarena.com`, `www.k-startup.go.kr`, `www.kurly.com` — 이 도메인들은 정찰 없이 바로 수집 시도 가능.
+
+<!-- END GENERATED: domain-list -->
+
+### profile 조회/저장 코드
+
+```python
+from domain_profile import DomainProfile
+profile_mgr = DomainProfile()  # base_dir=./fingerprints
+
+# Step 1-A: 조회
+if profile_mgr.exists(domain):
+    profile = profile_mgr.load(domain)
+    # notes/fetcher_type/antibot_strategy/api_endpoints/selectors 활용
+
+# Step 5-A: 수집 성공 후 저장 (필수 게이트)
+profile_mgr.save(domain, {
+    "domain": domain,
+    "capability": "<static|js_render|api|session>",   # ★ SSOT — 능력 수준. 비워 두면 save() 가 fetcher_type 에서 채운다
+    "fetcher_type": "<yt-dlp|RSS|oEmbed|Jina|Fetcher|FetcherSession|DynamicFetcher|DynamicSession|Spider|playwright_spa_intercept|curl_cffi_grid|StealthyFetcher|chrome_cdp|API_SESSION>",   # 파생 — 현재 엔진에서의 구현체. 앞 4개는 Phase 0 공인 우회로
+    "antibot_type": "<none|cloudflare|akamai|spa_session|naver_antibot|other>",
+    "antibot_strategy": "<none|playwright_intercept|impersonate|curl_cffi_grid|stealthy|chrome_cdp|naver_antibot|authenticated_browser>",   # 실제로 쓴 대응. 사다리 B 를 썼으면 반드시 그 값을 적는다
+    "site_type": "<static|csr|api|spa_session|akamai>",
+    "selectors": {...},
+    "pagination": {...},
+    "api_endpoints": [...],
+    "notes": "<다음 사람이 정찰 없이 바로 수집할 수 있는 결정적 한두 줄>",
+    # 사다리 B(4단 이상)로 수집했을 때만. **실제로 통지했고 사용자가 '진행' 을 고른 경우에만 적는다** —
+    # 그 일이 없었으면 이 블록을 적지 않는다. 근거가 아니라 선택을 적는다.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [byungjunjang/web-crawler](https://github.com/byungjunjang/web-crawler) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
