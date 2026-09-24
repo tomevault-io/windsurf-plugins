@@ -1,14 +1,32 @@
 ---
 trigger: always_on
-description: generates an empty `api_docs/unmerged.d/ZF-XXXXXX.md` file (where
+description: This file provides guidance to AI coding agents for contributing to
 ---
 
-# CLAUDE.md - Guidelines for AI Contributions to Zulip
+# AGENTS.md - Guidelines for AI Contributions to Zulip
 
-This file provides guidance to Claude (and other AI coding assistants) for
-contributing to the Zulip codebase. These guidelines are designed to produce
+This file provides guidance to AI coding agents for contributing to
+the Zulip codebase. These guidelines are designed to produce
 contributions that meet the same high standards we expect from human
 contributors.
+
+When doing any work with AI assistants, it is crucial to follow our
+AI use policy and guidelines (the "AI use policy and guidelines"
+section in `CONTRIBUTING.md`). In particular:
+
+> **Do not submit an AI-generated PR you haven't personally
+> understood and tested**, as this wastes maintainers' time. PRs that
+> appear to violate this guideline will be closed without review.
+
+> **Do not post AI-generated messages** in the [Zulip development
+> community](https://zulip.com/development-community/) -- we want to
+> read your own genuine expression of your thoughts.
+
+Claude Code automatically uses `.claude/rules/` and `.claude/skills/`.
+If you are a different agent, read the files in these folders to see
+the rest of the agent instructions and when they're relevant. Rules
+are relevant for files listed in `paths:` at the top of the rule
+file. Skills explain when they're relevant in their `description`.
 
 ## Philosophy
 
@@ -35,39 +53,13 @@ change should make the codebase more maintainable and easier to read.
 
 ### No detail is too small
 
-Zulip holds itself to a high bar for polish because users depend on
-this software daily, and because the project is built to last for
-decades. There is no category of "minor issue" that is acceptable
-to ship — if something is broken in any context where a user would
-encounter it, it must be fixed before merging. The project's
-extensive investment in testing, tooling, and review processes exists
-precisely so that these issues get caught and fixed, not so that they
-can be classified as low-priority and deferred.
-
-This philosophy extends to every aspect of the product:
-
-- **Visual precision matters.** Alignment, spacing, colors, and font
-  sizes must be consistent with similar existing UI. When making CSS
-  changes, you must demonstrate with pixel-precise before/after
-  comparisons that there are no unintended side effects.
-- **Every state matters.** UI must look correct in all its states:
-  hover, active, disabled, focused, selected, empty, overflowing.
-  Changes that could plausibly affect colors, contrast, or
-  theme-dependent imagery must work in both light and dark themes;
-  changes whose effect can't reasonably vary with theme (pure
-  geometry/typography — `font-size`, `line-height`, `margin`,
-  `padding`, `display`, `font-weight`, etc.) only need a single
-  theme verified.
-- **Every window size matters.** UI must look good from wide desktop
-  (1920px) down to narrow phone screens (480px).
-- **Every language matters.** Translated strings can be 1.5x longer
-  than English or half as short. UI must handle both extremes without
-  breaking layout. Think about right-to-left languages too.
-- **Every interaction path matters.** Keyboard navigation, screen
-  readers, permission levels, feature interactions (banners
-  overlapping, resolved topics, muted messages), and edge cases in
-  data (empty lists, very long names, single items vs. many) must all
-  be considered.
+There is no category of "minor issue" that is acceptable to ship —
+if something is broken in any state, size, theme, or language where
+a user would encounter it, it must be fixed before merging. If a fix
+would require a design decision, raise it as a question rather than
+shipping the broken state. See `.claude/rules/ui-testing.md` for
+what to test for UI changes (the file loads automatically when you
+work on frontend files).
 
 The right attitude is: "What could go wrong, and how do I verify that
 it doesn't?" not "It looks fine to me." **What isn't tested probably
@@ -108,9 +100,6 @@ git log --oneline -20 -- path/to/file.py
 # Check for related issues on GitHub
 ```
 
-Always show existing similar code and explain how it works before proposing
-changes.
-
 ### 2. Propose an Approach
 
 Before writing code, explain the plan:
@@ -124,11 +113,25 @@ Before writing code, explain the plan:
 
 Structure changes as clean commits:
 
-- Backend and API changes (with tests and API doc changes documented
-  fully using our double-entry changelog system). When starting an API
+- Backend and API changes, with tests and API doc changes documented
+  fully using our double-entry changelog system. Instructions for
+  documentation can be found in `.claude/rules/api-changelog.md`
+  (loaded automatically when you edit `zerver/openapi/zulip.yaml`).
+- Frontend UI changes (with tests and user-facing documentation
+  updates). Remember to plan to use your visual test skill
+  (`.claude/skills/visual-test/SKILL.md`) to check your work whenever
+  you change web app code (HTML, CSS, JS).
+
+Each commit should be self-contained, highly readable and reviewable
+using `git show --color-moved`, and pass lint/tests independently. If
+extracting new files or moving code, always do that in a separate
+commit from other changes.
+
+### 4. Verify Before Finalizing
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zulip/zulip](https://github.com/zulip/zulip) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
