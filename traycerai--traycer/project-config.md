@@ -1,97 +1,101 @@
 ---
 trigger: always_on
-description: Use when the task matches. GUI skills: see `clients/gui-app/AGENTS.md`.
+description: Electron shell around `@traycer-clients/gui-app`. Read with repo-root
 ---
 
-# AGENTS.md
+# AGENTS.md — clients/desktop
 
-Default branch: `main`. Bun 1.3.14 workspaces + Nx.
+Electron shell around `@traycer-clients/gui-app`. Read with repo-root
+`AGENTS.md`.
 
-Open-source **clients, CLI, and protocol**. The Traycer Host and cloud backends
-are **not** here — the CLI provisions a signed host from GitHub Releases; see
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+## Role
 
-## Nested docs (read when editing there)
+1. Load the `gui-app` renderer.
+2. Delegate host lifecycle to the **Traycer CLI** — Desktop never spawns the
+   host. Discover WS URL from `~/.traycer/host[/dev]/pid.json`; tail
+   `~/.traycer/host[/dev]/host.log`.
+3. Expose `IRunnerHost` via `contextBridge` / `ipcMain.handle`.
 
-- [`clients/gui-app/AGENTS.md`](clients/gui-app/AGENTS.md)
-- [`clients/desktop/AGENTS.md`](clients/desktop/AGENTS.md)
+Transport-agnostic: do **not** proxy host RPC. `gui-app` talks to the host's
+localhost HTTP/WS after `LocalHostSnapshot`.
 
-## Map
+One scoped, sunsetted exception: the v1.2.0 `host.*` maintenance projections
+in `host-management-ipc.ts` ("The maintenance-RPC projections") answer four
+protocol response shapes from main for a LOCAL host too old to serve them
+(negotiated away at handshake). Nothing is proxied — there is no host wire
+surface to forward to; main is the _origin_, because only main can shell the
+bundled CLI and read the on-disk install records the answers come from. The
+block comment there carries the full rationale; delete the lane when the
+fleet floor reaches 1.2.0.
 
-| Path                   | Package                        | Role                             |
-| ---------------------- | ------------------------------ | -------------------------------- |
-| `protocol/`            | `@traycer/protocol`            | Client⇄host wire contract        |
-| `clients/traycer-cli/` | `@traycer-clients/traycer-cli` | CLI (host install, auth, agents) |
-| `clients/shared/`      | `@traycer-clients/shared`      | Transport / auth / formatting    |
-| `clients/gui-app/`     | `@traycer-clients/gui-app`     | GUI renderer                     |
-| `clients/desktop/`     | `@traycer-clients/desktop`     | Electron shell                   |
+A second, permanent exception: the **`browser.sessions` stream is main's**
+(browser-security-hardening H10). Main opens it, answers every cookie-bearing
+frame on it, and forwards only the opaque UX projection to the renderer over
+`browserViewSessions*`. This is not transport proxying for its own sake - it is
+the whole point. That stream carries the master cookie jar: capture answers,
+seeded storage state, the store-key handshake, the forget ledger and its ack.
+A renderer that can read those frames is a fully trusted principal over every
+login on the machine, which is what root cause C of
+`specs/browser-security-review.md` found it to be; after H10 no cookie value
+exists in a renderer process at all. `gui-app` still talks to the host directly
+for everything else, including every other browser RPC.
 
 ## Commands
 
 ```bash
-bun install
-bun run build
-bun run compile                 # never tsc directly
-bun run lint && bun run format
-make test-affected              # optional targeted run; CI owns the test gate
-bunx nx run @traycer-clients/traycer-cli:build   # single package
-pre-commit run --all-files      # explicit full-repo static validation
+# from clients/desktop/
+bun run dev           # shell + renderer only
+bun run compile       # type-check (no emit)
+bun run build         # main + renderer (no package)
+bun run package       # electron-builder
+bun run package:dir   # unpacked smoke build
+bun run test
 
-make dev-desktop                # signed host from Releases + HMR desktop
-make dev-desktop VERSION=1.2.3  # pin host release
+# end-to-end (repo root, macOS/Linux) — production cloud + released host
+make dev-desktop
+make dev-desktop VERSION=1.2.3
 ```
 
-`make dev-desktop` talks to the **production** cloud — no local backends. Details:
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+Details: [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 
-**Commits:** do **not** manually run `compile` / `build` / `lint` / `format`
-before committing. `pre-commit` already runs the affected workspace checks
-(build, compile, lint, format). Tests run in CI (`test.yml`), not in the hook —
-only re-run checks yourself when diagnosing a hook or CI failure. Commits need
-DCO (`git commit -s`).
+**Commits:** don't manually run `compile` / `build` / `lint` / `format` before
+committing — repo-root `pre-commit` already runs the affected checks (see root
+`AGENTS.md`). Tests are CI, not the hook. Re-run checks only when diagnosing
+failures.
 
-## Non-negotiable
+## Layout
 
-**Protocol** — `@traycer/protocol` uses per-method `{ major, minor }` RPC versions
-negotiated at handshake (not npm semver). CLI **inlines** protocol at build time.
-See `protocol/README.md`.
+| Path                    | Role                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `src/electron-main/`    | Main process (`main-process.ts`); feature folders under `app/`, `auth/`, `host/`, `windows/`, `menu/`, `tray/`, `ipc/` |
+| `src/electron-preload/` | `window.runnerHost` bridges (`preload-bridge.ts` + `*-bridge.ts`)                                                      |
+| `src/renderer-shell/`   | Thin React host; UI is `gui-app` via vite aliases                                                                      |
+| `src/ipc-contracts/`    | Plain-data types shared across main/preload/renderer                                                                   |
+| `scripts/`              | `dev/`, `prepack/`, `assets/`                                                                                          |
+| `resources/cli/`        | Staged CLI SEA (`<platform>-<arch>/traycer`) → `process.resourcesPath/cli/`                                            |
+| `resources/tray/`       | Tray icons (regenerate via `scripts/assets/generate-tray-icons.cjs`)                                                   |
+| `resources/host/`       | Placeholder only — **never** ship a host binary here                                                                   |
 
-**Host identity** (GUI):
+## Invariants
 
-1. `hostId` is canonical; "device" is UI copy — no parallel `deviceId` field.
-2. Tabs bind a `hostId` for life (`<TabHostProvider>` → `useTabHostId()`). Never
-   use `useAddressableHostId()` inside a tab. Cross-host = **clone-not-migrate**.
-   Reachability checked at tab-open only.
+- Bundle CLI only, not the host. Host lives under `~/.traycer/host/` via CLI.
+- Main entry: `dist/main/index.js`.
+- Preload stays CommonJS and imports only from `src/ipc-contracts/` — with one
+  governed exception, `electron-preload/selection-authority-bridge.ts`, which
+  also imports the selection-authority **contract parsers** and the
+  **buffered/rotating client** from `clients/shared/host-selection/`. Two
+  reasons, and a new exception needs both: (1) the attach/rotate choreography is
+  identical for the Electron and browser/dev bindings, so a preload-local copy
+  is a second implementation of a protocol that must not drift; (2) parsing at
+  this hop is what makes same-major skew safety structural — renderer domain
+  code never sees an unparsed envelope. The preload is esbuild-bundled to one
+  CommonJS file, so a shared import is inlined and the CommonJS half of the rule
+  is unaffected. Everything else still crosses as plain wire types through
+  `src/ipc-contracts/`; do not read this as licence to move feature logic into
+  preload.
+- **Keyboard input while a browser guest has focus is ONE declarative
 
-**Shared code** — transport/auth in `clients/shared/`; wire contract in
-`protocol/`. Don't duplicate.
-
-One deliberate exception: the **remote session core** (`RemoteSession`, the
-relay socket, logical streams, the scheduler, Noise channel and mux chunking)
-lives in `protocol/src/host-transport/remote/`, not `clients/shared/`. It is
-runtime-neutral and is driven by two peers — the desktop client dialing a
-host, and a host dialing another host for cross-host agent calls — so it
-cannot depend on anything client-only. What stays in `clients/shared/` is
-the client-specific edge: grant acquisition (`grant-client`, which needs
-fetch + bearer + entitlement), the per-render session cache
-(`active-remote-sessions`), and the thin `RemoteSession` adapter that binds
-those in. Put a change in `protocol/` if both peers need it; in
-`clients/shared/` if only the desktop does.
-
-## Type safety (ESLint — do not bypass)
-
-```ts
-// BAD                         // GOOD
-fn(x?: T)                      fn(x: T | undefined)
-fn(x = 1)                      fn(x: number)  // caller passes explicitly
-...args: [T?] | []             // no rest-tuple optionals
-as any / as unknown / chained  // narrow or define a real type
-ReturnType<typeof fn>          // name the concrete type
-```
-
-## Skills
-
-Use when the task matches. GUI skills: see `clients/gui-app/AGENTS.md`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [traycerai/traycer](https://github.com/traycerai/traycer) — distributed by [TomeVault](https://tomevault.io).
