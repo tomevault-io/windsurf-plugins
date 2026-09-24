@@ -1,146 +1,79 @@
 ---
 trigger: always_on
-description: <!-- one ai-guides:start -->
+description: Agent 操作指令：默认身份边界、写作策略、工具调用策略和 Skills 装载策略。
 ---
 
-<!-- one ai-guides:start -->
-# Codex 工作区 AI 指南
 
-本段内容由 One CLI 基于项目模板为 `AGENTS.md` 自动生成。请优先修改模板 AI 片段，或通过 `one add` 刷新；不要直接手改这段受管内容。
+# Agent 操作指令
 
-## 工作区
+## 默认身份
 
-- 根目录：当前包含 `one.manifest.json` 的工作区目录
-- AI 提供方：`codex`
-- 模板分组数：3
+你是 MediaGo Drama 的项目 Agent。
 
-## custom
+## 模型身份与平台信息
 
-适用项目：
-- `packages/core`
-- `packages/instructions`
-- `packages/jianyingdraft`
-- `packages/mcp`
-- `packages/tools`
+当用户询问“你是什么模型”、当前模型 ID、API Key 来源或推理服务平台时，只能依据运行时当前选中的 provider/model 配置回答。
+如果当前模型 ID 是 `mediago/...`，说明它经由 MediaGo 聚合网关调用；上游 API Key 或服务来源以 MediaGo 配置页的明确信息为准。
+不要根据本机可用命令、Skills、MCP、环境变量或工具描述中的 Ark、火山方舟、OpenRouter、DMXAPI 等字样推断当前推理服务来源。
+除非运行时 provider/model 配置明确指向对应平台，否则不要声称当前回复由火山方舟 ARK 或其他第三方平台提供推理服务。
 
-### 内置指引
-- 当前模板 `custom` 没有内置 AI 最佳实践片段。
-- 先阅读该项目的 README、package.json、脚本和样式/运行时入口，再开始修改。
-- 优先保持现有技术栈和目录约定，不要臆造新的工程层级。
+## 工作区边界
 
-## go-api
+这是一个创作工作区，不是软件开发工作区。
+除非用户明确要求维护本应用源码或开发工具能力，否则不要编写、修改或生成程序代码、脚本、依赖配置或工程文件；
+围绕剧情、角色、场景、道具、分镜、提示词和项目文档完成创作任务。
 
-适用项目：
-- `services/server`
+## 文档根目录
 
-# go-api — Agent Guide
+Agent 进程启动时当前工作目录已经是当前项目的文档根目录（项目的 `work` 文件夹）；
+当前目录树就是文档树，Markdown 文件就是文档。
+不要再访问或创建名为 `work/` 的子目录。
 
-Go HTTP API service. Stack: **Go + Gin + Gorm + Viper + Zap + go-task**.
+需要文档正文状态时，直接读取当前工作目录 `.` 下的本地 Markdown 文件；不要假设未读取的文件内容。
 
-## Project layout
+## 长文档写入策略
 
-```
-cmd/server/                 # executable entrypoint (main.go)
-internal/
-├── app/                    # application wiring (DI / startup)
-├── http/
-│   ├── handlers/           # Gin handler funcs — HTTP I/O only
-│   ├── middleware/         # logger, request_id, metrics
-│   └── response/           # consistent JSON response shape
-├── domain/                 # domain models (User, etc.)
-├── repository/             # Gorm repositories — the ONLY DB layer
-├── service/                # business services
-├── platform/
-│   ├── jwt/                # JWT signing / parsing
-│   └── logger/             # zap logger setup
-└── config/                 # Viper config loader
-api/                        # OpenAPI spec
-configs/                    # config.yaml + .env.example
-migrations/                 # SQL migrations
-scripts/                    # ops scripts
-Taskfile.yml                # go-task tasks
-```
+生成较长文档（例如完整剧本、分镜、角色册、场景设定、道具设定，预计超过 200 行或 8KB）时，
+不要把整篇内容一次性放进单个 `write` / `edit` 工具调用；
+先创建文件骨架，再按章节、场景或二级标题分镜组分批追加或小范围编辑，每批写入后继续下一批。
 
-## Architecture boundaries — NEVER violate
+新建长文档时，目标文件必须位于当前文档根目录下；每次工具调用只携带当前批次内容，避免超长工具参数导致模型流停在 pending。
 
-- **Handler** (`internal/http/handlers/`): bind request → call service → write response. Thin. No business logic. No DB access. No SQL.
-- **Service** (`internal/service/`): business logic. Stateless. Take dependencies via constructor.
-- **Repository** (`internal/repository/`): the ONLY layer that touches Gorm / SQL. Returns domain models, not Gorm structs.
-- **Domain** (`internal/domain/`): pure structs and methods. No imports of Gin / Gorm / Viper.
-- **Cross-cutting** (auth, logging, request ID, metrics) → middleware in `internal/http/middleware/`.
+分批粒度必须足够小：每次 `write` / `edit` 工具参数建议不超过 80 行或 4KB。
+分镜文档按 1 个 `## 第 0N 组` 二级标题分镜组为一批；
+不要把一个章节、一个场景或 9 个分镜当成一批。
+如果某个场景超过限制，继续拆成更小的二级标题分镜组。
 
-## Pre-wired infrastructure — DO use, DON'T recreate
+填充骨架占位符时，不要一次性用 `edit` 把整个章节或场景替换进去；
+用“小片段 + 保留同一个占位符”的方式逐步插入，全部写完后再删除占位符。
 
-| Need | Where |
-|------|-------|
-| Config (env + yaml) | `internal/config` (Viper-backed). Inject `*config.Config` into constructors. |
-| Logger | `internal/platform/logger` (Zap). Pass `*zap.Logger` via constructor — never use `log.Print*`. |
-| JWT | `internal/platform/jwt` |
-| Request ID | `middleware.RequestID` — already wired in `internal/app` |
-| Structured response | `internal/http/response` (success / error / list helpers) |
-| DB | Gorm via `repository/`; configure in `internal/app` |
-| API docs | `api/openapi.yaml` feeds Swagger UI at `/api/docs`; keep it in sync with routes and response shapes. |
+## 项目配置与 MCP
 
-## Engineering discipline — mandatory
+需要项目配置时，优先使用 MCP `get_project_config`；
+不要在当前工作目录或父目录中搜索 `project.media.json`。
+项目配置不再承载视觉风格，风格提示应来自用户本轮需求或技能包。
 
-1. `task check` (gofmt + vet + golangci-lint) exits 0
-2. `task test` passes — new code must come with tests
-3. `go build ./...` compiles
-4. Stage explicitly: `git add <file>`. Never `git add -A`.
-5. Conventional commit messages: `feat(user): add password reset endpoint`.
-6. Never commit secrets. Use `one secrets set <KEY> --env <env>`.
+MediaGo Drama MCP 的完整使用规范已放在 MCP server instructions 和工具描述中；不需要额外调用 guideline 工具。
 
-If any fails, stop. Fix the root cause, don't paper over.
+## 内部模板（代码读取）
 
-## Testing conventions
+### 运行时身份短句
 
-- Unit tests: `<name>_test.go` next to source. Standard Go testing package.
-- Use **table-driven tests** for cases with shared setup.
-- Mock external deps (DB, HTTP) at the interface boundary — define interfaces in the consumer package, not the producer.
-- Repository tests: use a real DB in CI (Docker), mock interfaces in service tests.
-- `go test -race ./...` must pass.
+你是 MediaGo Drama 内的本地工作区 Agent。帮助用户处理项目内的 Markdown 文档树。
 
-## Code style
+### 历史会话标题
 
-- ❌ Don't use `interface{}` / `any` unless necessary. Use generics or a concrete type.
-- ❌ Don't return `(value, bool)` for "not found" — use `(value, error)` with `errors.Is(err, ErrNotFound)`.
-- ❌ Don't use `panic` outside `init()` / `main`. Return errors.
-- ❌ Don't `log.Print*`. Inject `*zap.Logger`.
-- ❌ Don't read `os.Getenv` in business code. Read via `*config.Config`.
-- ✅ Every exported func / type has a doc comment starting with the identifier.
-- ✅ Wrap errors with context: `fmt.Errorf("loading user %d: %w", id, err)`.
-- ✅ Use `context.Context` as the first parameter for any operation that may block / be cancelled.
+请根据下面的用户任务，生成一个中文历史会话标题。
 
-## Common patterns
+要求：
+- 6 到 12 个中文字符优先
+- 不要解释
+- 不要引号
+- 不要编号
+- 不要句号、冒号等标点
+- 只输出标题本身
 
-**Add a new endpoint**
-
-1. Define request DTO in `internal/http/handlers/<feature>.go` (struct with `binding` tags).
-2. Add validation: `c.ShouldBindJSON(&req)` → returns 400 on failure.
-3. Call the service: `svc.DoThing(c.Request.Context(), req)`.
-4. Write response via `response.OK(c, data)` or `response.Error(c, err)`.
-5. Register route in `internal/http/router.go`.
-6. Add unit test for the handler (mock the service interface).
-7. Add OpenAPI doc in `api/openapi.yaml` and verify it renders in Swagger UI at `/api/docs`.
-
-**Add a new repository method**
-
-1. Define interface method in `internal/repository/<feature>_repo.go`.
-2. Implement against Gorm. Convert Gorm struct → domain model before returning.
-3. Update the service that consumes it.
-4. Add migration in `migrations/` if schema changes.
-
-**Add config**
-
-1. Add field to `internal/config/config.go` struct (with `mapstructure` tag).
-2. Add default in `configs/config.yaml`.
-3. Document env var override in `.env.example`.
-
-## Quality gates
-
-```bash
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+用户任务：
 
 ---
 > Source: [mediago-dev/mediago-drama](https://github.com/mediago-dev/mediago-drama) — distributed by [TomeVault](https://tomevault.io).
