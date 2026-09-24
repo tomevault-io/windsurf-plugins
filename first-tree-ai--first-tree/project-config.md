@@ -1,92 +1,81 @@
 ---
 trigger: always_on
-description: **first-tree** — the unified CLI and infrastructure for agent teams. It is a pnpm monorepo for the CLI, server, client runtime, web app, docs, and agent-team tooling.
+description: `@first-tree/qa` contains the First Tree-specific assets used by the shipped `first-tree-qa` skill: tier rules, reusable
 ---
 
-# AGENTS.md
+# QA Package Instructions
 
-**first-tree** — the unified CLI and infrastructure for agent teams. It is a pnpm monorepo for the CLI, server, client runtime, web app, docs, and agent-team tooling.
+`@first-tree/qa` contains the First Tree-specific assets used by the shipped `first-tree-qa` skill: tier rules, reusable
+briefings, natural-language QA cases, environment recipes, evidence guidance, templates, and fixtures. The skill owns
+the core QA principles and lifecycle; this package is the repository-specific authority for how First Tree applies them.
 
-What first-tree is NOT:
+It is not a test runner, CLI, or CI gate. Stable deterministic behavior belongs in product tests, recurring agent
+behavior belongs in `@first-tree/skill-evals`, and live or judgment-dependent behavior may use focused or full QA.
 
-- not an LLM agent itself (agent logic lives elsewhere)
-- not an orchestration framework
+## Tier Selection
 
-## Tech Stack
+Choose the lowest tier and narrowest affected scope that can support the requested conclusion, and record both before
+setup. Use changed paths, public-contract impact, statefulness, cross-surface reach, and failure blast radius; line count
+is only a supporting signal.
 
-- **Server:** Fastify / Drizzle ORM / PostgreSQL / Zod
-- **Client:** fetch + ws (Cloud SDK/observability + generic Runtime + built-in Providers)
-- **Command:** Commander.js / @inquirer/prompts (unified CLI)
-- **Shared:** Zod schemas + TypeScript types + config system
-- **Web:** React 19 / Vite
-- **Tooling:** pnpm / Turborepo / Biome / Vitest / tsdown
-- **Node.js:** minimum 22.13, recommended 24
+| Tier | Use it for | Environment | Maximum honest conclusion |
+| --- | --- | --- | --- |
+| `test-only` | Localized deterministic integration/regression checks or an explicit test request | Run matching package/named tests; use `pnpm test` only for repository-wide or shared-input scope | Only the reported automated checks passed or failed |
+| `focused-local` | Ordinary feature validation, defect reproduction, or focused performance work | Reuse the QA warm environment and start only affected surfaces plus necessary adjacent boundaries | Only the observed paths passed or failed under the recorded local conditions |
+| `full-isolated` | Release-sensitive, clearly major/high-risk, cross-surface, or explicitly isolated QA | Take an exclusive clean task slot in the QA warm environment for the selected scope | Only the completed isolated scope passed or failed; release-wide only when requested |
 
-## Common Commands
+Do not select `full-isolated` merely because Docker is available, a committed case exists, or the request is vague.
+`full-isolated` strengthens isolation; it does not automatically broaden validation to every product surface. A lower
+tier may recommend escalation, but it must not claim release readiness or silently weaken a case that requires the full
+tier.
 
-```bash
-pnpm install
-docker compose up -d
+## Environment Reuse
 
-pnpm --filter @first-tree/server dev
-pnpm --filter @first-tree/web dev
+- Keep one QA-owned warm environment outside the source repository. Retain compatible infrastructure, caches, images,
+  and dependencies after a run instead of rebuilding or tearing them down by default.
+- Reuse the same task slot across retries and new target revisions. Before each reuse, record the warm-environment ID,
+  task key, exact target, health, profile compatibility, and mutable-state baseline.
+- Between tasks, release the task lease and reset task-owned data, namespaces, ports, processes, and credentials; do not
+  destroy the warm environment. A retained environment is a reported residual state, not failed cleanup.
+- Never reuse operator/customer data, logged-in browser profiles, writable provider homes, or unattributable mutable
+  state. If reset or attribution is not credible, repair the slot, narrow the claim, or report `BLOCKED`/`INCONCLUSIVE`.
 
-pnpm check && pnpm typecheck
-pnpm test
+## Invariants For Every Tier
 
-pnpm --filter @first-tree/server db:generate
-pnpm --filter @first-tree/server db:migrate
-```
+A result cannot be `PASS` when an applicable invariant is violated:
 
-Full CLI commands and env vars live in [docs/cli-reference.md](docs/cli-reference.md). Per-package scripts live in each package's `package.json`.
+1. Resolve and report the exact target, selected tier, scope, commands or product paths, and evidence boundary.
+2. Do not modify product source while testing. Product fixes and committed case maintenance are separate tasks.
+3. Require evidence from the boundary actually claimed: test output for `test-only`; real relevant product behavior for
+   `focused-local`; scoped isolated and real product evidence for `full-isolated`.
+4. Keep retained run artifacts outside the source repository and redact secrets, credentials, private sessions, and
+   user data.
+5. Separate target failures from environment, dependency, credential, provider, platform, data-precondition, or
+   insufficient-evidence failures.
+6. Report exactly one status and one case disposition, and state task reset plus retained warm-environment state honestly.
 
-## Required Reading By Topic
+## Tier Requirements
 
-- **HTTP routes, JWT auth, scope helpers, or multi-org behavior:** read [docs/development/http-path-conventions.md](docs/development/http-path-conventions.md) before editing. It is the single source of truth.
-- **Onboarding kickoff/chat-start behavior:** read [docs/development/onboarding-kickoff-contract.md](docs/development/onboarding-kickoff-contract.md) before editing `/me/onboarding/kickoff`, `/orgs/:orgId/context-tree/setup-chat`, or the client inbound prompt formatting.
-- **Running an in-tree CLI next to prod/staging:** use `scripts/dev-install.sh` and read [docs/development/local-dev-isolation.md](docs/development/local-dev-isolation.md).
+### `test-only`
 
-## Repo-Local Skills
+- Run the matching package or named suite for a localized deterministic change. Run `pnpm test` when the requested
+  conclusion or changed shared inputs require repository-wide validation.
+- Record the exact command, exit code, duration when available, and failing test identifiers or output.
+- Do not create a Docker cell, capability matrix, QA plan, or `QA READY` claim.
+- A passing test command is not live-product, provider, cross-surface, performance, or release evidence.
 
-- `skills/first-tree-write/SKILL.md` — source-driven Context Tree authorship
-- `skills/first-tree-read/SKILL.md` — task-scoped Context Tree reading
-- `skills/first-tree-seed/SKILL.md` — one-time bootstrap for an empty tree
-- `skills/first-tree-qa/SKILL.md` — risk-tiered professional QA workflow
+### `focused-local`
 
-Operator-only flows such as `login`, `daemon install`, and `agent create` belong in [docs/cli-reference.md](docs/cli-reference.md) and [docs/onboarding-guide.md](docs/onboarding-guide.md), not in skills.
-
-## Monorepo Structure
-
-- `apps/cli/` — unified CLI source; CI publishes channel-specific packages
-- `apps/doc-website/` — documentation website
-- `packages/shared/` — `@first-tree/shared` schemas, types, and config
-- `packages/server/` — `@first-tree/server` Fastify API server
-- `packages/client/` — `@first-tree/client` Cloud SDK/observability, generic Runtime, and built-in Providers
-- `packages/web/` — `@first-tree/web` React workspace
-- `packages/skill-evals/` — eval tooling for repo-local skills
-- `packages/qa/` — internal QA workflow assets for agent-run validation
-- `docs/` — user, operator, development, migration, and troubleshooting docs
-- `skills/` — repo-local skill payloads
-
-## Architecture Rules
-
-- **Package boundaries:** Server, Client, Command, and Web are independently packaged/deployed and share code through `@first-tree/shared`. The CLI is the user-facing command surface and depends only on Client + Shared. Server ships separately as the SaaS Docker image.
-- **Server state:** Server is stateless. PostgreSQL is the only persistence/queue/notification backend; do not add Redis or MQ.
-- **Unified user-JWT auth:** A single user JWT authorizes Web/Admin API calls and every agent the user manages on the client WebSocket. Route classification, JWT shape, and scope helpers live in [docs/development/http-path-conventions.md](docs/development/http-path-conventions.md). Channel homes live in [docs/development/local-dev-isolation.md](docs/development/local-dev-isolation.md). Agents bind via `agents.client_id` + `agent:pinned`; R-RUN is re-evaluated at every `agent:bind`. Switching users goes through `first-tree login <code>` and the local-client switch path; `logout --purge` retires the current server client and cuts its runtime routes before destructive local cleanup, after which cleared agents can be moved to a new connected runtime from Web.
-- **Inbox boundary:** Server writes to Inbox; Client pulls / receives WebSocket notifications. Delivery is at-least-once; Client deduplicates.
-- **Agent identity:** Agents are managed by the server Admin API. Agent profile markdown lives in `agents.profile`. Context Tree integration is optional and injected by Client at workspace startup.
-- **Credentials:** Sensitive credentials are AES-256-GCM encrypted at the application layer via `services/crypto.ts`.
-- **Messages:** Message IDs are UUID v7 and messages are immutable after creation.
-
-## Coding Conventions
-
-- Use `unknown` + type narrowing instead of `any`.
-- Avoid `as` assertions; when unavoidable for third-party libraries, explain why nearby.
-- Do not use `enum`; use `as const` objects and Zod-compatible literals.
-- Use `import type`, prefer `type` over `interface` unless extension/implementation requires an interface, and give public APIs explicit return types.
+- Prefer an exact-target worktree in the existing task slot. Reuse compatible task services across retries and start only
+  affected surfaces plus the nearest boundary required by the validation question.
+- Local non-isolated startup is allowed. Inventory the warm environment and any reused dependency or service first,
+  record its owner/config/state/health, and do not mutate valuable or operator-owned data. Use task-owned data/config for
+  write paths.
+- Establish Build, Run, Drive, Observe, Measure, and Reset for the in-scope surfaces before executing the planned
+  behavior. A lightweight `plan.md` may then record the focused scope.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [first-tree-ai/first-tree](https://github.com/first-tree-ai/first-tree) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
