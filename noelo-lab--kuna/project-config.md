@@ -15,7 +15,7 @@ kuna is an **agent-first decompiler written in Rust**: a decompilation engine pl
 compiler, organized around an explicit phase model whose decision points are exposed as
 per-run, flippable options — the LLM control surface is the product. It started as a Rust
 port of Ghidra's decompiler (Apache-2.0 — see `LICENSE` and `NOTICE`) and has since
-diverged on its own defaults and features; the origin story lives in `docs/history.md`, and 
+diverged on its own defaults and features; the origin story lives in `docs/history.md`, and
 is not needed for day-to-day work.
 
 ## Layout
@@ -28,6 +28,7 @@ is not needed for day-to-day work.
 | `tests/golden/` | Differential golden vectors for the workspace suite (`make rust-test`). |
 | `specs/Ghidra/Processors/` | Vendored SLEIGH specs. `.sla` files are built artifacts (gitignored), produced by `slacomp`. |
 | `scripts/` + `tools/pipeline/` | Python helpers (`decompile.py` library shim, `paths.py`, `pipeline/`, `decbench/`) + driver for the improvement pipeline (`docs/improvement-pipeline.md`) and the decbench campaign (`docs/decbench-loop.md`). |
+| `scripts/repipe/` + `tools/repipe/` | The RE-friction loop (`docs/re-pipeline.md`): Codex Sol-low testers reverse-engineer crackmes with kuna and record where it fails them; Codex Sol-high-or-above builders close those gaps and self-merge. Durable backlog in `docs/re-needs/`; promoted regression probes in `tests/cli/`. |
 | `integrations/` | Front-ends embedding the engine: `ghidra/` (kuna as stock Ghidra's decompiler core), `web/` (the project site + in-browser decompiler at `kuna.noelo.org`). |
 
 ## Build & test
@@ -50,13 +51,18 @@ make specs      # compile all .slaspec → .sla with slacomp
 | `make rust-test` | full cargo workspace suite + `docs/options.md` freshness | green |
 | `make check-spec` | `docs/spec/` anchors + inline code paths resolve; each phase folder owned by exactly one chapter (`--strict` adds option-mention coverage) | green |
 
-CI runs all four (plus `kuna catalog --check`) on every pull request and every push to
-main — `.github/workflows/tests.yml`. Run them locally anyway: the workspace suite is the
-long pole in CI, so local failures are found far sooner.
+CI runs all four (plus `kuna catalog --check`) on every push to main —
+`.github/workflows/tests.yml`. On a **pull request from a branch in this repo** the
+workspace suite is skipped and only the parity gates run; **you are the gate for
+`make rust-test` on those PRs**, which is why it is on the list above. To demand it from
+CI on a particular PR, add the **`full-ci`** label — that label is itself a trigger, so
+the suite starts on the label alone. (It also always runs pre-merge on a fork PR, and via
+*Run workflow*.) Run all four locally regardless: the workspace suite is the long pole in
+CI, so local failures are found far sooner.
 
 - **Never re-pin `docs/baseline.json` to absorb a regression** — fix the code or make the
   change opt-in. The only sanctioned re-pins are an intentional upstream sync or a
-  DIV-recorded default change (`kuna test --save-baseline`; see `docs/history.md`).
+  deliberate default change, and the commit message says which (`kuna test --save-baseline`).
   Adding a stage test DOES re-record the stages baseline:
   `kuna test --datatests --datatests-dir tests/stages --save-baseline docs/baseline-stages.json`.
 - `docs/options.md` is generated — after touching option metadata:
@@ -68,28 +74,13 @@ The user-facing binary (`decompiler/crates/kuna-cli` → `decompiler/target/rele
 The commands agents use most:
 
 ```bash
-kuna decompile ./a.out main                        # one function (or an address with --addr)
-kuna decompile-all ./a.out --json                  # whole binary in one in-process load
-kuna functions ./a.out --json                      # enumerate functions
-kuna decompile-project ./a.out                     # export .c/.h/.asm/README project folder
-kuna catalog --json                                # discover the settable options
-kuna decompile ./a.out main --option NAME VALUE    # flip a decision for this run
-kuna test --all --baseline docs/baseline.json      # the parity gate
-```
-
-Full reference (flags, JSON schemas, watchdog, project-export artifacts): **`docs/cli.md`**.
-
-## The phase model
-
-The engine is organized as ordered phases **P1–P9** (partition → lift/flow → dataflow →
-calls → types → variables → regions → structure → emit) plus an orthogonal **P0
-knowledge/configuration plane**; source folders are named after them. Folders are a
-taxonomy — the real pass order is `universal_sched` in
-`decompiler/crates/kuna-decomp/src/infra/universalaction.rs`. Named decision points inside
-phases are **settable assertions/options** (`--option NAME VALUE`, discovered via
+kuna docs                                          # the embedded manual — cli, options, phases, modes
+kuna install-skill                                 # install the embedded agent skill (skills/kuna/SKILL.md)
+kuna decompile ./a.out main [--json]               # one function (or an address with --addr)
+kuna xrefs ./a.out --to 0x401030 --json            # what references this; --from for the reverse
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Noelo-Lab/kuna](https://github.com/Noelo-Lab/kuna) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
