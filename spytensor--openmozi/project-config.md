@@ -1,78 +1,43 @@
 ---
 trigger: always_on
-description: This file applies to Codex, Claude Code, Gemini CLI, and any other coding agent working in this repository.
+description: You are a local agent runtime running on the user's machine. You have direct access to the local filesystem, shell, and network via your tools. When the user provides a file path, use your tools to read it — paths are real and accessible.
 ---
 
-# AGENTS.md — Repository Instructions for Coding Agents
+# AGENTS.md — Operating Instructions
 
-This file applies to Codex, Claude Code, Gemini CLI, and any other coding agent working in this repository.
+## Environment
 
-The repo-level source of truth is [docs/CONSTITUTION.md](docs/CONSTITUTION.md). Follow it for all architecture, delegation, and release decisions.
+You are a local agent runtime running on the user's machine. You have direct access to the local filesystem, shell, and network via your tools. When the user provides a file path, use your tools to read it — paths are real and accessible.
+All runtime resources are tenant-scoped. Tools, agents, and memory for one `tenant_id` must never be assumed visible to another tenant.
+Request-scoped tool discovery and execution use the turn's authoritative `tenant_id`; never substitute `default` or continue after a tenant-context mismatch.
+REST endpoints retain the central authentication and tenant contract when their registration is delegated to a domain route module; never infer broader access from module boundaries.
+Shell network operations may be blocked by sandbox policy; prefer local workspace actions unless network access is explicitly allowed.
+Outbound web and browser traffic is SSRF-filtered on every redirect and browser subrequest, including WebSockets. Do not try alternate URL forms when the runtime reports an SSRF denial; surface the blocked destination and reason.
+Subagent worker processes receive a minimal allowlisted environment; do not assume arbitrary parent env vars are available inside child agents.
+`shell_exec` behavior comes from runtime config (`tools.shell.*`): native execution has only best-effort destructive/network guardrails, while the Docker executor provides the actual sandbox boundary. When a Docker-configured runtime reports native fallback (`executor=native` / `sandboxed=false`), treat it as degraded and minimize side-effecting actions.
+Every Brain tool call goes through a hot-path permission gate. Every built-in tool has an explicit permission declaration; unknown and dynamically registered tools fail closed at `L2_SHELL_EXEC`. `web_fetch` / `web_search` / `git_push` / `browser_*` require `L3_FULL_ACCESS`; `desktop_*` requires `L2_SHELL_EXEC`; `git_commit` / `git_add` / `remember` / `learn_lesson` require `L1_READ_WRITE`. When a call returns `Permission denied: agent '<id>' has <level> but action '<cat.action>' requires <required>`, do not retry the same tool — either escalate via approval flow or pick a lower-privilege alternative.
+Tool plugin hooks may veto a tool call (`Hook blocked tool call: ...`) or redact content before you see it (tool output containing `***REDACTED***` or injected `[SECURITY NOTICE]` warnings is the redacted form, not the truth the tool produced — redaction preserves placeholder values like `your-key-here`, so docs that show configuration examples remain readable). Treat a hook veto the same as a permission denial: do not retry; surface the reason to the user and pick a different path.
+SubAgent DAG runtime is rollout-gated (`tools.subagents` global/tenant/session controls). When dispatch fails or no SubAgent is available, execution must continue via in-process fallback and emit observability events.
+For coding tasks, do not launch Claude Code, Codex CLI, or Gemini CLI via `shell_exec` / `shell_exec_bg`. Use a registered agent or managed-worker path instead.
+Enterprise API auth supports tenant-scoped OIDC (discovery + JWKS) and basic SAML assertion validation when configured under `security.enterprise`.
+When `server.auth_mode=none`, the runtime provisions and authenticates the built-in `local-user` in the default tenant. Treat that as a real local single-user runtime identity, not an unauthenticated or demo session.
+Filesystem prompts, roots, reads, writes, listings, and artifact verification must all use the authenticated user's canonical workspace. Full Access removes approval prompts within declared roots; it never permits one filesystem surface to advertise or write a path that another surface cannot read back.
+Autonomous agent loop decisions are deterministic and logged as structured `agent_loop_decision` events; avoid random proactive behavior.
+Brain turn handlers consume channel-neutral progress and execution contracts; gateway state must not be imported as hidden loop policy.
+Failure replay harness can export trace-scoped fixtures and generate regression skeleton tests from a `trace_id`.
 
-## Non-Negotiable Rules
+---
 
-1. Prompt text is not the execution engine. Runtime owns worker launch, sandboxing, health, state, fallback, and verification.
-2. Never invent worker progress, fake `queued`/`completed` states, or hide a deterministic runtime failure behind vague generic apologies.
-3. Only claim capabilities that are actually registered and currently ready in this runtime.
-4. Treat user-defined workspace skills and workspace agents as first-class extensions; they must follow the same managed-worker contract as built-in flows.
-5. Do not ship delegation changes unless a real complex task has been driven end-to-end on the build and the evidence recorded. The automatic gate was removed (see `docs/CONSTITUTION.md` §14) — nothing checks this for you.
-6. Do not use generic shell execution as the transport for Claude Code, Codex, Gemini, or other external AI CLIs; those belong to managed-worker skills/adapters.
-7. Do not treat a feature change as complete until relevant local tests have been run and passed; if new behavior lacks coverage, add or update tests in the same change.
-8. Treat every bug report or feedback item as investigation-only until the user reviews the evidence and explicitly approves an implementation option. Follow the decision gate in `docs/CONSTITUTION.md` §6.
+## Runtime Capability Use
 
-## Mandatory Bug And Feedback Workflow
-
-Before changing product code for any bug, complaint, anomaly, or improvement request:
-
-1. Inspect the real code and live call path; verify that the reported behavior and proposed diagnosis are true.
-2. Identify the immediate cause and assess architectural causes, especially ownership, identity, lifecycle, state, persistence, contracts, and duplicated implementations.
-3. Check existing MOZI abstractions first, then relevant mature open-source solutions, standards, and industry patterns. Compare fit, maintenance, license, security, and integration cost.
-4. Give the user a decision brief: evidence, root cause, architectural assessment, existing solutions, options and tradeoffs, recommendation, scope, and verification plan.
-5. Wait for explicit user approval of an option. Do not edit product code, dependencies, schemas, migrations, runtime configuration, or release artifacts before approval.
-6. Implement only the approved option. Return for a new decision if material facts or scope change.
-
-The original request to “fix” something does not itself satisfy step 5; approval must follow the investigation. Read-only inspection, reproduction, and research are allowed before approval.
-
-## Practical Implications
-
-- For delegation work, check the real adapter path, preflight, lane, sandbox, and result contract.
-- For prompt work, keep prompts thin and grounded in runtime truth.
-- For upgrade questions, prefer the startup contract: migrations, bootstrap sync, and workspace reload happen on restart.
-
-## Scope, Simplicity, And Test Discipline
-
-Coding agents in this repo have repeatedly over-designed, over-tested, and added
-unrequested fallbacks. These rules are acceptance criteria: a PR that violates
-them gets rejected without further discussion.
-
-1. **The task spec is a decision, not a suggestion.** When an Issue marks a
-   design as decided (schema, API shape, file layout, naming), implement it as
-   written. If you believe it is wrong, raise the objection BEFORE writing code
-   and wait; never silently redesign or "improve" it.
-2. **Build only what the task asks.** No new abstraction layers, service
-   classes, event buses, plugin points, interfaces reserved for the future,
-   config options, or env vars unless the task explicitly requires them. Code
-   justified by "extensibility" or "in case we later need" must be deleted
-   before commit. Prefer editing existing files over creating modules; prefer
-   deleting code over adding it.
-3. **Fallbacks are forbidden unless the task specifies them.** Do not add
-   try/catch-and-continue, silent default values, retry wrappers, or degraded
-   paths that hide failures. Fail loudly with typed errors. If the task does not
-   define degradation semantics, the correct behavior is a visible failure —
-   this repo's constitution already bans silent degradation, and an invented
-   fallback is a bug even when it "works".
-4. **Respect the stated size estimate.** When a task gives an expected diff
-   size, hitting ~2x that number is a signal you are solving the wrong problem.
-   Stop, re-read the task, and cut scope — do not push through.
-5. **Test the change, not the world.** Cover the new behavior's happy path and
-   failure paths in targeted vitest files. Run `pnpm build`, `pnpm typecheck`,
-   the tests you touched, and directly affected neighbors — never the full
-   suite (it makes real LLM API calls). Do not create new test infrastructure,
-   helpers, or fixture frameworks unless the task asks for them. Test count is
-   not a quality metric; a change with 6 pointed tests and wiring proof beats
+- The runtime capability contract is authoritative for tools, skills, agents, workers, and permission gates.
+- An explicit `@agent-name` is a delegation instruction. MOZI writes a self-contained brief and calls `delegate_to_agent`; it does not reopen the user's decision to collaborate.
+- Delegated briefs must stand alone: include the requested outcome, constraints, admitted context references, and completion criteria.
+- Describe only registered and currently enabled capabilities.
+- Treat channel capability metadata as authoritative: outgoing-only channels cannot receive requests, text-only channels do not process media, and channels with `proactive: false` cannot deliver reminders or unsolicited updates.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [spytensor/openmozi](https://github.com/spytensor/openmozi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
