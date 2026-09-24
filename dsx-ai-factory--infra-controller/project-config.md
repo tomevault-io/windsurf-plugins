@@ -1,142 +1,138 @@
 ---
 trigger: always_on
-description: This file provides guidance for AI coding agents working in the
+description: provides multi-tenant, API-driven bare-metal lifecycle management, working in
 ---
 
 # AGENTS.md
 
 This file provides guidance for AI coding agents working in the
-`infra-controller` repository.
+`rest-api/` tree of the `infra-controller` repository.
 
 ## Project Overview
 
-**NVIDIA Infra Controller (NICo)** is an API-based microservice written in Rust
-and Golang that provides site-local, zero-trust, bare-metal lifecycle
-management with DPU-enforced isolation. It automates the complexity of the
-bare-metal lifecycle to fast-track building next-generation AI Cloud offerings.
+**NVIDIA Infrastructure Controller REST** is a collection of Go microservices that comprise
+the management backend for NVIDIA Infrastructure Controller (NICo), exposed as a REST API. It
+provides multi-tenant, API-driven bare-metal lifecycle management, working in
+concert with Core services for on-site hardware operations.
 
 > **Status:** Active development. APIs, configurations, and features may
 > change without notice between releases.
 
 ### Key Responsibilities
 
-- Hardware inventory management and orchestration
-- Redfish-based hardware management
-- Hardware testing and firmware updates
-- IP address allocation and DNS services
-- Power control (on/off/reset)
-- Provisioning, wiping, and node-release orchestration
-- Machine trust enforcement during tenant switching
+- REST API for hardware inventory, provisioning, and lifecycle orchestration
+- Multi-tenant site and instance management
+- Temporal-based cloud and site workflow orchestration
+- On-site agent for datacenter-local operations
+- IP address management (IPAM)
+- Authentication and authorization (Keycloak, JWT, service accounts)
+- Native PKI certificate management
+- CLI client (`nicocli`) with interactive TUI
 
 ## Repository Structure
 
 ```text
-infra-controller/
-├── crates/              # Rust crate implementations. To discover all crates
-│                        # and their purpose, run `ls crates/` or see the
-│                        # [workspace] members list in `Cargo.toml` — each
-│                        # crate's own `Cargo.toml` has a `description` field.
-│                        # Note: the directory name does NOT always equal the
-│                        # crate name (e.g. crates/api/ → crate nico-api).
-│                        # Use `grep '^name =' crates/<dir>/Cargo.toml | head -1`
-│                        # to get the actual crate name before running
-│                        # `cargo test -p <name>` or similar.
-├── book/                # mdBook documentation
-├── deploy/              # Kubernetes deployment configs and Kustomization overlays
-├── dev/                 # Local dev tools (Dockerfiles, test configs, certs)
-├── helm/                # Helm chart for Kubernetes deployment
-├── bluefield/           # BlueField DPU-specific components
-├── pxe/                 # PXE boot artifact generation
-├── lints/               # Custom Clippy lints (carbide-lints crate)
-├── include/             # Shared Makefile fragments
-├── .github/             # GitHub Actions workflows and templates
-├── rest-api/            # Golang-based REST API
-├── Cargo.toml           # Workspace dependency management
-├── Makefile.toml        # Primary build/task automation
-├── Makefile-build.toml  # Build-specific tasks
-└── Makefile-package.toml # Packaging tasks
+rest-api/
+├── api/                  # Main REST API server (Echo-based)
+├── auth/                 # Authentication (Keycloak, JWT, service accounts)
+├── cert-manager/         # Native PKI certificate management (credsmgr)
+├── cli/                  # CLI client (nicocli) with TUI
+├── common/               # Shared utilities and configuration
+├── db/                   # Database layer (Bun ORM, pgx, migrations)
+├── deploy/               # Kubernetes deployment (Kind, Kustomize, Helm)
+├── docker/               # Dockerfiles (local dev and production)
+├── helm/                 # Helm charts for Kubernetes deployment
+├── ipam/                 # IP address management
+├── nvswitch-manager/     # NVSwitch firmware management (NSM)
+├── openapi/              # OpenAPI spec and SDK generation
+├── powershelf-manager/   # Power shelf management (PSM)
+├── flow/                 # Carbide Flow logic
+├── sdk/                  # Go API client (simple and standard variants)
+├── site-agent/           # On-site agent for datacenter
+├── site-manager/         # Site management service (sitemgr)
+├── site-workflow/        # Site-level Temporal workflows
+├── temporal-helm/        # Temporal Helm chart
+├── workflow/             # Cloud Temporal workflows and activities
+├── workflow-schema/      # Protobuf and workflow schemas
+├── .github/              # GitHub Actions workflows and templates
+├── Makefile              # Primary build/task automation
+└── go.mod                # Go module and dependency management
 ```
 
 ## Technology Stack
 
-### gRPC API and components
-
-- **Language:** Rust (edition 2024, toolchain pinned in `rust-toolchain.toml`)
-- **Async runtime:** Tokio
-- **gRPC framework:** Tonic (with TLS via Rustls/aws_lc_rs)
-- **HTTP framework:** Axum (pinned; see `Cargo.toml` for compatibility rationale)
-- **Database:** SQLx (compile-time checked queries)
-- **Observability:** OpenTelemetry, Tracing (structured logfmt logging)
-- **Build tool:** `cargo-make` (TOML task runner)
-- **API definitions:** Protocol Buffers (protobuf)
-
-### REST API and components
-
-- **Language (REST API):** Golang 1.26.x
+- **Language:** Go (version specified in `go.mod`; module `github.com/NVIDIA/infra-controller/rest-api`)
+- **HTTP framework:** Echo v4 (with middleware for CORS, auth, rate limiting, audit)
+- **Database:** PostgreSQL via pgx v5 (connection pool) and Bun ORM (queries, migrations)
+- **Workflow engine:** Temporal (cloud and site workflows/activities)
+- **gRPC:** Connect-RPC and google.golang.org/grpc (site-agent, workflow schemas)
+- **Protobuf:** buf for code generation
+- **Observability:** OpenTelemetry, Prometheus (echoprometheus), Sentry
+- **Auth:** Keycloak, JWT
+- **Testing:** testify (assert/require/suite), go-sqlmock, testcontainers-go, gomock
+- **Build tool:** Make
 
 ## Build, Test, and Lint Commands
-
-### REST API contract conventions
-
-- Do not use `omitempty` on REST API response fields. Clients must be able to
-  distinguish an empty value from a field unsupported by the API version.
-- Paginated operations must implement deterministic ordering before pagination
-  and document every supported `orderBy` value and its default in OpenAPI. Do
-  not rely on an upstream API or database's implicit result order.
-
-All task automation uses `cargo-make`. Install it with:
-
-```bash
-cargo install cargo-make
-```
 
 ### Building
 
 ```bash
-# Standard debug build (all workspace crates)
-cargo build
+# Build all binaries (linux/amd64, static)
+make build
 
-# Release build
-cargo build --release
+# Build and install CLI to $GOPATH/bin
+make nico-cli
 
-# Full CI build + test (mirrors what CI runs)
-cargo make build-and-test-release-container-services
+# Build Docker images (production)
+make docker-build
 
-# Build the admin CLI locally
-cargo make build-cli
+# Build Docker images (local dev, public base images)
+make docker-build-local
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
-cargo test
+# Run all tests (auto-manages PostgreSQL container)
+make test
 
-# Build prerequisites first, then test (recommended for integration tests)
-cargo make correctly-execute-tests
+# Module-level tests
+make test-api
+make test-db
+make test-workflow
+make test-auth
+make test-common
+make test-cert-manager
+make test-site-agent        # starts mock Core and Flow gRPC servers first
+make test-site-manager
+make test-site-workflow
+make test-ipam
+
+# PostgreSQL management for tests
+make postgres-up            # start test PostgreSQL container
+make postgres-down          # stop test PostgreSQL container
+make ensure-postgres        # start if not running, wait until ready
+make migrate                # run database migrations against test DB
 ```
 
-When writing tests, prefer the **table-driven** style and helpers from
-`carbide-test-support`; use the [Testing section in `STYLE_GUIDE.md`](STYLE_GUIDE.md#testing)
-for table structure and API details. Use grouped `scenarios!` / `value_scenarios!`
-or explicit `check_cases` / `check_values` when cases share one operation and
-assertion form. When cases share setup but require different assertions, use a
-local case table that keeps each case's check next to its inputs.
+Tests require a PostgreSQL container (postgres:14.4-alpine) on port 30432.
+The Makefile manages this automatically via `ensure-postgres`.
 
-Before adding coverage, inventory the relevant unit, database, controller, and
-integration tests. Each new test should have one reason to exist: an observable
-contract or distinct failure boundary that no retained test protects. Use the
-smallest set of cases that exercise different behavior. Do not enumerate a
-Cartesian product merely because inputs are booleans or enums; enumerate a
-combination only when it is reachable and protects distinct observable behavior
-or a distinct failure boundary, including precedence between conflicting inputs.
+Use these targets rather than calling `go test` yourself, because they start what the tests
+need and skipping that setup does not fail fast:
 
-Place each proof at the narrowest layer that can exercise the contract.
-Higher-level tests should prove wiring, persistence, transaction behavior,
-concurrency, or external effects that lower-level tests cannot; do not repeat a
+- `make test-site-agent` starts mock Core and Flow gRPC servers. Without them the
+  `site-agent/pkg/components` tests retry the connection on a `40s` backoff until the `10m`
+  test timeout, so a bare `go test ./site-agent/...` looks like a hang rather than an error.
+  That target also scopes to `site-agent/pkg/components` and sets `CGO_ENABLED=1` for `-race`,
+  so it is not the same package set or the same build.
+- `test-api`, `test-auth`, `test-db`, `test-flow`, `test-ipam`, `test-nvswitch-manager`,
+  `test-powershelf-manager`, and `test-workflow` call `ensure-postgres` first.
+- Every Postgres-backed package resets the schema, so packages running in parallel drop and
+  recreate the same tables and fail in `TestSetupSchema`. Pass `-p 1` whenever you do run
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dsx-ai-factory/infra-controller](https://github.com/dsx-ai-factory/infra-controller) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
