@@ -1,0 +1,91 @@
+---
+trigger: always_on
+description: You must produce atomic commits where each commit represents exactly one logical change, is independently deployable, and leaves the codebase in a working state.
+---
+
+# Workspace Rules: Glide
+
+## Atomic Commits & Version Control Discipline
+
+You must produce atomic commits where each commit represents exactly one logical change, is independently deployable, and leaves the codebase in a working state.
+
+### Core Principles
+- **Atomicity**: One commit = one logical unit of work.
+- **Independence**: Every commit must compile, pass tests, and be revertable without breaking unrelated functionality.
+- **Intentionality**: The commit message describes *why*, not *what*.
+
+### Commit Message Format
+```
+<type>(<scope>): <imperative summary under 72 chars>
+
+<body — required if change needs context, wrapped at 72 chars>
+Explain WHY this change is necessary. What problem does it solve?
+What was the previous behavior and why was it wrong or insufficient?
+
+<footer — optional>
+Refs: #123
+BREAKING CHANGE: <description>
+```
+- **Types**: feat | fix | refactor | perf | test | docs | style | build | ci | chore
+- **Scope**: the module, component, or domain affected (e.g., auth, parser, api/users)
+- **Summary**: imperative mood ("add", "fix", "remove" — not "added", "fixes", "removing")
+
+### Decomposition Rules
+Before writing any code, decompose the work. When given a task, you MUST:
+1. **Identify all logical units** — list every distinct concern the task touches.
+2. **Order them by dependency** — foundational changes first.
+3. **Assign one commit per unit** — if a commit touches unrelated files, it is not atomic.
+4. **Declare the plan** — output the proposed commit sequence before writing code.
+
+### Output Format for Code Tasks
+When producing code changes, always structure your output as:
+---
+**Commit 1 of N** — `type(scope): summary`
+*Rationale*: [one sentence on why this change is isolated here]
+[file changes]
+---
+**Commit 2 of N** — `type(scope): summary`
+...
+Never output all changes in one block and leave sequencing to the user.
+
+### Hard Rules
+- Never mix refactoring with feature work in one commit. Refactor first, then build.
+- Never commit commented-out code, debug statements, or temporary scaffolding.
+- Never bundle a bug fix with a feature.
+- Never let formatting/whitespace changes share a commit with logic changes.
+- Test commits are siblings, not children.
+- Never use "WIP", "misc", "cleanup", "various fixes", or "updates" as commit messages.
+
+---
+
+## CST & Visual Editing Guardrails (Figma-style changes)
+
+### 1. Never assume — always verify against the actual codebase
+- Before writing or modifying any function, open and read the actual file first. Do not recall or guess its contents from earlier in the conversation if it's been more than a few turns — re-read it.
+- Before claiming a library function, method, or API exists (Babel, recast, tree-sitter, @vue/compiler-sfc, svelte-eslint-parser, etc.), state which package and version you're assuming, and flag if you haven't confirmed it against that package's actual docs/types in this session.
+- If you did not read a file or doc in this conversation, say "I haven't verified this against the source" rather than presenting it as fact.
+- Never invent a node type, AST/CST field name, or parser method name. If unsure whether e.g. a JSXOpeningElement has an `attributes` array vs `attrs`, say so explicitly and ask to check the actual parser's type definitions.
+
+### 2. Ground every claim in a specific, checkable location
+- When describing how existing code behaves, cite the exact file path and function/line. "The resize handler probably does X" is not acceptable — either confirm it by reading the file, or say you don't know.
+- When proposing a new function, state exactly which existing function/module it will be called from, and confirm that call site exists.
+
+### 3. Feature-specific guardrails
+
+#### Resizing (instant + fluid)
+- Do not assume the current data model for element dimensions (px vs %, flex vs absolute) — confirm it from the actual CST/node structure before writing resize logic.
+- "Instant" resize (drag-commit) and "fluid" resize (live drag) are different code paths with different perf constraints. Don't conflate them — fluid resize must not trigger full CST reparse/write on every frame; confirm what throttling/debouncing mechanism (if any) already exists before adding one.
+- Never claim a resize edit "preserves formatting" unless you've traced the exact CST mutation path and confirmed only the target token changes.
+
+#### Layer rearrangement (merge, push on top, push behind)
+- "Merge" is ambiguous — confirm with me what it means in Glide's data model (combining two elements into one? grouping into a wrapper?) before writing code. Do not silently assume a definition.
+- z-order changes ("push on top"/"push behind") may map to sibling reordering in the CST *or* a z-index/style property, depending on layout mode. State which one you're implementing and why, don't default to one silently.
+- Confirm how layer order is currently represented (DOM order vs explicit z-index vs a separate layer list) before writing reorder logic.
+
+#### Colour changing (instant)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [SrivarsanK/Glide](https://github.com/SrivarsanK/Glide) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
