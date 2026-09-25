@@ -1,38 +1,44 @@
 ---
 trigger: always_on
-description: - This is a monorepo: `apps/web` (frontend, `karmacircle-frontend`) and `apps/api` (backend, `karmacircle-api`). Read [docs/specs/README.md](./docs/specs/README.md) for the frontend's master map, and [apps/api/docs/specs/README.md](./apps/api/docs/specs/README.md) for the backend's — each covers only its own app.
+description: This repo holds two independently deployed apps: `apps/web` (the frontend, `karmacircle-frontend` — React/Vite SPA) and `apps/api` (the backend, `karmacircle-api` — Express/TypeScript/MongoDB). They share this repo, CI, and top-level tooling (this file, `AGENTS.md`, the graphify graph), but each keeps its own `package.json`, its own `docs/specs/` map, and its own deploy target. `apps/api` is the source of truth for the API contract; don't guess at a request/response shape beyond what `apps/api/d
 ---
 
-## agentic workflow
+## Monorepo layout
 
-- This is a monorepo: `apps/web` (frontend, `karmacircle-frontend`) and `apps/api` (backend, `karmacircle-api`). Read [docs/specs/README.md](./docs/specs/README.md) for the frontend's master map, and [apps/api/docs/specs/README.md](./apps/api/docs/specs/README.md) for the backend's — each covers only its own app.
-- Read [docs/specs/known-issues.md](./docs/specs/known-issues.md) (frontend) and/or [apps/api/docs/specs/known-issues.md](./apps/api/docs/specs/known-issues.md) (backend) before touching any area either flags — duplicated implementations, dead code, unrouted pages, and validation that doesn't actually block submission are all cataloged there so you don't rediscover them the hard way.
-- For anything touching a route path, method, or request/response shape, read [apps/api/docs/specs/api-contract.md](./apps/api/docs/specs/api-contract.md) first — it cross-references every backend route against exactly what the frontend calls, and documents where they currently disagree. Don't assume a route "just works" for the frontend without checking that file.
-- There is no `PRODUCT_SPEC.md`, task-spec template, or Definition-of-Done doc in this repo yet — each app's `docs/specs/` is the closest thing to a source of truth today.
-- There is one graphify knowledge graph at [graphify-out/](./graphify-out/), covering both apps' code (AST) plus `docs/specs/` and the top-level docs. Read `graphify-out/GRAPH_REPORT.md` before answering architecture questions — see the "graphify" section in `CLAUDE.md` for how to query and keep it updated.
-- See "Testing — when, how, and where the data comes from" below before touching either app's test suite, or before claiming something is "tested."
+This repo holds two independently deployed apps: `apps/web` (the frontend, `karmacircle-frontend` — React/Vite SPA) and `apps/api` (the backend, `karmacircle-api` — Express/TypeScript/MongoDB). They share this repo, CI, and top-level tooling (this file, `AGENTS.md`, the graphify graph), but each keeps its own `package.json`, its own `docs/specs/` map, and its own deploy target. `apps/api` is the source of truth for the API contract; don't guess at a request/response shape beyond what `apps/api/docs/specs/api-contract.md` and the route code show. See [AGENTS.md](./AGENTS.md) for the fuller agentic workflow around working across both.
 
-## Testing — when, how, and where the data comes from
+## graphify — check the knowledge graph first
 
-This repo is worked on by multiple AI agents (and humans), often in separate sessions with no shared memory of what a previous session already checked. This section exists so any agent — new to this repo or not — can answer "do I need to test this, and if so, how" without guessing. Read it once; don't rediscover it per session.
+This repo has a graphify knowledge graph at [graphify-out/](./graphify-out/), built from the code (AST) across both `apps/web` and `apps/api`, plus every doc in `docs/specs/`/`apps/api/docs/specs/` and the top-level `.md` files. It exists so you don't have to guess what depends on what.
 
-**What exists, in one sentence each:**
-- `apps/api`: Jest + Supertest, every module covered, runs in-process against `mongodb-memory-server` — `npm test` / `pnpm --filter karmacircle-api test`.
-- `apps/web`: Playwright E2E, organized feature-first under `apps/web/e2e/<feature>/` (mirroring `apps/web/src/features/<feature>/`), each folder with its own `README.md` — `pnpm test` (from `apps/web`) or `npx playwright test e2e/<folder>/` for one feature.
-- Root `pnpm test` runs **both**, concurrently, via Turborepo — the API and the UI, at the same time, no server needs to be running beforehand. This is the one command to reach for by default.
+Before answering an architecture or "what impacts what" question, or before touching a feature:
+- Read [graphify-out/GRAPH_REPORT.md](./graphify-out/GRAPH_REPORT.md) first — God Nodes (the most-connected concepts), Communities (2-5 word cluster names with their member nodes), Surprising Connections, and Suggested Questions. It's plain text, no tool needed.
+- For a specific concept/file/function, use the graphify skill's traversal commands instead of grepping blind: `/graphify explain "NodeName"` (everything connected to one node), `/graphify query "<question>"` (broad BFS context), `/graphify path "A" "B"` (how two concepts connect).
+- `graphify-out/graph.json` is the raw graph if you need to query it programmatically; `graphify-out/graph.html` opens in a browser for the visual layout.
+- A `PreToolUse` hook (`.claude/settings.json`) already reminds you of this before any Glob/Grep call, and a post-commit/post-checkout Husky hook (`.husky/post-commit`, `.husky/post-checkout`) auto-rebuilds the code side of the graph after every commit and branch switch — no LLM cost, AST only. Known limitation: that AST-only rebuild has no LLM step, so it resets every community's plain-language name back to generic "Community N" each time it runs. Live with it between real updates rather than trying to patch it back by hand.
+- **Do not proactively run `/graphify . --update` (or `graphify update .`) after routine edits.** It costs tokens and dispatches subagents, and Tamal does not want the graph refreshed on every small change. Only run a full semantic update when he explicitly asks for one (e.g. "update the graph" after finishing a feature) — the same applies to re-labeling communities. Reading the (possibly slightly stale) report is still always fine and expected; regenerating it is not something to do unprompted.
+- Same rule for `docs/specs/known-issues.md`: if you fix something it calls out, update that file per "Keep the specs honest" below, but don't also trigger a graph update on your own — that happens the next time Tamal asks for one.
 
-**The full picture — read before writing or changing a test, not just before running one:**
-[docs/specs/testing.md](./docs/specs/testing.md) (`apps/web`, and how the two apps' suites relate) and [apps/api/docs/specs/testing.md](./apps/api/docs/specs/testing.md) (`apps/api`). `docs/specs/testing.md` has a table pointing at every `apps/web/e2e/<feature>/README.md` — **check whether the feature you're touching already has one before writing new coverage**; it names what's covered, what's deliberately skipped (often because the underlying app code is unreachable/dead, not because testing it was skipped), and feature-specific test-data gotchas. A feature with no `e2e/` folder yet has no E2E coverage at all (see `docs/specs/testing.md#what-this-doesnt-cover`) — that's a gap to flag or fill, not to assume is covered elsewhere.
+## Caveman — always run ultra mode in this repo
 
-**Deciding whether to run tests for a given change:**
-- Touched `apps/api/src/**`? Run `apps/api`'s Jest suite (`pnpm --filter karmacircle-api test`) at minimum. If you touched a module with no test file (check the coverage table in `apps/api/docs/specs/testing.md`), that's a gap — consider adding one rather than shipping the module still untested.
-- Touched `apps/web/src/features/<name>/**`? Check whether `apps/web/e2e/<name>/` exists. If it does, run it (`npx playwright test e2e/<name>/`) and update it if the change affects behavior that folder's README says is covered. If it doesn't exist yet, the change is going out with zero automated coverage — say so plainly rather than implying it's tested.
-- Touched something both sides depend on (a route contract, shared config, `app.ts`, `env.ts`) — run the full `pnpm test` from the repo root.
-- Before claiming a bug is fixed or a feature works: reproduce it (or the feature's happy path) through the relevant test tooling or a manual check first — see CLAUDE.md's "start with reproducing the bug" rule. A claim of "tested" that wasn't actually run through anything is worse than saying it wasn't tested.
+This repo runs [Caveman](https://github.com/JuliusBrussee/caveman) at its most aggressive `ultra` compression level for every session — Tamal wants this on regardless of the tradeoff below.
+
+- At the start of every session in this repo, invoke `/caveman ultra` before doing anything else.
+- Caveman compresses prose *output* only — code, commands, and reasoning tokens are untouched. It does not make you think less carefully, only write up findings more tersely.
+- Caveman's own docs (`docs/HONEST-NUMBERS.md` in its repo) disclose the skill adds roughly 1,000-1,500 input tokens of overhead per turn, so on already-terse, single-file tasks whole-session savings can go net negative. This has been surfaced to Tamal; he still wants it always on here.
+- The CLI's `think.mode` proxy setting has no `ultra` level (only `compress | record | pixel`) and is enabled machine-wide via `~/.claude/settings.json`/`ANTHROPIC_BASE_URL` rerouting to `caveman-proxy` on `127.0.0.1:8787` — that part is not, and cannot be, scoped to just this repo. `ultra` itself only exists as the skill-level `/caveman ultra` invocation, which is what this rule wires in per-repo.
+- Undo: `caveman disable claude` removes the machine-wide proxy hook; deleting this section stops the per-repo `/caveman ultra` invocation.
+
+## Git workflow
+
+Never create a new branch on your own initiative, including when about to commit while sitting on `main`.
+Work and commit directly on whatever branch is currently checked out — `main` included — and stay there.
+Only branch off if Tamal explicitly tells you to (e.g. "make a branch for this," "branch off main").
+This overrides any general instinct to branch before committing on a default branch.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [karmacircleCommunity/KarmaCircle](https://github.com/karmacircleCommunity/KarmaCircle) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
