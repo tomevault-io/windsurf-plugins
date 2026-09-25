@@ -1,0 +1,74 @@
+---
+trigger: always_on
+description: This file provides guidance to AI coding agents when working with code in this repository.
+---
+
+# AGENTS.md
+
+This file provides guidance to AI coding agents when working with code in this repository.
+
+## What this repository is
+
+A catalog of **Agent Skills** (per the [agentskills.io](https://agentskills.io/specification) spec) for OpenTelemetry, published by OllyGarden. The skills are **non-opinionated and vendor-neutral by design** — there are many valid ways to use OpenTelemetry, so prescribing conventions is out of scope. They exist to give an agent **token-efficient, agent-friendly retrieval**: small fetch tables, lookup indexes, and scripts that point at upstream sources of truth instead of copying docs into context, so answers stay current as OpenTelemetry evolves.
+
+Most changes are to Markdown and YAML files that AI agents consume. The exception is `tools/otel-agent-tools/`, a Go module that generates and validates some of the bundled reference data (see below). "Correctness" means a skill is well-scoped, accurate, points at the maintained source of truth, and is registered in all the right places.
+
+## Preferred workflow
+
+For any change that adds, renames, moves, or removes a skill, or that alters what a skill triggers on or recommends, follow [`docs/preferred-workflow.md`](docs/preferred-workflow.md). Typo and prose fixes go straight to a PR — unless they touch `SKILL.md` frontmatter, since a `description:` edit changes when the skill activates.
+
+## Running the gates locally
+
+The two skill gates are scripts in `bin/`. Both resolve the repository root themselves, so any path spelling works from any working directory — the `./` form below assumes you are at the root:
+
+```bash
+./bin/validate-skill.sh            # spec conformance + house rules; a path checks one skill
+./bin/check-skill-inventory.py     # skills/, marketplace.json, and README in sync
+```
+
+CI enforces one further check that is not a `bin/` script: the `Link Check` workflow. Reproduce it locally with the `lychee` command in [`docs/preferred-workflow.md`](docs/preferred-workflow.md#5-run-the-gates).
+
+`validate-skill.sh` needs `skills-ref`, pinned in `bin/skills-ref.requirement` — that file is the single source CI, Renovate, and `CONTRIBUTING.md` all read, so never paste a revision anywhere else. Install with `uv tool install "$(cat bin/skills-ref.requirement)"`.
+
+## Skill constraints
+
+- The directory name equals the `name:` field — **automated** by `bin/validate-skill.sh` (via `skills-ref`).
+- Frontmatter parses as YAML, `description` fits in 1024 characters, no unknown keys — **automated**, same script.
+- `SKILL.md` stays under 500 lines — **automated**. Past that, move detail into `references/`.
+- Registration across `skills/`, `marketplace.json`, and `README.md` — **automated** by `bin/check-skill-inventory.py`.
+- Links resolve — **automated** by the `Link Check` workflow, which scans the whole repository weekly and on every PR.
+- Keeping content vendor-neutral, DRY, and token-efficient — **review-enforced**, not automated. A green build says nothing about it.
+
+## Architecture
+
+Each skill is a self-contained directory under `skills/<skill-name>/`:
+
+- `SKILL.md` (required) — YAML frontmatter (`name`, `description`, optional `license`, `compatibility`, `metadata`) followed by the instruction body.
+- `references/` (optional) — task-focused docs the SKILL.md links to for detail it doesn't inline (e.g. `otel-go/references/` splits setup, API, instrumentation libraries, performance, breaking changes).
+- `components/` (skill-specific) — `otel-collector` uses one directory per Collector component (`README.md` plus `configuration.md`, `advanced.md`, `quirks.md`, `verification.md`) for progressive disclosure.
+- `scripts/` (optional) — helper or lookup scripts (e.g. `otel-semantic-conventions` ships a query script).
+
+Two hard rules that are easy to get wrong:
+
+1. **The directory name must equal the `name:` field** in its `SKILL.md` (spec directory rule).
+2. Skill `name:` fields are **unprefixed** (`otel-go`, `otel-collector`, …). This is the upstream *facts* package — the companion [`skills`](https://github.com/ollygarden/skills) repo holds OllyGarden's *opinions* under an `ollygarden-` prefix and references these skills for facts. Keep facts here; don't fold opinions in.
+
+## The `tools/otel-agent-tools` Go module
+
+A small Go CLI under `tools/otel-agent-tools/` (wired into the workspace via `go.work`) fetches upstream OpenTelemetry data and renders the generated reference index consumed by `otel-sdk-versions`. CI lints, builds, and tests it, and link-checks the generated index. When changing it:
+
+- `go build ./cmd/otel-agent-tools` and `go test ./...` from `tools/otel-agent-tools/`.
+- Generated output (e.g. `skills/otel-sdk-versions/references/generated/otel-version-index.md`) is produced by the tool — regenerate it rather than hand-editing, so it stays consistent and the link check passes.
+
+## Adding or renaming a skill — keep three places in sync
+
+A new skill is only "registered" when it appears in **all** of these. Missing any one is the most common defect:
+
+1. The directory `skills/<name>/` with a `SKILL.md`.
+2. The `plugins` array in `.claude-plugin/marketplace.json` (`name` + `source: ./skills/<name>` + `description`).
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ollygarden/opentelemetry-agent-skills](https://github.com/ollygarden/opentelemetry-agent-skills) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
