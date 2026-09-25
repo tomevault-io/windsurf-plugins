@@ -1,179 +1,155 @@
 ---
 trigger: always_on
-description: This guide explains the semantic design system philosophy for building consistent, maintainable UIs. The system is built on three core concepts: **Canvas**, **Surface**, and **Layer**.
+description: Outline is a fast, collaborative knowledge base built for teams. It's built with React and TypeScript in both frontend and backend, uses a real-time collaboration engine, and is designed for excellent performance and user experience. The backend is a Koa server with an RPC API and uses PostgreSQL and Redis. The application can be self-hosted or used as a cloud service.
 ---
 
-# Design System Philosophy Guide
+Outline is a fast, collaborative knowledge base built for teams. It's built with React and TypeScript in both frontend and backend, uses a real-time collaboration engine, and is designed for excellent performance and user experience. The backend is a Koa server with an RPC API and uses PostgreSQL and Redis. The application can be self-hosted or used as a cloud service.
 
-## Overview
+There is a web client which is fully responsive and works on mobile devices.
 
-This guide explains the semantic design system philosophy for building consistent, maintainable UIs. The system is built on three core concepts: **Canvas**, **Surface**, and **Layer**.
+**Monorepo Structure:**
 
-## Core Concepts
+- **`app/`** - React web application with MobX state management
+- **`server/`** - Koa API server with Sequelize ORM and background workers
+- **`shared/`** - Shared TypeScript types, utilities, and editor components
+- **`plugins/`** - Plugin system for extending functionality
+- **`public/`** - Static assets served directly
+- **Various config files** - TypeScript, Vite, Vitest, oxfmt, Oxlint configurations
 
-### 1. Canvas (`bg-canvas`)
+Refer to /docs/ARCHITECTURE.md for detailed architecture documentation.
 
-**What it is**: The application-level background that serves as the foundation for all content. The canvas is the **entire application background**, not individual pages. There is only **one canvas** in the entire application, used at the root level.
+## Instructions
 
-**When to use**:
+You're an expert in the following areas:
 
-- **Only at the application root** - the single root container that wraps the entire application
-- The main application background (not page backgrounds)
+- TypeScript
+- React and React Router
+- MobX and MobX-React
+- Node.js and Koa
+- Sequelize ORM
+- PostgreSQL
+- Redis
+- HTML, CSS and Styled Components
+- Prosemirror (rich text editor)
+- WebSockets and real-time collaboration
 
-**When NOT to use**:
+## General Guidelines
 
-- ❌ Page-level backgrounds
-- ❌ Nested containers
-- ❌ Cards or components
-- ❌ Modals or dropdowns
-- ❌ Sidebars or panels
-- ❌ Anywhere else in the application
+- Critical – Do not create new markdown (.md) files.
+- Use early returns for readability.
+- Emphasize type safety and static analysis.
+- Follow consistent oxfmt formatting.
+- Do not replace smart quotes ("") or ('') with simple quotes ("").
+- Do not add translation strings manually; they will be extracted automatically from the codebase.
 
-**Critical Rule**: Canvas should only appear **once** in your entire application - at the root level. All pages, routes, and components sit on top of this single canvas.
+## Dependencies and Upgrading
 
-**Example**:
+- Use yarn for all dependency management.
+- After updating dependency versions, install to update lockfiles:
 
-```tsx
-// ✅ Correct: Canvas at application root (only place it should be)
-// App.tsx or root layout
-<div className="bg-canvas min-h-screen">
-  {/* All application content goes here */}
-  <Routes>
-    <Route path="/" element={<Page />} />
-  </Routes>
-</div>;
-
-// ✅ Correct: Pages use surfaces, not canvas
-function Page() {
-  return <div className="bg-surface-1">{/* Page content */}</div>;
-}
-
-// ❌ Wrong: Canvas used for a page
-function Page() {
-  return <div className="bg-canvas">{/* Don't use canvas here */}</div>;
-}
-
-// ❌ Wrong: Canvas used for a card
-<div className="bg-canvas p-4 rounded-md">{/* Card content */}</div>;
+```bash
+yarn install
 ```
 
-### 2. Surface (`bg-surface-1`, `bg-surface-2`, `bg-surface-3`)
+- When adding a `resolutions` entry to address a security advisory in a transitive dependency, target only the specific vulnerable descriptors using the `name@npm:<range>` syntax rather than overriding the package globally. Inspect `yarn.lock` to find the exact ranges requested by upstream packages and add one entry per vulnerable range, e.g.:
 
-**What it is**: Top-level containers that sit directly on the canvas. Surfaces never overlap each other - they are siblings in the layout hierarchy.
-
-**When to use**:
-
-- Main content areas
-- Sections of a page
-- Primary containers
-- Panels that sit side-by-side
-
-**Surface hierarchy**:
-
-- `bg-surface-1`: Primary surface (most common)
-- `bg-surface-2`: Secondary surface (for variation)
-- `bg-surface-3`: Tertiary surface (rare, for special cases)
-
-**Rules**:
-
-- Surfaces are **siblings**, not nested (in the same plane)
-- Each surface should use its corresponding layer for nested elements
-- Surfaces provide the base for stacking layers
-
-**Exception - Different Planes**:
-
-- Modals, overlays, and popovers exist on a **different plane** (different z-index/stacking context)
-- In these cases, it's acceptable to use a surface even when there's a surface below
-- This is because they are visually and functionally separate from the underlying content
-
-**Example**:
-
-```tsx
-// ✅ Correct: Surfaces as siblings
-<div className="bg-canvas">
-  <div className="bg-surface-1">
-    {/* Main content area */}
-  </div>
-  <div className="bg-surface-2">
-    {/* Secondary content area - sibling, not nested */}
-  </div>
-</div>
-
-// ✅ Correct: Page with header and main (same surface)
-<div className="bg-surface-1">
-  <header className="border-b border-subtle">
-    {/* Header is part of the surface, not a separate surface */}
-  </header>
-  <main>
-    {/* Main is part of the surface, not a separate surface */}
-  </main>
-</div>
-
-// ❌ Wrong: Surface nested in surface (same plane)
-<div className="bg-surface-1">
-  <div className="bg-surface-2">
-    {/* This breaks the philosophy */}
-  </div>
-</div>
-
-// ✅ Correct: Modal on different plane
-<div className="bg-canvas">
-  {/* Main page content */}
-  <div className="bg-surface-1">
-    Page content
-  </div>
-
-  {/* Modal overlay - different plane */}
-  <div className="fixed inset-0 z-50">
-    <div className="bg-backdrop fixed inset-0" />
-    <div className="bg-surface-1 rounded-lg shadow-lg p-6">
-      {/* Modal can use surface-1 even though page uses surface-1 */}
-      Modal content
-    </div>
-  </div>
-</div>
+```json
+"resolutions": {
+  "qs@npm:^6.5.2": "^6.14.2",
+  "qs@npm:^6.11.0": "^6.14.2",
+  "qs@npm:^6.14.0": "^6.14.2"
+}
 ```
 
-### 3. Layer (`bg-layer-1`, `bg-layer-2`, `bg-layer-3`)
+This keeps overrides scoped to the affected dependents and avoids forcing unrelated consumers onto an incompatible version.
 
-**What it is**: Stacking layers that create depth within a surface. Layers stack on top of each other in a specific order.
+## TypeScript Usage
 
-**When to use**:
+- Use strict mode.
+- Avoid "unknown" unless absolutely necessary.
+- Never use "any".
+- Prefer type definitions; avoid type assertions (as, !).
+- Always use curly braces for if statements.
+- Avoid # for private properties.
+- Prefer interface over type for object shapes.
 
-- Cards within a surface
-- Group headers
-- Nested containers
-- Dropdowns and modals
-- Sidebars
-- Any element that needs to appear "on top" of a surface
+## Classes & Code Organization
 
-**Layer hierarchy**:
+### Class Member Order
 
-- `bg-layer-1`: First layer (closest to surface)
-- `bg-layer-2`: Second layer (on top of layer-1)
-- `bg-layer-3`: Third layer (on top of layer-2)
+1. Public static variables
+2. Public static methods
+3. Public variables
+4. Public methods
+5. Protected variables & methods
+6. Private variables & methods
 
-**Critical Rule - Layer-to-Surface Association**:
+### Exports
 
-- `bg-surface-1` → use `bg-layer-1` for nested elements
-- `bg-surface-2` → use `bg-layer-2` for nested elements
-- `bg-surface-3` → use `bg-layer-3` for nested elements
+- Exported members must appear at the top of the file.
+- Always use named exports for new components & classes.
+- Document ALL public/exported functions with JSDoc.
 
-**Rare Exception - Visual Separation**:
+## React Usage
 
-In very rare cases, you may go one level above for visual separation when needed for specific UI elements:
+- Use functional components with hooks.
+- Event handlers should be prefixed with "handle", like "handleClick" for onClick.
+- Avoid unnecessary re-renders by using React.memo, useMemo, and useCallback appropriately.
+- Use descriptive prop types with TypeScript interfaces.
+- Do not import React unless it is used directly.
+- Use styled-components for component styling.
+- Ensure high accessibility (a11y) standards using ARIA roles and semantic HTML.
 
-- Inputs in modals (modal has `bg-surface-1`, input can use `bg-layer-2` for separation)
-- Buttons, switches, and form controls that need more visual distinction
-- **Important**: This is very rare and should only be used for interactive form elements, not for content boxes or cards
+## MobX State Management
 
-**Example**:
+- Use MobX stores for global state management.
+- Keep stores in `app/stores/`.
+- Use `observable`, `action`, and `computed` decorators appropriately.
+- Prefer computed values over manual calculations in render.
+- Keep business logic in stores, not components.
 
-```tsx
-// ✅ Correct: Surface-1 with layer-1
+## Database & ORM
+
+- Use Sequelize models in `server/models/`.
+- Generate migrations with Sequelize CLI:
+
+```bash
+yarn sequelize migration:create --name=add-field-to-table
+```
+
+- Run migrations with `yarn db:migrate`.
+- Use transactions for multi-table operations.
+- Add appropriate indexes for query performance.
+- Always handle database errors gracefully.
+
+## API Design
+
+- RESTful endpoints under `/api/`.
+- Authentication endpoints under `/auth/`.
+- Use consistent error responses.
+- Validate request data using the validation middleware and schemas
+- Use presenters to format API responses.
+- Keep API routes thin, use model methods for business logic, or commands if logic spans multiple models.
+
+## Authentication & Authorization
+
+- JWT tokens for authentication.
+- Policies in `server/policies/` for authorization.
+- Use cancan-style ability checks.
+- Use authenticated middleware for protected routes.
+- Always verify user permissions before data access.
+
+## Real-time Collaboration
+
+- WebSocket connections for real-time updates.
+- Use Y.js for collaborative editing.
+- Handle connection state changes gracefully.
+
+## Documentation
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aryaniyaps/lamina](https://github.com/aryaniyaps/lamina) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
