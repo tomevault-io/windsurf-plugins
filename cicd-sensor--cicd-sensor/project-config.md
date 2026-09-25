@@ -1,86 +1,89 @@
 ---
 trigger: always_on
-description: cicd-sensor is an eBPF-powered CI/CD runtime security sensor.
+description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 ---
 
-# Repo Instructions
+# Agent Guide for opentelemetry-go
 
-cicd-sensor is an eBPF-powered CI/CD runtime security sensor.
-The source of truth for design is `docs/`.
+This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 
-## AI agent workflow
+Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
+Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
 
-This repo is developed through collaborative engineering, not autonomous "vibe coding".
+## Core expectations
 
-AI agents should first investigate the code, docs, runtime behavior, and tradeoffs; then help write down the design or plan; then implement the agreed change. Do not skip directly from a rough idea to a finished PR.
+- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
+- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
+- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
+- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
+- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
+- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
+- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
+- Keep dependencies minimal and justified.
+- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
+- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
+- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
 
-Before changing external state such as creating, closing, reopening, or merging GitHub Issues / PRs, pushing branches, or publishing releases, show the exact target and proposed content, then wait for explicit approval.
+## Default workflow
 
-Use ignored `work_docs/` for local temporary design drafts, progress notes, investigation logs, and result reports. Do not place local-only working notes at the repository root.
+For new features and behavior changes, use this order unless the task explicitly says otherwise:
 
-## What to read first
+1. Read the relevant package, its tests, and any package docs or `README.md`.
+2. Add or update a failing unit test that captures the required behavior or regression.
+3. Implement the smallest change that makes the test pass.
+4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
+5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
+6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
+7. Run `make precommit` each time before considering the work complete.
 
-- `docs/index.md` — project goal and supported platforms
-- `docs/user-guide/overview.md` — runner environments and usage models
-- `docs/developer-guide/overview.md` — repository layout and subsystem reading order
-- `docs/developer-guide/agent.md` — Job / Scope / JobRegistry / KernelTracker model
-- `docs/developer-guide/agent-ownership-boundaries.md` — Agent / JobRegistry / Job / JobScopeState ownership rules and per-Job evaluation rationale
-- `docs/developer-guide/ebpf-runtime.md` — cgroup v2 tracking, BPF map boundary, eBPF code style and contribution contract
-- `docs/developer-guide/manager.md` — config and log delivery boundary
-- `docs/developer-guide/rule-engine.md` — RuleSet / RuleModifier / CEL flow
+For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
 
-## Detailed rules
+## Verification
 
-The files below add detail that only applies when touching specific paths. **They apply to any AI coding agent working in this repo — Claude Code, Codex, Gemini, or otherwise. The `.claude/` directory is only there because Claude Code auto-loads from that path; the contents are not Claude-specific.** Read the relevant one before changing code in that area.
+- Use `make` as the canonical repository verification command. The default target is `precommit`.
+- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
+- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
+- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
 
-| File | Apply when |
-| --- | --- |
-| `.claude/rules/10-code.md` | Touching `**/*.go`, `go.mod`, `go.sum`. Go baseline, tooling, style, comments. |
-| `.claude/rules/20-testing.md` | Writing or reviewing tests. Required test-case table and coverage-perspective table. |
-| `.claude/rules/30-cel-rules.md` | Touching `rules/**`, `internal/rule/**`. RuleSet / RuleModifier schema, CEL surface, event-type sources. |
-| `.claude/rules/40-supply-chain.md` | Touching `.github/**`, `.gitlab-ci.yml`, Dependabot, or Renovate config. SHA pinning and cooldown. |
-| `.claude/rules/50-design-docs.md` | Writing or updating local Design Docs for large feature additions or substantial behavior changes. |
+## Documentation and changelog
 
-## Build and test
+- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
+- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
+- Prefer examples over long code snippets in GoDoc when practical.
+- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
+- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
+  - Always put the PR number at the end of the line (e.g., `(#1234)`), NOT the issue number.
+  - If the PR number is not yet known, omit it until the PR is created, then update the changelog entry before merging.
+  - Always use references to the go module that is updated (e.g., `go.opentelemetry.io/otel/sdk/metric`), instead of just the path (e.g., `sdk/metric`).
 
-- `make build` — build agent + manager binaries (Linux).
-- `make test` — run unit tests.
-- `go test -race ./...` — race detector (required for concurrency changes).
-- `make check` — `generate` + `test` + `rules-validate` + `rules-bundle-validate` + `diff-check` (the gate this repo uses before commit).
-- `make integration` / `make bpf-integration` — integration suites (need privileges; may require Linux).
-- `make rules-validate` — validate baseline rule YAML.
-- `make generate` — regenerate protobuf and bpf2go output (run after touching `proto/` or BPF C sources). BPF compilation runs through Docker, so macOS / Windows hosts work as long as Docker is available.
+## Repository habits
 
-## Repository layout
+- Prefer focused diffs. Avoid drive-by cleanup.
+- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
+- Generated files are checked in. If your change affects generation, keep generated output up to date.
+- Prefer fast local search tools such as `rg` when exploring the repository.
+- When changing behavior, make the invariants explicit in tests.
 
-| Path | Role |
-| --- | --- |
-| `cmd/cicd-sensor` | Agent CLI |
-| `cmd/cicd-sensor-manager` | Manager server |
-| `cmd/cicd-sensorctl` | Report / attestation / rule validation CLI |
-| `internal/agent` | Agent runtime (Listener, JobRegistry, Job, Scope, KernelTracker) |
-| `internal/rule` | RuleSet / RuleModifier schema, resolution, CEL compile and evaluate |
-| `internal/manager` | Config service, collector ingest, output routing |
-| `internal/ctl` | Report and attestation generation |
-| `proto/` | Connect / protobuf wire schema |
-| `rules/` | Baseline rule YAML |
-| `docs/` | Design source of truth (mdbook published from `cicd-sensor.github.io`) |
+## Personas
 
-## Agent components
+### Feature Agent
 
-The Agent is built from several components, each owning a different boundary. Before writing code, identify which component owns the state, lifecycle, or interface you are touching. Do not let responsibilities leak across components.
+Use this persona for new behavior, new API surface, or spec-driven feature work.
 
-| Component | Owns |
-| --- | --- |
-| `Agent` | Top-level process orchestrator. Owns provider/runner selection, socket lifecycles, manager clients, host config cache startup, and shutdown. |
-| `Listener` | Unix-socket HTTP entrypoint. Owns provider routes, peer credentials, request trust checks, and dispatch into JobRegistry. |
-| `NRI observer` | Separate `cicd-sensor nri` process. Observes containerd NRI events and sends Kubernetes staging requests to the Agent. |
-| `ManagerClient / host config cache` | Manager config fetch boundary and cached host config for Kubernetes host paths. Does not own Jobs or KernelTracker state. |
-| `JobRegistry` | Active jobs catalog and KernelTracker binding. Creates scope state, composes tracking primitives, and finalizes Jobs. |
-| `Job` | One CI/CD job's lifecycle, identity, and event worker. |
+- Start with a failing unit test.
+- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
+- Implement the smallest viable change.
+- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
+- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
+
+### Refactoring Agent
+
+Use this persona when improving structure without intentionally changing behavior.
+
+- Treat behavior preservation as the default contract.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cicd-sensor/cicd-sensor](https://github.com/cicd-sensor/cicd-sensor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
