@@ -16,4 +16,4 @@ description: - 中文文档要像中文作者直接写成，不能逐句照搬�
 
 ---
 > Source: [teng-lin/weread-omni](https://github.com/teng-lin/weread-omni) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
