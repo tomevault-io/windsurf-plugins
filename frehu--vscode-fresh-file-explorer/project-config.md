@@ -31,34 +31,47 @@ From cheapest to most expensive:
 
 **Historical data is cached across the max configured time window.** Switching time windows almost never requires a git call — `setTimeWindow()` checks whether the in-flight or cached data already covers the new window and falls back to `refreshTreeOnly()` if so. The incremental load fires threshold callbacks so smaller windows get data first.
 
-**`refreshEpoch`** is incremented by `refresh()` and `hardRefresh()`. `updateFreshFiles()` checks it at each async boundary and throws `RefreshCancelledError` if a newer refresh started. Always preserve this check when adding async work to the load path.
+### Manual Scan — Dormancy Is a Gate, Not a Mode Switch
 
-## `files.exclude` is Per-Node, Not Global
+`freshFileExplorer.freshFileLoading: "manual"` makes the fresh-files scan wait for
+an explicit Refresh (an enum, not a boolean, so a future fully-manual mode needs no
+settings migration). This setting is meant for users who care about startup impact,
+or those who simply don't care about the namesake feature of the fresh file explorer.
+Implemented as one predicate (`isScanDormant`) checked at two chokepoints
+— `kickOffLoad()` and `refreshPending()`, both in `LoadOrchestrator` — rather
+than at every call site that triggers a refresh. Add new automatic refresh triggers *above* those chokepoints and
+they're covered for free.
 
-The tree honors VS Code's `files.exclude` (`freshFileExplorer.respectFilesExclude`, default on). The non-obvious part: a glob is evaluated **relative to the workspace folder of the node it's rendered under**, so the *same* absolute file can be hidden under one root and shown under another. The motivating case (issue #3): a repo root added alongside its own `backend/` subfolder, with the root excluding `backend` — `backend/app.js` must vanish under the root node yet remain under the backend node. A single global "display map" cannot express this; don't try to filter `_freshFiles` once and reuse it everywhere.
+Two rules keep it from breaking neighbouring features:
 
-- Pure glob matching: [filesExcludeMatcher.ts](src/fresh-files/filesExcludeMatcher.ts) — a faithful port of VS Code's own `vs/base/common/glob.ts` engine (not minimatch). A bare `backend` matches the path *and its ancestor prefixes* (mirrors the Explorer pruning the `backend` dir node); bare patterns stay root-anchored.
-- Per-node application: [FilesExcludeFilter](src/fresh-files/filesExcludeFilter.ts). `isExcludedUnder(path, folder)` is the per-node check used by `buildTree`/`buildFlatList`/`buildRepoView`. `isExcludedByOwner` / `filterByOwner` handle the flat lenses (group-by-author/commit, search) that have no node context.
-- Both are pure/unit-tested; the provider holds only wiring + a compiled-glob cache invalidated on config change. `when`-clause (sibling) excludes are unsupported.
+- **Repo discovery still runs while dormant.** `ensureReposDiscovered()` runs Phase 1
+  of the load on its own (deduplicated against a concurrent full load in `RepoDiscovery`) and
+  fires `onReposReady` without touching git log. Branch compare, auto-follow and the
+  blame heatmap all resolve repos through it, so none of them go dark. It's called
+  from activation, not just from the first tree render — the view may be hidden.
+- **Explicit consumers arm; ambient ones stay gated.** Anything the user directly
+  asked for — quick pick, Code Telescope finder, fresh-files search, the stonks panel,
+  the heatmap toggle, filter-by-author/commit — routes through `ensureDataLoaded()`,
+  which calls `armScan()`. Silently returning empty would look like a bug. Arming is
+  sticky for the session.
 
-## Path Handling
+  The test is who initiated the *call*, not whether the feature was opted into. The
+  heatmap sits on both sides of that line: `handleToggleHeatmap` arms, because a user
+  clicked it, while `HeatmapDecorationProvider.provideFileDecoration` checks
+  `isScanDormant` and bails, because VS Code polls it for every visible file right
+  after activation. Without that second guard, manual scan is a no-op for anyone with
+  `heatmap.enabled` on — it would arm immediately after activation with no user action.
 
-- Git uses forward slashes; Windows uses backslashes. We try to stick to normalized paths `/`.
-- Use and define branded types for different path variants
-- `asAbsolutePath()` calls `normalizePath()` internally
+  Display-only commands (time window, grouping, sort order) deliberately do *not*
+  arm; they'd be a surprising trigger for a scan, and the dormant tree already says
+  it hasn't scanned.
 
-## Git Command Execution
+`dataLoaded` stays false while dormant, so `enterDormant()` clears
+`ContextKeys.LOADING` explicitly — `package.json` `when` clauses depend on it.
 
-Always use **`execGitWithArgs(args[], cwd)`** — uses `spawn()` with an argument array, no injection risk. For large outputs, stream instead of buffering: `streamGitLogNameStatus` in `gitOperations.ts`, or the diff-search parser's own `streamGitDiffOutput` (local to `diffSearchParser.ts`).
-
-## Webview Message Protocol
-
-The host↔webview boundary is a `postMessage` contract typed by discriminated
-unions in `src/webview/messages.ts` (compiled by both tsconfigs). Every host
-panel sends through a typed `_post(msg: XToWebview)` wrapper and types its
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [FreHu/vscode-fresh-file-explorer](https://github.com/FreHu/vscode-fresh-file-explorer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
