@@ -9,14 +9,14 @@ This environment contains a prebuilt **SkillDAG** typed-skill graph workspace.
 
 ## Required First Step
 
-Before writing any code, retrieve relevant skills in two steps:
+Before attempting any task, retrieve relevant skills with two steps:
 
 ```bash
 skilldag graph search "goal + artifact/format + operation/API + verifier-critical constraint" --top-k 5
 skilldag show <skill_id>
 ```
 
-`skilldag graph search` returns a ranked list of skill ids with scores and one-line descriptions. `skilldag show <id>` prints the full SKILL.md body. Pass multiple ids — `skilldag show A B C` — to read several skills in one call. Both commands are on PATH inside the container.
+`skilldag graph search` returns a ranked list of skill ids with scores and one-line descriptions. `skilldag show <id>` prints the full SKILL.md body. Pass multiple ids — `skilldag show A B C` — to read several skills in one call.
 
 When writing the query, include only the retrieval-critical task facts that are actually known:
 
@@ -35,7 +35,9 @@ exact civ6 district adjacency calculator
 
 Avoid vague queries such as `solve this task` or `help with benchmark`.
 
-Retrieval is free and interruptible. Use `skilldag show <id>` for each skill that looks relevant, and consult more skills later if the task surface changes. If the ranking is empty, explicitly note that no relevant skill was found and continue without claiming skill usage. Otherwise, use the retrieved skills only as constraints on how to solve the task.
+Retrieval is free and interruptible. Use `skilldag show <id>` for each skill that looks relevant before writing any code, and consult more skills mid-task when the situation changes. If the ranking is empty, explicitly note that no relevant skill was found and proceed without claiming skill usage.
+
+Treat retrieved skills as a narrowing device, not as permission to expand scope.
 
 ## Failure Reflection
 
@@ -101,4 +103,4 @@ Rules:
 
 ---
 > Source: [Ericbai06/SkillDAG](https://github.com/Ericbai06/SkillDAG) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
