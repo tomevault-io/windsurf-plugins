@@ -1,175 +1,77 @@
 ---
 trigger: always_on
-description: > Versão operacional curta para runners. Em divergência, os artefatos canônicos em `.roadmap/` prevalecem.
+description: O ESAA não usa MCP. Use `python -m esaa`, com `--root` apontando para este
 ---
 
-# AGENTS.md — Contrato operacional Codex/ESAA
+# AGENTS.md — ESAA
 
-> Versão operacional curta para runners. Em divergência, os artefatos canônicos em `.roadmap/` prevalecem.
-> O ESAA não usa MCP. Use a CLI ESAA: `python -m esaa`.
+O ESAA não usa MCP. Use `python -m esaa`, com `--root` apontando para este
+workspace. O pacote Python é `esaa-core`; o módulo é `esaa`.
 
-## 1. Autoridade e termos
+## Autoridade e contexto
 
-ESAA é o protocolo de governança. Harness executa. Orchestrator é o single writer do event store. Agente emite intenções válidas, nunca escreve diretamente no store.
+O Orchestrator é o único escritor do event store e dos efeitos finais.
+[AGENT_CONTRACT](.roadmap/AGENT_CONTRACT.yaml),
+[ORCHESTRATOR_CONTRACT](.roadmap/ORCHESTRATOR_CONTRACT.yaml),
+[schema do agente](.roadmap/agent_result.schema.json) e
+[RUNTIME_POLICY](.roadmap/RUNTIME_POLICY.yaml) definem as regras aplicáveis.
+Não edite diretamente `.roadmap/activity.jsonl` nem suas projeções
+(`roadmap.json`, `issues.json`, `lessons.json`, `project_profile.json`).
 
-Fontes canônicas:
-- Event store: `.roadmap/activity.jsonl`.
-- Projeções/read models: `.roadmap/roadmap.json`, `.roadmap/issues.json`, `.roadmap/lessons.json`.
-- Contratos: `.roadmap/AGENT_CONTRACT.yaml`, `.roadmap/ORCHESTRATOR_CONTRACT.yaml`, `.roadmap/agent_result.schema.json`, `.roadmap/RUNTIME_POLICY.yaml`.
+Para trabalhar numa tarefa, obtenha `python -m esaa dispatch-context TASK-ID`.
+Use `eligible` para descobrir tarefas disponíveis e `state TASK-ID` para estado.
+Leia somente as referências necessárias à tarefa; padrões de leitura autorizada
+não são uma exigência de varrer o repositório. O contexto contém referências a
+artefatos; recupere seu conteúdo quando necessário dentro dos limites autorizados.
+Os perfis PARCER em `.roadmap/PARCER_PROFILE.<papel>.yaml` são orientação por papel:
+carregue somente o perfil correspondente quando precisar dessa especialização.
 
-Read models são derivados do event store. Não edite manualmente `roadmap.json`, `issues.json`, `lessons.json` ou `activity.jsonl`.
+## Trabalho e conclusão
 
-## 2. CLI e runner
+Consultas e diagnósticos são somente leitura: não emita transições nem
+`file_updates`. Relate o resultado e as limitações relevantes.
 
-Em workspaces publicados, o pacote Python é `esaa-core`, mas o módulo/comando é `esaa`.
+Na execução governada, `claim` e `complete` são submissões separadas. Cada envelope
+contém uma `activity_event` e `prior_status` coerente. JSON puro é obrigatório no
+envelope submetido ao Orchestrator, não nas mensagens de conversa.
+O actor que reivindicou completa; `file_updates` só acompanha `complete`.
+A revisão segue o papel autorizado e a política ativa. `done` é terminal:
+problemas exigem `issue.report` e o fluxo de hotfix, sem reabrir a tarefa original.
 
-Comandos úteis:
+Investigue contexto recuperável e resolva escolhas locais reversíveis dentro do
+escopo autorizado sem pedir aprovação a cada passo. Prepare e valide candidatos
+em ambiente permitido; os efeitos finais continuam via `file_updates`.
+Quando a tarefa incluir execução, inspeção e correção, prossiga até satisfazer os
+critérios de aceitação e reúna verificações reais antes de `complete`.
+Respeite os mínimos de checks do contrato; `complete` não é aprovação nem publicação.
 
-```powershell
-python -m esaa --version
-python -m esaa --root . verify
-python -m esaa --root . eligible
-python -m esaa --root . roadmap status --detail
-```
+Obtenha a decisão necessária antes de alterar requisitos, permissões ou efeitos
+externos ainda não autorizados. Se um requisito material continuar indefinido,
+uma dependência obrigatória faltar ou um boundary impedir a entrega, reporte
+`issue.report` com evidências; não ultrapasse o limite nem invente autorização.
+Lessons aplicáveis em `reject`, `require_field` ou `require_step` são obrigatórias.
+Considere `warn` sem convertê-lo por si só em bloqueio ou impor texto fixo de aceite.
 
-Todo comando que escreve no event store deve identificar o runner:
+## Proveniência e integridade
 
-```powershell
-python -m esaa --root . --runner codex submit --actor agent-spec output.json
-# ou uma vez por sessão:
-$env:ESAA_RUNNER_ID = "codex"
-```
+Identifique o runner real em cada comando que escreve eventos:
+`python -m esaa --runner codex submit --actor agent-impl result.json`.
+Use o identificador do seu runner, não copie `codex` se executar por outro runner.
+O Orchestrator carimba `runner`; não o inclua no JSON do agente. Registro e modo
+strict são definidos em [agents_swarm](.roadmap/agents_swarm.yaml) e RUNTIME_POLICY.
+Após escrita governada, execute `python -m esaa verify`.
 
-Regras:
-- Use `--runner codex` ou `ESAA_RUNNER_ID=codex` em `submit`, `task create`, `init`, `run`.
-- Não coloque campo `runner` no JSON do agente; o Orchestrator carimba isso.
-- Runners registrados: `claude-cowork`, `claude-code`, `codex`, `human-terminal`, `unattended`.
-- Com policy strict, runner desconhecido falha com `RUNNER_UNKNOWN`.
+No runtime que oferece locks com metadados, releitura sob lock e verificação da
+escrita, deixe a CLI tratar a contenção; a existência transitória do lock não
+exige intervenção manual. Isso não autoriza tarefas de outro responsável nem
+edições concorrentes nos mesmos arquivos. Em runtimes sem essas garantias,
+mantenha um runner por workspace e interrompa a escrita se houver lock.
+Nunca remova locks manualmente. Interrompa a operação afetada e relate evidências
+em `STORE_LOCK_TIMEOUT`, `JSONL_INVALID`, `EVENT_SEQ_*`, `APPEND_VERIFY_FAILED`
+ou falha de integridade; não contorne o mecanismo.
 
-## 3. Concorrência
-
-Até locks com metadados/read-after-write estarem garantidos no workspace alvo:
-- Um runner por vez neste workspace.
-- Antes de escrever, se existir `.roadmap/activity.jsonl.lock`, pare e pergunte ao usuário.
-- Se encontrar `STORE_LOCK_TIMEOUT`, `JSONL_INVALID` ou `EVENT_SEQ_*`, pare e reporte.
-- Após escrita governada, rode `python -m esaa --root . verify`.
-- Não reivindique tarefa atribuída a outro runner.
-
-## 4. Modos de operação
-
-### Read-only
-
-Use para análise, diagnóstico, explicação ou inspeção. Não emita `claim`, `complete`, `review`, nem `file_updates`.
-
-Feche com:
-
-```text
-- Task ID: N/A
-- Summary: <o que foi feito>
-- Changed files: Nenhum.
-- Tests run: Nenhum.
-- ESAA verification: Not run.
-- ESAA closure status: Not applicable — read-only request.
-- Blockers, if any: <se houver>
-```
-
-### Execução governada
-
-Use quando o usuário pede implementar/corrigir/gerar artefatos sob ESAA.
-
-Regras:
-- Two-step obrigatório: uma invocação para `claim`, outra para `complete`.
-- Exatamente uma `activity_event` por output.
-- JSON puro, sem markdown, sem texto fora do envelope.
-- `prior_status` sempre presente e coerente.
-- `file_updates` apenas com `action=complete`.
-- O agente não aplica efeitos finais diretamente; envia `file_updates` para o Orchestrator.
-- Nunca reabra ou modifique tarefa `done`; reporte issue.
-
-Boundaries por `task_kind` vêm de `.roadmap/AGENT_CONTRACT.yaml#boundaries.by_task_kind`.
-
-## 5. Decision tree
-
-1. `task_status == todo` -> emitir `claim`.
-2. `task_status == in_progress` e `assigned_to` é seu actor -> executar e emitir `complete`.
-3. `task_status == review` -> apenas `agent-qa` emite `review`.
-4. `task_status == done` -> emitir `issue.report`; done é imutável.
-5. Se uma lesson ativa inviabiliza o output, emitir `issue.report`.
-6. Se houver dependência ausente, boundary impossível, contexto insuficiente ou lock divergente, emitir `issue.report`.
-
-## 6. Envelopes canônicos
-
-### claim
-
-```json
-{
-  "activity_event": {
-    "action": "claim",
-    "task_id": "T-000",
-    "prior_status": "todo"
-  }
-}
-```
-
-### complete com conteúdo completo
-
-```json
-{
-  "activity_event": {
-    "action": "complete",
-    "task_id": "T-000",
-    "prior_status": "in_progress",
-    "notes": "Resumo objetivo.",
-    "verification": {
-      "checks": ["teste ou inspeção executada"]
-    }
-  },
-  "file_updates": [
-    {
-      "path": "docs/spec/T-000.md",
-      "content": "# Conteúdo completo\n"
-    }
-  ]
-}
-```
-
-### complete com edits
-
-```json
-{
-  "activity_event": {
-    "action": "complete",
-    "task_id": "T-000",
-    "prior_status": "in_progress",
-    "verification": {
-      "checks": ["edição validada"]
-    }
-  },
-  "file_updates": [
-    {
-      "path": "src/esaa/service.py",
-      "base_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "edits": [
-        {
-          "old_string": "texto antigo exato",
-          "new_string": "texto novo",
-          "replace_all": false
-        }
-      ]
-    }
-  ]
-}
-```
-
-Semântica de edits:
-- O Orchestrator resolve `{path, base_sha256, edits}` para `{path, content}` antes de external effects, resource limits, staging e artifacts.
-- `base_sha256` é sha256 dos bytes atuais do arquivo.
-- `old_string` deve casar no texto progressivamente editado.
-- `old_string` casa contra o texto UTF-8 decodificado com os newlines exatos do arquivo (CRLF incluído — não normalize `\r\n` para `\n`); arquivo não-UTF-8 → `EDIT_INVALID`.
-- Mais de um match exige `replace_all=true`.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Para sintaxe específica, use `python -m esaa <comando> --help` e o contrato local.
 
 ---
 > Source: [elzobrito/ESAA-Core](https://github.com/elzobrito/ESAA-Core) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
