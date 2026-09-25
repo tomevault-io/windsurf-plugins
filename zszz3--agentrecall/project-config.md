@@ -1,62 +1,64 @@
 ---
 trigger: always_on
-description: - Before searching local files or text, check whether `rg` is available. Prefer `rg` and `rg --files` over `grep` or slower alternatives.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Repository instructions
+# CLAUDE.md
 
-## Tooling
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-- Before searching local files or text, check whether `rg` is available. Prefer `rg` and `rg --files` over `grep` or slower alternatives.
+Also read `AGENTS.md` — it holds the binding rules for release notes, dual-app changes, merge/versioning, and safe test practices. This file covers commands and architecture.
 
-## Code structure
+## Commands
 
-- Prefer changing the existing function or component directly when logic has only one caller.
-- Create a helper only when it is reused across independent call sites or isolates a meaningful domain, lifecycle, safety, concurrency, or resource-management boundary.
-- Do not add trivial pass-through wrappers, single-use aliases, or functions exported only to make an implementation detail directly testable. Test observable behavior through the owning function or component instead.
+```bash
+npm run setup                # setup:v1 + setup:v2 (do this instead of npm install — see below)
+npm run dev:v1               # or dev:v2
+npm test                     # test:repo + test:v1 + test:v2
+npm run typecheck            # tsc --noEmit in both apps
+npm run release-note:check   # MUST pass before opening an MR
+npm run package:smoke:all    # build + tarball-install smoke for both apps, in parallel
+```
 
-## Dual-app session development
+Per-app work is faster scoped:
 
-- `apps/main-1.0` is the stable session application and `apps/main-2.0` includes the upgraded session experience. For every session-related bug fix or feature, inspect the relevant behavior in both applications before changing code.
-- When the behavior applies to both applications, implement and test it in both directories. Do not mechanically copy implementations: V1 uses SQLite and mostly synchronous store APIs, while V2 uses PostgreSQL and asynchronous store APIs.
-- If a session behavior intentionally differs between V1 and V2, document the reason in the change and cover the intended divergence with tests.
-- Changes unrelated to sessions may target only the affected application.
+```bash
+npm --prefix apps/main-2.0 test        # vitest run && node --test scripts/*.test.mjs
+cd apps/main-2.0 && npx vitest run src/core/postgres/schema.test.ts   # single file
+cd apps/main-2.0 && npx vitest run -t "reconciles the OpenViking"     # single test by name
+cd apps/main-1.0 && npx vitest         # watch mode
+npm run test:workflow-transaction    # V2 workflow-v2 / workspace-transaction gate
+npm run test:workflow-performance    # V2 incremental-IPC regression gate
+```
 
-## Development branches and release notes
+Notes:
 
-- Every independent development branch must add exactly one user-facing release note before opening an MR.
-- Add the note at `.release-notes/<branch-slug>.md`; keep it updated as the branch changes.
-- The note must have one `#` title and at least one bullet under `## 新增功能` or `## Bug 修复`.
-- Release notes are product copy for end users, not engineering change logs. Include only user-visible new capabilities and user-visible bugs that were fixed.
-- Describe the outcome in plain language. Do not mention MRs/PRs, branches, `main`, CI, GitHub Actions, commits, version-bump logic, build or release pipelines, refactors, test counts, internal service names, database details, file paths, or implementation mechanics unless that detail is itself an intentional user-facing feature.
-- Remove internal-only changes entirely. If a useful outcome contains private or sensitive context, rewrite it at the product-behavior level and omit identifiers, hosts, paths, table names, credentials, and organizational details.
-- Do not use vague text such as “优化代码”, “修复一些问题”, or “新增若干功能”. A reader should understand what became possible or what stopped going wrong.
-- A small number of appropriate emoji is allowed when it improves scanning, but clarity comes first.
-- User-facing release-note bullets are aggregated verbatim in GitHub Release notes and are shown in the terminal and the App update UI. Treat them as final product copy.
-- Run `npm run release-note:check` before opening an MR. Do not open or merge an MR while this check fails.
+- **`npm install` alone is not enough.** `scripts/setup-app.mjs` runs `npm ci` with `AGENT_RECALL_SKIP_STATUSLINE_INSTALL=1` (so postinstall does not write into your real `~/.claude`), restores the embedded-PostgreSQL native symlinks that npm packing drops (V2 only), and validates the Electron binary. On Windows, the first `npm run setup:v2` needs an Administrator terminal for those symlinks.
+- **There is no ESLint/Prettier/Biome/editorconfig.** `tsc --noEmit` is the only static gate; match surrounding style by hand.
+- CI (`.github/workflows/quality-check.yml`) runs on ubuntu/macos/windows: `setup` → `release-notes check-range` → full `npm test` (Linux only) or `test:scripts` (mac/Windows) → `package:smoke:all`. The full suite is **not green on Windows** (POSIX paths, symlinks, fake-CLI spawning) — that is why mac/Windows only run the script tests.
 
-## Merge and release
+## Two applications, one repo
 
-- MRs target `main`. Direct feature pushes to `main` are not part of the development workflow.
-- MRs merged into `main` accumulate release notes; they do not publish immediately.
-- The release workflow publishes accumulated notes every day at 10:00 Beijing time (02:00 UTC), and can be triggered manually for an urgent release.
-- A scheduled or manual run with no added release notes since the latest stable tag exits without publishing a release.
-- Follow semantic versioning as `x.y.z`, and be conservative about version bumps.
-- Prefer bumping `z` for routine releases, including Bug fixes and small user-facing functionality additions, removals, or changes.
-- Bump `y` only when the release contains a reasonable new capability increase or a concentrated batch of major Bug fixes.
-- Bump `x` only for very large releases or very large changes. Any change that increases `x` must be confirmed with the user before proceeding.
-- In the current release-note workflow, any accumulated `新增功能` entry bumps `y`, while an accumulated release containing only `Bug 修复` entries bumps `z`; reserve `新增功能` for changes that intentionally warrant a `y` bump.
-- Trigger the release workflow manually for urgent releases. Do not create an application tag or GitHub Release directly unless recovering a failed automated release.
+`apps/main-1.0` (`agent-recall`, stable) and `apps/main-2.0` (`agent-recall-v2`, preview) are independently installed, versioned, and released. The root has **no npm workspaces**; each app has its own lockfile and `node_modules`.
 
-## Safe test and packaging workflow
+They share concepts but not code. The critical difference: **V1 stores sessions in SQLite with a fully synchronous store API; V2 uses embedded PostgreSQL with a fully async store API.** Per `AGENTS.md`, any session-related change must be inspected in both apps and implemented in both when it applies — but never by copy-paste, because the data layer diverges.
 
-- Tests that exercise installation, update, uninstall, hooks, MCP setup, Skills, or session discovery must use a temporary `HOME`, temporary npm prefix, and synthetic fixtures. Never read, upload, rewrite, or delete the real user's Claude, Codex, Skills, Supabase, Electron, or session data.
-- Do not run global install or uninstall tests against the developer's active Node.js prefix. Use a temporary prefix and remove it after the test.
-- Validate behavior on both macOS and Windows paths. Keep platform-specific assertions behind explicit platform branches, and do not assume `/Users/...` paths or POSIX-only commands.
-- Package smoke tests must build first, install the generated tarball into a temporary prefix, verify the packaged CLI, and clean all temporary files and child processes.
+Release channels also diverge: V1 tags `vX.Y.Z` and owns the repo "Latest" marker (V1's updater hardcodes `releases/latest/download/update.json`); V2 tags `v2-X.Y.Z` plus a force-moved `v2-latest` tag that mirrors the stable install and update assets, giving V2 fixed package and manifest URLs without stealing the Latest marker.
+
+## Shared architecture (both apps)
+
+Electron 42 + React 19 + TypeScript 5.7, pure ESM, built by `electron-vite`. Node ≥ 22.13.
+
+- **No path aliases in either app.** Every import is relative (`../../core/...`). Don't introduce `@/`-style aliases.
+- **`src/core/`** — Electron-free domain logic: session loaders, the store, indexing, migration, SSH/WSL sync, Supabase sync, skills, quota, provider config. This is where most real logic lives.
+- **`src/main/`** — Electron wiring: `index.ts` (a very large god-file: windows, tray, global shortcut, IPC registration, startup sequencing), `main/ipc/` (contract registrars), `main/services/` (injectable, unit-testable service classes).
+- **`src/preload/index.ts`** — builds one flat `api` object from per-domain factories, then `contextBridge.exposeInMainWorld("sessionSearch", api)` and `export type SessionSearchApi = typeof api`. That exported type is how the renderer gets end-to-end typing; there is no separate API type declaration to keep in sync.
+- **`src/shared/ipc/`** — zod-validated channel contracts. `defineIpcRequest(channel, argsTuple)` + `registerIpcHandler(ipc, contract, handler)` (which returns a disposer). Newer domains use this; older channels are raw `ipcMain.handle("domain:verb", …)` in `main/index.ts` with hand-written preload wrappers. Prefer the contract path for new work.
+- **Two renderer windows**: `index.html` (main) and `quick-search.html` (global-shortcut palette), both declared as rollup inputs in `electron.vite.config.ts`.
+- **DB path discovery for out-of-process tools**: because Electron's `userData` differs between dev and packaged builds, the app writes a pointer file (`~/.agent-recall/db-path` for V1, `~/.agent-recall-v2/database-url` for V2). The standalone MCP servers in `bin/` deliberately re-implement the resolution logic rather than importing from `src/` — they must run without a build step.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zszz3/AgentRecall](https://github.com/zszz3/AgentRecall) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
