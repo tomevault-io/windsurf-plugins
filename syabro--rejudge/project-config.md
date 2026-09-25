@@ -57,4 +57,4 @@ How the project is built — tooling, architecture, testing approach, and any te
 
 ---
 > Source: [syabro/rejudge](https://github.com/syabro/rejudge) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
