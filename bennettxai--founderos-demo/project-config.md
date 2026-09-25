@@ -1,0 +1,108 @@
+---
+trigger: always_on
+description: Founder OS is a personal operating system for a one-person business: a web
+---
+
+# FOUNDER OS
+
+Founder OS is a personal operating system for a one-person business: a web
+command center that runs a company as a set of AI-assisted departments. This
+file is the contributor guide for anyone (human or agent) working in the repo.
+
+Runs on port **4100**.
+
+## Commands
+
+```bash
+npm install
+npm run dev        # dev server → http://localhost:4100
+npm test           # vitest suite (must stay green)
+npm run typecheck  # tsc --noEmit
+npm run seed       # re-seed data/founder-os.db (idempotent)
+npm run build && npm start
+```
+
+Node 22 is the supported runtime.
+
+## Stack
+
+Next.js 14 App Router (server components) + TypeScript + Tailwind +
+better-sqlite3 (`data/founder-os.db`, WAL, auto-seeded on first touch) +
+Zod + Vitest.
+
+## Architecture: demo-first, real-ready
+
+This is the load-bearing design rule. The app looks alive out of the box
+because of rich seeded data, but every page and API route reads through the
+repository layer. Never query SQLite directly from a page or route:
+
+- `lib/data.ts` — `getDb()` app singleton; seeds on first touch
+- `lib/db.ts` — `openDb()` + repos (`departments`, `agents`, `metrics`, `tools`, …)
+- `lib/seed.ts` — all seeded content lives here
+- `lib/schemas.ts` — Zod schemas validate every row on the way OUT of the DB
+
+Swapping a seeded table for a live source is a repo-level change. Keep it that
+way: new data = new repo method + Zod schema + seed entry + test.
+
+## Connectors and agents
+
+- `lib/connectors/` — one module per integration group (email over IMAP, chat,
+  payments, CRM, knowledge, social, calendar, local services). Every connector
+  returns an honest `ConnectorStatus` and never reports a fake "connected".
+  With no credentials configured they degrade to a clearly-labelled
+  disconnected state rather than failing the page.
+- `lib/creds.ts` — credential resolution. Reads `process.env` first. Never
+  commit a secret value or paste a key into the repo.
+- `lib/agents/runtime.ts` + `real.ts` — the agent registry. Every seeded agent
+  row maps 1:1 to a `RuntimeAgent` with a real `run()` (enforced by the seed
+  tests). Runs persist to `agent_runs` via `POST /api/agents/[id]/run`.
+- `/integrations` is the live connections board (`GET /api/connections`).
+- Credentials go in `.env.local` (gitignored). See `.env.example`.
+
+## Knowledge core (G-Brain)
+
+G-Brain is the knowledge layer behind `/brain`: a markdown store on disk plus
+an optional vector backend and a local embedding model. The provider in
+`lib/connectors/gbrain.ts` shells out to a CLI when one is configured and falls
+back to grepping the local store when the database is unreachable, so the page
+degrades instead of erroring. Every brain read goes through
+`lib/brain-retrieval.ts` (retrieve a pool, rerank, return the top hits) rather
+than calling `provider.search()` directly; the rerank pass is optional and
+fails soft. Provider selection is `BRAIN_PROVIDER`, with `stub` available for
+tests.
+
+## Views
+
+`/` operator console (pulse row, connections strip, agent list, compact
+G-Brain core) · `/comms` unified feed · `/social` growth dashboard ·
+`/agents` roster with Run buttons + last-run state · `/org` hierarchy board
+(operator → Conductor super agent → 5 pillars: Sales, Marketing/Growth, TECH,
+Finances, Communications → worker pills; broadcast composer; markup frozen —
+do not restructure) · `/brain` G-Brain knowledge core (signature `BrainViz`
+rings + live `gbrain ›` query card + doctor warnings, with the original
+capture / life-map / pipeline / graph / query-path sections kept underneath) ·
+`/roadmap` phases + quarters · `/analytics` real connector numbers ·
+`/funnel` living client-journey flow (Vantage + Launchpad Cohort: stage
+columns left→right, one node per client, 4–5 touch markers per path; seeded
+dummy, real-ready for organic + paid attribution) ·
+`/reference` reference model · `/integrations` live connections board · `/brand-deals` sponsorship slab (Deal Journeys mould: hatched funnel, meters, drawer) · `/trading` brokerage monitor slab (sleeve line, reasoning, positions, orders, trade log, limits + Autopilot switch) · `/chats` agent chat hub · `/adpilot` + `/blueprint` · `/doctor` health checks · `/usage` token-burn board. Every screen runs the interaction layer: page-wide cursor spotlight (`PageSpotlight` in the layout, `--px/--py` on `:root` from `useLens`), `.pressable` hover lens + press sink on every control, `AsyncButton` idle→busy→done, `SlidingTabs`, slab motion (`Rise`, count-ins, drawn lines). Chrome:
+fixed `Sidebar` (Operate/System groups) + sticky `Topbar` (breadcrumb + ⌘K) +
+`CommandPalette` (⌘K, digit-key view jumps). API routes mirror these under
+`app/api/*` — note `GET /api/brain?q=` runs a hybrid search; bare `GET` returns
+provider status.
+
+## Cohort invite (demo growth surface)
+
+Copy + URL live once in `lib/cohort.ts` (`COHORT_URL`, `COHORT_CTA`,
+`COHORT_STORAGE_KEY`) so the two placements can't drift:
+
+- `CohortBanner` — static footer CTA, rendered in `app/layout.tsx` right after
+  `{children}`, so it is the last thing on **every** view. No client JS.
+- `CohortModal` — first-run welcome pop-up, home screen only, once per browser
+  (`shouldShowCohortModal`; dismissal persists to localStorage). Mounted beside
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Bennettxai/FounderOS-DEMO](https://github.com/Bennettxai/FounderOS-DEMO) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
