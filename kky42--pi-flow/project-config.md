@@ -19,27 +19,29 @@ description: - Code must explain its own behavior through clear names, types, st
 - When changing nearby code, update or remove its comments in the same change. A misleading comment is worse than no comment.
 - These rules apply to source, tests, scripts, and examples. Do not edit generated output, vendored dependencies, or `refs/` solely to enforce them.
 
-## pi-flow Agent contract (v1)
+## pi-flow run_agent contract
 
 - This repo implements a lightweight pi extension named `pi-flow`, not a fork of `refs/pi-subagents`.
-- The registered tool is `Agent`. v2 adds an opt-in `workflow` tool (see "pi-flow workflows (v2)" below); the v1 contract here still governs the `Agent` tool.
-- Tool parameters follow the Claude Code-style shape: `description`, `prompt`, optional `subagent_type`, and optional `session_key` for an explicitly resumable child conversation.
-- `description` is UI/routing metadata. `prompt` is the full subagent task.
+- The registered tool is `run_agent`. v2 adds an opt-in `run_workflow` tool (see "pi-flow workflows (v2)" below); the v1 contract here still governs the `run_agent` tool.
+- Tool parameters use `label`, `prompt`, optional `profile`, and optional `session_key` for a resumable child conversation.
+- `label` is UI/routing metadata. `prompt` is the full subagent task.
 - The only V1 built-in profile is `general-purpose`. There are no built-in aliases.
-- `subagent_type` defaults to `general-purpose`.
+- `profile` defaults to `general-purpose`.
 - `general-purpose` adds no role prompt.
 - Do not replace pi's base system prompt in v1.
-- V1 is foreground-only. Do not add background execution, result polling, steering, scheduling, per-call model override, or per-call thinking override. Session continuation is explicit and foreground-only via caller-chosen `session_key`.
-- Tool calls still only accept `description`, `prompt`, optional `subagent_type`, and optional `session_key`; backend/model/thinking selection is profile-based.
-- Subagent timeout is a global operator-facing guardrail (`subagentTimeoutMs` / `--subagent-timeout-ms`), not a per-call Agent or workflow `agent()` parameter. The runtime timeout is owned by `spawnSubagent` after callers acquire a concurrency slot, so queue time does not count against it.
-- Subagents start with a fresh one-shot conversation and the same working directory when `session_key` is omitted. Parent conversation messages and tool results are not inherited. Passing the same caller-chosen `session_key` creates/continues that child backend conversation instead. The extension maps `session_key` to the backend-native session/thread id internally and persists the direct-Agent mapping as parent-session custom state.
+- Every top-level `run_agent` call follows Pi's normal Tool lifecycle: `execute()` remains pending until the child completes, fails, or is aborted, and then returns one terminal envelope containing `task_type`, `status`, `label`, and plain-text `content`, plus `session_key` only when a resumable child session actually started. There is no accepted Tool result, custom completion notification, polling, steering, scheduling, per-call model override, or per-call thinking override.
+- Top-level calls use the Tool abort signal. Before session-tree navigation or shutdown, abort and drain active PiFlow calls, then reset task and session-key state without creating a model turn.
+- Tool calls accept only `label`, `prompt`, optional `profile`, and optional `session_key`; backend/model/thinking selection is profile-based.
+- Subagent timeout is a global operator-facing guardrail (`subagentTimeoutMs` / `--subagent-timeout-ms`), not a per-call parameter on `run_agent` or workflow `run_agent()`. The runtime timeout is owned by `spawnSubagent` after callers acquire a concurrency slot, so queue time does not count against it.
+- Direct subagents start with a fresh persisted conversation and the same working directory when `session_key` is omitted. PiFlow generates and returns the effective key once the child starts, so a later call can resume it; failed calls that never started a child carry no key. A supplied unbound key names a new child; a bound key continues that child. Parent messages and tool results are not inherited. The extension maps the key to the backend-native session/thread id and persists the direct-subagent binding as parent-session custom state.
 - Pi-backed subagents inherit the caller's current model and thinking level unless a custom profile pins `model` or `thinking`.
-- Custom profiles may set `backend: pi` (default), `backend: codex`, or `backend: claude`. Codex-backed profiles run external `codex exec --json --dangerously-bypass-approvals-and-sandbox --ephemeral -- -` for one-shot calls, omit `--ephemeral` for keyed first calls, and use `codex exec resume --json ... <session_id> -` for keyed continuation; they send the task prompt on stdin, pass the profile body as `developer_instructions`, pass profile `model`/`thinking` through Codex CLI, parse `thread.started.thread_id`, token usage from Codex JSONL events, and estimate cost for listed models. Claude-backed profiles run external `claude -p --output-format stream-json --verbose --dangerously-skip-permissions --no-session-persistence` for one-shot calls, omit `--no-session-persistence` for keyed first calls, add `--resume <session_id>` for keyed continuation, send the task prompt on stdin, pass the profile body as `--append-system-prompt`, pass profile `model`/`thinking` through Claude Code, parse `system/init.session_id`, parse token usage from stream JSON, and use Claude Code's reported `total_cost_usd` when available. External CLI backends intentionally run in yolo/no-approval mode; only use them in trusted repositories.
+- Custom profiles may set `backend: pi` (default), `backend: codex`, or `backend: claude`. Every direct run_agent call is persistent from its first turn. Unkeyed Workflow-internal calls may remain one-shot. Codex uses `codex exec resume --json ... <session_id> -` for continuation; Claude uses `--resume <session_id>`. Both receive the task on stdin, profile prompt/model/thinking settings, bounded output handling, usage parsing, and the existing external CLI permission bypasses. Only use external backends in trusted repositories.
 - `tools` frontmatter is a pi-backend child-session allowlist only. External CLI profiles use their CLI's own tool and permission surface.
 - There is no pi-flow permissions system in v1. Profiles are ordinary agents with optional prompts and tool allow-lists; external backends are explicit user dependencies.
+- Subagents cannot invoke PiFlow delegation tools. Pi-backed children receive neither `run_agent` nor `run_workflow` nor the flow prompt (`buildFlowPrompt`); external CLI children do not load the PiFlow extension.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kky42/pi-flow](https://github.com/kky42/pi-flow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
