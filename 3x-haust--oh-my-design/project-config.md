@@ -8,87 +8,70 @@ description: This file governs how the Codex / GPT-5.6 path contributes to this 
 This file governs how the Codex / GPT-5.6 path contributes to this repository. `CLAUDE.md`
 covers the Claude Code path; both share the repository conventions at the bottom.
 
-## Division of labour: a strong model plans, the session model executes
+## Model ownership: the user chooses the model and any invocation override
 
-The principle is the same across both paths — planning quality dominates the outcome, so a
-capable model owns the plan and review while the session model handles mechanical
-implementation. On the GPT-5.6 generation (Sol / Terra / Luna), the role mapping below comes
-from a role-by-role Codex benchmark.
+The concrete model selected for the host session is user-owned configuration. OMD never replaces
+it for a child agent unless the user supplies an explicit role override on that Codex host
+invocation. This applies equally to Codex and Claude Code, to every pipeline role, and to ad-hoc
+workers spawned during the run.
 
-### Role → model
+- **Codex:** omit `model` from every `spawn_agent` call. Official brokered roles also omit a model
+  unless the user supplied that role's host-only `--omd-role-model` option on this invocation.
+- **Claude Code:** agent metadata declares `model: inherit`; never request Opus, Sonnet, Haiku, or
+  any concrete model in a spawn.
+- **Both hosts:** source-owned defaults set only the role's reasoning/effort tier. Judgment-heavy
+  roles use `high`; the production hand uses `medium`. A user may override a Codex role's effort
+  for one host invocation with `--omd-role-effort`.
+- A recommendation, benchmark, role name, or belief that another model would perform better is
+  never authority to override the user's selection. Without an explicit host override, a Luna
+  session keeps Luna for every OMD child and a Sol session keeps Sol.
 
-| Role | Model | Why |
-|---|---|---|
-| **Orchestration · architecture · high-risk review (critic/planner)** | **Sol (recommended)** | Holds whole-repo context, decides what changes and why, reviews the diff it did not write. |
-| **Precise code-edit executor** | **Terra xhigh (recommended)** | The efficient default for exact-edit implementation work. |
-| **Low-cost executor** | **Luna high (recommended)** | Cheaper lane for lower-risk mechanical work. |
+The pipeline's agent source files carry only the effort tier. The Codex adapter normally emits
+`model_reasoning_effort` and no `model`; the Claude adapter emits `model: inherit` plus `effort`.
+Codex role overrides are valid only when the user places `--omd-role-model role=model` or
+`--omd-role-effort role=low|medium|high` on the outer `omd-codex exec` command. The host strips
+those options before coordinator launch, binds them to that invocation, and applies them inside
+the broker. A coordinator, role task, or installed agent profile must not invent an override.
 
-### Benchmark basis (limited scope — read the caveat)
+## Adaptive design and evidence ownership
 
-Measured on a **restricted exact-edit task set** only:
+- Host wrappers preserve each role's declared publication method. Direct writes apply only to
+  explicitly owned, directly editable paths and never replace a required CLI publisher. Complete
+  current evaluator lineage belongs in the public input skeleton and the source-free judgment
+  packet; transport repairs do not authorize reconstructed judgments or weaker evidence checks.
+- Acquisition `requiredState` describes an inspectable reference component state, not the
+  destination's promised behavior. Keep destination outcomes in requirements and falsifiers.
+  Framer repairs a misframed plan; Scout never relabels an observation to pass exact state binding.
+- Sparse reference pages are not automatically blocked pages. A successful HTTP response with a
+  measured, visible, nonempty scoped component may resolve the short-body heuristic; document-root
+  selectors, empty/hidden content, HTTP 403/server errors, and challenge titles do not gain an exemption.
+- Reference viewport families and state-preserving capture follow `core/protocol/reference-assembly.md`.
+  Retain complementary observations without inflating independent evidence; a probe metric never
+  substitutes for the state visible in the saved capture.
+- The outcome, risk, uncertainty, and available evidence select the route. Optional stages and
+  methods require either selection or a written skip; the full capability catalog is not a
+  universal sequence.
+- Concept exploration records its candidate count and evidence-based reason before generation.
+  Distinct concepts need different content-to-form relationships and macro composition, not different
+  brand colours. Anchor and background counts follow content. An unshipped image draft can still be
+  useful decision material; asset shipping restrictions do not by themselves justify skipping it.
+  Select feasible concepts for rendered task fit and craft; use cost only for an explicit budget
+  constraint or a tie between equivalent candidates. `core/theory/imagegen.md` owns the procedure.
+- Native Codex provisional HTML studies use the optional `omd-study` helper, not a replacement
+  production owner or approval stage. `core/theory/imagegen.md#provisional-source-studies` owns
+  its input, directory grant, pre-generation decision, render, and downstream-use contract.
+- `new-product` and `new-marketing` are distinct reference-discovery needs. Greenfield product work
+  can require a task-flow benchmark; a marketing launch does not impersonate a product workflow.
+- A prompt-only greenfield marketing brief that demands a product difference but supplies no
+  verified capability or mechanism stops before art direction and production. Category references
+  identify missing facts; they do not become destination capabilities.
+- Benchmark product evaluation begins from the current task outcome, evidence claims, frame-owned
+  selector-free entry contract, and sanitized task-flow projection. `omd lifecycle plan` derives
+  fixed evaluator selectors and exact assertions; callers cannot substitute a different manifest.
+- Entry contracts support both prerequisite → gated-action flows and prerequisite → observable-
 
-- 8 TypeScript edits: **Terra xhigh 8/8**.
-- Repeated test runs: Terra xhigh and Luna xhigh both **9/12**, but at equal accuracy Terra
-  vs Luna spent **~72% fewer input tokens, ~43% fewer output tokens, ~28% lower estimated
-  cost, ~29% less wall-clock time**.
-
-So for exact-edit executor work, **Terra xhigh matched Luna xhigh's accuracy far more
-efficiently** — hence Terra xhigh as the precise-edit default and Luna high as the low-cost
-lane.
-
-**Caveat, load-bearing:** this benchmark measures exact-edit tasks only. It does **not**
-demonstrate planning, architecture, or orchestration ability. Those stay with **Sol** on
-judgment, not on this benchmark — the exact-edit numbers say nothing about the work Sol is
-assigned.
-
-### How it runs
-
-Sol interrogates the request, writes a self-contained spec (files, rules, definition of
-done), dispatches implementation to Terra xhigh (or Luna high for cheap/low-risk work), then
-verifies the result against the spec — Sol does not hand-write the implementation, and it
-reviews precisely because it did not write the code.
-
-A spec handed to an executor carries: source-of-truth vs generated files, the narrowness
-discipline for any new linter rule (positive AND negative tests), the baseline test count,
-and the definition of done (`npm test` clean, `tsc` clean, `npm run build` succeeds).
-
-### The pipeline's own agents
-
-**`omd-framer`, `omd-scout`, `omd-writer`, `omd-eye`, and `omd-hand` do not pin a model** — they inherit
-whatever model you selected for the session. The pipeline does not force a specific model on
-any agent. The role split above (Sol for orchestration/review, Terra xhigh for precise edits,
-Luna high for the cheap lane) is a recommendation for how to assign work within a session;
-the choice is yours. Planning-heavy sessions benefit most from a capable model like Sol;
-`omd-hand` (the mechanical build executor) is where a cheaper model is a reasonable
-trade-off. Both the `@high` (framer/scout/writer/eye) and `@medium` (hand) tiers that appear in
-the agent source files now serve only to communicate *intent* — no concrete model name is
-emitted by the adapters.
-
-## Repository conventions
-
-- **Source of truth is `src/`.** `src/agents/*.agent.yaml` and `src/skills/omd-*/SKILL.md`
-  are the prompt originals. Root `agents/`, `skills/`, and `dist/` are generated by
-  `npm run build` — never edit them directly.
-- **Edited directly:** `core/`, `bin/`, `adapters/`, `test/`, `evals/`, `scripts/`,
-  `README.md`, `README.ko.md`, `.github/`, and the theory/recipe packs under `core/`.
-- **`.omd/` is the design record**, committed with the repo. `.omc/` is local session state
-  and is gitignored.
-- **New linter rules stay narrow.** Every pattern gets a positive AND a negative test; a
-  tell that cannot be made safe goes to the prompt layer with the reason recorded in-file.
-  Rules warn, never error — a deliberate choice can overrule one with a written reason.
-- **Commits use conventional prefixes** (`feat:`, `fix:`, `docs:`, `chore:`). Do not add
-  AI attribution footers to commit messages.
-- **Branch → PR → squash-merge.** Every change lands on a feature branch and merges through
-  a PR; `main` is protected (one approval; the admin, 3x-haust, may bypass).
-- **Merge continuously, release on request only.** Feature branches merge to `main` as
-  they finish — do not cut a version for every feature. A release happens **only when the
-  user explicitly asks** for one. Work accumulates on `main` between releases.
-- **Releasing (when asked):** bump all three manifests with `scripts/bump.ts`, merge the
-  bump to `main`, and the release workflow tags and publishes structured notes
-  automatically.
-- **Definition of done for any change:** `npm test` 0 fail, `npx tsc --noEmit` clean,
-  `npm run build` succeeds.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [3x-haust/oh-my-design](https://github.com/3x-haust/oh-my-design) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
