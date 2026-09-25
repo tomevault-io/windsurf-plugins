@@ -1,0 +1,64 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+This file is adapted from the hand-crafted [.github/copilot-instructions.md](.github/copilot-instructions.md), which has proven to work well for coding agents on this repo. Keep the two in sync when changing project-wide guidance.
+
+## 1. Architecture & "Big Picture"
+OpenSfM is a Structure-from-Motion library with a hybrid architecture:
+- **Core Logic (C++)**: Heavy computational tasks (geometry, bundle adjustment, features, dense, map) live in C++ under `opensfm/src/lib/`. Each library (e.g., `geometry`, `bundle`, `sfm`, `map`) is laid out as `src/` (implementation), `test/` (gtest `*_test.cc`), and `python/` (PyBind11 bindings). They are exposed to Python as compiled modules (e.g., `pygeometry`, `pybundle`, `pymap`) and imported from the root package (e.g., `from opensfm import pygeometry`).
+- **Pipeline Layout (Python)**: Application logic, pipeline orchestration, and the CLI are in the Python `opensfm/` package.
+- **Two-layer commands**: `opensfm/commands/<name>.py` are thin CLI wrappers (subclass `CommandBase`, define `name`/`help`, parse args) that delegate to `opensfm/actions/<name>.py`, where the real `run_dataset(data, ...)` logic lives. Add new pipeline steps in both places.
+- **Data Abstraction**: The `DataSet` class (`opensfm/dataset.py`) is the central definition for filesystem interactions. All pipeline stages read/write to a hardcoded directory structure (`images/`, `config.yaml`, `reconstruction.json`) managed by this class.
+- **State Management**: The `Reconstruction` class (`opensfm/types.py`) wraps the C++ `pymap.Map` object. This pattern (Python class holding a C++ handle) is pervasive.
+
+## 2. Key Developer Workflows
+
+> Always activate the conda environment at least once before building, running, or testing: `conda activate opensfm`.
+
+### Building
+The project uses `scikit-build-core` to compile C++ extensions (config in `pyproject.toml`).
+- **Full Build**: `pip install -e .[test]` — builds C++ extensions plus tests and installs the package in editable mode. The build directory is `build/` (compiled `.so` files live there via editable redirect mode).
+- **Rebuild C++**: Re-run `pip install -e .` after changing `.cc` files.
+- **Dependencies**: Python deps are in `pyproject.toml`. The outer environment (C++ toolchain, libraries) is set up through `conda` and `conda.yml`. Any change to `conda.yml` requires recreating the env: `conda env create --file conda.yml --yes` then `conda activate opensfm`.
+
+### Testing
+- **Frameworks**:
+    - Python: `pytest`, tests in `opensfm/test/test_*.py`.
+    - C++: `gtest`, tests in `opensfm/src/lib/<XXX>/test/*_test.cc`.
+- **Run Python tests**: `pytest opensfm/test/`. First run `export LD_PRELOAD=$CONDA_PREFIX/lib/libtcmalloc.so` (tcmalloc is mandatory). Run a single test with `pytest opensfm/test/test_foo.py::test_bar`. `not slow` excludes long integration tests.
+- **Run C++ tests**: built with `OPENSFM_BUILD_TESTS=ON`; run via `ctest --output-on-failure` from the CMake build directory.
+- **Coverage**: `./run_coverage.bash` (handles conda activation; defaults to `not slow`).
+- **Style**: favor many small tests with few asserts, ideally one function per test; only 1-2 larger integration tests per file. Prefer toy/synthetic examples that verify correctness, not just return semantics.
+- **Synthetic Data**: Python tests rely heavily on synthetic scenes generated in `opensfm/test/conftest.py` (e.g., fixtures `scene_synthetic`, `scene_synthetic_cube`).
+
+### Running the Pipeline
+- **Entry Point**: `bin/opensfm` (bash, sets `LD_PRELOAD` for tcmalloc) → `bin/opensfm_main.py` → `commands.command_runner`.
+- **Example**: `bin/opensfm reconstruct path/to/dataset` invokes `Command.run_impl` in `opensfm/commands/reconstruct.py`, which calls `actions/reconstruct.py::run_dataset`.
+
+## 3. Coding Conventions & Patterns
+
+### Python/C++ Interop
+- **Wrappers**: Prefer Python wrappers over raw C++ objects (e.g., use `opensfm.types.Reconstruction` instead of `opensfm.pymap.Map` where possible).
+
+### Code Philosophy
+- **Readability**: Prioritize clear, simple, maintainable code. You're a seasoned engineer who knows real-world trade-offs — apply frameworks/design patterns only when strictly justified now, not for hypothetical futures. Use descriptive names; break complex functions into smaller, focused ones.
+- **Documentation**: Docstrings for all public functions/classes. For complex algorithms, comment the rationale and key steps.
+- **C++ Style**: Follow existing style; format with `clang-format` (`.clang-format` at repo root). Key points:
+    * Stick to STL and Eigen for data structures. Avoid OpenCV datastructures in C++, except for image resizing.
+    * Use SoA (Structure of Arrays) for performance-critical data like point clouds.
+    * Minimize heap allocation/fragmentation: prefer stack-allocated buffers; reuse heap buffers; avoid tiny allocations inside long loops.
+- **Design**: Reuse the core lib's data structures. Manipulating large reconstructions efficiently is paramount — minimize copies, apply Data-Oriented Design, and leverage GPU acceleration where possible.
+
+### Type Hinting
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [OpenSfM/OpenSfM](https://github.com/OpenSfM/OpenSfM) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
