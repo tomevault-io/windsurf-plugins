@@ -1,119 +1,81 @@
 ---
 trigger: always_on
-description: This is a **production-ready AI coding plugin** providing 38 specialized agents, 156 skills, 72 commands, and automated hook workflows for software development.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Everything Claude Code (ECC) — Agent Instructions
+# CLAUDE.md
 
-This is a **production-ready AI coding plugin** providing 38 specialized agents, 156 skills, 72 commands, and automated hook workflows for software development.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Version:** 1.9.0
+## Project Overview
 
-## Core Principles
+This is a **Claude Code plugin** - a collection of production-ready agents, skills, hooks, commands, rules, and MCP configurations. The project provides battle-tested workflows for software development using Claude Code.
 
-1. **Agent-First** — Delegate to specialized agents for domain tasks
-2. **Test-Driven** — Write tests before implementation, 80%+ coverage required
-3. **Security-First** — Never compromise on security; validate all inputs
-4. **Immutability** — Always create new objects, never mutate existing ones
-5. **Plan Before Execute** — Plan complex features before writing code
+## Running Tests
 
-## Available Agents
+```bash
+# Run all tests
+node tests/run-all.js
 
-| Agent | Purpose | When to Use |
-|-------|---------|-------------|
-| planner | Implementation planning | Complex features, refactoring |
-| architect | System design and scalability | Architectural decisions |
-| tdd-guide | Test-driven development | New features, bug fixes |
-| code-reviewer | Code quality and maintainability | After writing/modifying code |
-| security-reviewer | Vulnerability detection | Before commits, sensitive code |
-| build-error-resolver | Fix build/type errors | When build fails |
-| e2e-runner | End-to-end Playwright testing | Critical user flows |
-| refactor-cleaner | Dead code cleanup | Code maintenance |
-| doc-updater | Documentation and codemaps | Updating docs |
-| cpp-reviewer | C++ code review | C++ projects |
-| cpp-build-resolver | C++ build errors | C++ build failures |
-| docs-lookup | Documentation lookup via Context7 | API/docs questions |
-| go-reviewer | Go code review | Go projects |
-| go-build-resolver | Go build errors | Go build failures |
-| kotlin-reviewer | Kotlin code review | Kotlin/Android/KMP projects |
-| kotlin-build-resolver | Kotlin/Gradle build errors | Kotlin build failures |
-| database-reviewer | PostgreSQL/Supabase specialist | Schema design, query optimization |
-| python-reviewer | Python code review | Python projects |
-| java-reviewer | Java and Spring Boot code review | Java/Spring Boot projects |
-| java-build-resolver | Java/Maven/Gradle build errors | Java build failures |
-| loop-operator | Autonomous loop execution | Run loops safely, monitor stalls, intervene |
-| harness-optimizer | Harness config tuning | Reliability, cost, throughput |
-| rust-reviewer | Rust code review | Rust projects |
-| rust-build-resolver | Rust build errors | Rust build failures |
-| pytorch-build-resolver | PyTorch runtime/CUDA/training errors | PyTorch build/training failures |
-| typescript-reviewer | TypeScript/JavaScript code review | TypeScript/JavaScript projects |
+# Run individual test files
+node tests/lib/utils.test.js
+node tests/lib/package-manager.test.js
+node tests/hooks/hooks.test.js
+```
 
-## Agent Orchestration
+## Architecture
 
-Use agents proactively without user prompt:
-- Complex feature requests → **planner**
-- Code just written/modified → **code-reviewer**
-- Bug fix or new feature → **tdd-guide**
-- Architectural decision → **architect**
-- Security-sensitive code → **security-reviewer**
-- Autonomous loops / loop monitoring → **loop-operator**
-- Harness config reliability and cost → **harness-optimizer**
+The project is organized into several core components:
 
-Use parallel execution for independent operations — launch multiple agents simultaneously.
+- **agents/** - Specialized subagents for delegation (planner, code-reviewer, tdd-guide, etc.)
+- **skills/** - Workflow definitions and domain knowledge (coding standards, patterns, testing)
+- **commands/** - Slash commands invoked by users (/tdd, /plan, /e2e, etc.)
+- **hooks/** - Trigger-based automations (session persistence, pre/post-tool hooks)
+- **rules/** - Always-follow guidelines (security, coding style, testing requirements)
+- **mcp-configs/** - MCP server configurations for external integrations
+- **scripts/** - Cross-platform Node.js utilities for hooks and setup
+- **tests/** - Test suite for scripts and utilities
 
-## Security Guidelines
+## Key Commands
 
-**Before ANY commit:**
-- No hardcoded secrets (API keys, passwords, tokens)
-- All user inputs validated
-- SQL injection prevention (parameterized queries)
-- XSS prevention (sanitized HTML)
-- CSRF protection enabled
-- Authentication/authorization verified
-- Rate limiting on all endpoints
-- Error messages don't leak sensitive data
+- `/tdd` - Test-driven development workflow
+- `/plan` - Implementation planning
+- `/e2e` - Generate and run E2E tests
+- `/code-review` - Quality review
+- `/build-fix` - Fix build errors
+- `/learn` - Extract patterns from sessions
+- `/skill-create` - Generate skills from git history
 
-**Secret management:** NEVER hardcode secrets. Use environment variables or a secret manager. Validate required secrets at startup. Rotate any exposed secrets immediately.
+## Development Notes
 
-**If security issue found:** STOP → use security-reviewer agent → fix CRITICAL issues → rotate exposed secrets → review codebase for similar issues.
+- Package manager detection: npm, pnpm, yarn, bun (configurable via `CLAUDE_PACKAGE_MANAGER` env var or project config)
+- Cross-platform: Windows, macOS, Linux support via Node.js scripts
+- Agent format: Markdown with YAML frontmatter (name, description, tools, model)
+- Skill format: Markdown with clear sections for when to use, how it works, examples
+- Skill placement: Curated in skills/; generated/imported under ~/.claude/skills/. See docs/SKILL-PLACEMENT-POLICY.md
+- Hook format: JSON with matcher conditions and command/notification hooks
 
-## Coding Style
+## Contributing
 
-**Immutability (CRITICAL):** Always create new objects, never mutate. Return new copies with changes applied.
+Follow the formats in CONTRIBUTING.md:
+- Agents: Markdown with frontmatter (name, description, tools, model)
+- Skills: Clear sections (When to Use, How It Works, Examples)
+- Commands: Markdown with description frontmatter
+- Hooks: JSON with matcher and hooks array
 
-**File organization:** Many small files over few large ones. 200-400 lines typical, 800 max. Organize by feature/domain, not by type. High cohesion, low coupling.
+File naming: lowercase with hyphens (e.g., `python-reviewer.md`, `tdd-workflow.md`)
 
-**Error handling:** Handle errors at every level. Provide user-friendly messages in UI code. Log detailed context server-side. Never silently swallow errors.
+## Skills
 
-**Input validation:** Validate all user input at system boundaries. Use schema-based validation. Fail fast with clear messages. Never trust external data.
+Use the following skills when working on related files:
 
-**Code quality checklist:**
-- Functions small (<50 lines), files focused (<800 lines)
-- No deep nesting (>4 levels)
-- Proper error handling, no hardcoded values
-- Readable, well-named identifiers
+| File(s) | Skill |
+|---------|-------|
+| `README.md` | `/readme` |
+| `.github/workflows/*.yml` | `/ci-workflow` |
 
-## Testing Requirements
-
-**Minimum coverage: 80%**
-
-Test types (all required):
-1. **Unit tests** — Individual functions, utilities, components
-2. **Integration tests** — API endpoints, database operations
-3. **E2E tests** — Critical user flows
-
-**TDD workflow (mandatory):**
-1. Write test first (RED) — test should FAIL
-2. Write minimal implementation (GREEN) — test should PASS
-3. Refactor (IMPROVE) — verify coverage 80%+
-
-Troubleshoot failures: check test isolation → verify mocks → fix implementation (not tests, unless tests are wrong).
-
-## Development Workflow
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+When spawning subagents, always pass conventions from the respective skill into the agent's prompt.
 
 ---
 > Source: [mit-network/everything-claude-code](https://github.com/mit-network/everything-claude-code) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
