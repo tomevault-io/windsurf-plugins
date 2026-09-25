@@ -50,4 +50,4 @@ Every Cut change has to hold on every surface, and the plan for it says how:
 
 ---
 > Source: [DonkeyCut/Donkey](https://github.com/DonkeyCut/Donkey) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
