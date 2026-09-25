@@ -1,77 +1,156 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) and other coding agents when working
+description: An agent is a markdown file that supplies the prompt for a run. It turns a
 ---
 
-# AGENTS.md
+# Agents
 
-This file provides guidance to Claude Code (claude.ai/code) and other coding agents when working
-with code in this repository. `CLAUDE.md` is a symlink to this file.
+An agent is a markdown file that supplies the prompt for a run. It turns a
+recurring research task into an artifact you can version and review, instead of
+a block of text pasted at the call site.
 
-## Commands
+```bash
+cynative -p --agent aws-public-datastores "AWS account ID 128149835728 only"   # with a task
+cynative -p --agent aws-public-datastores                    # without
+cynative --agent aws-public-datastores                       # seeds an interactive session
+```
 
-All targets are wired through `make`. Lint and test rely on `go tool golangci-lint` (pinned via
-`go.mod`), so no separate install is needed. `moq` is pinned the same way and `make generate`
-writes the gitignored `*_mock_test.go` mocks. **Run `make generate` before
-`go test ./internal/<pkg>` on a fresh checkout**, or the tests won't compile.
+`--agent` composes with `-p`, `--auto-approve`, `--verbose`, `--config` and
+piped stdin.
 
-- `make check`: the full gate CI runs, `check-go` + `check-scripts`.
-- `make check-go`: `mod-tidy-check` (a non-mutating `go mod tidy -diff`, so the gate fails on an
-  untidy `go.mod`/`go.sum` instead of rewriting them) + generate + lint + shell-complexity +
-  format-diff + test + `windows-build` (GOOS=windows amd64/arm64 cross-compile). 100%
-  `go.mod`-pinned; the `mod-tidy-check` step is non-mutating but may consult the module cache,
-  so the gate is not fully network-free; **the pre-commit hook runs this**.
-- `make check-scripts`: `shellcheck` (all tracked `*.sh`) + PSScriptAnalyzer (every tracked
-  `*.ps1`) + Pester unit tests (every tracked `test/*.Tests.ps1`) +
-  `sh-test` (the POSIX `install.sh` unit tests, a `python3`-backed loopback smoke
-  test of the `CYNATIVE_BASE_URL` download-base seam, its non-loopback-HTTP reject, and the
-  fail-closed checksum-mismatch abort, the
-  live-e2e guardrails unit tests, the connector-e2e orchestration unit tests, the shared
-  release-gate invocation-contract and gate-assert unit tests, the llm-smoke workflow golden,
-  the gate trusted-caller pin check, the release publish-gate pin check, the llm-smoke
-  secret-reference pin (the sorted-unique `secrets.<NAME>` set in `llm-smoke.yaml` must be
-  exactly the two api keys; the `release.yaml` job that calls the gate must forward exactly
-  those two names and each as an **identity forward**, `NAME: ${{ secrets.NAME }}`; in
-  **both** workflows, bracket-form `secrets[...]` and
-  whole-object uses like `toJSON(secrets)` are rejected, as is any `secrets:` key whose
-  value is the scalar `inherit`). The forwarding arm is the load-bearing one and the one no
-  earlier version had: the exact-set arm counts references *inside* `llm-smoke.yaml`, so by
-  itself it is satisfied by a caller that forwards `OPENAI_API_KEY: ${{ secrets.APP_PRIVATE_KEY }}`
-  - the name the gate sees never changes, only the value does. It is scoped to the job whose
-  `uses:` names the gate (matched on basename, `@ref` tolerated), so the other reusable calls
-  in `release.yaml` keep their own grants; a `release.yaml` with no such job fails closed
-  rather than passing vacuously. The matched target must also be **this repo's own** workflow
-  (`./` or `cynative/cynative/`), since a basename says nothing about the owner: a call
-  retargeted at `attacker/collector/.github/workflows/llm-smoke.yaml@main` would otherwise
-  satisfy every arm while forwarding both api keys out of the repository. The checker (`scripts/ci/check-llm-smoke-secrets.py`,
-  unit-tested by `test/llm-smoke-secrets.unit.test.sh`) **parses both workflows with
-  PyYAML** (a `SafeLoader` subclass with the YAML 1.1 implicit scalar resolvers cleared, so
-  `on:` and `yes:` stay distinct string keys instead of colliding on `True` and dropping
-  whichever expression the first one held; `!!python/*` tags are still refused)
-  rather than grepping the text, which is what makes the pin hold: comments carry
-  no meaning, so prose can neither hide a reference nor invent one; `secrets: inherit` is
-  matched structurally, so the next-line, folded, quoted, `!!str` and anchor/alias
-  spellings all fail alike; and expression scanning is confined to `${{ }}` spans with
-  Actions string literals blanked, so a `}` inside `format('{0}', ...)` cannot end a span
-  early, `inputs.secrets` is not mistaken for the secrets context, and the word "secrets"
-  in a step name or a shell line is not a match. Anything unresolved fails closed: a missing,
-  unreadable, non-UTF-8 or unparseable file, and an unterminated `${{` span (Actions would
-  reject that workflow, and guessing where it ended used to mint a phantom secret name out of
-  a shell comment). Both tree walks carry a visited set, so a self-referencing anchor cannot
-  recurse forever and an alias-amplification document cannot burn the CI job's timeout.
-  It is still a tripwire, **not** an Actions expression
-  evaluator: it reads the workflow as written, so it cannot follow a secret name assembled
-  at runtime. The suite asserts each fixture is parseable YAML before using it, since the
-  case that motivated this (#216) was a fixture no parser accepts, which pinned nothing.
-  Then the Scoop-manifest and Homebrew-Formula
-  renderers and both strict asset-digest lookups (`sha_for` over the manifest TSV,
-  `sha_for_checksums` over `checksums.txt`; each must fail on a duplicate row rather than return
-  the first match) unit tests, the release asset-set assertion's unit tests (the
-  fail-closed-on-missing-digest branches plus the generate-mode artifact-type allowlist:
-  Archive, Checksum and Signature, never Binary or Certificate), the release signing contract
+## The file format
+
+```markdown
+---
+description: Finds publicly accessible data stores in an AWS account.
+---
+Check S3, RDS snapshots, EBS snapshots and public AMIs for exposure.
+Report each finding with the resource ARN and how it is reachable.
+```
+
+The filename is the agent name, so `public-exposure.md` runs as
+`--agent public-exposure`.
+
+**Names** are lowercase kebab-case: 1 to 64 bytes of `a-z`, `0-9` and `-`, not
+starting or ending with a hyphen. Windows reserved device names (`con`, `nul`,
+`com1`…) are rejected on every platform so behaviour does not differ by OS.
+
+**Frontmatter is required and strict.** It must be exactly one YAML mapping
+whose only key is `description`, a single-line non-empty string of at most 256
+bytes. Single-line is enforced against Unicode line and paragraph separators
+(U+2028, U+2029) as well as ordinary control characters, since a renderer that
+honours them would let a description break out of its `agents list` row. Unknown
+keys, duplicate keys, aliases, merge keys, custom tags and multiple documents
+are all rejected.
+
+That strictness is deliberate. A frontmatter key cynative does not understand,
+such as a `model:` or `tools:` override, fails loudly rather than being silently
+ignored, so a file written against a newer version cannot appear to work while
+doing nothing.
+
+**The body** is everything after the closing `---` line, preserved byte for
+byte. It must not be blank. Whole files are capped at 64 KiB.
+
+A `---` line *after* the closing fence is body content, not a second
+frontmatter block.
+
+## Where agents come from
+
+Agents come from exactly two sources, searched in order, first match wins:
+
+| Precedence | Source | Location |
+| --- | --- | --- |
+| 1 | user | `~/.cynative/agents/` |
+| 2 | built-in | embedded in the binary |
+
+To add your own agents, create the directory and write markdown files in it. Cynative does not create it for you:
+
+```bash
+mkdir -p ~/.cynative/agents
+```
+
+### Shadowing
+
+A user agent takes precedence over a built-in of the same name, and
+`cynative agents list` marks the loser:
+
+```
+NAME    DESCRIPTION                 SOURCE   STATUS
+alpha   Your copy of alpha.         user     active
+alpha   The built-in alpha.         builtin  shadowed by user
+beta    A built-in agent.           builtin  active
+broken                              user     invalid (blocking)
+```
+
+A file that is found but unusable — malformed, unreadable, oversized, a symlink,
+or not a regular file — is `invalid (blocking)`. It still *claims* the name, so
+nothing else answers to it and the run fails with an error naming the file.
+Resolution never falls through to the built-in in that case: a typo in your own
+agent must fail loudly rather than silently run a different one that happens to
+share the name.
+
+There is no way to address a built-in that a user agent shadows. Rename your
+file.
+
+## What the model receives
+
+The prompt is three labelled sections in fixed order:
+
+```
+agent description:
+<the description from the frontmatter>
+
+user instruction:
+<your task, if you passed one>
+
+agent instructions:
+<the body, verbatim>
+```
+
+The `user instruction:` section is omitted entirely when you pass no task. The
+system prompt is unchanged: an agent is a named prompt, not a persona, so
+cynative's scope, halt-and-ask and read-only rules apply exactly as they always
+do.
+
+### Piped input
+
+Piping works as it always has, with one adjustment: when an agent is selected,
+piped stdin is always treated as untrusted data and fenced in
+`<piped_input>` tags, even with no positional task.
+
+```bash
+cat findings.json | cynative -p --agent triage-findings
+```
+
+Without an agent, bare piped stdin is your task. With one, the agent file is
+already supplying the instruction, so the piped bytes are data to analyse rather
+than orders to follow.
+
+### Interactive sessions
+
+`cynative --agent X` runs the agent as the first turn and then opens a normal
+follow-up session. It does not re-apply the agent to every turn; the first turn
+stays in the conversation history, so the model keeps the context.
+
+The greeting shown for a bare interactive session is skipped, because the agent
+is a seed task.
+
+One limitation worth knowing: if the first turn is interrupted, stopped by the
+token budget, or hits the iteration limit, nothing is recorded in history, so a
+follow-up turn has no memory of the agent's instructions. Re-run the agent. This
+is how a typed task behaves too.
+
+Sub-agents spawned by the `task` tool do not inherit the agent body. They start
+with a clean context by design; the supervising model puts what they need into
+the task description.
+
+## Inspecting agents
+
+```bash
+cynative agents list          # every agent, with source and status
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cynative/cynative](https://github.com/cynative/cynative) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
