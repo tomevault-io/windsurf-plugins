@@ -1,90 +1,76 @@
 ---
 trigger: always_on
-description: This repository is a Go project following the **microservice** architecture design. Services including:
+description: > This document is intended for **AI Agents** (and developers) who read or analyze this repository. The goal is to help the reader build a mental model as quickly as possible: what this service does, how the code is layered, where each kind of logic lives, and how a request flows through its lifecycle.
 ---
 
-# AGENTS Guidelines for This Repository
+# AIGateway Service
 
-This repository is a Go project following the **microservice** architecture design. Services including:
+> This document is intended for **AI Agents** (and developers) who read or analyze this repository. The goal is to help the reader build a mental model as quickly as possible: what this service does, how the code is layered, where each kind of logic lives, and how a request flows through its lifecycle.
 
-- **API**: The API service handles HTTP requests and responses. It is the entry point for external clients to interact with the system.
-- **User**: The User service handles user-related operations, such as user registration, login, and profile management. All requests are proxied to this service from the API service.
-- **Accounting**: The Accounting service handles accounting-related operations, such as recording user token or hardware resource usage, or updating user balances. All requests are proxied to this service from the API service.
-- **Moderation**: The Moderation service handles content moderation operations, such as flagging inappropriate text or images. All requests are proxied to this service from the API service.
-- **DataViewer**: The DataViewer service handles dataset preview operations, such as fetching dataset metadata or previewing dataset files. All requests are proxied to this service from the API service.
-- **Notification**: The Notification service handles sending notifications to users, such as email or push notifications. All requests are proxied to this service from the API service.
-- **Payment**: The Payment service handles payment operations, such as processing payments or refunding payments. All requests are proxied to this service from the API service.
-- **AIGateway**: The AIGateway service handles AI model inference operations, such as running AI models or generating AI outputs. It's another entry point for external clients to interact with the AI models. 
-- **Runner**: The Runner service is a bridge between api service and Kubernetes cluster. It handles deployment of models, spaces.
-- **LogCollector**: The LogCollector service handles collecting logs from Kubernetes cluster. All logs are sent to this service from the Runner service and API service.
+## 1. One-Sentence Summary
 
-# Structure
-Every service follows the layered architecture design: handler -> component -> builder (database, rpc, git, etc.).
+**AIGateway is an OpenAI-compatible (and Anthropic Messages) AI inference gateway**: it exposes a unified `/v1/*` API externally and internally handles "model resolution → protocol routing → reverse proxy to upstream inference services → usage/billing/LLM log/trace collection and accounting." It is the entry point for external clients calling AI models on the CSGHub platform.
 
-- The handler layer handles HTTP requests and responses.
-- The component layer handles business logic and coordinates between different layers.
-- The builder layer handles low-level operations, such as database access, RPC calls, or Git operations.
-- Every golang file should have a corresponding `*_test.go` file for unit tests.
+Service directory: `aigateway/`; entry point: `cmd/csghub-server/cmd/aigateway/launch.go` (start with `go run -tags=saas cmd/csghub-server/main.go aigateway launch --config=common/config/local.toml`).
 
-Folders relative to the root of the repository for each service:
+---
 
-| Service | Folder |
-|---------|--------|
-| API     | api    |
-| User    | user   |
-| Accounting | accounting |
-| Moderation | moderation |
-| DataViewer | dataviewer |
-| Notification | notification |
-| Payment | payment |
-| AIGateway | aigateway |
-| Runner | runner |
-| LogCollector | logcollector |
+## 2. Directory Structure & Responsibilities
 
-## Examples
+The layering follows the repository-wide convention (`handler → component → builder`), but AIGateway has its own extensions.
 
-### Router
+| Directory | Responsibility | Key Files / Types |
+|---|---|---|
+| `router/` | HTTP route registration, middleware wiring | `router/aigateway.go` is the **single** `/v1/*` route table (see §5) |
+| `handler/` | HTTP handler layer: request parsing, protocol adaptation, reverse proxy, response transformation, recording | `handler/openai.go` (main handler, 1100+ lines) |
+| `handler/plan/` | **Three-stage pipeline skeleton** (Extract → Plan → Execute), protocol-agnostic | `interfaces.go`, `orchestrator.go`, `planner.go` |
+| `handler/protocol/` | Protocol route resolver (Native / Adapter / Disabled) | `adapt.go`'s `adapterMatrix` |
+| `handler/anthropic/` | Anthropic Messages API (`/v1/messages`) implementation | `handler.go`, `to_chat_adapter.go`, `to_responses_adapter.go`, `native.go` |
+| `handler/responses/` | Responses API helper sub-package (routing, llmlog normalization, ID mapping, sensitivity handling) | `responses_routing.go`, `responses_id_mapper.go` |
+| `handler/streamdecoder/` | SSE stream decoder | `stream_decoder.go` |
+| `component/` | Business logic layer (model management, usage, sensitivity, LLM logging) | `openai.go` (model resolution), `usage_limiter.go`, `safety_policy.go`, `moderation.go`, `llmlog_*.go` |
+| `component/router/` | Upstream session routing, upstream catalog normalization | `session_router.go`, `upstream_catalog.go` |
+| `component/adapter/` | Multimodal provider adapters (text2image / text2video / audio / ocr) | `*_adapter.go` + provider files in each sub-directory |
+| `component/availability/` | Upstream health check, circuit breaking, state caching | `health_checker.go`, `circuit_breaker.go`, `availability_manager.go` |
+| `component/metrics/` | Request metrics collection (Prometheus / DB sink) | `collector_ee.go`, `sink_ee.go` |
+| `component/trace/` | LLM tracing (Sigil tracer) | `llm_tracer.go`, `sigil.go` |
+| `token/` | Token counting (usage/billing) | `token_counter.go`, `*_token_counter.go`, `tokenizer_*.go` |
+| `task/` | Async generation task (video) polling/billing orchestration | `orchestrator.go`, `metering.go`, `service.go` |
+| `task/processor/` | Async task resource processor interface + implementations (video) | `processor.go`, `video/video.go` |
+| `types/` | Service-internal shared data structures (protocol, request/response, model, trace) | see §4 |
+| `middleware/` | Metrics middleware (EE) | `metrics_ee.go` |
+| `http/response/wrapper/` | Response body wrapper/transformer (image, ocr) | `wrapper/image.go`, `wrapper/ocr.go` |
 
-- `api/router/api.go` is an example of a router that registers HTTP routes and their corresponding handlers for common functionality across services.
-- `accounting/router/api.go` is an example of a router that registers HTTP routes and their corresponding handlers for the Accounting service.
-- `runner/router/api.go` is an example of a router that registers HTTP routes and their corresponding handlers for the runner service.
+### Build Tags (CE / EE / SAAS)
 
-### Handler Layer
+The repository has three build variants, distinguished by **Go build tags**. Files typically end with `_ce.go` / `_ee.go` / `_saas.go` or use `//go:build` annotations:
 
-- `api/handler/space.go` is an example of a handler that deals with space-related HTTP requests.
-- `api/handler/evaluation.go` is an example of a handler that deals with evaluation-related HTTP requests.
+- **CE** (Community Edition): `//go:build !ee && !saas`
+- **EE** (Enterprise Edition): `//go:build ee` (or `ee || saas`)
+- **SAAS**: `//go:build saas`
 
-### Component Layer
+Typical examples:
+- `component/llmlog_capture_ce.go` vs `component/llmlog_capture_ee.go` (LLM training logs only enabled in EE)
+- `component/openai_model_filter_{ce,ee,saas}.go` (model filtering logic differs per variant)
+- `handler/metrics_helpers_{ce,ee}.go`, `middleware/metrics_ee.go` (metrics only compiled in EE/SAAS)
+- `router/api_{ce,ee}.go` (`extendRoutes` extends routes per variant)
+- `handler/mcp_*.go`, `handler/agent_ee.go`, `handler/sandbox_ee.go` etc. (MCP / Agent / Sandbox are EE features)
 
-- `component/space.go` is an example of a component that deals with space-related business logic.
-- `component/evaluation.go` is an example of a component that deals with evaluation-related business logic.
+> **Search tip**: When a feature appears to have "per-variant implementations," search for `_ce/_ee/_saas` variants of the same file name first. Interfaces are typically defined in non-suffixed files, with implementations spread across suffixed files.
 
-### Database Builder Layer
+---
 
-- `builder/store/database/space.go` is an example of a builder that deals with space-related database operations.
+## 3. Core Architecture
 
-### Database Migration
+### 3.1 Three-Stage Pipeline (Standard Pattern for New Protocols)
 
-- `builder/store/database/migrations/20240201061926_create_spaces.go` is an example of a database migration script that creates a space table.
-- use `go run cmd/csghub-server/main.go migration create_go` to generate a go database migration script.
-- use `go run cmd/csghub-server/main.go migration create_sql` to generate a sql database migration script. 
-- never manually create migration scripts; always generate them using the migration generator commands above.
+`handler/plan/` defines a unified three-stage flow: **protocol-agnostic Planner + protocol-specific Handler** combination:
 
-### Space Deploy
-
-- `builder/deploy/deployer.go` create build and deploy task in database, then create temporal workflow to run the task.
-- `api/workflow/activity/deploy_activity.go` impletements temporal activities to run the build and deploy task by call runner api.
-- `runner/handler/imagebuilder.go` implements runner api to trigger image builder process by call image builder component.
-- `runner/component/imagebuilder.go` implements runner component to trigger deploy process by call knative api.
-- `runner/handler/service.go` implements runner api to trigger deploy process by call deploy component.
-- `runner/component/service.go` implements runner component to trigger deploy process by call knative api.
-- `docker/spaces/builder/Dockerfile*` are Dockerfile that builds the space image.
-
-## Code Style & Conventions:
-
+```
+Extract (protocol-specific)  →  Plan (protocol-agnostic)  →  Execute (protocol-specific)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [OpenCSGs/csghub-server](https://github.com/OpenCSGs/csghub-server) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
