@@ -39,4 +39,4 @@ this repo, not a reason to stop and ask. Run them, then report what they cost.
 
 ---
 > Source: [vercel/next-evals-oss](https://github.com/vercel/next-evals-oss) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
