@@ -59,4 +59,4 @@ description: 本文件是 vue-upload-component 的统一协作规则。用户当
 
 ---
 > Source: [lian-yue/vue-upload-component](https://github.com/lian-yue/vue-upload-component) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
