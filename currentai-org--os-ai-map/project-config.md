@@ -1,102 +1,51 @@
 ---
 trigger: always_on
-description: This file provides guidance to coding agents and assistants when working in this repository.
+description: Entry point for agent sessions in `os-ai-map`. Four things, then get to work:
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to coding agents and assistants when working in this repository.
+Entry point for agent sessions in `os-ai-map`. Four things, then get to work:
 
-## Project Overview
+1. **`AGENTS.md` is the repo map** — directory layout, the `build/` stages, the data model,
+   how to write to `sources/`, and the traps that have caught people before. Read it.
+2. **`docs/README.md` routes your task to its workflow.** Find yours there and follow the
+   workflow document; do not improvise a procedure one already carries.
+3. **Use the registered skill for that workflow.** They live under `.claude/skills/` (symlinks
+   into `skills/`), so the Skill tool should list them by name; if it does not, read
+   `skills/<name>/SKILL.md` directly. `update-product` is the router if you are unsure which
+   door.
+4. **Warehouse writes are maintainer-only.** UDM revisions, static-model reloads and notebook
+   publishes are steps under `docs/operations/`. An editor session works in `sources/`, `docs/`
+   and `notebooks/`, and opens a PR.
 
-`os-ai-map` is the public data + modeling home behind the AI Stack Map. It holds curated
-YAML (`sources/`), warehouse SQL and fetchers (`warehouse/`), a deterministic build
-pipeline (`build/`), and the published notebook (`notebooks/`).
+## Scope boundary
 
-There is no front-end in this repo. The website lives in the `aipotluck.org` monorepo
-(`currentai-org/aipotluck.org`), which *consumes* this data and does not regenerate it.
-The older `os-ai-visualization` repo is retired; it still receives bot data-sync PRs, so
-activity there is not a signal of real work.
+This repository governs the **Open Source AI Gap Map's data system**, not the OSO organization's
+warehouse. Two files, kept disjoint: a **governed asset** belongs in `warehouse/assets.yaml` only if it
+is a governed output (a published table powering the map), repo-owned computation implementing/auditing
+map semantics, a repo-owned data artifact, or a temporary repo-owned compatibility shim with an exit
+(there are none as of 2026-09-20 — the last two were platform-authored and were retired). A **direct
+OSO input** those depend on belongs in `warehouse/dependencies.yaml` as a contract (not owned) —
+**never in `assets.yaml`**, and the `PLATFORM MIRROR (read-only)` banner on a `warehouse/models/` file
+is how that file says so, with no exception (gated by `mirror_ownership_violations`). A table
+that merely exists on OSO, or is read only by a standalone notebook or another platform product, is
+**out of scope** entirely — it lives on OSO. See `docs/architecture/adr-003-repository-scope-boundary.md`
+(Accepted; fully implemented). ADR-003 is **done**: the mechanism (the `role` field,
+`warehouse/dependencies.yaml` contracts, the root-scoped DAG, the anti-reintroduction gates) and the
+externalization (the 28 backlog assets removed from this repo's inventory + publisher and frozen under
+platform ownership — disposition `frozen-without-producer`, no OSO deletion; see
+`warehouse/audits/externalization.json`) have both landed. The governed inventory is the Gap Map's own
+data system — 36 governed assets + 19 dependency contracts; `population: long_tail` is retired and the
+gates keep peripheral OSO tables out. The old Phase-5 namespace-move runbooks stay **superseded**.
 
-## Directory map
+## Conventions
 
-```
-sources/               Curated YAML: organizations, categories, products, scores
-sources/taxonomy.yaml  Arc grouping + cross-category display order
-sources/signal_routing.yaml  Which machine signal is authoritative per dimension, and
-                       which values mean "this source has no answer" (abstain_values)
-sources/evidence_policy.yaml  When an observation is admissible as evidence
-sources/rubrics/       Shared scoring ladders. A category inherits one with
-                       `scoring_recipe: {extends: <name>}` rather than copying it;
-                       or, for a category whose products don't all climb the same
-                       ladder, `{extends: {<product type>: <name>, ...}}` (safeguards
-                       is the example). build/rubrics.py resolves either form.
-                       license-to-tier lives here, because whether AGPL is `osi` is
-                       a fact about AGPL, not about one category.
-warehouse/models/      UDM SQL (entities, events, metrics, scores)
-warehouse/ingest/      Python fetchers that write CSVs to warehouse/catalog/
-warehouse/catalog/     Raw external CSVs (HF benchmarks, incidents, GitHub orgs)
-warehouse/sources.yaml Manifest: each external source declares EITHER a fetcher
-                       (writes a CSV) or an ingested_by (a UDM reads it directly)
-build/                 Python pipeline, see below
-notebooks/             Generated ai-stack-map.py and standalone companion notebooks (pypi-geo-trends, oss-ai-trends, long-tail-explorer)
-docs/methodology.md    Canonical methodology copy, rendered into the notebook (a build input)
-docs/guides/           Query conventions, notebook style, freshness and verification
-docs/runbooks/         Maintainer deploy runbooks
-docs/schemas/          JSON Schemas for the source files (four concerns + taxonomy)
-skills/                Agent skills for common editor workflows
-tests/                 pytest suite for build helpers and serializer behavior
-```
-
-### What is in `build/`
-
-Every module is a CLI with a docstring that explains why it exists; run any of them with
-`--help`. Grouped by what they are for:
-
-```
-Notebook build      validate.py      sources/ schema + cross-file invariants
-                    serialize.py     sources/ -> build/notebook_data.json
-                    render.py        notebook_data.json -> notebooks/ai-stack-map.py
-                    update_readme.py syncs the README stat badges
-                    slugs.py         slug helpers shared by the above
-
-Config bridge out   serialize_registry.py  identity: what exists
-                    serialize_rubric.py    each category's rubric + recorded evidence
-                    publish_registry.py    pushes both table sets to OSO as static models
-
-Scores back in      apply_scores.py   reads computed scores from OSO, writes
-                                      openness.score and openness.class into
-                                      sources/scores/ and nothing else. The ONLY
-                                      inbound data path. It writes no dates -- see
-                                      docs/guides/verification.md.
-
-Checkers (CI)       check_rubric.py    does the rubric reproduce the hand-authored scores
-                    check_routing.py   which dimensions have a usable machine signal
-                    check_freshness.py how stale is each axis
-
-Proposers           propose_arxiv.py     candidate arXiv ids, verified live
-                    propose_artifacts.py candidate artifacts, verified live
-```
-
-Proposers deliberately **print rather than write**. Matching artifacts by name measured 2
-correct in 10 on this data, and a wrong artifact attaches another project's license and
-downloads to a product, which is indistinguishable from a real score until someone checks.
-
-## Data model
-
-The curated source set is four per-record YAML concerns in `sources/` plus the single
-`sources/taxonomy.yaml` manifest:
-
-- **organizations**: one file per org (`name`=slug, `display_name`, `type`, `homepage`,
-  optional `github` typed-url array and `comments` string). Owns the `products:` roster: a list of product slugs that belong to this org. A product
-  slug must appear in exactly one org roster (validated).
-- **categories**: one file per stack-map category (`name`=slug, `display_name`). Owns the
-  ordered product roster (`products:` array). Order equals display order. One product
-  appears in exactly one category. Category files no longer carry `arc` or cross-category
-  `order`. Optional `comments` string for curator notes.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `uv` for everything Python. `uv run python -m build.<module>`; every module takes `--help`.
+- Trino SQL for warehouse work.
+- American English. No AI tells in commits, PRs, or prose.
+- Category slugs are `underscore_form`; product and org slugs are `kebab-case`.
 
 ---
 > Source: [currentai-org/os-ai-map](https://github.com/currentai-org/os-ai-map) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
