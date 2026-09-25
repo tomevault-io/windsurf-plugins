@@ -1,0 +1,108 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+`ipctool` is a single static C99 binary that runs *on* an IP camera or DVR and
+reports its hardware as YAML: SoC, board, sensor, flash layout, RAM, firmware,
+clocks. It probes hardware directly (`/dev/mem`, I2C/SPI, `/proc`, MTD), so
+almost nothing useful executes on an x86 host. The same tree also builds
+`libipchw` (a small static library exposing chip/sensor identity, see
+`include/ipchw.h`) and `ipcinfo` (`example/ipcinfo.c`), a minimal consumer of it.
+
+Shipped binaries are static musl builds for arm32 (the canonical target),
+mips32 and arm64, and are UPX-packed before release: the raw static-musl binary
+crashes at startup on legacy kernels (Linux <= 3.18, i.e. XiongMai and old
+HiSilicon SDK firmware), and the UPX stub sidesteps that.
+
+## Build
+
+Native build (compiles everything, runs the unit test; hardware paths return
+nothing on a PC):
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./build/cYAML_test          # exit 0 == all cases passed
+```
+
+Cross build, exactly as CI does it (PR check and release both use these
+toolchains):
+
+```sh
+# arm32 (HiSilicon/Goke V1..V5, XM, SigmaStar, ...): OpenIPC hi3516cv100 musleabi toolchain
+# mips32 (Ingenic):  OpenIPC ingenic-t31 musl toolchain
+# arm64 (Hi3519DV500 etc.): Bootlin aarch64--musl--stable toolchain
+export PATH=/opt/<toolchain_dir>/bin:$PATH
+cmake -S . -B build-arm -DCMAKE_C_COMPILER=arm-openipc-linux-musleabi-gcc -DCMAKE_BUILD_TYPE=Release
+cmake --build build-arm
+upx build-arm/ipctool       # match the release artefact before testing on a camera
+```
+
+Toolchain URLs and directory names are in `.github/workflows/pr-build-check.yml`.
+`build*` and `build-arm*` are gitignored.
+
+CMake knobs worth knowing:
+
+- `CMAKE_C_FLAGS` is hard-reset to `-std=gnu99` at the top of `CMakeLists.txt`,
+  so `-DCMAKE_C_FLAGS=...` on the command line does **not** survive. Add flags
+  in `CMakeLists.txt` (guarded by a cache option) instead.
+- `-DBUILD_SHARED_LIBS=ON` is what drops the global `-static`. Needed for a
+  dynamic/ASAN build (use a glibc cross toolchain that ships libasan; musl
+  toolchains do not).
+- `-DIPCHW_VENDORS=all|none|"sstar;ingenic"` selects which vendor HALs go into
+  `libipchw`. HiSilicon is always in — it is not in this knob's vocabulary,
+  because `chipid.c` reaches it directly rather than through the vendor table.
+  The `ipctool` executable always carries every vendor.
+- `-DIPCHW_HISI=all|none|"v4"` selects which HiSilicon *generations* `libipchw`
+  can identify — the chip-ID table, a sensor-bus back-end per generation, and
+  the temperature and die-ID readers. Roughly 8 KB on arm32 for the lot.
+
+  **Its default follows `IPCHW_VENDORS`**, because naming your silicon should
+  not have to be done twice. A narrowing — `-DIPCHW_VENDORS=ingenic` — says the
+  binary will never boot on a HiSilicon part, so `IPCHW_HISI` defaults to
+  `none`. The two spellings that are not a narrowing keep every generation:
+  `all` means "identify any camera this is dropped on", and `none` means only
+  the always-in vendors, which *is* HiSilicon. Both are how `ipcinfo` is built
+  (its own default and the firmware package's `none`), so neither moved when
+  this was added; a narrowed consumer lost 8.3 KB. An explicit `-DIPCHW_HISI`
+  always wins.
+
+  Do not reach for weak symbols or a section registry to replace this knob: it
+  was tried, and it works by *not* pulling `hal_hisi.c.o` from the archive,
+  which deletes HiSilicon detection from every static consumer including the
+  ones that want it. "Which silicon can this build identify" is a runtime
+  question the linker cannot answer — nothing here is dead code as far as it
+  knows.
+- `-DIPCHW_PADMUX=all|none|"v1;v4;sstar"` selects which SoC families' pad-mux
+  tables go into `libipchw`. `sstar` and `ingenic` are families here too: the
+  vendor knob answers "can this build detect the SoC", this one answers "does
+  it carry the SoC's pad table", and they are deliberately separate. All of it
+  is ~75 KB on arm32 and nothing is dropped by `--gc-sections`, because
+  `regs_by_chip()` and `padmux_ops()` name every family from a single switch:
+  a consumer that wants one family has to say so. `v4` is the expensive
+  HiSilicon token (13.6 KB) because one SDK build runs on ev200, ev300,
+  3518ev300 and dv200, and those are four different tables; `sstar` is 25 KB
+  for three families and ~2200 claims. The macros are PUBLIC on the `ipchw`
+  target so a consumer can `#error` on a family it forgot. The `ipctool`
+  executable always carries every table.
+- `-DONLY_LIBRARY=ON` builds just `libipchw`. `-DSKIP_VERSION=ON` skips the
+  git-derived `version.c` (generated by `cmake/version.cmake` on every build).
+  That generated file is compiled by one object library, `ipctool_version`,
+  which `ipctool` and `ipcinfo` both link. Do not put it back in their source
+  lists: a custom-command output listed in two independent targets gets a
+  copy of its rule in each target's `build.make`, and `make -jN` then runs
+  both copies at once and they rewrite the file under each other.
+  `SKIP_FUNDING` removes the sponsorship banner from `-h`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [OpenIPC/ipctool](https://github.com/OpenIPC/ipctool) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
