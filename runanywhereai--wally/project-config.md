@@ -110,4 +110,4 @@ extractor takes `--source-commit` and `--source-branch` together or not at all,
 
 ---
 > Source: [RunanywhereAI/wally](https://github.com/RunanywhereAI/wally) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
