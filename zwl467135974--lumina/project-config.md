@@ -154,4 +154,4 @@ description: <!-- AI Rules Sync: This file mirrors .cursorrules content. Keep .c
 
 ---
 > Source: [zwl467135974/lumina](https://github.com/zwl467135974/lumina) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
