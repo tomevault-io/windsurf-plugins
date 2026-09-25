@@ -3,7 +3,7 @@ trigger: always_on
 description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -13,7 +13,7 @@ Python 3.14 async REST API. FastAPI + SQLAlchemy 2 (async) + PostgreSQL + Alembi
 
 ## Common commands
 
-The development workflow runs inside Docker via `just` (`just --list` / read the `Justfile` for the full recipe list). The `application` service mounts the repo and depends on a `db` Postgres service. Bare `just` runs the default pipeline (install + lint + build + test).
+The development workflow runs inside Docker via `just` (`just --list` / read the `justfile` for the full recipe list). The `application` service mounts the repo and depends on a `db` Postgres service. Bare `just` runs the default pipeline (install + lint + build + test).
 
 Things the recipe names don't make obvious:
 
@@ -78,4 +78,4 @@ Endpoints inject repositories with `FromDI(Repository)` from `modern_di_fastapi`
 
 ---
 > Source: [modern-python/fastapi-sqlalchemy-template](https://github.com/modern-python/fastapi-sqlalchemy-template) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
