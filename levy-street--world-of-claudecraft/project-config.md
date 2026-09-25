@@ -1,93 +1,76 @@
 ---
 trigger: always_on
-description: This file owns Codex runtime behavior for World of ClaudeCraft. The root and
+description: <!-- World of ClaudeCraft, project-root CLAUDE.md. Keep this lean (about 200 lines)
 ---
 
-# Codex entry point
+<!-- World of ClaudeCraft, project-root CLAUDE.md. Keep this lean (about 200 lines)
+     and strictly repo-wide. Area-specific guidance lives in each subdirectory's own
+     CLAUDE.md (src/sim/, src/render/, server/, ...), which load on demand when you
+     open files there, so do NOT duplicate them here. Anchor guidance on stable paths,
+     symbols, and pinned tests, never on counts that rot. HTML comments like this are
+     stripped before load (zero tokens). No em dashes, en dashes, or emojis. -->
 
-This file owns Codex runtime behavior for World of ClaudeCraft. The root and
-directory-local `CLAUDE.md` files remain canonical for repository facts, architecture,
-hard invariants, conventions, commands, the default task workflow and deliverable
-contract, and the QA contract. Claude-specific model,
-memory, Workflow, slash-command, and agent-runtime instructions do not apply to Codex.
-Do not edit or replace the Claude setup unless the user explicitly asks for that work.
+# World of ClaudeCraft
 
-## Start safely
+A classic-style micro-MMO **and** a headless reinforcement-learning
+environment, both driven by one deterministic TypeScript simulation core.
+Stack: TypeScript (ESM, `strict`) · Three.js renderer · `ws` WebSockets ·
+Postgres (`pg`) · Vite + esbuild · Vitest. No UI framework in the game client; tiny
+dependency set. The one sanctioned exception is the standalone admin dashboard
+(`src/admin/`), which is built with Svelte 5 (it never touches the game client bundle).
 
-1. Run `git status --short` before edits and preserve unrelated user work.
-2. Follow the default task workflow in `CLAUDE.md`: base the work on the latest
-   `release/**` branch, never `main`, and create a separate worktree for the task.
-3. Read the root `CLAUDE.md` in full. Before reading or changing files in a directory,
-   read that directory's `CLAUDE.md` if it exists. Codex builds its instruction chain at
-   session start, so opening a nested file does not load local guidance automatically.
-4. Use `rg` and targeted reads to discover the current shape. Follow existing code and
-   tests instead of relying on remembered inventories or line numbers.
+## Repo map
+| Path | What it is |
+|---|---|
+| `src/sim/` | **Deterministic game core, the source of truth.** No DOM/Three deps; runs in browser, server, and headless. |
+| `src/sim/content/` | Data-as-code: classes, abilities, talents, zones, dungeons, items, professions, mounts, deeds, Reliquary pages. |
+| `src/render/` | Three.js renderer (procedural geometry/textures/VFX + curated GLBs). Reads the world; never mutates it. |
+| `src/game/` | Local input, camera, keybinds, gamepad, mobile controls, sampled WebAudio SFX, and procedural music. |
+| `src/ui/` | Classic HUD (frames, windows, tooltips, map, FCT), procedural icons, i18n. |
+| `src/styles/` | Extracted HUD CSS under one `@layer` order, imported once via `src/main.ts`. See `src/styles/CLAUDE.md`. |
+| `src/net/` | Online client: REST auth + WebSocket world mirror (`ClientWorld`), reconnect, native-app glue, wallet glue. |
+| `src/admin/` | Admin dashboard SPA (separate `admin.html` entry). |
+| `src/guide/` | Public guide/wiki SPA (separate `guide.html` entry, served at `/wiki`); spoiler-safe content generated from `src/sim/`. |
+| `src/editor/` | World editor SPA (separate root-level `editor.html` entry); its 3D viewport composes the real `Sim` + `Renderer`. |
+| `src/world_api.ts` + `src/world_api/` | `IWorld`, the seam render/ui depend on: one facet interface per domain file under `src/world_api/`, re-aggregated by the barrel (see Architecture). |
+| `src/main.ts` | Client entry; fixes the world seed. |
+| `server/` | Authoritative game server: HTTP+WS, world loop, Postgres, auth, social, moderation. |
+| `server/http/` | The REST request pipeline spine: table router, middleware onion, per-domain `RouteDef` tables, typed schemas, stable error codes. |
+| `server/epic/` · `server/steam/` · `server/parse/` · `server/email/` | Store/platform glue, combat-parse ingest, transactional email; each has its own `CLAUDE.md`. |
+| `headless/` + `python/` | RL env server (`env_server.ts`) + Python Gym bindings. |
+| `bot/` | Discord bot (role sync, relay, activity feed; own `CLAUDE.md`). |
+| `electron/` (+ `build/`) | Desktop (Steam) shell + packaging assets; see `docs/desktop-release.md`. |
+| `android/` + `ios/` | Capacitor native shells (`npm run native:*`). |
+| `tests/` | Vitest suite (subdirectory map in `tests/CLAUDE.md`). |
+| `scripts/` | Asset/build/i18n/SFX tooling + browser E2E / screenshot scripts. |
+| `patches/` + `data/` | pnpm-patched dependencies (Three.js is patched; check before bumping it) + checked-in map data. |
+| `public/` · `docs/` | Static assets, **deployed verbatim to the live site** · design + PRD + ops docs. |
+| `mediawiki/` + `deploy/` | Player-wiki container + production first-boot assets (see `DEPLOY.md`). |
 
-Never revert, discard, stage, commit, push, file an issue, post a review, or mutate a
-remote system unless the user authorized that action. If a commit is requested, stage
-only this task's files and follow the scoped Conventional Commit rule in `CLAUDE.md`.
+Most directories above have their own `CLAUDE.md` with local conventions; read it when you work there.
 
-## Work effectively
+## Commands
+Install once per clone/worktree with **pnpm** (pinned via `packageManager` in
+`package.json`; Corepack not required): `npm install -g pnpm@<the pinned version>`, then
+`pnpm install --frozen-lockfile`. Same on macOS, Linux, and Windows; the shared store
+makes multi-worktree installs cheap. Never commit `package-lock.json`. Full policy:
+CONTRIBUTING.md. After install, `pnpm run <script>` and `npm run <script>` both work;
+the nested `npm run` forms below are the package.json script names.
 
-- Keep the main thread responsible for integration and final verification.
-- Parallelize bounded exploration, log analysis, and read-only reviews when useful.
-  Give overlapping files one implementation owner and wait for every delegated task
-  before reporting completion.
-- Treat subagent results as evidence to verify, not verdicts to relay unchanged.
-- Use the active session model and reasoning setting. Do not weaken acceptance criteria,
-  tests, or review depth for a faster model. Route by task shape, not a hardcoded model:
-  clear mechanical work can run fast, while ambiguous architecture and security work
-  needs deeper reasoning.
-- Fetch current official documentation for external APIs and libraries. Do not write
-  unstable interfaces from memory.
-- Prefer small modules, decisive tests, and existing seams. Do not add frameworks or
-  abstractions without a concrete repository need.
+- `npm run dev`: Vite client on :5173 (proxies `/api`, `/admin/api`, `/ws` to :8787).
+- `npm run server`: esbuild-bundle + run the authoritative server on :8787.
+- `npm test`: Vitest. **Prefer a single file while iterating:** `npx vitest run tests/sim.test.ts`.
+- `node scripts/gate_select.mjs`: **the pre-merge gate.** Same step list as `npm run gate`
+  (nothing dropped) with one substitution: the full vitest run becomes ONE merged
+  `vitest related` invocation (the always-run floor rides it as self-selecting seeds,
+  same form as the CI shards). Roughly 3x faster; falls back to the full suite for any change it
+  cannot reason about. See `docs/qa-gate.md`.
+- `npm run gate`: the full CI-equivalent gate, still the deeper check (i18n gen + freshness, malware scan,
+  changed-files biome, SFX conformance, full tests with bounded workers, the real-browser
+  regression suite, `tsc`, all builds;
 
-## Codex workflows
-
-Repository skills live in `.agents/skills/` and are invoked as `$skill-name`:
-
-- `$woc-qa`: scope and run the contribution gate, then dispatch relevant reviewers.
-- `$woc-extract-and-test`: extract a module behind behavior-pinning tests.
-- `$woc-feature-plan`: produce an implementation-ready plan for cross-cutting work.
-- `$woc-review-pr`: verify a pull request without posting unless explicitly requested.
-- `$woc-file-issue`: draft an issue, and file it only with explicit authorization.
-- `$woc-write-game-tooltips`: write or audit plain English tooltips against live combat values and
-  scaling.
-- `$woc-image-to-glb`: build a shipping GLB asset from a reference image through the
-  repo pipeline.
-- `$woc-release-merge-audit`: find semantic damage after release integration.
-- `$woc-release-malware-audit`: scan and judge malicious-code risk.
-- `$woc-codex-audit`: compare the checked-in Codex architecture with current official
-  guidance.
-
-Read-only specialist agents live in `.codex/agents/`. Use only the roles matching the
-changed surface: sim architecture, cross-platform parity, persistence, database
-performance, server hot-path performance, security, test coverage, frontend, release
-malware, and official documentation research. The parent runs deterministic commands once; reviewers inspect
-evidence instead of duplicating the full gate.
-
-For SQL, database call sites, schema or indexes, query cadence/cardinality, pool or lock
-behavior, timeout policy, background work, database driver/dependency versions, PostgreSQL engine
-or resource/configuration/topology changes, or stored-data growth, invoke
-`woc_database_performance` before implementation decisions and again on the finished diff.
-Pair it with persistence or security review when those concerns also apply.
-
-For server work that runs per tick, per request, per broadcast, per session, or on a
-recurring main-thread job (a shared read or cache, a growing collection, a snapshot or event
-payload, a `selfWireJson` key or the `src/sim/` read it calls, an autosave or sweep job, a
-`world_state` blob write), invoke `woc_server_hot_path`; it owns the non-SQL server budget
-and the grown-collection rules in `server/CLAUDE.md` "Hot paths".
-
-## Completion contract
-
-Run checks proportional to the change while iterating. Before calling an implementation
-complete, use `$woc-qa` or follow `docs/qa-gate.md`, including the pre-merge bar
-`node scripts/gate_select.mjs` (or the deeper `npm run gate`) when the canonical gate
-requires it. Report the exact commands and outcomes, remaining risks, and
-any checks you could not run. A hook or subagent report never substitutes for the shared
-test, typecheck, build, i18n, and security gates.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [levy-street/world-of-claudecraft](https://github.com/levy-street/world-of-claudecraft) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
