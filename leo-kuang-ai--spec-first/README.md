@@ -2,8 +2,6 @@
 
 > Tome by [leo-kuang-ai](https://github.com/leo-kuang-ai/spec-first), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
-spec-first
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
