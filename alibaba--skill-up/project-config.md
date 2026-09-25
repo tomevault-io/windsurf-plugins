@@ -39,6 +39,11 @@ make lint-tools
 If you are in mainland China and `go install` is slow, set
 `GOPROXY=https://goproxy.cn,direct` before running the commands above.
 
+On Windows, `make` is unavailable by default; use the PowerShell equivalents
+in `scripts/windows/` (`hooks.ps1`, `lint-tools.ps1`, `verify.ps1`). See the
+[Windows support guide](docs/guide/windows.md) for supported features and
+known limitations.
+
 ## Build & run
 
 ```bash
@@ -59,7 +64,12 @@ go build -o bin/skill-up ./cmd/skill-up
 ```bash
 # Unit tests (race detector enabled — always use this)
 make test
+
 # equivalent: go test -race ./...
+go test -race ./...
+
+# GitHub Action adapter tests (requires Python 3)
+make test-action
 
 # Run a single test
 go test -race -run TestFoo ./internal/config/
@@ -122,6 +132,7 @@ internal/           Private implementation — never import from outside the mod
   mcp/              MCP provisioner (mock / real)
   skill/            Install Skill files into Engine's conventional path (excluding evals/)
   evaluator/        Evaluator: iterates cases, calls agent.Run, returns CaseResult
+  evalevent/        Internal evaluation event model, publisher, lifecycle, and JSONL sink
   judge/            Judges: rule_based, script, agent_judge
   report/           Report generators: JSON / JUnit / HTML / Anthropic grading & benchmark
   runner/           End-to-end orchestration for `skill-up run`
@@ -129,18 +140,9 @@ internal/           Private implementation — never import from outside the mod
 pkg/                Publicly importable APIs (semver-stable; change with care)
   skillup/          Embeddable evaluation API
   transcript/       Transcript parsing helpers
-e2e/                End-to-end tests (build-tag gated) + testdata/
-examples/           Example fixtures and debug inputs
-docs/               Design docs, user manuals, and the VitePress site
-                    (built & deployed to GitHub Pages by .github/workflows/docs.yml)
-```
-
-### Boundary rules
-
-- `internal/` is **private**. Never import it from outside this module; never
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [alibaba/skill-up](https://github.com/alibaba/skill-up) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
