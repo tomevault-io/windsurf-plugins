@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to AI coding agents (Claude Code, Codex, Cursor, and others) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents (Claude Code, Codex, Cursor, and others) when working with code in this repository.
 
 ## Project Overview
 
-ttt is a terminal text editor written in Go, using tcell for terminal rendering. The Go module name is `ttt` (in go.mod).
+ttt is a terminal text editor written in Go, using tcell for terminal rendering. The Go module is `github.com/eugenioenko/ttt`.
 
 ## Build & Test Commands
 
@@ -18,7 +18,7 @@ make build        # builds to bin/ttt
 make run          # build + run
 make test         # go test ./...
 make fmt          # gofmt -w .
-make lint         # golint ./...
+make lint         # golangci-lint run
 go test ./internal/core/buffer/   # run tests for a single package
 
 # Open a multi-folder workspace
@@ -30,49 +30,45 @@ bin/ttt ~/projectA ~/projectB file.go
 
 ## Architecture
 
-The codebase follows a strict layered architecture: **core → view → render → term → ui**, with `workspace` sitting alongside as an independent support layer. The core layer has zero terminal dependencies and is fully unit-testable in isolation.
+[`ARCHITECTURE.md`](ARCHITECTURE.md) is the source of truth for package ownership and the architecture convergence plan. The codebase uses dependency zones rather than a strict linear layer chain: domain, services, presentation kernel, product presentation, application, plugin host, and platform.
 
-### Layers
+Known boundary violations and explicit boundary decisions are documented there. Highlighting is presentation-owned at `internal/highlight`; Chroma lexing, lexer-state detection, caching, and `term.Style` mapping stay together there. tcell events are intentionally used across `term`, `widgets`, `ui`, and narrow application/platform wiring. Do not create cosmetic wrappers merely to satisfy the old layer diagram.
 
-- **`internal/core/`** — UI-agnostic editor engine. Must never import terminal or rendering packages.
-  - `buffer/` — Line-based text storage (`[]string`), rune-level insert/delete, file I/O (load/save)
-  - `cursor/` — Visual column cursor with goal-column preservation for vertical movement
-  - `undo/` — Command-pattern undo/redo via `EditCommand` interface (InsertRune, DeleteRange, InsertLine)
-  - `highlight/` — Regex-based per-line syntax highlighting (`Highlighter` interface with `Span` output)
-  - `buffers/` — Multiple buffer management (list + active index)
+### Packages
 
-- **`internal/view/`** — Viewport (scrolling, cursor-to-screen mapping) and status bar rendering
+Packages are grouped by the dependency zones in [`ARCHITECTURE.md`](ARCHITECTURE.md), which is the source of truth for zone membership and dependency direction.
 
-- **`internal/render/`** — Diff-based renderer: compares prev/curr cell grids and emits minimal updates
+**Domain** (`internal/core/`): UI-agnostic editor engine. Domain code must not start processes, access terminal state, render widgets, or coordinate application lifecycle.
 
-- **`internal/terminal/`** — Integrated terminal emulator. Wraps `hinshun/vt10x` for VT escape sequence parsing and `creack/pty` for PTY lifecycle management. Provides the backing state for terminal tabs.
+- **`core/buffer/`**: line-based text storage (`[]string`), rune-level insert/delete, file I/O (load/save).
+- **`core/cursor/`**: visual column cursor with goal-column preservation for vertical movement.
+- **`core/undo/`**: command-pattern undo/redo via the `EditCommand` interface; `BatchCommand` groups edits into one undo step.
+- **`core/selection/`**: selection ranges and text extraction.
+- **`core/multicursor/`**: multi-cursor state (add, dedupe, collapse).
+- **`core/fold/`**: indentation-based fold ranges and fold state.
+- **`core/diff/`**: line diffing, unified diff generation and parsing, and git gutter change kinds.
+- **`core/clipboard/`**: clipboard with system, OSC 52, and process-local backends. It starts processes, which the Domain rules forbid; treat it as an existing exception, not a pattern for new domain code.
 
-- **`internal/term/`** — Terminal abstraction via `Screen` interface. `TcellScreen` is the real implementation; `MockScreen` is used in tests. Only this package imports `tcell`. Also defines `DirectColor` and `CellAttr` types for direct RGB color rendering (used by the terminal emulator to bypass the style map for 256-color support).
+**Services**: external-process and external-state integration, exposing typed operations and results without owning widgets.
 
-- **`internal/ui/`** — Window manager and pane system. `Window` binds a `Rect`, `Viewport`, and `Buffer` together. `WindowManager` tracks focus across windows. Also contains `terminal_widget.go` (renders vt10x grid as direct-color cells, handles key-to-VT translation), `root.go` (ForceKeys and RawKeyConsumer interface for terminal key routing), and `content_split.go` (OnTopClick/OnBottomClick for focus routing between editor and bottom panel).
+- **`internal/git/`**: git CLI wrapper (status, staging, commit, repo discovery).
+- **`internal/github/`**: `gh` CLI wrapper for pull requests.
+- **`internal/lsp/`**: language server client (see LSP Integration).
+- **`internal/terminal/`**: integrated terminal emulator. Wraps `gitpod-io/xterm-go` for VT parsing and `aymanbagabas/go-pty` for PTY lifecycle.
+- **`internal/watcher/`**: fsnotify-based reporting of on-disk changes to open files and watched directories.
+- **`internal/workspace/`**: multi-folder workspaces. `Folder` and `Workspace` track project roots, with `IsRepo` git detection, `FolderForFile` lookup (longest-prefix match), and JSON `.ttt` workspace files. Falls back to `cwd` when no folders are given.
 
-- **`internal/workspace/`** — Multi-folder workspace management. `Folder` and `Workspace` types track one or more project roots, with `IsRepo` git-detection, `FolderForFile` lookup (longest-prefix match), and JSON-based workspace file loading/saving (`.ttt` files). The editor falls back to `cwd` when no folders are explicitly provided.
+**Presentation kernel**: screen cells, styles, width measurement, rendering, layout, and reusable interaction primitives.
 
-- **`cmd/ttt/main.go`** — Entry point with event loop. Wires all components together, handles key dispatch, viewport scrolling, and redraw. Accepts a `--workspace <file>` flag to open a saved workspace, or folder/file paths as positional arguments.
-
-### Design Principles
-
-1. **UX comes first.** Implement the UI feel and look first, then the functionality. When making design decisions, prioritize user experience over implementation simplicity. If a feature needs good navigation, discoverability, or interaction patterns, invest in that rather than taking shortcuts.
-2. **Single source of truth for layout.** When Render computes layout values (positions, offsets), store them on the struct so event handlers reuse them directly instead of recalculating — divergent calculations cause click offset bugs.
-
-### Key Design Constraints
-
-- Cursor `Col` is a visual column (rune-based), not a byte index — all line-length calculations use `[]rune()`.
-- The renderer uses double-buffering (prev/curr cell grids) to minimize terminal writes.
-- `Screen` interface keeps tcell isolated — the rest of the codebase never imports tcell directly (except `cmd/ttt/main.go` for event types).
-- **Never hardcode colors.** All colors must go through the theme system (`internal/config/theme.go` → `StyleDef` → `term.Style` constants → `buildStyleMap`). Add a new `StyleDef` field to `ThemeConfig`, a `term.Style` constant, and wire it in `buildStyleMap()`. Widgets reference `term.Style*` constants, never color values. The one exception is the integrated terminal, which uses direct RGB color rendering via `DirectColor`/`CellAttr` to support 256-color output.
-- **Terminal colors** are configured via the `terminal` field in `ThemeConfig` (`TerminalColors`), which holds 16 ANSI colors plus foreground/background defaults.
-- The diff view layers syntax highlighting on top of diff background colors using `BgStyle` layering.
-- **RawKeyConsumer interface**: when the integrated terminal is focused, all key events are routed directly to the PTY. Only force-keys (Ctrl+`) bypass this to allow toggling the terminal panel.
-- Async PTY output wakes the event loop via `PostEvent`/`EventInterrupt`.
+- **`internal/term/`**: `Screen` interface. `TcellScreen` is the real implementation; `MockScreen` supports unit-level `Screen` and renderer tests; `SimScreen` implements tcell's screen contract for composed E2E and chaos tests. Also defines `DirectColor` and `CellAttr` for direct RGB rendering (used by the integrated terminal to bypass the style map for 256-color output).
+- **`internal/render/`**: diff-based renderer that compares prev/curr cell grids and emits minimal updates.
+- **`internal/textwidth/`**: display-width measurement (`Rune`, `String`, `Runes`), the single source of truth for how many terminal columns text occupies. Wraps `clipperhouse/displaywidth` with the same options tcell v3 uses internally, including the `RUNEWIDTH_EASTASIAN` toggle, so layout always matches what tcell draws.
+- **`internal/highlight/`**: presentation-owned per-line syntax highlighting via `chroma/v2`. Owns language selection, multi-line region state (block comments, docstrings, template and raw strings, each discovered by probing the lexer), caching, and mapping Chroma token types to `term.Style`. Full-buffer re-lexing is a known performance trap; avoid it.
+- **`internal/view/`**: viewport (scrolling, cursor-to-screen mapping) and the segment-based status bar.
+- **`internal/widgets/`**: reusable widget primitives backing both the Plugin Widget API and core panels (tree, table, list, input, dialog, dropdown, tabs, stacks, scrollview, markdown, and so on). `surface.go`/`virtual_surface.go` provide the drawing surface abstraction; `focus.go` handles focus traversal.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [eugenioenko/ttt](https://github.com/eugenioenko/ttt) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
