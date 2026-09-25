@@ -1,107 +1,66 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: A pnpm monorepo for Agent Client Protocol (ACP) React components and a framework-agnostic core.
 ---
 
-# CLAUDE.md
+# Repository Guidelines
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A pnpm monorepo for Agent Client Protocol (ACP) React components and a framework-agnostic core.
 
-## Build & Development
+## Project Structure & Module Organization
 
-```bash
-pnpm install                         # Install all deps
-pnpm build                           # Build both packages (core → react)
-pnpm build:core                      # Build only @acp-components/core
-pnpm build:react                     # Build only @acp-components/react
-pnpm lint                            # Lint all TypeScript in packages/*/src
-```
+- `packages/core` (`@acp-components/core`): provider, `AcpClient`, vanilla Zustand stores (`acpStore`, `sessionStore`, `fileTreeStore`), transports (Stdio/Http/WebSocket/custom), actions, and shared types. Zero React dependency.
+- `packages/react` (`@acp-components/react`): UI layer with `components/` (each component in its own subdirectory), `context/` (`AcpContext`, `PlatformContext`), `hooks/`, `i18n/`, and `styles/`.
+- `examples/`: `demo` (Vite web app), `server` (WebSocket-to-stdio bridge), `tauri` (desktop shell).
+- `assets/`, `design-system/`, `docs/`: shared resources and documentation.
 
-### Web Demo
+Tests are co-located next to source as `*.test.ts` or `*.test.tsx`.
 
-```bash
-pnpm dev:server                      # Terminal 1 — WebSocket ↔ stdio bridge
-pnpm dev                             # Terminal 2 — Vite dev server at localhost:5173
-pnpm dev:tauri                       # Tauri desktop dev (stdio transport)
-pnpm build:tauri                     # Tauri production build
-```
-
-### Running a single test
+## Build, Test, and Development Commands
 
 ```bash
-pnpm --filter @acp-components/core test -- -t "test name pattern"
-pnpm --filter @acp-components/react test -- -t "test name pattern"
+pnpm install              # install all workspace deps
+pnpm build                # build core, then react
+pnpm build:core           # build @acp-components/core only
+pnpm build:react          # build @acp-components/react only
+pnpm test                 # run vitest across both packages
+pnpm lint                 # eslint packages/*/src/**/*.{ts,tsx}
+pnpm dev                  # Vite demo at localhost:5173 (run pnpm dev:server first)
+pnpm dev:server           # WebSocket -> stdio bridge on ACP_PORT (default 3100)
+pnpm dev:tauri            # Tauri desktop dev
 ```
 
-### Bridge server env vars
+Run a single package or filter by test name:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ACP_PORT` | `3100` | WebSocket port |
-| `ACP_HOST` | `127.0.0.1` | WebSocket host |
-| `ACP_AGENT` | `opencode` | Agent binary |
-| `ACP_AGENT_ARGS` | `acp` | Agent arguments |
-
-## Architecture
-
-### Package Layering
-
-```
-Application Layer (Vite Demo / Tauri / Custom Apps)
-  └─ @acp-components/react (UI Layer)
-       Components (15+) + Hooks (useSyncExternalStore) + AcpContext + PlatformContext + Theme + i18n
-       depends on ↓
-     @acp-components/core (Data Layer)
-       createAcpProvider (multi-agent lifecycle) + AcpClient (per-agent, wraps ACP SDK)
-       + Transport (Stdio/WebSocket/HTTP/Custom) + acpStore + sessionStore + fileTreeStore (vanilla Zustand)
-       + Actions (sessions/prompt/permission/fileTree/extensions, agent-aware)
-       built on ↓
-     @agentclientprotocol/sdk (ACP protocol types + ClientSideConnection)
-
-Platform Layer (orthogonal to the above): a `Platform` interface (defined in `@acp-components/react`) + `PlatformContext`/`usePlatform()` provide host-native capabilities to the UI. The interface is **sharded** into cohesive slices — `fs?` (readDirectory/readFileContent/writeFileContent?/watchFileTree?), `dialogs?` (openLink/openFilePicker/notify), `storage` (always required), `openExternalEditor?` (host takes over file opening, bypassing built-in FileViewer), `updater?`, `system?` (restart?/exportLogs?) — capability is expressed by slice / method presence; callers guard with `?.` at the use site. Each host (web demo, Tauri template) implements its own `Platform` (`createWebPlatform` / `createTauriPlatform`). Workspace load/save is NOT on `Platform` — it lives in the `useWorkspacesPersistence` hook, backed by `storage('workspaces')`. core does NOT implement `Platform` — it only owns the shared primitive types (`PlatformKind`, `PlatformStorage`, `UpdaterState`, …).
+```bash
+pnpm --filter @acp-components/core test
+pnpm --filter @acp-components/core test -- -t "pattern"
 ```
 
-**Critical rules**:
-- `@acp-components/core` has zero React dependency. It uses vanilla Zustand stores. React layer subscribes via `useSyncExternalStore`. Never add React imports to core.
-- `AcpClient`'s client-side callbacks are **only** `sessionUpdate` / `requestPermission` / `extMethod` / `extNotification`. File access is a UI-side capability consumed via `usePlatform()`.
-- `Platform` and `AcpContext` are orthogonal: `Platform`/`usePlatform()` for native capabilities, `AcpContext`/`useAcpContext()` for agent connection/session state. Agent transport is configured via `AgentConfig.transport` on `AcpProvider` and is **not** part of `Platform`.
+Each package also exposes `test:watch` for interactive vitest.
 
-### Multi-Agent & Multi-Workspace State Model
+## Coding Style & Naming Conventions
 
-```
-acpStore (global):
-  agents: Map<agentId, AgentConnection>        — per-agent status, info, capabilities, authMethods
-  workspaces: Map<cwd, WorkspaceState>          — per-workspace sessions
-  activeSessionId: SessionId | null             — global active session (workspace derived via SessionMeta.cwd)
-  pendingAuth: { agentId } | null               — pending auth agent
+- TypeScript strict mode; ES2022 target, ESNext modules, bundler resolution.
+- ESLint flat config (`eslint.config.js`): typescript-eslint recommended plus react-hooks rules.
+- Prefix unused vars, args, and caught errors with `_`.
+- Styles: SCSS Modules with `camelCaseOnly` locals; theme via `data-acp-theme` (`"dark"` default, `"light"`).
+- Use `--acp-*` CSS custom properties and never hardcode hex colors. Avoid inline styles unless the value is dynamic.
+- React components live in `packages/react/src/components/<name>/`, one per directory.
 
-sessionStore (per-session, keyed by SessionId):
-  messages[], isStreaming, pendingToolCalls (Map),
-  pendingPermissions[], plan[], usage, configOptions[], availableCommands[]
+## Testing Guidelines
 
-fileTreeStore (per-workspace):
-  per-cwd file-tree state (nodes / expanded / loaded / error); directory reader is injected from Platform.readDirectory
-```
+- Framework: Vitest. React tests use `@testing-library/react` with jsdom.
+- Co-locate tests as `<module>.test.ts(x)` next to the code under test.
+- Use `describe`/`it`/`expect` from vitest; mock native APIs (`navigator.clipboard`, timers) in `beforeEach`/`afterEach`.
+- Keep core tests free of React imports: core must stay framework-agnostic.
 
-- **Agent** = independent ACP connection (transport + status + capabilities). Connected in parallel.
-- **Workspace** = directory (cwd). Holds sessions from multiple agents.
-- **Session** = belongs to workspace + agent pair (`SessionMeta.agentId` + `SessionMeta.cwd`).
-- **Active Workspace** = derived from `activeSessionId` by looking up `SessionMeta.cwd` in workspaces.
+## Commit & Pull Request Guidelines
 
-### Data Flow (Unidirectional)
-
-```
-Agent → NDJSON stream → Transport.readable
-  → AcpClient.onSessionUpdate (per agent)
-    → createAcpProvider dispatches sessionUpdate type to store actions
-      → acpStore / sessionStore (Zustand vanilla)
-        → useSyncExternalStore → React Hooks → Components re-render
-          → user action → Actions → AcpClient.prompt/cancel → Transport.writable → Agent
-```
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Commit messages are lowercase, imperative, and short: `add session view`, `fix http transport`, `update readme`. No conventional-commit prefix.
+- Open PRs against the default branch with a description of what changed and why; link any related issue.
+- Ensure `pnpm lint` and `pnpm test` pass before requesting review. Add or update tests for any behavior change in `packages/core` or `packages/react`.
 
 ---
 > Source: [zvzuola/acp-components](https://github.com/zvzuola/acp-components) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
