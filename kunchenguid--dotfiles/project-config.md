@@ -8,4 +8,4 @@ description: <!-- Points Claude at AGENTS.md via import; edit AGENTS.md, not thi
 
 ---
 > Source: [kunchenguid/dotfiles](https://github.com/kunchenguid/dotfiles) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
