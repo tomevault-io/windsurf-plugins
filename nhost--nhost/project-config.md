@@ -1,88 +1,93 @@
 ---
 trigger: always_on
-description: This file provides project-specific guidance for the Nhost AI service.
+description: This document helps AI agents work effectively in this codebase. It explains the philosophy, patterns, and pitfalls behind the code, so you can make good decisions on any task, not just scenarios explicitly covered.
 ---
 
-# CLAUDE.md
+# Agents
 
-This file provides project-specific guidance for the Nhost AI service.
+This document helps AI agents work effectively in this codebase. It explains the philosophy, patterns, and pitfalls behind the code, so you can make good decisions on any task, not just scenarios explicitly covered.
 
-## Project overview
+## Philosophy
 
-The service is written in Go and provides two features:
+This is a minimal, idiomatic WebSocket library. Simplicity is a feature.
 
-- **Auto-embeddings** — generates OpenAI embeddings for database rows, keeps vector columns synchronized, and deploys permission-aware search functions.
-- **Multi-provider agents** — streams agent responses through explicitly configured OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google Gemini adapter instances and supports GraphQL, MCP, web search, and web fetch tools.
+Before adding code, articulate why it's necessary in one sentence. If you cannot justify the addition, it probably isn't needed.
 
-## Build and development commands
+Before adding a dependency, don't. Tests requiring external packages are isolated in `internal/thirdparty`.
 
-The service uses the monorepo Nix flake. Run these commands from `services/ai` (or enter the shell from the repository root with `nix develop .#ai`).
+## Workflow
 
-```bash
-make develop
-make check
-make build
-make build-docker-image
-make dev-env-up
-make dev-env-up-short
-make dev-env-down
-make migrations-add MIGRATION_NAME=xxx
-```
+Every task follows phases. Do not skip phases; if you realize you missed something, return to the appropriate phase.
 
-### Tests
+**Making changes:**
 
-```bash
-go test ./...
-go test -v ./path/to/package
-go test -run TestName ./...
-```
+1. **Research** - Understand the problem and codebase before acting
+2. **Plan** - Articulate your approach before implementing (when asked, or for complex changes)
+3. **Implement** - Make changes in small, verifiable steps
+4. **Verify** - Confirm correctness using external tools
 
-Tests that need PostgreSQL require the development environment. The full CI check runs linting, tests, and code-generation verification.
+For trivial changes (typo fixes, comment updates), an abbreviated workflow is acceptable.
 
-## Architecture
+## Research
 
-### Code generation
+Research in sequential passes. Each pass has one focus. Don't skip ahead to code until you've completed the earlier passes.
 
-- **gqlgenc** (`gqlgenc.yml`) generates the Hasura client and models from `hasura/client.graphqls`. After starting a clean development environment and applying the service migrations and metadata, run `GOEXPERIMENT= go generate .` from `services/ai`. Clearing `GOEXPERIMENT` keeps generated JSON fields compatible with standard Go builds. `make check` runs the same directive and fails if generation changes tracked files. Keep the explicit `package: hasura` settings: generation removes its output files before recreating them, and package inference can otherwise select the black-box test package.
-- Generate against the migrated live schema, not a schema file or stale Hasura container. Provider identity is a bounded string throughout PostgreSQL, Hasura, GraphQL, and Go; there is no provider catalog, foreign key, tracked enum table, generated enum, or provider-specific metadata reload. After migration changes, perform the documented full volume reset, verify the live schema and metadata, run generation twice to prove stability, and never hand-edit generated files.
-- **mockgen** generates package-local mocks for retained boundary interfaces.
+**Pass 1: Read the issue.** If you were given a link, read it now. Do not explore code, do not pass go. Fetch the linked issue or document first. Summarize what it asks for. If you cannot restate the problem, you are not ready to proceed.
 
-### Key packages
+**Pass 2: Read linked references.** Follow every link in the issue: related issues, RFCs, external docs. Document what you learn. Code comments reference RFC 6455 (WebSocket), RFC 7692 (compression), and RFC 8441 (HTTP/2).
 
-- `cmd/` — CLI commands, HTTP routing, auto-embeddings webhooks, and service startup.
-- `agents/` — multi-provider agent orchestration, SSE streaming, approval flow, and tools.
-- `agents/provider/` — strict aggregate configuration plus OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google Gemini adapters. Each instance owns one trusted startup endpoint and header set and never supplies auto-embedding configuration.
-- `agents/tool/` — GraphQL, MCP, web search, and web fetch tools.
-- `autoai/` — auto-embeddings configuration and database functionality.
-- `autoai/embeddings/` — background embedding synchronization.
-- `openai/` — narrow OpenAI embedding client built on `github.com/openai/openai-go`.
-- `hasura/` — generated GraphQL client plus metadata helpers.
-- `migrations/` — PostgreSQL migrations and Hasura table, relationship, and event-trigger setup.
+**Pass 3: Trace the code.** Start from public API inward: `Accept` (server) or `Dial` (client) → `Conn` → `Reader`/`Writer`. Read tests for intent; the autobahn-testsuite (`autobahn_test.go`) validates protocol compliance.
 
-### Request flow
+**Pass 4: Check both platforms.** Native Go files have `//go:build !js`. WASM lives in `ws_js.go`. Same API, different implementations. WASM wraps browser APIs and cannot control framing, compression, or masking.
 
-1. Gin serves health/version routes, agent SSE routes, and auto-embeddings webhooks.
-2. Hasura event triggers notify the service when auto-embeddings configuration changes.
-3. The background synchronization process fetches pending rows through Hasura, generates vectors through the OpenAI SDK, and writes results through the configured mutation.
-4. Agent routes load agent/session/message data through Hasura and stream provider events to clients.
+**Pass 5: Search exhaustively.** If the change affects a pattern used in multiple places, grep for all instances. Missing one creates inconsistent behavior.
 
-### Database
+**Pass 6: Document unknowns.** List what you still don't know. Unknown unknowns become known unknowns when you ask "what am I still unsure about?"
 
-Tables live in the `ai` schema. Auto-embeddings use `auto_embeddings_configuration`; agents use `agents`, `agent_sessions`, and `agent_messages`. Provider declarations are configuration-only and are never persisted. PostgreSQL requires `vector`, `http`, and `pg_jsonschema`.
+**After all passes:** Can you restate the problem in your own words? If not, return to Pass 1. Gaps in earlier passes will cause problems later.
 
-## Code standards
+## Plan
 
-- Follow the repository Go rules in `.claude/docs/go-design-rules.md`.
-- Use the root `go.mod` and `vendor/`; never add service-local dependency files.
-- Do not hand-edit generated files; regenerate them from their source definitions.
-- Handle errors with call-site context.
-- `AGENT_PROVIDERS` is the sole authority for agent-provider identity. Keep registry keys and persisted provider values as strings; do not add built-in identities, provider tables, foreign keys, or GraphQL/Go enums.
-- Construct configured provider clients once in `cmd.buildAgentProviders`, store them in `provider.Registry`, and keep per-agent models request-scoped in `provider.StreamRequest`; do not add models to reusable provider clients.
-- Agent adapters must use only declared endpoints and headers, refuse redirects, pin OpenAI and Anthropic retry counts explicitly, and sanitize SDK errors. Do not permit SDK ambient credentials, endpoints, backends, projects, locations, or ADC behavior to affect requests.
-- Build every Google instance from a fresh explicit client config. Preserve the private sentinel-removal transport, clone requests and headers before scrubbing the generated key, and never mutate `http.DefaultTransport`.
+When asked to plan, write to `PLAN.md`. Write for someone else, not yourself; don't skip context you already know.
+
+**Pass 1: Document research.** Summarize what you learned in Research. Follow every reference; document findings so the implementer can verify. If the research section is empty, you haven't researched enough.
+
+**Pass 2: Consider approaches.** For non-trivial problems, enumerate at least two approaches. For each, note: what would change, what could go wrong, what's the tradeoff.
+
+**Pass 3: Detail the chosen approach.** Explain what and why, not step-by-step how. Point to specific files, functions, line numbers. Make claims verifiable. Leave room for the implementer to find a better solution.
+
+**Pass 4: List open questions.** What's still unclear? What assumptions are you making? What would change your approach?
+
+**After all passes:** Review from the implementer's perspective. Could they start work with only this document? If not, add what's missing.
+
+## Implement
+
+Implement in sequential passes. Don't write code until you've completed the verification passes.
+
+**Pass 1: Verify understanding.** Did you do your research? Can you state your approach in one sentence? If requirements are ambiguous, stop and ask. A wrong assumption wastes more time than a quick question.
+
+**Pass 2: Check scope.** Does this need to exist? Check if it already exists in the API. Is this the library's job or the user's job? The library handles protocol correctness; application concerns (reconnection, auth, routing) belong in user code.
+
+**Pass 3: Check invariants.** Walk through Key Invariants before writing code:
+
+- Reads: Will something still read from the connection?
+- Pools: Will pooled objects be returned on all paths?
+- Locks: Are you using context-aware `mu`, not `sync.Mutex`?
+- Independence: Are you coupling reads and writes unnecessarily?
+
+**Pass 4: Implement.** Make the change. Every change needs a reason; if you can't articulate why it improves things, don't make it. Preserve existing comments unless you can prove they're wrong.
+
+**Pass 5: Verify examples.** Trace through usage examples as if writing real code. If an example wouldn't compile, the design is wrong. Check edge cases: what happens on error? On cancellation?
+
+**After all passes:** If feedback identifies a problem, fix that specific problem. Don't pivot to a new approach without articulating what failed and why the new approach avoids it.
+
+## Verify
+
+Verify using external signals. Self-assessment is unreliable; these tools are the ground truth.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nhost/nhost](https://github.com/nhost/nhost) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
