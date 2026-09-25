@@ -85,4 +85,4 @@ ruff check .           # lint
 
 ---
 > Source: [PINA-org/PINA](https://github.com/PINA-org/PINA) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
