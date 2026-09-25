@@ -130,4 +130,4 @@ Flutter framework errors, plugin failures, and native macOS logs are captured as
 
 ---
 > Source: [conceptadev/superdeck](https://github.com/conceptadev/superdeck) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
