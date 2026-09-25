@@ -1,168 +1,89 @@
 ---
 trigger: always_on
-description: provides endpoint identity validation (keys must match) and
+description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 ---
 
-SHIELD Agent Protocol
-=====================
+# Agent Guide for opentelemetry-go
 
-The Agents of SHIELD are the workhorse of the data protection
-solution.  They perform backup and restore tasks.
+This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 
-All communication with the Agents is initiated by the Core.
-Agents **never** initiate a connection to the Core themselves.
+Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
+Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
 
-All communication is handled over an SSH connection.  This
-provides endpoint identity validation (keys must match) and
-confidentiality (so that credentials to target / storage systems
-are not compromised).  The SSH protocol is documented fully in
-[RFC 4251 (Architecture)][rfc4251], [RFC 4252 (AUTH
-Protocol)][rfc4252], [RFC 4253 (Transport Layer)][rfc4253], and
-[RFC 4254 (Connection Protocol)][rfc4254].
+## Core expectations
 
-Communication between the Core and the Agent is intermittent; the
-Core does **not** maintain a persistent SSH connection to any
-Agent.  Instead, as tasks are run on by the Core Scheduler,
-connections are made to the involved Agents as needed.
+- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
+- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
+- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
+- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
+- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
+- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
+- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
+- Keep dependencies minimal and justified.
+- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
+- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
+- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
 
-SHIELD uses the [Connection Protocol (RFC 4254)][rfc4254] to issue
-commands from the SHIELD Core to its participating Agents.  Each
-connection from the Core to an Agent initiates a new SSH Session.
-Once that Session is fully set up, an `SSH_MSG_CHANNEL_REQUEST` is
-sent, and a new Channel, of type "exec" is established.  The
-_command_ string sent with this channel is a JSON-encoded
-Agent-Request.
+## Default workflow
 
-(For more information on SSH channels, refer to RFC 4254).
+For new features and behavior changes, use this order unless the task explicitly says otherwise:
 
-The format of an Agent-Request is as follows:
+1. Read the relevant package, its tests, and any package docs or `README.md`.
+2. Add or update a failing unit test that captures the required behavior or regression.
+3. Implement the smallest change that makes the test pass.
+4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
+5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
+6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
+7. Run `make precommit` each time before considering the work complete.
 
-    {
-      "operation"       : "OP-STRING",
+For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
 
-      "target_plugin"   : "PLUGIN-NAME",
-      "target_endpoint" : "JSON-encoded STRING",
+## Verification
 
-      "store_plugin"    : "PLUGIN-NAME",
-      "store_endpoint"  : "JSON-encoded STRING",
+- Use `make` as the canonical repository verification command. The default target is `precommit`.
+- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
+- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
+- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
 
-      "restore_key"     : "OPAQUE-IDENTIFIER",
-    }
+## Documentation and changelog
 
-As of SHIELD v0.10.8, the only recognized operations are:
+- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
+- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
+- Prefer examples over long code snippets in GoDoc when practical.
+- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
+- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
+  - Always put the PR number at the end of the line (e.g., `(#1234)`), NOT the issue number.
+  - If the PR number is not yet known, omit it until the PR is created, then update the changelog entry before merging.
+  - Always use references to the go module that is updated (e.g., `go.opentelemetry.io/otel/sdk/metric`), instead of just the path (e.g., `sdk/metric`).
 
-  - backup
-  - restore
-  - purge
+## Repository habits
 
-Future Direction
-----------------
+- Prefer focused diffs. Avoid drive-by cleanup.
+- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
+- Generated files are checked in. If your change affects generation, keep generated output up to date.
+- Prefer fast local search tools such as `rg` when exploring the repository.
+- When changing behavior, make the invariants explicit in tests.
 
-For the 7.x version of SHIELD, the [ROADMAP][map] lays out several
-ambitious usability goals that require changes to the Agent
-Protocol.  In order to give operators and site administrators the
-smoothest possible roll-out, we need to be highly aware of
-backwards-compatibility at every turn.
+## Personas
 
-The following new functionality needs to be added:
+### Feature Agent
 
-- **Metadata** - Agents must respond to metadata queries from the
-  SHIELD core and provide information about themselves, including
-  identifiers (name / address), version details, available plugins
-  (and _their_ versions), metadata for how to configure each
-  plugin, etc.
+Use this persona for new behavior, new API surface, or spec-driven feature work.
 
-- **Storage Tests** - Agents must respond to "test" requests by
-  running plugin-specific health checks against the given endpoint
-  configurations.  This helps operators answer questions like "can
-  I retrieve archives from S3?"
+- Start with a failing unit test.
+- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
+- Implement the smallest viable change.
+- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
+- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
 
-- **Plugin Validation** - Agents must respond to "validate"
-  requests by running plugin validation for the given plugin,
-  against the given configuration.
+### Refactoring Agent
 
-To this end, Agents will need to be able to handle the following
-new request types:
+Use this persona when improving structure without intentionally changing behavior.
 
-### "status"
-
-The SHIELD Core requests Agent status by issuing the following
-Agent-Request:
-
-    {
-      "operation" : "status"
-    }
-
-Older SHIELD agents will respond to this with an error.  SHIELD
-Core will have to mark the agent as v0.0.0 (or whatever the most
-recent version before agents learned how to respond properly), and
-treat the health as "degraded"
-
-Newer SHIELD agents will respond with the following JSON:
-
-    {
-      "name"    : "<name-set-by-admin>",
-      "version" : "<X.Y.Z>",
-      "health"  : "ok",
-      "plugins" : {
-        "s3" : {
-          "name"    : "S3 Backup + Storage Plugin",
-          "author"  : "Stark \u0026 Wayne",
-          "version" : "0.0.1",
-          "features": {
-              "target" : "no",
-              "store"  : "yes"
-          },
-          "config" : {
-            "store" : [
-              { FIELD-DEFINITION },
-              ...
-            ]
-          }
-        },
-        ...
-      }
-    }
-
-The `name` and `version` field are just strings.  The Web UI will
-interpret `version` and search for appropriate misconfigurations
-and other pitfalls between Core version and Agent version.
-
-The `health` field indicates an Agent-defined assertion of the
-overall health of the Agent.  The specifics of what goes into
-making this decision are left to the Agent implementation.  The
-possible values are:
-
-- "ok" - Everything is good; no problems detected.
-- "degraded" - Non-fatal issues were detected.  For example,
-  some plugin scripts may not be executable.
-- "failing" - Fatal issues were detected.  No plugins, invalid
-  plugins detected, other environmental issues, etc.
-
-(Note that a SHIELD core may upgrade the critical-ness of a health
-alert.  For example, a non-responsive agent may be marked as
-"failing")
-
-The `plugins` field contains a map of plugin metadata, keyed by
-executable name.  This allows the Core to build up a list of
-capabilities for each agent, and validate configuration before it
-is attempted on-Agent.
-
-The values of the `plugins` map are the JSON output by executing
-the `info` command.  Legacy plugin binaries will not include the
-`config` top-level key; that is a new addition.
-
-### "test"
-
-The SHIELD Core requests a plugin configuration test by issuing
-the following Agent-Request:
-
-    {
-      "operation" : "test"
-      "plugin"    : "<PLUGIN-NAME>"
+- Treat behavior preservation as the default contract.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shieldproject/shield](https://github.com/shieldproject/shield) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
