@@ -1,105 +1,38 @@
 ---
 trigger: always_on
-description: Find academic papers across 5 sources (OpenAlex / Semantic Scholar / CrossRef / PubMed / arXiv) with adjustable depth — Quick scan (5 min) to Audit prep (3 hr). Use when the user wants to find papers, run a literature search, gather references, or scope a research topic. Triggers on: search verbs ('find papers', 'literature search', 'papers about X'), review types ('scoping review', 'systematic review', 'SR prep', 'literature review', 'lit review', 'help me write a lit review'), Chinese ('找文献', 
+description: Published Agent Skill (Apache 2.0). Edit the **git repo** here; the running copy
 ---
 
+# paper-search-pro — notes for sessions modifying this repo
 
-# paper-search-pro
+Published Agent Skill (Apache 2.0). Edit the **git repo** here; the running copy
+is separate at `~/.claude/skills/paper-search-pro/` — sync to it (rsync
+`scripts/` `references/` `assets/` + `SKILL.md`) for changes to take effect.
 
-Multi-source literature search with adjustable depth. Four tiers, five data sources orchestrated by you (the main agent). Python helpers handle deterministic work; LLM classification is delegated to parallel Inline SubAgents — no external API key required.
+## Invariants — do not break
+- **R-04 naming**: OpenAlex / SJR / 中科院(CAS) journal metrics are *partitions / open impact*, **never "Impact Factor"**. Only JCR `IF(YYYY)` is a real Impact Factor.
+- **R-19 human-path preservation**: the human 14-STEP flow — especially **STEP 6** (parallel classification SubAgents) and **STEP 12** (HTML render) — must stay **byte-identical** when the agent/headless, source-switch, and journal-rank features are unused. Every new capability is opt-in additive; default = current behavior.
+- **Journal-rank data is never committed** (Clarivate/SCImago/CAS copyright). It is runtime-fetched from public GitHub mirrors into `~/.paper-search-pro/ranks/`. `scripts/journal_rank.py` is the single canonical rank layer; `scripts/sjr_helper.py` is superseded (kept for back-compat, not the wired source).
+- **Zero new hard dependencies** for v2.2 (GitHub-raw fetch uses `requests`) — keep it that way: no playwright, no heavyweight libs.
 
-## When to use this skill
+## Test
+`PYTHONPATH=. python3 -m pytest tests -q` — ~264 offline pass. The ~12 failures in `tests/test_openalex_helper.py` are live OpenAlex rate-limit / key issues (environmental), not regressions.
 
-- User wants to find academic papers / 找文献 / 论文搜索
-- User is preparing a literature review, systematic review (SR), scoping review, or meta-analysis
-- User wants to scope research on a topic for a thesis / proposal / coursework / news story
-- User asks "what research exists on X" / "find me papers about Y"
-- User uploads a query that suggests literature gathering (PICO, SPIDER, MeSH, RCT, etc.)
+## Building the HTML report (`bundle.html`)
+The report is TypeScript + Vite in `assets/webartifacts_app/paper-report/`. `node_modules` lives only
+in the **installed** copy (`~/.claude/skills/paper-search-pro/...`) — the repo gitignores it — so build
+there: `rsync -a <repo>/…/src/ <inst>/…/src/` → `cd <inst>/…/paper-report && pnpm exec vite build` →
+`npx html-inline -i dist/index.html -o bundle.html` → copy `bundle.html` back here (it's committed).
+**Use `vite build`, NOT `pnpm build`** — the `tsc -b` gate is pre-existingly broken (React19/TS6 drift:
+`baseUrl` deprecation + unused `calendar.tsx`/`resizable.tsx` type errors + an `App.tsx` union-props
+strictness); none affect the runtime, and `bundle.html` has always been a vite+inline product.
 
-## When NOT to use
-
-- User wants to **read** a specific paper (use PDF reader / download tool)
-- User wants to **summarize** a single known paper (use a summarizer)
-- User wants to **download** PDFs given DOIs (use `paper-downloader-portable`)
-- User already has a literature set and wants to write a review (use `literature-set-review` / `factor-outcome-review`)
-- User wants concept explanation, not papers ("what is prospect theory" → just answer)
-
----
-
-## 🔥 Execution discipline (read this BEFORE running anything)
-
-These four rules govern every step below. Violating them is the dominant failure mode observed in real sessions — re-read them whenever you feel rushed.
-
-### Rule A — NEVER `cd` into the Skill directory
-
-**Reason**: `cd $PSP_HOME` rebinds `./` to the Skill asset directory. Every `./paper-search-results/...` after that lands inside the Skill folder, not where the user is working. Re-installing the Skill overwrites history; the user can't find outputs in their own working directory.
-
-**Correct pattern** — execute helpers from the user's working directory using `PYTHONPATH`:
-
-```bash
-PYTHONPATH=$PSP_HOME \
-  python3 -m scripts.openalex_helper search "<query>" --limit 30 \
-  > "$SEARCH_DIR/raw/openalex.json"
-```
-
-Where `$PSP_HOME` is the Skill install directory (resolved in STEP 0) and `$SEARCH_DIR` is an **absolute path under the user's PWD** (also from STEP 0). Shell `cwd` remains the user's PWD; `./` paths resolve to where the user expects.
-
-### Rule B — Parallelism is MANDATORY for SubAgent dispatch
-
-When you launch classifier SubAgents (STEP 6), you **must** put up to 5 `Task` tool_use blocks **inside one assistant message**. Serial dispatch (one Task per message, waiting for each result) makes Standard tier take ~17 min instead of ~10. See STEP 6 worked example.
-
-### Rule C — Tell the user every time you skip a step
-
-If you deliberately skip any STEP (because tier budget is exhausted, data is empty, or user preference), state it explicitly:
-- **What** you skipped (e.g. "STEP 10 L3 enrichment")
-- **Why** (tier? data? user choice?)
-- **What's lost** (e.g. "no influentialCitationCount, no funder/license fields")
-- **How to recover** (e.g. "re-run at `--tier deep` to include this")
-
-Never skip silently. Skipping is fine; surprising the user is not.
-
-### Rule D — Read the cited references/ file BEFORE the step
-
-Each STEP names a `references/<file>.md`. Read it before running the step's commands — the cheatsheets contain edge cases that are not duplicated in SKILL.md. Average must-read coverage across recent sessions was 5/17 — drive it higher.
-
----
-
-## Architecture at a glance
-
-```
-You (main agent) drive the workflow per this SKILL.md.
-Python helpers do deterministic work — NO LLM inside, NO external API key.
-
-  L1 OpenAlex (primary)  → deep top-100 multi-strategy
-  L2 PubMed (medical)    → MeSH enricher (mostly; Audit-tier can search independently)
-  L2 arXiv (CS/preprint) → T-0~T-4 freshness sentinel
-  L3 Semantic Scholar    → influentialCitationCount + abstract fallback
-  L3 CrossRef            → funder / license / clinical-trial-number
-
-  Classification         → Inline SubAgents (parallel, file-IPC, 5 per message)
-  Output                 → HTML (Shadcn) + MD + BibTeX/RIS/CSV + PRISMA-S log
-```
-
----
-
-## The 4 tiers — pick first
-
-| Tier | Wall-clock | Papers | When to pick |
-|------|------------|--------|--------------|
-| Quick | ~5-8 min | 20-60 | "查一下" / "几篇" / "before tomorrow" / fast scope |
-| **Standard** (default) | ~10-17 min | 60-180 | Scope a topic / write background / general lit search |
-| Deep | ~30-45 min | 180-400 | "thorough" / writing a review article / 综述写作 |
-| Audit | ~2-3 hr | 400-1000+ | "systematic review" / "PRISMA" / "Cochrane" / "meta-analysis" |
-
-📖 **BEFORE picking, read `references/tier_decision.md`.** Tell the user your choice and why. For Audit, show limitations warning + get explicit confirmation before starting.
-
----
-
-## The recipe
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Design record
+Full v2.2 research + the **HTML design-sync maintenance playbook** (delta method, build recipe, and the
+misunderstandings to avoid) live outside the repo:
+`~/Documents/Claude Code/Skills/Enhancement/Paper Search Pro/` → `00_maintenance_playbook.md` +
+`CLAUDE.md`; delta plans in `../01_working/NN_deltaN_sync_plan.md`; backend work in `v2.2-evolution/`.
 
 ---
 > Source: [O0000-code/paper-search-pro](https://github.com/O0000-code/paper-search-pro) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
