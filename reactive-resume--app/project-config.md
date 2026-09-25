@@ -79,4 +79,4 @@ Narrow cross-cutting helpers go in `packages/utils` only after checking no domai
 
 ---
 > Source: [reactive-resume/app](https://github.com/reactive-resume/app) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
