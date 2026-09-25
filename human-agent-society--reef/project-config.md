@@ -107,4 +107,4 @@ for the environment required by the selected backend.
 
 ---
 > Source: [Human-Agent-Society/reef](https://github.com/Human-Agent-Society/reef) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
