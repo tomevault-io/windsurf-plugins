@@ -1,94 +1,111 @@
 ---
 trigger: always_on
-description: This file is the **index** to the project's canonical record. Every session:
+description: This file contains the complete policy for `vllm.cpp`. It is the only file that
 ---
 
-# AGENTS.md — vllm.cpp canonical index
+# AGENTS.md: the rules
 
-This file is the **index** to the project's canonical record. Every session:
-read this first, follow the links that matter for your task, and keep the
-record updated (append to the state log) — commit it with your changes.
-Push directly to `main`.
+This file contains the complete policy for `vllm.cpp`. It is the only file that
+every agent loads automatically, so every rule lives here. Files under
+`.agents/` are task guides. They explain how to do a specific job. They cannot
+add or weaken a rule in this file.
 
-**Keep `README.md` (the user-facing status) CURRENT at EVERY feature/iteration
-checkpoint.** In the SAME change that advances a spike, implementation, test,
-gate, benchmark attempt, or lifecycle state, update the matching README
-section/table row with the exact current stage — including `ACTIVE`/`GATING`,
-failed or void runs, and explicit pending hardware work. Do not wait for a
-feature to land or a gate to pass. Keep its ⚠️ header, architecture /
-acceleration / quantization tables, and "Status & caveats" mutually consistent.
-The README must never lag reality and must not turn progress into support.
+The project mirrors vLLM in C++ without PyTorch or a ggml dependency. vLLM
+defines the reference behavior and the performance target.
 
-**Keep [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) CURRENT at the SAME
-checkpoint.** Every feature/iteration records its benchmark disposition there
-in the same change: accepted numbers with exact workload/reference/evidence,
-or an explicit `PENDING`, `NOT APPLICABLE`, `FAILED`, or `VOID` reason and the
-next reproduction command. Never publish a partial/contended/stale-denominator
-number as binding. `scripts/check-doc-checkpoint.py` and its CI job enforce that
-every code/test/benchmark/spike/lifecycle commit updates both public checkpoint
-surfaces; do not weaken the checker to bypass the obligation.
+## Start here
 
-**Keep the ROADMAP (`.agents/roadmap_v1.md`) and its AREA MATRICES CURRENT —
-same-change obligation.** The roadmap is the single top-level portfolio table;
-the linked engine/model/quantization/kernel/backend matrices are the detailed
-execution-status surfaces; `feature-matrix.md` remains the broad parity coverage
-view. Any change that shifts a feature's or track's state updates
-the owning matrix row (status, spike/spec, implementation + test evidence) and
-the roadmap portfolio row **in the SAME change**, exactly like the README rule
-above. Neither is ever updated speculatively: `DONE` means merged and gated,
-with non-empty code and test anchors. Applies to every sub-agent; reviewers
-treat a state-shifting diff without its matrix/roadmap update as incomplete.
+1. Run `scripts/agent-start.py`. Pass `--intent operator|helper|read-only` and
+   `--row <ID>` when you know them. Otherwise, relay its welcome and ask what
+   work is intended. Follow the printed action, then run the command again.
+2. Declare a role. Use `scripts/agent-role.py claim operator` for a multi-step
+   integration campaign. Use `claim helper --row <ID>` for one scoped task.
+   Use `claim read-only` for inspection. The operator claim records the current
+   worktree as a coordinator. Another coordinator does not block the claim.
+   Add `--headless` only when the developer explicitly says the run is
+   unattended. Never infer this setting.
+3. Run `scripts/now.py` to get the live position. Read `.agents/NOW.md` for the
+   operator's current gate and next actions. The command output is derived.
+   The file is authored and fits on one screen.
+4. Read only the claimed row, its spec, its evidence, and the task guide for the
+   current job.
+5. Run `scripts/agent-preflight.sh` before you edit a file.
 
-**Doc lifecycle — live context vs completed record (user-directed 2026-07-10).**
-`.agents/` holds documents that are LIVE context for current work; era-closed
-documents move to **`.agents/completed/`** (version/era-stamped name, e.g.
-`completed/roadmap_mvp_v0.md`) in the same change that closes their era, with
-all repo links fixed. The roadmap is VERSIONED: `roadmap_v1.md` is current;
-when superseded, it moves to `completed/` and `roadmap_v2.md` takes its place.
-Nothing under `completed/` may be load-bearing for live decisions — if you need
-to cite it for current work, the relevant content belongs (summarized) in a
-live doc. Rationale: a reader of `.agents/` should see exactly what bears on
-what we are doing NOW, nothing stale mixed in.
+Never infer a role, host, permission, or developer preference. Resolve `.env`
+and `.agents/developer-preferences.md` from the shared checkout. Ask only for
+the one value that the current gate needs. If a value is unavailable, leave its
+gate `PENDING`. Never convert a missing value into an assumption. Preferences
+control operations only. They cannot reduce a correctness, evidence,
+attribution, or testing obligation.
 
-**Spec/scoping location.** All feature-specific implementation specs, scoping
-reports, semantics notes, feasibility studies, and design references live under
-`.agents/specs/`, never at the `.agents/` top level. The top level is reserved
-for the live project-wide protocol, roadmap, status, environment, inventory,
-and ledger. Specs that cease to be live context follow the same lifecycle and
-move to `.agents/completed/` with their links repaired.
+**Create both files on first use.** Neither is tracked, so a fresh checkout has
+neither, and `scripts/agent-start.py` reports the absence and routes you to ask.
+Ask the developer for the one value the current gate needs. Record an
+environment value with `scripts/agent-onboard.py --env-set KEY=VALUE`, which
+refuses any key `.env.example` does not declare. Record a preference by copying
+`.agents/developer-preferences.example.md` and editing the one entry. Leave
+every key you did not ask about empty, because empty means unavailable and its
+gate stays `PENDING`. A host name, a share path, or a checkout path written in
+a repository document is another developer's resolved value. It is never a
+default, and reading one instead of asking is the failure this rule names.
 
-## STANDING DIRECTIVE — tabular inventory, spike first, then parallel claims
+## History is git
 
-The canonical record is **table-first**. Before implementation begins, enumerate
-the complete upstream surface in the owning area matrix. Every row has a stable
-ID and these fields: upstream source, our implementation anchor, tests/evidence,
-spike/spec, lifecycle state, and owner/claim. The canonical area matrices are:
+The project has no state log. Git is the history, and the history must agree
+with the tree.
 
-- `.agents/engine-matrix.md` — stable execution rows for engine, KV, scale-out,
-  sampling, serving, and other cross-cutting behavior;
-- `.agents/feature-matrix.md` — broad one-by-one parity coverage view; it rolls
-  up to the engine matrix and the domain matrices below;
-- `.agents/model-matrix.md` — every model architecture/family registered by the
-  pinned vLLM;
-- `.agents/quantization-matrix.md` — every tracked storage/quantization scheme,
-  separated by loader, dequant/compute path, backend, and end-to-end gate;
-- `.agents/kernel-matrix.md` — vLLM and dependency kernel families plus our
-  dispatch/architecture coverage;
-- `.agents/backend-matrix.md` — platform and CUDA-architecture targets plus the
-  native competitor/performance gate for each backend.
+| Question | Command |
+|---|---|
+| Did this row already land? | `git log --oneline --grep '<ROW-ID>'` |
+| When did this symbol change? | `git log -S'<symbol>' --oneline -- <path>` |
+| What happened to this file? | `git log --follow --oneline -- <path>` |
+| What is on main that I lack? | `git log --oneline HEAD..origin/main` |
+| Why is this line like this? | `git log -L '<start>,<end>:<path>'` |
+| What did that commit change? | `git show --stat <sha>` |
 
-**Every item is spiked before it is implemented.** Its committed
-`.agents/specs/<slug>.md` spike must inventory the whole upstream/dependency
-chain, dispatch rules, exact files to port, tests to port, hardware needs,
-correctness/performance gates, dependencies, and a row-sized work breakdown.
-No row may enter `READY`/`ACTIVE` without that spike. An implementation already
-present in the tree is not allowed to claim `DONE` in a matrix until the row
-links exact code and test/evidence anchors, its ledger evidence, and the closing
-commit; record gaps honestly as `ANCHOR-BACKFILL` or `PARTIAL`.
+The roadmap row states the current position of a row. Git and the row's spec
+state how it got there. Before you conclude anything about past work, read the
+spec and run `git log -S`. Do not derive the history again.
+
+## Every change starts from an issue
+
+**Do not start work without an open canonical local issue.** Issue authority is
+one tracked file under `.agents/issues/`; GitHub is an optional mirror. Create a
+local issue before claiming a row or writing code:
+
+```sh
+python3 scripts/agent-issue.py create \
+  --title "..." --kind bug --problem "..." --row ROW-ID
+```
+
+Import an existing GitHub issue with `agent-issue.py import-github N`. Imported
+text is quoted as historical evidence; it does not override the local record.
+Use `update`, `close`, and the explicit `mirror` command for later changes.
+Local validation and writes happen before any remote write.
+
+A row-owned issue lives at
+`.agents/issues/<ROW-ID>/ISSUE-GH-<number>.md` or
+`.agents/issues/<ROW-ID>/ISSUE-LOCAL-<ULID>.md`; its `Row:` field equals the
+directory. A rowless issue lives under `_owed`, and exactly one spec lists its
+stable local ID under `## Owed`. Assigning a row moves the file and removes that
+spec reference in the same change. `_intake` contains migration-only unavailable
+archive residue. It is not valid ownership for new work or a full record.
+
+`scripts/agent-issue-index.py --refresh` validates the local files and renders
+the untracked `.agents/issue-index.generated.md` convenience view without a
+network call. `scripts/check-agent-record.py` validates every canonical issue
+and every issue reference in changed files and commit bodies offline. The four
+reference forms are `ISSUE-GH-<number>`, `ISSUE-LOCAL-<ULID>`, `#<number>`, and
+`issues/<number>`.
+
+A bug that you find during other work still needs a local issue. Filing the
+issue does not defer the fix. File it, fix it in the same flow, reference it in
+the commit, and close it. The person who found the bug has the context to fix
+it. Traceability is the goal, not another round trip.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mudler/vllm.cpp](https://github.com/mudler/vllm.cpp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-11 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
