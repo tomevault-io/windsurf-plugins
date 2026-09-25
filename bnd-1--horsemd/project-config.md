@@ -1,98 +1,88 @@
 ---
 trigger: always_on
-description: Guidance for Claude / AI agents (and new devs) working in this repo. Keep it
+description: HorseMD is an Electron + Vite + React Markdown editor with a shared renderer for desktop and Capacitor mobile builds.
 ---
 
-# CLAUDE.md
+# Repository Guidelines
 
-Guidance for Claude / AI agents (and new devs) working in this repo. Keep it
-short; deep detail lives in [`docs/`](./docs/).
+## Project Structure & Module Organization
 
-## What this is
+HorseMD is an Electron + Vite + React Markdown editor with a shared renderer for desktop and Capacitor mobile builds.
 
-**HorseMD** — a warm, Typora-style Markdown editor. Electron shell + Vite +
-React, with **Milkdown Crepe** (ProseMirror-based WYSIWYG) as the editor engine.
-Core idea: every file opens as a **tab in one window**, not a new process. The
-shell (tabs, file tree, command palette, outline, themes, i18n, welcome screen)
-is all hand-written.
+- `src/main/index.js`: Electron main-process lifecycle, window, IPC assembly, menus, assets, and update checks.
+- `src/main/filesystem.js`, `watchers.js`, `documents.js`: file operations, watchers, dialogs, and PDF export.
+- `src/preload/index.js`: secure `window.api` bridge exposed to the renderer.
+- `src/renderer/src/`: React app, Milkdown editor, hooks, shell components, themes, i18n, platform shim.
+- `src/renderer/src/components/Editor.jsx`: Crepe/ProseMirror editor wrapper; keep new editor features in focused `editor-*.js` helpers when possible.
+- `src/renderer/src/hooks/` and `src/renderer/src/lib/`: file ops, lifecycle, outline, find/replace, menus, and review actions.
+- `docs/`: architecture, features, development workflow, mobile notes, and manual testing.
+- `scripts/`: lightweight verification and CDP helpers.
+- `website/`: static product/download homepage; `guide/`: isolated VitePress user tutorial site.
+- `build/`, `icons/`, `android/`, `ios/`: packaging assets and mobile shells.
 
-## Commands
+## Build, Test, and Development Commands
 
 ```bash
-npm install            # if Electron download is slow: ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
-npm run dev            # electron-vite dev (HMR)
-npm run build          # build main + preload + renderer → out/
-npm start              # run the built app
-npm run dist           # build + electron-builder package for the HOST platform
-npm run dist:dir       # unpacked build (no installer)
+npm install
+npm run dev
+npm run build
+npm start
+npm run dist
+npm run build:mobile
+npm run test:source-map
+npm run guide:check
+node scripts/test-strike-guard.mjs
 ```
 
-`npm run dist` packages for whatever OS you run it on — **Windows NSIS** on
-Windows, **macOS dmg + zip** on macOS (a dmg must be built on macOS). If the
-electron-builder binaries download slowly:
-`ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`.
+- `npm run dev`: starts Electron/Vite hot reload.
+- `npm run build`: builds main, preload, and renderer into `out/`; CI uses this.
+- `npm start`: runs the built app.
+- `npm run dist`: creates the host-platform installer via `electron-builder`.
+- `npm run build:mobile`: builds the Capacitor renderer into `dist-mobile/`.
+- `npm run test:source-map`: runs Markdown raw-offset ↔ ProseMirror mapping tests for tables, duplicate text, code, images, lists, and HTML.
+- `npm run guide:check`: validates tutorial metadata, versions, links, assets, screenshot privacy/dimensions, and builds the guide site.
+- `node scripts/test-strike-guard.mjs`: runs CriticMarkup strike regression checks.
 
-Builds are **unsigned**: Windows shows SmartScreen ("更多信息 → 仍要运行");
-macOS Gatekeeper blocks first launch (right-click → Open, or
-`xattr -dr com.apple.quarantine /Applications/HorseMD.app`).
+## Coding Style & Naming Conventions
 
-## Layout
+Use ES modules, React functional components, two-space indentation, single quotes, and no semicolons. Components use `PascalCase.jsx`; hooks use `useName.js`; editor helpers use descriptive `editor-*.js` names. No formatter or linter is enforced, so match nearby code. Avoid adding large logic blocks to `App.jsx` or `Editor.jsx`; prefer small modules under `hooks/`, `lib/`, or `components/editor-*.js`.
 
-```
-src/main/index.js      main process: window, IPC (fs/dialog/watch), menu, file watching
-src/preload/index.js   contextBridge → window.api (whitelisted IPC)
-src/renderer/src/
-  App.jsx              shell: tabs, state, session, theme, lang, welcome, editor routing
-  components/Editor.jsx  Crepe wrapper + block controls + enhancements
-  components/{Sidebar,Tabs,Outline,CommandPalette,StatusBar,icons}.jsx
-  {blocks,themes,i18n,onboarding}.{js,jsx}
-  styles/app.css       all styles + theme variables
-build/                 icon.ico (Windows) + icon.icns (macOS)
-scripts/               CDP-based e2e helpers (etv.mjs, inspect.mjs)
-docs/                  architecture / features / implementation-notes / development
-```
+## Testing Guidelines
 
-## Conventions & rules
+There is no single `npm test` command. Run `npm run build` before PRs. For editor/review logic, add or update focused scripts under `scripts/`. For UI changes, follow `docs/manual-test-checklist.md`; CDP helpers are in `docs/development.md`.
 
-- **Cross-platform — do not break the other OS.** This app ships on Windows and
-  macOS from one codebase. Platform-specific code is gated:
-  - main process: `process.platform === 'darwin' | 'win32'`
-  - renderer: `window.api.platform` → an `.app.is-win` / `.app.is-mac` class on
-    the root; write platform CSS under those selectors only.
-  - title bar: `hiddenInset` + `trafficLightPosition` on macOS (top bar spans
-    full width, activity bar drops below the traffic lights); `titleBarOverlay`
-    on Windows. Keep both paths working when touching the top bar.
-  - shortcuts accept both `Ctrl` and `Cmd` (`metaKey`).
-- **Markdown vs plain text.** Supported extensions are centralized:
-  `MD_EXTS`/`MD_RE` in `main/index.js` (open dialog + folder scan), and
-  `MD_DOC_RE` in `App.jsx`. `.md/.markdown/.mdx` open in the Crepe rich editor;
-  `.txt` (and any other file with a path) opens in the **plain textarea** —
-  feeding plain text through Milkdown collapses line breaks and hangs on large
-  files. New untitled tabs (no path) use the rich editor.
-- **ProseMirror view**: get it via `crepe.editor.ctx.get(editorViewCtx)` —
-  `crepe.editor.view` is `undefined` in this Milkdown version.
-- **Crepe content callback**: register `crepe.on(markdownUpdated)` **before**
-  `crepe.create()`, or changes never fire (saves would write stale content).
-- **State**: session is `localStorage["minimd.session.v1"]`; onboarding flag is
-  `localStorage["horsemd.onboarded.v1"]`. Themes are `body` classes
-  (`light|dark` + optional `theme-*`).
-- **Don't commit `dist/` or `out/`** (gitignored). `build/icon.*` IS tracked.
+CDP automation must use `scripts/lib/electron-test-app.mjs` with its default
+background mode so tests do not take native keyboard focus or show over the
+user's work. Input-rule, caret, line-break, mode-switch, and source-fidelity
+tests must send committed text one character at a time via
+`scripts/lib/human-input.mjs`, with raw key events for delimiters and special
+keys. Bulk text insertion is only appropriate for paste semantics, fixture
+setup, or behavior unrelated to incremental typing. Per-character committed
+Chinese text is not a substitute for a real IME composition test.
 
-## Testing
+For any real/manual reproduction of rich-text ↔ source divergence, launch the
+actual HorseMD process with `--horsemd-input-trace` in Electron argv before the
+user starts editing. Do not rely on `ELECTRON_ENABLE_LOGGING` alone: it does not
+persist the source/candidate/canonical transaction evidence needed to identify
+the first divergence. Keep the trace-enabled instance running through the real
+operation sequence, and inspect the first integrity failure before changing code.
 
-No unit tests. Verification is done by running the packaged app and observing
-behavior (screenshots), plus the CDP e2e scripts in `scripts/` — see
-[`docs/development.md`](./docs/development.md). On macOS, when scripting the dev
-build, note that `osascript "tell application \"Electron\""` can launch the
-generic `node_modules` Electron bundle (a name collision); prefer testing the
-packaged **HorseMD.app**, which has a unique name and bundle id.
+User-facing changes must update the matching `guide/` page. Tutorial screenshots must come from a rebuilt and freshly installed current app using an isolated profile; follow `docs/user-guide-maintenance.md`. Never publish screenshots containing personal paths or stale UI.
 
-## When in doubt
+## Commit & Pull Request Guidelines
 
-Read the matching doc in `docs/` before changing a subsystem — many non-obvious
-behaviors (editor data flow, drag regions, watcher echo suppression, the
-title-bar layout) are documented there with their root causes.
+History uses concise subjects such as `feat(#38): ...`, `fix(site): ...`, `docs: ...`, `chore: ...`, and `refactor: ...`. Keep commits focused and imperative. PRs should describe the change, link issues, include UI screenshots, mention desktop/mobile impact, and add `CHANGELOG.md` entries for user-facing changes.
+
+## Security & Configuration Tips
+
+Keep Electron renderer access behind `window.api`; do not enable Node integration. Do not commit signing keys, keystores, or local config such as `android/key.properties`. When adding native capabilities, update both desktop preload and the Capacitor shim or gate the UI with `window.api.capabilities`.
+
+## User Execution Preference
+
+- For routine project-development commands such as build, start, dev, test, read-only diagnostics, and local packaging, the user has explicitly authorized automatic execution without asking again each time.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [BND-1/horseMD](https://github.com/BND-1/horseMD) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
