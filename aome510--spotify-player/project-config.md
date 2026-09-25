@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file guides Claude Code when working in this repository.
+description: This file guides coding agents when working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file guides Claude Code when working in this repository.
+This file guides coding agents when working in this repository.
 
 ## Project Overview
 
@@ -67,4 +67,4 @@ Event/UI threads never call async functions directly. They send a `ClientRequest
 
 ---
 > Source: [aome510/spotify-player](https://github.com/aome510/spotify-player) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
