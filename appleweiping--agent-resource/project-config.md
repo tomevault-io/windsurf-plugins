@@ -1,117 +1,67 @@
 ---
 trigger: always_on
-description: You are an agent working with the **beautiful-html-templates** library. Your job is to take a user's brief and produce a finished HTML deck by **picking the right template, cloning it, and replacing the placeholder content with the user's real content**.
+description: - **Setup environment**: `./setup.sh`
 ---
 
-# Agent Instructions
+# Anthropic Quickstarts Development Guide
 
-You are an agent working with the **beautiful-html-templates** library. Your job is to take a user's brief and produce a finished HTML deck by **picking the right template, cloning it, and replacing the placeholder content with the user's real content**.
+## Computer-Use Demo
 
-This document is your operating manual. Read it once at the start of any deck-building task.
+### Setup & Development
 
----
+- **Setup environment**: `./setup.sh`
+- **Build Docker**: `docker build . -t computer-use-demo:local`
+- **Run container**: `docker run -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY -v $(pwd)/computer_use_demo:/home/computeruse/computer_use_demo/ -v $HOME/.anthropic:/home/computeruse/.anthropic -p 5900:5900 -p 8501:8501 -p 6080:6080 -p 8080:8080 -it computer-use-demo:local`
 
-## 1. The full workflow
+### Testing & Code Quality
 
-For every deck-building request, follow this exact sequence. Do **not** skip the clarifying step or the preview step.
+- **Lint**: `ruff check .`
+- **Format**: `ruff format .`
+- **Typecheck**: `pyright`
+- **Run tests**: `pytest`
+- **Run single test**: `pytest tests/path_to_test.py::test_name -v`
 
-### Step 1 — Ask the user about occasion and mood
+### Code Style
 
-Before reading any files, ask the user:
+- **Python**: snake_case for functions/variables, PascalCase for classes
+- **Imports**: Use isort with combine-as-imports
+- **Error handling**: Use custom ToolError for tool errors
+- **Types**: Add type annotations for all parameters and returns
+- **Classes**: Use dataclasses and abstract base classes
 
-> "Two quick questions before I pick a template:
-> 1. **What's the occasion?** (e.g. founder pitch, research synthesis, brand manifesto, classroom kickoff, etc.)
-> 2. **What mood / vibe do you want?** (e.g. confident & punchy, quiet & literary, warm & playful, dark & moody, etc.)"
+## Customer Support Agent
 
-Wait for the user's answer. Do not pick yet. Even if the brief seems obvious, ask — the user's *taste* often surprises in ways no inferred brief can capture.
+### Setup & Development
 
-### Step 2 — Read `index.json` and pick 3 candidates
+- **Install dependencies**: `npm install`
+- **Run dev server**: `npm run dev` (full UI)
+- **UI variants**: `npm run dev:left` (left sidebar), `npm run dev:right` (right sidebar), `npm run dev:chat` (chat only)
+- **Lint**: `npm run lint`
+- **Build**: `npm run build` (full UI), see package.json for variants
 
-Read `index.json` at the repo root. Match the user's stated occasion + mood against each template's `mood`, `tone`, `best_for`, and `formality`. **Pick three templates** whose tones genuinely fit. The three should be *different enough from each other* that the user has a real choice — e.g. don't pick three editorial templates if the brief is editorial; pick one editorial, one warmer alternative, and one wildcard that re-interprets the brief.
+### Code Style
 
-### Step 3 — Build a title-slide preview of each candidate
+- **TypeScript**: Strict mode with proper interfaces
+- **Components**: Function components with React hooks
+- **Formatting**: Follow ESLint Next.js configuration
+- **UI components**: Use shadcn/ui components library
 
-For each of the 3 candidates:
+## Financial Data Analyst
 
-1. Read the template's `template.html` to learn its visual system.
-2. Take the **first slide only** (the cover / title slide of that template).
-3. Replace the placeholder content with **the user's actual deck topic / title / subtitle / author / date** — i.e., make this preview real, not generic.
-4. Save the preview as a standalone HTML file in a temp folder, e.g. `previews/01-<slug>.html`. Keep all sibling assets (`styles.css`, `deck-stage.js`, etc.) the template needs so the preview opens correctly.
+### Setup & Development
 
-These three preview files should be self-contained — opening any of them shows that template's title slide, populated with the user's real content.
+- **Install dependencies**: `npm install`
+- **Run dev server**: `npm run dev`
+- **Lint**: `npm run lint`
+- **Build**: `npm run build`
 
-### Step 4 — Open all 3 previews in the browser, send paths to user
+### Code Style
 
-Open each of the 3 preview files in the browser using `open <path>` (macOS). Then send the user a message like:
-
-> "Three options to compare:
->
-> 1. **<Template A>** — <one-line tone description>
->    `/path/to/previews/01-template-a.html`
-> 2. **<Template B>** — <one-line tone description>
->    `/path/to/previews/02-template-b.html`
-> 3. **<Template C>** — <one-line tone description>
->    `/path/to/previews/03-template-c.html`
->
-> Which one feels right?"
-
-Wait for the user to pick.
-
-### Step 5 — Build the full deck in the chosen template
-
-Once the user picks:
-
-1. Clone the chosen template's full folder into the user's project workspace.
-2. Adapt every slide per the rules in §3 (preserve / replace / extend).
-3. If the user's deck needs more slides than the template's demo holds, duplicate existing layouts to fit; if it needs fewer, drop slides from the bottom. Update page-number labels.
-4. **If a slide needs a layout the template doesn't have, design it from scratch using the template's design system** — same fonts, same color palette, same decorative vocabulary, same spacing rhythm, same component grammar. Do not bail back to the user; do not pick a different template; do not import a new visual language. The new slide should look like a natural extension of the template, not a graft. (See §5 — designing missing layouts.)
-
-### Step 6 — Open the final deck in the browser, send the file path
-
-Open the finished deck with `open <path>`. Send the user a message like:
-
-> "Done. Your deck is at `/path/to/deck/template.html` — opened it in your browser.
->
-> [One line about what you did and any caveats.]"
-
-This applies to **every artifact you produce** — preview files, intermediate iterations, final deck. Always open it, always send the path.
-
----
-
-## 2. What's in `index.json`
-
-```jsonc
-{
-  "schema_version": 1,
-  "template_count": 28,
-  "templates": [
-    {
-      "slug": "neo-grid-bold",
-      "name": "Neo-Grid Bold",
-      "tagline": "Editorial neo-brutalism with a single neon yellow accent on off-white paper.",
-      "mood": ["confident", "punchy", "editorial", "modern"],
-      "occasion": ["product launch", "design review", "founder pitch", ...],
-      "tone": ["bold", "minimal", "design-led", "graphic"],
-      "formality": "medium",
-      "density": "high",
-      "scheme": "light",
-      "best_for": "Anything that should feel confident and editorial-graphic ...",
-      "avoid_for": "Contexts that need to feel quiet, traditional, or warm ...",
-      "slide_count": 12
-    },
-    ...
-  ]
-}
-```
-
-Field definitions:
-
-| field | how to use it |
-|---|---|
-| `mood` | emotional adjectives. Match against the user's *feeling* keywords. |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **TypeScript**: Strict mode with proper type definitions
+- **Components**: Function components with type annotations
+- **Visualization**: Use Recharts library for data visualization
+- **State management**: React hooks for state
 
 ---
 > Source: [appleweiping/AGENT_RESOURCE](https://github.com/appleweiping/AGENT_RESOURCE) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
