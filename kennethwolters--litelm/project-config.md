@@ -1,39 +1,38 @@
 ---
 trigger: always_on
-description: litelm is a 2,660 LOC reimplementation of litellm's core routing+formatting. It works as a **DSPy backend for 6 providers** — that is the only verified claim. Everything beyond that is untested.
+description: litelm is a 2,912 LOC reimplementation of litellm's core routing+formatting. Its DSPy contract and seven providers have been verified live; everything beyond the evidence below is untested.
 ---
 
-# Ground Truth (updated 2026-04-17)
+# Ground Truth (updated 2026-09-19)
 
-litelm is a 2,660 LOC reimplementation of litellm's core routing+formatting. It works as a **DSPy backend for 6 providers** — that is the only verified claim. Everything beyond that is untested.
+litelm is a 2,912 LOC reimplementation of litellm's core routing+formatting. Its DSPy contract and seven providers have been verified live; everything beyond the evidence below is untested.
 
 ## What's Actually Proven
 
-- **DSPy integration:** All 7 DSPy execution paths work (Predict, CoT, typed signatures, streaming, embeddings, ReAct, multi-output). 10 live smoke tests.
-- **7 providers verified live:** openai, anthropic, groq, mistral, xai, openrouter, azure. 44 live tests covering basic completion, streaming, streaming+usage, tool calls, streaming tool calls, embeddings, error mapping.
-- **161 own tests pass**, 47 skipped (live tests needing API keys).
-- **65 of litellm's ported tests pass** out of 79 high-relevance tests (82.3%). The other 1060+ collected tests fail at import — they reference litellm internals (Router, proxy, provider-specific LLM modules) we intentionally don't implement. (Upstream re-synced 2026-03-16; test count changed due to litellm restructuring.)
+- **DSPy integration:** All 7 DSPy execution paths work (Predict, CoT, typed signatures, streaming, embeddings, ReAct, multi-output). 10 live smoke tests, re-certified 2026-09-11.
+- **7 providers verified live:** openai, anthropic, groq, mistral, xai, openrouter, azure. 45 live tests covering basic completion, streaming, streaming+usage, tool calls, streaming tool calls, embeddings, error mapping; all re-certified 2026-09-11.
+- **265 own tests pass**, 55 skipped (live tests needing API keys), including a 2026-09-19 local gate run against the current lock.
+- **Current classified ported baseline:** 75 tests pass against LiteLLM `9a715df2` from 2026-09-11. After explicit contract-based scope review, no remaining assertion/runtime failure is actionable. Raw counts are not comparable to the March baseline because upstream's test layout and conftest behavior changed substantially.
 
 ## What's NOT Proven
 
 - **10 providers with no API keys:** bedrock, cloudflare, together_ai, fireworks_ai, deepseek, perplexity, deepinfra, gemini, cohere, ollama. They route through OpenAI-compat which works for the 7 tested providers, but provider-specific quirks (like Mistral's `type=None` tool calls) can only be found with live testing.
-- **Bedrock + Cloudflare handlers:** 420 LOC of custom handler code (SigV4 auth, raw httpx SSE parsing) with zero live testing. The Bedrock client cache was just added — also untested against a real endpoint.
+- **Bedrock + Cloudflare handlers:** Bedrock uses custom SigV4 auth; Cloudflare delegates to its OpenAI-compatible `/ai/v1` endpoint. Both still have zero live testing.
 
-## Honest Ported Test Breakdown (1,080 collected, synced 2026-03-16)
+## Honest Ported Test Breakdown (2,121 collected, synced 2026-09-11)
 
-After fixing conftest to exclude nested dirs by basename (not just root-level glob):
+The harness loads only litelm's shim conftest and excludes suites outside the declared routing/formatting contract. Upstream's repository growth means these counts are not comparable to the March baseline.
 
 | Bucket | Count | What it means |
 |--------|------:|---------------|
-| Passed | 56 | Working |
-| Assertion failures | 12 | Our code runs but produces wrong results |
-| Runtime errors | 6 | Our code runs but crashes |
-| Needs API key | 29 | Would need live credentials |
-| Skipped | 70 | Skipped by test logic |
-| Timeout | 1 | Timed out |
-| Import errors | 906 | Tests importing litellm internals we don't implement — **will never pass** |
+| Passed | 75 | Working |
+| Assertion failures | 25 | Reviewed; LiteLLM-specific config, annotations, or prompt rewriting |
+| Runtime errors | 68 | Reviewed; internal model registries/transforms or unsupported providers |
+| Needs API key | 32 | Would need unavailable credentials |
+| Skipped | 57 | Skipped by test logic |
+| Import errors | 1,864 | Tests importing LiteLLM internals/features litelm intentionally does not implement |
 
-Of the 14 high-relevance failures, **none are actionable** — all are out of scope (compactifai 7, fallbacks/Router 3, gemini no_api_key 2, poetry deps 1, Anthropic system message format 1). 0 regressions vs previous baseline; 9 fewer passes are tests removed upstream.
+The classifier reports **0 remaining high-relevance failures** after explicit path-level review. The audit found and fixed actionable gaps in future Claude thinking, Anthropic schema handling/native structured output, embedding retry propagation, and exception response headers. The categorized JUnit result was produced outside the repository. The source-level audit reviewed 360 core-path commits from `649eb2d` through `9a715df2`; 171 candidates received explicit decisions with no unknown rows.
 
 ## Project Plan
 
@@ -42,7 +41,7 @@ Of the 14 high-relevance failures, **none are actionable** — all are out of sc
 - Core routing, completion, streaming, embedding, text_completion, responses API
 - 4 custom handlers (anthropic, bedrock, cloudflare, mistral)
 - Own type system, exception hierarchy, error wrapping across all SDK paths
-- DSPy contract fully satisfied for 6 providers
+- DSPy contract fully satisfied across all 7 verified execution paths
 - Client caching (thread-safe, Azure api_version-aware, Bedrock cached)
 - All actionable ported test failures fixed: exception kwargs, `__getitem__`, images, kwarg stripping, mock streaming, mock_completion, n support
 - No remaining actionable ported test failures (14 high-relevance failures all out of scope)
@@ -59,7 +58,7 @@ Only worth doing when a specific use case demands it. Each new provider key can 
 
 ### What's explicitly out of scope (and stays out)
 
-Router, proxy, caching, budgeting, agents, guardrails, image gen, audio, OCR, fine-tuning, batches, assistants, scheduler, callbacks/integrations (opik, mlflow, etc), provider config registry, a2a protocol, compactifai.
+Router, proxy, caching, budgeting, agents, guardrails, image gen, audio, OCR, fine-tuning, batches, assistants, scheduler, callback integration frameworks (opik, mlflow, etc), provider config registry, a2a protocol, compactifai. Minimal LiteLLM-compatible completion success/failure callback hooks are implemented.
 
 ## Architecture Comparison: litellm vs litelm (audited 2026-03-16)
 
@@ -71,15 +70,9 @@ litellm is ~40K LOC across 1,667 Python files. Its public namespace exports **1,
 
 | Layer | LOC | What it does | In litelm? |
 |-------|-----|-------------|:---:|
-| `main.py` — core completion engine | 7,601 | `completion()`, `acompletion()`, `embedding()`, streaming, error handling | **Yes** (300 LOC) |
-| `utils.py` — helpers | 9,313 | Token counters, param validation, model info lookups, `get_optional_params()` | **No** |
-| `router.py` — load balancer | 9,611 | Fallback routing, round-robin, cost-based, TPM/RPM strategies | **No** |
-| `cost_calculator.py` — pricing | 2,253 | `completion_cost()` from 500KB model pricing JSON | **No** |
-| `llms/` — 90+ provider handlers | ~15K | Per-provider translation classes | **4 handlers** (1,135 LOC) |
-| `types/` — 156 type files | ~8K | Response types, provider-specific types, proxy types | **1 file** (361 LOC) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kennethwolters/litelm](https://github.com/kennethwolters/litelm) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
