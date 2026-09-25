@@ -1,21 +1,21 @@
 # Ketch
 
-> Source: [linroid/Ketch](https://github.com/linroid/Ketch). Graded, signed and kept in sync across platforms by [TomeVault](https://tomevault.io)
+> Source: [linroid/Ketch](https://github.com/linroid/Ketch). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [linroid/Ketch](https://github.com/linroid/Ketch).
+Original source: `AGENTS.md` in [linroid/Ketch](https://github.com/linroid/Ketch).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [linroid/Ketch](https://github.com/linroid/Ketch) — a repo with 44+ stars on GitHub.
+From [linroid/Ketch](https://github.com/linroid/Ketch) — a repo with 53+ stars on GitHub.
 
 ---
 
