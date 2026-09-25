@@ -1,117 +1,186 @@
 ---
 trigger: always_on
-description: This project is for developing applications on the GitHub Universe 2025 hackable conference badge - a custom Pimoroni Tufty 2350 edition. It's an RP2350-based device running MicroPython with a 320x240 TFT color display (pixel-doubled to 160x120 for performance) and custom IR sensors.
+description: Handles button state and timing.
 ---
 
-# Copilot Instructions for Universe 2025 Tufty Badge Development
+# Universe 2025 badge app development archive
 
-This project is for developing applications on the GitHub Universe 2025 hackable conference badge - a custom Pimoroni Tufty 2350 edition. It's an RP2350-based device running MicroPython with a 320x240 TFT color display (pixel-doubled to 160x120 for performance) and custom IR sensors.
+This guidance applies only to the archived Universe 2025 sources under
+`badge25/`. New development belongs in `badge/` and must follow
+[`badge/AGENTS.md`](../badge/AGENTS.md). Paths written as `/badge/apps/` in
+older examples correspond to `/badge25/apps/` in this repository.
 
-## Project Structure
+This document provides context for maintaining applications for the GitHub
+Universe 2025 Tufty badge. Its Badgeware imports, physical buttons, display
+behavior, and lifecycle are not compatible with the Universe 2026 runtime.
 
-```
-/
-├── badge/                     # Badge firmware and apps (deployed to /system/ on device)
-│   ├── main.py               # Main entry point and app launcher
-│   ├── secrets.py            # WiFi configuration secrets
-│   ├── apps/                 # Application directory
-│   │   ├── badge/            # GitHub profile stats viewer
-│   │   ├── flappy/           # Flappy Bird style game
-│   │   ├── gallery/          # Image gallery viewer
-│   │   ├── menu/             # App launcher/menu system
-│   │   ├── monapet/          # Virtual pet simulator
-│   │   ├── quest/            # IR beacon scavenger hunt
-│   │   ├── sketch/           # Drawing app
-│   │   └── startup/          # Boot animation
-│   └── assets/               # Shared assets (fonts, sprites)
-│       ├── fonts/            # Pixel Perfect Fonts (.ppf, .af)
-│       └── mona-sprites/     # Mona character sprite sheets
-└── README.md
-```
+## Hardware Overview
 
-## Hardware Specifications
+The GitHub Universe 2025 badge is a custom Pimoroni Tufty 2350 device with the following specifications:
 
 - **Processor**: RP2350 Dual-core ARM Cortex-M33 @ 200MHz
 - **Memory**: 512kB SRAM, 16MB QSPI XiP flash
-- **Display**: 320x240 full colour IPS display (pixel doubled to 160x120 for performance)
-- **Screen dimensions**: WIDTH=160, HEIGHT=120 (logical pixels)
+- **Display**: 320x240 full colour IPS (pixel-doubled to 160x120 logical pixels for performance)
+- **Screen Dimensions**: WIDTH=160, HEIGHT=120 (all app coordinates use these logical pixels)
+- **Runtime**: MicroPython v1.14-5485 with custom badgeware library
 - **Connectivity**: 2.4GHz WiFi and Bluetooth 5
-- **Battery**: 1000mAh rechargeable (up to 8 hours runtime)
-- **Platform**: MicroPython with custom badgeware library
+- **Battery**: 1000mAh rechargeable lithium polymer (up to 8 hours runtime)
 - **Buttons**: 
-  - UP, DOWN, A, B, C (front-facing buttons)
-  - HOME (back button - triggers quit_to_launcher to return to menu)
-  - RESET, BOOTSEL (hardware buttons)
-- **IR**: Receiver and transmitter for beacon hunting and remote control
-- **Ports**: USB-C (charging/programming), Qw/ST, SWD
-- **GPIO**: 4 GPIO pins + power through-hole solder pads
+  - **Front**: UP, DOWN, A, B, C
+  - **Back**: HOME (returns to launcher menu)
+  - **Hardware**: RESET, BOOTSEL
+- **IR**: Receiver (pin 21) and transmitter for beacon hunting and remote control
 - **LEDs**: 4-zone backlight (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT)
-- **Case**: Durable polycarbonate with lanyard fixings
-- **Runtime**: MicroPython v1.14-5485 with custom badgeware library and built-in modules (see below)
+- **Ports**: USB-C (charging/programming), Qw/ST connector, SWD debug
+- **GPIO**: 4 additional GPIO pins + power available through solder pads
 
-## App Development Guidelines
+## App Structure and Lifecycle
 
-### Required App Structure
-
-Every app must be in `/system/apps/<app_name>/` (or `badge/apps/<app_name>/` in repository) with:
-
-1. **`__init__.py`** - Main app implementation with required functions:
-   ```python
-   def init():      # Optional: Called when app starts (for state loading)
-   def update():    # Required: Called every frame for input handling and rendering
-   def on_exit():   # Optional: Called when quitting app (for state saving)
-   ```
-
-2. **`icon.png`** - App icon (used by menu launcher)
-   - **Format**: 24x24 pixel color PNG file
-   - **Color space**: RGB with optional transparency
-   - **Location**: Must be in the app's root directory
-
-### Built-in Modules ###
-The following built in modules are available to the MicroPython code running on the device:
-
-array, binascii, builtins, cmath, collections, errno, gc, hashlib, heapq, io, json, machine, math, micropython, network, os, platform, random, re,select, socket, ssl, struct, sys,time, uctypes, rp2, bluetooth, cryptolib, deflate, framebuf, vfs, lwip, ntptime, mip, badgeware,picovector, pimoroni, pimoroni_i2c, qrcode, st7789, powman, board, boot, datetime, ezwifi, pcf85063a, qwstpad, cppmem, adcfft, aioble, asyncio, uasyncio, requests, urequests, urllib, webrepl, websocket, umqtt, ulab, aye_arr, breakout_as7262, breakout_as7343, breakout_bh1745, breakout_bme280, breakout_bme68x, breakout_bme69x, breakout_bmp280, breakout_dotmatrix, breakout_encoder, breakout_encoder_wheel, breakout_icp10125, breakout_ioexpander, breakout_ltr559, breakout_matrix11x7, breakout_mics6814, breakout_msa301, breakout_paa5100, breakout_pmw3901, breakout_potentiometer, breakout_rgbmatrix5x5, breakout_rtc, breakout_scd41, breakout_sgp30, breakout_trackball, breakout_vl53l5cx
-
-### Core Imports and Setup
-
-```python
-from badgeware import screen, Image, PixelFont, SpriteSheet, io, brushes, shapes, run, Matrix
-
-# Standard color definitions (RGB values)
-BACKGROUND = brushes.color(r, g, b)
-FOREGROUND = brushes.color(r, g, b, alpha)  # alpha is optional (0-255)
-HIGHLIGHT = brushes.color(r, g, b)
-
-# Set up font - loads from /system/assets/fonts/
-screen.font = PixelFont.load("/system/assets/fonts/nope.ppf")
-
-# Enable antialiasing for smooth vector graphics
-screen.antialias = Image.X2  # or Image.X4 for higher quality, Image.OFF to disable
+### Directory Layout
+```
+/system/apps/<app_name>/
+    __init__.py         # Required - contains init(), update(), on_exit()
+    icon.png            # Required - 24x24 PNG icon for launcher
+    assets/             # Optional - images, fonts, data files
+        *.png           # Images (PNG format, true color or paletted)
+        *.ppf           # Pixel fonts (if not using system fonts)
+        *.json          # Data files
 ```
 
-### State Management Pattern
+### Required Functions
+
+#### `update()` - Main Loop (REQUIRED)
+Called every frame by the main loop. This is where all app logic, input handling, and rendering happens.
 
 ```python
-# Define default state dictionary
-state = {
-    "key": default_value,
-    "count": 0,
-    # ... other state variables
-}
-
-# Load saved state (merges with defaults) in init()
-def init():
-    State.load("app_name", state)
-
-# Save state when app exits
-def on_exit():
-    State.save("app_name", state)
-
-# Update state based on input
 def update():
+    # 1. Handle input
+    if io.BUTTON_A in io.pressed:
+        # Button A was just pressed
+        pass
+    
+    if io.BUTTON_B in io.held:
+        # Button B is being held down
+        pass
+    
+    # 2. Update game state/logic
+    # Use io.ticks for milliseconds since boot
+    # Use io.ticks_delta for frame delta time
+    
+    # 3. Clear screen
+    screen.brush = brushes.color(0, 0, 0)
+    screen.clear()
+    
+    # 4. Draw everything
+    screen.brush = brushes.color(255, 255, 255)
+    screen.text("Hello", 10, 10)
+    
+    # No explicit display update needed - handled automatically
+```
+
+#### `init()` - Initialization (OPTIONAL)
+Called once when the app starts. Use for loading resources, setting up state, etc.
+
+```python
+def init():
+    global game_state, sprite_sheet, font
+    
+    # Load resources
+    sprite_sheet = SpriteSheet("/system/apps/myapp/assets/sprites.png", 4, 2)
+    font = PixelFont.load("/system/assets/fonts/nope.ppf")
+    
+    # Initialize state
+    game_state = {
+        "score": 0,
+        "level": 1,
+        "player_x": 80,
+        "player_y": 60
+    }
+    
+    # Set up screen
+    screen.font = font
+    screen.antialias = Image.X2
+```
+
+#### `on_exit()` - Cleanup (OPTIONAL)
+Called when the user presses HOME or the app terminates. Use for saving state, cleanup, etc.
+
+```python
+def on_exit():
+    # Save state to file
+    try:
+        with open("/myapp_save.json", "w") as f:
+            json.dump(game_state, f)
+    except:
+        pass  # Handle gracefully
+```
+
+### Starting the App
+At the bottom of `__init__.py`, call `run()` with your update function:
+
+```python
+run(update)
+```
+
+## badgeware API Reference
+
+### Core Modules
+
+#### `screen` - Main Display (160x120 Image object)
+The primary drawing surface. All rendering happens on this object.
+
+**Properties:**
+- `screen.width` - Always 160
+- `screen.height` - Always 120
+- `screen.brush` - Current brush (color) for drawing
+- `screen.font` - Current font for text rendering
+- `screen.antialias` - Antialiasing mode (Image.OFF, Image.X2, Image.X4)
+- `screen.alpha` - Global alpha transparency (0-255)
+
+**Methods:**
+```python
+# Clear screen with current brush color (fastest)
+screen.clear()
+
+# Draw shapes (requires screen.brush to be set)
+screen.draw(shape)  # shape from shapes module
+
+# Draw text at position
+screen.text("Hello", x, y)
+
+# Measure text size
+width = screen.measure_text("Hello")
+
+# Blit (copy) image at position
+screen.blit(image, x, y)
+
+# Scale blit (resize while blitting, negative dims flip)
+screen.scale_blit(image, x, y, width, height)
+```
+
+#### `io` - Input and Timing
+Handles button state and timing.
+
+**Button Constants:**
+- `io.BUTTON_A`, `io.BUTTON_B`, `io.BUTTON_C`
+- `io.BUTTON_UP`, `io.BUTTON_DOWN`
+- `io.BUTTON_HOME`
+
+**Button State Sets:**
+```python
+# Buttons just pressed this frame (single fire)
+if io.BUTTON_A in io.pressed:
+    # Triggered once per press
+    
+# Buttons currently held down
+if io.BUTTON_B in io.held:
+    # Triggered every frame while held
+    
+# Buttons just released this frame
+if io.BUTTON_C in io.released:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [badger/home](https://github.com/badger/home) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
