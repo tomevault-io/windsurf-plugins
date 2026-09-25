@@ -65,4 +65,4 @@ require separate authority.
 
 ---
 > Source: [yylo-dev/yylo](https://github.com/yylo-dev/yylo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
