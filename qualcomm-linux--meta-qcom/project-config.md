@@ -16,6 +16,19 @@ This file guides automation agents to run builds / checks the same way CI does:
 
 meta-qcom is an OpenEmbedded / Yocto Project hardware enablement layer for Qualcomm based platforms.
 
+## Agent skills
+
+Reusable agent skills for the qualcomm-linux projects are maintained in
+[qcom-linux-skills](https://github.com/qualcomm-linux/qcom-linux-skills),
+in the `SKILL.md` format understood by Claude Code, Codex, Cursor and
+similar agents. Several of them cover the workflows described in this file,
+such as `qcom-yocto-build-image` (build images with kas-container),
+`qcom-yocto-pre-pr-checks` (the CI-parity checks from section 4),
+`qcom-yocto-update-base-lock` (refresh `ci/base.lock.yml`), and
+`qcom-flash-qdl` / `qcom-boot-validate` (flash and boot-test a board).
+Install them with the repository's `install.sh` and prefer an existing
+skill over re-deriving the workflow; improvements go back to that catalog.
+
 ## 1) Prerequisites
 
 1. `kas-container` available on PATH, or set `KAS_CONTAINER=/abs/path/to/kas-container`
@@ -23,29 +36,20 @@ meta-qcom is an OpenEmbedded / Yocto Project hardware enablement layer for Qualc
 2. Container runtime access (Docker/Podman backend used by `kas-container`).
 3. Work directories outside the repository for build outputs and shared caches.
 
-### Container runtime smoke test (required order)
+### Container runtime smoke test
 
-Run Docker first:
-
-```sh
-docker run --rm hello-world
-```
-
-Then check Podman:
+`kas-container` uses Docker when it is installed and falls back to Podman
+otherwise (set `KAS_CONTAINER_ENGINE` to override), so check the engine it
+will pick:
 
 ```sh
-if command -v podman >/dev/null 2>&1; then
-  podman run --rm hello-world
-else
-  echo "podman not installed; continue with Docker backend"
-fi
+docker run --rm hello-world    # or, on a Podman-only host: podman run --rm hello-world
 ```
 
 Notes:
 
 - Do not use `sudo` unless the host setup explicitly requires it.
 - Do not create or modify user groups as part of this workflow.
-- If Podman is unavailable, Docker-only operation is acceptable.
 
 ## 2) Recommended environment
 
@@ -63,7 +67,7 @@ mkdir -p "${DL_DIR}" "${SSTATE_DIR}" "${KAS_WORK_DIR}"
 ## 3) Build with kas-container (CI style)
 
 CI build composition pattern:
-`:ci/<machine>.yml[:distro.yml][:kernel.yml]`
+`ci/<machine>.yml[:ci/<distro>.yml][:ci/<kernel>.yml]`
 
 Example:
 
@@ -100,12 +104,6 @@ Run a subset:
   --command "/repo/ci/oe-selftest.sh /repo /work qcom_fitimage.QcomFitImageMatrixTests"
 ```
 
-If passing explicit tests directly (without helper), call:
-
-```sh
-ci/oe-selftest.sh "$REPO_DIR" "$KAS_WORK_DIR" qcom_fitimage.QcomFitImageMatrixTests
-```
-
 ## 5) Direct kas shell alternative (no helper wrapper)
 
 For one-off commands:
@@ -119,14 +117,15 @@ Use the helper scripts for CI parity whenever possible.
 
 ## 6) Pull request / contribution workflow
 
-Follow the contribution workflow documented in
-[CONTRIBUTING.md](CONTRIBUTING.md):
+Changes reach `qualcomm-linux/meta-qcom` as GitHub pull requests against
+**master**, from a topic branch in a fork that is rebased on the latest
+upstream `master`; review iterates in the pull request discussion. Commit
+requirements are in [CONTRIBUTING.md](CONTRIBUTING.md) (see section 7).
 
-1. Target branch: **master**.
-2. Fork `qualcomm-linux/meta-qcom`, create a topic branch, implement changes.
-3. Rebase on latest upstream `master`.
-4. Open a GitHub pull request.
-5. Use PR discussion for review iteration.
+Open a pull request, backports included, only when the user asks for one.
+Every pull request lands in the maintainers' review queue, so one the user
+did not ask for, or does not know about, is review load nobody wanted.
+Otherwise, stop once the change is committed and tell the user it is ready.
 
 Before opening/updating a PR, run CI-equivalent checks in this order:
 
@@ -145,17 +144,9 @@ explains the problem before the imperative actions, and the mandatory
 `Signed-off-by` (and, when applicable, `Assisted-by`) trailers.
 
 When committing programmatically, take the `Signed-off-by` identity from the
-local git configuration and append the trailer explicitly:
 
-```text
-Signed-off-by: $(git config user.name) <$(git config user.email)>
-```
-
-Never fabricate a name or email; always read them from `git config`.
-
-Fixups within the same patch series are not allowed; changes should be
-corrected in the patch where they are introduced.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [qualcomm-linux/meta-qcom](https://github.com/qualcomm-linux/meta-qcom) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
