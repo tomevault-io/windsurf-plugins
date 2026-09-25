@@ -1,96 +1,129 @@
 ---
 trigger: always_on
-description: Instructions for Claude Code / contributor sessions in this repo. This is the PUBLIC, open-source
+description: This guide is for an agentic AI - Claude Code, Cursor, or a custom local agent - working a bug
 ---
 
-# Working on Quarry VRC (public)
+# Quarry for AI agents
 
-Instructions for Claude Code / contributor sessions in this repo. This is the PUBLIC, open-source
-build. It mirrors the private codebase's discipline, with two deliberate differences: releases are
-cut on the GitHub Releases page, and **nothing operator-specific is ever committed**.
+This guide is for an agentic AI - Claude Code, Cursor, or a custom local agent - working a bug
+bounty hunt alongside a human in Quarry. It explains what Quarry is, how to record a lead the app
+will index, how to query the console, and how to ship a report to HackerOne.
 
-## Nothing personal ships
+Quarry is deliberately simple to automate: **your research is plain Markdown on disk**, and the
+whole corpus is queryable over an HTTP API. There is no SDK to learn and no lock-in - you read and
+write files, and optionally call the API for structured queries.
 
-This repo is public (or will be). It must never contain any operator's HackerOne username, API
-credentials, program handles, reports, leads, payloads or research. Everything is bring-your-own at
-runtime and lands only on the (git-ignored) data/workspace/payloads volumes. If you add a file that
-could hold a credential or personal data, add it to `.gitignore` in the same commit.
+## The mental model
 
-**This was violated once and it must not recur.** The app code was forked from a private codebase
-and shipped real references - an engineer's handle in a denylist, program handles used as code
-examples, an operator's home-directory workspace paths, and a whole product-alias table for one
-private target. The code carries **placeholders** (`ExampleVendor`, `example-connector-*`,
-`vulns_example`, `#0000000`, `<lab-host>`) precisely so a real name is an obvious outlier. Keep it
-that way: never paste a real program name, handle, path, report id or count into code or a comment -
-use the placeholder.
+| Thing | Where it lives | Authority |
+|---|---|---|
+| **Leads** (your working notes/findings) | Markdown files in the **workspace volume** | the files - you own them |
+| **Reports** | pulled from the **HackerOne API** | HackerOne |
+| **Programs / scopes / targets** | the **HackerOne API** | HackerOne |
+| **Payloads** | a cloned reference library | the clone |
+| **Retest verdicts** | the `regressions` table, via the console or `regression.py` | you - it is a judgement, not an entity |
 
-**The gate: [`scripts/check-no-private-data.sh`](scripts/check-no-private-data.sh) MUST pass before
-every push, PR and release.** It runs two layers:
+The SQLite database is only a cache and a search index. You never edit it directly: you write a
+Markdown file, and Quarry indexes it (immediately in-app, or on the next `ingest.py --rebuild`).
 
-1. Structural checks that catch whole classes of leak (operator home paths, RFC1918 IPs, 7+ digit
-   report ids, non-placeholder `vulns_*` names, private keys / tokens, real emails) without naming
-   anything private.
-2. A literal `.private-denylist` you keep OUTSIDE git (it is `.gitignore`d) - one string per line of
-   your live program handles, vendor names and identifiers. The committed script cannot enumerate
-   those without leaking them, so they live only on your machine and in CI as a secret. Maintain it
-   as you take on new programs.
+## Workspace layout
 
-CI runs the structural layer on every PR (`.github/workflows/no-private-data.yml`); the denylist
-layer is your local pre-push responsibility. Run `bash scripts/check-no-private-data.sh` yourself
-before opening any PR or cutting any release.
+Leads and reports are files under the workspace root (mounted at `/workspace` in the container),
+organised by target and vulnerability class:
 
-## Delivery workflow
-
-Two long-lived branches:
-
-- **`dev`** - staging. Work lands here first.
-- **`main`** - what ships. `dev` merges into it as a release.
-
-1. **Branch off `dev`**, never commit directly to `main` or `dev`. Names: `fix/`, `feat/`, `docs/`.
-2. **Open a PR into `dev`** (`gh pr create --base dev`). Both suites green first when the app code is
-   present (`python3 tests/test_smoke.py`, `node tests/test_render.js`). Prefix the title `feat:` or
-   `fix:`. Bump `VERSION` in the same commit (minor for behaviour, patch for a fix/docs pass).
-3. **One PR per KIND of change** - a feature and a docs change never share a PR.
-4. **Every code reference in a PR body (and every release note) is a backticked hyperlink pinned to
-   the commit SHA.** Write ``[`server.py`](https://github.com/skraft9/quarry-vrc/blob/<40-char-sha>/server.py)``
-   - the backticks INSIDE the link so a path still reads as code - never a bare path, and never a
-   branch name (branch links 404 because our branch names contain slashes, and die on merge anyway).
-   Get the SHA with `git rev-parse HEAD` before opening the PR; add `#L<n>` or `#L<a>-L<b>` to point
-   at a line. Do NOT hard-wrap a PR body: one long line per paragraph, because GitHub reflows it.
-5. **Cite every PR by its NUMBER** (`#12`) and say what it DID. GitHub renders `#12` as the PR's own
-   title, so do not repeat the title - the number and the "what it did" are how a reader later finds
-   when a behaviour changed. Release notes list the included PRs this way.
-
-## Releases go on the GitHub Releases page
-
-A `dev` -> `main` merge is a **release**. Unlike the private repo, the public repo publishes each
-release through the GitHub Releases feature so users get a versioned, downloadable artifact and notes:
-
-```bash
-gh pr create --base main --head dev --title "v1.1.0 - <what shipped>"
-# after merge, from main:
-gh release create v1.1.0 --title "v1.1.0 - <what shipped>" --notes "..."
+```
+/workspace/<target>/<CLASS>/notes/<slug>.md      a LEAD (your working note)
+/workspace/<target>/<CLASS>/reports/<slug>.md     a REPORT (what you send to HackerOne)
+/workspace/<target>/notes/<slug>.md               a lead with no class
 ```
 
-**Batch a task list into one release.** Land each change as its own PR into `dev`, then promote to
-`main` and cut ONE GitHub Release at the end, rather than releasing after every merge.
+`<CLASS>` is a short code taken from the directory name: `BAC`, `DoS`, `RCE`, `SECRETS`, `PRIVESC`,
+`AUTHN`, `INJECTION`, `SSRF`, `INTEGRITY`, `API`, ... A file under `evidence/` or `bin/` is ignored,
+so put PoC scripts and captures there without polluting the lead list.
 
-**Versioning.** Everything pre-official is BETA on the `1.x` line, starting at **1.0.0** and moving
-up. The **official public launch opens the `2.0` train**, and that release is packaged on the
-Releases page. **Every version and sub-version gets its own tag and release, incrementing by one
-with no gaps** - the next release is exactly one step above the current tag. A gap reads as a lost
-release; it usually comes from batching UNRELATED changes into one release (which consumes the
-skipped numbers). Batch a coherent task list, never unrelated work.
+## Recording a lead the app will index
 
-The end state after a release is `main`, `dev` and nothing else - sweep merged branches.
+A file becomes a **lead** when it carries a `**Status:**` marker **within its first 25 lines**.
+Without that marker it is treated as a note (still searchable, but not a queue item). Write leads
+to this house format so the app parses every field:
 
-### Release-note format (the standard)
+```markdown
+# <ref> - <one-line title of the finding>
 
-A release note is real software release notes, not a one-line summary. Structure:
+**Decision summary:** One or two sentences: what you think is wrong and whether it is worth chasing.
+
+| | |
+|---|---|
+| **Status:** | open |
+| **Researcher** | yourhandle |
+| **Date** | 2026-01-15 |
+| **Target** | SomeProduct 1.2.3 |
+| **Version** | 1.2.3 |
+| **Class** | BAC / broken access control |
+| **CWE** | CWE-284 |
+| **Privilege** | low |
+| **Impact** | Confidentiality - High |
+| **Source** | https://github.com/vendor/product @ tag v1.2.3 |
+
+## Claim
+<the mechanism, precisely, with file:line where you can>
+
+## Proof
+<how to reproduce; put runnable PoCs under bin/, captures under evidence/>
+```
+
+**Status vocabulary** (the lead's place in the workflow), lowest to terminal:
+
+`open` -> `confirmed` -> `ready` -> `submitted` -> `awarded`, plus `parked` (shelved) and `killed`
+(dead, do not re-hunt). Move a lead by editing its `**Status:**` value. The **Researcher** row is
+what attributes a lead to a collaborator, so fill it in.
+
+**Rules that matter to the parser:**
+
+- The `**Status:**` row is FIRST and within the first 25 lines.
+- One finding per file. Name the file for the finding, e.g. `bac-idor-on-order-endpoint.md`.
+- Keep the header a real Markdown table so `Class`, `CWE`, `Privilege` and `Impact` are read into
+  their columns.
+
+## Querying the console (API + Bearer tokens)
+
+Every list is available over the API, so you can pull exactly the context you need instead of
+re-reading the whole workspace. Issue a **Bearer token** in the **Tokens** tab, then:
+
+```bash
+TOKEN=tok_...
+BASE=https://<host>:<port>
+
+curl -sk -H "Authorization: Bearer $TOKEN" "$BASE/api/leads?status=ready"
+curl -sk -H "Authorization: Bearer $TOKEN" "$BASE/api/reports?program=<handle>"
+curl -sk -H "Authorization: Bearer $TOKEN" "$BASE/api/programs"
+curl -sk -H "Authorization: Bearer $TOKEN" "$BASE/api/search?q=idor"
+```
+
+Bearer requests are CSRF-exempt (there is no ambient browser credential), so they are the right
+channel for scripts and agents. A read token cannot mutate; ask the operator for a write token only
+if you need to create leads through the API rather than by writing files.
+
+## Drafting and shipping a report to HackerOne
+
+When a lead reaches `ready`, turn it into a report and file it. A report is prose aimed at a triager:
+lead with the impact, state the broken control in the first line, give exact steps to reproduce
+(commands only in code blocks; what a command returns goes in the prose above it), and end with
+remediation. Write it to `.../reports/<slug>.md`.
+
+To submit, the human connects their HackerOne credential once in **Integrations** (username + API
+token, stored write-only). Then a report is filed straight to the API - from the app's submit action
+on the lead/report, or from the CLI:
+
+```bash
+# prints the payload and STOPS; add --confirm to actually send
+python3 h1.py --submit reports/<slug>.md --program <handle> \
+  --weakness cwe-284 --scope "<in-scope asset>" --severity medium
+```
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [skraft9/quarry-vrc](https://github.com/skraft9/quarry-vrc) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
