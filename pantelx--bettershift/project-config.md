@@ -1,167 +1,73 @@
 ---
 trigger: always_on
-description: BetterShift is a **Next.js 16** self-hosted shift management app using:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# BetterShift - Copilot Instructions
+# CLAUDE.md
 
-## Architecture Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-BetterShift is a **Next.js 16** self-hosted shift management app using:
+## Project
 
-- **Database**: SQLite with Drizzle ORM (`lib/db/schema.ts`)
-- **Auth**: better-auth with multi-provider support (`lib/auth.ts`, `lib/auth/`)
-- **State**: TanStack Query for server state (`hooks/use*.ts`)
-- **UI**: Radix primitives + shadcn/ui (`components/ui/`)
-- **i18n**: next-intl with `de.json` as source of truth (`messages/`)
+BetterShift is a self-hosted shift-planning app: Next.js 16 (App Router) + React 19, SQLite via Drizzle, better-auth, next-intl, Tailwind v4 with shadcn/ui primitives. It builds to `output: "standalone"` and ships as a Docker image.
 
-### Key Data Flow
-
-```
-API Route → getSessionUser() → getUserCalendarPermission() → db query → Response
-Component → useQuery hook → fetch('/api/...') → TanStack Query cache
-```
-
-## Critical Patterns
-
-### Permission System (`lib/auth/permissions.ts`)
-
-Every calendar operation must check permissions. Priority order:
-
-1. Owner (`calendar.ownerId === userId`)
-2. Share permission (`calendarShares` table)
-3. Access token (cookie-based)
-4. Guest permission (`calendar.guestPermission`)
-
-```typescript
-// Always use these helpers in API routes
-import { getSessionUser } from "@/lib/auth/sessions";
-import {
-  canEditCalendar,
-  getUserCalendarPermission,
-} from "@/lib/auth/permissions";
-
-const user = await getSessionUser(request.headers);
-if (!(await canEditCalendar(user?.id, calendarId))) {
-  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-}
-```
-
-### Query Keys (`lib/query-keys.ts`)
-
-All queries must use centralized query keys for proper cache invalidation:
-
-```typescript
-import { queryKeys } from "@/lib/query-keys";
-
-// Use factory functions
-useQuery({ queryKey: queryKeys.calendars.all, ... });
-useQuery({ queryKey: queryKeys.shifts.byCalendar(calendarId), ... });
-```
-
-### API Route Pattern
-
-```typescript
-// app/api/[resource]/route.ts
-export async function GET(request: Request) {
-  const user = await getSessionUser(request.headers);
-  // Check auth if enabled: isAuthEnabled() from lib/auth/feature-flags
-  // Check permissions with getUserCalendarPermission() or similar
-  // Rate limit sensitive operations: await rateLimit('type', identifier)
-  // Audit log actions: await logUserAction('ACTION', userId, metadata, request)
-}
-```
-
-### Component Structure
-
-- Mark client components with `"use client"` at top
-- Use `@/components/ui/` primitives (shadcn pattern)
-- Sheets/dialogs use `BaseSheet` for consistent behavior
-- Forms extract logic to custom hooks (`useShiftForm`, etc.)
-
-## Development Commands
+## Commands
 
 ```bash
-npm run dev          # Start dev server
-npm run db:migrate   # Apply migrations
-npm run i18n         # Validate translations (de.json is source)
-npm run lint         # ESLint check
-tsc --noEmit         # TypeScript check without emitting
-npm run test         # Full validation: lint + build + i18n
+npm run dev            # Dev server
+npm run build          # Production build — this is also the type check used in CI
+npx tsc --noEmit       # Type check alone, much faster than a build
+npm run lint           # ESLint (next core-web-vitals + typescript + @tanstack/query)
+npm run i18n           # Translation check (see i18n below)
+npm test               # lint + build + i18n — the gate before committing
+npm run test:ci        # adds db:generate + db:migrate, mirrors .github/workflows/pr-checks.yml
+
+npm run db:generate    # Create a migration after editing lib/db/schema.ts
+npm run db:migrate     # Apply migrations
+npm run db:studio      # Drizzle Studio
 ```
 
-## Common Tasks
+There is no unit-test framework here — "tests" means the lint/build/i18n pipeline. When something fails, run the individual script rather than all of `npm test`.
 
-### Adding a Translation
+`npm run release:patch|minor|major` bumps the version and pushes the tag; the release workflow builds the image from it.
 
-1. Add key to `messages/de.json` (primary source)
-2. Run `npm run i18n` - it reports missing keys in en.json/it.json
-3. Add translations to other locales
+## Workflow
 
-### Creating an API Endpoint
+Commits follow Conventional Commits (`type(scope): summary`, e.g. `feat(ui):`, `fix(auth):`, `chore:`, `perf:`; `!` before the colon for breaking changes). `scripts/changelog.sh`, called from `.github/workflows/release.yml`, builds the release changelog straight from `git log --pretty=%s --no-merges` between tags — grouped by that prefix, with `refactor|ci|style|test|build` dropped as internal-only.
 
-1. Create route in `app/api/[resource]/route.ts`
-2. Use `getSessionUser()` for auth, `rateLimit()` for protection
-3. Log actions with `logUserAction()` or `logSystemEvent()`
-4. Return proper HTTP status codes with NextResponse.json()
+## Architecture
 
-### Adding Database Fields
+### Request flow
 
-1. Modify `lib/db/schema.ts`
-2. Run `npm run db:generate` to create migration
-3. Run `npm run db:migrate` to apply
+```text
+proxy.ts  →  app/api/**/route.ts  →  getSessionUser(headers)  →  permission check  →  db  →  NextResponse.json()
+component →  hooks/use*.ts (TanStack Query) → fetch("/api/…") → cache keyed via lib/query-keys.ts
+```
 
-### Creating a Hook
+`proxy.ts` is the middleware — Next.js 16 renamed `middleware.ts` to `proxy.ts` and the export is `proxy`. It runs on almost every path (see `config.matcher`) and executes four stages in order:
 
-Follow existing patterns in `hooks/`:
+1. **DB health check**, cached in-module for 10s (5s while unhealthy) with a 2s timeout. Unhealthy redirects everything to `/system-unavailable`; only `/api/health`, `/api/version`, `/api/releases` and `manifest.json` are exempt.
+2. **`/share/token/[token]`** — rate limits, validates the token, writes the grant into a cookie, records usage and audit-logs it, then redirects to `/?id=<calendarId>`.
+3. **Auth guard** — presence check of the better-auth session cookie only; actual session validation happens in the route handlers. Without a cookie it falls through to guest access or redirects to `/login?returnUrl=…`.
+4. **Security headers + CSP** on the response.
 
-- Prefix with `use`
-- Use `queryKeys` for query keys
-- Handle rate limit errors with `isRateLimitError()` / `handleRateLimitError()`
-- Show feedback with `toast` from sonner
+Anything added here affects every request, so weigh cost and check the exempt list.
 
-## File Conventions
+`instrumentation.ts` runs once per server start (Node runtime only): it preloads the version and starts `autoSyncService`. That service is an in-process `setTimeout` scheduler holding a job per external sync — not a cron job, and not shared across replicas.
 
-| Path                  | Purpose                                        |
-| --------------------- | ---------------------------------------------- |
-| `lib/auth/*.ts`       | Auth utilities (sessions, permissions, tokens) |
-| `lib/db/schema.ts`    | All Drizzle table definitions                  |
-| `hooks/use*.ts`       | TanStack Query hooks with mutations            |
-| `components/ui/*.tsx` | Radix-based primitives (don't modify directly) |
-| `app/api/`            | Route handlers (GET/POST/PATCH/DELETE)         |
-| `messages/*.json`     | i18n strings (de.json is authoritative)        |
+### Frontend shape
 
-## Auth Modes
+The product is essentially one client page. `app/page.tsx` pulls data hooks (`useCalendars`, `useShifts`, `usePresets`, `useNotes`, `useExternalSync`), pairs them with action hooks (`useShiftActions`, `useNoteActions`) and dialog state (`useDialogStates`), and renders every sheet and dialog through `components/dialog-manager.tsx` — add new dialogs there rather than inline. Real routes exist only for `/login`, `/register`, `/profile`, `/admin/*` and `/system-unavailable`.
 
-- `AUTH_ENABLED=true`: Full multi-user with roles (user/admin/superadmin)
-- `AUTH_ENABLED=false`: Single-user mode, all operations bypass auth checks
-- Check with `isAuthEnabled()` from `lib/auth/feature-flags`
+View preferences (shifts per day, sorting, note visibility, day highlighting) come from `hooks/useViewSettings.ts` and exist on two levels. The personal view is stored per account in `userPreferences` via `/api/user/view-settings`; guests and `AUTH_ENABLED=false` keep it in `localStorage`, and a signed-in account without a stored view gets the device's values once. A calendar can pin its own view in `calendars.viewSettings` (`null` = off), which replaces the personal view as a whole for everyone with access; the stamp-bar toggle always stays personal, and compare mode always uses the personal view. `lib/view-settings.ts` holds the types, defaults and the sanitiser shared by routes and client.
 
-## Important Rules
+### Calendar access model
 
-### Date Handling
+Two independent questions, easy to conflate:
 
-Always use **local dates** without timezone conversion:
 
-- Store as `YYYY-MM-DD` strings in SQLite
-- Use `formatDateToLocal(date)` from `lib/date-utils.ts` before saving
-- Display with `date-fns` + locale from `getDateLocale(locale)`
-
-### External Sync (Read-Only)
-
-Shifts synced from external calendars cannot be edited/deleted:
-
-- Check `shift.syncedFromExternal` before allowing mutations
-- These shifts have `externalSyncId` set
-
-### Optimistic Updates
-
-All mutations use TanStack Query optimistic updates (`hooks/useShifts.ts` as reference):
-
-1. `onMutate`: Cancel queries, save previous state, apply optimistic update
-2. `onError`: Rollback to previous state, show error toast
-3. `onSettled`: Invalidate queries to refetch real data
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [panteLx/BetterShift](https://github.com/panteLx/BetterShift) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
