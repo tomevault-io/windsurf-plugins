@@ -87,4 +87,4 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ---
 > Source: [yungifez/skuul](https://github.com/yungifez/skuul) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
