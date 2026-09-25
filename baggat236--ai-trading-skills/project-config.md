@@ -1,123 +1,119 @@
 ---
 trigger: always_on
-description: This skill uses automated data collection:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository Purpose
+## What This Project Is
 
-This repository contains Claude Skills for equity investors and traders. Each skill packages domain-specific prompts, knowledge bases, and helper scripts to assist with market analysis, technical charting, economic calendar monitoring, and trading strategy development. Skills are designed to work in both Claude's web app and Claude Code environments.
+A daily market dashboard application built with Streamlit and Claude Agent SDK. It runs 5 trading skills (FTD Detector, Uptrend Analyzer, Market Breadth, Theme Detector, VCP Screener) in parallel to generate a unified dashboard, then provides an interactive chat interface for discussing the results with a market-advisor agent. No API keys are required for 3 of 5 skills; FTD Detector and VCP Screener show N/A without `FMP_API_KEY` (free tier sufficient).
 
-⚠️ **Important:** Some skills require paid API subscriptions (FMP API and/or FINVIZ Elite) to function. See the [API Key Management](#api-key-management) section for detailed requirements by skill.
-
-## Repository Architecture
-
-### Skill Structure
-
-Each skill follows a standardized directory structure:
-
-```
-<skill-name>/
-├── SKILL.md              # Required: Skill definition with YAML frontmatter
-├── references/           # Knowledge bases loaded into Claude's context
-├── scripts/             # Executable Python scripts (not auto-loaded)
-└── assets/              # Templates and resources for output generation
-```
-
-**SKILL.md Format:**
-- YAML frontmatter with `name` and `description` fields
-- `name` must match the directory name for proper skill detection
-- Description defines when the skill should be triggered
-- Body contains workflow instructions written in imperative/infinitive form
-- All instructions assume Claude will execute them, not the user
-
-**Progressive Loading:**
-1. Metadata (YAML frontmatter) loads first for skill detection
-2. SKILL.md body loads when skill is invoked
-3. References load conditionally based on analysis needs
-4. Scripts execute on demand, never auto-loaded into context
-
-### Key Design Patterns
-
-**Knowledge Base Organization:**
-- `references/` contains markdown files with domain knowledge (sector rotation patterns, technical analysis frameworks, news source credibility guides)
-- Knowledge bases provide context without requiring Claude to have specialized training
-- References are read selectively during skill execution to minimize token usage
-
-**Script vs. Reference Division:**
-- Scripts (`scripts/`) are executable code for API calls, data fetching, report generation
-- References (`references/`) are documentation for Claude to read and apply
-- Scripts handle I/O; references handle knowledge
-
-**Output Generation:**
-- Skills generate reports (markdown + JSON) saved to `reports/` directory
-- Filename convention: `<skill>_<analysis-type>_<date>.md` (and `.json`)
-- Reports use structured templates from `assets/` directories
-- Scripts should default `--output-dir` to `reports/` (or pass `--output-dir reports/` when invoking)
-
-## Common Development Tasks
-
-### Creating a New Skill
-
-Use the skill-creator plugin (available in Claude Code):
+## Commands
 
 ```bash
-# This invokes the skill-creator to guide you through setup
-# Follow the 6-step process: Understanding → Planning → Initializing → Editing → Packaging → Iterating
+# Setup
+pip install -r requirements.txt
+cp .env.example .env   # Set ANTHROPIC_API_KEY (optional if using subscription)
+
+# Generate dashboard
+python3 generate_dashboard.py --project-root ../..
+python3 generate_dashboard.py --project-root ../.. --lang ja
+
+# Run
+streamlit run app.py
 ```
 
-The skill-creator will:
-1. Ask clarification questions about the skill's purpose
-2. Create the directory structure
-3. Generate SKILL.md template
-4. Set up references and scripts directories
-5. Package the skill into a .skill file
+## Architecture
 
-**MANDATORY: After creating or committing a new skill, complete ALL of the following:**
+```
+app.py                  Streamlit UI (entry point) — Dashboard tab + Chat tab
+  ↓ uses
+agent/client.py         ClaudeChatAgent: wraps SDK streaming responses
+  ↓ uses
+agent/async_bridge.py   AsyncBridge: runs async coroutines in Streamlit's sync context
+agent/attachments.py    Server-side attachment persistence for txt/md/csv/json
+agent/knowledge.py      knowledge/*.md listing + on-demand rg search
+agent/context_builder.py Prompt context composer with character budget
+agent/sanitizer.py      Output sanitizer: redacts secrets and system paths
+agent/_sdk_patch.py     Monkey-patch for unrecognized SDK message types
+config/settings.py      .env → environment variable loading and constants
 
-1. **Generate documentation pages** (auto-gen handles EN page + JA stub + index updates):
-   ```bash
-   python3 scripts/generate_skill_docs.py --skill <skill-name>
-   ```
-2. **Add to catalog category sections** in `docs/en/skill-catalog.md` and `docs/ja/skill-catalog.md`
-3. **Add to API Requirements Matrix** in both catalog files
-4. **Add to README** descriptions in `README.md` (English) and `README.ja.md` (Japanese)
-5. If the skill requires API keys, add to the API Requirements table in `README.md` and the API要件 section in `README.ja.md`
-6. If a new category is needed, create it in both READMEs and both catalogs
-
-> **Pre-commit enforcement:** The `docs-completeness` hook blocks commits if any `skills/*/SKILL.md` exists without corresponding `docs/en/skills/<name>.md` and `docs/ja/skills/<name>.md`. Run the generate command above to fix.
-
-### Creating Documentation Site Pages
-
-Generate documentation pages for the Jekyll site at `docs/`.
-
-**Auto-generation (recommended for most skills):**
-
-```bash
-# Generate 6-section EN page + JA stub for a specific skill
-# Also updates docs/en/skills/index.md and docs/ja/skills/index.md automatically
-python3 scripts/generate_skill_docs.py --skill <skill-name>
-
-# Regenerate all auto-generated pages (ONLY pages marked `generated: true`;
-# hand-maintained pages are refused — use --force to override, never in CI)
-python3 scripts/generate_skill_docs.py --overwrite
+generate_dashboard.py   5-skill parallel execution → unified markdown report
 ```
 
-> **Skill doc ownership / drift gate:** Committed `docs/{en,ja}/skills/*.md` are
-> source-of-truth. A page is generator-owned only if its frontmatter has
-> `generated: true`; `generated: false` or an absent marker (and any
-> `HAND_WRITTEN` skill) is hand-maintained and **protected** — `--overwrite`
-> refuses it (`--force` is the CI-forbidden escape hatch). The
-> `skill-docs-drift` pre-commit hook + CI step run `generate_skill_docs.py
-> --check`, which content-compares **only** `generated: true` pages and never
-> reverts hand-maintained docs. See `docs/README.md` → "Skill Doc Ownership".
+### Streamlit ↔ async Integration
 
+Streamlit reruns scripts synchronously, so `AsyncBridge` maintains a persistent `asyncio` event loop and dispatches SDK coroutines via `run_until_complete()`. Both `AsyncBridge` and `ClaudeChatAgent` are stored in `st.session_state` to survive reruns.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### SDK Client Flow
+
+`ClaudeChatAgent.send_message_streaming()` connects to `ClaudeSDKClient` and normalizes `StreamEvent` (text deltas), `AssistantMessage` (complete text), `ToolUseBlock` (tool calls), and `ResultMessage` (errors/completion) into `StreamChunk` dicts that the UI consumes.
+
+### Sandbox Trade-off
+
+- SDK sandbox mode is controlled by `CLAUDE_SDK_SANDBOX_ENABLED` (`false` by default).
+- Default `false` keeps behavior aligned with project-level permission policies in `.claude/settings.json`.
+- For stricter runtime isolation, set `CLAUDE_SDK_SANDBOX_ENABLED=true`.
+
+## Configuration
+
+| Location | Purpose |
+|---|---|
+| `.env` | `ANTHROPIC_API_KEY`, `FMP_API_KEY`, `CLAUDE_MODEL`, `APP_LOCALE`, knowledge/context settings |
+| `.claude/agents/market-advisor.md` | Market advisor persona (frontmatter + system prompt) |
+| `.claude/skills` | Symlink to `../../skills/` — all trading skills available |
+| `.mcp.json` | MCP server definitions (optional) |
+| `.claude/settings.json` | Project-level permission rules |
+| `knowledge/*.md` | Auto-generated dashboards referenced at answer time |
+
+## Sandbox Rules — Code Execution via Chat UI
+
+This project runs a Claude Agent through a Streamlit chat UI. When the agent creates and executes scripts on behalf of the user, it **must** follow these rules.
+
+### File Creation Rules
+
+- User-requested scripts must be placed in the **`scripts/` directory**
+- The following files and directories must **never** be overwritten, modified, or deleted:
+  - `app.py`, `generate_dashboard.py`
+  - `agent/` (all files)
+  - `config/` (all files)
+  - `.claude/` (all files)
+  - `.env`, `.env.example`
+  - `requirements.txt`
+  - `CLAUDE.md`, `README.md`
+  - `.mcp.json`
+
+### Security Rules (Mandatory)
+
+The following rules **must never be violated under any circumstances**.
+
+1. **No access to secrets**
+   - Never write code that reads, displays, or outputs the contents of `.env`
+   - Never display, log, or write authentication credentials such as `ANTHROPIC_API_KEY`
+
+2. **No exposure of internal paths or system information**
+   - Never include absolute paths (`/Users/...`, `/home/...`) in responses
+   - Always use project-relative paths (e.g., `scripts/demo.py`, `knowledge/`)
+   - Summarize tool outputs in your own words; never paste raw output containing system paths
+
+### Date and Time Rules (Mandatory)
+
+When displaying dates in reports, summaries, or responses:
+
+1. **Never guess or infer the current date** — always verify by reading the `generated_at` field from output JSON files or by running a date command
+2. **Use the date from the data source** — if presenting results from a JSON report, use that report's `generated_at` timestamp as the reference date
+3. **If the current date is needed**, run `python3 -c "from datetime import date; print(date.today())"` to confirm before writing
+
+## Key Dependencies
+
+- `streamlit` >= 1.42.0
+- `claude-agent-sdk` >= 0.1.35
+- `python-dotenv` >= 1.0.0
+- `requests` >= 2.31.0
 
 ---
 > Source: [BaggaT236/AI-Trading-Skills](https://github.com/BaggaT236/AI-Trading-Skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
