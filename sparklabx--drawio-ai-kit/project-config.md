@@ -25,4 +25,4 @@ description: `drawio-ai-kit` helps an AI draw correct, beautiful draw.io diagram
 
 ---
 > Source: [sparklabx/drawio-ai-kit](https://github.com/sparklabx/drawio-ai-kit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
