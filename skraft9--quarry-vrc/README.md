@@ -2,16 +2,14 @@
 
 > Sourced from [skraft9/quarry-vrc](https://github.com/skraft9/quarry-vrc), graded against the public Tome Standard and kept consistent across every major platform by [TomeVault](https://tomevault.io)
 
-A central console for managing vulnerability research at scale.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [skraft9/quarry-vrc](https://github.com/skraft9/quarry-vrc).
+Original source: `AGENTS.md` in [skraft9/quarry-vrc](https://github.com/skraft9/quarry-vrc).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
