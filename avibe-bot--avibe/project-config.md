@@ -1,125 +1,114 @@
 ---
 trigger: always_on
-description: This document is the operating manual for coding agents working in this repository.
+description: This directory is a portable standard package for capability-first, scenario-driven testing.
 ---
 
-# Agent Guidelines for Avibe
+# Scenario Testing Standard
 
-This document is the operating manual for coding agents working in this repository.
+This directory is a portable standard package for capability-first, scenario-driven testing.
 
-## 1. Project Overview
+Treat this folder as the entrypoint when you are doing any of the following:
 
-Avibe is the local-first Agent OS: one install command turns a machine into the
-runtime an agent lives in, and the user operates that runtime through Web or IM
-surfaces such as Slack, Discord, Telegram, Feishu/Lark, and WeChat.
+- designing or refactoring a project's testing architecture
+- introducing scenario-harness or closed-loop flow testing
+- defining reusable testing standards that should survive beyond one repository
+- translating recurring manual regressions into stable automated coverage
 
-Current product shape:
+## Mission
 
-- V2 config-driven service with a Web UI setup wizard and settings pages
-- multi-platform message transport with shared core orchestration
-- multi-backend agent routing across OpenCode, Claude Code, and Codex
-- local Incus-based unified regression environment for real cross-platform verification
+Build a testing system where feature work and bug fixes are validated as user-visible capability flows, not only as isolated unit behaviors.
 
-Default mindset:
+The goal is not to replace unit tests or E2E tests.
+The goal is to add a reusable middle layer that answers:
 
-- treat the system as **multi-platform, multi-backend** first
-- prefer root-cause fixes over narrow patches
-- preserve user-visible behavior unless the task explicitly changes product behavior
-- make the next agent/platform inherit correct behavior automatically
+- what capability is being changed
+- what scenarios define its success and failure boundaries
+- what parts can be simulated deterministically
+- what still requires contract, smoke, or manual verification
 
-## 2. Design Philosophy and Architecture
+## Operating Rules
 
-### Core Rule: Fix at the Highest Appropriate Layer
+1. Start from capabilities, not files, modules, or bugs.
+2. Require stable scenario IDs and reusable scenario catalogs.
+3. Prefer shared harness primitives over one-off mocks.
+4. Keep the harness light enough for everyday development use.
+5. Turn the standard into delivery rules, not just reference docs.
 
-- If a bug appears on one platform, check whether the same logic exists for the others before patching a platform adapter.
-- If a behavior should be shared by multiple backends, prefer the shared core or backend abstraction over a single backend implementation.
-- Keep transport/platform details out of core business logic whenever possible.
+## Folder Map
 
-Decision checklist before writing code:
+- `README.md`
+  Overview and intended reuse model.
+- `STANDARD.md`
+  The core methodology and testing pyramid.
+- `ADOPTION.md`
+  The onboarding workflow for a testing-owner agent adopting this standard in a new project.
+- `WORKFLOW.md`
+  The day-to-day workflow for feature work, bug fixes, reviews, and CI.
+- `templates/`
+  Reusable templates for capability specs, scenario catalogs, dependency observations, and PR checklists.
+- `examples/`
+  Concrete project mappings. These explain how one repo applies the standard without redefining the standard itself.
 
-1. **Scope**: is this platform-specific/backend-specific, or common?
-2. **Abstraction**: can the shared base or core layer own this behavior?
-3. **Call path**: is the code called from controller/handlers/common flow?
-4. **Future-proofing**: would a new platform/backend inherit the correct behavior automatically?
+## Deterministic Navigation Rule
 
-### Codebase Map
+Assume the next agent starts from zero memory and only has this file as its prompt.
 
-- `main.py` - entry point wiring `config.V2Config` into `core/controller.py`
-- `core/controller.py` - orchestration and dependency wiring
-- `core/handlers/` - platform/backend-agnostic business workflows
-- `core/message_dispatcher.py` - outbound message routing and reply enhancement flow
-- `core/reply_enhancer.py` - file-link and quick-reply prompt injection helpers
-- `modules/im/` - IM platform adapters (`slack.py`, `discord.py`, `telegram.py`, `feishu.py`, `wechat.py`) plus shared base classes
-- `modules/agents/` - agent backend adapters (`opencode/`, `codex/`, Claude-related modules) plus shared abstractions
-- `modules/im/formatters/` - platform-specific formatting built on shared formatter concepts
-- `config/` - V2 config, settings, sessions, paths, and compatibility conversion
-- `ui/` - React + Vite + TypeScript Web UI
-- `scripts/` - operational helpers, including regression testing workflows
-- `tests/` - pytest-style unit/integration/regression coverage
+That agent must be able to find the project's scenario assets through fixed locations, not through guesswork.
 
-### Runtime Data and Important Paths
+Preferred project layout:
 
-- default home: `~/.avibe/`
-- legacy home: `~/.vibe_remote/` remains a compatibility path and may be a back-symlink to `~/.avibe/`
-- logs: `~/.avibe/logs/vibe_remote.log`
-- persisted state: `~/.avibe/state/`
-- default agent working directory: `_tmp/`
-- generated regression metadata: `.runtime/incus-regression/` in the primary checkout
+- `tests/scenarios/INDEX.yaml`
+  Project capability index. Read this first.
+- `tests/scenarios/<capability>/catalog.yaml`
+  Canonical scenario IDs and coverage state for that capability.
+- `tests/scenarios/<capability>/observations.yaml`
+  Historical dependency observations and reality-feedback notes for that capability.
+- `tests/scenarios/<capability>/test_*.py`
+  Executable scenario evidence.
+- `tests/scenario_harness/`
+  Shared harness primitives.
 
-## 3. Runtime Environments
+Human-facing docs may still exist elsewhere, but the project should make one location canonical for scenario metadata.
 
-### Local `vibe` Service
+## Expected Outputs
 
-Common commands:
+For a project adopting this standard, the normal outputs are:
 
-- install: `uv tool install avibe-os`
-- run: `vibe`
-- inspect: `vibe status`
-- stop: `vibe stop`
+- a product and capability summary
+- a capability map
+- a capability spec
+- a scenario catalog with stable IDs
+- a harness boundary inventory
+- a reusable scenario harness layer
+- a dependency observation log
+- project-specific reference scenarios
+- PR/CI rules that enforce the standard
 
-Use local `vibe` for:
+## Starting Rule
 
-- local packaging checks
-- local CLI behavior checks
-- editable-install UI preview when explicitly needed
+When adopting this standard in a new repository, start with `ADOPTION.md` before changing tests.
 
-Hard rule:
+Use `WORKFLOW.md` only after the adoption baseline exists.
 
-- **Never restart the local `vibe` service for routine verification.**
-- The local `vibe` process may be the coding agent runtime itself; restarting it can interrupt the session.
-- **Tests and probes must be hermetic by default.** Treat `$HOME`, XDG dirs,
-  keychains, CLI config/token stores, running services, browser profiles, and
-  cloud accounts as production data unless the user explicitly asks otherwise.
-- Any test that reaches write-capable production paths must redirect the whole
-  call path to test-owned state and prove a representative write cannot touch
-  real local or external user state; `uses_real_paths` tests must remain read-only.
-- Unless the user explicitly asks otherwise, use the Incus regression environment for user-facing verification.
+When working inside an already-adopted repository:
 
-### Regression Testing (Incus)
+1. read the project's `tests/scenarios/INDEX.yaml`
+2. open the target capability's `catalog.yaml`
+3. open the same capability's `observations.yaml`
+4. read the listed scenario test files
+5. only then change production code, harness primitives, or docs
 
-When the user says `回归测试`, update the latest code into the existing **local**
-Incus regression environment, preserve accumulated product state unless reset is
-explicitly requested, then let the user verify Slack, Discord, Feishu/Lark, and
-WeChat behavior.
+## Non-Goals
 
-Entry points:
+- inventing a heavy generic workflow engine up front
+- forcing all real-world verification into automation
+- replacing focused unit tests with giant scenario tests
+- coupling the standard to Vibe Remote specifics
 
-- default: `./scripts/run_regression.sh`
-- direct: `python3 scripts/incus_regression.py up --target master`
-- macOS/Lima: `INCUS_CMD="limactl shell avibe-incus-regression -- sudo incus" ./scripts/run_regression.sh`
+## Adoption Rule
 
-Hard rules:
-
-- local Incus only for development regression; never use `--remote`, SSH, remote
-  tenant projects, demos, or customer/user environments unless explicitly asked
-  for remote ops
-- use the runner, not raw Incus commands; it owns naming, source sync, state
-  preparation, readiness checks, Show Runtime setup, metadata, and cleanup
-- `master` is the long-running unified four-platform environment; keep it online,
-  preserve product state, sync source, and restart the service in place
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+When you add or modify a testing standard in this repository, update the project-specific guidance to point back to this folder rather than duplicating the standard elsewhere.
 
 ---
 > Source: [avibe-bot/avibe](https://github.com/avibe-bot/avibe) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
