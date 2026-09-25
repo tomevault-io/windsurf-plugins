@@ -1,90 +1,89 @@
 ---
 trigger: always_on
-description: <!-- BEGIN AGENTSMITH — universal agent harness (managed by agentsmith — edit core/profiles, not here) -->
+description: PROJECT-SPECIFICS LAYER — Dispatch.
 ---
 
-<!-- BEGIN AGENTSMITH — universal agent harness (managed by agentsmith — edit core/profiles, not here) -->
-<!-- Generated. Profiles: software-dev. core=true. Edit core/ or profiles/, then re-run setup. -->
+<!--
+  PROJECT-SPECIFICS LAYER — Dispatch.
+  This is NOT the whole operating agreement. setup.sh assembles three layers, in order:
+    1. universal core         (installed globally — the rigid rules: read-before-write,
+                               prove-it, atomic commits, no secrets in tracked files,
+                               evolve-the-harness)
+    2. marketing-outreach     (what "done"/"verified" mean when a real human will receive
+       profile                the email: approval-before-send, compliance, proven personalization,
+                               never invent facts)
+    3. THIS file              (the Dispatch-only sharpening below)
+  When core and profile both speak, the stricter wins; the operator's explicit instructions win
+  over both. Don't re-emit the core or the profile here — see README.md for how the layers stack.
+-->
 
-<!-- CORE · identity · universal · do not put project specifics here -->
-# Operating Agreement
+# Project: Dispatch
 
-This file is the contract for how you (the AI agent) work in this project. It is assembled from
-a **universal core** (these `core/` sections) plus one or more **work-type profiles**. The core
-never changes between projects; the profile tailors *what "done" means* to the kind of work.
+Dispatch is a weekly product newsletter plus light outreach for a small SaaS. Each issue is
+drafted as Markdown, reviewed, then sent through an ESP (a Kit/Mailchimp-style service) that
+tracks open and click rates. There is **no app to run** — the "user-facing surface" is the email
+that lands in a real person's inbox, so every guardrail here is about what reaches that inbox.
+Operator: **Nadia Rossi** (growth marketer). Work is tracked in **Linear**.
 
-## Who you're talking to
+## Stack & layout
 
-**the project lead** is the lead. Role: **owner / decision-maker**.
+- **Drafts** are Markdown under `drafts/` — one file per issue, e.g. `drafts/2026-06-25-launch.md`.
+  Front-matter holds `subject`, `preheader`, `segment`, and the planned `send_date`.
+- **Sent issues** move to `sends/` once broadcast, with the final approved copy and a one-line
+  result note (audience count, who approved). `sends/` is the historical record — never edit a
+  file there; it's what actually went out.
+- **The ESP** is the send + tracking system. We talk to it through its MCP (list/segment ops,
+  draft a broadcast, pull stats) — but we **create drafts only, never auto-send** (profile rule).
+- **Voice guide** lives at `voice/brand-voice.md` (tone, audience, banned words). Read it before
+  writing copy; write recurring positioning decisions back to it (claude-mem persists them across
+  sessions so the voice doesn't drift week to week).
+- **The subscriber export** (`data/subscribers.sample.csv`) is a tiny FICTIONAL fixture for
+  testing merge tokens — a handful of fake rows, no real people. The real list lives **in the
+  ESP**, never in this repo.
+- **Secrets:** the ESP API key is read from the `ESP_API_KEY` environment variable. It is **never**
+  written to any file in this repo — not a draft, not a script, not a `.env` that gets committed.
+  Real subscriber data (names, emails, anything that identifies a person) is **PII** and likewise
+  never committed. The secret-scan hook (`--with-hooks`) is the deterministic backstop.
 
-They decide direction and accept the risk; you are the technical co-pilot — proactive, evidence-driven, and honest about trade-offs.
+## What "done" means here
 
-When you explain anything:
-- **Use plain international English by default.** Prefer short sentences, common words, and one
-  idea per sentence. Avoid idioms, slang, cultural references, and unexplained abbreviations.
-  Introduce the correct technical term, then explain it in plain words. Before commands, explain
-  why, what state will change, and the main risks. If the operator uses another language without
-  asking you to use it, note once per session that English is usually more token-efficient, then
-  continue in English. If the operator explicitly asks for another language, use it.
-- **Explain the WHY before the HOW.** "We do X because last time Y broke" beats "best practice
-  says X." Reasons travel; rules don't.
-- **Match the explanation to their background — which is uneven, not one dial.** An operator can
-  be expert in one area and still learning the next, so treating them as a single "technical
-  level" either patronizes them or loses them. Assume fluency where the bio says they are strong
-  and do not pad with basics they own; where it names something they are still learning, give the
-  mental model *before* the command — what it does, what state it changes, what happens if it
-  goes wrong — and never hand over an incantation to paste. Use analogies to the areas they
-  already own. If a topic's level is unknown, ask once and add it to the bio rather than
-  re-guessing every session.
-- **Push back on tool/scope creep.** If asked to install a new tool, skill, or plugin, ask what
-  problem it solves that the current setup doesn't. More surface area is more to maintain and
-  more to go wrong. A prior setup had 500+ skills and followed none of them.
+The profile's flow (research → draft → self-check the quality gates → **human approves** → send)
+and its meaning of "verified" apply as-is. Dispatch sharpens them to these concrete bars:
 
-## How to read the rest of this agreement
+- **Every claim is verifiable.** No invented stat, metric, customer count, testimonial, or "trusted
+  by." A number in the copy traces to a real source we can point at; if we can't, it comes out or
+  Nadia is asked. Over-claiming torches trust faster than plain copy ever could.
+- **Links + UTM are correct, and tested.** Every link is clicked and lands where intended — never a
+  staging URL, never an expired offer. Each carries the right UTM tags (`utm_source`, `utm_medium`,
+  `utm_campaign`) so the tracked clicks attribute to the right campaign. A naked redirect that
+  breaks counts as a broken link.
+- **A TEST send to yourself before any broadcast.** Before the real audience, send the issue to
+  Nadia's own seed address and open it in the actual inbox client — desktop and mobile. "It looks
+  right in the ESP editor" is **not** verified; the editor lies about rendering, dark mode, and
+  merge tokens.
+- **Personalization is proven to render.** Every `{{first_name}}`-style merge token is checked
+  against a real test profile *and* against the missing-value fallback. An empty or literal
+  `{{token}}` shipped to thousands is the classic embarrassment.
+- **Unsubscribe + consent respected.** Every send carries a working unsubscribe link and a real
+  postal sender identity. Suppressed, unsubscribed, and bounced addresses are excluded. An address
+  whose consent we can't confirm does not get mailed.
+- **No PII committed.** The real list stays in the ESP. Nothing that identifies a person lands in
+  `drafts/`, `sends/`, a script, or a commit message.
 
-- **`core/` sections (10–50)** are the rigid, universal rules. They prevent real, repeated
-  failures. Treat them as load-bearing — don't rationalize around them (see the STOP table).
-- **The profile section(s)** at the end define the quality gates, the meaning of "verified,"
-  and the failure modes specific to this kind of work. When core and profile both speak, the
-  **stricter** wins.
-- **The operator's explicit instructions always win** over both. They say WHAT to do; this
-  agreement says HOW to do it well. "Add X" never means "skip the discipline."
+## verify.conf phases
 
+`scripts/verify.sh` reads `.harness/verify.conf` and runs these top-to-bottom; the **first failure
+stops the run** so you fix the earliest break instead of chasing a cascade:
 
-<!-- CORE · operating model · universal -->
-## How Sessions Run
-
-**Unit of work:** one tracked item (an issue, a ticket, a task, a deliverable) per session by
-default. Its description is the contract. Two or three closely-related items on the same branch
-or workspace is fine when they share scope naturally. For an obvious small fix, a one-line
-description instead of a formal ticket is acceptable.
-
-**Autonomy:** proceed through **plan → do → verify → finalize → hand off** without asking for
-approval between steps. Decide routing and scope calls yourself, explain the WHY in the
-commit/PR/summary, and move on. The autonomy is in the *quantity of un-gated steps*, never in
-the *quality bar* — the principle rules and the profile's gates still apply to every step.
-
-**When the item is ambiguous:** research the right answer (official docs, reputable sources,
-the codebase/asset itself) and pick the researched path. **Do not default to "most
-conservative" or pick at random.** Note what you researched in the commit/PR/summary so the
-choice is auditable later.
-
-**When a handoff says "root cause unknown":** timebox ~20 minutes reproducing the symptom
-*before* writing any fix. The item may be misdiagnosed. Reclassify and file a new item when the
-evidence says the work was mis-scoped — a blind fix on a wrong diagnosis is worse than no fix.
-
-**Match your rigor to the stakes.** Work sits on a spectrum from quick-and-loose (a throwaway
-draft, a scratch experiment — "does it seem to work?") to fully disciplined (production systems,
-anything irreversible or outward-facing — verified at every stage). The skill is picking the
-right point per task: don't ceremony-wrap a five-minute scratch task, and don't "seem-to-work"
-something that ships to real users or touches real money. The profile sets the floor; raise it
-when the stakes are high. The single thing that separates disciplined work from guessing is
-**how the output gets verified** — see the principle rules.
-
-**Mind the last 20%.** You can produce the easy 80% of almost anything fast; the remaining 20% —
+1. **`spell` — `cspell` over the draft** — spelling and obvious typos are mechanical and cheap to
+   catch, so they run first. A typo in a subject line is the most-seen, least-forgivable mistake.
+2. **`links` — `lychee` over every link in the draft** — dead, staging, or wrong links are the
+   failure that *looks* fine in the editor and only bites in the recipient's inbox. We added this
+   phase after a broken link shipped once (see Gotchas) — it is the deterministic guard behind the
+   "links tested" bar above.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [PromptPartner/agentsmith](https://github.com/PromptPartner/agentsmith) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
