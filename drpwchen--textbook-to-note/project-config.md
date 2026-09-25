@@ -1,135 +1,89 @@
 ---
 trigger: always_on
-description: You are helping your user set up `textbook-to-note`: a local-first pipeline
+description: This repo has two kinds of AI reader, and they need different files.
 ---
 
-# AGENTS.md — Instructions for your AI coding agent
+# CLAUDE.md — which audience are you?
 
-You are helping your user set up `textbook-to-note`: a local-first pipeline
-that converts their own PDF/EPUB textbooks into searchable markdown, then
-into structured, fully-cited notes in their personal knowledge vault
-(Obsidian, Logseq, or a plain markdown folder). This repository is designed
-to be deployed **by you**, an AI coding agent, working directly with the
-user rather than requiring them to hand-run every script themselves.
+This repo has two kinds of AI reader, and they need different files.
 
-Read this file fully before doing anything. Then work through the steps
-below in order, checking in with the user at the marked decision points.
+**You are setting this tool up for a user** (they said "read AGENTS.md and set this up") →
+read [`AGENTS.md`](AGENTS.md). Nothing on this page applies to you.
 
-## What you're setting up
+**You are changing this repo** (fixing a bug, adding a behaviour, cutting a release) → read
+[`openspec/README.md`](openspec/README.md) first, then continue here.
 
-```
-converter/    — PDF/EPUB → markdown conversion (0 LLM tokens)
-figures/      — on-demand figure extraction with QC gating
-skills/       — two Claude Code skill definitions (drop-in to ~/.claude/skills/)
-workflows/    — the note-writing workflow specification
-templates/    — real production note templates (zh-TW + English) for Step 1.1's topic-type table
-docs/         — architecture + OCR-ladder reference docs
-examples/     — one example output note showing the target format
-shared/       — shared config (paths, env var names)
-requirements.txt
-```
+---
 
-Read `docs/architecture.md` first for the full picture, and
-`docs/ocr-ladder.md` if you'll be doing any OCR-heavy conversions.
+## Working on this repo
 
-## Step 1: Understand the user's situation
+### Spec before code
 
-Ask, or infer from context:
-- Where do their textbook PDFs/EPUBs already live? (a folder, a cloud-synced
-  drive, etc.)
-- What notes tool do they use, and where is their vault/notes folder?
-- Do they want the optional semantic search index (LanceDB + a local
-  embedding model via ollama), or is grep-only fine for their corpus size?
-  Semantic search pays off once there are more than a handful of books;
-  for a small personal library, skip it initially and add later.
-- Do they have a GPU available locally? This affects whether the OCR ladder
-  (`docs/ocr-ladder.md`) can use a GPU-accelerated engine or should fall
-  back to CPU-only options. See "Choosing your hardware tier" in
-  `docs/ocr-ladder.md` for the tier table (CPU-only / Apple Silicon 8GB /
-  Apple Silicon 16GB+ / NVIDIA 8GB / NVIDIA 16GB+) before recommending any
-  OCR/vision-QC/embedding stack.
+`openspec/specs/` states what this tool does. When a request changes that:
 
-## Step 2: Install dependencies
+1. Write the delta spec first — `openspec/changes/<name>/` (copy `openspec/changes/TEMPLATE`).
+2. Get the maintainer's line-by-line approval on it.
+3. Then implement.
 
-```bash
-pip install -r requirements.txt
-```
+**When the requirement shifts mid-implementation, go back and change the delta spec before
+touching code again.** A spec that gets updated after the fact is a changelog, and the whole
+point is to have the argument before the code exists rather than after.
 
-`requirements.txt` covers PDF parsing, EPUB conversion (needs `pandoc` on
-`PATH` separately — check with `pandoc --version` and prompt the user to
-install it if missing), and the optional semantic-search stack. If the user
-declined semantic search in Step 1, you can skip installing that subset.
+`openspec/specs/` itself is edited only by the archive step, never to describe work you are
+about to do.
 
-## Step 3: Configure paths
+### How much ceremony — decide before you start
 
-Configuration is environment-variable driven with repo-relative defaults —
-`shared/config.py` documents every variable and works with zero setup:
-drop books in `./books`, get markdown in `./output`.
+Not every change earns a full spec cycle. The test: **if the agent misread the requirement,
+does one follow-up prompt fix it?**
 
-Set env vars (in the shell, or a `.env` you source) only where the defaults
-don't fit:
-- `BOOKS_DIR` — where the user's PDFs/EPUBs live (default `./books`)
-- `OUTPUT_DIR` — where converted markdown goes (default `./output`; keep it
-  outside the notes vault — this corpus is for your reference, not for the
-  user to read directly)
-- Optional OCR fallback: `SURYA_VENV_PY` + `SURYA_ADAPTER` (see
-  `docs/ocr-ladder.md`)
-- Optional semantic search: `INDEXER_SCRIPT` + `VAULT_SEARCH_DIR`
-- Figure output/cache locations: env-driven constants documented at the top
-  of `figures/figure_qc_gate.py` (default `./output/figures`, inside the
-  user's vault attachments folder if they want embeds to resolve)
+- Yes → **Tier 0.** No spec. Commit with `[no-spec]`. Tests still have to be green.
+- No, but the scope is unambiguous → **Tier 1.** Half a page of delta spec, written as
+  acceptance criteria (Given-When-Then, observable Then, thresholds as literal numbers).
+- Anything on the list below → **Tier 2.** Full cycle (proposal + delta + tasks), line-by-line
+  maintainer approval, and one independent verifier pass after the implementation is done.
 
-Run `python shared/config.py` to print the resolved configuration and
-confirm it before converting anything. Never hardcode paths into scripts or
-skill files — always go through `shared/config.py` or env vars, so the repo
-stays portable across machines and users.
+Tier 2 in this repo:
 
-## Step 4: Convert a first book (smoke test)
+- **OCR routing** — what sends a PDF down the Surya path, the silent-`fitz`-failure detection,
+  `--force-surya`. It only exists in the `--batch-dir` path, and getting it wrong costs a user
+  a multi-GB install and hours of runtime.
+- **Table gating** — every `T2N_TABLE_*` constant, `figures/figure_qc_gate.py`,
+  `figures/pregate.py`, and the review-queue flagging. A gate that is too loose ships a
+  misbound dose as clean citable data.
+- **Release discipline** — anything that changes what a released tag contains, or the
+  `CHANGELOG` + tag flow itself.
 
-Pick one book the user cares about and convert it end to end, narrating what
-you're doing:
+⚠️ Tier 0 means "cheap to notice and cheap to undo", **not "small diff"**. A two-line change
+with fuzzy scope is exactly where an agent improvises — that one is Tier 1.
 
-```bash
-python converter/convert.py "path/to/one.pdf" --book-label "Author Title — Ch.1"
-```
+The full tiering rules live in the maintainer's local toolkit and are not part of this repo.
+If you are an outside contributor, **default to Tier 1** and let the maintainer downgrade it.
 
-Check the output markdown for:
-- Readable, non-garbled text
-- `<!-- page N -->` markers present
-- Any `<!-- REF: Fig. X.Y → ... -->` markers where the source mentions
-  figures
+### The commit guard
 
-If the text looks garbled or mostly empty, read `docs/ocr-ladder.md` and
-re-run with the OCR-forcing flag (`--force-surya`, requires the optional
-OCR engine from `docs/ocr-ladder.md`) rather than assuming the conversion is
-broken — most garbled output on a first try is a silent fitz failure that
-the OCR ladder is built to catch.
+`.claude/hooks/spec-sync-guard.py` blocks a `git commit` that stages `converter/`,
+`figures/`, `citations/`, `shared/`, `skills/`, `workflows/`, or `templates/` while staging
+nothing under `openspec/` and no `CHANGELOG.md` entry. Test-only changes are exempt.
 
-Once the smoke test looks right, convert the rest of the user's priority
-books:
+If a commit is genuinely internal, re-run it with `[no-spec]` in the message. Do not disable
+the hook.
 
-```bash
-python converter/convert.py --batch-dir "path/to/their/textbook/folder"
-```
+### Release discipline (this repo is public)
 
-This can take a while for a large library — run it as a background job and
-report progress, don't block the conversation on it. Don't run two batch
-conversions against the same `OUTPUT_DIR` concurrently — progress tracking
-is last-writer-wins, so overlapping runs will corrupt each other's progress
-state.
+Every user-visible change ships as: `CHANGELOG.md` entry + commit + version tag. Never
+overwrite a released tree wholesale.
 
-## Step 5: (Optional) Build the semantic index
+Stage explicit paths. Never `git add -A` or `git add .`.
 
-Only if the user opted in during Step 1:
+### Two rules that override convenience
 
-```bash
-python converter/post_convert.py --index
-```
-
-Requires the local embedding model to be running (e.g. `ollama pull
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Never tune a QC threshold to make a failing case pass.** Fix that book's geometry logic
+  instead. This applies to `figures/figure_qc_gate.py`, `figures/pregate.py`, and every
+  `T2N_TABLE_*` constant.
+- **A new default-ON behaviour needs a corpus measurement** showing it corrects wrong
+  output. Additive behaviours ship as opt-in flags, default OFF, byte-identical when unset.
 
 ---
 > Source: [drpwchen/textbook-to-note](https://github.com/drpwchen/textbook-to-note) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
