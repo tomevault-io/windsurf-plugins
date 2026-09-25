@@ -1,7 +1,25 @@
 ---
 trigger: always_on
-description: You are a senior Kotlin Multiplatform library engineer working on "Ketch", an open-source Kotlin
+description: This is the shared entry point for coding agents working in this repository. These instructions
 ---
+
+# Coding Agent Instructions
+
+This is the shared entry point for coding agents working in this repository. These instructions
+apply throughout the repository, regardless of the agent or editor being used.
+
+Before making changes, read and follow both shared rule documents:
+
+- [Code style](docs/development/code-style.md)
+- [Testing](docs/development/testing.md)
+
+Keep project guidance in this file and the linked documentation. Any tool-specific instruction
+files should only point here, so there is a single source of truth. For tools that do not discover
+`AGENTS.md` automatically, explicitly include this file in their context or ask them to read it.
+
+Historical design plans live in `docs/plans/`; consult them when relevant, but verify their
+assumptions against the current code. The existing
+[BitTorrent design assessment](docs/plans/kmp-expert-plan.md) is one such reference.
 
 You are a senior Kotlin Multiplatform library engineer working on "Ketch", an open-source Kotlin
 Multiplatform download manager library.
@@ -21,7 +39,7 @@ library/
   core/       # In-process download engine -- published SDK module
   ktor/       # Ktor-based HttpEngine implementation -- published SDK module
   ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
-  torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM only) -- published SDK module
+  torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM, iOS) -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
   remote/     # Remote KetchApi client (HTTP + SSE) -- published SDK module
@@ -79,38 +97,20 @@ cli/          # JVM CLI entry point
 
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
-  `ServerConfig`, `RemoteConfig`, `PlatformFileSystem` (expect/actual)
+  `ServerConfig`, `RemoteConfig`, `AiSettings`, `LlmSettings`, `LlmProvider`,
+  `SearchSettings`, `SearchProvider`, `PlatformFileSystem` (expect/actual)
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
   `ConnectionState`, `WireModels`, `WireMapper`
 
-### `ai:discover` (JVM only)
-- `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `ResourceDiscoveryService`,
-  `DiscoverQuery`, `DiscoverResult`, `RankedCandidate`
-- `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
-  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
-- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`
-- `com.linroid.ketch.ai.search` -- `SearchProvider`, `DummySearchProvider`
-- `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
-  `RobotsTxtParser`
-
-## Implemented Features
-
-### Core Download Engine
-- Multi-platform: Android (minSdk 26), JVM 11+, iOS (iosArm64, iosSimulatorArm64), WasmJs
-- Segmented downloads with concurrent HTTP Range requests
-- Pause / Resume with server identity validation (ETag, Last-Modified)
-- File integrity check on resume (validates local file size vs. claimed progress)
-- Retry with exponential backoff for transient errors
-- Persistent task metadata via `TaskStore` interface
-- Duplicate download guards in `start()`, `startFromRecord()`, `resume()`
-
-### Queue Management (`DownloadQueue`)
+### `ai:discover` (JVM/Android only)
+- `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`,
+  `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
+  `RankedCandidate`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [linroid/Ketch](https://github.com/linroid/Ketch) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
