@@ -76,4 +76,4 @@ Anti-patterns to delete on sight in `architecture.md`, `specification.md`, `READ
 
 ---
 > Source: [JINGBANZ/evolving](https://github.com/JINGBANZ/evolving) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
