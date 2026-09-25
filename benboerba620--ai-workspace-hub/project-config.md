@@ -1,13 +1,13 @@
 ---
 trigger: always_on
-description: 这个 repo 是一个 all-in-one AI 研究工作系统，包含六大能力。Codex 进入本目录后，先读本文件，再读 `workspace/workspace-config.md`。
+description: 这个 repo 是一个 all-in-one AI 研究工作系统，包含六大能力。Claude Code 进入本目录后，先读本文件，再读 `workspace/workspace-config.md`。
 ---
 
 # AI Workspace Instructions
 
-这个 repo 是一个 all-in-one AI 研究工作系统，包含六大能力。Codex 进入本目录后，先读本文件，再读 `workspace/workspace-config.md`。
+这个 repo 是一个 all-in-one AI 研究工作系统，包含六大能力。Claude Code 进入本目录后，先读本文件，再读 `workspace/workspace-config.md`。
 
-本文件与 `CLAUDE.md` 保持**同一套工作协议**。两者内容应当同源，改一个就同步另一个。研究对象、状态和 ID 统一遵循 `system/integrations/object-model.md`。
+本文件与 `AGENTS.md` 保持**同一套工作协议**。两者内容应当同源，改一个就同步另一个。研究对象、状态和 ID 统一遵循 `system/integrations/object-model.md`。
 
 ## 工作方式
 
@@ -82,7 +82,16 @@ description: 这个 repo 是一个 all-in-one AI 研究工作系统，包含六�
 
 状态标签：`PAUSED` 半成品 / `DONE` 完成 / `决策` 决定。
 
-**上限与自动清理（写断点时顺手做，不另外问用户）**：「最近对话延续」段按 14 天滚动、最多约 20 条。每次追加新行后自检——① 把**超过 14 天**的条目整行移到 `workspace/meta/active-context-archive-YYYY-MM.md`（不丢续接锚点）；② 若移完仍超 20 条，再把最旧的几条一并移到归档，直到段内 ≤ 20 条。同日同主题用"改"不用"新增"，避免堆叠。
+**上限与自动清理（写断点时顺手做，不另外问用户）**：「最近对话延续」段有三道闸门——① **日期**：超过 14 天的条目整条剪到 `workspace/meta/active-context-archive-YYYY-MM.md`（不丢续接锚点）；② **条数**：剪完仍超 20 条时，最旧的几条一并归档；③ **行长**：单条正文超 1500 字节时，全文进归档、原地只留一行索引（标题 + 文件路径 + 存档指针）。第三道管的是前两道够不着的地方——一条写成小作文的条目既不老也不多，却能单独吃掉整个文件的预算。
+
+写完断点跑一次脚本即可，不要手工搬运：
+
+```bash
+python3 system/scripts/prune_active_context.py           # dry-run，先看会剪什么
+python3 system/scripts/prune_active_context.py --apply   # 确认后执行
+```
+
+脚本只动「最近对话延续」段；「当前关注」「待办」这类状态段需要人判断，一个字节都不碰。同日同主题用"改"不用"新增"，避免堆叠。
 
 ## 最小试跑（基座，零依赖）
 
@@ -90,7 +99,7 @@ description: 这个 repo 是一个 all-in-one AI 研究工作系统，包含六�
 
 > 把 `inbox/first-note.md` 整理进 personal wiki。
 
-Codex 应该创建一篇 `wiki/sources/YYYY-MM-DD-first-note.md`，并在 `workspace/meta/active-context.md` 记录本次试跑结果。这条链路只读写 markdown，不需要安装任何依赖。
+Claude 应该创建一篇 `wiki/sources/YYYY-MM-DD-first-note.md`，并在 `workspace/meta/active-context.md` 记录本次试跑结果。这条链路只读写 markdown，不需要安装任何依赖。
 
 ## 数据源
 
@@ -103,18 +112,9 @@ Codex 应该创建一篇 `wiki/sources/YYYY-MM-DD-first-note.md`，并在 `works
 | Finnhub / EOD / yfinance | 美股（daily-watch 降级源） | `FINNHUB_API_KEY` / `EOD_API_KEY` / `ENABLE_YFINANCE` | 免费档可用 |
 | Longbridge Skill | 多市场 | 独立安装与授权 | 外部 Agent 扩展，不是日报脚本内置源 |
 
-获取方式：
-- Longbridge：https://open.longbridge.com/zh-CN/skill/
-- tushare：https://tushare.pro/register
-- FMP：https://financialmodelingprep.com/
 
-## 系统维护（防臃肿）
-
-- 装好上手后一次性瘦身：`system/skills/post-install-cleanup.md`（清安装脚手架 + 精简必读文件）。
-- 每周结构体检、给精简建议：`system/skills/structure-health.md`。
-
-<!-- 文件说明：Codex 入口路由和工作规则。 -->
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Benboerba620/ai-workspace-hub](https://github.com/Benboerba620/ai-workspace-hub) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
