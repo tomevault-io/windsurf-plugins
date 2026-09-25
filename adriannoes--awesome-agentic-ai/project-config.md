@@ -1,125 +1,93 @@
 ---
 trigger: always_on
-description: > This document is mainly for agents and LLMs to follow when implementing
+description: You are working in a project with the Playwright Pro plugin installed. Follow these rules for all test-related work.
 ---
 
-# React View Transitions
+# Playwright Pro — Agent Context
 
-**Version 1.0.0**
-Vercel Engineering
-March 2026
+You are working in a project with the Playwright Pro plugin installed. Follow these rules for all test-related work.
 
-> **Note:**
-> This document is mainly for agents and LLMs to follow when implementing
-> view transitions in React applications. Humans may also find it useful,
-> but guidance here is optimized for automation and consistency by
-> AI-assisted workflows.
+## Golden Rules (Non-Negotiable)
 
----
+1. **`getByRole()` over CSS/XPath** — resilient to markup changes, mirrors how users see the page
+2. **Never `page.waitForTimeout()`** — use `expect(locator).toBeVisible()` or `page.waitForURL()`
+3. **Web-first assertions** — `expect(locator)` auto-retries; `expect(await locator.textContent())` does not
+4. **Isolate every test** — no shared state, no execution-order dependencies
+5. **`baseURL` in config** — zero hardcoded URLs in tests
+6. **Retries: `2` in CI, `0` locally** — surface flakiness where it matters
+7. **Traces: `'on-first-retry'`** — rich debugging without CI slowdown
+8. **Fixtures over globals** — share state via `test.extend()`, not module-level variables
+9. **One behavior per test** — multiple related `expect()` calls are fine
+10. **Mock external services only** — never mock your own app
 
-## Abstract
+## Locator Priority
 
-Guide for implementing smooth, native-feeling animations using React's View Transition API. Covers the `<ViewTransition>` component, `addTransitionType`, CSS view transition pseudo-elements, shared element transitions, Suspense reveals, list reorder, directional navigation, and Next.js integration. Includes a step-by-step implementation workflow, ready-to-use CSS animation recipes, and common mistake warnings.
+Always use the first option that works:
 
----
-
-## Table of Contents
-
-1. [Core Reference](#when-to-animate)
-   - [When to Animate](#when-to-animate)
-   - [Availability](#availability)
-   - [Core Concepts](#core-concepts)
-   - [Styling with View Transition Classes](#styling-with-view-transition-classes)
-   - [Transition Types](#transition-types)
-   - [Shared Element Transitions](#shared-element-transitions)
-   - [Common Patterns](#common-patterns)
-   - [How Multiple VTs Interact](#how-multiple-vts-interact)
-   - [Next.js Integration](#nextjs-integration)
-   - [Accessibility](#accessibility)
-2. [Implementation Workflow](#implementation-workflow)
-   - [Step 1: Audit the App](#step-1-audit-the-app)
-   - [Step 2: Add CSS Recipes](#step-2-add-css-recipes)
-   - [Step 3: Isolate Persistent Elements](#step-3-isolate-persistent-elements)
-   - [Step 4: Add Directional Page Transitions](#step-4-add-directional-page-transitions)
-   - [Step 5: Add Suspense Reveals](#step-5-add-suspense-reveals)
-   - [Step 6: Add Shared Element Transitions](#step-6-add-shared-element-transitions)
-   - [Step 7: Verify Each Navigation Path](#step-7-verify-each-navigation-path)
-   - [Common Mistakes](#common-mistakes)
-3. [Patterns and Guidelines](#patterns-and-guidelines)
-4. [CSS Animation Recipes](#css-animation-recipes)
-5. [View Transitions in Next.js](#view-transitions-in-nextjs)
-
----
-
-Animate between UI states using the browser's native `document.startViewTransition`. Declare *what* with `<ViewTransition>`, trigger *when* with `startTransition` / `useDeferredValue` / `Suspense`, control *how* with CSS classes. Unsupported browsers skip animations gracefully.
-
-## When to Animate
-
-Every `<ViewTransition>` should communicate a spatial relationship or continuity. If you can't articulate what it communicates, don't add it.
-
-Implement **all** applicable patterns from this list, in this order:
-
-| Priority | Pattern | What it communicates |
-|----------|---------|---------------------|
-| 1 | **Shared element** (`name`) | "Same thing — going deeper" |
-| 2 | **Suspense reveal** | "Data loaded" |
-| 3 | **List identity** (per-item `key`) | "Same items, new arrangement" |
-| 4 | **State change** (`enter`/`exit`) | "Something appeared/disappeared" |
-| 5 | **Route change** (layout-level) | "Going to a new place" |
-
-This is an implementation order, not a "pick one" list. Implement every pattern that fits the app. Only skip a pattern if the app has no use case for it.
-
-### Choosing Animation Style
-
-| Context | Animation | Why |
-|---------|-----------|-----|
-| Hierarchical navigation (list → detail) | Type-keyed `nav-forward` / `nav-back` | Communicates spatial depth |
-| Lateral navigation (tab-to-tab) | Bare `<ViewTransition>` (fade) or `default="none"` | No depth to communicate |
-| Suspense reveal | `enter`/`exit` string props | Content arriving |
-| Revalidation / background refresh | `default="none"` | Silent — no animation needed |
-
-Reserve directional slides for hierarchical navigation (list → detail) and ordered sequences (prev/next photo, carousel, paginated results). For ordered sequences, the direction communicates position: "next" slides from right, "previous" from left. Lateral/unordered navigation (tab-to-tab) should not use directional slides — it falsely implies spatial depth.
-
----
-
-## Availability
-
-- **Next.js:** Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
-- **Without Next.js:** Install `react@canary react-dom@canary` (`ViewTransition` is not in stable React).
-- Browser support: Chromium 111+, Firefox 144+, Safari 18.2+. Graceful degradation.
-
----
-
-## Core Concepts
-
-### The `<ViewTransition>` Component
-
-```jsx
-import { ViewTransition } from 'react';
-
-<ViewTransition>
-  <Component />
-</ViewTransition>
+```typescript
+page.getByRole('button', { name: 'Submit' })        // 1. Role (default)
+page.getByLabel('Email address')                     // 2. Label (form fields)
+page.getByText('Welcome back')                       // 3. Text (non-interactive)
+page.getByPlaceholder('Search...')                    // 4. Placeholder
+page.getByAltText('Company logo')                    // 5. Alt text (images)
+page.getByTitle('Close dialog')                      // 6. Title attribute
+page.getByTestId('checkout-summary')                 // 7. Test ID (last semantic)
+page.locator('.legacy-widget')                       // 8. CSS (last resort)
 ```
 
-React auto-assigns a unique `view-transition-name` and calls `document.startViewTransition` behind the scenes. Never call `startViewTransition` yourself.
+## How to Use This Plugin
 
-### Animation Triggers
+### Generating Tests
 
-| Trigger | When it fires |
-|---------|--------------|
-| **enter** | VT first inserted during a Transition |
-| **exit** | VT first removed during a Transition |
-| **update** | DOM mutations inside a VT. With nested VTs, mutation applies to the innermost one |
-| **share** | Named VT unmounts and another with same `name` mounts in same Transition |
+When generating tests, always:
 
-Only `startTransition`, `useDeferredValue`, or `Suspense` activate VTs. Regular `setState` does not animate.
+1. Use the `Explore` subagent to scan the project structure first
+2. Check `playwright.config.ts` for `testDir`, `baseURL`, and project settings
+3. Load relevant templates from `templates/` directory
+4. Match the project's language (check for `tsconfig.json` → TypeScript, else JavaScript)
+5. Place tests in the configured `testDir` (default: `tests/` or `e2e/`)
+6. Include a descriptive test name that explains the behavior being verified
 
-### Critical Placement Rule
+### Reviewing Tests
 
+When reviewing, check against:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. All 10 golden rules above
+2. The anti-patterns in `skills/review/anti-patterns.md`
+3. Missing edge cases (empty state, error state, loading state)
+4. Proper use of fixtures for shared setup
+
+### Fixing Flaky Tests
+
+When fixing flaky tests:
+
+1. Categorize first: timing, isolation, environment, or infrastructure
+2. Use `npx playwright test <file> --repeat-each=10` to reproduce
+3. Use `--trace=on` for every attempt
+4. Apply the targeted fix from `skills/fix/flaky-taxonomy.md`
+
+### Using Built-in Commands
+
+Leverage Claude Code's built-in capabilities:
+
+- **Large migrations**: Use `/batch` for parallel file-by-file conversion
+- **Post-generation cleanup**: Use `/simplify` after generating a test suite
+- **Debugging sessions**: Use `/debug` alongside `/pw:fix` for trace analysis
+- **Code review**: Use `/review` for general code quality, `/pw:review` for Playwright-specific
+
+### Integrations
+
+- **TestRail**: Configured via `TESTRAIL_URL`, `TESTRAIL_USER`, `TESTRAIL_API_KEY` env vars
+- **BrowserStack**: Configured via `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY` env vars
+- Both are optional. The plugin works fully without them.
+
+## File Conventions
+
+- Test files: `*.spec.ts` or `*.spec.js`
+- Page objects: `*.page.ts` in a `pages/` directory
+- Fixtures: `fixtures.ts` or `fixtures/` directory
+- Test data: `test-data/` directory with JSON/factory files
 
 ---
 > Source: [adriannoes/awesome-agentic-ai](https://github.com/adriannoes/awesome-agentic-ai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
