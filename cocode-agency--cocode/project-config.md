@@ -1,122 +1,142 @@
 ---
 trigger: always_on
-description: Cocode 产品由三个 **同级目录** 组成：桌面/Web GUI、终端 TUI、Agent 运行时（harness）。本文件在 git 仓库根目录，覆盖整个工作区；各子目录有独立 pnpm workspace 与依赖。
+description: This file is the repository-level development contract. Every agent working in this
 ---
 
-# AGENTS.md
+# Cocode Agent Engineering Rules
 
-Cocode 产品由三个 **同级目录** 组成：桌面/Web GUI、终端 TUI、Agent 运行时（harness）。本文件在 git 仓库根目录，覆盖整个工作区；各子目录有独立 pnpm workspace 与依赖。
+This file is the repository-level development contract. Every agent working in this
+repository MUST read and follow it before changing code. User instructions for a
+specific task take precedence when they explicitly conflict with this file; otherwise
+these rules are mandatory.
 
-## 仓库布局
+## 1. Agent instruction portability
 
-```
-./
-  AGENTS.md           ← 本文件
-  cocode-gui/         桌面 / Web GUI（含 .dev/guide、.dev/rfc）
-  cocode-tui/         终端 TUI（含 .dev/rfc）
-  cocode-harness/     harness 运行时（gitignore，勿提交嵌套副本）
-```
+When adding or revising agent constraints, prompts or examples in this file:
 
-`cocode-harness/` 亦可用与其 **同级** 的独立 clone（例如 `~/www/cocode-harness`）。不要在 GUI/TUI 目录中修改 harness 插件或 agent loop。
+- MUST NOT include personal names, usernames, email addresses, machine names,
+  user-home paths or other person/device-specific identifiers.
+- MUST use repository-relative paths, environment variables, standard tool
+  discovery or neutral placeholders so the instructions can be reused directly
+  on another device.
+- MUST NOT assume a particular operating system, shell, checkout location or
+  locally installed absolute binary path. If a platform-specific step is
+  unavoidable, state the condition and provide a discoverable alternative.
+- MUST keep the resulting instructions independent of local environment state;
+  do not encode secrets, local credentials, or assumptions about another
+  developer's filesystem.
 
-## 仓库边界
+## 2. Project baseline
 
-| 目录 | 职责 | 连 harness 的方式 |
-| --- | --- | --- |
-| **cocode-gui/** | 品牌 UI、设计系统、Host 客户端 | HTTP POST + 双 WebSocket → `dsh web` |
-| **cocode-tui/** | 终端 UI、JSON-RPC 客户端 | stdio NDJSON-RPC → jsonrpc-agent 子进程 |
-| **cocode-harness/** | Cordis 插件树、`@deepseek-ai/dsh-*` 运行时 | — |
+This repository is an electron-vite + electron-builder + TypeScript desktop application.
 
-跨目录需求：harness 侧实现能力，GUI/TUI 侧消费 wire API。
+- Node.js: `>=22.12.0` (use the version in `.nvmrc` when available).
+- pnpm: `10.34.5` exactly.
+- Electron: `43.x` as pinned by `package.json`.
+- Renderer: React `18.x`.
+- Styling: Tailwind CSS `3.x` with PostCSS.
+- UI primitives: shadcn/ui source components backed by Radix UI.
+- Class composition: `clsx` + `tailwind-merge` through `cn()`.
 
-## cocode-gui/
+Before running project commands, use the repository runtime. If `.nvmrc` exists,
+select the version declared there; otherwise use a compatible Node.js version
+from the `engines` field. Run pnpm through Corepack at the pinned version:
 
-```
-cocode-gui/
-  .dev/
-    guide/               设计系统（design-system.html 为视觉权威）
-    rfc/                 GUI 相关 RFC（pending/、implemented/）
-  src/main.ts
-  packages/
-    connection/          Host 传输（@cocode/gui-connection）
-    ui/                  设计令牌与 UI 基元（@cocode/ui）
-```
-
-**分层**：传输 → app 内 `runtime/`（会话状态，零 React）→ 呈现（React/Electron + `packages/ui`）。
-
-`.dev/` 下除 `guide/`、`rfc/` 外的本地 scratch 不入库；RFC 写在 `cocode-gui/.dev/rfc/`，不要堆在仓库根。
-
-```sh
-cd cocode-gui
-pnpm install
-pnpm run dev          # Electron desktop client (default)
-pnpm run dev:web      # browser-only, e.g. design-system.html
-pnpm run typecheck
+```bash
+corepack pnpm@10.34.5 <command>
 ```
 
-联调：`cd ../cocode-harness && pnpm dsh web`（默认 `http://127.0.0.1:3080`）。
+Do not weaken `engines` constraints or upgrade React to 19 / Tailwind to 4 as a
+shortcut for a local environment mismatch.
 
-Harness 参考：`cocode-harness/packages/host/apiproxy/`、`cocode-harness/packages/client/connection/`。
+## 3. Source tree and ownership
 
-## cocode-tui/
+The source tree is organized by Electron runtime boundary first, then by business
+boundary:
 
-```
-cocode-tui/
-  .dev/
-    rfc/                 TUI 相关 RFC（pending/、implemented/）
-  src/main.ts
-  packages/
-    connection/          JSON-RPC 传输（@cocode/tui-connection）
-```
-
-TUI 通过 `@deepseek-ai/dsh-sdk-client` 封装 spawn + `session.event` 流；技能/slash 走 `session.prompt` 文本路径。RFC 写在 `cocode-tui/.dev/rfc/`。
-
-```sh
-cd cocode-tui
-pnpm install
-pnpm run dev
-pnpm run typecheck
+```text
+src/
+├── main/                  # trusted Electron main process
+├── preload/               # minimal, allow-listed context bridge
+├── renderer/              # React renderer process
+├── contracts/             # cross-process protocol and DTO definitions
+└── shared/                # pure TypeScript code safe for every runtime
 ```
 
-Harness 参考：`cocode-harness/packages/sdk/client/`、`cocode-harness/examples/jsonrpc-agent/`。
+### `src/main`
 
-**不适用**：`cocode-harness/packages/terminal/*` 是 Agent PTY 工具，不是 TUI 客户端。
+Main owns privileged desktop capabilities and the authoritative business model.
 
-## cocode-harness/
-
-Agent 运行时 fork，规范见 [cocode-harness/AGENTS.md](cocode-harness/AGENTS.md)（或独立 clone 内同名文件）。
-
-```sh
-cd cocode-harness
-pnpm install && pnpm run build
-pnpm dsh web          # GUI 联调
+```text
+src/main/
+├── index.ts               # thin process entry; calls bootstrap only
+├── bootstrap/             # composition root and dependency wiring
+├── shell/                 # Electron lifecycle and desktop shell adapters
+├── contexts/              # main-process bounded contexts
+└── shared/                # main-only technical capabilities
 ```
 
-## 约定
+`main/shell` may contain Electron APIs, BrowserWindow management, menus, tray,
+protocols, updater, shortcuts, security and lifecycle code. It MUST NOT contain
+business rules that belong in a bounded context.
 
-- **包名**：GUI 用 `@cocode/gui-*`、`@cocode/ui`；TUI 用 `@cocode/tui-*`；harness 用 `@deepseek-ai/dsh-*`。
-- **ESM**：`"type": "module"`；跨包用 package name，包内用 `.ts` 相对路径。
-- **配置**：可变项走环境变量（见各目录 `.env.example`），禁止硬编码 harness 路径、模型、API Key。
-- **密钥**：`.env` 不入库；key 只走 harness credentials。
-- **模型可见 ⟺ 可重建**：UI 呈现态不进 session log。
-- **构建产物不入库**：`cocode-gui/packages/cocode/*/lib/` 由 `pnpm build:cocode-plugins` 生成，只本地存在，不提交/推送。
-- **pnpm store**：用默认全局 store（macOS：`~/Library/pnpm/store`）。禁止 `--store-dir .pnpm-store`，不要在仓库内创建 `.pnpm-store/`。
-- **文件末尾**：恰好一个 trailing newline。
+`main/index.ts` MUST remain thin. Move lifecycle, window creation and registrations
+to focused modules under `bootstrap` or `shell`.
 
-## 开发检查
+### `src/preload`
 
-| 改动 | 检查 |
-| --- | --- |
-| GUI 组件 / 令牌 | `cd cocode-gui && pnpm run dev:web` + `.dev/guide/design-system.html` 对照 |
-| TUI 交互 | `cd cocode-tui && pnpm run dev` + JSON-RPC 联调 |
-| harness API | 先在 harness 落地，再更新对应 `packages/connection` |
+Preload is the only bridge between privileged Main APIs and Renderer code.
 
-## 相关文档
+```text
+src/preload/
+├── index.ts               # thin preload entry
+├── bridges/               # allow-listed APIs grouped by capability/context
+├── validators/            # runtime validation of IPC inputs/outputs
+└── types/                 # Window/global declarations for exposed APIs
+```
 
-- Harness 架构：`cocode-harness/docs/architecture.md`
-- Host API：`cocode-harness/packages/host/apiproxy/README.md`
-- SDK 客户端：`cocode-harness/packages/sdk/client/README.md`
+Preload MUST expose narrow capability APIs through `contextBridge`. Never expose
+`ipcRenderer`, `ipcMain`, Node.js modules, or a generic `send/invoke` wrapper.
+Preload MUST NOT implement domain rules or become a second application service layer.
+
+### `src/renderer`
+
+Renderer owns React presentation, user interaction and renderer-local application
+state. It MUST NOT import Electron or Node.js privileged APIs.
+
+```text
+src/renderer/
+├── index.tsx              # React 18 createRoot entry
+├── app/                   # renderer composition root, providers, router, layouts
+├── contexts/              # UI-side bounded contexts
+├── components/ui/         # shadcn/ui source components
+├── hooks/                 # renderer-wide hooks used by multiple contexts
+├── lib/                   # renderer-wide technical helpers, including cn()
+├── shared/                # renderer-only generic UI/state utilities
+└── styles/                # Tailwind layers, tokens and global styles
+```
+
+`src/renderer/app/App.tsx` is the application shell. It may compose providers and
+routes, but business workflows belong in a context.
+
+### `src/contracts`
+
+`contracts` defines how independent runtime boundaries communicate:
+
+```text
+src/contracts/
+├── ipc/                   # channel names, request/response DTOs
+├── events/                # cross-boundary event payloads
+└── schemas/               # runtime schemas for boundary validation
+```
+
+Contracts describe what is sent, received and returned. They MUST NOT contain
+repositories, database adapters, Electron calls, business implementations or UI
+components.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cocode-agency/cocode](https://github.com/cocode-agency/cocode) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
