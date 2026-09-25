@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [gykim80/perfectpixel-studio](https://github.com/gykim80/perfectpixel-studio).
+Original source: `CLAUDE.md` in [gykim80/perfectpixel-studio](https://github.com/gykim80/perfectpixel-studio).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
