@@ -19,9 +19,10 @@ Complete the task on that branch.
 
 After finishing the work and verifying that all checks pass:
 
-1. Stage and commit your changes.
-2. Push the branch to `origin`.
-3. Open a pull request using the GitHub CLI.
+1. Update `CHANGELOG.md` under `## [Unreleased]` for user-facing changes (see [Changelog Guidelines](#changelog-guidelines)).
+2. Stage and commit your changes.
+3. Push the branch to `origin`.
+4. Open a pull request using the GitHub CLI.
 
 ```bash
 git add .
@@ -66,6 +67,19 @@ https://www.conventionalcommits.org/en/v1.0.0/#summary
 
 ---
 
+## Changelog Guidelines
+
+We maintain `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+Before opening a pull request, add an entry under `## [Unreleased]` for any user-facing changes:
+
+- **End-User Friendly**: Make entries easy to understand for end users. For new features, explain what they actually do in plain language without heavy technical jargon. For bug fixes, describe what the bug was in a friendly, relatable way rather than focusing on internal code mechanics, file paths, or private symbols.
+- **Formatting**: `- **<scope>**: <Description>` (e.g. `- **asset**: Fix an issue where moving a video to trash while it was still transcoding could cause it to lose its trashed status`).
+- **No PR Numbers**: Do not include PR numbers or links; the release pipeline automatically appends the detailed PR list.
+- **Internal Changes**: Routine refactors, test additions, or internal chores without external behavior changes may omit changelog updates.
+
+---
+
 ## Pull Request Template
 
 ```md
@@ -95,7 +109,8 @@ Add any additional context, caveats, or follow-up work.
   - `bun run format`
   - `bun run typecheck`
   - `bun run test`
-  - `bun run test:e2e`
+  - `bun run test:e2e:app`
+  - `bun run test:e2e:webui`
   - `bun run test:e2e:workflow`
 
 - **Backend Testing Mandate**: Every backend feature, service method, workflow, and activity MUST be accompanied by comprehensive tests. Logic-heavy code without corresponding test coverage is considered incomplete.
@@ -130,24 +145,9 @@ The project is a monorepo managed by **Bun Workspaces**. It follows a strictly d
   - `@shumai/agent`: AI agent workflows and activities.
   - `@shumai/transcode`: Media processing workflows and activities.
 
-### Layered Communication Rules
-
-1.  **API Layer** calls **Core Layer**. Do not access the database directly in the API layer.
-2.  **Core Layer** calls **Database Layer** and other Core services.
-3.  **DTO Layer** is imported by all layers to ensure end-to-end type safety.
-4.  **No Direct DB Leak**: Do not return Prisma objects directly from the API; always map them to DTOs.
-
-## Dependency Management
-
-We follow Bun's monorepo conventions for dependency management:
-
-1.  **Self-Contained Packages**: Every workspace package MUST declare its own runtime `dependencies` in its local `package.json`. Do not rely on dependencies being available via the root.
-2.  **Shared DevDependencies**: Common development tools (e.g., `typescript`, `eslint`, `vitest`, `prettier`, `prisma`) MUST be declared in the root `package.json` to ensure version consistency across the workspace.
-3.  **Local DevDependencies**: Tools specific to a single package (e.g., `@vitejs/plugin-react` for `webui`) should be declared in that package's local `package.json`.
-4.  **Workspace Imports**: Use `workspace:*` for internal package dependencies.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shumaiOne/shumai](https://github.com/shumaiOne/shumai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
