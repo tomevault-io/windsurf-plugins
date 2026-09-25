@@ -1,118 +1,93 @@
 ---
 trigger: always_on
-description: **Purpose:** a TypeScript UI framework where Effect's `<A, E, R>`
+description: Tiny plugin (~70 LOC). Responsible for getting `.vx` files through
 ---
 
-# verrex — Effect-native UI framework
+# `@verrex/core/vite` — Vite integration for `.vx`
 
-**Purpose:** a TypeScript UI framework where Effect's `<A, E, R>`
-channels propagate from every leaf of the view tree to the root.
-Forgetting to provide a service `Layer` becomes a _compile-time
-error that names the missing service_; symmetrically, forgetting to
-handle an error with a `Catch` boundary becomes a _compile-time
-error that names the unhandled error_ (`mount` requires
-`Effect<View<never>, never, R>`). Errors live in two phases: construction
-errors ride the Effect `E`; live errors a rendered subtree can still
-produce ride the `View<E>` success — one `Catch` boundary discharges both.
+Tiny plugin (~70 LOC). Responsible for getting `.vx` files through
+Vite's dev pipeline as if they were `.ts` files.
 
-**Honest scope today:** the _construction_ channel is fully type-tracked —
-a forgotten boundary on a failing build is a compile error. The _live_
-channel is tracked at two leaves. (1) `Async` _without_ a `failure` arm (or
-with a _partial_ tag map, whose residual rides), typed
-`Effect<View<E>, never, R | Scope>`. Its failures (initial fetch or refetch)
-ride `View<E>` to the nearest `Catch`, and `mount`'s `View<never>` gate makes
-a missing boundary a compile error naming `E`. The `failure` arm mirrors
-`Catch`'s two forms: a function handles everything at the leaf
-(`View<never>`); a tag map handles matched tags at the leaf — keeping the
-fetch loop live, so a dep change can recover the view — while the residual
-rides `View<Exclude<E, { _tag }>>`. (2) _Event handlers_ (#72): an intrinsic's
-`on*` prop returning `Effect<_, E, R>` stamps `E` on the element's `View<E>`
-and folds `R` into its requirements — a forgotten boundary or Layer for a
-handler is the same compile error as for construction. The remaining
-untracked live surface: a _reactive re-render_ whose Effect fails (an
-`AtomRef`-driven child re-emitting a failing Effect) is still caught only at
-_runtime_ by `Catch`'s sink, not typed.
+Public surface: `export function verrex(): Plugin` (also `default`).
+The user adds it to their `vite.config.ts` plugins array.
 
-**The name** is built from the channels of an `Effect<View, E, R>`:
-**V** (View — the `A`, always the `View` here), **E** (Error), **R**
-(Requirements), plus **X**, because the JSX/TSX syntax it borrows adds an
-X too. `V + E + R + X` spells **verx**, stylized to **verrex** (and the
-`.vx` source extension).
+## What it does
 
-Status: experimental proof-of-concept. Not production-ready.
+The plugin **owns the full `.vx` → JavaScript transform** and hands
+Vite finished JS. It does _not_ lean on Vite's built-in transformer to
+strip the TypeScript — see "Why we own the whole transform" below.
 
-## The constraint that shaped everything
+Three hooks, each load-bearing:
 
-TypeScript's JSX type-checker erases generic type variables at the
-JSX boundary — every component result collapses to `JSX.Element`.
-React, Solid, Preact all live with this. For a framework where
-the _point_ is that `E`/`R` channels survive composition, that's
-fatal.
+| Hook                                 | Purpose                                                                                                                                                                                                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enforce: "pre"`                     | Run before other plugins' transforms so our hook is the one that turns a `.vx` id into a module. If you drop the flag and something breaks, ordering is the first thing to check.                                                                                              |
+| `configureServer(server)` middleware | Rewrites every `.vx` request URL to add `?import` (if not already present).                                                                                                                                                                                                    |
+| `transform(code, id)`                | Two steps: (1) `transformVerrex(code, id, { errorRecovery: false })` turns JSX into `h()` calls (still TypeScript); (2) Vite's `transformWithOxc(ts, id, { lang: "ts" }, babelMap)` strips the types → JS and chains the Babel map. Returns `{ code, map, moduleType: "js" }`. |
+| `load(id)`                           | Reads the raw file from disk for `?import`-suffixed requests. Belt-and-suspenders — the middleware ensures every `.vx` request hits this path.                                                                                                                                 |
 
-So this project deliberately **never lets `tsc` see JSX**:
+## Why we own the whole transform (Vite 8 / Oxc)
 
-1. Source files use a custom `.vx` extension.
-2. `@verrex/core/compiler` (Babel-based) rewrites every JSX node into an
-   `h(tag, props, ...children)` call **before** tsc sees the file.
-3. `h()`'s generic signature in `verrex` uses conditional
-   types (`FoldE`/`FoldR`) to union every child's `E` and `R` into
-   the result `Effect<View, E, R>`.
+The plugin type-strips in-house and returns plain JS rather than riding
+Vite's built-in transformer — that coupling is fragile (it snapped in
+Vite 8's esbuild → Oxc swap), and Rolldown infers a module's language
+from its extension, which fails on the unknown `.vx`:
 
-Everything else — the `.vx` extension, the Babel choice, the
-custom Vite dev server hook, the TS Language Service plugin —
-exists to support this constraint.
+- `transformWithOxc(tsCode, id, { lang: "ts" }, babelMap)` — Vite 8's
+  exported Oxc transform. `lang: "ts"` tells Oxc the post-Babel code is
+  TypeScript (it can't infer that from the `.vx` id); the 4th arg
+  `inMap` chains the Babel `.vx` → TS map so the returned map resolves
+  to the original `.vx`.
+- `moduleType: "js"` on the result tells Rolldown the output is plain
+  JavaScript, so it never runs lang-detection on the `.vx` id.
 
-### "JSX" here means JSX _syntax_, not JSX _semantics_
+This keeps the plugin **bundler-agnostic**, and the same `transform`
+runs in dev and build.
 
-This is the most important framing for anyone (or any agent)
-joining the codebase. **We borrow JSX syntax. We do not use JSX
-in any other sense.**
+### Build vs. editor error policy
 
-We use:
+`transformVerrex`'s default `errorRecovery: true` lets the editor tolerate
+mid-edit unparseable source (see [`@verrex/core/compiler`](../compiler/AGENTS.md)).
+The build path passes **`errorRecovery: false`** so a genuine syntax
+error throws here — a Vite error overlay in dev, a failed build in CI —
+instead of the compiler silently recovering and us shipping a broken
+module. Vite (not tsc) is the only checker on the build path, so this
+plugin is where "fail loudly on bad syntax" has to live.
 
-- The angle-bracket form `<div>...</div>` as a source-code shape.
-- Babel's `jsx` parser plugin to recognize that shape.
-- Editor / Treesitter JSX highlighting (via `typescriptreact`
-  filetype mapping).
+## Why the URL-rewrite middleware exists
 
-We do **not** use:
+Without the `?import` middleware, a direct browser GET for
+`/src/Counter.vx` hits Vite's **static-asset middleware**, which
+returns the file with empty `Content-Type`. Localhost is lenient
+about that; real browsers under strict-MIME (including any
+non-localhost origin like LAN) reject it.
 
-- A JSX runtime (`jsx-runtime`, `jsx-dev-runtime`,
-  `React.createElement`, none of it).
-- The `JSX` TypeScript namespace (`JSX.IntrinsicElements`,
-  `JSX.Element`). If those names appear in an error message,
-  something is wrong — tsc is seeing JSX it shouldn't.
-- Any React-shaped library. There is no React, Preact, Solid
-  dependency.
-- TypeScript's JSX type-checker. It's never engaged because the
-  compiler removes the syntax before tsc parses the file.
+Adding `?import` routes the same URL through Vite's **module
+pipeline** where the `transform` hook fires, the result is
+JavaScript, and `Content-Type: text/javascript` is set
+correctly. Strict-MIME accepts that.
 
-Post-compile, `Counter.vx` is `h("div", { class: "counter" }, ...)`
-calls in a `.ts` file. Plain function calls in plain TypeScript.
-That's the only thing tsc, Vite, your IDE's type-checker, or any
-downstream tool ever sees.
+Every `.vx` URL gets `?import` appended (preserving any existing
+query), so every request — first load, HMR cache-bust re-fetch
+(`?t=<ts>`), ES-module subgraph fetch (`import "./Counter.vx"` from an
+already-loaded module) — goes through the module path. The latter two
+never touch HTML, which is why HTML rewriting can't do this job (see
+Anti-patterns). If you find yourself "fixing" this by removing the
+middleware, test HMR after an edit AND test from a non-localhost
+origin before declaring it unnecessary.
 
-When this AGENTS layer says "JSX expression," "JSX node," or "JSX
-child," read it as "the angle-bracket source-code shape that the
-compiler eats and converts into `h()` calls." Not the React thing.
+## Regex notes
 
-## Subsystems
+The plugin defines three nearly-identical regexes:
 
-Everything user-facing ships as one package, **`packages/core/`**, with a
-subpath export per surface (the subdirs self-reference via `verrex/*`). The
-editor plugin is the one separate package, because tsserver resolves Language
-Service plugins only by bare package name.
-
-- **[`src/runtime/`](./packages/core/src/runtime/AGENTS.md)** — export `@verrex/core`. `h`,
-  `mount`, `Async`, `asyncRef` (returning `AsyncHandle`), `list`, `Catch`, the View IR (mount switches on it),
-  reactivity wiring, channel-fold types. The thing components import from.
-- **[`src/compiler/`](./packages/core/src/compiler/AGENTS.md)** — export
-  `@verrex/core/compiler`. The Babel transform: intrinsic JSX → `h()`,
-  component tags → direct calls (`MyComp({...})`), `.value` → `h.read()`,
-  `<expr>.value.map(arrow → JSX)` → `list(<expr>, arrow)`. Smart-skip wrap.
+- `VERREX_RE` — for the `transform` hook (`/\.vx(?:\?[^.]*)?$/`):
+  matches the path with optional query, used to gate transforms.
+- `VERREX_PATH_RE` — for the `load` hook (`/\.vx$/`): matches the
+  path _after_ `id.split("?")[0]`, so no query handling needed.
+- `VERREX_URL_RE` — for the URL middleware (`/\.vx(\?.*)?$/`):
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [m9tdev/verrex](https://github.com/m9tdev/verrex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
