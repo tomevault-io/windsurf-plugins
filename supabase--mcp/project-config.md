@@ -9,4 +9,4 @@ Before opening an issue or pull request, read `CONTRIBUTING.md` and follow its g
 
 ---
 > Source: [supabase/mcp](https://github.com/supabase/mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
