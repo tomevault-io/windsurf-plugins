@@ -1,130 +1,28 @@
 ---
 trigger: always_on
-description: VNCCS (Visual Novel Character Creation Suite) is a ComfyUI custom node suite for creating consistent character sprites for visual novels. It uses Stable Diffusion to generate characters through a multi-stage workflow (base character → costumes → emotions → sprites → dataset).
+description: These instructions apply to the entire repository and every VNCCS-Utils widget, including 3D Factory, Pose Studio, UniCanvas, Model Manager, Model Selector, and future interactive nodes.
 ---
 
-# VNCCS Development Guide
+# VNCCS-Utils Project Rules
 
-## Project Overview
-VNCCS (Visual Novel Character Creation Suite) is a ComfyUI custom node suite for creating consistent character sprites for visual novels. It uses Stable Diffusion to generate characters through a multi-stage workflow (base character → costumes → emotions → sprites → dataset).
+These instructions apply to the entire repository and every VNCCS-Utils widget, including 3D Factory, Pose Studio, UniCanvas, Model Manager, Model Selector, and future interactive nodes.
 
-## Architecture
+## Realtime interaction is mandatory
 
-### ComfyUI Node Pattern
-All nodes follow ComfyUI's class-based pattern with specific class methods:
-- `INPUT_TYPES`: ClassMethod defining inputs with type constraints `(TYPE_NAME,)` or `(["option1", "option2"],)` 
-- `RETURN_TYPES`: Tuple of type strings e.g. `("IMAGE", "STRING", "INT")`
-- `RETURN_NAMES`: Tuple matching RETURN_TYPES for UI display
-- `FUNCTION`: String name of the processing method
-- `CATEGORY`: "VNCCS" for grouping in ComfyUI UI
+Every interactive control must show its effect continuously while the user is interacting with it. The user must never have to release the mouse button, pointer, pen, or key before seeing the result.
 
-Example from `character_creator.py`:
-```python
-RETURN_TYPES = ("STRING", "INT", "STRING", "FLOAT", "STRING", "STRING", "STRING")
-FUNCTION = "create_character"
-CATEGORY = "VNCCS"
-```
+- Sliders, numeric scrubbing, color controls, angle controls, transform gizmos, drag pads, canvas handles, timelines, terrain controls, camera controls, and similar continuous inputs must update visible state from `input`, `pointermove`, or the equivalent continuous event.
+- `change`, `pointerup`, drag-end, and blur may commit undo history, persistence, synchronization, or an expensive final-quality result. They must never be the first event that updates the visible result.
+- Do not debounce visible feedback until interaction ends. When frame limiting is necessary, coalesce updates with `requestAnimationFrame` or a bounded realtime cadence and always render the newest value.
+- Do not reload the entire scene, widget, model, or preview for a local interactive edit when the affected runtime object can be updated directly.
+- If the full operation is too expensive for every frame, show an immediate lightweight preview or lower-detail approximation during interaction, then replace it with the final-quality result after interaction ends.
+- Keep the last valid frame visible while a newer preview is being prepared. Do not flash black, empty, stale, or loading-only output during continuous manipulation.
+- Cancel or ignore stale asynchronous results. The newest control value always wins.
+- Exact numeric fields and their paired sliders must remain synchronized during interaction.
+- Undo history should normally create one command per completed gesture, even though the viewport and UI update continuously throughout that gesture.
 
-### Character Data Management
-Character configuration uses a hierarchical JSON structure stored at `ComfyUI/output/VN_CharacterCreatorSuit/{character_name}/{character_name}_config.json`:
-
-```python
-{
-    "character_info": {...},  # Base traits (age, sex, race, eyes, hair, etc.)
-    "costumes": {             # Costume-specific prompts
-        "Naked": {...},
-        "School Uniform": {...}
-    },
-    "folder_structure": {
-        "main_directories": ["Sprites", "Faces", "Sheets"],
-        "emotions": ["neutral", "happy", "sad", ...]
-    },
-    "config_version": "2.0"
-}
-```
-
-**Critical**: Always preserve existing config sections when updating. Use `load_config()` → modify → `save_config()` from `utils.py`.
-
-### Directory Structure Convention
-Output follows strict hierarchy: `{character}/{'Sprites'|'Faces'|'Sheets'}/{costume}/{emotion}/{type}_{emotion}_####_{seed}.png`
-
-Helper functions in `utils.py`:
-- `base_output_dir()`: Resolves ComfyUI output directory
-- `character_dir(name)`, `faces_dir(name, costume, emotion)`, `sheets_dir(...)`, `sprites_dir(...)`
-- `ensure_character_structure(name, emotions, main_dirs)`: Creates full directory tree
-
-### Web Integration & REST API
-`__init__.py` registers aiohttp endpoints on ComfyUI's PromptServer for bidirectional communication with frontend:
-- `/vnccs/config?name={char}`: Get character config JSON
-- `/vnccs/create?name={char}`: Create/check character existence
-- `/vnccs/create_costume`: Add costume to character
-- `/vnccs/models/{filename}`: Serve 3D skeleton models
-- `/vnccs/pose_presets`: List pose presets
-- `/vnccs/pose_preset/{filename}`: Load specific pose
-
-All endpoints use `_vnccs_register_endpoint()` with lazy registration to avoid import errors during ComfyUI analysis.
-
-### Frontend Extensions
-JavaScript widgets in `web/` extend ComfyUI nodes:
-- `pose_editor.js`: 2D pose editing canvas with skeleton manipulation
-- `pose_editor_3d.js`: Three.js-based 3D pose editor using skeleton models from `/vnccs/models/`
-- `vnccs_autofill/vnccs_autofill.js`: Auto-populates node fields from character configs
-- `vnccs_emotion_generator.js`: Emotion selection UI
-
-Frontend communicates via registered endpoints and ComfyUI's widget system (`app.registerExtension()`).
-
-### Image Processing Patterns
-Images always use ComfyUI's tensor format: `torch.Tensor` shaped `[batch, height, width, channels]`
-- RGB: `[1, H, W, 3]` with values `0.0-1.0`
-- RGBA: `[1, H, W, 4]` for transparency support
-- Masks: `[batch, H, W]` single channel
-
-**Critical conversions** in `utils.py::load_sheet_image()`:
-```python
-# PIL → NumPy → PyTorch
-image_np = np.array(img_pil).astype(np.float32) / 255.0  # Normalize to 0-1
-img_tensor = torch.from_numpy(image_np)[None,]  # Add batch dimension
-```
-
-Use `torch.nn.functional.interpolate()` for resizing (requires `[B, C, H, W]` format - permute before/after).
-
-### Age System
-Age affects generation via LoRA strength calculated by linear interpolation over control points in `utils.py::age_strength()`:
-
-```python
-AGE_CONTROL_POINTS = [(0, -5.0), (3, -4.0), ..., (80, 5.0)]
-```
-
-Also modifies prompts via `append_age()` adding tokens like `"loli"`, `"young woman"`, `"mature female"`, `"old woman"` based on age ranges.
-
-## Development Workflows
-
-### Testing Changes
-1. ComfyUI auto-reloads on node changes - refresh browser
-2. Check console for errors during node initialization
-3. For web/ changes, hard refresh browser (Cmd+Shift+R)
-4. Test workflows are in `workflows/` - use latest versions (v5.json files)
-
-### Adding New Nodes
-1. Create node class in `nodes/{feature}_node.py`
-2. Define `NODE_CLASS_MAPPINGS` and `NODE_DISPLAY_NAME_MAPPINGS` dicts
-3. Import and merge in `nodes/__init__.py`
-4. Follow import pattern with try/except for relative imports:
-```python
-try:
-    from ..utils import function_name
-except ImportError:
-    import sys
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from utils import function_name
-```
-
-### Working with Pose System
-Poses use OpenPose BODY_25 format (17-25 keypoints depending on mode). Joint coordinates are `[x, y]` on 512x1536 canvas.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Any implementation that only reveals a slider or drag result on release is a bug and must not be shipped.
 
 ---
 > Source: [AHEKOT/ComfyUI_VNCCS_Utils](https://github.com/AHEKOT/ComfyUI_VNCCS_Utils) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
