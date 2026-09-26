@@ -1,87 +1,140 @@
 ---
 trigger: always_on
-description: You have a persistent, file-based memory system. Build it up over time so future conversations have a complete picture of who the user is, how they'd like to collaborate, what behaviors to avoid or repeat, and the context behind the work.
+description: This repo contains patterns for bootstrapping AI-friendly projects. Follow these instructions to scaffold a complete new project for the developer.
 ---
 
-# Project Instructions
+# Agent Project Bootstrap
 
-## Memory System
+This repo contains patterns for bootstrapping AI-friendly projects. Follow these instructions to scaffold a complete new project for the developer.
 
-You have a persistent, file-based memory system. Build it up over time so future conversations have a complete picture of who the user is, how they'd like to collaborate, what behaviors to avoid or repeat, and the context behind the work.
+> Scaffolding a **new** project. For applying these patterns to an **existing** codebase, see `ADOPT.md`.
 
-If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.
+## Step 0: Detect what's already installed
 
-## Types of Memory
+Hooks and skills install **system-wide** under `~/.claude/`, so they're shared
+across every project. Detect them first and never ask about components that are
+already present. Run:
 
-There are four discrete types. Only save information that is NOT derivable from the current project state (code, git history, file structure).
+```bash
+# Hooks: install.sh stamps this file with the installed version
+HOOKS_VER=$( [ -f ~/.claude/hooks/.agent-starter-version ] && cat ~/.claude/hooks/.agent-starter-version || echo "" )
+HOOKS_N=$( ls ~/.claude/hooks/*.sh 2>/dev/null | wc -l | tr -d ' ' )
 
-### user
-**What it stores:** Information about the user's role, goals, responsibilities, and knowledge.
-**When to save:** When you learn any details about the user's role, preferences, responsibilities, or knowledge.
-**How to use:** Tailor your behavior to the user's profile. Collaborate with a senior engineer differently than a first-time coder. Frame explanations relative to their domain knowledge.
-
-Examples:
-- "I'm a data scientist investigating what logging we have in place" → save: user is a data scientist, currently focused on observability/logging
-- "I've been writing Go for ten years but this is my first time touching the React side" → save: deep Go expertise, new to React - frame frontend explanations in terms of backend analogues
-
-### feedback
-**What it stores:** Guidance the user has given about how to approach work - both what to avoid AND what to keep doing.
-**When to save:** Any time the user corrects your approach ("no not that", "don't", "stop doing X") OR confirms a non-obvious approach worked ("yes exactly", "perfect, keep doing that"). Corrections are easy to notice; confirmations are quieter - watch for them.
-**How to use:** Let these memories guide your behavior so the user doesn't need to offer the same guidance twice.
-**Structure:** Lead with the rule, then a **Why:** line and a **How to apply:** line. Knowing why lets you judge edge cases.
-
-Examples:
-- "don't mock the database in these tests - we got burned when mocked tests passed but prod migration failed" → save: integration tests must hit a real database. Why: mock/prod divergence masked a broken migration. How to apply: all test files in this repo use real DB connections.
-- "stop summarizing what you just did, I can read the diff" → save: terse responses, no trailing summaries.
-- "yeah the single bundled PR was the right call here" → save: for refactors, user prefers one bundled PR over many small ones. Confirmed approach - not a correction.
-
-### project
-**What it stores:** Information about ongoing work, goals, initiatives, bugs, or incidents NOT derivable from code or git history.
-**When to save:** When you learn who is doing what, why, or by when. Always convert relative dates to absolute (e.g., "Thursday" → "2026-03-05").
-**How to use:** Understand broader context behind the user's requests, anticipate coordination issues, make better suggestions.
-**Structure:** Lead with the fact/decision, then **Why:** and **How to apply:** lines. Project memories decay fast - the why helps judge if they're still relevant.
-
-Examples:
-- "we're freezing all non-critical merges after Thursday" → save: merge freeze begins 2026-03-05 for mobile release cut. Flag non-critical PRs after that date.
-- "ripping out old auth middleware because legal flagged session token storage" → save: auth rewrite driven by compliance, not tech debt - scope decisions should favor compliance over ergonomics.
-
-### reference
-**What it stores:** Pointers to where information lives in external systems.
-**When to save:** When you learn about resources in external systems and their purpose.
-**How to use:** When the user references an external system or you need external info.
-
-Examples:
-- "check Linear project INGEST for pipeline bugs" → save: pipeline bugs tracked in Linear project "INGEST"
-- "grafana.internal/d/api-latency is what oncall watches" → save: latency dashboard - check when editing request-path code.
-
-## What NOT to Save
-
-- Code patterns, conventions, architecture, file paths, or project structure - derivable by reading the project
-- Git history, recent changes, who-changed-what - `git log` / `git blame` are authoritative
-- Debugging solutions or fix recipes - the fix is in the code, commit message has context
-- Anything already documented in CLAUDE.md files
-- Ephemeral task details: in-progress work, temporary state, current conversation context
-
-These exclusions apply even when the user explicitly asks. If they ask to save a PR list or activity summary, ask what was *surprising* or *non-obvious* - that's the part worth keeping.
-
-## Memory File Format
-
-Each memory is its own `.md` file with YAML frontmatter:
-
-```markdown
----
-name: {{memory name}}
-description: {{one-line description - be specific, used to decide relevance in future conversations}}
-type: {{user, feedback, project, reference}}
----
-
-{{memory content - for feedback/project types: rule/fact, then **Why:** and **How to apply:** lines}}
+# Skills: the starter skills this bootstrap installs
+for s in commit commit-push-pr simplify remember dream new-project adopt-project reflect; do
+  [ -d ~/.claude/skills/$s ] && echo "skill:$s present" || echo "skill:$s missing"
+done
+echo "hooks: version ${HOOKS_VER:-none}, $HOOKS_N scripts"
 ```
 
-### Saving Process
+Hooks are installed if `.agent-starter-version` exists (record the version);
+skills are installed per directory listed as `present`. Carry this into the
+interview and scaffold: only ask about, and only install, what's **missing**. If
+a stamped hooks version is present but older than the repo `VERSION`, note an
+update is available and offer to re-run `install.sh` (idempotent) - don't force it.
+
+## Step 1: Interview the Developer
+
+Ask these questions **one at a time** before taking any action:
+
+1. **Project name** - what is the name of the project?
+2. **Description** - one sentence describing what it does.
+3. **Tech stack** - language, framework, package manager (e.g. "TypeScript, Next.js, pnpm").
+   - **Tailwind design-system lint** - ask this follow-up only when the stack is
+     TypeScript/JavaScript with a UI framework (React, Next.js, Remix, Vite +
+     React): "Does the project use Tailwind v4, and should I add `@shadcn/lint`
+     (blocks raw palette colors, arbitrary values, inline styles, unknown
+     classes, and restyling design-system components via `className`)? yes/no".
+     Record the answer; it drives the optional block in Step 2 step 4. Skip
+     the question for non-UI stacks.
+4. **Optional components** - ask **only about what Step 0 reported as missing**.
+   If hooks and all skills are already installed, skip this question entirely -
+   state what was detected and move on. Otherwise offer the missing set:
+   - Hooks (auto-enforce file size limits, lint-on-save, silent-error and dangerous-command blocking, codebase health checks at `~/.claude/hooks/`)
+   - Skills (commit, commit-push-pr, simplify, remember, dream, new-project, adopt-project, reflect at `~/.claude/skills/`)
+   - Both
+   - Neither
+5. **Repo path** - what is the local path to the agent-starter repo? (e.g. `~/code/agent-starter`). Always required: the CLAUDE.md template, foundation templates, and lint configs are all copied from the repo. (Hooks and skills also install from here when selected and not already present.)
+
+Do not proceed past this step until you have all answers.
+
+## Step 2: Scaffold the Project
+
+Execute these steps in order. Read the referenced files in this repo for full detail on each pattern.
+
+### 1. Create directory structure
+
+Reference: `guides/large-codebase-best-practices.md` - Section 1 (Feature-based directory structure)
+
+Create the project root and subdirectories:
+
+```
+<project-name>/
+├── src/
+│   ├── features/      # feature modules - each gets its own directory
+│   ├── services/      # shared business logic by domain
+│   ├── utils/         # truly shared utilities
+│   ├── types/         # shared type definitions (break import cycles here)
+│   ├── constants/     # named constants by domain
+│   ├── schemas/       # validation schemas
+│   ├── entrypoints/   # app entry points
+│   └── migrations/    # data/config format migrations
+├── tests/
+├── docs/
+└── scripts/
+```
+
+### 2. Generate CLAUDE.md
+
+Reference: `templates/CLAUDE.md`
+
+Copy `templates/CLAUDE.md` into `<project-name>/CLAUDE.md`.
+In the `## Project-Specific Instructions` section at the bottom, add:
+
+```
+**Project:** <project-name>
+**Description:** <project-description>
+```
+
+### 3. Create config files
+
+**`.gitignore`:**
+```
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+.cache/
+coverage/
+CLAUDE.local.md
+```
+
+**`.env.example`:**
+```
+# Required environment variables - copy to .env and fill in values
+```
+
+**`README.md`:**
+```markdown
+# <project-name>
+
+<project-description>
+
+## Getting Started
+
+<!-- Add setup instructions here -->
+```
+
+**`CLAUDE.local.md`** (gitignored - personal, machine-local instructions that are never committed): create it with just a comment header.
+
+**`.claude/rules/`** - modular instruction files loaded alongside CLAUDE.md. Create `.claude/rules/starter-patterns.md`, the apply-on-touch pattern index (the same file `ADOPT.md` Tier 4 writes), so new code has a pointer to each foundation guide. Optionally add topic stubs (`testing.md`, `git-workflow.md`, `code-style.md`, `security.md`) per `templates/NEW_PROJECT_PROMPT.md`.
+
+### 4. Install lint configs (TypeScript/JavaScript or Python projects)
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sneg55/agent-starter](https://github.com/sneg55/agent-starter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
