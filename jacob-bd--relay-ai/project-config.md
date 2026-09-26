@@ -1,94 +1,121 @@
 ---
 trigger: always_on
-description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+description: Use the **Google Gemini CLI** with models from your relay-ai registry — Anthropic, xAI, Google Gemini, Nvidia, DeepSeek, OpenAI, and more. *Note: Gemini CLI integration is currently experimental.*
 ---
 
-# AGENTS.md
+# Gemini CLI with relay-ai (Experimental)
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+Use the **Google Gemini CLI** with models from your relay-ai registry — Anthropic, xAI, Google Gemini, Nvidia, DeepSeek, OpenAI, and more. *Note: Gemini CLI integration is currently experimental.*
 
-## Commands
+| Command | What it launches | Config target |
+|---------|------------------|---------------|
+| **`relay-ai gemini`** | Gemini **terminal** (TUI / Prompt loop) | Ephemeral proxy port via environment variables |
+
+The command uses the registry (`~/.relay-ai/providers.json`) and the same provider picker as Claude Code and Codex. The CLI uses Google's native Gemini format endpoints when possible, and a local API translation proxy for other models (Anthropic, OpenAI-compatible, etc.).
+
+**Full flag reference:** `relay-ai gemini --help`. This guide explains *how it works* and *how to use it*.
+
+**Agent / alef-agent integration** (boot flags, NDJSON streaming): see **[AI-AGENTS.md](AI-AGENTS.md)** or run `relay-ai --ai`.
+
+---
+
+## Prerequisites
+
+1. **relay-ai** installed on your PATH (`npm install -g @jacobbd/relay-ai`, or built locally).
+2. **At least one provider** in the registry:
+   ```bash
+   relay-ai providers add
+   # or: relay-ai providers import
+   ```
+3. **Gemini CLI installed:**
+   ```bash
+   npm install -g @google/gemini-cli
+   ```
+
+**Supported:** Registry providers plus OpenCode Zen/Go cloud backends all route through relay-ai's translation layer if they don't natively speak Gemini format.
+
+---
+
+## How it works
+
+The Gemini CLI uses the **Gemini API format** (`POST /v1beta/models/:model:generateContent`). When you select a non-Google provider, relay-ai spins up a local translation proxy:
+
+```
+Gemini CLI  →  relay-ai Proxy (127.0.0.1, Tier 2)  →  Vercel AI SDK  →  Anthropic / xAI / OpenAI / …
+Gemini CLI  →  Google directly (Tier 1, Google API only)
+```
+
+Your real API keys stay in relay-ai (keychain / registry). The proxy securely handles them in memory for the session.
+
+---
+
+## Quick start
 
 ```bash
-npm run build       # compile TypeScript → dist/cli.js (via tsup, ESM, shebang injected)
-npm test            # run all tests with vitest
-npm run typecheck   # type-check without emitting (tsc --noEmit)
-npm run dev         # watch mode build
-
-# Run a single test file
-npx vitest run tests/env.test.ts
-npx vitest run tests/models.test.ts
-
-# Test the CLI locally (already npm-linked)
-relay-ai --help
-relay-ai models          # manage favorite models for mid-session switching
-relay-ai Codex --dry-run   # simulate full first-run without writing anything
-relay-ai Codex --setup    # re-ask subscription tier
-relay-ai Codex --trace    # write debug log to /tmp/relay-ai-debug.log and print errors on exit
-relay-ai server           # foreground OpenCode/registry API gateway
-relay-ai server --vertex  # foreground Vertex AI gateway (gcloud ADC)
-relay-ai codex            # Codex CLI with registry providers (see docs/CODEX.md)
-relay-ai codex-app        # Codex desktop app (macOS/Windows; see docs/CODEX.md)
-
-# Rebuild after code changes before testing manually
-npm run build && relay-ai --version
+relay-ai gemini
 ```
 
-## Architecture
+Pick provider → pick model → Gemini prompt loop opens. relay-ai automatically points the Gemini CLI at the translation proxy.
 
-**Entry point:** `src/cli.ts` orchestrates the full flow. Every other module is a focused unit with no side effects at import time.
+### relay-ai flags
 
-**Data flow (`relay-ai Codex`):**
-```
-cli.ts
-  → findClaudeBinary()         [launch.ts — locate Codex binary]
-  → fetchLocalProviders()      [providers.ts — ephemeral opencode serve, GET /config/providers, normalize]
-  → p.select "Which provider?" [shown when local providers are available]
+| Flag | Purpose |
+|------|---------|
+| *(none)* | Interactive launch |
+| `--trace` | Write debug logs to `~/.relay-ai/logs/gemini-proxy-debug.log` |
+| `--help` | Help text |
 
-  ── OpenCode cloud path (default) ──
-  → resolveOrCollectApiKey()   [reads env, OS credential store (all platforms), or prompts user]
-  → askSubscriptionTier()      [prompts.ts — one-time question, saved to conf store]
-  → getModels()                [models.ts — API fetch + cache enrichment + format classification]
-  → runWizard()                [prompts.ts — backend/model selector, filters unsupported]
+relay-ai **manages** `--provider` and `--model`. You can pass other Gemini CLI flags directly:
 
-  ── Local provider path ──
-  → pickLocalModel()           [prompts.ts — filter/select model from local provider]
-
-  ── Shared launch (no favorites) ──
-  → startProxy()               [proxy.ts — single-model wrapper around startProxyCatalog]
-  → buildChildEnv(baseUrl, …)  [env.ts — removes 17 conflicting vars, sets OpenCode vars]
-  → launchClaude()             [launch.ts — spawn with stdio:inherit]
-  → proxyHandle.close()        [stops proxy after Codex exits]
-
-  ── Switch-menu launch (favorites.length > 0) ──
-  → buildCatalogRoutes()       [catalog.ts — starting model + favorites, max 20]
-  → startProxyCatalog()        [proxy.ts — multi-route proxy, alias IDs per model]
-  → buildChildEnv(…, gatewayDiscovery=true)  [sets CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1]
-  → launchClaudeViaCatalog()   [cli.ts — shared launch + trace cleanup]
+```bash
+relay-ai gemini -p "Analyze this"
+relay-ai gemini --provider google --model gemini-2.5-flash -p "Review this file" -o stream-json
 ```
 
-**`relay-ai models`:** Interactive favorites manager (`src/favorites.ts`). Reads/writes `favoriteModels` in config. Saves once on Done. Stale favorites (unavailable models) are silently skipped when building the catalog.
+### Environment isolation
 
-**Catalog routing** (`src/catalog.ts`): `localModelToRoute`, `zenGoModelToRoute`, `makeRouteResolver`, `buildCatalogRoutes`. Routes built only for starting model + favorites — not the full model list. Alias IDs via `aliasModelId()` in proxy so Codex sees unique model names in `/model`.
+When you launch, relay-ai builds a clean child environment:
 
-**Critical URL constraint:** `BACKENDS.baseUrl` in `constants.ts` must NOT include `/v1`. The Anthropic SDK appends `/v1/messages` automatically. Setting it to `https://opencode.ai/zen/v1` would cause requests to hit `/zen/v1/v1/messages` → 404.
+1. Removes conflicting env vars from the child process.
+2. Sets `GOOGLE_API_KEY` to the proxy placeholder and configures endpoint discovery via `GEMINI_API_BASE_URL`.
+3. Sets `GEMINI_MODEL` to the selected model.
 
-**Model discovery two-source merge:**
-- Primary: `GET {backendUrl}/v1/models` (no auth needed, returns available IDs)
-- Enrichment: `~/.cache/opencode/models.json` (written by OpenCode CLI) — provides `name`, `family`, `cost`, `provider.npm`
-- `isAnthropicNative`: true when `modelFormat === 'anthropic'`
-- `modelFormat`: classified from `provider.npm` in cache, or by ID-prefix heuristic:
-  - `@ai-sdk/anthropic` or `Codex-*` → `'anthropic'` (direct passthrough)
-  - `@ai-sdk/openai` or `gpt-*` → `'unsupported'` in the **cloud OpenCode wizard** (OpenCode Zen/Go proxy layer; not direct OpenAI). Use the **local OpenAI provider** instead for GPT models.
-  - `@ai-sdk/google` or `gemini-*` → `'unsupported'` (needs model-specific endpoints)
-  - Everything else → `'openai'` (routed through the SDK adapter via the local proxy)
-- `sourceBackend`: set from the backend that was queried — critical for `go` tier which shows Zen free models + Go paid models in one list, so the correct `ANTHROPIC_BASE_URL` can be set per selected model
+When the Gemini CLI exits (normal exit, Ctrl+C, terminal close), your shell is unchanged.
 
-**Translation layer — the Vercel AI SDK adapter** (`src/sdk-adapter.ts` + `src/provider-factory.ts`): All non-Anthropic providers route through the Vercel AI SDK (`ai` + `@ai-sdk/*`, the same packages OpenCode loads), which owns wire format, endpoint selection, and provider quirks. This is the **single** translation path — there is no hand-rolled per-provider translation.
+### Favorites catalog mode
 
+When you have saved favorites via `relay-ai models`, `relay-ai gemini` will show your starting model + favorites in the mid-session model picker natively.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+---
+
+## Provider routing
+
+| Provider | Route | Notes |
+|----------|-------|-------|
+| **Google** | Tier 1 direct | SDK adapter bypass for pure Gemini performance |
+| **Anthropic, xAI, OpenAI, Nvidia, DeepSeek, …** | Tier 2 proxy | Local translation proxy converts Gemini format requests to the respective native formats via Vercel AI SDK |
+| **OpenCode Zen / Go** | Tier 2 proxy | Requires an OpenCode API key |
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Provider missing in picker | `relay-ai providers add` |
+| Model errors / disconnected | Run `relay-ai gemini --trace` to view proxy logs in `~/.relay-ai/logs/gemini-proxy-debug.log` |
+| JSON parse error on first stdout lines (agents) | Missing `-o stream-json` or `-o json` when running in agent mode |
+
+### Known Limitations
+
+- **Model name does not switch:** The model name displayed in the top right corner of the Gemini CLI UI does not automatically switch/update after we do the `.model_name` change mid-session. This is a known UI limitation with the Gemini CLI.
+
+## See also
+
+- [Gemini CLI NPM package](https://www.npmjs.com/package/@google/gemini-cli)
+- [AI Agents & alef-agent](AI-AGENTS.md)
+- `relay-ai gemini --help`
 
 ---
 > Source: [jacob-bd/relay-ai](https://github.com/jacob-bd/relay-ai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
