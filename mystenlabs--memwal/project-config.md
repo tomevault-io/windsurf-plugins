@@ -1,155 +1,109 @@
 ---
 trigger: always_on
-description: |
+description: Ultracite Rules - AI-Ready Formatter and Linter
 ---
 
 
-# Walrus Memory — Portable Agent Memory
+# Project Context
+Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
 
-Walrus Memory enables AI agents to operate reliably across apps and sessions, without losing context. It stores memories on Walrus (decentralized storage), encrypts them with SEAL, enforces ownership onchain via Sui smart contracts, and retrieves them with semantic (vector) search. Memory is portable by design — not tied to a single runtime or provider — and scoped by `owner + namespace` for isolation and coordination.
+## Key Principles
+- Zero configuration required
+- Subsecond performance
+- Maximum type safety
+- AI-friendly code generation
 
----
+## Before Writing Code
+1. Analyze existing patterns in the codebase
+2. Consider edge cases and error scenarios
+3. Follow the rules below strictly
+4. Validate accessibility requirements
 
-## When to Use
+## Rules
 
-Use Walrus Memory when your app or agent needs:
+### Accessibility (a11y)
+- Don't use `accessKey` attribute on any HTML element.
+- Don't set `aria-hidden="true"` on focusable elements.
+- Don't add ARIA roles, states, and properties to elements that don't support them.
+- Don't use distracting elements like `<marquee>` or `<blink>`.
+- Only use the `scope` prop on `<th>` elements.
+- Don't assign non-interactive ARIA roles to interactive HTML elements.
+- Make sure label elements have text content and are associated with an input.
+- Don't assign interactive ARIA roles to non-interactive HTML elements.
+- Don't assign `tabIndex` to non-interactive HTML elements.
+- Don't use positive integers for `tabIndex` property.
+- Don't include "image", "picture", or "photo" in img alt prop.
+- Don't use explicit role property that's the same as the implicit/default role.
+- Make static elements with click handlers use a valid role attribute.
+- Always include a `title` element for SVG elements.
+- Give all elements requiring alt text meaningful information for screen readers.
+- Make sure anchors have content that's accessible to screen readers.
+- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
+- Include all required ARIA attributes for elements with ARIA roles.
+- Make sure ARIA properties are valid for the element's supported roles.
+- Always include a `type` attribute for button elements.
+- Make elements with interactive roles and handlers focusable.
+- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
+- Always include a `lang` attribute on the html element.
+- Always include a `title` attribute for iframe elements.
+- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
+- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
+- Include caption tracks for audio and video elements.
+- Use semantic elements instead of role attributes in JSX.
+- Make sure all anchors are valid and navigable.
+- Ensure all ARIA properties (`aria-*`) are valid.
+- Use valid, non-abstract ARIA roles for elements with ARIA roles.
+- Use valid ARIA state and property values.
+- Use valid values for the `autocomplete` attribute on input elements.
+- Use correct ISO language/country codes for the `lang` attribute.
 
-- **Portable memory** — persists outside prompts and context windows, moves across agents, apps, and workflows
-- **Full owner control** — programmable permissions and explicit ownership define how memory is shared and accessed
-- **Agent coordination** — shared memory spaces help agents coordinate across long-running and multi-step workflows
-- **Semantic recall** — retrieve memories by meaning, not just keywords
-- **Verifiable integrity** — memory integrity can be independently verified without centralized trust
-- **Cross-app memory** — not tied to a single runtime or provider, share memory between apps via delegate keys
-
----
-
-## When NOT to Use
-
-- Temporary conversation context that only matters in the current session
-- Large file storage (Walrus Memory is optimized for text memories)
-- Use cases that don't need encryption or decentralization
-
----
-
-## Installation
-
-```bash
-# Install the SDK
-pnpm add @mysten-incubation/memwal
-
-# Optional: for Vercel AI SDK integration
-pnpm add ai zod
-
-# Optional: for manual client (client-side SEAL encryption)
-pnpm add @mysten/sui @mysten/seal @mysten/walrus
-```
-
----
-
-## Quick Start
-
-### 1. Get Your Credentials
-
-You need a **delegate key** (Ed25519 private key) and **account ID** (Walrus Memory account object ID on Sui).
-
-Generate them at:
-- Production: https://memory.walrus.xyz
-- Staging: https://staging.memory.walrus.xyz
-
-### 2. Initialize the SDK
-
-```ts
-import { MemWal } from "@mysten-incubation/memwal";
-
-const memwal = MemWal.create({
-  key: process.env.MEMWAL_PRIVATE_KEY!,
-  accountId: process.env.MEMWAL_ACCOUNT_ID!,
-  serverUrl: process.env.MEMWAL_SERVER_URL ?? "https://relayer.memory.walrus.xyz",
-  namespace: "my-app",
-});
-```
-
-### 3. Store and Recall Memories
-
-```ts
-// Store one already-distilled fact and wait until it is indexed.
-await memwal.rememberAndWait(
-  "User prefers dark mode and works in TypeScript.",
-  undefined,
-  { timeoutMs: 30_000 },
-);
-
-// Recall by meaning
-const result = await memwal.recall({ query: "What are the user's preferences?" });
-console.log(result.results);
-
-// Extract facts from free-form text and wait until all accepted facts are indexed.
-const analyzed = await memwal.analyzeAndWait(
-  "I live in Hanoi and prefer dark mode.",
-  undefined,
-  { timeoutMs: 30_000 },
-);
-console.log(analyzed.facts.map((fact) => fact.text));
-
-// Check relayer health
-await memwal.health();
-```
-
-Use `*AndWait` when a workshop UI saves and then immediately recalls in the
-same flow. Indexing can lag by a few seconds, so `remember()` / `analyze()`
-may return before recall can find the new memory. Manual polling is still
-available for advanced async UIs:
-
-```ts
-const accepted = await memwal.remember("User likes Sui.");
-const stored = await memwal.waitForRememberJob(accepted.job_id, {
-  pollIntervalMs: 750,
-  timeoutMs: 30_000,
-});
-```
-
----
-
-## SDK Entry Points
-
-| Entry Point | Import | Description |
-|---|---|---|
-| `MemWal` | `@mysten-incubation/memwal` | **Default.** Relayer handles embedding, SEAL encryption, Walrus upload, vector search |
-| `MemWalManual` | `@mysten-incubation/memwal/manual` | Manual flow — client handles embedding and SEAL encryption |
-| `withMemWal` | `@mysten-incubation/memwal/ai` | Vercel AI SDK middleware — auto recall + save around AI conversations |
-| Account utils | `@mysten-incubation/memwal/account` | Account creation, delegate key management |
-
----
-
-## API Surface
-
-### Walrus Memory Methods
-
-| Method | Description | Returns |
-|---|---|---|
-| `remember(text, namespace?)` | Accept one memory job immediately | `{ job_id, status }` |
-| `rememberAndWait(text, namespace?, opts?)` | Store one memory and wait for completion | `{ id, job_id, blob_id, owner, namespace }` |
-| `recall({ query, limit?, namespace?, maxDistance? })` *(preferred)* or `recall(query, limit?, namespace?)` | Semantic search for memories | `{ results: [{ blob_id, text, distance }], total }` |
-| `analyze(text, namespace?)` | Extract facts and accept one memory job per fact | `{ job_ids, facts, fact_count, status, owner }` |
-| `analyzeAndWait(text, namespace?, opts?)` | Extract facts and wait for all fact jobs to complete | `{ results, facts, total, succeeded, failed, owner }` |
-| `restore(namespace, limit?)` | Rebuild missing index entries from Walrus | `{ restored, skipped, total, namespace, owner }` |
-| `health()` | Check relayer health | `{ status, version }` |
-| `getPublicKeyHex()` | Get hex-encoded public key | `string` |
-
-### Lower-Level Methods
-
-| Method | Description |
-|---|---|
-| `rememberManual({ blobId, vector, namespace? })` | Register pre-uploaded blob with pre-computed vector |
-| `recallManual({ vector, limit?, namespace? })` | Search with pre-computed vector (returns blob IDs only) |
-| `embed(text)` | Generate embedding vector (no storage) |
-
-### All Response Shapes
-
-```ts
+### Code Complexity and Quality
+- Don't use consecutive spaces in regular expression literals.
+- Don't use the `arguments` object.
+- Don't use primitive type aliases or misleading types.
+- Don't use the comma operator.
+- Don't use empty type parameters in type aliases and interfaces.
+- Don't write functions that exceed a given Cognitive Complexity score.
+- Don't nest describe() blocks too deeply in test files.
+- Don't use unnecessary boolean casts.
+- Don't use unnecessary callbacks with flatMap.
+- Use for...of statements instead of Array.forEach.
+- Don't create classes that only have static members (like a static namespace).
+- Don't use this and super in static contexts.
+- Don't use unnecessary catch clauses.
+- Don't use unnecessary constructors.
+- Don't use unnecessary continue statements.
+- Don't export empty modules that don't change anything.
+- Don't use unnecessary escape sequences in regular expression literals.
+- Don't use unnecessary fragments.
+- Don't use unnecessary labels.
+- Don't use unnecessary nested block statements.
+- Don't rename imports, exports, and destructured assignments to the same name.
+- Don't use unnecessary string or template literal concatenation.
+- Don't use String.raw in template literals when there are no escape sequences.
+- Don't use useless case statements in switch statements.
+- Don't use ternary operators when simpler alternatives exist.
+- Don't use useless `this` aliasing.
+- Don't use any or unknown as type constraints.
+- Don't initialize variables to undefined.
+- Don't use the void operators (they're not familiar).
+- Use arrow functions instead of function expressions.
+- Use Date.now() to get milliseconds since the Unix Epoch.
+- Use .flatMap() instead of map().flat() when possible.
+- Use literal property access instead of computed property access.
+- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
+- Use concise optional chaining instead of chained logical expressions.
+- Use regular expression literals instead of the RegExp constructor when possible.
+- Don't use number literal object member names that aren't base 10 or use underscore separators.
+- Remove redundant terms from logical expressions.
+- Use while loops instead of for loops when you don't need initializer and update expressions.
+- Don't pass children as props.
+- Don't reassign const variables.
+- Don't use constant expressions in conditions.
+- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [MystenLabs/MemWal](https://github.com/MystenLabs/MemWal) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
