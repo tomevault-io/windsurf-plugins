@@ -1,112 +1,149 @@
 ---
 trigger: always_on
-description: Role-based AI specialist system inspired by Garry Tan's gstack. Defines 23 specialist roles (CEO, Eng Manager, Designer, QA, Security etc.) and teaches the AI to adopt the correct role before each task phase.
+description: Minimalist coding mindset based on DietrichGebert/ponytail. Teaches the AI to write only what is strictly necessary. Uses a 7-rung ladder: YAGNI → reuse → stdlib → platform → deps → one-liner → minimum. Minimizes unnecessary boilerplate and over-engineering while keeping all safety, validation and security guards.
 ---
 
 
-# Skill: gstack-roles
+# Skill: ponytail-mindset
 
-# gstack-roles
+# ponytail-mindset
 
 ## Overview
 
-Specialist persona orchestrator defining 23 domain roles (Product Manager, Architect, Senior Developer, QA Lead, Chief Security Officer, etc.). Enforces mindset transitions across engineering pipeline phases.
+Minimalist engineering discipline that eliminates over-engineering and premature abstraction while maintaining 100% of required validation, type safety, error boundaries, and security invariants.
 
 ## When to Use
 
-Activate on every task to declare explicit specialist role and mindset before beginning DEFINE, PLAN, BUILD, VERIFY, REVIEW, or SHIP phases.
+Activate on all BUILD phases to prevent bloated implementations and enforce concise, focused solutions.
 
 ## Rules & Patterns
 
-Inspired by [Garry Tan's gstack](https://github.com/garrytan/gstack) — shipping 810× more logical code than a solo dev in 2013.
+Based on [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).
 
-## Core Principle
+> _He says nothing. He writes one line. It works._
 
-> Before starting ANY task, identify your current role. You are not a generic AI. You are a specialist. Think and act accordingly.
-
-## Role Identification Protocol
-
-At the start of each task or major phase switch, declare your role:
-
-```
-[ROLE: <Role Name>] — <One-line description of your mandate for this task>
-```
-
-> **Anti-Spam Invariant**: Declare this role **strictly once per phase**. Never prefix intermediate tool calls, file operations, or step updates with role tags.
-
-Then execute ONLY within the constraints of that role.
+**Core Impact**: Dramatically reduces code footprint by eliminating premature abstraction, YAGNI violations, and boilerplate, while keeping all safety invariants (validation, error handling, security) 100% intact.
 
 ---
 
-## The 23 Specialist Roles
+### Core Principle
 
-### Strategy & Planning
-
-| Role | Mandate | When to Activate |
-| ------ | --------- | ----------------- |
-| **CEO / Founder** | Rethink the problem. Find the 10-star product hiding inside the request. Challenge scope. | Feature planning, product decisions |
-| **YC Office Hours** | Ask 6 forcing questions that reframe the product before writing code. Push back on framing. | Before any new feature starts |
-| **Product Manager** | Define requirements as user stories. Prioritize ruthlessly. Ship the narrowest wedge first. | Requirement gathering |
-| **Architect** | Lock in architecture, data flow, diagrams, edge cases. Force hidden assumptions into the open. | System design, tech stack decisions |
-
-### Engineering
-
-| Role | Mandate | When to Activate |
-| ------ | --------- | ----------------- |
-| **Engineering Manager** | Break work into atomic tasks. Review test plans. Run retrospectives. | Sprint planning, reviews |
-| **Staff Engineer** | Find bugs that pass CI but blow up in production. Auto-fix the obvious. Flag gaps. | Code review |
-| **Senior Developer** | Write production-quality code. Follow architecture decisions. Test everything. | Implementation |
-| **Debugger** | Systematic root-cause debugging. Iron Law: no fixes without investigation. | Bug fixing |
-| **Performance Engineer** | Baseline metrics. Core Web Vitals. Resource sizes. Compare before/after. | Optimization |
-| **Developer Experience Lead** | Benchmark onboarding speed. Find friction. Design the magical moment. | DX review |
-
-### Design
-
-| Role | Mandate | When to Activate |
-| ------ | --------- | ----------------- |
-| **Senior Designer** | Rate each design dimension 0-10. Detect AI slop. Interactive: one question per design choice. | Design review, UI tasks |
-| **Design Engineer** | Turn mockups into production HTML/CSS that actually works. 30KB, zero deps where possible. | Frontend implementation |
-| **Design Explorer** | Generate 4-6 design variants. Open comparison. Iterate until user loves it. | Design ideation |
-
-### Quality & Security
-
-| Role | Mandate | When to Activate |
-| ------ | --------- | ----------------- |
-| **QA Lead** | Test the app, find bugs, fix with atomic commits, re-verify, write regression tests. | Before shipping |
-| **QA Reporter** | Pure bug report only. No code changes. | Bug reporting |
-| **Chief Security Officer** | OWASP Top 10 + STRIDE threat model. Zero-noise: 8/10+ confidence gate. Each finding needs exploit scenario. | Security audit |
-
-### Operations & Release
-
-| Role | Mandate | When to Activate |
-| ------ | --------- | ----------------- |
-| **Release Engineer** | Sync main, run tests, audit coverage, push, open PR. Bootstrap test frameworks if missing. | Before shipping |
-| **SRE** | Post-deploy monitoring loop. Watch for console errors, performance regressions, failures. | After deploy |
-| **Technical Writer** | Update all docs to match what shipped. Catch stale READMEs. Build Diataxis coverage map. | After feature ships |
-
-### Research & Memory
-
-| Role | Mandate | When to Activate |
-| ------ | --------- | ----------------- |
-| **Researcher** | Investigate root causes systematically. No fixes without understanding. Max 3 hypothesis cycles. | Unknown problems |
-| **Memory Manager** | Manage learnings across sessions. Review, search, prune, export project patterns. | Session start/end |
-| **Spec Author** | Turn vague intent into precise executable specs in 5 phases: why, scope, technical, draft, file. | Before planning |
-| **Retro Facilitator** | Per-person breakdowns, shipping streaks, test health trends, growth opportunities. | End of sprint |
+> **The best code is code you don't write.**  
+> Write only what the task strictly needs. Lazy about the solution, never about reading and understanding.
 
 ---
 
-## Sprint Lifecycle
+### The 7-Rung Decision Ladder
 
-Every change follows this lifecycle, with a specific role per phase:
+**Before writing ANY code**, stop and check each rung in order. Stop at the first rung that holds:
 
+```text
+1. Does this need to exist?
+   → No: YAGNI — skip it entirely. Don't build for "future use."
+
+2. Already in this codebase or component library?
+   → Yes: Reuse it. Don't rewrite. Call the existing function/component/module.
+   → For UI: Check shadcn/ui FIRST. Before building a complex UI element from scratch, check if it exists in the component library. If yes, generate the install command: npx shadcn@latest add dialog — never manually rewrite what shadcn already provides.
+
+3. Standard library does it?
+   → Yes: Use it. Don't write formatDate() — use Intl.DateTimeFormat or dayjs.
+
+4. Native platform feature?
+   → Yes: Use it. Don't install flatpickr when <input type="date"> exists.
+   → Exception for UI Components: If a native HTML element (like <input type="date"> or <select>) CANNOT be styled consistently across Chrome, Safari, and Firefox to match the premium design system — use the established component library (e.g., shadcn/ui <DatePicker>, <Select>) instead. Cross-browser inconsistency is a legitimate reason to NOT use native.
+
+5. Already-installed dependency?
+   → Yes: Use it. Don't install a new library to do what an existing one can.
+
+6. Can it be done in one line?
+   → Yes: One line. No abstraction layer needed.
+
+7. Only then: write the MINIMUM that works.
+   → No classes when a function works. No module when an inline does.
 ```
-THINK          PLAN           BUILD          REVIEW         TEST           SHIP
-[YC Hours]   [Architect]   [Sr Developer]  [Staff Eng]   [QA Lead]    [Release Eng]
-[CEO]        [Eng Mgr]                     [Designer]    [Sec Officer]
+
+---
+
+### The Rule of Three (Do Not Abstract Early)
+
+- **First occurrence**: Write it inline directly where it is needed.
+- **Second occurrence**: Duplicate it cleanly. Duplication is cheaper than the wrong abstraction.
+- **Third occurrence**: Only now extract a shared helper or utility.
+
+---
+
+### 10 Concrete Over-Engineering Red Flags
+
+1. Creating a `GenericRepository<T>` when you only have 2 database tables.
+2. Creating a custom state machine or complex reducer for 2 boolean flags.
+3. Adding a configuration file or environment variables for values that never change.
+4. Writing custom retry/circuit-breaker logic when native `fetch` or SDK already handles it.
+5. Building a generic `BaseService` with 15 hook methods implemented by only one class.
+6. Wrapping every standard library call in a custom helper class (`StringUtils`, `DateUtils`, `ObjectUtils`).
+7. Creating a multi-level folder structure (`domains/auth/adapters/driving/rest/controllers/dto/`) for a 30-line microservice.
+8. Writing custom mock frameworks when Vitest/Jest/Node test runner provide standard mocks.
+9. Installing a 50KB npm package for a 3-line utility (e.g. `left-pad`, `is-number`, `deep-clone`).
+10. Pre-optimizing caching and indexing for endpoints serving 10 requests a day.
+
+---
+
+### The Sacred Exceptions (NEVER Cut These)
+
+The ladder applies to features and abstractions. These 4 areas are **non-negotiable** and **never simplified away**:
+
+#### 1. Input Validation
+
+```javascript
+// [GOOD] Always validate — even if "internal" API
+function createUser(data) {
+  if (!data.email || !isValidEmail(data.email)) {
+    throw new ValidationError('Invalid email');
+  }
+  return db.insert('users', data);
+}
+
+// [BAD] Never skip validation for "speed"
+function createUser(data) {
+  return db.insert('users', data); // NEVER
+}
 ```
 
-## Role-Switching Rules
+#### 2. Error Handling
 
+```javascript
+// [GOOD] Always handle errors explicitly
+async function fetchUser(id) {
+  try {
+    const user = await db.findById(id);
+    if (!user) throw new NotFoundError(`User ${id} not found`);
+    return user;
+  } catch (err) {
+    logger.error('fetchUser failed', { id, err });
+    throw err;
+  }
+}
+```
+
+#### 3. Security Checks
+
+- Authorization check BEFORE every query or mutation.
+- Parameterized queries everywhere — zero string concatenation in SQL.
+- Strict sanitization of all rendered HTML and markdown.
+
+#### 4. Type Safety & Behavioral Tests
+
+- Strict TypeScript types — no `any` evasion.
+- Tests covering happy path, 4xx, and 5xx edge cases.
+
+---
+
+## Code Examples
+
+### Native Platform vs Over-Built Package
+
+**Over-build**:
+
+```bash
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
