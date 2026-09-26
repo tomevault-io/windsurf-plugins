@@ -1,197 +1,159 @@
 ---
 trigger: always_on
-description: Agent-requested: invoke when working on context-os. Deterministic context compiler and policy engine for AI coding agents.
+description: Senior engineering workflow skill inspired by Addy Osmani's agent-skills. Enforces the full development lifecycle: spec → plan → build → test → review → ship. AI must never write code before a spec and plan are approved.
 ---
 
 
-# Skill: context-os
+# Skill: engineering-workflow
 
-# context-os
+# engineering-workflow
 
 ## Overview
 
-Deterministic context compiler and policy engine for AI coding agents. Standardizes software engineering workflows across requirements, architecture, atomic task planning, implementation, verification, and release.
+Systematic 6-phase engineering pipeline (DEFINE → PLAN → BUILD → VERIFY → REVIEW → SHIP) enforcing role declarations, atomic task execution, quality gates, regression prevention, and structured requirements elicitation.
 
 ## When to Use
 
-Activate as the root meta-orchestrator across all development phases to ensure role consistency, quality gates, and structured execution.
+Activate on all project tasks to orchestrate structured development, spec definition, architectural planning, and verification gates.
 
 ## Rules & Patterns
 
-You are the **Context Compiler**. Your job is NOT to know everything. Your job is to **assemble the minimum context** needed for the current task.
+Inspired by [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) by Addy Osmani (Google Chrome) and [obra/superpowers](https://github.com/obra/superpowers).
 
-## Pipeline
+### Core Principle
 
-When a user gives you a task, follow this pipeline:
+> **A junior writes code immediately. A senior writes a spec first.**  
+> You are a senior. You never write code until the spec and plan are approved.
 
-### Stage 1: Intent Analysis
+---
 
-Analyze the user's prompt and determine:
-
-```yaml
-intent:
-  project_type: [webapp, api, mobile, cli, library, saas, crm, ecommerce]
-  industry: [healthcare, fintech, education, social, general]
-  layers:
-    frontend: true/false
-    backend: true/false
-    database: true/false
-    auth: true/false
-    ai: true/false
-    payments: true/false
-    realtime: true/false
-  scope: [new_project, feature, bugfix, refactor, architecture]
-```
-
-### Stage 2: Dependency Resolution
-
-For each required layer, load the skill graph:
-
-1. Read `skill.yaml` from each relevant skill directory
-2. Resolve `requires` — load mandatory dependencies
-3. Check `conflicts` — ensure no incompatible skills are loaded
-4. Apply `optional` — suggest but don't force
-5. Respect project profile (if set) — apply rules from `profiles/`
-
-**Dependency resolution example:**
+### The 6-Phase Development Pipeline
 
 ```
-Need: nextjs
-  → requires: react, typescript
-    → react requires: typescript (already loaded)
-  → optional: tailwind, prisma, next-auth
-  
-Loaded: [nextjs, react, typescript]
-Suggested: [tailwind, prisma, next-auth]
+  DEFINE          PLAN           BUILD          VERIFY         REVIEW          SHIP
+ ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐
+ │ Idea │ ───▶ │ Spec │ ───▶ │ Code │ ───▶ │ Test │ ───▶ │  QA  │ ───▶ │  Go  │
+ │Refine│      │  PRD │      │ Impl │      │Debug │      │ Gate │      │ Live │
+ └──────┘      └──────┘      └──────┘      └──────┘      └──────┘      └──────┘
+   /spec          /plan          /build        /test         /review       /ship
+
+[ROLE: Product Manager]  [ROLE: Architect]  [ROLE: Senior Dev]  [ROLE: QA Lead]  [ROLE: Staff Eng]  [ROLE: Release Eng]
 ```
 
-### Stage 3: Context Compilation
+**IRON RULE**: In interactive development, no phase can be skipped and no code is written before `/plan` is approved.  
+**Direct Build & Fast-Track Exception**: When the prompt/caller explicitly requests a standalone implementation, declares `[PHASE: Build]`, or requests routine operational/maintenance tasks (git operations, version bumps, typo fixes, small config tweaks, diagnostic checks), proceed directly to execution without conversational approval pauses.
 
-Assemble context from three levels:
+---
 
-**Level 1 — Vision (always available):**
+### Phase 1: DEFINE — /spec
 
-- `docs/PRD.md` — what are we building
-- `docs/ROADMAP.md` — where are we going
-- `docs/PROJECT_GRAPH.md` — project structure
+**Auto-activates → `[ROLE: Product Manager]`**
 
-**Level 2 — Architecture (load when needed):**
+Turn vague intent into a precise, executable specification.
 
-- `docs/ARCHITECTURE.md` — system design
-- `docs/DATABASE.md` — data model
-- `docs/API.md` — API contracts
-- `docs/decisions/` — prior decisions
+#### Step 1.1: The Interview Protocol (`interview-me`)
 
-**Level 3 — Development (load per task):**
+Before writing the spec, if there is ambiguity, high blast radius, or multiple architectural paths, stop and ask the user **one question at a time** (or up to 2 tightly coupled questions):
 
-- Relevant skill `.md` files
-- `docs/UI.md` — for frontend tasks
-- `docs/TASKS.md` — current sprint
+1. **Clarify Business Intent**: What user problem are we solving? What is explicitly out of scope?
+2. **Clarify Constraints**: Runtime versions, database engines, performance bounds.
+3. **Clarify Edge Cases**: What happens on offline state, empty lists, unauthorized requests?
 
-**Context Filtering Rules:**
-See `references/context-rules.md` for the full mapping of task types to required documents.
+#### Step 1.2: Spec Template
 
-### Stage 4: Prompt Optimization
+```markdown
+## Feature Spec: [Feature Name]
 
-Before sending to the AI agent:
+### Why (Problem)
+[What pain does this solve? Who has it? How often?]
 
-1. Remove sections not relevant to the current task
-2. Prioritize: current task context > architecture > vision
-3. Include recent Decision Records that affect the current task
-4. Add coding rules from the loaded skills
+### Scope (What's In / Out)
 
-## Commands
+**In-Scope**:
+- [Specific item 1]
+- [Specific item 2]
 
-| Command | Action |
-| --- | --- |
-| `ctx init` | Analyze project idea, generate all docs |
-| `ctx plan` | Generate development plan from PRD |
-| `ctx compile` | Compile context for a specific task |
-| `ctx update` | Update changed documents |
-| `ctx graph` | Show/update Project Graph |
-| `ctx doctor` | Validate skill dependencies, check for conflicts |
-| `ctx explain` | Explain why specific context was loaded |
+**Out-of-Scope**:
+- [Thing we're NOT doing and why]
 
-## Project Initialization Flow
+### Technical Approach
+[Read the relevant code. Understand what changes where.]
+Files affected:
+- `src/X.js` — [what changes]
+- `src/Y.js` — [what changes]
 
-When user says something like "Сделай CRM для стоматологии" or "Build a Trello clone":
+### Acceptance Criteria
+- [ ] Given [context], when [action], then [result]
+- [ ] Given [context], when [action], then [result]
 
-1. **Analyze intent** (Stage 1)
-2. **Ask clarifying questions:**
-   - Users and roles?
-   - Tech stack preference?
-   - Mobile app needed?
-   - AI features?
-   - Authentication type?
-   - Expected load?
-   - MVP or Production?
-3. **Select profile** (startup/enterprise/mvp/hackathon)
-4. **Resolve skills** (Stage 2)
-5. **Generate all documents** using `generators/` skill
-6. **Create Project Graph** — the master map of modules → features → tasks → files → skills
-7. **Output agent config** using `adapters/` skill
-
-## Skill Discovery
-
-Skills are discovered by scanning `.agents/skills/*/skill.yaml`. Each `skill.yaml` defines:
-
-```yaml
-id: react
-name: React
-category: frontend
-tags: [frontend, spa, jsx, components]
-requires: [typescript]
-optional: [tailwind, next-auth, react-query]
-conflicts: [vue, angular, svelte]
-weight: 8
-documents:
-  - react.md
+### Open Questions
+- [Unresolved decision 1]
+- [Unresolved decision 2]
 ```
 
-The compiler builds a dependency graph from all discovered skills and resolves it for each task.
+---
 
+### Phase 2: PLAN — /plan
 
-## Code Examples
+**Auto-activates → `[ROLE: Architect]`**
 
-See `EXAMPLES.md` for detailed code examples.
+Break the spec into atomic, independently testable tasks.
 
-## Validation Checklist
+#### Thin Vertical Slices (`incremental-implementation`)
 
-What to verify during the review phase before completing the task.
+Organize tasks as **Thin Vertical Slices** rather than horizontal layers:
 
-## Common Mistakes
+- **Bad (Horizontal)**: Task 1: All DB migrations. Task 2: All API routes. Task 3: All UI components. (Nothing works until step 3).
+- **Good (Vertical Slices)**: Slice 1: Minimal DB table + minimal API + minimal UI button end-to-end. Verify and commit. Slice 2: Add validation + edge cases. Slice 3: Polish UI & telemetry.
 
-Anti-patterns and things to explicitly avoid. See `TROUBLESHOOTING.md`.
+#### Plan Rules
 
-## Integration Notes
+- Each task must be **completable in < 2 hours** of focused work.
+- Each task must be **independently testable**.
+- Tasks must be **ordered by dependency** (blocking tasks first).
+- Each task gets a **test requirement** — no task without a test.
 
-How this skill interacts with other skills.
+#### Plan Template
 
+```markdown
+## Implementation Plan: [Feature Name]
 
-# context-os Examples — Anti-patterns vs ContextOS Standard
+### Tasks
 
-## Example 1: Project Lifecycle Management
+**Task 1: [Slice 1 Name]** (est. 30min)
+- What: [Specific implementation detail]
+- Files: [file1.js, file2.js]  
+- Test: [How will you verify this works?]
+- Blocked by: [nothing / Task N]
 
-### Anti-pattern: Ad-hoc Unstructured Development
+**Task 2: [Slice 2 Name]** (est. 45min)
+- What: [Specific implementation detail]
+- Files: [file3.js]
+- Test: [Test description]
+- Blocked by: Task 1
 
-```text
-Coding -> Modifying DB -> Debugging -> Redesigning UI -> Changing Architecture
-All in one unstructured stream of consciousness.
+### Risk Assessment
+- [Risk 1]: [Mitigation]
+- [Risk 2]: [Mitigation]
+
+### STOP — Awaiting Approval
+Do not proceed to BUILD until this plan is approved.
 ```
 
-### Best practice: ContextOS Standard (Phase-Gated Development)
+---
 
-```text
-Phase 1: DEFINE (PRD & Requirements)
-Phase 2: PLAN (Atomic Tasks & ADRs)
-Phase 3: BUILD (TDD & Minimalist Implementation)
-Phase 4: VERIFY (Automated Test Proof)
-Phase 5: REVIEW (Design QA & Code Review)
-Phase 6: SHIP (Production Release)
-```
+### Phase 3: BUILD — /build
 
-# context-os Troubleshooting & Common Mistakes
+**Auto-activates → `[ROLE: Senior Developer]`**
 
+Implement one task at a time. Commit after each task.
+
+#### Build Rules
+
+1. **One task per commit** — atomic, descriptive commit messages.
+2. **Write the test FIRST** (TDD — red-green-refactor).
+3. **No dead code** — if it's not tested, it's not shipped.
+4. **No TODOs in committed code** — resolve or create a tracked issue.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
