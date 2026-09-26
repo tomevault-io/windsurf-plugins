@@ -1,117 +1,125 @@
 ---
 trigger: always_on
-description: 跨平台、面向非技术用户的 [frp](https://github.com/fatedier/frp) 桌面客户端，
+description: > 本文件面向在该目录（`src/`）下做前端开发的工程师。涉及前后端协议的部分
 ---
 
-# MoonProxy
+# 前端开发指南（MoonProxy）
 
-跨平台、面向非技术用户的 [frp](https://github.com/fatedier/frp) 桌面客户端，
-基于 Tauri v2 构建，支持 Windows 与 macOS。
+> 本文件面向在该目录（`src/`）下做前端开发的工程师。涉及前后端协议的部分
+> 也给出对应后端命令 / 事件的引用，便于一眼对齐。
 
-> 用户视角的介绍请看 [README.md](./README.md)；本文档面向在仓库里改代码的工程师。
+## 1. 技术栈
 
-## 功能
+- **框架**：Vue 3（`<script setup lang="ts">`）
+- **构建**：Vite 6
+- **类型**：TypeScript 5.6（`strict`、`noUnusedLocals`、`noUnusedParameters`）
+- **桥接**：`@tauri-apps/api`（`core` / `event` / `window`）+ 官方插件
+  - `@tauri-apps/plugin-dialog`：原生对话框
+  - `@tauri-apps/plugin-fs`：文本 / 目录读写
+  - `@tauri-apps/plugin-opener`：外部链接
+  - `@tauri-apps/plugin-shell`：副作用留作扩展位（侧车执行由后端封装）
+- **状态**：原生 `ref` / `reactive`，**不引入** Pinia / Vuex
+- **样式**：手写 CSS（无 Tailwind / UnoCSS），遵循 `styles.css` 中的 HSL 令牌
+- **图表**：`chart.js` + `vue-chartjs`（仅主页实时流量曲线，按需 register 模块）
 
-- 用户填入自己的 frps 服务端（地址、端口、Token、用户名），或预置自定义服务商快速切换
-- 可视化管理代理规则（TCP / UDP / HTTP / HTTPS），主页实时显示本地端口连通性
-- 实时流量监控：主页上下行速率曲线、连接数与累计流量（内置 TCP 中转层计数）
-- 一键启动 / 停止 frpc：启动按钮分 4 态（已停止 / 连接中 / 已连接 / 连接错误），
-  连接状态由 frpc 自身证据支撑（`/api/status` 探测 + 30s 超时回退）
-- 系统托盘常驻：关闭窗口默认隐藏到托盘，frpc 继续后台运行
-- 开机启动 + 静默启动（自启时隐藏到托盘）
-- 开机自动连接（仅 OS 自启路径触发，手动启动不会误连）
-- 定时连接（按星期多选 + 起止时间，分钟对齐 + 启动补跑 + 热加载）
-- frpc 引擎自更新：GitHub Release → SHA256 校验 → 原子替换，无需重装应用
-- 应用本体自更新：基于 `tauri-plugin-updater` 的「重启并安装」
-- 通过 Tauri sidecar 机制内置 frpc 二进制，用户无需单独安装
-
-## 技术栈
-
-- 前端：Vue 3 + TypeScript + Vite 6
-- 后端：Rust + Tauri v2
-- frpc 版本：v0.69.1（已内置；可通过 `pnpm sync:frpc` 同步其他平台）
-
-## 目录结构
+## 2. 目录结构与文件职责
 
 ```
-moonproxy-desktop/
-├── src/                          # Vue 前端
-│   ├── App.vue                   # 顶层壳：TitleBar + 视图路由 + 全局键盘 / 右键 + 事件订阅
-│   ├── main.ts                   # 挂载入口（按 ?view= 区分主窗 / 日志窗）
-│   ├── state/                    # 跨组件响应式状态（拆分到各文件）
-│   │   ├── index.ts              # 统一导出
-│   │   ├── runtime.ts            # 运行时：frpc 状态 / 日志 / 启动时间
-│   │   ├── config.ts             # 服务商 / 代理配置
-│   │   ├── prefs.ts              # 偏好：语言 / 启动项 / 定时
-│   ├── styles.css                # HSL 设计令牌 + 通用组件类
-│   ├── composables/              # 按主题拆分的可复用状态 / 命令
-│   │   ├── useToast.ts
-│   │   ├── useFrpcUpdate.ts      # frpc 引擎自更新
-│   │   ├── useAppUpdate.ts       # 应用本体自更新
-│   │   ├── useProxyHealth.ts     # 主页端点健康点 + 指数退避轮询（3→6→12→24s）
-│   │   ├── useTraffic.ts         # 实时流量：累计 / 滚动窗口 / 瞬时速率
-│   │   └── useAppEvents.ts       # 应用级事件订阅 + 启动初始化
-│   ├── components/
-│   │   ├── TitleBar.vue          # 跨平台标题栏
-│   │   ├── BrandIcon.vue         # 单色品牌标识
-│   │   ├── CloseConfirm.vue      # frpc 运行时的关闭确认弹窗
-│   │   ├── Toast.vue             # 顶部 Toast 渲染
-│   │   ├── home/                 # HomeView 子组件（启动按钮 / 流量图表 / 端点列表 …）
-│   │   └── settings/             # 设置面板 Tab 子组件
-│   │       ├── ProviderTab.vue   # 服务商
-│   │       ├── ProxyTab.vue      # 代理规则
-│   │       ├── InterfaceTab.vue  # 界面语言切换
-│   │       ├── LaunchTab.vue     # 开机启动 / 静默启动 / 开机自动连接
-│   │       ├── ScheduleSection.vue  # 定时连接（LaunchTab 内嵌）
-│   │       ├── LogsTab.vue       # 运行日志
-│   │       └── AboutTab.vue      # 关于（含软件更新 + 核心引擎）
-│   └── views/
-│       ├── HomeView.vue          # 主面板：流量图表 / 启动按钮 / 端点列表 / 引导卡片
-│       ├── ServicesView.vue      # 「服务」视图：复用 ProviderTab + ProxyTab
-│       └── SettingsView.vue      # 设置面板：分段控件 + Tab 切换
-├── src-tauri/
-│   ├── src/
-│   │   ├── main.rs               # Windows release 抑制控制台
-│   │   ├── lib.rs                # Tauri Builder 配置 + setup hook + invoke_handler + ExitRequested 兜底
-│   │   ├── types.rs              # 共享类型：StartArgs / ProxyConfig
-│   │   ├── config.rs             # frpc.toml 生成 + 客户端配置持久化
-│   │   ├── process.rs            # frpc 子进程生命周期
-│   │   ├── frpc_state.rs         # 连接状态机 + 日志环形缓冲
-│   │   ├── proxy_health.rs       # 代理本地端口连通性探测
-│   │   ├── proxy_relay.rs        # frpc↔本地服务 TCP 中转层 + 流量统计
-│   │   ├── latency.rs            # 服务端 TCP 握手延迟探测
-│   │   ├── frpc_update.rs        # frpc 自更新
-│   │   ├── prefs.rs              # 应用偏好
-│   │   ├── scheduler.rs          # 按星期定时启停 frpc
-│   │   ├── tray.rs               # 系统托盘
-│   │   └── assets/               # 编译期嵌入资源（托盘图标）
-│   ├── binaries/                 # frpc sidecar 二进制（按平台目标命名；不入库，本地放置）
-│   ├── capabilities/
-│   │   ├── default.json          # 主窗权限
-│   │   └── logs.json             # 独立日志窗权限
-│   ├── tauri.conf.json           # 窗口 400×740、无装饰、sidecar 声明、updater 端点
-│   └── tauri.macos.conf.json     # macOS 平台覆盖：系统交通灯 + Overlay + hiddenTitle
-├── docs/app-icons/               # 图标设计源（APP Icon + 托盘图标），含 README 规范
-└── scripts/                      # 仓库辅助脚本
-    ├── sync-frpc.sh              # 按 .env 版本同步 frpc 二进制到 src-tauri/binaries/
-    └── check-icons.py            # 图标规范校验（更新图标后必跑）
+src/
+├── main.ts                       # 挂载入口；按 URL `?view=logs` 分流到 LogsWindow，否则挂 App
+├── App.vue                       # 主窗顶层壳：TitleBar + 视图路由 + 全局键盘/右键监听；事件订阅已抽到 useAppEvents
+├── types.ts                      # 前后端共享类型（ProxyConfig / FrpcConfig / Prefs / FrpcStatus / LogEntry / TrafficPayload）
+├── i18n.ts                       # vue-i18n 实例 + AppLocale 类型 + setLocale / normalizeLocale
+├── state/                        # 核心响应式状态，按主题拆分（详见 §3.2）
+│   ├── index.ts                  # 聚合 barrel：仅做 `export * from "./xxx"`，不放任何状态
+│   ├── config.ts                 # config + isConfigured + toArgs
+│   ├── prefs.ts                  # prefs（应用偏好）
+│   ├── runtime.ts                # frpcStatus / frpcError / running / logs
+├── commands/                     # 按职责拆分的 invoke 封装（全部吞异常、不向前端抛）
+│   ├── config.ts                 # loadConfig / saveConfig
+│   ├── contextMenu.ts            # showEditMenu（输入框原生右键编辑菜单）
+│   ├── frpc.ts                   # startFrpc / stopFrpc
+│   ├── latency.ts                # probeServerLatency（服务端 TCP 握手延迟探测）
+│   └── prefs.ts                  # loadPrefs / savePrefs / setAutoLaunch / refreshAutoLaunch
+├── styles.css                    # 设计令牌（HSL）+ 通用组件类（.btn / .input / .card / .badge）
+├── vite-env.d.ts                 # *.vue 模块声明
+├── composables/
+│   ├── useToast.ts               # 轻量 Toast（showToast / dismiss timer）
+│   ├── useFrpcUpdate.ts          # frpc 自更新：版本 / updateInfo / 下载 / 横幅相关
+│   ├── useAppUpdate.ts           # 应用本体自更新
+│   ├── useProxyHealth.ts         # 主页端点健康点：proxyHealth + 指数退避轮询（3→6→12→24s）
+│   ├── useAppEvents.ts           # 应用级事件订阅 + 启动初始化（App.vue 已委托）
+│   ├── useLogsWindow.ts          # 打开/聚焦独立日志窗口（WebviewWindow label="logs"）
+│   └── useTraffic.ts             # 实时流量：累计字节 / 60s 滚动窗口 / 瞬时速率 + 格式化
+├── components/
+│   ├── TitleBar.vue              # 跨平台标题栏：mac 交通灯避让、Win 最小化/关闭、拖动区；「服务」「设置」（仅 home）与「返回」（仅非 home）均按 OS 分槽（macOS 右 / Windows 左，远离系统窗口控件）
+│   ├── BrandIcon.vue             # 单色品牌标识（currentColor SVG），跟随标题文字色
+│   ├── CloseConfirm.vue          # frpc 运行时的关闭确认弹窗（最小化 / 退出）
+│   ├── Toast.vue                 # 顶部 Toast 渲染
+│   ├── home/                     # HomeView 拆出的子组件（详见 §5.4）
+│   │   ├── StartButton.vue       # 底部药丸形启动按钮 + CSS 双层涟漪 + 4 态文案
+│   │   ├── TrafficChart.vue      # 实时流量曲线（chart.js）：连接数 / 上下行速率 / 累计
+│   │   ├── ProxyList.vue         # 公网访问地址列表 + 健康点 + 复制按钮 + 指数退避健康轮询
+│   │   ├── GuideCard.vue         # 未配置引导卡片
+│   │   └── SystemStatus.vue      # 底部只读系统状态栏（开机启动 / 定时连接）
+│   ├── banners/
+│   │   └── UpdateBanners.vue     # 顶部 4 类横幅：frpc 错误条 / 软件本体更新 / 引擎已应用 / 引擎待应用
+│   └── settings/                 # 设置面板 Tab 子组件
+│       ├── ProviderTab.vue
+│       ├── ProxyTab.vue
+│       ├── InterfaceTab.vue      # 界面语言切换
+│       ├── LaunchTab.vue         # 开机启动 / 静默启动 / 开机自动连接（ScheduleSection 抽出独立子件）
+│       ├── ScheduleSection.vue   # 定时连接：主开关 + 星期选择 + 起止时间 + 校验 + 保存
+│       ├── LogsTab.vue           # 运行日志
+│       └── AboutTab.vue          # 关于（含软件更新 + 核心引擎）
+└── views/
+    ├── HomeView.vue              # 主面板：纯组装（TrafficChart + GuideCard + ProxyList + StartButton + SystemStatus + 错误条 + 启停逻辑）
+    ├── ServicesView.vue          # 「服务」视图：复用 ProviderTab + ProxyTab 的分段控件
+    ├── SettingsView.vue          # 设置面板：分段控件 + Tab 切换
+    └── LogsWindow.vue            # 独立日志窗口根组件：get_logs 拉历史 + listen 实时；不复用 App.vue 的关闭/快捷键逻辑
 ```
 
-> 前端 / 后端开发约定详见各自目录下的 `AGENTS.md`（`src/AGENTS.md`、`src-tauri/AGENTS.md`）。
+## 3. 状态层
 
-## 配置与数据存储
+> 设计原则：**单例、扁平、纯响应式**。所有跨视图共享状态按主题拆分到独立模块，
+> 视图组件只读 + 通过封装的命令函数修改。
+>
+> - `types.ts`：前后端共享类型（snake_case，与 Rust 一一对应）
+> - `state/` 子目录：核心响应式状态，按主题拆为 `config` / `prefs` / `runtime`
+>   三个模块；统一经 `state/index.ts` barrel 暴露；
+>   `isConfigured` / `toArgs` 留在 `state/config.ts`（仅服务 config）
+> - `commands/config.ts` / `commands/frpc.ts` / `commands/prefs.ts`：按职责拆分的 invoke 封装
+> - `composables/useFrpcUpdate.ts`：frpc 引擎自更新相关状态
+> - `composables/useAppUpdate.ts`：应用本体自更新相关状态
+> - `composables/useProxyHealth.ts`：代理本地端口连通性
+> - `composables/useTraffic.ts`：实时流量（累计 / 滚动窗口 / 瞬时速率）
+> - `composables/useAppEvents.ts`：应用级 Tauri 事件订阅 + 启动初始化（App.vue 已委托）
 
-按语义拆成三套独立存储，全部落到 Tauri 标准 `app_config_dir()`
-（macOS：`~/Library/Application Support/<bundle-identifier>/`；
-Windows：`%APPDATA%\<bundle-identifier>\`），互不污染。
+### 3.1 类型
 
-| 数据           | 存储后端                  | 文件                    | 键 / 格式       | 管理模块                                  | 写入时机                                                                 |
-| -------------- | ------------------------- | ----------------------- | --------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| 应用偏好       | `tauri-plugin-store`      | `prefs.json`            | `auto_launch` / `silent_start` / `auto_connect`（bool）+ `schedule`（`Schedule` 对象：`enabled` / `weekdays[7]` / `start_time` / `stop_time`，按星期定时启停 frpc）+ `language`（字符串） | `src-tauri/src/prefs.rs`                  | `LaunchTab` / `InterfaceTab` 保存；`set_auto_launch` 先写 OS 启动项再以实际状态回填；`auto_connect` 仅在 `--auto-launched`（OS 自启）时触发 `start_frpc`；`schedule` 由 `scheduler.rs` 每分钟重读热加载 |
-| 客户端配置     | `tauri-plugin-store`      | `config.store.json`     | 单键 `start_args`（整体序列化 `StartArgs`） | `src-tauri/src/config.rs` `save_config`/`load_config` | 设置面板「服务商」「代理」Tab 保存                                        |
+`types.ts`：
+
+```ts
+// ProxyConfig 是按 `type` 拆分的 discriminated union——每种 frp 代理类型
+// 有独立的 schema（TCP/UDP 走 remotePort，HTTP/HTTPS 走 customDomain 且
+// 不接受 remotePort）。聚合在扁平结构里会让 build_toml / URL 生成路径
+// 都需按字符串 type 分叉，且无法在编译期排除非法字段。
+type ProxyConfig =
+  | { type: "tcp" | "udp"; name: string; local_ip: string;
+      local_port: number; remote_port: number }
+  | { type: "http" | "https"; name: string; local_ip: string;
+      local_port: number; custom_domain: string };
+interface FrpcConfig {
+  custom_name: string;   // 自定义服务商显示名称
+  server_addr: string; server_port: number;
+  token: string; user: string;
+  proxies: ProxyConfig[];
+}
+interface Prefs {
+  auto_launch: boolean;  // 开机启动（OS 实际状态）
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [MoonProxyHQ/moonproxy-desktop](https://github.com/MoonProxyHQ/moonproxy-desktop) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
