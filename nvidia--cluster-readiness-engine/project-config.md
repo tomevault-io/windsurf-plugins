@@ -100,4 +100,4 @@ There is no Remediation controller. ADR-061 removed it. NVCRE does not taint, co
 
 ---
 > Source: [NVIDIA/cluster-readiness-engine](https://github.com/NVIDIA/cluster-readiness-engine) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
