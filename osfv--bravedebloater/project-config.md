@@ -67,4 +67,4 @@ pwsh -NoProfile -File scripts/Test-LatestPolicyTemplates.ps1 -TemplateZipPath /t
 
 ---
 > Source: [osfv/BraveDebloater](https://github.com/osfv/BraveDebloater) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
