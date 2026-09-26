@@ -6,94 +6,88 @@ description: <!-- SPDX-License-Identifier: Apache-2.0
 <!-- SPDX-License-Identifier: Apache-2.0
      https://www.apache.org/licenses/LICENSE-2.0 -->
 
-# AGENTS — spec-loop operational context
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-This file is the **operational** context for the spec-loop only:
-build/validate commands, the repository map, and the branch rules. It is
-loaded by the loop's prompts in addition to the repository-wide
-[`/AGENTS.md`](../../AGENTS.md), which still governs everything (commit
-trailers, placeholder convention, privacy/security posture). Where the
-two overlap, the repo-wide `AGENTS.md` wins.
+- [Gemini CLI harness](#gemini-cli-harness)
+  - [Harness contract](#harness-contract)
+  - [Invoke a Magpie skill](#invoke-a-magpie-skill)
+  - [Install](#install)
+    - [Authentication with the clean-environment wrapper](#authentication-with-the-clean-environment-wrapper)
+  - [Security model](#security-model)
+    - [Tool-sandboxing boundaries](#tool-sandboxing-boundaries)
+    - [What asks and what denies](#what-asks-and-what-denies)
+    - [Policy loading and precedence](#policy-loading-and-precedence)
+    - [Deterministic guard rules](#deterministic-guard-rules)
+  - [Reuse framework MCP servers](#reuse-framework-mcp-servers)
+  - [Spec-loop runner](#spec-loop-runner)
+  - [Verify](#verify)
+  - [Update](#update)
+  - [Doctor](#doctor)
+  - [setup-isolated lifecycle](#setup-isolated-lifecycle)
+  - [Known limitations](#known-limitations)
+  - [Developer checks](#developer-checks)
+  - [Upstream references](#upstream-references)
 
-## Repository map (what the loop edits)
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-This repo has no `src/` tree. Work lands in one of:
+<!-- SPDX-License-Identifier: Apache-2.0
+     https://www.apache.org/licenses/LICENSE-2.0 -->
 
-- `.claude/skills/<name>/SKILL.md` — agent-readable skills (Markdown +
-  YAML frontmatter; required keys `name`, `description`, `license`).
-- `tools/<tool>/` — deterministic Python tools (`uv`, hatchling,
-  `src/` + `tests/`, `dependencies = []` where possible).
-- `docs/` — human-facing documentation. `docs/rfcs/` is the **separate**
-  governance layer — the loop never edits it.
-- `tools/spec-loop/specs/` — the specs this loop consumes.
+# Gemini CLI harness
 
-## Validation commands (the build "backpressure" step)
+**Capability:** capability:platform
 
-Run the spec's own **Validation** block first. General checks:
+**Harness:** Gemini CLI
 
-```bash
-# Validate skill definitions (frontmatter, links, placeholders)
-uv run --project tools/skill-and-tool-validator --group dev skill-and-tool-validate
+Gemini CLI is an agent harness that runs Magpie's shared skills with repository instructions, an action guard, tool sandboxing, and per-action approval policies.
+The adapter is **experimental**: its Linux sandbox does not provide the Claude Code reference setup's home-directory read isolation or domain allowlist.
+The integration follows the harness contract in [add-a-harness](add-a-harness.md)
+and [RFC-AI-0004](../rfcs/RFC-AI-0004.md).
 
-# Validate the compact inventory helper
-uv run --project tools/spec-inventory --group dev pytest tools/spec-inventory/tests
+## Harness contract
 
-# A skill's behavioural eval suite (every skill must have one)
-uv run --project tools/skill-evals skill-eval tools/skill-evals/evals/<skill-name>/
+| Magpie requirement | Gemini CLI implementation |
+|---|---|
+| Skill discovery | Gemini reads the canonical `.agents/skills/magpie-*/SKILL.md` links. The existing `universal` row in `skills/setup/agents.md` covers this path. |
+| Repository instructions | The framework's `GEMINI.md` imports its `AGENTS.md`. |
+| Tool bridges | Skills invoke the existing `tools/*` CLI adapters through shell calls, subject to the approval policy and sandbox grants below. Each adapter declares its own prerequisites. |
+| Deterministic guard | Project `.gemini/settings.json` registers Magpie's `agent_guard/__init__.py --gemini` adapter for Gemini's `BeforeTool` shell events. The adapter calls Magpie's `dispatch()` function to check the command. Adopters register the hook through the install lifecycle below. |
+| Spec-loop | The `gemini` profile forwards the prompt, model, and output format. |
+| Credential isolation | `agent-iso gemini` launches the CLI through the generic clean-environment wrapper, which filters inherited environment variables. |
+| Filesystem and network | `security.toolSandboxing: true` enables Gemini's tool sandboxing. The shipped profile adds no extra writable directories or network grant. See [Tool-sandboxing boundaries](#tool-sandboxing-boundaries) for the difference between native file tools and shell access. |
+| Tool approval | Explicit `policyPaths` loads `policies/magpie.toml`: scoped reads are allowed, other shell calls and native edits require confirmation, and selected commands and credential paths are denied. MCP calls require confirmation. |
+| MCP servers | Register the same server commands in Gemini's user settings; see [Reuse framework MCP servers](#reuse-framework-mcp-servers). No servers or credentials are installed by this profile. |
 
-# A tool's own tests (substitute the tool path)
-uv run --project tools/<tool> --group dev pytest
+## Invoke a Magpie skill
 
-# Shell scripts
-bash -n <script>.sh && shellcheck <script>.sh
-```
+Install the [Gemini extension](../setup/marketplace-install.md#google-gemini-cli) through [setup](../../skills/setup/SKILL.md), or use the canonical `.agents/skills/` links with a pinned snapshot.
+Both methods expose the same skill sources.
+The framework's [`GEMINI.md`](../../GEMINI.md) imports `AGENTS.md`; adopters retain their own project instructions alongside that context.
 
-There is no repo-wide test runner; validate the specific surface the
-spec touches. If a work item adds or changes a **skill**, it must also
-add/extend that skill's eval suite under
-`tools/skill-evals/evals/<skill-name>/` (per `/AGENTS.md` § Reusable
-skills — a skill without an eval suite is incomplete). If a work item
-adds a **tool**, that tool ships its own tests. Both must pass before
-commit.
+From the adopter repository root:
 
-## Branch rules (the user's constraint: one branch per fix/feature)
+1. Complete [installation](#install) and launch Gemini through the clean-environment wrapper.
+2. Use `/memory show` to inspect repository instructions and `/skills list` to check discovery.
+3. Ask `Use the magpie-list-skills skill.` and review the activation request.
+4. Approve the skill's catalogue script when prompted; interpreter commands require tool approval even for a read-only workflow.
 
-- **Never commit feature work to the integration branch.** Build mode
-  branches `<slug>` off the integration branch (`$SPEC_LOOP_BASE`,
-  default: `main`) first.
-- **One spec per branch, one branch per PR.** Do not bundle specs.
-- A feature branch edits only **its own** spec's `status:` (→ `done`) —
-  not sibling specs and not `IMPLEMENTATION_PLAN.md` (avoids cross-branch
-  conflicts; the plan is reconciled by a later `plan` pass).
-- The **`update`** beat (specs fell behind code others contributed)
-  branches `sync-specs-<timestamp>` and edits `specs/` **only** — it
-  documents reality, it never changes a skill, tool, or doc outside the
-  spec dir. The runner, not the prompt, owns `.last-sync`.
-- The runner feeds each iteration **both** the open PRs and the local
-  work-item branches as in-flight work. Because the loop never pushes, a
-  built-but-un-pushed item exists only as a local branch with no PR, so the
-  local-branch list (not just open PRs) is what prevents the loop from
-  rebuilding the same item every iteration.
+Skill activation consent and tool approval are separate decisions.
+Skills use the existing `tools/*` adapters, whose READMEs declare their prerequisites.
 
-## Hard limits (governance — do not cross)
+## Install
 
-- **No push, no PR.** `git push` and `gh pr create` are in the `ask`
-  list of `.claude/settings.json`. The loop stops at a local commit and
-  prints the human-run commands. Opening the PR is the human's click.
-- **No `.claude/settings.json` edits** (it is in the `deny` list).
-- **No new network/filesystem allowances.** Run inside the existing
-  sandbox.
+Use Gemini CLI **0.59.0 or later**.
+The validation baseline is 0.59.0 on Linux; later versions require [verification](#verify) before use.
+The tested Linux backend requires `bwrap` (bubblewrap), usable user namespaces, and ordinary shell utilities.
+Use the framework's [sandbox primitive versions](../../tools/agent-isolation/pinned-versions.toml) when installing bubblewrap.
+Python 3.11+ is required for profile linting and the existing action guard.
 
-## Commits
+For guided setup, ask Gemini: `Use the magpie-setup-isolated-setup-install skill.`
 
-- Imperative subject describing the user-visible change.
-- Trailer `Generated-by: <agent> (<model>)`, where `<agent>` and `<model>`
-  are the actual agent and model you are running as (e.g. `Claude (Opus
-  4.8)`, `OpenCode (Big Pickle)`) — do not hardcode either. **Never**
-  `Co-Authored-By` with an agent (repo-wide `AGENTS.md` § Commit and PR
-  conventions).
-- One commit per build iteration (the change + its spec `status` flip).
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apache/magpie](https://github.com/apache/magpie) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
