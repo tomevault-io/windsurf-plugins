@@ -141,4 +141,4 @@ When describing what a module or function does, prefer infinitive phrases:
 
 ---
 > Source: [mrinalwadhwa/fluent](https://github.com/mrinalwadhwa/fluent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
