@@ -26,7 +26,7 @@ Cross-platform Kubernetes desktop client. Multi-context cluster management with 
 | Toolchain | mise (pins Go, Node, Wails CLI versions) |
 | Lint / format | golangci-lint (Go) + ESLint (frontend) |
 | Tests | `go test` (backend) + Vitest + jsdom (frontend) |
-| CI release builds | GitHub Actions matrix on hosted runners (macOS, Windows, Linux) |
+| CI release builds | GitHub Actions matrix on hosted runners (macOS arm64 + Linux amd64; Windows disabled until the v1 distribution path) |
 | Release publishing | `softprops/action-gh-release` (macOS .tar.gz + Linux .tar.gz + .deb assets today), Homebrew cask auto-bump for macOS + AUR `klustr-bin` auto-bump for Arch |
 
 ## Project Structure
@@ -39,8 +39,14 @@ klustr/
 ├── main.go                       application entry point
 ├── internal/                     pure Go business logic (no Wails imports)
 │   └── kube/
-│       ├── config.go                kubeconfig parsing, context discovery
+│       ├── config.go                kubeconfig parsing, context discovery + exec auth hints
 │       ├── path.go                  GUI-launch PATH augmentation for exec credential helpers
+│       ├── shellenv.go              GUI-launch login-shell env import (PATH + allowlist)
+│       ├── creds_provider.go        CredentialProvider interface + status/mapping types
+│       ├── creds_awsvault.go        aws-vault provider (detect / profiles / export capture)
+│       ├── creds_store.go           context→profile mapping JSON under the user config dir
+│       ├── creds.go                 credentialManager: single-flight capture, in-memory
+│       │                            secrets, ahead-of-expiry refresh + client rebuild
 │       ├── manager.go               ClientManager lifecycle (Clientset / Ping / Watch /
 │       │                            StopWatch) + Logs / Exec / PortForward / CRD forwarders
 │       │                            + watcher() helper
@@ -49,10 +55,13 @@ klustr/
 │       │                             autoscaling / admission / rbac / helm / gateway / pods)
 │       ├── mutate.go                generic apply / delete / scale via dynamic client +
 │       │                            kindToGVR map
-│       ├── informers.go             contextWatcher lifecycle + the single start() that wires
-│       │                            every kind's event handler + shared helpers
+│       ├── informers.go             contextWatcher lifecycle + start() bootstrap + the
+│       │                            kindBindings routing table + ensureKind lazy per-kind
+│       │                            start + shared helpers
 │       │                            (sortByNamespaceName, formatLabelSelector, OwnerRef, …)
 │       ├── informers_<group>.go     per-sidebar-group XxxInfo types and lister methods
+│       ├── permissions.go           per-kind SelfSubjectAccessReview probing →
+│       │                            cluster-wide / scoped / denied routing map
 │       ├── details.go               shared types (ContainerSummary) + helpers
 │       │                            (matchLabels, deploymentConditions, quantitiesToStrings,
 │       │                             policyRules, rbacSubjects, …)
@@ -64,22 +73,10 @@ klustr/
 │       ├── argocd.go                Application list + Sync / Refresh through the K8s API
 │       │                            (no argocd CLI, no argocd-server dependency)
 │       ├── gateway.go               typed Gateway API informers + status / route helpers
-│       ├── rollout.go               Deployment / StatefulSet / DaemonSet rollout history
-│       │                            and one-click revert (kubectl rollout undo path)
-│       ├── install.go               one-click metrics-server install / uninstall from
-│       │                            upstream components.yaml
-│       ├── events.go                core/v1 Events list filtered by involvedObject
-│       ├── metrics.go               metrics.k8s.io pod CPU/memory usage (polled, not watched)
-│       ├── overview.go              cluster-wide CPU / memory / pod aggregation
-│       ├── logs.go                  streaming log sessions
-│       ├── exec.go                  SPDY exec sessions
-│       └── portforward.go           port-forward registry & lifecycle
-├── app/                          Wails binding adapter (thin layer over ClientManager)
-├── frontend/
-│   ├── eslint.config.js          ESLint flat config
+│       ├── karpenter.go             Karpenter NodePool / NodeClaim views (CRD-gated)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SametKUM/klustr](https://github.com/SametKUM/klustr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
