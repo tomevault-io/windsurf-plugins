@@ -1,114 +1,96 @@
 ---
 trigger: always_on
-description: Libra is a Rust implementation of an AI agent-native version control system with
+description: `libra agent` is an intentionally different external-agent capture extension,
 ---
 
-# Libra - Repository Custom Instructions for GitHub Copilot
+# Agent Command Development
 
-## What this repo is
+`libra agent` is an intentionally different external-agent capture extension,
+not a Git-compatible command.
 
-Libra is a Rust implementation of an AI agent-native version control system with
-Git on-disk compatibility, SQLite-backed repository metadata, durable AI runtime
-state, tiered local/S3/R2 object storage, and a Cloudflare-backed publish flow.
+OpenCode content capture on **macOS** is assembled through seatbelt
+(`sandbox-exec`) via `SandboxManager::transform`; the seatbelt backend carries
+a deprecation (**弃用**) risk if Apple removes `sandbox-exec`. See
+[`../tracing/agent.md`](../tracing/agent.md) §5 for the read-isolation
+asymmetry and fail-closed metadata-only degrade when the backend is missing.
 
-This is a single Rust package named `libra` plus two TypeScript/Next.js surfaces:
+The shared `run_bounded_exporter` Unix `pre_exec` sets both soft and hard
+`RLIMIT_CORE` to zero next to the existing per-platform `RLIMIT_FSIZE`.
+Failure to set either limit fails spawn with context. Core limits propagate
+to exporter descendants without changing the parent process; SIGXFSZ
+disposition, byte caps, deadlines and sandbox controls are unchanged.
+This also suppresses cores from unexpected exporter crashes. Piped core
+handlers decide whether to honor the limit. systemd-coredump v259 honors
+it when `core_pattern` passes the limit through `%c`; brief signal metadata
+can remain. The regression
+`opencode_export_core_limits_are_zero_in_child_and_descendants` exercises
+the real runner and confirms child/descendant limits and unchanged parent
+limits. It does not establish the cause of any historical linker SIGKILL.
 
-- `web/`: the static Code UI exported by Next.js and embedded into the Rust binary.
-- `worker/`: the Libra publish Cloudflare Worker, backed by D1 and R2.
+The active development contract, backlog, and compatibility guardrails live in
+[`../tracing/agent.md`](../tracing/agent.md). Keep this file as the command
+development index entry so `docs/development/commands/README.md` can list every
+public CLI command without duplicating the Agent planning document.
 
-Do not assume the older multi-crate `engine/`, `delta/`, `transport/`, or
-`storage/` layout exists. The current implementation lives primarily under
-`src/`, with command handlers in `src/command/` and shared/runtime internals in
-`src/internal/` and `src/utils/`.
+## Deferred / Non-goal parity
 
-## Repository layout
+The following external-agent parity surfaces are decided **non-goals** for the
+current wave. Each is recorded — with its handling and restart condition — in
+the 「还未实现的功能」 table of [`../tracing/agent.md`](../tracing/agent.md)
+(the canonical Agent contract); they are surfaced to users in
+[`docs/commands/agent.md`](../../commands/agent.md) and in the `agent` row of
+[`COMPATIBILITY.md`](../../../COMPATIBILITY.md):
 
-- `src/main.rs`: binary entry point.
-- `src/lib.rs`: embedding API (`exec`, `exec_async`) and public re-exports.
-- `src/cli.rs`: clap root grammar, global output flags, repository preflight, and
-  command dispatch.
-- `src/command/`: one module per `libra <subcommand>`, including Git-compatible
-  commands (`init`, `clone`, `add`, `commit`, `push`, `pull`, `status`, `log`,
-  `show`, `diff`, `branch`, `switch`, `checkout`, `merge`, `rebase`, `stash`,
-  `worktree`, etc.) and Libra-only commands (`code`, `code-control`, `agent`,
-  `automation`, `usage`, `graph`, `sandbox`, `cloud`, `publish`, `db`).
-- `src/internal/ai/`: AI runtime, providers, tools, MCP, session storage,
-  permissions, sandboxing, context budget, goal mode, orchestration, skills, and
-  web projections.
-- `src/internal/tui/`: terminal UI for `libra code`.
-- `src/internal/model/`: Sea-ORM models.
-- `src/internal/protocol/`: Git, HTTPS, SSH, LFS, and local protocol clients.
-- `src/internal/publish/`: publish snapshot/export pipeline.
-- `src/utils/`: object/path/storage/output/test helpers, tiered storage,
-  worktree utilities, pager support, and stable CLI error types.
-- `sql/`: SQLite bootstrap schemas and migrations; `sql/publish/` is the publish
-  Worker schema.
-- `tests/`: integration tests. `tests/INDEX.md` is the authoritative index of
-  every cargo `--test` target.
-- `tests/command/`: per-command integration suites and shared command helpers.
-- `tests/compat/`: cross-command compatibility guards that must also be
-  registered as `[[test]]` entries in `Cargo.toml`.
-- `docs/commands/`: user-facing command docs, kept in sync with the CLI surface.
-- `COMPATIBILITY.md`: compatibility matrix guarded by tests.
-- `.github/workflows/`: CI gates. `base.yml` is the main PR gate.
+1. **`agent add`/`remove` `--local-dev` / `--force`** — unpublished; canonical
+   `status` / `enable` / `disable` (+ `add` / `remove` aliases) only. If
+   implemented, each must hang on both the canonical verb and its alias.
+2. **Provider-specific transcript compaction/reassemble trait** — deferred parity
+   on top of the landed manifest-relative chunking (no provider-specific
+   compactor yet).
+3. **Optional capability traits** (`ProtectedFilesProvider`, `TranscriptCompactor`,
+   `HookResponseWriter`, `RestoredSessionPathResolver`, …) beyond the landed
+   `DeclaredAgentCaps` set — no public behavior yet.
+4. **External-RPC method family beyond the v2 `info`/capability gate** —
+   undeclared capabilities stay fail-closed.
+5. **Non-first-batch supported roster** — `gemini` / `cursor` / `copilot` /
+   `factory-ai` stay `supported=false` (unsupported, not hook-installable, not
+   launchable) and are omitted from `agent list` entirely; the first batch is
+   `claude-code` / `codex` / `opencode`. The omission is pinned by
+   `tests/command/agent_roster_test.rs::agent_roster_surface`; the unsupported
+   registry classification stays pinned by
+   `tests/compat/agent_capability_matrix_pin.rs`.
 
-## Languages and defaults
+## Historical import contract
 
-- Rust edition: 2024.
-- Primary runtime: Tokio.
-- CLI parsing: clap derive in `src/cli.rs` and `src/command/*`.
-- Database: SQLite through Sea-ORM.
-- Serialization: serde and serde_json.
-- Logging/diagnostics: tracing and user-facing `CliError`/`CliResult`.
-- Frontend: Next.js 16, React 19, TypeScript, Tailwind CSS, pnpm.
-- Prefer existing helpers and local patterns over new abstractions. In particular,
-  use `src/utils/`, `src/internal/db.rs`, command test helpers, and AI runtime
-  helper APIs where they already model the behavior being changed.
-
-## Rust coding rules
-
-- Run `cargo +nightly fmt --all` formatting. `rustfmt.toml` groups imports as
-  standard, external, then crate imports.
-- CI treats clippy warnings as failures:
-  `cargo clippy --all-targets --all-features -- -D warnings`.
-- Avoid wildcard imports except in tests.
-- Prefer `anyhow::Result`/`anyhow::Context` for CLI flows and `thiserror` for
-  domain/library errors. User-facing errors must say what failed, which resource
-  was affected, and what the user can do next.
-- Production code must not use `unwrap()`, `expect()`, or `panic!()` unless the
-  case is obviously infallible and has a short `// INVARIANT:` comment. This
-  applies to startup and initialization paths too. Tests may use them.
-- When adding public enum contracts under `src/internal/ai/agent_run/`, preserve
-  additive compatibility with `#[non_exhaustive]` where the existing guard expects
-  it.
-- Respect the repository object format. Libra supports `sha1` and `sha256` via
-  `core.objectformat`; do not hard-code 20-byte object IDs.
-- Keep hot paths streaming and bounded. Avoid unbounded directory walks, retries,
-  buffers, allocations, or network calls in command paths unless clearly justified.
-- Do not log secrets, tokens, provider keys, vault material, full authorization
-  headers, or sensitive AI transcript details. Use existing redaction utilities.
-
-## Build and test commands
-
-Use `LIBRA_SKIP_WEB_BUILD=1` for Rust-only iteration when the embedded Code UI is
-not the subject of the change.
-
-```bash
-cargo +nightly fmt --all --check
-LIBRA_SKIP_WEB_BUILD=1 cargo clippy --all-targets --all-features -- -D warnings
-LIBRA_SKIP_WEB_BUILD=1 cargo test --all
-cargo run -- <cmd>
-```
-
-Feature-gated Rust tests:
-
-```bash
-cargo test --features test-network --test network_remotes_test
-cargo test --features test-live-ai --test ai_agent_test --test ai_chat_agent_test -- --test-threads=1
-cargo test --features test-live-cloud --test cloud_storage_backup_test --test publish_live_test --test storage_r2_test -- --test-threads=1
+The active DR-05/M4 contract is implemented by `libra agent import` and is
+specified canonically in [`../tracing/agent.md`](../tracing/agent.md): explicit
+consent before content access/export, provider-root descriptor authorization,
+typed redaction before persistence, current-repository ownership, coverage
+claim + import identity fencing, and local erase tombstones. The default
+`agent list --json` remains schema v1; callers opt into the method matrix with
+`--schema-version 2`. Batch limits charge bytes actually read from the held
+source even when a candidate later fails validation, and the absolute deadline
+begins before discovery, bounds reservation/object/CAS work, and releases every
+owned uncommitted import lease on expiry. Transaction commit awaits are not
+cancelled: the deadline is checked immediately before commit and the resulting
+success is authoritative even if observation finishes after the deadline. A
+failed abandonment is chained into the surfaced error with a doctor-repair hint.
+Repository ownership is the canonical shared Libra
+storage identity, so sibling linked worktrees are accepted while cross-repo
+sources remain rejected. Import attempt markers are created in the reservation
+transaction; live, export, and subagent writers use the same fail-closed
+pre-object registration. The effective per-source read cap is
+`min(agent.max_transcript_read_bytes, 16 MiB)`; explicit larger settings emit
+the actual effective value. Discovery traversal/open and held-descriptor file
+reads run in private, kill-on-timeout helper processes wrapped by the command's
+absolute deadline. Provider roots are
+opened component-by-component; Claude sources and each nested Codex date
+directory are opened relative to pinned no-follow descriptors before consent. Each new OID is added
+as a durable provisional preclaim before its loose-object write, but becomes
+deletion-eligible only after this writer wins publication and records it in
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [libra-tools/libra](https://github.com/libra-tools/libra) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
