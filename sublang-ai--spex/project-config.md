@@ -15,4 +15,4 @@ description: - Canonical specs live in @specs/.
 
 ---
 > Source: [sublang-ai/spex](https://github.com/sublang-ai/spex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
