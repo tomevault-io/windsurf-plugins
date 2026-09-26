@@ -90,4 +90,4 @@ Verify using external signals. Self-assessment is unreliable; these tools are th
 
 ---
 > Source: [Dking08/croc-app](https://github.com/Dking08/croc-app) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
