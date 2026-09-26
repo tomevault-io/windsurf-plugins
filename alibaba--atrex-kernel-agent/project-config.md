@@ -1,106 +1,46 @@
 ---
 trigger: always_on
-description: In an AKA campaign, use the enabled `gpu-wiki.query` plugin through
+description: This file defines hard behavioral constraints for the optimization workflow.
 ---
 
-# GPU Wiki Agent Entry
+# GPU Kernel Optimizer — Agent Constraints
 
-In an AKA campaign, use the enabled `gpu-wiki.query` plugin through
-`python3 tools/plugin.py call gpu-wiki.query --input wiki_request.json`.
-The input is a JSON object with a `request` string and optional `max_records`, `max_bytes`,
-and `exclude`. Follow the campaign's injected plugin instructions. The direct commands below
-remain available for standalone Wiki maintenance and queries.
+This file defines hard behavioral constraints for the optimization workflow.
+The full multi-cycle workflow and terminal handoff are defined in `orchestrator/prompts/episode.md`.
 
-Read `README.md` first. This wiki is **two independent JSON record stores**, and
-which one to ask depends on whether a benchmark could prove the answer wrong.
+## Framework Guidance
 
-**Default door — describe your situation, do not compose a query.**
-`python3 gpu-wiki/tools/query_nl.py "<prose>"` parses AKA's standard request
-format deterministically; other prose gets one store-blind intent extraction by
-`query_bridge_agent`. Deterministic code then resolves operator aliases and
-components, queries isolated lanes, safely widens, and returns payloads keyed by
-stable record id. The bridge cannot invoke either query tool or carry a record.
+- **The V0 baseline is a pure-PyTorch reference wrapper** (correct + directly submittable), NOT yet in any optimized DSL. Migrating the body of `run()` from PyTorch to the `--framework` DSL is the *suggested* first lever of the optimization loop — do it in an early iteration, and update `solution.json` `spec.languages`/`dependencies` in the same iteration so the harness benches the real kernel.
+- The `--framework` value is a **recommended optimization direction**, not a hard constraint. Sessions MAY use a different DSL or mixed approaches if evidence shows a better performance path.
+- Preinstalled third-party helper libraries may be used, but the campaign environment is immutable: never
+  install or locally build a package. If a library is unavailable, use existing tooling or record a blocker.
+- `triton` and `gluon` belong to the same framework family (`triton/gluon`). When either is specified, both are acceptable implementation targets.
+- When Triton-level optimization plateaus, the orchestrator latches a mandatory Triton→Gluon episode directive. The episode derives layouts from TTGIR, repairs the lowering through correctness and performance parity, and later episodes remain in Gluon. Do not hand-trigger conversion before the directive is active.
 
-Every call independently attempts both `gpu_wiki` and `internal_gpu_wiki`. A missing
-directory, the tracked `SOURCE.txt` placeholder alone, an incomplete interface, or a
-zero-result lookup makes only that module empty. Internal results use
-`internal_gpu_wiki::<stable-id>` and each record declares its `store`, preserving
-strict store and payload isolation.
+## Benchmark Harness Integrity
 
-```bash
-python3 gpu-wiki/tools/query_nl.py "fused RMSNorm in triton on sm_100. ncu says 75% of
-    DRAM peak so it is bandwidth bound. Is fusing the passes a known dead end here, and
-    how does triton express the row reduction on this part?" --brief
-python3 gpu-wiki/tools/query_nl.py --file request.txt --max-bytes 20000
-```
+- **No hacking the evaluation script for performance.** Do NOT modify, monkey-patch, subclass, shadow, or otherwise subvert `test_kernel.py` — nor any other file/module the evaluator loads (`sol-execbench`, `torch.cuda.Event`/`time` shims, RNG/seeding utilities, the timing loop, the comparison/tolerance check) — to make a slower kernel *look* faster or to make an incorrect result *pass*. Any speedup must come from a faster `run()` on **arbitrary** inputs — not from gaming the measurement.
+- **test_kernel.py is immutable for performance measurement**: DO NOT modify `test_kernel.py` to change the benchmark harness (e.g., warmup count, repetition count, `return_mode`, timing method, input shapes, or any other benchmark parameter) in order to obtain better performance numbers.
+- `test_kernel.py` defines the ground-truth benchmark methodology. Any change to it invalidates cross-version comparisons.
+- If a measurement methodology issue is discovered (e.g., outlier inflation, incorrect return mode), report it in `memory/v<N>.json` under `pitfalls_and_fixes` and propose the fix — but DO NOT apply the fix to `test_kernel.py` within an optimization iteration.
+- **Validate + bench ONLY via `python test_kernel.py`** — it runs the real `sol-execbench` evaluator over EVERY workload in `workload.jsonl` (the full ground-truth shape set) with each workload's own tolerance. Never hand-roll a correctness test, bench a single "representative" shape, or edit the harness. A PASS here == a directly submittable solution.
+- **The optimization objective is `performance.performance_score`.** Every route computes one speedup per shape and maximizes their arithmetic mean. Native Atrex-Bench uses each shape's authoritative metadata production latency as its baseline; SOL uses the evaluator's reference implementation as its baseline. Per-workload latency remains in `performance.latency_us_by_shape` for diagnosis. A version is committable only if all workloads pass and the score improves vs HEAD beyond noise.
+- **The SOL ground-truth files are immutable**: never edit `definition.json`, `reference.py`, or `workload.jsonl`. Edit `kernel.py` (DPS `run()`; args = definition.inputs then definition.outputs); update `solution.json` only when languages/dependencies/entry_point change.
+- **`profile_driver.py` is the immutable profiling entry point** — profilers run `python <file>`, and `kernel.py` is import-only, so profile `profile_driver.py`, never `kernel.py`. It is a protected path: choose what it drives with `PROFILE_ITERS` / `PROFILE_WARMUP` / `PROFILE_WORKLOAD_IDX` / `PROFILE_SHAPE_ID` instead of editing it, and do NOT add a `__main__` profiling block to `kernel.py` — an in-kernel entry is silently lost the next time `run()` is rewritten, leaving the profiler to capture nothing while still exiting 0. When it genuinely cannot express the case, add a fallback driver under `profiles/<dir>/harness/` and profile that file.
 
-Say which parts of your description are measured and which are still guesses — that
-is what decides whether the bridge spends the symptom axis. Give the architecture the
-runtime reported. Also state the separate true public product and explicitly request its
-full hardware spec plus relevant architecture/ISA facts, so the same call can return both stores.
-Do not pre-compress into keywords.
+### Generalized Atrex-Bench problems
 
-Read each record's `source`, `type`, `match.arch`, and isolated `payload`, plus
-deterministic `notes`. Evidence and bridge commentary are not served.
-
-For attribution, copy the response's top-level `query_id` and each materially
-used record's own canonical `wiki_id`; never reconstruct either value from prose
-or from the backward-compatible mapping key.
-
-When a returned record materially informs an optimization decision, preserve the
-emitted `query_id` and canonical `wiki_id` in that experiment's existing journal
-append. Retrieval alone does not count as adoption: use `no_material_use` when a
-query was considered but not used, and never copy payload text into attribution.
-This repository persists the compact evidence in the experiment journal. Any
-projection into canonical memory belongs to the consuming integration and is
-outside this repository; the agent must not write a separate Wiki log or modify
-`memory/vN.json` itself.
-
-**Experience, addressed directly** (`kernel_wiki/records/`) — ranked, scoped search,
-for when you already know the exact address. Query it with
-`python3 gpu-wiki/tools/query_wiki.py` using explicit `--arch` / `--vendor` /
-`--dsl` filters before broad grep. `--arch` takes whatever the runtime
-reported (`sm_90`, `sm_100`, `gfx942`, `h20`, `b300`, `mi300x`) or the family
-name (`hopper`, `blackwell`, `cdna3`, ...).
-
-**Check `--coverage` before filtering on `--type`.** The type axis looks like the one
-that expresses intent, and it is the one that most often returns zero on a subject
-the store covers well: in one store `strategy` is 81% of the records for an
-architecture while the types the docs name are about 4%, and callers who led with
-`--type anti-strategy` concluded the store was empty on operators it documents
-thoroughly. A "known dead end" is frequently prose inside a `strategy` record.
-
-```bash
-python3 gpu-wiki/tools/query_wiki.py --arch sm_100 --dsl triton --coverage
-python3 gpu-wiki/tools/query_wiki.py --symptom register-pressure --arch blackwell --brief --limit 2
-python3 gpu-wiki/tools/query_wiki.py --list-arch          # also --list-dsl --list-type --list-symptoms
-python3 gpu-wiki/tools/query_wiki.py --list-family --like gemm   # filter a long vocabulary
-```
-
-Scope is a hard boundary and unknown filter values fail closed. A zero-match
-query returns a **labelled random sample** of the scoped pool — never read it as
-advice about what you asked, and never drop `--arch` to make an empty result
-look successful.
-
-**Facts** (`hardware_wiki/records/`) — exact lookup, fail-loud. Peaks,
-capacities, ISA and feature definitions:
-
-```bash
-python3 gpu-wiki/tools/query_hardware.py --product b200 --field peak_compute.bf16.dense
-python3 gpu-wiki/tools/query_hardware.py --list products   # b200 b300 mi300x mi308x mi355x sm120
-```
-
-A recognized but unrecorded part (`h20`, `h100`, `a100`) exits **4** with a
-disposition: obtain the number from runtime device attributes or the vendor
-datasheet for that exact part. Never substitute another part's numbers — a wrong
-peak silently rescales every utilization figure derived from it.
-
-After changing records, the index, or the tools, run:
-
-```bash
+- When `agent_problem.json` exists, it is the authoritative public contract. Optimize across its
+  complete `shape_domain`; use aggregate distribution shares only to prioritize common paths.
+- Exact `shapes.json`, evaluator metadata, and per-case roofline inputs are private. Do not search
+  outside the workspace for the source operator directory or reconstruct hidden cases.
+- Profile a real evaluator case by selecting an opaque id from canonical
+  `memory/vN.json.performance.latency_us_by_shape` with `PROFILE_SHAPE_ID`. The sandbox injects only
+  that selected case into the ephemeral remote profile workspace; the driver removes its private JSON
+  before importing candidate code. Profile multiple ids when distinct performance regimes matter.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [alibaba/atrex-kernel-agent](https://github.com/alibaba/atrex-kernel-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
