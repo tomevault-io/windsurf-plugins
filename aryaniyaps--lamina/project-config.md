@@ -1,155 +1,91 @@
 ---
 trigger: always_on
-description: Outline is a fast, collaborative knowledge base built for teams. It's built with React and TypeScript in both frontend and backend, uses a real-time collaboration engine, and is designed for excellent performance and user experience. The backend is a Koa server with an RPC API and uses PostgreSQL and Redis. The application can be self-hosted or used as a cloud service.
+description: Guidelines for using modern TypeScript features (v5.0-v5.8)
 ---
 
-Outline is a fast, collaborative knowledge base built for teams. It's built with React and TypeScript in both frontend and backend, uses a real-time collaboration engine, and is designed for excellent performance and user experience. The backend is a Koa server with an RPC API and uses PostgreSQL and Redis. The application can be self-hosted or used as a cloud service.
 
-There is a web client which is fully responsive and works on mobile devices.
+# TypeScript Coding Guidelines & Modern Features (v5.0 - v5.8)
 
-**Monorepo Structure:**
+When writing TypeScript code, prioritize using modern features and best practices introduced in recent versions (up to 5.8).
 
-- **`app/`** - React web application with MobX state management
-- **`server/`** - Koa API server with Sequelize ORM and background workers
-- **`shared/`** - Shared TypeScript types, utilities, and editor components
-- **`plugins/`** - Plugin system for extending functionality
-- **`public/`** - Static assets served directly
-- **Various config files** - TypeScript, Vite, Vitest, oxfmt, Oxlint configurations
+## Global Themes Across 5.x
 
-Refer to /docs/ARCHITECTURE.md for detailed architecture documentation.
+1. **Standard decorators are here; legacy decorators are legacy.**
+   New TC39-compliant decorators landed in 5.0 and were extended in 5.2 (metadata). Old `experimentalDecorators`-style behavior is still supported but should be treated as legacy.
 
-## Instructions
+2. **Type system is more precise and less noisy.**
+   Major work went into narrowing, control flow analysis, error messages, and new helpers like `NoInfer`, inferred predicates, and better `undefined`/`never`/uninitialized checks.
 
-You're an expert in the following areas:
+3. **Module / runtime interop has been modernized.**
+   Options like `--moduleResolution bundler`, `--module nodenext`/`node18`, `--rewriteRelativeImportExtensions`, `--erasableSyntaxOnly`, and `--verbatimModuleSyntax` are about playing nicely with ESM, Node 18+/22+, direct TypeScript execution, and bundlers.
 
-- TypeScript
-- React and React Router
-- MobX and MobX-React
-- Node.js and Koa
-- Sequelize ORM
-- PostgreSQL
-- Redis
-- HTML, CSS and Styled Components
-- Prosemirror (rich text editor)
-- WebSockets and real-time collaboration
+4. **The standard library keeps tracking modern JS.**
+   Support for new ES features (iterator helpers, `Object.groupBy`/`Map.groupBy`, new Set/ES2024 APIs) shows up as type declarations and sometimes extra checks (regex syntax checking, etc.).
 
-## General Guidelines
+When generating or refactoring code, prefer these newer idioms, and avoid patterns that conflict with updated checks.
 
-- Critical – Do not create new markdown (.md) files.
-- Use early returns for readability.
-- Emphasize type safety and static analysis.
-- Follow consistent oxfmt formatting.
-- Do not replace smart quotes ("") or ('') with simple quotes ("").
-- Do not add translation strings manually; they will be extracted automatically from the codebase.
+## Modern Features to Utilize
 
-## Dependencies and Upgrading
+### Type System & Inference
+- **`const` Type Parameters (5.0)**: Use `const` type parameters for more precise literal inference.
+  ```typescript
+  declare function names<const T extends string[]>(...names: T): void;
+  ```
+- **`@satisfies` Operator (5.0)**: Use `satisfies` to validate types without widening them.
+- **Inferred Type Predicates (5.5)**: Allow TypeScript to infer type predicates for functions that filter arrays or check types, reducing the need for explicit `is` return types.
+- **`NoInfer` Utility (5.4)**: Use `NoInfer<T>` to block inference for specific type arguments when you want them to be determined by other arguments.
+- **Narrowing**:
+  - **Switch(true) (5.3)**: Utilize narrowing in `switch(true)` blocks.
+  - **Boolean Comparisons (5.3)**: Rely on narrowing from direct boolean comparisons.
+  - **Closures (5.4)**: Trust preserved narrowing in closures when variables aren't modified after the check.
+  - **Constant Indexed Access (5.5)**: Use constant indices to narrow object/array properties.
 
-- Use yarn for all dependency management.
-- After updating dependency versions, install to update lockfiles:
+### Syntax & Control Flow
+- **Decorators (5.0)**: Use standard ECMAScript decorators (Stage 3).
+- **`using` Declarations (5.2)**: Use `using` for explicit resource management (Disposable pattern) instead of manual cleanup.
+  ```typescript
+  using resource = new Resource();
+  ```
+- **Import Attributes (5.3/5.8)**: Use `with { type: "json" }` for import attributes. Avoid the deprecated `assert` syntax.
+- **`switch` Exhaustiveness**: Rely on TypeScript's exhaustiveness checking in switch statements.
 
-```bash
-yarn install
-```
+### Modules & Imports
+- **`verbatimModuleSyntax` (5.0)**: Respect this flag by using `import type` explicitly when importing types to ensure they are erased during compilation.
+- **Type-Only Imports with Extensions (5.2)**: You can use `.ts`, `.mts`, `.cts` extensions in `import type` statements.
+- **`resolution-mode` (5.3)**: Use `import type { Type } from "mod" with { "resolution-mode": "import" }` if needed for specific module resolution contexts.
+- **JSDoc `@import` (5.5)**: Use `@import` tags in JSDoc for cleaner type imports in JS files if working in a mixed codebase.
 
-- When adding a `resolutions` entry to address a security advisory in a transitive dependency, target only the specific vulnerable descriptors using the `name@npm:<range>` syntax rather than overriding the package globally. Inspect `yarn.lock` to find the exact ranges requested by upstream packages and add one entry per vulnerable range, e.g.:
+### Standard Library & Built-ins
+- **Iterator Helpers (5.6)**: Use new iterator methods (map, filter, etc.) if targeting modern environments.
+- **Set Methods (5.5)**: Utilize new `Set` methods like `union`, `intersection`, etc., when available.
+- **`Object.groupBy` / `Map.groupBy` (5.4)**: Use these standard methods for grouping instead of external libraries like Lodash when appropriate.
+- **`Promise.withResolvers` (5.7)**: Use `Promise.withResolvers()` for creating promises with exposed resolve/reject functions.
 
-```json
-"resolutions": {
-  "qs@npm:^6.5.2": "^6.14.2",
-  "qs@npm:^6.11.0": "^6.14.2",
-  "qs@npm:^6.14.0": "^6.14.2"
-}
-```
+### Configuration & Tooling
+- **`--moduleResolution bundler` (5.0)**: Assume this resolution strategy for modern web projects (Vite, Next.js, etc.).
+- **`--erasableSyntaxOnly` (5.8)**: Be aware of this flag; avoid TypeScript-specific syntax that cannot be simply erased (like `enum`s or `namespaces`) if the project aims for maximum compatibility with tools like Node.js's `--strip-types`. Prefer `const` objects or unions over `enum`s if requested.
 
-This keeps overrides scoped to the affected dependents and avoids forcing unrelated consumers onto an incompatible version.
+## Specific Coding Patterns
 
-## TypeScript Usage
+### Arrays & Collections
+- Use **Copying Array Methods (5.2)** (`toSorted`, `toSpliced`, `with`) for immutable array operations.
+- **TypedArrays (5.7)**: Be aware that TypedArrays are now generic over `ArrayBufferLike`.
 
-- Use strict mode.
-- Avoid "unknown" unless absolutely necessary.
-- Never use "any".
-- Prefer type definitions; avoid type assertions (as, !).
-- Always use curly braces for if statements.
-- Avoid # for private properties.
-- Prefer interface over type for object shapes.
+### Classes
+- **Parameter Decorators (5.0/5.2)**: Use modern standard decorators.
+- **`super` Property Access (5.3)**: Avoid accessing instance fields via `super`.
 
-## Classes & Code Organization
+### Error Handling
+- **Checks for Never-Initialized Variables (5.7)**: Ensure variables are initialized before use to avoid new errors.
 
-### Class Member Order
-
-1. Public static variables
-2. Public static methods
-3. Public variables
-4. Public methods
-5. Protected variables & methods
-6. Private variables & methods
-
-### Exports
-
-- Exported members must appear at the top of the file.
-- Always use named exports for new components & classes.
-- Document ALL public/exported functions with JSDoc.
-
-## React Usage
-
-- Use functional components with hooks.
-- Event handlers should be prefixed with "handle", like "handleClick" for onClick.
-- Avoid unnecessary re-renders by using React.memo, useMemo, and useCallback appropriately.
-- Use descriptive prop types with TypeScript interfaces.
-- Do not import React unless it is used directly.
-- Use styled-components for component styling.
-- Ensure high accessibility (a11y) standards using ARIA roles and semantic HTML.
-
-## MobX State Management
-
-- Use MobX stores for global state management.
-- Keep stores in `app/stores/`.
-- Use `observable`, `action`, and `computed` decorators appropriately.
-- Prefer computed values over manual calculations in render.
-- Keep business logic in stores, not components.
-
-## Database & ORM
-
-- Use Sequelize models in `server/models/`.
-- Generate migrations with Sequelize CLI:
-
-```bash
-yarn sequelize migration:create --name=add-field-to-table
-```
-
-- Run migrations with `yarn db:migrate`.
-- Use transactions for multi-table operations.
-- Add appropriate indexes for query performance.
-- Always handle database errors gracefully.
-
-## API Design
-
-- RESTful endpoints under `/api/`.
-- Authentication endpoints under `/auth/`.
-- Use consistent error responses.
-- Validate request data using the validation middleware and schemas
-- Use presenters to format API responses.
-- Keep API routes thin, use model methods for business logic, or commands if logic spans multiple models.
-
-## Authentication & Authorization
-
-- JWT tokens for authentication.
-- Policies in `server/policies/` for authorization.
-- Use cancan-style ability checks.
-- Use authenticated middleware for protected routes.
-- Always verify user permissions before data access.
-
-## Real-time Collaboration
-
-- WebSocket connections for real-time updates.
-- Use Y.js for collaborative editing.
-- Handle connection state changes gracefully.
-
-## Documentation
+## Deprecations to Avoid
+- Avoid `import ... assert` (use `with`).
+- Avoid implicit `any` returns in `undefined`-returning functions (though 5.1 makes this easier, explicit is better).
+- Avoid `enum`s if the project prefers erasable syntax (5.8).
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aryaniyaps/lamina](https://github.com/aryaniyaps/lamina) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
