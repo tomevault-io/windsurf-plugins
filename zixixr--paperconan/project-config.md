@@ -96,4 +96,4 @@ recipe for measuring it is given instead of the figure — see the last rule for
 
 ---
 > Source: [zixixr/paperconan](https://github.com/zixixr/paperconan) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
