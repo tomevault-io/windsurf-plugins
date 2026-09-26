@@ -1,90 +1,85 @@
 ---
 trigger: always_on
-description: transforms do) — they take Unreal-native units.
+description: Unreal natively uses **centimeters**, **degrees**, and a **left-handed** coordinate system.
 ---
 
-# AGENTS.md — Tempo
+# Units and Coordinates
 
-Orientation for AI agents (and humans) working in this repository. Read this before making changes.
+Unreal natively uses **centimeters**, **degrees**, and a **left-handed** coordinate system.
+Robotics does not. Tempo converts between the two at the API boundary so your client code stays
+in the convention it expects.
 
-> Tempo is a collection of **Unreal Engine 5.6 / 5.7 / 5.8** plugins that turn Unreal into a
-> programmable simulator for robotics and autonomy. It is not an application — it is a set
-> of plugins that live in a host project's `Plugins/` directory (the reference host is
-> [TempoSample](https://github.com/tempo-sim/TempoSample)). The current working directory
-> is `.../<Project>/Plugins/Tempo`.
-
----
-
-## 1. What Tempo is
-
-Tempo exposes Unreal to external clients (Python / Rust / C++ / ROS 2) so they can drive a
-simulation deterministically: control time, spawn and configure actors, command vehicles,
-and stream synthetic sensor data. The design goal is to make Unreal's rendering and world
-simulation accessible behind a clean, code-generated, language-agnostic API.
-
-The two pillars to understand first:
-
-1. **A gRPC server inside the engine.** `TempoCore` hosts one `FTempoServer` (default port
-   `10001`). Every plugin registers RPC services on it. Clients talk to the sim over gRPC.
-2. **A code-generation pipeline.** `.proto` files are the source of truth. A pre-build step
-   compiles them into C++ stubs *and* ergonomic Python / Rust client libraries. You almost
-   never hand-write client code or wire serialization.
-
----
-
-## 2. Plugin map
-
-Each top-level `Tempo*` directory is an Unreal plugin (`<Name>/<Name>.uplugin`,
-`<Name>/Source/<Module>/`). Source files: ~ values exclude vendored third-party.
-
-| Plugin | Purpose | Depends on |
+| | Unreal internal | Tempo API |
 |---|---|---|
-| **TempoCore** | gRPC server, time control (pause/play/step, wall-clock vs fixed-step), settings, subsystem base classes, the proto→client codegen, vendored gRPC. The foundation everything else builds on. | — |
-| **TempoSensors** | Synthetic sensors: camera (RGB / depth / semantic+instance labels / 2D bounding boxes / H.264 video) and lidar (point clouds, per-beam calibration, reflectivity). Multi-tile wide-FOV / fisheye lens models, GPU readback, streaming. | TempoCore, AV/NV/AMF/WMF/VT codecs |
-| **TempoWorld** | World manipulation by reflection: spawn/destroy actors & components, get/set *any* `UProperty`, query actor state (pose/velocity/bounds), overlaps, raycasts. | TempoCore |
-| **TempoMovement** | Drive pawns/vehicles: normalized throttle/steer (open-loop), velocity/acceleration commands (closed-loop), kinematic bicycle/unicycle + Chaos vehicle models, AI move-to. | TempoCore |
-| **TempoAgents** | Large-scale traffic/crowd agents on Unreal **Mass** (ECS) + **ZoneGraph**; StateTree behaviors; gRPC map-query service (lanes, zones, traffic-light state). | TempoCore, External/Traffic, External/ZoneGraph |
-| **TempoGeographic** | Georeferencing (WGS84 ↔ Unreal cartesian), sim date/time, sun position. | TempoCore |
-| **TempoPCG** | Custom Procedural Content Generation nodes (runtime grass LOD, debris scatter). | TempoCore |
-| **TempoROS** | Native ROS 2 (rclcpp) embedded in Unreal — no external bridge process. Vendors a large ROS tree (~thousands of files) under `Source/ThirdParty/rclcpp`. Custom `.msg`/`.srv` codegen. *Optional.* | — |
-| **TempoROSBridge** | Maps Tempo gRPC services ↔ ROS topics/services. One submodule per domain (Core/Sensors/Movement/Geographic). *Optional; remove to run without ROS.* | TempoROS + the bridged plugin |
+| Distance | centimeters | **meters** |
+| Angle | degrees | **radians** |
+| Handedness | left-handed | **right-handed** |
 
-`External/` holds **vendored / forked Epic plugins**: `Traffic` (MassTraffic sample),
-`ZoneGraph`, `RuleProcessor` (PointCloud). Treat these as third-party — they have their own
-conventions and the only existing automation tests in the repo (in `RuleProcessor`). Don't
-restyle them to match Tempo.
+Velocities follow: linear in m/s, angular in rad/s.
 
----
+This applies to actor and component transforms, world state, sensor poses, movement commands,
+lidar azimuths and elevations, and geographic coordinates.
 
-## 3. The core architecture pattern (RPC services)
+## The exception: `set_*_property` { #the-exception-set_property }
 
-This is the single most important pattern. Every client-facing capability is an RPC service
-implemented by a UE **subsystem** that registers handlers on the gRPC server.
+The property setters in [TempoWorld](../plugins/tempo-world.md#getting-and-setting-properties)
+reach *arbitrary* `UPROPERTY` values through Unreal's reflection system. Tempo cannot know
+whether a given `float` or `FVector` represents a distance, a ratio, a gain, or a color channel —
+so for those it does not guess.
 
-**Flow:** `client stub → gRPC channel (:10001) → FTempoServer completion queue → handler delegate on a UObject subsystem → ResponseDelegate → client`
+| Property type | Converted? |
+|---|---|
+| `set_rotator_property`, `set_quat_property` | :material-check: radians/right-handed → degrees/left-handed |
+| `set_transform_property` | :material-check: location m → cm, rotation converted |
+| `set_float_property` | :material-close: raw — pass centimeters if it is a distance |
+| `set_vector_property`, `set_vector2d_property`, `set_int_vector_property`, `set_int_point_property` | :material-close: raw |
 
-To add or understand a service:
+`set_transform_property` is converted because a transform almost always represents a world-frame
+pose. A bare float or vector does not.
 
-1. **Proto** in `<Module>/Public/*.proto` or `Private/*.proto`. Conventions enforced by
-   `gen_protos.py`: package defaults to the module name; **RPC names must be unique within a
-   module** (the Python API is flattened per-module, no service prefix). Avoid Rust-keyword
-   field names (`type`, `match`, `move`) — use qualified names like `actor_type`.
-2. **Service provider**: a class implementing `ITempoServiceProvider`
-   (`TempoCore/.../TempoServiceProvider.h`) — usually a subsystem deriving one of Tempo's
-   base classes in `TempoSubsystems.h` (`UTempoGameWorldSubsystem`, etc., which guard against
-   CDO/duplicate instantiation).
-3. **Register** in `RegisterServices(FTempoServer&)` using `SimpleRequestHandler` (unary) or
-   `StreamingRequestHandler`, binding the generated `AsyncService::RequestXxx` to a member
-   function with signature
-   `void Handler(const ReqType&, const TResponseDelegate<RespType>&) const`.
-4. **Respond** by calling `ResponseContinuation.ExecuteIfBound(response, grpc::Status_OK)` —
-   may be deferred (async).
-5. The **codegen runs automatically** on the next build (PreBuildSteps in the `.uplugin`),
-   producing C++/Python/Rust clients.
+!!! warning "The practical consequence"
 
+    ```python
+    # Meters — set_actor_location is a first-class, unit-converted RPC.
+    tw.set_actor_location(actor="MyActor", location=Geometry.Vector(x=1.0, y=2.0, z=3.0))
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+    # Centimeters — RelativeLocation is a raw UProperty.
+    tw.set_vector_property(actor="MyActor", component="Mesh",
+                           property="RelativeLocation", x=100.0, y=200.0, z=300.0)
+    ```
+
+    Values you *read back* through `get_*_properties` are likewise Unreal-native and unconverted,
+    as are values returned by [`call_function`](../plugins/tempo-world.md#calling-functions).
+
+## Scale is unitless
+
+Every other `Vector` in the API is meters and right-handed, and is converted on the way in. A
+scale is a ratio, so its components are used exactly as given — negating Y to change handedness
+would mirror the object rather than re-express it.
+
+Scale is also never composed through `relative_to_actor`. Location and rotation are interpreted
+in the reference actor's frame; scale is always absolute. A non-uniform scale composed through a
+rotated frame does not survive as a transform, so applying the frame to it would quietly produce
+something you did not ask for.
+
+## Lidar sign convention
+
+`LidarScanSegment`'s `azimuths_rad` and `elevations_rad` are negated from Unreal's internal
+left-handed, Z-down convention, so client-side point-cloud math renders right-handed Z-up
+directly with no further correction.
+
+## ROS conversions
+
+The [TempoROS](../plugins/tempo-ros.md) converters do the same job for ROS message types. For
+example, `FVector` ⇄ `geometry_msgs::msg::Vector3` scales by 0.01 and negates Y, converting from
+Unreal's left-handed centimeters to ROS's right-handed meters.
+
+## Geographic frames
+
+Epic's GeoReferencing plugin is East-South-Up internally. Tempo composes a fixed −90° yaw
+correction so that `OriginRotation` presents **North-West-Up**, as documented. See
+[TempoGeographic](../plugins/tempo-geographic.md).
 
 ---
 > Source: [tempo-sim/Tempo](https://github.com/tempo-sim/Tempo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
