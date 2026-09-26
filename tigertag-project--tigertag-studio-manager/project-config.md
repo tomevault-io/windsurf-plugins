@@ -1,104 +1,325 @@
 ---
 trigger: always_on
-description: Every file read and grep costs tokens. Follow these rules on every task to keep context lean:
+description: Validates a Key6 API key and returns the associated user information.
 ---
 
-# Tiger Studio Manager — Claude reference
+# AGENT.md — TigerTag Inventory Web Page
 
-## ⚡ Token efficiency — read this first
+## Goal
 
-Every file read and grep costs tokens. Follow these rules on every task to keep context lean:
+Create a clean, single-page HTML application to manage a user's TigerTag inventory.
 
-| Do | Don't |
-|----|-------|
-| Read `CODEMAP.md` → jump to the exact line range | Read `inventory.js` from the top |
-| `grep -n "anchorFn"` → read only that range (`offset`/`limit`) | Read an entire 1000-line file to find one function |
-| Re-use content already in context this session | Re-read a file you read 2 messages ago |
-| `Read` with `offset`+`limit` to fetch the exact slice | `Read` without limits on files > 200 lines |
-| `Edit` with the minimal `old_string` that is unique | Rewrite whole sections when only 3 lines change |
-| Run `grep` + `Read` in parallel when targets are independent | Sequential read-then-grep round-trips |
-| Check `CODEMAP.md` line ranges before any `inventory.js` read | Blind grep across the 16 000-line file |
+The page must allow a logged-in user to:
 
-**Workflow for any `inventory.js` change:**
-1. `CODEMAP.md` → find section + anchor function name
-2. `grep -n "anchorFn"` → get exact line number
-3. `Read offset=N limit=40` → confirm context, draft edit
-4. `Edit` minimal diff
+1. Authenticate with Firebase.
+2. Generate or delete their Key6 API key.
+3. Verify a Key6 API key.
+4. Export their inventory as JSON.
+5. Display inventory items in a readable table.
+6. Test or update a spool weight using the public API.
+7. Optionally link an RFID UID to a spool through Firebase callable function `indexRfidForSpool`.
 
-**Workflow for any CSS change:**
-1. Identify the right file from the file map (00-base → 70-detail-misc)
-2. `grep -n "selector"` in that file → get line
-3. `Read offset=N limit=20` → confirm, then `Edit`
+This page is dedicated to **inventory management only**.
 
-> Warn the user when context is getting large (> ~60 k tokens used) so they can start a new session before quality degrades.
+Do not include TigerTag Manager media/image/file administration endpoints such as:
+- `UploadProductImg`
+- `DeleteProductImg`
+- `UploadFiles`
+- `uploadFilesLocal`
+- `DeleteFiles`
+- `UploadMedia`
+- `DeleteMedia`
 
-**Model fit — signal proactively, don't wait to be asked:**
-- **Simple task** (CSS tweak, i18n key, value change, short question) → suggest switching to **claude-haiku** or **claude-sonnet** to save tokens. Phrasing: *"This is a simple task — you can run it on Sonnet/Haiku to save tokens."*
-- **Complex task** (multi-file refactor, new system, multi-layer debugging, architecture) → if reasoning feels shallow or you keep making mistakes, ask to switch to **claude-opus**. Phrasing: *"This task is complex — switching to Opus will give a better result."*
-- Do not wait for the user to notice a problem: signal the mismatch as soon as it is obvious.
+Those endpoints are internal/backoffice tools and must not be exposed in this public inventory page.
 
 ---
 
-## 📋 WORKLOG.md — running change log
+## Base URLs
 
-`WORKLOG.md` at the repo root is the **single source of truth** for everything done since the last commit. It replaces memory and makes commit prep instant.
+Prefer the CDN domain for public usage:
 
-### Rule 1 — Update immediately after every change
-
-Do not batch updates. The moment you finish editing a file, append the entry to `WORKLOG.md`. If you delete something — write it in `Removed`. If you fix a bug in something you just added — merge into the existing entry. The log must reflect reality at all times.
-
-### File format
-
-```markdown
-# Worklog — vX.Y.Z (in progress)
-
-## Added
-- Short description — `file.js`, `file.css`
-
-## Changed
-- Short description — `file.js` (what and why)
-
-## Fixed
-- Bug description — `printers/bambulab/index.js`
-
-## Removed
-- What was deleted and why — `file.js`, `file.css`, i18n keys
-
-## i18n
-- Added: `key1`, `key2` — 9 locales
-- Removed: `oldKey1`, `oldKey2` — 9 locales
+```txt
+https://cdn.tigertag.io
 ```
 
-Rules:
-- One bullet = one logical change. Group sub-bullets under it if needed.
-- Always name the file(s) touched.
-- For removals: state **what** was removed, **why**, and **which files** it touched (JS + CSS + HTML + locales).
-- i18n section: always list keys by name, never just a count.
+Cloud Functions direct URL may be used only as fallback:
 
-### Rule 2 — Keep it clean as you go
+```txt
+https://us-central1-tigertag-connect.cloudfunctions.net
+```
 
-WORKLOG.md is a working draft, not a commit log. Apply these edits in real time:
+---
 
-- **Intermediate steps vanish.** If you added a feature and then changed it three times, the final entry describes the end state only — not the journey.
-- **Bugs in the same session collapse.** "Added X" + "Fixed X" → one "Added X (with fix for Y)" entry, not two.
-- **Reverts disappear entirely.** If you added something and then removed it in the same session, delete both entries — it never shipped, it has no place in the log.
-- **No implementation noise.** WORKLOG describes *what changed for the user / codebase*, not how Claude did it ("updated selector on line 42", "added guard in bambuConnect"). One sentence per logical change.
+## Useful Inventory Functions
 
-### Rule 3 — Synthesize at commit time
+### 1. `createAccessKey6`
 
-Before writing the `CHANGELOG.md` entry, do one final editorial pass on WORKLOG:
+Creates, rotates, or deletes the user's 6-character API key.
 
-1. **Merge related items.** Several "TigerPOD modal" entries → one grouped bullet with sub-items.
-2. **Drop ephemeral noise.** Version bump, llms.txt update, internal refactors with no user-visible effect → omit or fold into a single "internal" line.
-3. **User-facing language.** CHANGELOG is read by end users. Rewrite technical entries in plain language ("Bambu MQTT: fix _normState null return" → "Bambu Lab: printer state no longer resets to idle when receiving a status update mid-print").
-4. **Verify i18n delta.** Run `npm run i18n:check` — confirm key count matches WORKLOG before writing the CHANGELOG line.
+This endpoint requires a Firebase ID Token.
 
-### At commit time (3 steps, in order)
+#### Endpoint
 
-1. **Synthesize `WORKLOG.md`** (Rule 3 above) → write the new `CHANGELOG.md` entry
+```txt
+POST https://cdn.tigertag.io/createAccessKey6
+```
+
+#### Headers
+
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+Content-Type: application/json
+```
+
+#### Create Key Request
+
+```json
+{
+  "data": {
+    "action": "create",
+    "label": "inventory-web"
+  }
+}
+```
+
+#### Create Key Response
+
+```json
+{
+  "result": {
+    "success": true,
+    "key": "Tk237U",
+    "label": "inventory-web"
+  }
+}
+```
+
+#### Delete Key Request
+
+```json
+{
+  "data": {
+    "action": "delete"
+  }
+}
+```
+
+#### Delete Key Response
+
+```json
+{
+  "result": {
+    "success": true,
+    "message": "All API keys deleted (access disabled)"
+  }
+}
+```
+
+#### UI Requirements
+
+The page must provide:
+- a "Generate API Key" button;
+- a "Delete API Key" button;
+- a visible field showing the current generated key after creation;
+- a warning that deleting the key disables external access such as TigerScale.
+
+---
+
+### 2. `pingByApiKey`
+
+Validates a Key6 API key and returns the associated user information.
+
+#### Endpoint
+
+```txt
+GET https://cdn.tigertag.io/pingbyapikey?ApiKey=<KEY6>
+```
+
+Also support:
+
+```txt
+GET https://cdn.tigertag.io/pingByApiKey?ApiKey=<KEY6>
+```
+
+depending on Hosting rewrites.
+
+#### Example Request
+
+```bash
+curl "https://cdn.tigertag.io/pingbyapikey?ApiKey=Tk237U"
+```
+
+#### Success Response
+
+```json
+{
+  "success": true,
+  "uid": "xe1zTc8Op3dmV5mC9SfUnziuSaF2",
+  "displayName": "Benoît",
+  "message": "TigerTag API key valid"
+}
+```
+
+#### Error Response
+
+```json
+{
+  "success": false,
+  "reason": "invalid_api_key"
+}
+```
+
+#### UI Requirements
+
+The page must provide:
+- an input field for Key6;
+- a "Test API Key" button;
+- a status badge:
+  - green if valid;
+  - red if invalid;
+  - grey if untested.
+
+---
+
+### 3. `exportInventoryByApiKey`
+
+Exports the user's inventory as JSON.
+
+This endpoint requires:
+- a valid Key6 API key;
+- the Firebase Auth email of the user.
+
+#### Endpoint
+
+```txt
+GET https://cdn.tigertag.io/exportInventory?ApiKey=<KEY6>&email=<USER_EMAIL>
+```
+
+#### Example Request
+
+```bash
+curl "https://cdn.tigertag.io/exportInventory?ApiKey=Tk237U&email=user%40example.com"
+```
+
+#### Success Response
+
+The response is an object keyed by spool UID:
+
+```json
+{
+  "8396248126918784": {
+    "uid": 8396248126918784,
+    "measure_gr": 1000,
+    "container_weight": 232,
+    "weight_available": 519,
+    "material": "PLA",
+    "brand": "TigerTag",
+    "color_name": "Red"
+  },
+  "8396248126918785": {
+    "uid": 8396248126918785,
+    "measure_gr": 750,
+    "container_weight": 120,
+    "weight_available": 380
+  }
+}
+```
+
+#### Error Responses
+
+```json
+{
+  "success": false,
+  "reason": "missing_email"
+}
+```
+
+```json
+{
+  "success": false,
+  "reason": "email_mismatch"
+}
+```
+
+```json
+{
+  "success": false,
+  "reason": "invalid_api_key"
+}
+```
+
+#### UI Requirements
+
+The page must:
+- automatically use the logged-in Firebase user's email;
+- ask for the Key6 API key;
+- fetch the inventory;
+- render the inventory in a table;
+- show raw JSON in a collapsible `<details>` block;
+- allow refresh.
+
+Recommended table columns:
+- UID / spool ID
+- Material
+- Brand
+- Color
+- Weight available
+- Container weight
+- Measure / capacity
+- Last update
+- Actions
+
+Do not assume every field exists. Use graceful fallbacks such as `"-"`.
+
+---
+
+### 4. `setSpoolWeightByRfid`
+
+Updates the weight of a spool through the public API.
+
+Despite its name, the current implementation accepts the spool UID directly. The endpoint does not require Firebase login. It uses Key6.
+
+#### Endpoint
+
+```txt
+GET https://cdn.tigertag.io/setSpoolWeightByRfid?ApiKey=<KEY6>&uid=<SPOOL_ID>&weight=<RAW_WEIGHT>
+```
+
+#### Example Request
+
+```bash
+curl "https://cdn.tigertag.io/setSpoolWeightByRfid?ApiKey=Tk237U&uid=8396248126918784&weight=500"
+```
+
+#### POST Alternative
+
+```txt
+POST https://cdn.tigertag.io/setSpoolWeightByRfid
+```
+
+#### POST Headers
+
+```http
+Content-Type: application/json
+```
+
+#### POST Body
+
+```json
+{
+  "ApiKey": "Tk237U",
+  "uid": "8396248126918784",
+  "weight": 500
+}
+```
+
+#### Success Response
+
+```json
+{
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TigerTag-Project/TigerTag-Studio-Manager](https://github.com/TigerTag-Project/TigerTag-Studio-Manager) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
