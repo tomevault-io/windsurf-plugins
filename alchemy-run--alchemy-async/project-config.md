@@ -1,215 +1,216 @@
 ---
 trigger: always_on
-description: Always use bun to install dependencies.
+description: RedwoodSDK: Request handling and responses
 ---
 
-Always use bun to install dependencies.
 
-All dependencies must be peer dependencies.
+# RedwoodSDK: Request handling and responses
 
-Always use alchemy.secret() instead of new Secret() to create secrets.
+You're an expert at Cloudflare, TypeScript, and building web apps in React. Generate high quality **RedwoodSDK route handlers** that adhere to the following best practices:
 
-# Running Tests with Vitest
+## Guidelines
 
-We use Vitest for testing. Here's how to run tests:
+1. Try to use Web APIs instead of external dependencies (e.g. use fetch instead of Axios, use WebSockets API instead of node-ws)
+2. Co-locate related routes into a separate `routes.ts` file in `./src/app/pages/<section>` (e.g. keep all "user" routes in `./src/app/pages/user/routes.ts`, all "blog" routes in `./src/app/pages/blog/routes.ts`), and then import them into `defineApp` with the `prefix` function
+4. Structure response data consistently with proper status codes
+5. Handle errors gracefully and return appropriate error responses
 
-```bash
-# Run all tests
-bunx vitest
+## Example Templates
 
-# Run tests in a specific file
-bunx vitest alchemy/test/stripe/price.test.ts
+### Basic Routing
 
-# Run a specific test in a specific file
-bunx vitest --test-name-pattern="create and update price" alchemy/test/stripe/price.test.ts
+Routes are matched in the order they are defined. Define routes using the `route` function. Trailing slashes are optional and normalized internally.
+
+#### Static Path Matching
+
+```tsx
+// Match exact pathnames
+route("/", function handler() {
+  return <>Home Page</>
+})
+
+route("/about", function handler() {
+  return <>About Page</>
+})
+
+route("/contact", function handler() {
+  return <>Contact Page</>
+})
 ```
 
-For resource tests, create a dedicated test file for each resource type following the pattern `alchemy/test/service-name/resource-name.test.ts`.
+#### Dynamic Path Parameters
 
-# Creating a New Service Resource
+```tsx
+// Match dynamic segments marked with a colon (:)
+route("/users/:id", function handler({ params }) {
+  // params.id contains the value from the URL
+  return <>User profile for {params.id}</>
+})
 
-This guide provides step-by-step instructions for creating a new resource for a service (like Stripe's Price, Product, or Webhook resources).
-
-## Step 1: Create the Resource File
-
-Create a new file in the service directory with kebab-case naming:
-
-```
-alchemy/src/{{service-name}}/{{resource-name}}.ts
-```
-
-Example: `alchemy/src/stripe/price.ts`
-
-## Step 2: Define Resource Interfaces
-
-Start by importing dependencies and defining the resource interfaces:
-
-```typescript
-import type { Context } from "../context";
-import { Resource } from "../resource";
-
-/**
- * Properties for creating or updating a {{ResourceName}}
- */
-export interface {{ResourceName}}Props {
-  /**
-   * {{Property description}}
-   */
-  propertyName: string;
-
-  /**
-   * {{Property description}}
-   */
-  anotherProperty?: number;
-
-  // Add all required and optional properties
-  // Include JSDoc comments for each property
-}
-
-/**
- * Output returned after {{ResourceName}} creation/update
- * IMPORTANT: The interface name MUST match the exported resource name
- * For example, if your resource is exported as "Product", this interface
- * should be named "Product" (not "ProductOutput")
- *
- */
-export interface {{ResourceName}} extends Resource<"{{service-name}}::{{ResourceName}}"> {{ResourceName}}Props {
-  /**
-   * The ID of the resource
-   */
-  id: string;
-
-  /**
-   * Time at which the object was created
-   */
-  createdAt: number;
-
-  // Add all additional properties returned by the service
-  // Include JSDoc comments for each property
-}
+route("/posts/:postId/comments/:commentId", function handler({ params }) {
+  // Access multiple parameters
+  return <>Comment {params.commentId} on Post {params.postId}</>
+})
 ```
 
-## Step 3: API Client Implementation
+#### Wildcard Path Matching
 
-Create a minimal API client that wraps fetch calls without excessive abstraction:
+```tsx
+// Match all remaining segments after the prefix
+route("/files/*", function handler({ params }) {
+  // params.$0 contains the wildcard value
+  return <>File: {params.$0}</>
+})
 
-```typescript
-/**
- * Options for {{ServiceName}} API requests
- */
-export interface {{ServiceName}}ApiOptions {
-  /**
-   * API key or token to use (overrides environment variable)
-   */
-  apiKey?: string;
+route("/docs/*/version/*", function handler({ params }) {
+  // Multiple wildcards available as params.$0, params.$1, etc.
+  return <>Document: {params.$0}, Version: {params.$1}</>
+})
+```
 
-  /**
-   * Account or project ID (overrides environment variable)
-   */
-  accountId?: string;
-}
+### Response Types
 
-/**
- * Minimal API client using raw fetch
- */
-export class {{ServiceName}}Api {
-  /** Base URL for API */
-  readonly baseUrl: string;
+#### Plain Text Response
 
-  /** API key or token */
-  readonly apiKey: string;
+```tsx
+import { route } from "rwsdk/router";
 
-  /** Account ID */
-  readonly accountId: string;
+route("/api/status", function handler() {
+  return new Response("OK", {
+    status: 200,
+    headers: { "Content-Type": "text/plain" }
+  })
+})
+```
 
-  /**
-   * Create a new API client
-   *
-   * @param options API options
-   */
-  constructor(options: {{ServiceName}}ApiOptions = {}) {
-    // Initialize with environment variables or provided values
-    this.baseUrl = "https://api.{{service-name}}.com/v1";
-    this.apiKey = options.apiKey || process.env.{{SERVICE_API_KEY}} || '';
-    this.accountId = options.accountId || process.env.{{SERVICE_ACCOUNT_ID}} || '';
+#### JSON Response
 
-    // Validate required configuration
-    if (!this.apiKey) {
-      throw new Error("{{SERVICE_API_KEY}} environment variable is required");
+```tsx
+import { route } from "rwsdk/router";
+
+route("/api/users/:id", function handler({ params }) {
+  const userData = { id: params.id, name: "John Doe", email: "john@example.com" }
+
+  return Response.json(userData, {
+    status: 200,
+    headers: {
+      "Cache-Control": "max-age=60"
     }
-  }
+  })
+})
+```
 
-  /**
-   * Make a request to the API
-   *
-   * @param path API path (without base URL)
-   * @param init Fetch init options
-   * @returns Raw Response object from fetch
-   */
-  async fetch(path: string, init: RequestInit = {}): Promise<Response> {
-    // Set up authentication headers
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${this.apiKey}`
-    };
+#### JSX/React Components Response
 
-    // Add headers from init if provided
-    if (init.headers) {
-      const initHeaders = init.headers as Record<string, string>;
-      Object.keys(initHeaders).forEach(key => {
-        headers[key] = initHeaders[key];
-      });
+```tsx
+import { route } from "rwsdk/router";
+import { UserProfile } from '@/app/components/UserProfile'
+
+route("/users/:id", function handler({ params }) {
+  return <UserProfile userId={params.id} />
+})
+```
+
+#### Custom Document Template
+
+```tsx
+import { render, route } from "rwsdk/router";
+import { Document } from '@/app/Document'
+
+render(Document, [
+  route("/", function handler() {
+    return <>Home Page</>
+  }),
+  route("/about", function handler() {
+    return <>About Page</>
+  })
+])
+```
+
+### Error Handling
+
+```tsx
+import { route } from "rwsdk/router";
+
+route("/api/posts/:id", async function handler({ params }) {
+  try {
+    const post = await db.post.findUnique({ where: { id: params.id } })
+
+    if (!post) {
+      return Response.json(
+        { error: "Post not found" },
+        { status: 404 }
+      )
     }
 
-    // For FormData, remove Content-Type
-    if (init.body instanceof FormData) {
-      delete headers["Content-Type"];
-    }
-
-    // Make the request
-    return fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers
-    });
+    return Response.json(post)
+  } catch (error) {
+    console.error(error)
+    return Response.json(
+      { error: "Failed to retrieve post" },
+      { status: 500 }
+    )
   }
-
-  /**
-   * Helper for GET requests
-   */
-  async get(path: string, init: RequestInit = {}): Promise<Response> {
-    return this.fetch(path, { ...init, method: "GET" });
-  }
-
-  /**
-   * Helper for POST requests
-   */
-  async post(path: string, body: any, init: RequestInit = {}): Promise<Response> {
-    const requestBody = body instanceof FormData ? body : JSON.stringify(body);
-    return this.fetch(path, { ...init, method: "POST", body: requestBody });
-  }
-
-  /**
-   * Helper for PUT requests
-   */
-  async put(path: string, body: any, init: RequestInit = {}): Promise<Response> {
-    const requestBody = body instanceof FormData ? body : JSON.stringify(body);
-    return this.fetch(path, { ...init, method: "PUT", body: requestBody });
-  }
-
-  /**
-   * Helper for DELETE requests
-   */
-  async delete(path: string, init: RequestInit = {}): Promise<Response> {
-    return this.fetch(path, { ...init, method: "DELETE" });
-  }
-}
+})
 ```
 
-## Step 4: Implement the Resource
+### Organization with Co-located Routes
 
+Create a file at `./src/app/pages/blog/routes.ts`:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```tsx
+import { route } from "rwsdk/router";
+import { isAdminUser } from '@/app/interceptors'
+
+import { BlogLandingPage } from './BlogLandingPage'
+import { BlogPostPage } from './BlogPostPage'
+import { BlogAdminPage } from './BlogAdminPage'
+
+export const routes = [
+  route('/', BlogLandingPage),
+  route('/post/:postId', BlogPostPage),
+  route('/post/:postId/edit', [isAdminUser, BlogAdminPage])
+]
+```
+
+Then import these routes in your main worker file:
+
+```tsx
+// src/worker.tsx
+import { defineApp, render, route, prefix } from "rwsdk/router";
+import { Document } from '@/app/Document'
+import { HomePage } from '@/app/pages/home/HomePage'
+import { routes as blogRoutes } from '@/app/pages/blog/routes'
+
+export default defineApp([
+  /* middleware */
+  render(Document, [
+    route('/', HomePage),
+    prefix('/blog', blogRoutes)
+  ]),
+])
+```
+
+### Advanced: Route with Query Parameters
+
+```tsx
+import { route } from "rwsdk/router";
+
+route("/api/search", function handler({ request }) {
+  const url = new URL(request.url)
+  const query = url.searchParams.get('q') || ''
+  const page = parseInt(url.searchParams.get('page') || '1')
+  const limit = parseInt(url.searchParams.get('limit') || '10')
+
+  return Response.json({
+    query,
+    page,
+    limit,
+    results: [] // Your search results would go here
+  })
+})
+```
 
 ---
 > Source: [alchemy-run/alchemy-async](https://github.com/alchemy-run/alchemy-async) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
