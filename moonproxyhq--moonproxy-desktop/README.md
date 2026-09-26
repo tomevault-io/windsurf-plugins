@@ -2,8 +2,6 @@
 
 > Source: [MoonProxyHQ/moonproxy-desktop](https://github.com/MoonProxyHQ/moonproxy-desktop). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
-MoonProxy Desktop - Cross-platform FRP desktop client (frpc GUI) for macOS and Windows. NAT traversal / intranet penetration made simple. Open-source (MIT). Built with Tauri v2 + Vue 3 + Rust.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
