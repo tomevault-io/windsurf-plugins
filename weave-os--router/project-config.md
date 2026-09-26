@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: > **Mirror notice.** Generated from [CLAUDE.md](CLAUDE.md). Edit CLAUDE.md, then run `make generate-agent-guides`; CI rejects drift.
+description: > **Mirror notice.** Source for generated [AGENTS.md](AGENTS.md). Edit this file, then run `make generate-agent-guides`; CI rejects drift.
 ---
 
-# internal/router/cache — AGENTS
+# internal/router/cache — CLAUDE
 
-> **Mirror notice.** Generated from [CLAUDE.md](CLAUDE.md). Edit CLAUDE.md, then run `make generate-agent-guides`; CI rejects drift.
+> **Mirror notice.** Source for generated [AGENTS.md](AGENTS.md). Edit this file, then run `make generate-agent-guides`; CI rejects drift.
 
 Cross-request semantic response cache. Read [root CLAUDE.md](../../../CLAUDE.md) first.
 
@@ -25,4 +25,4 @@ Short-circuits near-duplicate non-streaming requests by cosine similarity on the
 
 ---
 > Source: [weave-os/router](https://github.com/weave-os/router) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
