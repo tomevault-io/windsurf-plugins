@@ -1,147 +1,105 @@
 ---
 trigger: always_on
-description: <!-- one ai-guides:start -->
+description: Publishable Go library. Stack: **Go module + go-task + stdlib `testing`**.
 ---
 
-<!-- one ai-guides:start -->
-# Claude Code 工作区 AI 指南
+# go-lib — Agent Guide
 
-本段内容由 One CLI 基于项目模板为 `CLAUDE.md` 自动生成。请优先修改模板 AI 片段，或通过 `one add` 刷新；不要直接手改这段受管内容。
+Publishable Go library. Stack: **Go module + go-task + stdlib `testing`**.
+Project layout follows
+[golang-standards/project-layout](https://github.com/golang-standards/project-layout).
 
-## 工作区
-
-- 根目录：当前包含 `one.manifest.json` 的工作区目录
-- AI 提供方：`claude-code`
-- 模板分组数：3
-
-## custom
-
-适用项目：
-- `packages/core`
-- `packages/instructions`
-- `packages/jianyingdraft`
-- `packages/mcp`
-- `packages/tools`
-
-### 内置指引
-- 当前模板 `custom` 没有内置 AI 最佳实践片段。
-- 先阅读该项目的 README、package.json、脚本和样式/运行时入口，再开始修改。
-- 优先保持现有技术栈和目录约定，不要臆造新的工程层级。
-
-## go-api
-
-适用项目：
-- `services/server`
-
-# go-api — Agent Guide
-
-Go HTTP API service. Stack: **Go + Gin + Gorm + Viper + Zap + go-task**.
-
-## Project layout
+## Starter layout (what's actually on disk)
 
 ```
-cmd/server/                 # executable entrypoint (main.go)
-internal/
-├── app/                    # application wiring (DI / startup)
-├── http/
-│   ├── handlers/           # Gin handler funcs — HTTP I/O only
-│   ├── middleware/         # logger, request_id, metrics
-│   └── response/           # consistent JSON response shape
-├── domain/                 # domain models (User, etc.)
-├── repository/             # Gorm repositories — the ONLY DB layer
-├── service/                # business services
-├── platform/
-│   ├── jwt/                # JWT signing / parsing
-│   └── logger/             # zap logger setup
-└── config/                 # Viper config loader
-api/                        # OpenAPI spec
-configs/                    # config.yaml + .env.example
-migrations/                 # SQL migrations
-scripts/                    # ops scripts
-Taskfile.yml                # go-task tasks
+pkg/
+└── greeter/                 # placeholder public package — rename / replace
+    ├── greeter.go
+    └── greeter_test.go
+
+go.mod                       # module path = github.com/example/<name> — change before publishing
+Taskfile.yml                 # fmt / vet / test / tidy / check
+README.md
+LICENSE                      # Apache-2.0
 ```
 
-## Architecture boundaries — NEVER violate
+The starter is intentionally minimal. The rest of the standard layout
+is **not** scaffolded — create directories only when you have real
+content to put in them. The cheatsheet below tells you which directory
+to use.
 
-- **Handler** (`internal/http/handlers/`): bind request → call service → write response. Thin. No business logic. No DB access. No SQL.
-- **Service** (`internal/service/`): business logic. Stateless. Take dependencies via constructor.
-- **Repository** (`internal/repository/`): the ONLY layer that touches Gorm / SQL. Returns domain models, not Gorm structs.
-- **Domain** (`internal/domain/`): pure structs and methods. No imports of Gin / Gorm / Viper.
-- **Cross-cutting** (auth, logging, request ID, metrics) → middleware in `internal/http/middleware/`.
+## golang-standards/project-layout — directory cheatsheet
 
-## Pre-wired infrastructure — DO use, DON'T recreate
+Look up before creating a new top-level directory. Don't invent new ones.
 
-| Need | Where |
-|------|-------|
-| Config (env + yaml) | `internal/config` (Viper-backed). Inject `*config.Config` into constructors. |
-| Logger | `internal/platform/logger` (Zap). Pass `*zap.Logger` via constructor — never use `log.Print*`. |
-| JWT | `internal/platform/jwt` |
-| Request ID | `middleware.RequestID` — already wired in `internal/app` |
-| Structured response | `internal/http/response` (success / error / list helpers) |
-| DB | Gorm via `repository/`; configure in `internal/app` |
-| API docs | `api/openapi.yaml` feeds Swagger UI at `/api/docs`; keep it in sync with routes and response shapes. |
+| Dir | Purpose | When to create |
+|-----|---------|----------------|
+| `/pkg` | **Public** library code. Anything importable by consumers. API == contract. | Already exists. Add a new subpackage `pkg/<feature>/` when grouping is needed. |
+| `/internal` | **Private** code. Go toolchain forbids imports from outside the module. | When you have helpers that must NOT leak to consumers (parsing internals, vendored utilities, version constants). |
+| `/cmd/<name>/` | Optional CLI(s) that ship alongside the library. `main.go` here must stay thin — flag parsing, then call into `pkg/`. | Only if the library has a companion executable (e.g. a code generator, a smoke-test binary). Pure libraries don't need it. |
+| `/examples/<name>/` | Runnable usage examples. Each subdir is `package main` with its own `main.go`. | When a public API is non-trivial; one example per major use case. |
+| `/api/` | Protocol contracts: OpenAPI, Proto, JSON Schema, gRPC IDL. | If the library publishes a wire protocol or codegen source. |
+| `/test/` | Integration / E2E tests + large test data. Unit tests stay next to source. | When you need a real backend (DB, network) or fixtures big enough to clutter source dirs. Gate with `//go:build integration`. |
+| `/docs/` | Design docs, ADRs, architecture notes. | When you accumulate enough non-README prose to justify a directory. |
+| `/scripts/` | Build, release, codegen, lint scripts. Treat as executable docs. | When something runs more than twice. |
+| `/build/` | Packaging configs (CI, Dockerfiles for release builds, goreleaser config). | When you ship binaries from `/cmd` or want reproducible release packaging. |
+| `/githooks/` | Repo-local git hooks. | If hooks are project-specific and not enforced by a separate tool. |
+| `/tools/` | Dev tooling pinned via `tools.go` blank imports. | When you need versioned dev tools (mockgen, stringer). |
+| `/third_party/` | Vendored / forked external code. | Rarely. Prefer `go.mod` replace directives. |
+
+**Directories that signal "this stopped being a library":** `/configs`,
+`/deployments`, `/web`, `/init`, `/assets`. If you find yourself
+reaching for these, the project is becoming an application — reconsider
+the scope or split into two modules.
+
+## Library contract — these are the rules
+
+A library is a public API. Every exported symbol is a promise.
+
+- **Only `pkg/**` is public.** Anything you don't want consumers to
+  import goes under `internal/`. Renaming, removing, or changing the
+  signature of an exported symbol in `pkg/` is a **breaking change**.
+- **Semantic versioning is non-negotiable.** Breaking changes bump
+  major. New features bump minor. Bugfixes bump patch.
+- **`v2+` requires a module path bump.** Append `/v2` (or `/v3`...) to
+  the module path in `go.mod` AND in import paths. There is no
+  shortcut.
+- **Every exported symbol has a doc comment** that starts with the
+  identifier name. `// Greet returns ...`, not `// Returns ...`.
+- **No `init()` side effects.** Consumers may not want them. Use
+  explicit constructors.
+- **Don't pollute global state.** No global mutable variables, no
+  hidden defaults that consumers can't override.
+- **Be conservative with dependencies.** Every dependency you add is
+  one your consumers must download and audit. Prefer the stdlib.
+  Vet bundle-size impact before pulling in anything heavy.
+- **Don't ship binaries from the root.** If you need a CLI, put it
+  under `cmd/<name>/`.
 
 ## Engineering discipline — mandatory
 
-1. `task check` (gofmt + vet + golangci-lint) exits 0
-2. `task test` passes — new code must come with tests
+1. `task check` exits 0 (tidy + fmt + vet + test)
+2. `go test -race ./...` passes — every new exported symbol comes
+   with a test
 3. `go build ./...` compiles
 4. Stage explicitly: `git add <file>`. Never `git add -A`.
-5. Conventional commit messages: `feat(user): add password reset endpoint`.
-6. Never commit secrets. Use `one secrets set <KEY> --env <env>`.
+5. Conventional commit messages: `feat(greeter): add multi-language Greet variants`.
+6. For breaking changes use `feat!:` or `fix!:` prefix AND describe
+   the breakage in the commit body.
 
-If any fails, stop. Fix the root cause, don't paper over.
+If any check fails, stop. Fix the root cause; don't paper over.
 
 ## Testing conventions
 
-- Unit tests: `<name>_test.go` next to source. Standard Go testing package.
-- Use **table-driven tests** for cases with shared setup.
-- Mock external deps (DB, HTTP) at the interface boundary — define interfaces in the consumer package, not the producer.
-- Repository tests: use a real DB in CI (Docker), mock interfaces in service tests.
-- `go test -race ./...` must pass.
-
-## Code style
-
-- ❌ Don't use `interface{}` / `any` unless necessary. Use generics or a concrete type.
-- ❌ Don't return `(value, bool)` for "not found" — use `(value, error)` with `errors.Is(err, ErrNotFound)`.
-- ❌ Don't use `panic` outside `init()` / `main`. Return errors.
-- ❌ Don't `log.Print*`. Inject `*zap.Logger`.
-- ❌ Don't read `os.Getenv` in business code. Read via `*config.Config`.
-- ✅ Every exported func / type has a doc comment starting with the identifier.
-- ✅ Wrap errors with context: `fmt.Errorf("loading user %d: %w", id, err)`.
-- ✅ Use `context.Context` as the first parameter for any operation that may block / be cancelled.
-
-## Common patterns
-
-**Add a new endpoint**
-
-1. Define request DTO in `internal/http/handlers/<feature>.go` (struct with `binding` tags).
-2. Add validation: `c.ShouldBindJSON(&req)` → returns 400 on failure.
-3. Call the service: `svc.DoThing(c.Request.Context(), req)`.
-4. Write response via `response.OK(c, data)` or `response.Error(c, err)`.
-5. Register route in `internal/http/router.go`.
-6. Add unit test for the handler (mock the service interface).
-7. Add OpenAPI doc in `api/openapi.yaml` and verify it renders in Swagger UI at `/api/docs`.
-
-**Add a new repository method**
-
-1. Define interface method in `internal/repository/<feature>_repo.go`.
-2. Implement against Gorm. Convert Gorm struct → domain model before returning.
-3. Update the service that consumes it.
-4. Add migration in `migrations/` if schema changes.
-
-**Add config**
-
-1. Add field to `internal/config/config.go` struct (with `mapstructure` tag).
-2. Add default in `configs/config.yaml`.
-3. Document env var override in `.env.example`.
-
-## Quality gates
-
-```bash
+- **Unit tests live next to source** as `<name>_test.go`. `go test`
+  auto-discovers them.
+- **Table-driven tests** for cases with shared setup. Use `t.Run(tt.name, ...)`
+  for sub-tests so failures point at the specific case.
+- **Test the public API**, not internal helpers. If a helper is
+  important enough to test directly, ask whether it should be in
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mediago-dev/mediago-drama](https://github.com/mediago-dev/mediago-drama) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
