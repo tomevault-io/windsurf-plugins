@@ -1,79 +1,105 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The Go binary that runs on the Echo Dot. Project-wide direction, the
 ---
 
-# CLAUDE.md
+# CLAUDE.md — `device/`
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+The Go binary that runs on the Echo Dot. Project-wide direction, the
+device/controller compatibility rules, the wire protocol and the release
+scheme are in the repo-root `CLAUDE.md`; the controller half is in
+`controller/CLAUDE.md`.
 
-## What this is
+## Building the device binary
 
-EchoMuse repurposes Amazon Echo Dot Gen 2 (FireOS 5 / Android 5.1, codename "biscuit") as an open-source voice assistant satellite. Two components:
+The Echo Dot runs FireOS 5 (API 22). Standard Go cross-compilation won't work — a custom Docker build environment is required.
 
-- **`device/`** — Go binary that runs directly on the rooted Echo Dot
-- **`controller/`** — Python asyncio WebSocket server that manages devices, runs wake word detection, and proxies to a voice pipeline
-- **`oww_forge/`** — standalone Docker batch trainer for custom openWakeWord models (synthetic TTS positives → augmentation → classifier head → `.onnx`). Not part of the controller; see `oww_forge/README.md`. **Published as an image** since 2026-08-20 (`forge-v*` tags → `forge-release.yml` → `ghcr.io/wilbowes/echomuse-forge`, CUDA on amd64 as `:latest` and CPU multi-arch as `:latest-cpu`) — prefer it to a local build, because the pins below are only preserved by a published artifact. Upstream pins in its Dockerfile are load-bearing (piper-sample-generator v2.0.0 flat layout; openWakeWord SHA with a `--convert_to_tflite` argparse patch). **Extra voices come from `piper_voices.py`, and its catalogue is FETCHED, never hardcoded** — 55 languages, ranked by speaker count, because a baked-in list of English voices makes every other language a code change; the same module backs the phrase preview. `google_tts.py` is rate-limited by Google at any real concurrency, so it retries transient failures and only retires a voice on a permanent refusal. Models install via the dashboard (Config → Wake word → "+ Custom model" → `/api/oww_models/upload`) into `oww_models/` beside the SQLite DB; `owwModel` stores the file path for custom models. openwakeword keys predictions by filename *stem*, never the path — always score via `em_oww_models.prediction_key`
+**One-time setup:**
+```bash
+# GoTinyAlsa is a git submodule at the repo root — the wilbowes/GoTinyAlsa
+# fork, NOT upstream Binozo, pinned to the fork's master. It carries two
+# GetAudioStream fixes: the defer-in-loop leak (v2.9.2) and a fresh slice per
+# read (fork PR #1, #607 — one reused buffer meant queued batches were
+# overwritten by the next read). Don't repoint it upstream until both are
+# merged there (Binozo/GoTinyAlsa#2 is the second).
+git submodule update --init
 
-## Where the detail lives
+# Build the compiler Docker image (from device/)
+cd device
+docker build -t echomuse-compiler compiler/
+```
 
-This file holds what is true across both halves. The depth sits in two
-directory-scoped files, which load when you touch files in those trees — read
-the relevant one before changing anything there.
+**The compiler base is pinned by DIGEST, and must stay that way.**
+`compiler/Dockerfile` carries the Go toolchain (1.24.0) and NDK
+(21.4.7075529) that compile the firmware, so it is the layer sitting
+directly on top of FireOS 5 — a 2015 platform that cannot be upgraded. It
+was `FROM ghcr.io/binozo/echogo:latest`, a third party's floating tag, and
+`release.yml` rebuilds the image **from scratch on every tag push**: every
+release was free to pick up a different compiler than the last, with no PR
+and no CI signal. The first symptom would be a binary the hardware refuses
+to run, which is the one failure here not recoverable from the dashboard.
 
-- **`device/CLAUDE.md`** — building the firmware and the pinned compiler,
-  the mic/audio pipeline, on-device wake word and asset distribution, the
-  external audio jack, CPU topology and thermals, volume/mute persistence,
-  the LED priority system, cgo.
-- **`controller/CLAUDE.md`** — running the controller, the Home Assistant
-  add-on and release channels, the ESPHome voice backend and HA entities,
-  the output chain and ducking, schema migrations, config scoping, activity
-  stats, support bundles, OTA, the provisioning wizard, the dashboard.
+Moving the pin needs **a real device in the loop**. The host tests and
+`go vet` cannot speak to it — they run on amd64 with the host toolchain,
+and this image is exercised only by `compile.sh` and `release.yml`, so a
+green CI run on a pin change proves nothing about it.
 
-## Direction: portable, and not dependent on Amazon
+**Compile:**
+```bash
+cd device
+./compile.sh
+# Output: build/server
+```
 
-**EchoMuse should run on more than one piece of hardware, with minimal change
-per platform, and should not depend on Amazon's software to work.** That is
-the direction, stated 2026-08-18. It is written here because contributors have
-sent multi-thousand-line PRs without knowing which project they were
-contributing to, and the answer changes how a change should be judged.
+`compile.sh` embeds the git version string via `-ldflags "-X .../client.Version=..."`. Dirty trees get a `YYYYMMDD-HHMM-dev` timestamp instead of the tag.
 
-**The dependency is already thin, and keeping it thin is the job.** The entire
-Android-specific surface in `device/` is about twenty call sites: `tinymix`
-(×10), `stop <service>` (×6), `svc wifi` (×2), `getprop` (×2). Everything else
-— mic, speaker, LEDs, buttons, ambient light, jack detect, WiFi state — is
-ALSA, i2c, evdev, sysfs and wpa_supplicant. This is a Linux daemon that
-happens to be running on Android because that is what shipped on the box.
+**Run Go tests (host):**
+```bash
+cd device
+go test ./...
+```
 
-Three consequences for reviewing a change:
+Tests only cover pure-Go logic — hardware-dependent code is not testable on the host.
 
-- **Prefer the Linux interface to the Android one**, and where an Android call
-  is unavoidable, isolate it rather than spread it.
-- **Resolve hardware by NAME, not by number.** `event2` is the volume button
-  on biscuit and the *touchscreen* on checkers; opening the wrong one succeeds
-  silently and leaves the buttons dead. The same rule already applies to i2c
-  (`als.resolve()` matches `tsl2540` by name, since `0-0039` is an
-  enumeration accident).
-- **A change that makes a vendor blob load-bearing is going the wrong way**,
-  and needs to justify itself as a terminal opt-in for one platform rather
-  than as the path forward. PR #168 (native AFE) is the **worked example,
-  declined 2026-08-21**: opt-in per device, default off, old path untouched,
-  built on genuine reverse engineering of the ASP pipeline, and audibly
-  better — and still the wrong direction, because it made Amazon's audio HAL
-  the path the audio takes. **Decline the direction, keep the findings.** Two
-  live bugs it surfaced were fixed on main first (the DAC clipping above
-  unity gain, the `Toggle` `disabled` prop), and stock's playback EQ was read
-  off a device as coefficients rather than adopted as a binary (#247). We do
-  not need Amazon's code to hit Amazon's target, and that is the general
-  answer whenever a vendor blob looks like the shortcut.
+**Run controller tests (host):**
+```bash
+cd controller
+python -m pytest tests/        # needs: pytest numpy scipy pyyaml — not the full requirements.txt
+```
 
-**LineageOS is probably the wrong target; postmarketOS already has an
-`amazon-biscuit` port** (its wiki and pmaports kernel config were corroborating
-sources for the ALS second-source diagnosis — see JOURNAL 2026-08-11). There is
-no Lineage port for a 2015 MT8163 on Android 5.1, and building one would mean
+Controller tests cover the pure-logic modules only (`em_eq`, `em_limiter`, `em_mbc`, `em_scenes`, `em_oww_models`, `em_oww_warmup`, `version`, `em_hostip`, `em_ingressauth`, and the decision modules — `em_linkauth`, `em_button`, `em_shadow`, `em_turnclock`, `em_runbarrier`, `em_announce`) — keep it that way unless you're prepared to pull openwakeword/aiohttp into the test environment. Both suites (plus `go vet`) run in CI on every push/PR (`.github/workflows/ci.yml`).
+
+**Release:** pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the binary in the compiler image and attaches it to a GitHub release. **Tag with `git tag -a --cleanup=verbatim`** — the annotation message becomes the release body (`body_path` from `git tag -l --format='%(contents)'`), which is what the dashboard shows next to an available update. Write it for the person deciding whether to push firmware to a device they depend on: what changed, what to expect, anything required of them. GitHub's generated commit list is still appended below it. A lightweight tag yields an empty body and falls back to that list, which is a worse experience, not a broken one.
+
+**`--cleanup=verbatim` is not optional if the notes use Markdown headings.**
+`git tag -a` defaults to `--cleanup=strip`, which treats a line beginning with
+`#` as a comment and deletes **the whole line** — so `## Volume` does not lose
+its markers, it disappears entirely. v2.12.0 shipped that way: the notes were
+structurally correct in the file, five headings gone from the published body,
+and the only visible sign was a wall of paragraphs. Fixing it afterwards means
+`gh api -X PATCH repos/<owner>/<repo>/releases/<id> -F body=@notes.md`
+(`gh release edit` has no `--notes-file`), and re-appending GitHub's generated
+commit list by hand, since the PATCH replaces the whole body.
+
+## Device audio pipeline
+
+Playback has a second plane: music rides `0x04`/`0x05` into its own buffer and
+is mixed against voice at the ALSA write, so a voice turn **ducks** music
+rather than pausing it. The rules for that mix — the constant-slew ramp, the
+per-sample interpolation, `music_flush` vs `speaker_flush` — are under
+"Ducking" in `controller/CLAUDE.md`.
+
+Each mic buffer passes through, in order:
+
+```
+raw 9ch S24_3LE → beamformer + fixed mic gain (micGainDb, applied to 24-bit samples) → mono S16_LE → [AEC] → [AGC] → [VAD gate] → /data WebSocket
+```
+
+Note the real buffer cadence: GoTinyAlsa's `GetAudioStream` reads the whole ALSA buffer per chunk (PeriodSize 512 × PeriodCount 5), so the mic pipeline runs on **160ms batches of 2560 samples**, not single 32ms periods. Anything assuming 512-sample buffers must handle multiples (this silently disabled AEC for four releases — see `aec.Process`).
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [wilbowes/EchoMuse](https://github.com/wilbowes/EchoMuse) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
