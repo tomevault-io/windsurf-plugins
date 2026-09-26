@@ -1,55 +1,46 @@
 ---
 trigger: always_on
-description: > Agent-facing context. If you're picking up work on this site, start here.
+description: > `CLAUDE.md` delegates here. Keep project instructions canonical in this file.
 ---
 
 # This Nimbus docs site
 
-> Agent-facing context. If you're picking up work on this site, start here.
+> `CLAUDE.md` delegates here. Keep project instructions canonical in this file.
 
-Astro-based docs site. The `nimbus-docs` package provides the integration, content schemas, navigation/sidebar/TOC computation, MDX→markdown rendering, build hooks, and the `nimbus` CLI. Everything you see in `src/` is user-owned and yours to edit.
+Astro-based docs. The `nimbus-docs` package handles content schemas, sidebar/TOC, MDX→markdown, build hooks, and the `nimbus` CLI. Everything in `src/` is yours to edit.
 
 ## File layout
 
 ```
-astro.config.ts                # imports `nimbus` and `defineNimbusConfig` — site config lives inline here
-nimbus.config.ts               # (alternative) some projects split the Nimbus config into its own file
+astro.config.ts              # imports nimbus + defineNimbusConfig
+nimbus.json                  # records the last reviewed Nimbus package version
 src/
-├── components.ts              # MDX globals registry — every component used in .mdx files must be listed here
-├── components/                # repo-owned components
-│   ├── AgentDirective.astro   # ships an agent-readable hint into every doc page; do not remove
-│   ├── Header.astro
-│   ├── Render.astro           # partial loader — <Render file="..." />
-│   └── ui/                    # registry-installed UI components (badge, dialog, sidebar, search, etc.)
+├── components.ts            # MDX globals registry — every component used in .mdx must be listed
+├── components/              # AgentDirective, Header, Render + ui/<slug>/
 ├── content/
-│   ├── docs/*.mdx             # docs content
-│   └── partials/*.mdx         # partials referenced via <Render file="..." />
-├── content.config.ts          # docsCollection() and partialsCollection() are registered here
-├── layouts/
-│   ├── BaseLayout.astro       # renders <NimbusHead /> + <AgentDirective />; wraps every page
-│   └── DocsLayout.astro       # docs page chrome — sidebar, TOC, breadcrumbs, pagination
-├── lib/
-│   └── cn.ts                  # Tailwind className merger (clsx + tailwind-merge)
+│   ├── docs/*.mdx
+│   └── partials/*.mdx       # referenced via <Render file="..." />
+├── content.config.ts        # registers docsCollection() + partialsCollection()
+├── layouts/                 # BaseLayout (NimbusHead), DocsLayout (sidebar/TOC/breadcrumbs)
+├── lib/cn.ts                # Tailwind className merger
 ├── pages/
-│   ├── index.astro            # landing
-│   ├── [...slug].astro        # docs catch-all
-│   ├── [...slug]/index.md.ts  # per-page markdown alternate (the .md sibling of every doc URL)
-│   ├── llms.txt.ts            # /llms.txt
-│   ├── og.png.ts              # site-level OG image
+│   ├── [...slug].astro
+│   ├── [...slug]/index.md.ts   # Markdown version of every page, all collections
+│   ├── [...slug]/index.mdx.ts  # authored source of every page, all collections
+│   ├── llms.txt.ts
+│   ├── og.png.ts                # site-level OG card
 │   ├── og/
-│   │   ├── _renderer.ts       # shared OG card renderer (underscore = not a route)
-│   │   └── [...slug].ts       # per-page OG image
-│   └── robots.txt.ts          # /robots.txt
-└── styles/
-    ├── globals.css
-    └── prose.css
+│   │   ├── _og-card-config.ts   # shared OG theme tokens (underscore = not a route)
+│   │   └── [...slug].ts         # per-page OG cards
+│   └── robots.txt.ts
+└── styles/                  # globals.css, prose.css
 ```
 
-For Cloudflare deploys, also: `wrangler.jsonc` at project root.
+Cloudflare deploys also have `wrangler.jsonc` at the project root.
 
 ## Writing docs
 
-Frontmatter must validate against `docsSchema` from `nimbus-docs/schemas`. Required: `title`. The schema includes optional fields for description, sidebar overrides, drafts, dates, edit-link suppression — read the schema for the full shape.
+Frontmatter validates against `docsSchema` (`nimbus-docs/schemas`). Required: `title`.
 
 ```mdx
 ---
@@ -57,55 +48,57 @@ title: My page
 description: One-line summary.
 ---
 
-# My page
+Content here. The page H1 comes from `title` — don't repeat it in the body.
 
-Content here.
+## Section heading
 ```
 
-**MDX components must be PascalCase and registered.** Every component used in a `.mdx` file (`<Steps>`, `<Card>`, etc.) must appear in `src/components.ts`. A pre-build validator catches typos and unregistered components with `file:line:column` and a "did you mean" hint.
+Rules:
 
-**Partials use `<Render />`.** Don't import `.mdx` files directly. Put shared content in `src/content/partials/<slug>.mdx`, then reference with `<Render file="<slug>" />`. The `Render` component emits a "did you mean" diagnostic for unknown slugs.
-
-**Icons render via `astro-icon` + Phosphor.** Use `<Icon name="ph:<glyph>" class="w-4 h-4" />` from `astro-icon/components`. Don't reintroduce inline `<svg>` blocks for icons. Browse glyphs at [phosphoricons.com](https://phosphoricons.com).
-
-**`AgentDirective` renders in `BaseLayout.astro`.** It writes an agent-readable hint at the top of every doc and markdown alternate pointing at `/llms.txt`. Don't remove it.
+- **Components must be PascalCase and registered in `src/components.ts`.** A pre-build validator catches typos with a "did you mean" hint.
+- **Partials use `<Render file="..." />`.** Don't import `.mdx` directly. Shared content lives in `src/content/partials/<slug>.mdx`.
+- **Icons use `astro-icon` + Phosphor.** `<Icon name="ph:<glyph>" class="w-4 h-4" />` from `astro-icon/components`. Glyphs: [phosphoricons.com](https://phosphoricons.com).
+- **Don't remove `<AgentDirective />` from `BaseLayout.astro`.** It points agents at `/llms.txt`.
 
 ## Adding things
 
 | Goal | Action |
 |---|---|
-| New doc page | Create `src/content/docs/<slug>.mdx` with valid frontmatter. The sidebar picks it up automatically. |
+| New doc page | Create `src/content/docs/<slug>.mdx`. Sidebar picks it up. |
 | New partial | Create `src/content/partials/<slug>.mdx`. Use via `<Render file="<slug>" />`. |
-| New UI component from the registry | `pnpm exec nimbus-docs add <slug>`. Resolves dependencies and writes files into `src/components/ui/<slug>/`. Remember to import + register the component in `src/components.ts` if it's used in MDX. |
-| New feature (e.g. custom 404, AI surface) | `pnpm exec nimbus-docs add <feature-slug>`. Prints an agent brief; pipe it to your coding agent. |
-| New custom page route | Add a file under `src/pages/`. |
-| Custom OG card style | Edit `src/pages/og/_renderer.ts`. |
+| UI from registry | `pnpm exec nimbus-docs add <slug>`. Register in `src/components.ts` if used in MDX. |
+| Feature recipe | `pnpm exec nimbus-docs add <feature-slug>`. Pipe the printed brief to your agent. |
+| Check it builds | `pnpm exec nimbus-docs check` — build-free preflight (env + structure + authoring + types). `--json` for an agent loop, `--fix` to repair what's safe. |
+| Custom page route | Add a file under `src/pages/`. |
+| Custom OG style | Edit `src/pages/og/_og-card-config.ts`. |
+| Check for updates | `pnpm exec nimbus-docs outdated` — starter files behind their tag + registry components behind. |
+| Upgrade Nimbus | Update the package, then run `pnpm exec nimbus-docs migrate --dry-run --diff`. Review every change and required manual step before applying. |
+| Upgrade a starter file | `pnpm exec nimbus-docs diff <file>` to review, `diff --apply <file>` to pull a clean upstream change. |
+| Upgrade a registry component | `pnpm exec nimbus-docs add <slug> --overwrite`, then review with `git diff`. |
 
-List installable items with `pnpm exec nimbus-docs list`.
+Extend Sätteri using `markdown.mdastPlugins` for Markdown AST transformations or `markdown.hastPlugins` for HTML AST transformations.
+If the site replaces Sätteri with another processor, set `admonitions: false` and keep that processor's existing callout implementation.
+
+List installable items: `pnpm exec nimbus-docs list`.
+
+## Upgrading Nimbus
+
+Keep `nimbus.json` committed. Its `lastReviewedNimbusVersion` is the baseline Nimbus uses to select the versioned reviews crossed by a package upgrade; state-detected migrations come from the current project files. It is not a package pin and should not be edited by hand.
+
+1. Update `@cloudflare/nimbus-docs` with the project's package manager.
+2. Preview the complete plan with `pnpm exec nimbus-docs migrate --dry-run --diff`. If no baseline exists yet, add `--from <previous-version>`.
+3. Review every versioned entry and resolve each blocked/manual item.
+4. Apply safe edits only with explicit consent: `pnpm exec nimbus-docs migrate --yes`. Review the resulting diff, then rerun the preview.
+5. When no migration remains, run `pnpm exec nimbus-docs migrate --yes` again to record the completed review in `nimbus.json`.
+6. Run the project's typecheck and production build, then run `pnpm exec nimbus-docs check` again for post-build coverage.
+
+Except for task-printing mode (`--print`), `migrate` exits nonzero while work or review remains; that is a pending-upgrade signal, not necessarily a command failure. Never skip versions by changing `nimbus.json` directly.
 
 ## Audit this site
 
-When asked to check or audit the site, walk the categories below. For each finding, emit a bullet:
-
-```
-- [error|warn|info] FILE:LINE — what's wrong + why it matters + recommended fix.
-```
-
-End the report with: `Summary: N errors, N warnings.`
-
-### Config
-- `astro.config.ts` imports `nimbus` and calls it with the result of `defineNimbusConfig({ ... })`.
-- `site` is a non-empty URL. Watch for trailing-slash mismatches against page URLs.
-- `editPattern` (if set) includes the literal `{path}` placeholder.
-- Every sidebar reference resolves to a real content entry.
-- Astro `output:` matches the deploy target (`static` for static deploys).
-
-### Content collections
-- `src/content.config.ts` registers `docsCollection()` from `nimbus-docs/content`. Register `partialsCollection()` too if `src/content/partials/` exists.
-- Every `.mdx` file lives inside a registered collection. Loose `.mdx` under `src/content/` outside a registered collection won't be picked up.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cloudflare/nimbus](https://github.com/cloudflare/nimbus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
