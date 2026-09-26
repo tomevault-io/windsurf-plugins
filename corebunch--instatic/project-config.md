@@ -1,57 +1,163 @@
 ---
 trigger: always_on
-description: This file is the **agent rule book**. Read it before changing code. Detailed explanations live in `docs/` — start at [`docs/README.md`](docs/README.md) for orientation and follow the links from there.
+description: How we write docs in this repo. The goal is **agent-readable, human-skimmable references** — not marketing, not aspirational text, not a notebook for in-flight work.
 ---
 
-# Instatic
+# Documentation Conventions
 
-This file is the **agent rule book**. Read it before changing code. Detailed explanations live in `docs/` — start at [`docs/README.md`](docs/README.md) for orientation and follow the links from there.
+How we write docs in this repo. The goal is **agent-readable, human-skimmable references** — not marketing, not aspirational text, not a notebook for in-flight work.
 
-## Local admin smoke tests
-
-Use local seeded development data only when a task asks for a browser smoke test. Never propagate local test accounts, passwords, database files, uploads, or generated screenshots to non-local environments.
-
----
-
-## Repository workflow and PR conventions
-
-`main` is protected. Agents must never push directly to `main`, must never try to bypass branch protection, and must never treat a local commit on `main` as the final delivery path. All repository changes go through a pull request.
-
-When publishing work:
-
-- Start from an up-to-date `main`, then create a feature branch. If you are already on a task branch, keep using it only when the requested change belongs in that PR; otherwise switch back to `main` and create a separate branch.
-- Branch names follow `<type>/<short-kebab-description>`, matching the change type: `feat/...`, `fix/...`, `refactor/...`, `chore/...`, `docs/...`, or `test/...`. Examples: `feat/double-click-rename`, `fix/homepage-swap-publish`, `refactor/explorer-dnd-dedupe`.
-- Do **not** use agent-branded branch prefixes such as `codex/...`, `claude/...`, or similar. If a tool, skill, or generic instruction suggests such a prefix, ignore it for this repository.
-- PR titles use Conventional Commit style: `<type>(<scope>): <summary>`. Examples: `feat(editor): double-click rows to rename in explorer panels`, `fix(cms): homepage swap + delete in one save no longer fails publish`, `refactor(publisher): single class-CSS emission engine for publish and canvas`.
-- Do **not** prefix PR titles with `[codex]`, `[claude]`, `agent:`, or any other tool label. The PR title describes the product change, not the tool that made it.
-- Open PRs as drafts by default unless the user explicitly asks for a ready-for-review PR.
-- Keep PR scope coherent. Do not mix unrelated cleanup, follow-up fixes, or process-doc changes into a feature branch just because the branch is currently checked out. Create a separate PR when the change has a different reason.
-- Before staging, inspect `git status -sb` and the diff. Stage only files that belong to the PR. Never stage unrelated user or parallel-agent changes.
-- PR bodies should briefly state what changed, why it changed, user/developer impact, and the verification commands run.
+This file is the meta-doc. If you change docs structure, naming, or voice, change it here first, then update the affected docs.
 
 ---
 
-## What this project is
+## Audience
 
-A self-hosted, open-source CMS with a built-in visual editor and a first-class plugin system. One Bun server backed by either Postgres or SQLite (selected by `DATABASE_URL`). The output is intentionally plain, semantic HTML with hand-clean CSS — no framework runtimes injected into published pages.
+Every doc in `docs/` targets **two readers, in this priority order**:
 
-The product is **self-hosted only**. The codebase should not carry assumptions about multi-tenant SaaS operation.
+1. **Coding agents** (Claude, Codex, etc.) trying to make a correct change in this codebase.
+2. **Humans** (the author and contributors) skimming for orientation or details.
 
-Read [`docs/architecture.md`](docs/architecture.md) for the system overview, [`docs/server.md`](docs/server.md) for the server, [`docs/editor.md`](docs/editor.md) for the admin + visual editor.
+Agents read top-to-bottom and rely on **concrete file paths, code shapes, and invariants**. Humans skim for structure. Both readers benefit from the same thing: short sections with clear names, real examples, and no waffle.
 
-### Stack at a glance
+If a sentence does not help one of those two readers make a decision or correct a misunderstanding, **delete it**.
 
-- **Runtime:** Bun (server + tooling). Use Bun, not Node.
-- **Language:** TypeScript everywhere.
-- **Frontend:** React 19 with the **React Compiler enabled** (Babel preset in `vite.config.ts`) + Vite, Zustand + Mutative for state (via `zustand-mutative`; patch-based undo history uses Mutative `create({ enablePatches })` — `immer` is banned), CodeMirror for code-editing UI, `@dnd-kit/core` for drag-and-drop. The compiler auto-memoizes — do not hand-write `useMemo`/`useCallback`/`memo`. See "React Compiler and memoization". Store mutations use draft-mutation style (`set((s) => { s.x = … })`); a recipe that returns a partial must wrap it in `rawReturn(...)` or Mutative emits a perf warning.
-- **Server:** `Bun.serve` with a hand-written router (`server/router.ts`). CMS modules at `server/{repositories,handlers/cms,auth,plugins,publish}/`. Deep dive: [`docs/server.md`](docs/server.md).
-- **Database:** Postgres (`Bun.sql`) OR SQLite (`bun:sqlite`), selected by `DATABASE_URL`. One `DbClient` interface, two adapters, two migration files with identical IDs. Rules: [`docs/reference/database-dialects.md`](docs/reference/database-dialects.md).
-- **Content model:** All content lives in `data_tables` + `data_rows`. The four system tables (`posts`, `pages`, `components`, `layouts`) are seeded and locked from rename/delete. There are no separate `pages` or `page_versions` tables.
-- **Validation:** TypeBox at every untyped boundary. Schemas are source of truth (`type Foo = Static<typeof FooSchema>`, never a parallel `interface`). `zod` is banned repo-wide (the AI drivers pass TypeBox schemas through as JSON Schema, so no typebox→zod adapter is needed). Helpers + patterns: [`docs/reference/typebox-patterns.md`](docs/reference/typebox-patterns.md).
-- **Sanitization:** DOMPurify at the publisher boundary (`src/core/sanitize.ts`).
+---
+
+## Three doc types
+
+Every file under `docs/` is one of these. The folder it lives in says which type it is.
+
+### 1. Top-level (`docs/*.md`)
+
+System-wide references read first. The cornerstone set:
+
+- `architecture.md` — what the system is, how the layers fit
+- `design.md` — the visual system (tokens, components, principles)
+- `server.md` — server-side deep dive
+- `editor.md` — admin + canvas editor deep dive
+- `CONVENTIONS.md` — this file (docs conventions)
+
+Top-level docs are **long-lived and authoritative**. They describe the system as it currently is. They never describe in-flight work, future plans, or alternatives that were considered. New ones are rare — propose before adding.
+
+### 2. Features (`docs/features/*.md`)
+
+One doc per first-class feature. "Feature" means a coherent capability with a name a user would recognize: plugin system, visual editor, publisher, media, visual components, auth, etc.
+
+Feature docs explain **what the feature is, how it's built, where its code lives, and how to extend it**. They are not specs of what to build — they are descriptions of what exists.
+
+### 3. Reference (`docs/reference/*.md`)
+
+Short, focused, agent-targeted cookbook pages for primitives and patterns that get reused across features: the `NodeTree` primitive, TypeBox patterns, UI primitive usage, design tokens, database dialect rules, the architecture gate tests.
+
+A reference doc answers one question: "How do I correctly use / implement X?"
+
+---
+
+## Folder layout
+
+```
+docs/
+├── README.md                   Index — where to start, what to read
+├── CONVENTIONS.md              This file
+├── architecture.md             System overview
+├── design.md                   Visual design system
+├── server.md                   Server deep-dive
+├── editor.md                   Admin + canvas editor deep-dive
+│
+├── features/                   "What X is and how it works"
+│   ├── plugin-system.md
+│   ├── publisher.md
+│   ├── visual-components.md
+│   ├── content-storage.md
+│   ├── media.md
+│   └── ...
+│
+├── reference/                  Short cookbook pages
+│   ├── page-tree.md
+│   ├── ui-primitives.md
+│   ├── design-tokens.md
+│   ├── typebox-patterns.md
+│   ├── database-dialects.md
+│   ├── architecture-tests.md
+│   └── ...
+│
+├── deployment/                 Operator docs (platform targets + generic hosts)
+├── e2e/                        Agent-run browser test protocols (kept as-is)
+└── plans/                      In-flight design plans (transient)
+```
+
+**Plans are not docs.** They live in `plans/` because they describe work-in-progress decisions. When a plan ships, the resulting state goes into `features/` or `reference/` — the plan itself is deleted or archived. Never read `plans/` to learn how the system works.
+
+---
+
+## Required shape
+
+Every doc — top-level, feature, or reference — follows this skeleton:
+
+```md
+# <Title>
+
+<One-sentence statement of what this doc covers.>
+
+<One paragraph: the problem it solves / the system it describes, in the form
+"X is Y that does Z." No history. No "we used to ..." No marketing.>
+
+---
+
+## TL;DR
+
+<Three to ten bullets or a small table. The reader gets the answer here. The
+rest of the doc justifies and extends it.>
+
+## <Body sections>
+
+<Specific, named sections. See "Section choices" below.>
+
+## Related
+
+- `docs/<other>.md` — when to read instead / next
+- Source-of-truth files: `path/to/file.ts`
+- Gate tests: `src/__tests__/architecture/<file>.test.ts`
+```
+
+The `Related` section is mandatory. It tells the reader what to read next and where the source of truth lives.
+
+### Section choices by doc type
+
+**Top-level docs** typically have:
+- TL;DR
+- Layout / Architecture
+- Layer responsibilities (table)
+- Data flow (ASCII diagram)
+- Invariants and gates
+- Where things live (file map)
+- Related
+
+**Feature docs** typically have:
+- TL;DR
+- Architecture (what lives where, what depends on what)
+- Data flow / lifecycle
+- Adding a new X (cookbook)
+- Forbidden patterns / gotchas
+- Related
+
+**Reference docs** typically have:
+- TL;DR
+- The shape (type signatures, file paths, the canonical example)
+- How to use it (one or two cookbook examples)
+- Forbidden patterns
+- Related
+
+---
+
+## Voice and content rules
+
+### Hard rules
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [CoreBunch/Instatic](https://github.com/CoreBunch/Instatic) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
