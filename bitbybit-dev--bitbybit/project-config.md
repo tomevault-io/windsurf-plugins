@@ -1,78 +1,97 @@
 ---
 trigger: always_on
-description: generates differs from what is committed. Never edit a generated file - change the kernel, or the
+description: The handful of conventions that hold everywhere in Bitbybit - colour ranges, which way is up, and the defaults that surprise people.
 ---
 
-# CLAUDE.md - the bitbybit open-source monorepo
 
-MIT-licensed, and the source of truth for the CAD algorithms and the published `@bitbybit-dev/*` npm
-packages. It is consumed as a git submodule elsewhere, but it stands alone: everything here builds and
-tests without it. Start with `README.md` for the overview, `CONTRIBUTING.md` before opening a PR.
+# Conventions That Hold Everywhere
 
-## Layout
+A few conventions run through the whole library. None of them is guessable, each one has a reasonable
+alternative that other tools picked instead, and each is worth five minutes now rather than an hour
+of confusion later.
 
-| Directory | What it is |
-|---|---|
-| `packages/dev/*` | the 14 published npm packages - see `packages/dev/CLAUDE.md` |
-| `docs/` | the Docusaurus site for learn.bitbybit.dev, including the generated API reference |
-| `examples/` | runnable examples per framework (angular, nextjs, nuxt, node, vite, react); `examples/scripts/examples.mjs` installs, builds and audits each one weekly from the registry, in examples.yml, and `examples/scripts/local.mjs` runs them against this repository's own packages instead |
-| `languages/` | the API help text per locale, keyed by each member's dotted path, and `doc-paths.json`, the map from documentation page names to those keys (`API_DOCS_GUIDE.md`) |
+## Colours are 0 to 1, not 0 to 255
 
-## Building the packages
+A colour given as an array is three numbers between **0 and 1**.
 
-The packages form a dependency DAG, and the order has one source: each package's `package.json`
-dependencies. `scripts/gen-ts-references.mjs` turns them into TypeScript project references -
-every `tsconfig.bitbybit.json` is a composite project that references the siblings its manifest
-declares, and `tsconfig.build.json` at the root references all eleven - so `tsc -b` orders the
-compiles itself and rebuilds only what changed. `npm run build-packages` is `pnpm -r run build-p`: pnpm orders the eleven stagings by the same
-manifests, each `build-p` compiles with `tsc -b` and stages dist/ for publishing.
-`npm run rebuild-all-packages` empties every dist first; `tsc -b tsconfig.build.json --verbose`
-prints the order it derives and what it considered up to date.
+```
+[1, 0, 0]        red
+[1, 0.5, 0]      orange
+[0, 0, 0]        black
+```
 
-All three of a package's TypeScript configs are generated: the build config, the strict view, and the
-`tsconfig.json` an editor and a lint run pick up - the build config's base and sibling paths without
-its emit settings or exclusions, so the tests and mocks are in the project there. After changing a
-dependency between packages, run `npm run gen:references` and commit the result; `check:references`,
-the first step of `npm test`, fails when any of the three is out of date.
-Three things are placed on purpose: the build info sits in each dist/, because `tsc -b` trusts it
-over the outputs and it has to vanish with the dist it describes (`copy-package`'s `.npmignore` keeps
-it out of the tarball); every build config excludes `dist` and `coverage`, which TypeScript would
-otherwise read as inputs; and every config states its `outDir`, which is how TypeScript keeps that
-directory out of the project - a stale one reads the built `dist` back in as source, silently.
+Many graphics tools use 0 to 255 instead, so `[255, 128, 0]` is a natural thing to write. It is not
+orange here. Those numbers are 255 times too large, and the result is clamped to white.
 
-## The workspace
+If you pass a value outside the range, a message in the console tells you so and names the likely
+cause. Divide by 255 and you have the right numbers.
 
-The fourteen packages under `packages/dev/` are one pnpm workspace (`pnpm-workspace.yaml`): one
-`pnpm install` at the root - `npm run ci-packages` is exactly that, frozen to the lockfile - installs
-all of them, and a sibling dependency whose exact pin matches the sibling's version becomes a symlink
-instead of a registry copy (`linkWorkspacePackages`). One `pnpm-lock.yaml` replaces the per-package
-npm locks; `npm run refresh-lockfile` rewrites it without touching node_modules. The manifests keep
-exact registry pins on purpose and never the `workspace:` protocol: `dist/` is what npm publishes, and
-`copy-package` derives its manifest through `scripts/dist-manifest.mjs`, which refuses a `workspace:`,
-`link:` or `file:` specifier. A dependency's install script runs only when `allowBuilds` lists it, so
-a new native dependency shows up as a decision, not a silent skip. Node comes from `.tool-versions`
-and pnpm from `packageManager`, which pnpm switches to on its own.
+You can also pass a hex string like `"#ff8000"` anywhere a colour is accepted, which avoids the
+question entirely.
 
-Every dist-published manifest also carries an `exports` map derived from its tree by `npm run
-gen:exports` (the root, every directory index under `lib/`, every kernel module, then patterns), with
-the `@bitbybit-dev/source` condition first in each entry: a consumer that declares the condition
-resolves the TypeScript sources - the shared test configuration does, through `resolve.conditions`,
-so a suite sees a sibling's edit without a rebuild - and one that does not resolves `dist/`. The map
-never reaches npm: `dist-manifest.mjs` drops it with `devDependencies` and `scripts`, and a published
-package resolves through `main` and `types` as every version has, because an exports map in a tarball
-would refuse the extensionless deep imports the examples make. `npm run check:exports` holds every
-manifest to that shape and every built `dist/package.json` to the derivation.
+### Geometry can carry its own colour, and it wins
 
-pnpm's layout is strict: a package resolves only what its own manifest declares, where npm's flat
-hoisting let it reach anything a sibling had installed. Every import in `lib/` must therefore be a
-dependency of that package - the engine packages import `@bitbybit-dev/base`, the three workers,
-`jsonpath-plus` and `verb-nurbs-web` directly, and declare them. Verify a build from a clone outside
-your home directory: a stray `~/node_modules` above the checkout satisfies an undeclared import on
-your machine and nowhere else, which is how one reached CI.
+JSCAD shapes can have a colour baked onto the geometry itself. When they do, that colour beats the one
+in your draw options.
 
+This is intentional: the colour on the geometry is the more specific instruction. It is also why a
+colour you chose in the options appears to be ignored for some shapes and respected for others. If you
+want your option to apply, remove the colour from the geometry rather than fighting it.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Y is up
+
+Bitbybit treats **Y** as the up axis, throughout.
+
+Many CAD systems treat Z as up instead. When you import from one, the model arrives lying on its side,
+which is what the `adjustZtoY` option on the STEP and IGES importers is for.
+
+Two related mappings, if you are building points by hand:
+
+- A 2D point becomes 3D as `[x, y]` to `[x, y, 0]`.
+- When drawings are flattened to 2D for DXF export, the **Y** value is dropped: 3D X becomes DXF X, and
+  3D Z becomes DXF Y.
+
+## Both sides of a surface are drawn by default
+
+`drawTwoSided` is **on** unless you explicitly set it to `false`.
+
+This is usually what you want. An open surface, or a solid you are looking into, shows its back faces
+rather than disappearing. The back faces are drawn in their own colour so you can tell which side you
+are seeing.
+
+Turn it off when you know your geometry is a closed solid viewed from outside, and you would rather not
+pay for the second set of faces.
+
+## Camera settings are tuned for a 20-unit scene
+
+Camera distance, the near and far clipping limits, and the pan and zoom sensitivities are all worked
+out from the size of your scene, using a 20-unit scene as the baseline.
+
+**This only happens if you pass no camera options at all.** Supplying any camera option switches the
+calculation off completely, and your values are used exactly as given.
+
+The practical consequence: a set of camera options that felt right for one model can feel wrong for a
+model ten times the size, because you have opted out of the scaling that would have adapted them. If a
+camera behaves oddly after a change of scale, try removing the options and letting them be derived.
+
+## Drawing a tag gives you back the tag
+
+Almost everything you draw gives you back a mesh or a scene object. Tags are the exception.
+
+A tag is a text label. It is not geometry - it is an HTML element sitting on top of the canvas, moved
+to follow a point in the scene. So drawing one gives you back the tag itself.
+
+You update it the same way as anything else, by passing what you got back into the next draw call. But
+if you are storing drawn results and expecting them all to be meshes, tags will not be.
+
+## A decal needs its material switched on
+
+Applying a decal to a mesh takes two steps, not one. Assigning the decal is the first. The mesh's
+material also has to have decals enabled on it.
+
+Doing only the first renders nothing at all, which looks like the feature is broken rather than
+half-configured.
 
 ---
 > Source: [bitbybit-dev/bitbybit](https://github.com/bitbybit-dev/bitbybit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
