@@ -1,149 +1,148 @@
 ---
 trigger: always_on
-description: Minimalist coding mindset based on DietrichGebert/ponytail. Teaches the AI to write only what is strictly necessary. Uses a 7-rung ladder: YAGNI → reuse → stdlib → platform → deps → one-liner → minimum. Minimizes unnecessary boilerplate and over-engineering while keeping all safety, validation and security guards.
+description: Agent-requested: invoke when working on Application Security. ContextOS rules for security
 ---
 
 
-# Skill: ponytail-mindset
+# Skill: Application Security
 
-# ponytail-mindset
+# security
 
 ## Overview
 
-Minimalist engineering discipline that eliminates over-engineering and premature abstraction while maintaining 100% of required validation, type safety, error boundaries, and security invariants.
+Enforces zero-trust defense-in-depth, OWASP API Top 10 mitigation, cryptographic hardening, sensitive data leakage protection, and AI/LLM safety across all services, endpoints, and agent integrations.
 
 ## When to Use
 
-Activate on all BUILD phases to prevent bloated implementations and enforce concise, focused solutions.
+Activate whenever writing authentication, authorization, session management, database queries, cryptography, external API integrations, user input handling, or agent tool calling.
 
 ## Rules & Patterns
 
-Based on [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail).
+### Negative Constraints (What NOT to Do)
 
-> _He says nothing. He writes one line. It works._
-
-**Core Impact**: Dramatically reduces code footprint by eliminating premature abstraction, YAGNI violations, and boilerplate, while keeping all safety invariants (validation, error handling, security) 100% intact.
-
----
-
-### Core Principle
-
-> **The best code is code you don't write.**  
-> Write only what the task strictly needs. Lazy about the solution, never about reading and understanding.
+1. **NEVER use standard string comparison (`===`) for secrets/hashes**: Always use `crypto.timingSafeEqual` to prevent timing attacks.
+2. **NEVER store sensitive JWT access/refresh tokens in `localStorage`**: Store tokens in `httpOnly`, `Secure`, `SameSite=Strict` cookies.
+3. **NEVER return raw database/internal error messages or stack traces to the client**: Return standardized generic error codes (`INTERNAL_SERVER_ERROR`) and log details internally.
+4. **NEVER trust client-provided IDs for authorization without tenant/ownership checks**: Always verify `where: { id, userId: session.userId }` to prevent Broken Object Level Authorization (BOLA/IDOR).
+5. **NEVER disable CSRF protection, CORS allow-all (`*`), or TLS verification (`NODE_TLS_REJECT_UNAUTHORIZED=0`) in production**: Always enforce strict origin whitelists and HTTPS.
+6. **NEVER pass un-sanitized third-party content directly into system prompts or shell execution**: Treat all external data as potentially adversarial.
 
 ---
 
-### The 7-Rung Decision Ladder
+### OWASP Top 10 for Modern APIs & Full-Stack
 
-**Before writing ANY code**, stop and check each rung in order. Stop at the first rung that holds:
+#### 1. Injection (SQL, NoSQL, Command)
 
-```text
-1. Does this need to exist?
-   → No: YAGNI — skip it entirely. Don't build for "future use."
+- Always use parameterized queries — never concatenate user input into SQL or shell commands.
+- Use ORMs (Prisma, Drizzle, SQLAlchemy) with strict schema validation.
+- Validate and sanitize all user input before processing.
 
-2. Already in this codebase or component library?
-   → Yes: Reuse it. Don't rewrite. Call the existing function/component/module.
-   → For UI: Check shadcn/ui FIRST. Before building a complex UI element from scratch, check if it exists in the component library. If yes, generate the install command: npx shadcn@latest add dialog — never manually rewrite what shadcn already provides.
+#### 2. Broken Object Level Authorization (BOLA / IDOR)
 
-3. Standard library does it?
-   → Yes: Use it. Don't write formatDate() — use Intl.DateTimeFormat or dayjs.
+- Validate user ownership on EVERY database read, update, or delete:
 
-4. Native platform feature?
-   → Yes: Use it. Don't install flatpickr when <input type="date"> exists.
-   → Exception for UI Components: If a native HTML element (like <input type="date"> or <select>) CANNOT be styled consistently across Chrome, Safari, and Firefox to match the premium design system — use the established component library (e.g., shadcn/ui <DatePicker>, <Select>) instead. Cross-browser inconsistency is a legitimate reason to NOT use native.
+  ```typescript
+  // [GOOD] Scoped to authenticated user
+  const doc = await db.document.findFirst({
+    where: { id: documentId, tenantId: session.tenantId }
+  });
+  ```
 
-5. Already-installed dependency?
-   → Yes: Use it. Don't install a new library to do what an existing one can.
+#### 3. Broken Authentication & Session Management
 
-6. Can it be done in one line?
-   → Yes: One line. No abstraction layer needed.
+- Use Argon2id or bcrypt (cost factor ≥ 12) for password hashing.
+- Short-lived access tokens (15 min) + secure HTTP-only refresh tokens.
+- Enforce rate limiting and brute-force lockouts on auth endpoints.
 
-7. Only then: write the MINIMUM that works.
-   → No classes when a function works. No module when an inline does.
+#### 4. SSRF (Server-Side Request Forgery)
+
+- Restrict server-side URL fetching: validate URL scheme (`https:` only), resolve IP, and block private CIDR blocks (`10.0.0.0/8`, `127.0.0.0/8`, `169.254.0.0/16`, `192.168.0.0/16`).
+
+#### 5. Security Misconfiguration & Headers
+
+Enforce modern production security headers:
+
+```http
+Content-Security-Policy: default-src 'self'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
 ```
 
 ---
 
-### The Rule of Three (Do Not Abstract Early)
+### AI Agent & LLM Security Invariants
 
-- **First occurrence**: Write it inline directly where it is needed.
-- **Second occurrence**: Duplicate it cleanly. Duplication is cheaper than the wrong abstraction.
-- **Third occurrence**: Only now extract a shared helper or utility.
+When building AI workflows, tools, or MCP servers:
 
----
-
-### 10 Concrete Over-Engineering Red Flags
-
-1. Creating a `GenericRepository<T>` when you only have 2 database tables.
-2. Creating a custom state machine or complex reducer for 2 boolean flags.
-3. Adding a configuration file or environment variables for values that never change.
-4. Writing custom retry/circuit-breaker logic when native `fetch` or SDK already handles it.
-5. Building a generic `BaseService` with 15 hook methods implemented by only one class.
-6. Wrapping every standard library call in a custom helper class (`StringUtils`, `DateUtils`, `ObjectUtils`).
-7. Creating a multi-level folder structure (`domains/auth/adapters/driving/rest/controllers/dto/`) for a 30-line microservice.
-8. Writing custom mock frameworks when Vitest/Jest/Node test runner provide standard mocks.
-9. Installing a 50KB npm package for a 3-line utility (e.g. `left-pad`, `is-number`, `deep-clone`).
-10. Pre-optimizing caching and indexing for endpoints serving 10 requests a day.
-
----
-
-### The Sacred Exceptions (NEVER Cut These)
-
-The ladder applies to features and abstractions. These 4 areas are **non-negotiable** and **never simplified away**:
-
-#### 1. Input Validation
-
-```javascript
-// [GOOD] Always validate — even if "internal" API
-function createUser(data) {
-  if (!data.email || !isValidEmail(data.email)) {
-    throw new ValidationError('Invalid email');
-  }
-  return db.insert('users', data);
-}
-
-// [BAD] Never skip validation for "speed"
-function createUser(data) {
-  return db.insert('users', data); // NEVER
-}
-```
-
-#### 2. Error Handling
-
-```javascript
-// [GOOD] Always handle errors explicitly
-async function fetchUser(id) {
-  try {
-    const user = await db.findById(id);
-    if (!user) throw new NotFoundError(`User ${id} not found`);
-    return user;
-  } catch (err) {
-    logger.error('fetchUser failed', { id, err });
-    throw err;
-  }
-}
-```
-
-#### 3. Security Checks
-
-- Authorization check BEFORE every query or mutation.
-- Parameterized queries everywhere — zero string concatenation in SQL.
-- Strict sanitization of all rendered HTML and markdown.
-
-#### 4. Type Safety & Behavioral Tests
-
-- Strict TypeScript types — no `any` evasion.
-- Tests covering happy path, 4xx, and 5xx edge cases.
+1. **Prompt Injection Defense**:
+   - Clearly delineate untrusted user/web content using boundary markers (e.g. `<untrusted_content>` tags).
+   - Never allow untrusted content to override system instructions or tool execution permissions.
+2. **Tool Execution Boundaries**:
+   - Destructive operations (database drops, file deletions, payment triggers) MUST require explicit user confirmation.
+   - Restrict file system tools to the workspace root — block directory traversal (`../`).
+3. **Secret Masking & Output Sanitization**:
+   - Scrub API keys (`sk-...`, `Bearer ...`), tokens, and credentials before writing to agent logs or step summaries.
 
 ---
 
 ## Code Examples
 
-### Native Platform vs Over-Built Package
+### Timing-Safe Secret Verification
 
-**Over-build**:
+```javascript
+import crypto from 'node:crypto';
 
-```bash
+export function verifyWebhookSignature(payload, signature, secret) {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = Buffer.from(hmac.update(payload).digest('hex'), 'utf8');
+  const sigBuffer = Buffer.from(signature, 'utf8');
+
+  if (digest.length !== sigBuffer.length) return false;
+  return crypto.timingSafeEqual(digest, sigBuffer);
+}
+```
+
+### Safe SSRF Prevention Wrapper
+
+```typescript
+import dns from 'node:dns/promises';
+
+export async function validateSafeUrl(urlString: string): Promise<URL> {
+  const parsed = new URL(urlString);
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Only HTTPS protocol is permitted');
+  }
+
+  const { address } = await dns.lookup(parsed.hostname);
+  if (
+    address.startsWith('127.') ||
+    address.startsWith('10.') ||
+    address.startsWith('192.168.') ||
+    address === '169.254.169.254'
+  ) {
+    throw new Error('Access to private/metadata IP addresses is blocked');
+  }
+
+  return parsed;
+}
+```
+
+---
+
+## Validation Checklist
+
+- [ ] All database queries parameterized or managed by type-safe ORM.
+- [ ] BOLA/IDOR prevented: all entity queries scoped by tenant/user id.
+- [ ] Cookies set with `HttpOnly`, `Secure`, and `SameSite=Strict` or `Lax`.
+- [ ] Passwords hashed with Argon2id / bcrypt.
+- [ ] Security headers active in middleware/reverse proxy.
+- [ ] No secrets or tokens checked into source control or exposed in logs.
+
+---
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
