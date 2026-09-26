@@ -1,89 +1,119 @@
 ---
 trigger: always_on
-description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+description: The Agent is the central component that connects CI/CD job lifecycle with runtime events.
 ---
 
-# Agent Guide for opentelemetry-go
+# Agent Architecture
 
-This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+The Agent is the central component that connects CI/CD job lifecycle with runtime events.
 
-Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
-Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
+One agent process runs on one host and can observe multiple CI/CD jobs at the same time.
+Kernel-side observation is handled with eBPF. Job lifecycle and rule evaluation are handled in userspace.
 
-## Core expectations
+## Architecture
 
-- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
-- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
-- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
-- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
-- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
-- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
-- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
-- Keep dependencies minimal and justified.
-- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
-- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
-- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
+```mermaid
+flowchart TB
+    START["host start / project start"]
+    PROXY["dockerd proxy"]
 
-## Default workflow
+    subgraph A["Agent"]
+        direction TB
+        L["Listener<br/>(Unix socket)"]
 
-For new features and behavior changes, use this order unless the task explicitly says otherwise:
+        subgraph JR["JobRegistry"]
+            direction TB
+            subgraph JOBS["Jobs"]
+                direction TB
+                EVAL["Evaluation"]
+                SCOPE["Scope<br/>host / project"]
+            end
+        end
 
-1. Read the relevant package, its tests, and any package docs or `README.md`.
-2. Add or update a failing unit test that captures the required behavior or regression.
-3. Implement the smallest change that makes the test pass.
-4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
-5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
-6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
-7. Run `make precommit` each time before considering the work complete.
+        subgraph KR["eBPF Runtime · Agent userspace"]
+            direction TB
+            KT["KernelTracker<br/>Job state management<br/>(cgroup / process tracking)"]
+            subgraph KIO["KernelIO"]
+                direction TB
+                BIO["BPF load / map / ringbuf I/O"]
+                UPROBE["HTTP uprobe worker<br/>one owner goroutine<br/>(when enabled)"]
+            end
+            KT -->|"map operations"| BIO
+            BIO -->|"raw ringbuf samples"| KT
+            BIO -->|"mapping control samples"| UPROBE
+            KT -->|"reconcile input"| UPROBE
+        end
 
-For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
+        subgraph OUT["Outputs"]
+            direction TB
+            LOGS["Job logs"]
+            RESULT["Project result"]
+        end
+    end
 
-## Verification
+    K["eBPF Runtime · Linux kernel<br/>programs / maps / ringbuf<br/>uprobe attachments"]
 
-- Use `make` as the canonical repository verification command. The default target is `precommit`.
-- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
-- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
-- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
+    START --> L
+    PROXY --> L
+    L --> JOBS
+    KT -->|"EventRecord"| EVAL
+    EVAL --> SCOPE
+    JR -->|"tracking commands"| KT
+    BIO <-->|"load / attach / read"| K
+    UPROBE -->|"attach / close"| K
+    SCOPE --> LOGS
+    SCOPE --> RESULT
 
-## Documentation and changelog
+    classDef agentOuter fill:transparent,stroke:#0f766e,color:#064e3b,stroke-width:2px;
+    classDef registry   fill:#d1fae5,stroke:#0f766e,color:#064e3b,stroke-width:1px;
+    classDef kernel     fill:#ccfbf1,stroke:#0f766e,color:#134e4a,stroke-width:1px;
+    classDef outputs    fill:#dcfce7,stroke:#0f766e,color:#14532d,stroke-width:1px;
+    classDef leaf       fill:#ffffff,stroke:#94a3b8,color:#374151,stroke-width:1px;
+    class A agentOuter
+    class JR,JOBS registry
+    class KR kernel
+    class OUT outputs
+    class L,EVAL,SCOPE,KT,BIO,UPROBE,LOGS,RESULT leaf
+```
 
-- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
-- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
-- Prefer examples over long code snippets in GoDoc when practical.
-- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
-- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
-  - Always put the PR number at the end of the line (e.g., `(#1234)`), NOT the issue number.
-  - If the PR number is not yet known, omit it until the PR is created, then update the changelog entry before merging.
-  - Always use references to the go module that is updated (e.g., `go.opentelemetry.io/otel/sdk/metric`), instead of just the path (e.g., `sdk/metric`).
+This diagram is the reference point for reading the Agent implementation.
+`host start`, `project start`, and dockerd proxy staging requests enter the Agent through the Listener over a Unix socket.
+JobRegistry issues tracking commands to KernelTracker.
+Scope owns rule, summary, and output state, but it does not operate
+KernelTracker or KernelIO directly. Together with the programs and resources
+loaded into the Linux kernel, KernelTracker and KernelIO form the
+**eBPF Runtime** described in the dedicated developer-guide chapter. eBPF
+Runtime is an architectural layer, not a separate process or Go component.
 
-## Repository habits
+## Concepts
 
-- Prefer focused diffs. Avoid drive-by cleanup.
-- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
-- Generated files are checked in. If your change affects generation, keep generated output up to date.
-- Prefer fast local search tools such as `rg` when exploring the repository.
-- When changing behavior, make the invariants explicit in tests.
+### Job
 
-## Personas
+A **Job** is one CI/CD job tracked by the Agent. It is identified by the provider-supplied job identity (repository, workflow run, job name, runner) and owns its own cgroup tracking, rule evaluation, scope-local summaries, and outputs. The Agent can run many Jobs at the same time; each Job is finalized independently when its work completes.
 
-### Feature Agent
+The Agent separates job identity from job metadata.
+Identity is required to register and track a Job.
+Metadata is attached to the Job for logs, reports, and search.
 
-Use this persona for new behavior, new API surface, or spec-driven feature work.
+| Category | Fields | Required | Purpose |
+| --- | --- | --- | --- |
+| Job identity | `provider`, `provider_host`, `project_path` | Yes | Common provider identity for every Job |
+| GitHub identity | `github_run_id`, `github_job`, `github_run_attempt`, `github_runner_tracking_id` | Yes for GitHub Jobs | Identifies a GitHub Actions job run attempt and runner tracking ID |
+| GitLab identity | `gitlab_job_id` | Yes for GitLab Jobs | Identifies a GitLab CI job execution |
+| Job metadata | `commit_sha`, `ref_name`, `trigger`, `actor_id`, `actor_name`, `github_workflow_ref`, `github_workflow_sha`, `github_workflow`, `gitlab_job_name`, `gitlab_config_ref_uri` | No | Enriches logs, reports, and triage |
 
-- Start with a failing unit test.
-- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
-- Implement the smallest viable change.
-- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
-- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
+### Scope
 
-### Refactoring Agent
+A **Scope** is the configuration / control surface attached to a Job. Two kinds exist, and a single Job may have one or both:
 
-Use this persona when improving structure without intentionally changing behavior.
+| Scope | Owner | Where it comes from | Typical setup |
+| --- | --- | --- | --- |
+| **Host scope** | Host operator (e.g., the platform team that installs cicd-sensor on the runner host) | `host start` from a runner hook | Self-hosted runners, where the agent is provisioned by infrastructure |
+| **Project scope** | Project / repository operator (e.g., the team owning the workflow) | `project start` from the cicd-sensor-action (or equivalent) | GitHub-hosted runners, where each workflow brings its own configuration through the Action |
 
-- Treat behavior preservation as the default contract.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cicd-sensor/cicd-sensor](https://github.com/cicd-sensor/cicd-sensor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
