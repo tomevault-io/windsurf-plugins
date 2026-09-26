@@ -1,108 +1,67 @@
 ---
 trigger: always_on
-description: This document provides comprehensive guidelines for developing and extending VAMS backend APIs and CDK infrastructure. Follow these rules to ensure consistency, quality, and maintainability across all backend and infrastructure implementations.
+description: Auto-loaded when Claude Code operates within `infra/lib/nestedStacks/pipelines/`. Covers pipeline stack layout, required Lambda package layout in `backendPipelines/`, VPC builder wiring, sub-process and log registration wiring, and S3 output path conventions. See `infra/CLAUDE.md` for cross-stack patterns (lambda builder, service helper, security helpers).
 ---
 
-# VAMS Backend + CDK Development Workflow & Rules
+# CLAUDE.md -- VAMS Pipeline Nested Stacks
 
-This document provides comprehensive guidelines for developing and extending VAMS backend APIs and CDK infrastructure. Follow these rules to ensure consistency, quality, and maintainability across all backend and infrastructure implementations.
+Auto-loaded when Claude Code operates within `infra/lib/nestedStacks/pipelines/`. Covers pipeline stack layout, required Lambda package layout in `backendPipelines/`, VPC builder wiring, sub-process and log registration wiring, and S3 output path conventions. See `infra/CLAUDE.md` for cross-stack patterns (lambda builder, service helper, security helpers).
 
-## 🏗️ **Architecture Overview**
+---
 
-### **File Structure Standards**
+## Pipeline Nested Stack Pattern
+
+Each pipeline follows a consistent structure:
 
 ```
-backend/
-├── backend/
-│   ├── handlers/                # Lambda function handlers (one per API domain)
-│   │   ├── assets/             # Asset-related handlers
-│   │   │   ├── assetService.py # GOLD STANDARD implementation
-│   │   │   ├── createAsset.py  # Asset creation handler
-│   │   │   └── uploadFile.py   # File upload handler
-│   │   ├── databases/          # Database-related handlers
-│   │   └── [domain]/           # Other domain handlers
-│   ├── models/                 # Pydantic request/response models
-│   │   ├── assetsV3.py        # Asset API models (GOLD STANDARD)
-│   │   ├── common.py          # Common response models
-│   │   └── [domain].py        # Domain-specific models
-│   ├── common/                # Shared utilities
-│   │   ├── constants.py       # Constants and configuration
-│   │   ├── validators.py      # Input validation functions
-│   │   └── dynamodb.py        # DynamoDB utilities
-│   └── customLogging/         # Logging utilities
-├── tests/                     # Test files (mirror handler structure)
-│   ├── handlers/              # Handler tests
-│   ├── models/                # Model tests
-│   └── conftest.py           # Test configuration
-└── requirements.txt          # Python dependencies
-
-infra/
-├── lib/
-│   ├── nestedStacks/
-│   │   ├── apiLambda/         # API Gateway and Lambda definitions
-│   │   │   ├── apiBuilder-nestedStack.ts  # API route definitions
-│   │   │   └── constructs/    # Custom constructs
-│   │   └── storage/           # Storage resource definitions
-│   │       └── storageBuilder-nestedStack.ts  # DynamoDB, S3, SNS
-│   ├── lambdaBuilder/         # Lambda function builders
-│   │   ├── assetFunctions.ts  # Asset lambda builders
-│   │   └── [domain]Functions.ts  # Domain lambda builders
-│   └── helper/                # CDK helper utilities
-└── config/                   # Configuration files
+lib/nestedStacks/pipelines/{category}/{pipelineName}/
+    {pipelineName}Builder-nestedStack.ts    # Stack definition
+    constructs/
+        {pipelineName}-construct.ts         # Infrastructure construct
+    lambdaBuilder/
+        {pipelineName}Functions.ts          # Lambda builder functions
 ```
 
-## 📋 **Development Workflow Checklist**
+**CRITICAL — Pipeline Lambda Directory Structure:** Every pipeline's `lambda/` directory in `backendPipelines/` MUST include:
 
-### **Phase 1: Pre-Implementation**
+```
+lambda/
+  __init__.py                    # Package marker (copy from existing pipeline)
+  customLogging/
+    __init__.py                  # Package marker
+    logger.py                    # safeLogger + mask_sensitive_data (copy from existing pipeline)
+  vamsExecute*.py                # Pipeline handler(s)
+  constructPipeline.py           # Batch job definition builder
+  openPipeline.py                # Step Functions starter
+  pipelineEnd.py                 # Cleanup + task token callback
+```
 
--   [ ] **Analyze Requirements**: Understand the new API/feature requirements
--   [ ] **Review Gold Standard**: Study `assetService.py` for implementation patterns
--   [ ] **Plan API Design**: Design request/response models and endpoints
--   [ ] **Plan CDK Changes**: Identify required infrastructure changes
--   [ ] **Plan Authorization**: Determine permission requirements and object types
--   [ ] **Plan Frontend Integration**: Identify frontend service changes needed
--   [ ] **Plan CLI Integration**: Identify CLI command changes needed
--   [ ] **Plan Documentation**: Identify documentation updates required
+Without `__init__.py` and `customLogging/logger.py`, Lambda will fail at import time with `No module named 'customLogging'`. Copy these files from any existing pipeline (e.g., `backendPipelines/3dRecon/splatToolbox/lambda/`).
 
-### **Phase 2: Implementation**
+Pipelines are conditionally created in `pipelineBuilder-nestedStack.ts` based on config flags.
 
-#### **Step 1: Backend Models (Pydantic)**
+**CRITICAL — VPC Builder Updates:** A new pipeline using AWS Batch, ECS, or Fargate must be added to condition blocks in `lib/nestedStacks/vpc/vpcBuilder-nestedStack.ts` — **which ones depends on the subnets its compute runs in.** Decide that first, by looking at what `pipelineBuilder-nestedStack.ts` passes as the pipeline's `pipelineSubnets`: `pipelineNetwork.isolatedSubnets.pipeline` or `pipelineNetwork.privateSubnets.pipeline`. Search for `useSplatToolbox` (private) and `usePreview3dThumbnail` (isolated) to see both treatments.
 
--   [ ] **Create Request Models**: Add Pydantic models in `models/[domain].py`
--   [ ] **Create Response Models**: Add response models with proper typing
--   [ ] **Add Validation Logic**: Include `@root_validator` for complex validation
--   [ ] **Follow Gold Standard**: Use `assetsV3.py` patterns for validation
--   [ ] **Import in Models**: Add new models to appropriate `__init__.py`
+| Block                                                                       | Isolated-subnet pipeline | Private-subnet pipeline |
+| --------------------------------------------------------------------------- | ------------------------ | ----------------------- |
+| 1. **Subnet creation** — pushes `subnetPublicConfig`/`subnetPrivateConfig`  | **No**                   | **Yes**                 |
+| 2. **Pipeline-only endpoints** — Batch, ECR API, ECR Docker, optionally EFS | **Yes**                  | **Yes**                 |
+| 3. **ECS endpoint** — the `needsEcsPrivate` variable                        | **No**                   | **Yes**                 |
 
-#### **Step 2: Backend Handler Implementation**
+-   **Block 2 is required either way.** Without it, Batch jobs cannot pull their container image, and the pipeline fails at task start with no obvious cause.
+-   **Block 1 for a private-subnet pipeline only.** `subnetPrivateConfig` is `PRIVATE_WITH_EGRESS` and the `ec2.Vpc` sets no `natGateways`, so CDK creates **one NAT gateway per Availability Zone** (~$66/month at the default two AZs, plus data processing). Add an isolated-subnet pipeline here and that cost is incurred for subnets its ENIs never occupy. Omit it for a private-subnet pipeline and its compute environment fails with `"Resource subnets are required"`.
+-   **Block 3 for a private-subnet pipeline only.** This is the ECS **control-plane** endpoint, which the ECS agent on an EC2-launch-type container instance needs. **Fargate tasks do not use it** — they need ECR, Amazon S3 and CloudWatch Logs, which block 2 supplies. Each endpoint adds one ENI per AZ (~$15/month).
 
--   [ ] **Create Handler File**: Add handler in `handlers/[domain]/[handler].py`
--   [ ] **Follow Gold Standard**: Use `assetService.py` patterns for structure
--   [ ] **Implement Error Handling**: Use comprehensive try/catch with proper exceptions
--   [ ] **Add Authorization**: Include Casbin enforcement with object-type checking
--   [ ] **Add Logging**: Use `safeLogger` for structured logging
--   [ ] **Add Environment Variables**: Load required environment variables with error handling
--   [ ] **Add AWS Clients**: Configure AWS clients with retry configuration
--   [ ] **Implement Business Logic**: Separate business logic from request handling
--   [ ] **Add Response Enhancement**: Include version info and bucket details where applicable
+Six pipelines run in isolated subnets today (3dBasic, CAD/mesh metadata extraction, Potree viewer, 3D thumbnail, GenAI metadata labeling, coordinate transform) and appear in block 2 only. Four run in private subnets (Splat Toolbox, NVIDIA Cosmos, NVIDIA GR00T, Isaac Lab training) and appear in all three. Regression coverage: `infra/test/pipelines/coordinateTransformVpcPlacement.test.ts`, which asserts both directions — no NAT for an isolated-subnet pipeline, NAT present for a private-subnet one.
 
-#### **Step 3: CDK Infrastructure**
+### Sub-Process and Log Registration Wiring
 
--   [ ] **Update Storage Resources**: Add new DynamoDB tables/S3 buckets in `storageBuilder-nestedStack.ts`
--   [ ] **Create Lambda Builder**: Add lambda function builder in `lambdaBuilder/[domain]Functions.ts`
--   [ ] **Configure Environment Variables**: Pass storage resources to lambda environment
--   [ ] **Configure Permissions**: Grant appropriate DynamoDB/S3/SNS permissions
--   [ ] **Configure VPC**: Add VPC/subnet configuration based on config flags
--   [ ] **Add KMS Permissions**: Include KMS key permissions for encryption
--   [ ] **Add API Routes**: Register routes in `apiBuilder-nestedStack.ts`
--   [ ] **Follow Naming Conventions**: Use consistent naming patterns
+The lambda that starts the pipeline's state machine (or submits a Batch job itself) registers its sub-process and log sources on the orchestration bus (`backendPipelines/CLAUDE.md` "Registering Sub-Processes and Logs"). Its builder supplies:
 
-#### **Step 4: API Gateway Integration**
-
--   [ ] **Add Route Definitions**: Use `attachFunctionToApi` for route registration
+-   `ORCHESTRATION_BUS_NAME: orchestrationBus.eventBusName` and `orchestrationBus.grantPutEventsTo(fun)`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [awslabs/visual-asset-management-system](https://github.com/awslabs/visual-asset-management-system) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
