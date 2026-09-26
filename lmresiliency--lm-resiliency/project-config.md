@@ -1,79 +1,119 @@
 ---
 trigger: always_on
-description: LM Resiliency protects long-running distributed LLM training with two complementary mechanisms:
+description: GEMINI captures training state into host memory, replicates it to a peer, and optionally persists it to node-local storage.
 ---
 
-# LM Resiliency Codex Guidance
+# GEMINI
 
-## Repository purpose
+GEMINI captures training state into host memory, replicates it to a peer, and optionally persists it to node-local storage.
+It provides a fast recovery tier for PyTorch, TorchTitan, Megatron Core, and DeepSpeed while leaving durable global checkpointing to the training framework.
 
-LM Resiliency protects long-running distributed LLM training with two complementary mechanisms:
+For the system design and evaluation, see [GEMINI: Fast Failure Recovery in Distributed Training with In-Memory Checkpoints](https://doi.org/10.1145/3600006.3613145).
+This guide defines the operational contract of the current implementation.
 
-- **GEMINI** provides frequent asynchronous in-memory checkpoints, peer replication, and fast recovery.
-- **SCOUT** detects and localizes silent data corruption (SDC), stragglers, collective desynchronization, process stalls, and selected hardware failures, and participates in checkpoint certification.
+## Architecture
 
-Correctness under partial failure is more important than convenience. Prefer conservative behavior when evidence is incomplete or contradictory.
+Checkpoint work is pipelined after each capture:
 
-## Working guidance
+1. GEMINI copies the current model, optimizer, and caller-owned state from GPU to pinned CPU memory.
+2. A background completion worker waits for the host copy and immediately starts replication to a paired rank.
+3. Node-local serialization runs independently at the configured flush cadence.
 
-- Read `CONTRIBUTING.md` before changing code.
-- For checkpoint or recovery changes, read `docs/gemini.md` and the relevant tests.
-- For detection, replay, consensus, hang, telemetry, or checkpoint-certification changes, read `docs/scout.md` and the relevant tests.
-- For public APIs, framework adapters, package imports, or supported versions, read `docs/compatibility.md` and `docs/api.md`.
-- Treat this file as review guidance, not as a replacement for tests or the documented runtime contracts.
-- Do not duplicate deterministic CI feedback. Ruff, formatting, pre-commit, packaging, and the CPU unit suite are handled by CI.
-- Do not weaken a documented safety property merely to make a test pass. Update implementation, tests, and documentation together when the contract intentionally changes.
-- Keep optional framework dependencies lazy. Importing `lm_resiliency` must not require DeepSpeed, Megatron Core, TorchTitan, Triton, or CUDA-only packages.
+The asynchronous GPU-to-CPU copy records a CUDA event.
+`maybe_wait()` waits for the completion worker and therefore guarantees that peer replication has been launched.
+This boundary prevents a checkpoint from mixing state from two optimizer steps.
 
-## Pull request review workflow
+Replication can span several training steps, but it must complete before the source buffer is reused at the next capture.
+Transfers are divided into fixed-size chunks to bound head-of-line interference with training communication.
 
-Use Codex review in batches rather than after every revision commit.
+## Buffer Layout
 
-Do not begin editing when the first review comment arrives.
+Replicated mode allocates four host slots lazily on the first capture:
 
-For the current PR head SHA:
+| Slot | Role |
+|---|---|
+| `own_current` | Receives the current GPU-to-CPU copy and becomes the replication source |
+| `own_previous` | Retains the prior completed local recovery copy |
+| `peer_current` | Receives the peer's current replica |
+| `peer_previous` | Retains the prior completed peer recovery copy |
 
-1. Wait until the Codex GitHub review has been submitted.
-2. Read every unresolved review thread.
-3. Run a complete independent review of the branch diff against the base branch.
-4. Combine and deduplicate all findings.
-5. Fix every accepted finding in one revision, run the relevant tests, and push once.
-6. Do not request another broad review until this revision is complete.
+Each slot owns its tensor buffers, structural metadata, step, and non-tensor state.
+Non-tensor state includes scheduler, sampler, RNG, and training-position data supplied by the framework adapter or `extra_state_fn`.
+The metadata travels with peer replication so recovery reconstructs the complete captured state.
 
-- The native Codex GitHub integration handles the initial review when a pull request is opened for review or moved from draft to ready.
-- When addressing review feedback, first inspect **all unresolved Codex review threads** and treat the complete set of actionable findings as one fix batch.
-- Implement the whole batch, add or update focused regression tests, run the relevant deterministic checks, and inspect the resulting diff before asking for another review.
-- Do **not** request `@codex review` after each commit, formatting fix, test-only adjustment, or other intermediate revision.
-- Resolve a review thread only after its underlying finding is actually addressed or intentionally rejected with a documented rationale.
-- After the current batch is addressed and the relevant CI checks pass, request **one** fresh `@codex review` to look for newly introduced or previously missed issues.
-- If that re-review produces new actionable findings, repeat the same batch process and request one additional review only after the next batch is complete.
-- A clean later review does not automatically resolve earlier GitHub review threads; verify the old findings are addressed and explicitly resolve those conversations before merge.
+HSDP can skip explicit peer replication because the replica dimension already holds corresponding shards.
+In that mode GEMINI uses two own slots.
 
-## Code Review Rules
+## Peer Replication
 
-Review for concrete correctness, safety, compatibility, and performance regressions. Prefer a small number of high-confidence findings over speculative comments. Do not report style-only issues that deterministic tooling can catch.
+`replication_jump` pairs ranks separated by a fixed world-rank distance.
+The default selects one visible node width so paired ranks normally reside on different hosts.
 
-Use these severities:
+For a world size of 16 and `replication_jump=8`, rank `0` pairs with rank `8`, rank `1` with rank `9`, and so on.
+Validate this assumption when rank placement is not contiguous by node.
 
-- **P0**: can corrupt training state, select unsafe recovery state, cause widespread data loss, or create a severe security issue.
-- **P1**: can deadlock/hang workers, misattribute a failure, break recovery, violate a documented compatibility contract, or introduce a major regression in a supported path.
-- **P2**: real but narrower correctness, robustness, test-coverage, or performance issue that should be fixed before relying on the affected path.
+The built-in replication path uses a dedicated Gloo process group.
+It is validated for correctness over TCP and is not a line-rate RDMA implementation.
+Production deployments can use manager-driven Torch Distributed or NIXL transfer APIs for replacement workflows, but automatic checkpoint replication currently uses Gloo.
+Manager-driven transfers bind a key to endpoint and tensor metadata, verify per-chunk checksums, and use bounded waits.
+The torch-distributed backend communicates on a dedicated Gloo group and requires both endpoints; fallback from one-sided NIXL is therefore explicit rather than automatic.
 
-For every finding, explain the concrete failure mode and point to the smallest relevant file/line range. Do not raise a finding when the concern is only hypothetical and cannot be tied to reachable behavior.
+`replication_chunk_size` limits the largest in-flight transfer unit.
+Choose it from measured training communication slack rather than assuming a fixed network rate:
 
-### Distributed correctness and liveness
+```python
+from lm_resiliency import estimate_chunk_size
 
-- Verify all participating ranks execute compatible collectives in the same order and with compatible tensor metadata.
-- Flag one-sided waits, mismatched barriers, lock ordering hazards, background-thread races, unsafe process-group reuse/destruction, and shutdown paths that can strand peers.
-- Treat timeout, cancellation, signal, exception, worker-loss, and partial-initialization paths as first-class behavior.
-- Check that rank-local decisions do not accidentally become job-wide decisions without consensus, and that job-wide decisions are actually agreed across the required ranks.
-- Preserve topology semantics across DP, DDP, FSDP/HSDP, TP, SP, CP, PP, EP, expert TP, ZeRO, and framework-specific process groups when the changed code applies to them.
+chunk_size = estimate_chunk_size(
+    nic_bandwidth_gbps=400,
+    layer_compute_ms=9.4,
+    ag_time_ms=1.0,
+    max_ag_delay_fraction=0.05,
+)
+```
 
-### GEMINI checkpoint and recovery invariants
+The default is 16 MiB.
+The estimator returns a bound derived from the supplied bandwidth and prefetch timing; it is not an automatic network profiler.
 
+## Configuration
+
+```python
+from lm_resiliency import InMemoryCkptConfig
+
+config = InMemoryCkptConfig(
+    enable=True,
+    interval=10,
+    replication_jump=-1,
+    replication_chunk_size=16 * 1024 * 1024,
+    disk_flush_interval=100,
+    disk_folder="./checkpoints",
+    run_id="training-run-2026-08-15",
+    verify_integrity=False,
+    skip_replication_if_hsdp=True,
+    pin_memory=True,
+)
+```
+
+| Field | Meaning |
+|---|---|
+| `interval` | Capture cadence in optimizer steps when GEMINI runs independently |
+| `replication_jump` | Peer rank spacing; `-1` uses the visible GPU count |
+| `replication_chunk_size` | Bytes per replication send |
+| `disk_flush_interval` | Node-local flush cadence; `0` disables periodic flush |
+| `disk_folder` | Node-local checkpoint directory |
+| `run_id` | Stable identity required to resume this run's node-local files |
+| `verify_integrity` | Store and verify CRC-32 for serialized shards |
+| `skip_replication_if_hsdp` | Use natural HSDP replicas instead of explicit peer transfer |
+| `pin_memory` | Allocate page-locked host buffers for asynchronous copies |
+
+The unified `enable_resiliency(..., interval=N)` call overrides the component interval.
+
+Set `run_id` to the same non-empty value on every rank and reuse it only for an
+intentional resume. When it is omitted, GEMINI uses `LM_RESILIENCY_RUN_ID` or
+torchrun's `TORCHELASTIC_RUN_ID`; without either launcher identity it coordinates
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [LMResiliency/lm-resiliency](https://github.com/LMResiliency/lm-resiliency) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
