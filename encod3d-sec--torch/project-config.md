@@ -1,57 +1,55 @@
 ---
 trigger: always_on
-description: | Operation | Action |
+description: - Use Obsidian wiki links: `[[Page Title]]` or `[[Page Title|display text]]`
 ---
 
-# Pentesting & Bug Bounty Wiki: Schema
+# Wiki Conventions
 
----
+## Cross-referencing
 
-## Quick reference
+- Use Obsidian wiki links: `[[Page Title]]` or `[[Page Title|display text]]`
+- Link to the exact page title as it appears in `index.md`.
+- In technique pages, link tools on first mention. In tool pages, link techniques on first mention.
+- Every course page must link to all technique and tool pages it covers.
+- Target pages link to technique pages used during the engagement.
 
-| Operation | Action |
-|---|---|
-| Query | `qmd_query "..."` via `wiki-search` MCP -> read results -> synthesise |
-| Ingest skip check | Read frontmatter only; skip page if ingest slug already in `sources:` |
-| Re-index / wiki status | `wiki` skill |
-| Git clone | Always WSL: `wsl -d kali-linux -u kali -- git clone <url> /home/kali/<name>` |
-| Run tooling against a target | Kali VM over SSH: `bash /root/vm.sh '<cmd>'` (VPN route + tools + chromium live there) -> `docs/virtual-machine.md` |
+## Log format
 
----
+Each entry must start with a consistent header (grep-parseable):
 
-## Skills and tools
+```
+## [YYYY-MM-DD] ingest:cpts | Module Name
+## [YYYY-MM-DD] ingest:portswigger | Module Name
+## [YYYY-MM-DD] ingest:thm | Section Name (N rooms)
+## [YYYY-MM-DD] ingest:research | Source Title
+## [YYYY-MM-DD] target | Target Name -- phase
+## [YYYY-MM-DD] query | Brief description
+## [YYYY-MM-DD] lint | pass N
+```
 
-| Task                                          | Use                                                                                    |
-| --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Multi-step planning                           | `superpowers:brainstorming` then `superpowers:writing-plans`                           |
-| Execute a plan                                | `superpowers:subagent-driven-development`                                              |
-| Debug unexpected behavior                     | `superpowers:systematic-debugging`                                                     |
-| About to claim done                           | `superpowers:verification-before-completion`                                           |
-| Write/edit vault `.md`                        | `obsidian:obsidian-markdown`                                                           |
-| Fetch URL for ingest                          | `WebFetch` tool                                                                        |
-| Read vault file                               | `Read` tool with machine path (see below)                                              |
-| Search vault                                  | `qmd_query` (semantic) or `qmd_search` (keyword) via `wiki-search` MCP                 |
-| Maintain wiki index (re-index, status)        | `wiki` skill                                                                           |
-| Load engagement playbook / FIND schema        | Read `targets/TARGETS.md`                                                              |
-| Audit CLAUDE.md (full review)                 | `claude-md-management:claude-md-improver`                                              |
-| Update CLAUDE.md (targeted session learnings) | `claude-md-management:revise-claude-md`                                                |
-| Session end / pause work                      | `gsd:pause-work` (optional plugin) or the manual pause-work steps                                                                       |
-| Parallel independent tasks                    | `superpowers:dispatching-parallel-agents`                                              |
-| Run a full bb/pt/ctf engagement autonomously  | `bb-workflow` / `pt-workflow` / `ctf-workflow` skill (driver: `scripts/campaign.py`; the single source of truth for the execution loop) |
-| Check the workflow driver is set up on this machine | `campaign-health` skill (`scripts/campaign-doctor.py`)                            |
-| About to attack a web endpoint                | `hunt-<type>` skill (see auto-triggers below)                                            |
-| Driving a web target through Burp (proxy-history triage, Repeater/Intruder/Collaborator) | `hunt-burp` skill (Burp MCP; setup [[burp-mcp]])              |
-| Starting recon on any target                  | wiki-recon skill                                                                       |
-| Manual login / MFA the agent can't do headlessly (Smart-ID, Mobile-ID, captcha) + drive & observe via CDP | `chrome-devtools-browser` skill (visible chromium on the VM via `scripts/browser-visible.sh` + chrome-devtools MCP) |
-| Manual login / MFA the agent can't do headlessly (Smart-ID, Mobile-ID, captcha) + drive & observe via CDP | `chrome-devtools-browser` skill (visible chromium on the VM via `scripts/browser-visible.sh` + chrome-devtools MCP) |
-| Validating / moving finding to Completed      | triage then evidence skills                                                            |
-| Vuln/CVE research on a target (binary/repo/app/firmware) | `research` skill (scaffolds `raw/research/<project>/`)                       |
-| Hand a fiddly, fully-specified exploit-compile/escalation run to a sub-agent | `delegate` skill (autonomous sub-agent exploit-run; false-root/hostname guardrail mandatory) |
-| Drive msfconsole (recon, exploit search/run, reverse shells, post-ex) | `metasploit` skill (msfconsole framework-driver; cheatsheet [[metasploit]]) |
+Followed by 2-4 bullet points summarising what changed.
 
+## Style guide
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Write in clear, precise prose. No filler.
+- All commands in fenced code blocks with the appropriate language tag (`bash`, `sql`, `python`, etc.).
+- Use `**bold**` for defined terms on first use.
+- Flag uncertainty with `[uncertain]` inline.
+- Flag contradictions between sources with `[contradicts: [[Other Page]]]` inline.
+- Cheatsheets use `#` comments for annotations, not prose.
+- Do not add warnings or legal disclaimers to technique or cheatsheet pages.
+- Never use em-dashes (--) in any output or wiki pages. Use a comma, semicolon, or rewrite the sentence instead.
+- Never use emojis in any output or wiki pages.
+
+## Tag taxonomy
+
+Controlled vocabulary lives in `scripts/tag-vocab.json` (canonical `keep` set, `aliases` for synonyms, `keep_patterns` like `esc\d+`/`cve-*`, `drop` for vague tags). A tag survives only if it is canonical or used >=3x across the corpus; tool names, protocol names, and one-off vague tags are dropped.
+
+- New pages: tag with **domain** (matches the wiki dir), **phase** (recon/enumeration/exploitation/post-exploitation/lateral-movement/privilege-escalation/persistence/evasion), **source** (thm/htb/h1/reference-import/writeup/cve), and specific **topic** tags from the vocabulary. Prefer existing canonical tags over inventing new ones.
+- Don't tag with tool names (find tools by page title) or vague words (meta, technique, session, scripting).
+- After bulk tag edits or before a lint pass, run `python3 scripts/normalize-tags.py` (dry-run) then `--apply`. Idempotent. **Excludes CTF and courses.**
+- To add a synonym merge or rescue a wrongly-dropped tag, edit `tag-vocab.json` and re-run.
 
 ---
 > Source: [Encod3d-Sec/TORCH](https://github.com/Encod3d-Sec/TORCH) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
