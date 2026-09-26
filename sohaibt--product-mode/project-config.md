@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: > For mixed PM + engineering teams working with Claude Code.
+description: > For mixed PM + engineering teams working with AI coding agents (Claude Code, Cursor, Codex, and others).
 ---
 
-# CLAUDE.md Product-Led Collaboration Guidelines
+# Product-Led Collaboration Guidelines
 
-> For mixed PM + engineering teams working with Claude Code.
+> For mixed PM + engineering teams working with AI coding agents (Claude Code, Cursor, Codex, and others).
 > Biases toward *shipping the right thing*, not just shipping fast.
 
 Inspired by [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876) on LLM coding pitfalls, rewritten to cover the failure modes that bite product teams before a single line of code is written: wrong problem, wrong scope, invisible tradeoffs, and unmeasured outcomes.
@@ -135,10 +135,9 @@ For every user-facing or behavior-changing release, define *upfront*:
 - [ ] **How we'll read it** : A/B test, before/after, cohort, qualitative
 
 Rules:
-- Ship instrumentation *in the same change* as the feature. Never "we'll add analytics later."
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sohaibt/product-mode](https://github.com/sohaibt/product-mode) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
