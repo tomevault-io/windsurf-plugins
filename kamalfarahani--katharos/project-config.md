@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to coding agents working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository.
 
 ## Commands
 
@@ -34,8 +34,8 @@ uv run pyright src
 # Multi-version test matrix (py313, py314, lint)
 uv run tox
 
-# Build docs
-cd docs && make html
+# Build docs and treat warnings as errors
+uv run --group docs sphinx-build -W -b html docs docs/_build/html
 ```
 
 ## Architecture
@@ -44,7 +44,7 @@ Katharos is a functional programming library structured in three layers, plus a 
 
 ### Layer 1: Algebraic abstractions (`src/katharos/algebra/`)
 
-Abstract base classes only — no concrete logic. Two independent hierarchies:
+Abstract base classes only - no concrete logic. Two independent hierarchies:
 
 - **Combining**: `Semigroup` (associative `op`, exposed as `@`) → `Monoid` (adds `identity()` classmethod)
 - **Computational context**: `Functor` (`fmap`) → `Applicative` (`pure`, `ap`, exposed as `**`) → `Monad` (`bind`, exposed as `|`; `then`/`>>` for sequencing)
@@ -64,19 +64,19 @@ Each type implements the appropriate algebra interfaces:
 | `MonoidMaybe` | Monoid | Maybe with a monoid instance |
 | `Sum`, `Product` | Monoid | numeric monoids; constrained by the `AdditiveMonoid`/`MultiplicativeMonoid` structural protocols (`src/katharos/types/monoid/`) |
 
-`Maybe` and `Result` are `@final` — do not subclass. Use `is_just()`/`is_nothing()` and `is_success()`/`is_failure()` for state checks rather than type checks.
+`Maybe` and `Result` are `@final` - do not subclass. Use `is_just()`/`is_nothing()` and `is_success()`/`is_failure()` for state checks rather than type checks.
 
-`Result`'s success/failure state is tracked internally, not inferred from the wrapped value's type — so an exception can be carried as a *success* value via `Success`/`pure` without being treated as a `Failure`. `Lazy` runs its fetcher at most once: `.resolve()` memoizes the value (and memoizes a raised exception, re-raising it on every later call); the guard lock is not reentrant, so a fetcher that resolves the same `Lazy` deadlocks.
+`Result`'s success/failure state is tracked internally, not inferred from the wrapped value's type - so an exception can be carried as a *success* value via `Success`/`pure` without being treated as a `Failure`. `Lazy` runs its fetcher at most once: `.resolve()` memoizes the value (and memoizes a raised exception, re-raising it on every later call); the guard lock is not reentrant, so a fetcher that resolves the same `Lazy` deadlocks.
 
 ### Layer 3: Utilities
 
-- **`src/katharos/functools/f.py`** — `F` static namespace: `compose`, `id`, `foldr`, `foldl`, `sigma` (fold a `NonEmptyList[Semigroup]`), `curry`, `lift_a2`/`lift_a3` (lift a binary/ternary function into an `Applicative` context)
-- **`src/katharos/syntax_sugar/do.py`** — `do` decorator for Haskell-style do-notation:
+- **`src/katharos/functools/f.py`** - `F` static namespace: `compose`, `id`, `foldr`, `foldl`, `sigma` (fold a `NonEmptyList[Semigroup]`), `curry`, `lift_a2`/`lift_a3` (lift a binary/ternary function into an `Applicative` context)
+- **`src/katharos/syntax_sugar/do.py`** - `do` decorator for Haskell-style do-notation:
   ```python
   @do(Maybe)
   def computation() -> DoBlock[Maybe, int]:
-      x: int = yield Maybe.Just(3)   # analogous to x <- Just 3 in Haskell
-      y: int = yield Maybe.Just(4)
+      x: int = yield Maybe[int].Just(3)   # analogous to x <- Just 3 in Haskell
+      y: int = yield Maybe[int].Just(4)
       return x + y
   ```
   Each `yield` unwraps the monadic value (short-circuits on `Nothing`/`Failure`). The plain `return` is automatically lifted via `Maybe.ret()`. The `DoBlock[M, R]` return-type alias (`Generator[M, Any, R]`) is exported alongside `do`.
@@ -87,10 +87,10 @@ Concurrency types are decoupled from any specific threading library by a backend
 
 CSP-style primitives live in `concurrency/csp/`:
 
-- **`Go`** / **`csp.go`** — a `Go` instance launches `go(fn, *args, **kwargs)` concurrently, returning a thread handle (fire-and-forget; return value discarded, exceptions don't propagate out). Used as a context manager (`with go:`), it becomes a structured-concurrency scope that joins all work spawned inside it on exit. Scopes are tracked per execution context via the backend's context-local storage, so a shared `Go` instance nests correctly. `Go` requires a backend; the usual entry point is the default `csp` runtime's `csp.go` (a `Go` bound to `default_backend()`), or construct your own `Go(backend)` to pin a specific backend.
+- **`Go`** / **`csp.go`** - a `Go` instance launches `go(fn, *args, **kwargs)` concurrently, returning a thread handle (fire-and-forget; return value discarded, exceptions don't propagate out). Used as a context manager (`with go:`), it becomes a structured-concurrency scope that joins all work spawned inside it on exit. Scopes are tracked per execution context via the backend's context-local storage, so a shared `Go` instance nests correctly. `Go` requires a backend; the usual entry point is the default `csp` runtime's `csp.go` (a `Go` bound to `default_backend()`), or construct your own `Go(backend)` to pin a specific backend.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kamalfarahani/katharos](https://github.com/kamalfarahani/katharos) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
