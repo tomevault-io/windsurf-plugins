@@ -1,93 +1,98 @@
 ---
 trigger: always_on
-description: Guidance for Claude Code (and human contributors) working in this repository.
+description: Repository guidance for OpenAI Codex and other agentic contributors. A faithful
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for Claude Code (and human contributors) working in this repository.
+Repository guidance for OpenAI Codex and other agentic contributors. A faithful
+Simplified-Chinese review copy lives in [AGENTS.zh-CN.md](AGENTS.zh-CN.md).
 
-## Project Overview
+## Product identity and scope
 
-"Claude Code Usage" is a VS Code extension that monitors Claude Code token
-usage and cost estimates in the status bar, with a detailed dashboard webview.
-It reads Claude Code's local `.jsonl` conversation logs and an OAuth-backed
-real `/usage` quota.
+- Claude Code Usage is a VS Code extension that reads local Claude Code and
+  Codex usage logs. Claude keeps its exact token totals, cost estimates, and
+  OAuth quota; Codex Beta in v2.3.0 has provider-specific local usage and
+  optimization views plus clearly labelled API-equivalent cost estimates,
+  without pretending those estimates are a bill or subscription charge.
+- Preserve the established product identity and Claude workflows while adding
+  provider-neutral contracts. Claude and Codex dashboard presentation must use
+  the same provider-aware render functions and the same CSS contract.
+- Prefer token-attribution accuracy over billing precision. Keep exact totals,
+  labelled estimates, and point-in-time quota observations as separate concepts.
+- Keep the extension local-first, lightweight, and read-mostly. Never modify
+  Claude or Codex conversation JSONL files. Treat credential handling as security-sensitive
+  and preserve the existing reviewed behavior.
+- Add no new runtime dependencies in v2.3.0.
 
-**Positioning (keep this in mind for every change):** Claude-only, lightweight,
-**token-precision over cost-precision**. Cost figures are estimates derived from
-public per-million-token rates — the product value is helping users *see where
-tokens go* and *use Claude Code better* (incl. the AI advice feature). Not a
-billing tool, not a multi-provider monitor.
+## Architecture boundaries
 
-## Architecture (`src/`)
+- `src/extension.ts`: activation, commands, refresh orchestration, watcher,
+  coalescing, settings changes, and diagnostic output.
+- `src/dataLoader.ts`: Claude JSONL parsing primitives, validation, attribution,
+  and content-analysis reducers retained for exact compatibility.
+- `src/claudeIncrementalIndex.ts`: the production in-memory per-file Claude
+  usage index, append-tail parser, exact global deduplication, and materialized
+  dashboard aggregates. Runtime refreshes must not fall back to a full-corpus
+  body read or full-record aggregation.
+- `src/providers/providerTypes.ts` and provider adapters: provider-neutral token,
+  coverage, confidence, and limit contracts. Do not erase provider semantics.
+- `src/providers/codex/`: allowed-root discovery, schema guards, exact-request
+  parsing with cumulative high-water fallback, per-file aggregate index, worker
+  protocol, bounded multi-worker cold backfill, and Codex facade.
+- `src/codexView.ts` / `src/codexViewComponents.ts`: Codex copy and default-provider
+  contracts only; they do not own HTML, client code, or styles.
+- `src/settings.ts`: the `SETTINGS` catalog and `SettingsStore`; do not scatter
+  direct configuration reads.
+- `src/statusBar.ts`: status-bar token/cost/quota/context presentation.
+- `src/webview.ts`: the single provider-aware Claude/Codex dashboard HTML and
+  client behavior. Compare never sums cost or quota across providers.
+- `src/i18n.ts`: all user-facing copy for all eight UI locales.
+- `src/types.ts`: shared contracts.
+- Read `ARCHITECTURE.md` before changing module ownership or the data flow. If
+  that change is submitted for maintainer review, also provide a faithful
+  Simplified-Chinese review companion.
 
-- **`extension.ts`** — main class, activation, refresh orchestration. Owns the
-  adaptive refresh cadence (activity-aware: ~15 s while logs are being written,
-  the user's interval when idle), the re-entrancy guard + coalescing, the
-  `fs.watch` recursive file watcher, and the diagnostic `OutputChannel`.
-- **`dataLoader.ts`** — finds + parses `.jsonl` records; dedup (keeps the
-  higher-token record on a hash collision); aggregation (today / month / all
-  time / sessions / projects / branches); content analysis; diagnostic stats.
-- **`statusBar.ts`** — the two status-bar items (cost + quota). Quota tooltip is
-  an HTML progress bar; `liveWindows()` drops windows whose reset time has
-  passed so a stale value never lingers.
-- **`webview.ts`** — the dashboard (tabs, charts, tables). Large single file:
-  server-rendered HTML + an inlined client script. Cost charts render as
-  gridded stacked compositions.
-- **`pricing.ts`** — pricing table (Anthropic + reference rates for OpenAI /
-  Gemini / DeepSeek / Kimi / GLM / Qwen), family-aware fallback, LiteLLM
-  runtime refresh.
-- **`claudeApiClient.ts`** — OAuth credential read + token refresh + `/usage`
-  fetch. Routes through the system `curl` binary because Anthropic's edge
-  rejects Node's TLS fingerprint.
-- **`advisor.ts`** + **`adviceDemoSample.ts`** — the opt-in AI advice feature
-  and its localised static demo.
-- **`i18n.ts`** — translations for en / de-DE / zh-TW / zh-CN / ja / ko.
-- **`types.ts`** — shared interfaces.
+## Safety and privacy invariants
 
-## Build & Release
+- Never upload prompt text, response text, raw JSONL lines, absolute paths, raw
+  session IDs, credentials, or local usernames. New v2.3.0 performance
+  diagnostics must not log them either; do not broaden older diagnostic output
+  without an explicit privacy review.
+- Codex discovery is allowlisted to `$CODEX_HOME/sessions/**/*.jsonl` and
+  `$CODEX_HOME/archived_sessions/**/*.jsonl` (default `~/.codex`). Never read
+  `auth.json`, SQLite databases, config secrets, keychains, browser state, or
+  unknown files for Codex usage.
+- Additionally, `$CODEX_HOME/session_index.jsonl` may be streamed solely to
+  recover the `id` → `thread_name` mapping used for real thread titles. Absolute
+  paths inside titles are masked, titles stay in memory and are never persisted,
+  symlinks and non-regular files are rejected, and no other field of that file
+  is read.
+- Raw Codex paths/session/parent IDs may exist only in short-lived local worker
+  memory. Persist machine-salted pseudonymous keys and numeric aggregates only.
+- Advice and optimizer network calls remain explicit user actions and may send
+  only the documented digest or text the user pasted.
+- New settings default to documented, non-surprising behavior. A beta provider
+  may default enabled only when its allowed local directory exists and absence
+  is a no-op; other experimental/approximate features default off unless an
+  approved spec explicitly says otherwise.
+- Do not read secret or credential files merely to diagnose a feature. Use
+  redacted metadata and fixtures.
+- Do not hand-edit generated files in `out/`; edit `src/` and compile.
 
-This repo is built with a **portable Node** (no global install assumed) and
-`@vscode/vsce`. Common commands:
+## Codex Beta data and performance invariants
 
-```bash
-npm run compile        # tsc -> out/
-npm run watch          # tsc --watch
-npx @vscode/vsce package   # build a .vsix
-```
+- Codex processed tokens are `input + output`. Fresh input + output is
+  `max(0, input - cached input) + output`; it is a behavior aid, not a cost or
+  quota equivalent. Cached input is a subset of input and reasoning is a subset
+  of output, so never add either twice.
+- Attribute valid request components from `last_token_usage`; its `total_tokens`
+  field is active-context size, not request usage. Suppress replay only when the
+  full numeric total-plus-last signature matches the same machine-salted
+  rate-limit source or the immediately preceding record. If last usage is
 
-- **F5** launches the Extension Development Host for manual testing.
-- **Releases are merge-and-auto-release.** As labelled PRs merge to `main`,
-  `.github/workflows/release-drafter.yml` keeps a **draft GitHub Release** up to
-  date (categorised notes + next semver version from the PR labels). To ship, a
-  maintainer reviews that draft and clicks **Publish** — which creates the tag
-  and triggers `.github/workflows/publish.yml`. Publish checks out the released
-  commit, stamps `package.json`'s version *from the release tag* (no hand-bump),
-  compiles, packages, publishes to the VS Code Marketplace + Open VSX, and
-  attaches the `.vsix`. So to release: just **Publish the draft Release** — no
-  manual `version` bump, no `git tag`.
-- Versioning follows semver and is driven by PR labels: `fix`/none → patch
-  (`2.0.x`); `feature` → minor (`2.x.0`); `breaking` → major.
-
-## Conventions
-
-- **Commit hygiene:** one meaningful commit per logical change; avoid a stream
-  of "fix the previous fix" commits. RC branches squash-merge to `main`.
-- **Tests:** a `node:test` suite runs against compiled output (`npm test`; see
-  `src/test/` and CONTRIBUTING). Pure-logic modules (pricing, aggregation,
-  quota-window handling, i18n) are the high-value targets; `pricing.ts` has the
-  first coverage, the rest are still open.
-- **Data is read-only:** the extension never writes to `~/.claude/`.
-
-## Documentation Maintenance
-
-When changing user-facing behaviour, update `README.md` (the canonical, fullest
-doc) and keep the language editions reasonably in sync:
-`README-en.md` (concise), `README-zh-CN.md` (full translation — highest-traffic
-locale), `README-zh-TW.md` / `README-ja.md` / `README-ko.md` (concise).
-`CHANGELOG.md` is the authoritative change record.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ClaudeCodeUsage/ClaudeCodeUsage](https://github.com/ClaudeCodeUsage/ClaudeCodeUsage) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
