@@ -1,133 +1,36 @@
 ---
 trigger: always_on
-description: **Actual MCP Server** bridges AI assistants with [Actual Budget](https://actualbudget.org/) via the Model Context Protocol (MCP), providing **63 tools** for conversational financial management. Supports two transports: **HTTP** (LibreChat/LobeChat/multi-user) and **stdio** (Claude Desktop/Claude Code).
+description: - Tool name MUST follow `actual_{domain}_{action}` snake_case convention
 ---
 
-# Copilot Instructions for Actual MCP Server
 
-## Project Overview
+## Rules for MCP tool files (`src/tools/*.ts`)
 
-**Actual MCP Server** bridges AI assistants with [Actual Budget](https://actualbudget.org/) via the Model Context Protocol (MCP), providing **63 tools** for conversational financial management. Supports two transports: **HTTP** (LibreChat/LobeChat/multi-user) and **stdio** (Claude Desktop/Claude Code).
+- Tool name MUST follow `actual_{domain}_{action}` snake_case convention
+- File name MUST match the tool name (e.g. `accounts_create.ts` for `actual_accounts_create`)
+- InputSchema MUST use `z.object({...})` from Zod
+- Use types from `CommonSchemas` in `src/lib/schemas/common.ts` for shared fields:
+  - Dates → `CommonSchemas.date` (validates YYYY-MM-DD)
+  - Account UUIDs → `CommonSchemas.accountId`
+  - Amounts → `CommonSchemas.amountCents` (integer cents, never decimal dollars)
+- The `call` function MUST `InputSchema.parse(args)` before any other logic
+- **NEVER wrap an `adapter.*` call in a session of your own.** `adapter.*` methods already open one, and the API mutex (`withApiLock` in `actual-adapter.ts`) is NOT reentrant, so nesting deadlocks. What you observe is a ~30s stall then `Actual API operation timed out after 30000ms (ACTUAL_OP_TIMEOUT_MS)`, because #270 bounds each operation inside the lock and that timeout is what breaks the deadlock. Read that error as a probable nesting bug, not a slow server.
+- Default to calling `adapter.*` methods. Do NOT reach for `@actual-app/api` just to avoid a wrapper.
+- **Importing `@actual-app/api` directly is correct in one case:** when you are already INSIDE a single adapter session callback and need more than one operation in that one cycle. Then use the raw functions, because calling back through `adapter.*` from in there is the nesting deadlock above. Exactly ONE tool file does this today (see CLAUDE.md):
+  - `budget_updates_batch.ts`: raw calls inside `adapter.batchBudgetUpdates(...)`, a batch of pure writes
+- **A read-then-write guard belongs in the ADAPTER, not the tool (#371, #376).** Four tool files used to hold one inside their own `withWriteSession`; all four were migrated. A guard in the tool costs `retry` on the reads, bypasses the observability call site, and leaves the matching `adapter.*` method reachable and UNGUARDED, which is how `adapter.deleteRule` sat callerless while silently failing to delete a schedule-owned rule. The single-cycle property does not require the raw api: `queueWriteOperation` holds the lock for its whole body
+- **When you move a guard into the adapter, fix its test's seam too.** Stubbing `adapter.withWriteSession` as a pass-through stubs away the guard itself. Use `_setSkipApiInitForTests(true)` with the RAW api functions stubbed BEFORE the adapter import (it destructures them at module load), and assert the cycle count with `_getWriteQueueBatchCountForTests()`
+- Error messages must be actionable: include entity type, ID, and a suggested next tool
+- After creating a tool file, you MUST:
+  1. Export it from `src/tools/index.ts`
+  2. Add the name to `IMPLEMENTED_TOOLS` in `src/actualToolsManager.ts`
+  3. Run `npm run build` first (verify-tools reads from `dist/`, not `src/`)
+  4. Run `npm run verify-tools` to confirm registration
+- To check uncovered Actual API surface before implementing: `npm run check:coverage`
+  (prints every `@actual-app/api` method against the current tool list; read-only, safe to run)
 
-**Tech Stack**: TypeScript (NodeNext/ESM), Node.js 20+, `@actual-app/api` v26, `@modelcontextprotocol/sdk`, Express 5, Zod v4, Playwright
-
-**Current Status**: Production-ready, 63 tools implemented
-
-## Architecture Essentials
-
-### Critical Pattern: `withActualApi` Wrapper
-
-**Every Actual API operation MUST use `withActualApi()` wrapper** from `src/lib/actual-adapter.ts`:
-
-```typescript
-// ✅ CORRECT - ensures data persistence
-await withActualApi(async () => {
-  return await rawAddTransactions(data);
-});
-
-// ❌ WRONG - data won't persist (tombstone issue)
-await rawAddTransactions(data);
-```
-
-**Why**: Actual Budget requires `api.shutdown()` after every operation to commit data. The `withActualApi` wrapper handles init/shutdown lifecycle automatically. Based on [s-stefanov/actual-mcp](https://github.com/s-stefanov/actual-mcp) pattern.
-
-### Tool Structure
-
-New tools should use `createTool()` from `src/lib/toolFactory.ts` — it wires up error handling, logging, and observability automatically:
-
-```typescript
-import { z } from 'zod';
-import { createTool } from '../lib/toolFactory.js';
-import { CommonSchemas } from '../lib/schemas/common.js';
-import adapter from '../lib/actual-adapter.js';
-
-export default createTool({
-  name: 'actual_domain_action',      // naming: actual_{domain}_{action}
-  description: '...',
-  schema: z.object({
-    account: CommonSchemas.accountId,
-    amount: CommonSchemas.amountCents, // always in cents, integer
-    date: CommonSchemas.date,          // YYYY-MM-DD
-  }),
-  handler: async (input) => {
-    return await adapter.someMethod(input);
-  },
-});
-```
-
-Many existing tools use the legacy pattern (both work, but `createTool()` is preferred for new tools):
-
-```typescript
-import type { ToolDefinition } from '../../types/tool.d.js';
-const InputSchema = z.object({ ... });
-const tool: ToolDefinition = {
-  name: 'actual_transactions_create',
-  description: '...',
-  inputSchema: InputSchema,
-  call: async (args: unknown) => {
-    const input = InputSchema.parse(args);
-    return await adapter.addTransactions(input);
-  },
-};
-export default tool;
-```
-
-**Key conventions**:
-- Tool names: `actual_{domain}_{action}` (e.g., `actual_accounts_create`)
-- Amounts: **always in cents** (integer), never dollars
-- Dates: `YYYY-MM-DD` format (validated by `CommonSchemas.date`)
-- UUIDs: Validated with `UUID_PATTERN` from `src/lib/constants.ts`
-- Shared schemas: Use `CommonSchemas` from `src/lib/schemas/common.ts` for consistency
-
-### Module Organization
-
-```
-src/
-├── index.ts                    # Entry point, CLI parsing, server startup
-├── actualConnection.ts         # Actual Budget connection lifecycle
-├── actualToolsManager.ts       # Tool registry (63 tools in IMPLEMENTED_TOOLS array), dispatch, validation
-├── auth/
-│   ├── setup.ts                # createMcpAuth() factory (MCPAuth singleton, AUTH_PROVIDER=oidc)
-│   └── budget-acl.ts           # Per-user budget ACL (email/sub/group principals, AUTH_BUDGET_ACL)
-├── lib/
-│   ├── actual-adapter.ts       # ⚠️ CRITICAL: withActualApi wrapper, retry logic
-│   ├── ActualMCPConnection.ts  # MCP protocol implementation (EventEmitter-based)
-│   ├── retry.ts                # Exponential backoff retry (3 attempts, 200ms base)
-│   ├── constants.ts            # All configuration constants, patterns, limits
-│   ├── schemas/common.ts       # Shared Zod schemas (accountId, amountCents, etc.)
-│   └── loggerFactory.ts        # Module-scoped loggers (winston)
-├── server/
-│   └── httpServer.ts           # HTTP transport
-└── tools/                      # 63 tool definitions (see actualToolsManager.ts)
-```
-
-## Development Workflow
-
-### Build & Run Commands
-
-```bash
-npm run build                   # TypeScript compilation (required before running)
-npm run dev -- --http --debug   # Development mode with HTTP transport + debug logs
-npm run start                   # Production mode (requires build first)
-
-# Testing
-npm run test:adapter            # Adapter smoke tests (concurrency, retry logic)
-npm run test:unit-js            # All unit tests (4 files)
-node tests/unit/transactions_create.test.js          # Run a single unit test file
-node tests/unit/schema_validation.test.js            # Schema validation tests only
-npm run test:e2e                # Playwright E2E tests (initialize → tools/call → streaming)
-npx playwright test --grep "initialize -> tools/list" # Single E2E test by name
-
-# Tool Management
-npm run verify-tools            # Verify all 63 tools are correctly registered
-npm run check:coverage          # List @actual-app/api methods vs current tool coverage
-
-# Debugging
-npm run test:mcp-client         # Connect as MCP client and exercise tools (requires build)
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+> On conflict, `CLAUDE.md` is authoritative over this file. It carries the same rules with fuller rationale.
 
 ---
 > Source: [agigante80/actual-mcp-server](https://github.com/agigante80/actual-mcp-server) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
