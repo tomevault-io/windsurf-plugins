@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [MageByte-Zero/spec-superflow](https://github.com/MageByte-Zero/spec-superflow).
+Original source: `copilot-instructions.md` in [MageByte-Zero/spec-superflow](https://github.com/MageByte-Zero/spec-superflow).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [MageByte-Zero/spec-superflow](https://github.com/MageByte-Zero/spec-superflow) — a repo with 821+ stars on GitHub.
