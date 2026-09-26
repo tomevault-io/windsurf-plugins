@@ -1,69 +1,46 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Last verified: 2026-07-26 (Transient-failure retry: `FailJob` is no longer the only terminal path. `Processor.handleJobError` classifies via `processor.IsTransient` — OCR failures that never got a verdict from the model (dial/timeout, 5xx, 429, 408) are requeued with exponential backoff through the new `Store.RequeueJob` + the long-dormant `requeue_after` column, up to `maxJobAttempts`; a 4xx or a parse error still fails on the first attempt. Shutdown mid-job now leaves the row `in_progress` for
 ---
 
-# CLAUDE.md
+# Boox Pipeline
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Last verified: 2026-07-26 (Transient-failure retry: `FailJob` is no longer the only terminal path. `Processor.handleJobError` classifies via `processor.IsTransient` — OCR failures that never got a verdict from the model (dial/timeout, 5xx, 429, 408) are requeued with exponential backoff through the new `Store.RequeueJob` + the long-dormant `requeue_after` column, up to `maxJobAttempts`; a 4xx or a parse error still fails on the first attempt. Shutdown mid-job now leaves the row `in_progress` for the startup reclaim instead of marking a good note failed. `Processor` also gained `Running()` and idempotent Start/Stop with a per-Start `done` channel — it previously panicked on a stop/start/stop cycle.)
 
-Last verified: 2026-06-12 (SyncModel + Settings IA: `internal/source` gained `SyncModel`/`SyncModelFor` — a typed per-source-type sync-semantics descriptor surfaced as `sync_model` on `GET /api/sources` and as Unicode-glyph banners (⇅/⬇) on the Files tabs; Settings split into four deep-linkable groups `/settings/{devices,ai,integrations,system}` (legacy `/settings` 303s to devices), with the Devices group rendering uniform per-source sections. Prior: ForestNote sync device management — /sync/v1 optional `device_name` envelope field; Settings "Sync Devices" card + /api/v1/sync/{devices,compact}; prune = cleanup-only delete of the sync_cursors row, spec §4.3)
+## Purpose
+Processing pipeline for Boox notes. Orchestrates parse → render → OCR → index → embed workflow
+for .note files uploaded via WebDAV, triggered by file uploads.
 
-Platform-neutral note management and task synchronization service supporting Supernote (via Supernote Private Cloud) and Onyx Boox devices. Six subsystems:
-1. **CalDAV task sync** -- CalDAV VTODO over local SQLite task store
-2. **Device sync** -- UB *is* the device-facing Supernote Private Cloud server (`internal/spcserver`); Supernote devices connect to UB directly. (The legacy SPC *client* — `internal/tasksync`, `internal/sync`, `internal/db`, MariaDB catalog write-through — was removed 2026-05-25.)
-3. **Supernote notes pipeline** -- scans Supernote .note files, extracts/OCRs text, indexes for full-text search
-4. **Boox notes pipeline** -- receives Boox .note files via WebDAV, parses ZIP+protobuf, renders strokes, OCRs, indexes for unified search
-5. **RAG retrieval pipeline** -- Ollama embeddings, hybrid FTS5+vector search, vLLM-powered chat with retrieval-augmented context
-6. **MCP server** -- Model Context Protocol server exposing note search/retrieval tools for AI agents
+## Contracts
+- **Exposes**: `Store` (UpsertNote, EnqueueJob, ClaimNextJob, CompleteJob, FailJob, RequeueJob, GetNote, ReclaimStuckJobs, RetryAllFailed, DeleteNote, SkipNote, UnskipNote, GetQueueStatus, ListNotesWithPrefix, UpdateNotePath, ReclaimAllInProgress), `BooxNote` and `BooxJob` models, `Processor` interface (Start, Stop, Running, Enqueue), `WorkerConfig` with Indexer, ContentDeleter, OCR interfaces, and embedding interfaces (Embedder, EmbedStore from rag package), `Importer` (ScanAndEnqueue, MigrateImportedFiles) with `ImportConfig` and `ImportResult` types.
+- **Guarantees**: Atomic job claiming via SQLite RETURNING. Watchdog reclaims stuck jobs (>10 min in_progress). Graceful shutdown waits for current job, and leaves it `in_progress` so the next Start reclaims it rather than failing it. Content deletion uses ContentDeleter interface to ensure FTS5 triggers fire. Embedding failures are best-effort (logged, do not fail the job). OCR failures DO fail the job (`worker.go` returns `ocr page N: %w`) — they are then classified transient/permanent per the Invariants below.
+- **Expects**: SQLite `*sql.DB` with `boox_notes` and `boox_jobs` tables (created by notedb schema migrations). `WorkerConfig` with Indexer, ContentDeleter, and optional OCR, Embedder, EmbedStore.
 
-## Bash Commands: No `cd &&` Compounds
+## Dependencies
+- **Uses**: `notedb` schema (boox_notes, boox_jobs tables), `booxnote` (ZIP parser), `booxrender` (page renderer), `processor.Indexer` interface (shared with Supernote processor), optional `processor.OCRClient` (vision API), `search.Store.Delete()` for content deletion, `rag` package (Embedder and EmbedStore interfaces for embedding text)
+- **Used by**: `cmd/ultrabridge` (wiring in main), `webdav` handler (Enqueue callback on upload), `web` handler (bulk import and management routes via BooxImporter interface)
+- **Boundary**: Does not own file discovery — WebDAV handler passes paths directly. Importer owns bulk discovery from a configured import path. Does not implement Embedder or EmbedStore — those come from `rag` package.
 
-**NEVER** use `cd /path && command` compound bash statements. This triggers a Claude Code bug where the permission prompt fires on `cd` instead of the actual command.
+## Key Decisions
+- Separate from Supernote processor: Boox notes use different parser/renderer (booxnote/booxrender vs go-sn for .note files; pdftoppm via pdfrender for .pdf files), no RECOGNTEXT injection, different storage format
+- PDF support: worker dispatches by file extension — .note files go through booxnote+booxrender, .pdf files go through pdfrender (renderPDFPageScaled with DPI scaling); both paths produce JPEG pages fed into the same OCR+index flow
+- Shared Indexer: uses same `processor.Indexer` interface and note_content/note_fts tables as Supernote for unified search
+- Atomic job claiming: SQLite RETURNING clause (SQLite 3.35+) for single-statement claim, avoiding race conditions
+- Content deletion via interface: `ContentDeleter` allows search.Store to maintain FTS5 triggers on re-process
+- Cache lifecycle: old cached JPEGs removed on re-process via `os.RemoveAll` before new renders
+- OCR source tracking: "api" if OCR enabled, empty string if OCR disabled (no "myScript" equivalent for Boox)
+- resolveMetadata preserves importer-provided metadata (title, author, etc.) when present; only falls back to WebDAV path extraction for files whose path is under the WebDAV root and that have no importer-supplied metadata
+- Embedding integration: OCR'd text is embedded via Embedder interface and stored via EmbedStore interface (both from `rag` package). Embedding failures are logged but do not fail the job; allows OCR to proceed if embedding is unavailable.
 
-Instead: `git -C /path`, `go -C /path build`, or absolute paths.
-
-## Project Structure
-
-### Core Components
-- `cmd/ultrabridge/` -- entry point, wires all components
-- `cmd/ub-mcp/` -- MCP server binary: exposes search_notes, get_note_pages, get_note_image tools via stdio or HTTP SSE (see domain CLAUDE.md)
-
-### Configuration & Data Management
-- `internal/appconfig/` -- SQLite-backed application config with two-stage loading (bootstrap env vars + settings table), restart detection (see domain CLAUDE.md)
-- `internal/notedb/` -- SQLite DB opener + schema migrations for notes, settings, and sources tables (see domain CLAUDE.md)
-- `internal/source/` -- Platform-neutral source abstraction: `Source` interface, `SourceRow` model, CRUD operations (see domain CLAUDE.md)
-- `internal/source/supernote/` -- Supernote source adapter: .note pipeline, Processor creation (see domain CLAUDE.md)
-- `internal/source/boox/` -- Boox source adapter: WebDAV receiver, Processor creation (see domain CLAUDE.md)
-
-### Task Synchronization
-- `internal/caldav/` -- CalDAV backend (go-webdav), VTODO conversion with iCal blob overlay (see domain CLAUDE.md)
-- `internal/taskstore/` -- Task model, field mapping helpers, MariaDB CRUD (legacy), ErrNotFound sentinel (see domain CLAUDE.md)
-- `internal/taskdb/` -- SQLite task store: Open/migrate DB, implements caldav.TaskStore (see domain CLAUDE.md)
-
-### Note Processing & Pipelines
-- `internal/processor/` -- background OCR job queue: backup, extract, render, OCR, inject, index (see domain CLAUDE.md)
-- `internal/search/` -- FTS5 full-text search over note content (see domain CLAUDE.md)
-- `internal/notestore/` -- file inventory (scan, list, get), content hashing, job transfer against SQLite notes table (see domain CLAUDE.md)
-- `internal/pipeline/` -- file detection: fsnotify watcher, reconciler, Engine.IO listener (see domain CLAUDE.md)
-- `internal/booxpipeline/` -- Boox processing pipeline: store, worker, processor (parse/render/OCR/index) (see domain CLAUDE.md)
-
-### Boox-Specific
-- `internal/booxnote/` -- Boox .note ZIP parser: protobuf pages, nested shape ZIPs, binary point files (see domain CLAUDE.md)
-- `internal/booxnote/proto/` -- Generated protobuf code for Boox .note format (NoteInfo, VirtualPage, ShapeInfoProto)
-- `internal/booxnote/testutil/` -- Exported test helper: builds synthetic .note ZIP files for tests
-- `internal/booxrender/` -- Stroke renderer: pressure-sensitive scribbles, geometric shapes via fogleman/gg (see domain CLAUDE.md)
-- `internal/webdav/` -- WebDAV server for Boox file uploads with versioning (see domain CLAUDE.md)
-- `internal/pdfrender/` -- PDF page rendering via pdftoppm (poppler-utils) for bulk import pipeline
-
-### RAG & Chat
-- `internal/rag/` -- RAG embedding infrastructure: Ollama embedder, embedding store with in-memory cache, hybrid FTS5+vector retriever, backfill (see domain CLAUDE.md)
-- `internal/chat/` -- Chat subsystem: session/message store (SQLite), vLLM streaming handler with RAG context injection (see domain CLAUDE.md)
-
-### Service Layer
+## Invariants
+- Job statuses: pending -> in_progress -> done|failed|skipped (or back to pending via
+  ReclaimStuckJobs, or via RequeueJob after a transient failure)
+- A transient OCR failure (see `processor.TransientError`) is requeued, not failed:
+  `RequeueJob` sets status=pending plus a future `requeue_after`, which ClaimNextJob
+  honours. Backoff doubles from 1 min, capped at 30 min, and the job fails terminally
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jdkruzr/ultrabridge](https://github.com/jdkruzr/ultrabridge) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
