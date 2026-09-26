@@ -3,7 +3,7 @@ trigger: always_on
 description: Movy is a Schwung **tool module** for Ableton Move. The UI (TypeScript →
 ---
 
-# CLAUDE.md — Movy
+# CONVENTIONS.md — Movy
 
 Movy is a Schwung **tool module** for Ableton Move. The UI (TypeScript →
 `ui.js`) runs in the shadow-UI QuickJS context; it presents the active chain
@@ -14,6 +14,45 @@ slot's synth parameters on the 8 knobs and is also a **native-Move-style
 Device: `ableton@move.local`
 
 **Plans:** Save all implementation plans to `movy/plans/` (not the repo root `plans/`).
+
+## Aider setup
+
+This repository is part of a parent `cld` workspace containing several related
+repositories. Aider agents should treat sibling repos as **context only**, not
+as files to edit unless the user explicitly asks and has added them to the chat.
+
+- `../schwung` — the main Schwung runtime/shadow-UI host. This is the most
+  important sibling: many host API facts in this file are sourced from
+  `schwung/src/shadow/shadow_ui.js`.
+- Other module repos may sit alongside `movy` under the same parent directory.
+  Until they are listed in `.aider.conf.yml` (or added to the chat manually),
+  aider does not see them.
+
+If you need aider to include those sibling repositories in its repo-map, add
+them to `.aider.conf.yml` under `read:`. Do not add broad `read:` globs that
+pull in build artifacts or the sibling repos' own `.aider` files.
+
+---
+
+## Context discipline
+
+A tool call is a full model turn — the whole conversation gets re-sent on
+every one — so round-trip *count* is the cost, not output size. Optimize for
+fewer calls, not smaller ones.
+
+- **Batch independent shell calls into one message.** Firing them one at a
+  time pays a full round trip each even when none depends on another's
+  result.
+- **Device work: one `ssh` round trip, not three.** The clear-log → act →
+  check-log cycle run as three separate `ssh ableton@move.local` calls is the
+  single most common device pattern in this repo's session history. Use
+  `scripts/dev-probe.sh log` instead — it clears the log, optionally injects a
+  MIDI event, polls for the pattern, and dumps matching lines inside one ssh
+  call. `scripts/dev-probe.sh status` does the same for reachability + deployed
+  `ui.js` md5 + log-enabled state.
+- **Grep or read a line range before reading a whole file.** `Read` on an
+  entire file is the most expensive call type per-invocation in this repo. If
+  you're hunting one symbol, `grep -n` it first and read just that range.
 
 ---
 
@@ -42,8 +81,17 @@ mirror in the UI.
 
 - **ENGINE_VERSION must match** between `engine/crates/movy-dsp/src/lib.rs`
   and `src/seq/constants.ts` (`build-dsp.sh` fails the build otherwise). The
-  UI probes `ping` and re-issues the DSP load until the version matches —
-  this is how a redeployed engine hot-reloads.
+  UI probes `ping` and re-issues the DSP load until the version matches.
+- **A redeployed `dsp.so` does NOT hot-reload — the stack must restart.** The
+  shim dlopens the engine by path, and glibc returns the library already loaded
+  under that path for as long as MoveOriginal lives, so the version gate above
+  just loops: it re-issues the load and the shim answers with the old binary.
+  `deploy.sh` therefore restarts the stack whenever the shipped `dsp.so`
+  differs (`--no-restart` opts out, and says loudly that the old engine is
+  still running). The restart must run **as root** — MoveOriginal is root's, so
+  `restart-move.sh` as the `ableton` user pkills nothing and still exits 0.
+  Bumping ENGINE_VERSION once for two different builds hides this completely:
+  both answer `ping` with the same string, and the stale one looks current.
 - **Engine sets must be blocking** (`host_module_set_param_blocking`): the
   `overtake_dsp:` param SHM is a single slot, so non-blocking writes (and even
   schwung's own DSP-load request) are routinely lost.
@@ -52,71 +100,9 @@ mirror in the UI.
   ships it scp-to-temp + `mv` (fresh inode).
 - Live pad notes are sounded **directly** (`shadow_send_midi_to_dsp`,
   channel = track) for zero latency; the engine only **records** them (no
-  double trigger). Recorded notes are suppressed until the clip wraps.
-- **Note-offs come from the ledger, never from current state.**
-  `keyboard/held-notes.ts` records `padNote → { track, pitch }` at note-on;
-  `noteOff`/`drumPadOff` take neither a track nor a `DrumConfig`. Deriving
-  either at release time strands notes whenever the active track, module, or
-  view changed mid-hold. All `0x8n` sends go through `release.ts:emitNoteOff`.
-  `app/unload.ts` (`globalThis.onUnload`, called by the host on *every*
-  teardown) releases the ledger plus the engine's open gates read from
-  `seqState.activeNotes` — the DSP is unloaded right after, so nothing else
-  can close them.
-- The engine has no filesystem; the UI ferries persisted state via
-  `host_read_file`/`host_write_file` (`src/seq/persist.ts`).
-
-### PErformance
-
-PErformance is very important, make sure you think about it for implementation and add new and run existing performance tests for the new features
-
-
-### Cost efficient usage
-
-if you are opus or fable 5 try to optimize token usage and make it cost efficient while make sure the code is reviewed by you. if there is an option to use subagent, use it only if it reduces limit usage
-
-### Build / deploy / test the engine
-
-```bash
-cd engine && cargo test            # pure seq-core logic (host)
-./scripts/build-dsp.sh             # cross-compile aarch64 → dist/dsp.so (glibc <= 2.35)
-./scripts/deploy.sh                # builds ui.js + dsp.so, deploys both (atomic .so)
-./scripts/test-seq.sh              # device e2e: transport, steps, record, session, persistence
-```
-
-If MoveOriginal dies, recover with the davebox restart sequence (root SSH;
-the user must run it): stop `move-launcher`, pkill the schwung stack, start
-`move-launcher`.
-
----
-
-## Dev loop
-
-Run tests in this order at the end of every task:
-
-Run `npm run build:browser` first (refreshes `dist/esm`), then in order
-(or just `npm test`, which builds + runs all six):
-
-```bash
-# 1. Local (always) — viewmodel/business logic assertions
-node browser-test/logic.mjs
-
-# 1a. Local (always) — replays all 76 dumped modules; asserts layout invariants
-#     + a per-module snapshot (browser-test/dump-expect.json). After an
-#     intentional layout change: node browser-test/dump-replay.mjs --update
-node browser-test/dump-replay.mjs
-
-# 1b. Local (always) — full init/tick/MIDI loop → setLED (drum grid, multi-step)
-node browser-test/app-loop.mjs
-
-# 2. Local (always) — framebuffer pixel-diff vs baselines (pure node, no browser)
-node browser-test/screenshot.mjs
-
-# 3. Local (always) — performance regression (fill_rect count, IPC call count, render time)
-node browser-test/perf.mjs
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [DimaDake/schwung-movy](https://github.com/DimaDake/schwung-movy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
