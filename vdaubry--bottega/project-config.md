@@ -120,4 +120,4 @@ provisioned by Corepack — run `corepack enable` once after cloning).
 
 ---
 > Source: [vdaubry/bottega](https://github.com/vdaubry/bottega) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
