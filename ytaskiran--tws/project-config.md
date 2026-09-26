@@ -1,22 +1,34 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to agents working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to agents working in this repository.
 
 ## Build & Test
 
 ```bash
 cargo build                    # compile
-cargo test                     # run all 75 tests
+cargo test                     # run the full test suite
 cargo test state::tests        # run tests in a specific module
 cargo test resolve_selection   # run tests matching a name pattern
 ```
 
-No linter or formatter is configured. There's no CI beyond `cargo build && cargo test`.
+## CI
+
+`.github/workflows/ci.yml` runs on every PR and every push to `main`. Five jobs, all required to pass:
+
+```bash
+cargo test   --all-targets --locked                   # Test
+cargo fmt    --all --check                            # Rustfmt — formatting
+cargo clippy --all-targets --locked -- -D warnings    # Clippy — lints as errors
+cargo audit                                           # Security audit — RustSec advisories
+bash scripts/verify-agent-hooks.sh                    # Agent hook protocol — see below
+```
+
+Run `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings` before pushing. CI pins the toolchain to **Rust 1.96.1** (see `RUST_VERSION` in `ci.yml`); rustfmt reflows and clippy lints shift between releases, so format/lint with a matching toolchain to avoid CI turning red on formatting alone.
 
 ## Workflow
 
@@ -52,7 +64,7 @@ Collections and threads are user-created, persisted to `~/.config/tws/state.json
 
 ## Architecture
 
-**Single-threaded event loop** in `app.rs` — the brain of the app. It owns the `Mode` state machine, key routing, rendering, and all side effects. The loop polls keys every 250ms and refreshes tmux sessions periodically (30s for agent scans).
+**Single-threaded event loop** in `app.rs` — the brain of the app. It owns the `Mode` state machine, key routing, rendering, and all side effects. The loop polls keys every 250ms and refreshes tmux sessions on a 30s floor, plus immediately whenever an agent hook fires (see [Agent status protocol](#agent-status-protocol)).
 
 ### Mode state machine
 
@@ -89,22 +101,9 @@ Immediate-mode: all widgets are rebuilt from `AppState` each frame. Components a
 ### tmux integration
 
 - Sessions are launched detached (`tmux new-session -d`), then attached via `switch-client` (inside tmux) or `attach-session` (outside tmux)
-- Agent detection: `tmux list-panes -a` gets pane PIDs → `ps -e` finds child processes → match against known agent binaries (`claude`, `codex`)
-- Agent renames are in-memory only (not persisted), preserved across 30s scan refreshes via a `renamed` flag and HashMap snapshot/restore in `do_agent_scan()`
 
-## Tests
-
-All tests are in-file `#[cfg(test)]` modules, not in a separate `tests/` directory. Coverage focuses on model construction, persistence round-trips, CRUD operations, selection resolution, and agent scan parsing. tmux command wrappers are not unit-tested (side-effectful).
-
-## CLI
-
-```
-tws              # launch TUI (default)
-tws import       # interactive import of unmanaged tmux sessions
-```
-
-Detach from a session with `prefix + d` to return to the shell.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ytaskiran/tws](https://github.com/ytaskiran/tws) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
