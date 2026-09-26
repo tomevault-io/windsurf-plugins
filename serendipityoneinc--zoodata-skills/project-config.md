@@ -3,7 +3,7 @@ trigger: always_on
 description: Before modifying or reviewing any skill, read and follow
 ---
 
-# Repository Agent Instructions
+# Claude Code Repository Instructions
 
 Before modifying or reviewing any skill, read and follow
 `CONTRIBUTING.md`, especially `Skill Specification Ownership`, then read the
@@ -24,4 +24,4 @@ module policies, or runtime rules into it.
 
 ---
 > Source: [SerendipityOneInc/ZooData-Skills](https://github.com/SerendipityOneInc/ZooData-Skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
