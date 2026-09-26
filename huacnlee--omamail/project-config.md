@@ -1,88 +1,88 @@
 ---
 trigger: always_on
-description: - Use colors from the active Omarchy system theme. Do not hard-code UI colors.
+description: Omamail reads the default AI selected in Omarchy. There is no Omamail AI settings
 ---
 
-# Repository working agreements
+# AI beside your mail
 
-## Colors
+Omamail reads the default AI selected in Omarchy. There is no Omamail AI settings
+page or separate Agent page. The background adapter currently supports Claude;
+other defaults produce an inline explanation without opening a terminal or picker.
+The installed Claude CLI uses its normal system login and provider configuration.
 
-- Use colors from the active Omarchy system theme. Do not hard-code UI colors.
-- Pass semantic colors down from `App.qml` as required component properties so
-  a theme change propagates through every view.
-- Derive muted, hover, and selected variants from an inherited color with
-  alpha, or from `Style.normalFillFor` / `hoverFillFor` / `selectedFillFor`.
-  Do not introduce literal fallback grays.
-- Secondary text mixes the foreground toward the **background**, not
-  `Qt.darker`. On a light theme, darkening an almost-black foreground makes
-  "secondary" text heavier than body text — the opposite of what it means.
-- `tests/test_source.sh` enforces the no-literal-colors rule. Keep it updated
-  rather than working around it.
+Choose the outline **AI icon** button beside Compose in the window header, the
+message menu, or `Alt+G` in the list, reader or composer. The right dock displays
+the conversation, aligned to the bottom with older turns above. Drag its left
+edge to resize; double-click the divider to restore the default width. User messages
+have a background and a › marker; AI replies have no background and each offers
+a copy icon after generation finishes that copies the original reply. Bold and code are formatted
+through an escaping formatter that cannot create links or remote resources. Execution status appears just above the input, which starts at one line and
+grows with newlines.
+Type `/` to show commands, then use Up/Down and Return or click a suggestion.
+Selecting a command only fills editable instructions. **Enter** sends;
+**Shift+Enter** inserts a newline. Ctrl+Enter also sends. While running, the
+stop icon ends the request. The **…** menu contains **New chat** and **History...**
+for the current mail or draft. The header AI button closes the dock without stopping an active request.
+While running, a timed Working line stays above the input and Escape interrupts
+the request; when idle, Escape closes the dock.
 
-## JavaScript libraries
+While AI is working, Enter adds another message to a Pending queue and clears
+the input immediately. Messages run in order in the same conversation after
+each successful reply. Click a pending message to bring it back into an empty
+input for editing, or remove it with ×. A failed start retains the message;
+interrupting or a failed reply pauses the queue. Pending messages are held only
+for this application session, with up to 20 messages and bounded text size.
+They never switch to another mail or conversation. The queue for a request still
+preparing its first turn waits until that conversation can be identified.
 
-- Files at the repository root ending in `.js` are read by the QML engine.
-  They start with `.pragma library` and use `var` and `function` only — no
-  `const`, `let`, arrow functions, or template literals.
-- Everything that parses, formats, or decides lives in one of them, so the node
-  tests can reach it without a compositor. QML holds no logic worth testing.
+The worker runs silently in the background. Text appears progressively, along
+with public status events such as reading a file or finishing a tool. Raw tool
+arguments/results, diagnostics, and internal reasoning are not displayed.
+Completed requests can be followed up in the same native Claude conversation.
+The **New chat** action reads the current mail or draft into a fresh conversation.
+Follow-ups keep the original context; a notice identifies a draft edited since
+that context was captured.
 
-## Entry points
+A request can cover at most 20 messages from one mailbox. The owning provider's
+normal read interface supplies complete bodies without selecting or marking mail
+read. Results stay bound to their account, messages and draft identity. You can
+select history text or copy each answer. Translation and rewriting commands act
+only on mail titles and bodies, excluding addresses and metadata. Their results
+separate Title and Body; draft insertion takes only the Body section, so a
+translated title is not accidentally inserted into the body. In a draft, **Insert at cursor**
+and **Replace body** apply only a completed successful reply; neither sends mail.
+Replacement is two text edits and can require two undo steps. The mail list has no AI icon. The header AI button stays static without a
+breathing animation.
 
-- `Service.qml` is constructed by the shell itself, which injects only `shell`,
-  `manifest`, `pluginRegistry`, and `barWidgetRegistry`. It must declare **no**
-  required properties: one the shell does not know about makes the whole plugin
-  fail to instantiate, with the reason buried in a console warning.
-- Plugin settings reach the service from the bar widget via `applySettings`,
-  because the shell hands settings to the widget rather than to the service.
+## Suggested events
 
-## UI labels
+With **Suggest calendar events from mail** on in Settings — off until it is — a
+message opened in the reader whose text mentions a date or a time is handed to
+the system AI once, in the background, with rules that ask for a JSON array of
+the events it finds and nothing else. The reader draws a card per event above
+the message: what, when, where, with **Add** and **Dismiss**. Add opens the
+calendar's event composer with the fields filled in, so the owner chooses the
+calendar and looks the times over before anything is written; a written event
+waves its suggestion away, a dismissed one stays away for the session.
 
-- Suffix button and menu labels with `...` when activating them opens a dialog,
-  a page, a browser, or a terminal workflow instead of completing the action
-  immediately.
-- Never let colour alone carry state. Unread is a dot, a heavier weight, and a
-  brighter subject, because some themes put the accent close to the foreground.
-- Prefer the shorter label when both are honest, but never buy brevity with
-  accuracy: "Mark these read" acts on the messages that are loaded, so it does
-  not claim to mark all of them.
+The gates are local and cheap, and they come before the model, because a
+look is a model call with the whole message in it: the setting; a message
+from a person rather than a machine or a list — `Agent.automatedMail` reads
+the sender (`noreply`, `notifications@`, `mailer-daemon`, a newsletter or
+alerts address) and Gmail's Promotions, Updates, Forums and Social
+categories off the row, and the reader knows a list by its List-Unsubscribe
+header; a time or a date in the subject or the text (`Agent.mentionsDate`: a
+clock time, a month with a day, a numeric date, "tomorrow", or a weekday
+bound to a plan like "on Thursday" — a bare "Sunday" in prose is a word);
+a message from the last two months (one with no known date is not looked
+at); no look at that message yet; and at most two looks running at once — a
+look that cannot start yet waits its turn. The worker sends at most the
+first 8,000 characters of the message. A
+look is a job started through the same account-bound `agent.context` read as an
+ask, with `events: true` on the payload; Rust records it with kind `events`.
 
-## Popups and their triggers
-
-- A control that opens a popup holds a selected style for as long as that popup
-  is on screen. A trigger that looks untouched while its own menu is up leaves
-  the menu looking unattached to anything, and leaves the user without an answer
-  to "which of these opened it".
-- Anchor a popup to the trigger's own edge, not to the pointer. `mapToGlobal(0, 0)`
-  on the control, never the click position: the menu should land in the same
-  place however the control was pressed.
-- Place a popup *after* it opens, and again whenever its height changes. A
-  `QQC.Popup` does not build its contents until the first `open()`, so its
-  height is still zero while any placement code is deciding whether it fits —
-  the first open lands somewhere different from every one after it, which is the
-  bug this rule exists to prevent.
-- A popup that would overflow flips to the other side of its trigger, then
-  clamps to the window edge, then clamps to zero. All three, in that order.
-
-## Secrets
-
-- Refresh tokens go to GNOME Keyring over stdin, never through a command line.
-- The OAuth client goes to a 0600 file, never to plugin settings: `shell.json`
-  is world-readable.
-- Anything that could carry a credential passes through `OAuth.redact` before
-  it can reach a label.
-- Remote images in a message body are blocked until the reader asks for them.
-  Qt's rich text engine really does fetch them, so rendering one fires every
-  tracking pixel in the message.
-
-## Verification
-
-- Run `make validate` after any QML or behavior change. It runs the node tests,
-  the source regressions, `qmllint`, and `omarchy plugin validate`.
-- `qmllint` cannot resolve `qs.Ui` / `qs.Commons` and reports unresolved-import
-  warnings for every plugin, including the shell's own. The exit code is the
-  gate, not the warning count.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [huacnlee/omamail](https://github.com/huacnlee/omamail) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
