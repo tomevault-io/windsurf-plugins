@@ -5,17 +5,17 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [open-circle/schema-benchmarks](https://github.com/open-circle/schema-benchmarks).
+Original source: `copilot-instructions.md` in [open-circle/schema-benchmarks](https://github.com/open-circle/schema-benchmarks).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Codex** — `AGENTS.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [open-circle/schema-benchmarks](https://github.com/open-circle/schema-benchmarks) — a repo with 50+ stars on GitHub.
+From [open-circle/schema-benchmarks](https://github.com/open-circle/schema-benchmarks) — a repo with 58+ stars on GitHub.
 
 ---
 
