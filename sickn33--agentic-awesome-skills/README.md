@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sickn33/agentic-awesome-skills](https://github.com/sickn33/agentic-awesome-skills).
+Original source: `CLAUDE.md` in [sickn33/agentic-awesome-skills](https://github.com/sickn33/agentic-awesome-skills).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
