@@ -1,159 +1,125 @@
 ---
 trigger: always_on
-description: Senior engineering workflow skill inspired by Addy Osmani's agent-skills. Enforces the full development lifecycle: spec → plan → build → test → review → ship. AI must never write code before a spec and plan are approved.
+description: High-precision engineering and execution guardrails optimized for Google Gemini models. Enforces zero-assumption file inspection, complete non-lazy implementations, surgical blast-radius containment, and mandatory proof-of-work execution.
 ---
 
 
-# Skill: engineering-workflow
+# Skill: gemini-precision
 
-# engineering-workflow
+# gemini-precision
 
 ## Overview
 
-Systematic 6-phase engineering pipeline (DEFINE → PLAN → BUILD → VERIFY → REVIEW → SHIP) enforcing role declarations, atomic task execution, quality gates, regression prevention, and structured requirements elicitation.
+High-precision operational standard designed specifically to harness the high speed and expansive context window of Google Gemini models while eliminating common LLM failure modes: hasty assumptions, partial code placeholders (`// ...`), unverified assertions, and scope creep.
 
 ## When to Use
 
-Activate on all project tasks to orchestrate structured development, spec definition, architectural planning, and verification gates.
+Activate whenever:
+
+- Executing non-trivial code modifications, refactoring, bug fixes, or architecture design.
+- The user requires maximum rigor, reliability, and precision from Gemini.
+- Handling complex multi-file changes where accidental side-effects must be zero.
 
 ## Rules & Patterns
 
-Inspired by [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) by Addy Osmani (Google Chrome) and [obra/superpowers](https://github.com/obra/superpowers).
+### 1. The Read-Before-Write Invariant (Zero Assumptions)
 
-### Core Principle
+**Never write code based on assumptions about the codebase.**
 
-> **A junior writes code immediately. A senior writes a spec first.**  
-> You are a senior. You never write code until the spec and plan are approved.
+- Before modifying a function or creating an integration, **always inspect the actual files** using `view_file` or `grep_search`.
+- Check the exact runtime, framework version, and installed dependencies (e.g. React 19 vs 18, Next.js 15 vs 14, Tailwind v4 vs v3, Zod vs Joi) in `package.json` or config files before generating code.
+- Verify imported symbol names and parameter signatures directly from source files.
 
----
+### 2. The Zero-Placeholder Invariant (Complete Code Only)
 
-### The 6-Phase Development Pipeline
+**Never produce lazy, incomplete, or stubbed output.**
 
-```
-  DEFINE          PLAN           BUILD          VERIFY         REVIEW          SHIP
- ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐
- │ Idea │ ───▶ │ Spec │ ───▶ │ Code │ ───▶ │ Test │ ───▶ │  QA  │ ───▶ │  Go  │
- │Refine│      │  PRD │      │ Impl │      │Debug │      │ Gate │      │ Live │
- └──────┘      └──────┘      └──────┘      └──────┘      └──────┘      └──────┘
-   /spec          /plan          /build        /test         /review       /ship
+- ❌ **Forbidden**:
+  - `// TODO: implement logic here`
+  - `// ... rest of existing code ...`
+  - `// ... existing imports ...`
+  - Mock stub returns when real integration is required
+- ✅ **Mandatory**:
+  - Provide **100% complete, fully-implemented, compilable, and drop-in ready** code.
+  - When replacing a block of code, include all necessary imports, type definitions, and edge-case handling.
 
-[ROLE: Product Manager]  [ROLE: Architect]  [ROLE: Senior Dev]  [ROLE: QA Lead]  [ROLE: Staff Eng]  [ROLE: Release Eng]
-```
+### 3. The Proof-of-Work Invariant (Verification Before Completion)
 
-**IRON RULE**: In interactive development, no phase can be skipped and no code is written before `/plan` is approved.  
-**Direct Build & Fast-Track Exception**: When the prompt/caller explicitly requests a standalone implementation, declares `[PHASE: Build]`, or requests routine operational/maintenance tasks (git operations, version bumps, typo fixes, small config tweaks, diagnostic checks), proceed directly to execution without conversational approval pauses.
+**Never claim a task is complete without tool-verified evidence.**
 
----
+- When modifying code or configuration:
+  1. Run the project validator or compiler (`node .agents/ctx.js validate`, `tsc --noEmit`, etc.).
+  2. Run unit and integration tests (`npm test`, `pytest`, etc.).
+  3. Run linter and formatting checks (`npm run lint:md`, `eslint`, etc.).
+- If a test or validation fails, do not guess: read the exact error trace, fix the root cause, and re-run until green.
 
-### Phase 1: DEFINE — /spec
+### 4. Surgical Blast Radius Containment
 
-**Auto-activates → `[ROLE: Product Manager]`**
+**Modify ONLY what is strictly necessary.**
 
-Turn vague intent into a precise, executable specification.
+- Keep edits isolated to the exact lines, functions, and files specified in the plan.
+- Do not reformat, reorder, or alter indentation of unrelated code blocks.
+- Preserve existing comments, docstrings, and project conventions unless explicitly asked to change them.
 
-#### Step 1.1: The Interview Protocol (`interview-me`)
+### 5. Ponytail Minimalism (YAGNI)
 
-Before writing the spec, if there is ambiguity, high blast radius, or multiple architectural paths, stop and ask the user **one question at a time** (or up to 2 tightly coupled questions):
+- Prioritize native platform APIs (standard library, browser built-ins) over new npm/pip packages.
+- Follow the "Rule of Three": inline on first use, duplicate cleanly on second, abstract only on third.
+- Keep solutions obvious to a mid-level developer without requiring multi-layered wrapper classes.
 
-1. **Clarify Business Intent**: What user problem are we solving? What is explicitly out of scope?
-2. **Clarify Constraints**: Runtime versions, database engines, performance bounds.
-3. **Clarify Edge Cases**: What happens on offline state, empty lists, unauthorized requests?
+### 6. Targeted Tool-Specific Modifications
 
-#### Step 1.2: Spec Template
+**Prevent accidental code loss during file updates.**
 
-```markdown
-## Feature Spec: [Feature Name]
+- For existing files requiring localized updates (< 50% change), always prefer surgical targeted replacement chunks over destructive full-file rewrites.
+- Never discard unrelated file sections, existing comments, or helper utilities.
 
-### Why (Problem)
-[What pain does this solve? Who has it? How often?]
+### 7. Persistent Context & Plan Tracking
 
-### Scope (What's In / Out)
+**Prevent context drift during multi-step tasks.**
 
-**In-Scope**:
-- [Specific item 1]
-- [Specific item 2]
+- When an operation requires more than 3 sequential steps, write and maintain a persistent plan or checklist on disk.
+- Never rely exclusively on volatile conversational memory for tracking complex multi-file refactorings.
 
-**Out-of-Scope**:
-- [Thing we're NOT doing and why]
+### 8. Progressive Step Narration (Transparent Pair Programming)
 
-### Technical Approach
-[Read the relevant code. Understand what changes where.]
-Files affected:
-- `src/X.js` — [what changes]
-- `src/Y.js` — [what changes]
+**Eliminate the "black box" by narrating technical decisions.**
 
-### Acceptance Criteria
-- [ ] Given [context], when [action], then [result]
-- [ ] Given [context], when [action], then [result]
-
-### Open Questions
-- [Unresolved decision 1]
-- [Unresolved decision 2]
-```
-
----
-
-### Phase 2: PLAN — /plan
-
-**Auto-activates → `[ROLE: Architect]`**
-
-Break the spec into atomic, independently testable tasks.
-
-#### Thin Vertical Slices (`incremental-implementation`)
-
-Organize tasks as **Thin Vertical Slices** rather than horizontal layers:
-
-- **Bad (Horizontal)**: Task 1: All DB migrations. Task 2: All API routes. Task 3: All UI components. (Nothing works until step 3).
-- **Good (Vertical Slices)**: Slice 1: Minimal DB table + minimal API + minimal UI button end-to-end. Verify and commit. Slice 2: Add validation + edge cases. Slice 3: Polish UI & telemetry.
-
-#### Plan Rules
-
-- Each task must be **completable in < 2 hours** of focused work.
-- Each task must be **independently testable**.
-- Tasks must be **ordered by dependency** (blocking tasks first).
-- Each task gets a **test requirement** — no task without a test.
-
-#### Plan Template
-
-```markdown
-## Implementation Plan: [Feature Name]
-
-### Tasks
-
-**Task 1: [Slice 1 Name]** (est. 30min)
-- What: [Specific implementation detail]
-- Files: [file1.js, file2.js]  
-- Test: [How will you verify this works?]
-- Blocked by: [nothing / Task N]
-
-**Task 2: [Slice 2 Name]** (est. 45min)
-- What: [Specific implementation detail]
-- Files: [file3.js]
-- Test: [Test description]
-- Blocked by: Task 1
-
-### Risk Assessment
-- [Risk 1]: [Mitigation]
-- [Risk 2]: [Mitigation]
-
-### STOP — Awaiting Approval
-Do not proceed to BUILD until this plan is approved.
-```
+- Avoid executing long, silent chains of tool calls without user visibility.
+- Provide a concise 1–2 sentence transparent status update before key operations:
+  - State what was inspected or verified from the code.
+  - State the architectural decision made and the immediate next action.
+- Keep narration crisp and actionable without excessive verbosity.
+- **Zero-Spam Constraint**:
+  - ❌ **Forbidden**: Starting every intermediate step, tool call, or status update with domain/phase/role tags (e.g. `[DOMAIN: ...] [PHASE: ...] [ROLE: ...]`).
+  - ✅ **Mandatory**: Declare role and phase strictly once at the start of a phase. Intermediate step updates must be clean, natural language sentences describing technical actions directly.
+  - Do not narrate routine micro-inspections (single line reads or basic greps). Announce only meaningful task phases and decisions.
 
 ---
 
-### Phase 3: BUILD — /build
+## Code Examples
 
-**Auto-activates → `[ROLE: Senior Developer]`**
+### Bad (Lazy Model Output) vs Good (Precision Model Output)
 
-Implement one task at a time. Commit after each task.
+**❌ Bad (Lazy AI Output)**:
 
-#### Build Rules
+```javascript
+// user.service.js
+export async function updateUser(id, data) {
+  // ... existing auth check ...
+  // TODO: validate data with zod
+  return await db.user.update({ where: { id }, data });
+}
+```
 
-1. **One task per commit** — atomic, descriptive commit messages.
-2. **Write the test FIRST** (TDD — red-green-refactor).
-3. **No dead code** — if it's not tested, it's not shipped.
-4. **No TODOs in committed code** — resolve or create a tracked issue.
+**✅ Good (Gemini Precision Output)**:
+
+```javascript
+// user.service.js
+import { z } from 'zod';
+import { db } from '../lib/db.js';
+import { ValidationError, UnauthorizedError } from '../errors/index.js';
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
