@@ -1,107 +1,34 @@
 ---
 trigger: always_on
-description: <!-- AGENTLAS-INSTALL-ENTRY -->
+description: Public GitHub release work must follow the canonical `Public Release Allowlist
 ---
 
-# Agentlas Core Engine Meta-Agent Team
+# Hephaestus Gemini Extension
 
-<!-- AGENTLAS-INSTALL-ENTRY -->
-> **Asked to install this repo, not to work on it?** This file is the
-> contributor constitution and will not help you. Read the install block at the
-> top of [README.md](README.md): it points at
-> `scripts/install-all-runtimes.sh`, which writes only under `~/.agentlas`,
-> `~/.local/bin`, and this host's own plugin/command-adapter directories.
+Public GitHub release work must follow the canonical `Public Release Allowlist
+(Hard Rule)` in the repository `AGENTS.md`: publish only end-user
+install/runtime files and public README/LICENSE/CHANGELOG material; never
+publish internal docs, research, benchmarks, tests/fixtures, results/logs,
+signing/credentials, environment files, private paths/memory, or unrelated
+local work.
 
+Use Hephaestus, the Agentlas Core Engine Meta-Agent, when the user wants to
+create one Agentlas agent, create a multi-agent team, package an existing agent,
+or open the local ontology GUI.
 
-## Repository Constitution: Local Main Only
+Generated or packaged agents must include `.agentlas/global-commands.json` and
+the final response must include `global_commands`.
 
-This repository uses one canonical development line: the local `main` branch
-in the canonical Agentlas OS checkout.
-
-- Make every source change and commit directly on local `main`.
-- Do not create feature, release, backup, agent-named, or temporary branches.
-- Do not create Git worktrees. Use an external recovery directory or a verified
-  Git bundle when a safety snapshot is required.
-- Before editing, confirm the canonical checkout is on `main`, inspect status,
-  fetch remote refs, and inspect `main...origin/main`. A GUI "Pull origin"
-  button is not permission to pull or merge blindly.
-- If local `main` is dirty, preserve it with a reviewed checkpoint commit before
-  reconciling remote changes on that same branch.
-- Push only `main` and intentional release tags. Do not publish side branches.
-
-## Public Release Allowlist (Hard Rule)
-
-Before any commit, push, tag, release, or upload to a public GitHub repository,
-construct and review an explicit allowlist. Public source and release artifacts
-may contain only files required for an end user to install and run the product,
-plus public-facing `README`, `LICENSE`, and `CHANGELOG` material.
-
-Never publish internal design or research documents, plans, benchmarks,
-benchmark prompts or results, tests, fixtures, test data, scores, logs,
-screenshots, signing material, certificates, credentials, environment files,
-operator notes, private paths, local memory, or recovery artifacts. Run tests
-and benchmarks only in local/private temporary storage or private CI; publish
-neither their inputs nor their artifacts. Existing unrelated local work must
-remain unstaged.
-
-For a public release, do not use a blanket `git add -A`. Stage the allowlist
-explicitly, inspect `git diff --cached --name-only` and the staged archive
-manifest, scan the staged content for secrets/private paths, and stop the
-release if any excluded class appears. A passing test does not authorize
-publishing the test.
-
-This repository is a portable four-agent meta-agent team. Use it to create or
-package Agentlas-compatible single agents and multi-agent teams for Codex,
-Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, OpenClaw, Hermes
-Agent, Ollama-served local models (Gemma, DeepSeek — see
-`docs/local-models.md`), and `AGENTS.md`-compatible runtimes.
-
-## Source Of Truth
-
-- Canonical entry point: `AGENTS.md`.
-- Architecture ownership rule: `docs/source-of-truth.md`.
-- Runtime split and sync boundary: `docs/runtime-sync-boundaries.md`.
-- Third-party plugin contribution boundary: `CONTRIBUTING.md` and
-  `PLUGIN_CONTRIBUTIONS.md`.
-- Global command contract: `docs/global-command-contract.md`.
-- Production Ontology Runtime: `docs/ontology-runtime.md`, `ontology/`,
-  `bin/ontology`, and `scripts/verify-ontology-runtime.sh`.
-- Agentlas Cloud runtime contract: `docs/agentlas-cloud-runtime.md`,
-  `agentlas_cloud/`, `schemas/agentlas-manifest.schema.json`, and
-  `templates/agentlas.json.tpl`.
-- Hephaestus Network 2.0 contract: `docs/hephaestus-network-2.0.md`,
-  `docs/runtime-fallback-adapters.md`, `agentlas_cloud/networking/`,
-  `schemas/routing-card.schema.json`, `.agentlas/routing-card.json`, and
-  `scripts/verify-routing-cards.sh`.
-- Stormbreaker robust execution contract: `docs/robustness-protocol.md`,
-  `docs/robustness-eval.md`, and `schemas/robustness-eval-result.schema.json`.
-- Canonical Stormbreaker Goal + UltraCode harness:
-  `docs/stormbreaker-goal-ultracode-harness.md`,
-  `agentlas_cloud/networking/stormbreaker_harness.py`, and
-  `schemas/stormbreaker-goal-ultracode-harness.schema.json`.
-- Builder quality gate: `contracts/builder-interview-research-gate.md`,
-  `docs/builder-quality-research-basis.md`,
-  `templates/builder-interview.md.tpl`, `templates/research-sources.md.tpl`,
-  `templates/tool-selection.md.tpl`, `templates/domain-expert-synthesis.md.tpl`,
-  `templates/prompt-performance-contract.md.tpl`, and
-  `templates/capability-eval-plan.json.tpl`.
-- Portable support contracts: `docs/mode-classifier.md`,
-  `docs/clarify-question-loop.md`, `docs/agentlas-auto-activation.md`,
-  `docs/local-credential-store.md`, and `docs/skill-lifecycle-promotion.md`.
-- Agent experience and MCP contracts: `docs/agent-experience-assets.md`,
-  `docs/mcp-build-resolution.md`, the matching `schemas/*.schema.json`
-  files, `.agentlas/mcp-policy.json`, and
-  `scripts/verify-experience-assets-contract.sh`.
-- Team members: `agents/10-single-agent-builder/agent.md`,
-  `agents/20-multi-agent-team-builder/agent.md`, and
-  `agents/30-agentlas-packager/agent.md`, plus
-  `agents/40-session-agent-builder/agent.md`.
-- Mode contracts: `modes/single-agent-creator.md`, `modes/team-builder.md`,
-  `modes/agentlas-packager.md`, and `modes/session-agent-builder.md`.
-- Portable runtime core: `.agents/agentlas-core-engine-meta-agent/agent.md`.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Agentlas Workforce continuity is mandatory, not an explicit goal-mode feature.
+At the start of every nontrivial project turn call
+`workforce.goal_context({projectDir})`. Reuse an active exact roster plus local
+skills when sufficient; recruit only a real gap. Every
+`workforce.prepare_execution` call must include `projectDir` and the incumbent
+`goalId` when continuing; Core derives one when absent and automatically binds
+the successful plan. Keep it across turns, sessions, restarts, compaction, and
+lease expiry. Release only after explicit whole-goal completion/cancellation
+through `workforce.complete_goal(explicitCompletion=true)`.
 
 ---
 > Source: [agentlas-ai/Agentlas-OS](https://github.com/agentlas-ai/Agentlas-OS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
