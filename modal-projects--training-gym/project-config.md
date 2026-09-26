@@ -1,112 +1,135 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Agents are particularly useful when you need to validate hypotheses or run many experiments in parallel. However, they are less effective when forced to create and sift through thousands of lines of configuration files and training scripts. The Training Gym solves this with an intuitive API, a CLI for maximum observability into the run status, and skills that teach agents best practices such as smoking runs and tactics for debugging.
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Agent-driven training
 
-## What this repo is
+Agents are particularly useful when you need to validate hypotheses or run many experiments in parallel. However, they are less effective when forced to create and sift through thousands of lines of configuration files and training scripts. The Training Gym solves this with an intuitive API, a CLI for maximum observability into the run status, and skills that teach agents best practices such as smoking runs and tactics for debugging.
 
-`modal-training-gym` is a pip-installable Python package that provides framework-aware launchers for distributed training on Modal's multi-node GPU clusters. Users import framework configs, attach a model + dataset, and `modal run` — the package handles image construction, cluster topology, Ray/NCCL bring-up, volume mounts, and checkpointing.
+This guide demonstrates how to effectively use agents with the Gym by getting Claude to post-train a model of its choosing to respond only in [rhyme](https://open.spotify.com/episode/5txYOHA44zWiSgNK623Epp).
 
-## Commands
+## Set up
+
+First, we'll install the `training-gym` CLI:
 
 ```bash
-# Setup
-uv sync                              # install deps (Python 3.12 required)
-uv run pre-commit install            # register tutorial-regen hook
-
-# Lint (ruff — tutorials/ is excluded via pyproject.toml)
-uv run ruff check modal_training_gym/
-uv run ruff format --check modal_training_gym/
-
-# Type check
-uv run pyright modal_training_gym/    # if pyright is available
-
-# Compile check (no GPU needed)
-uv run python -m compileall modal_training_gym/
-
-# Tutorials — NEVER edit generated files directly
-uv run python tutorials/generate_tutorial.py              # regenerate all .py + .ipynb
-uv run python tutorials/generate_tutorial.py path/to/src  # regenerate one
-
-# Docs (Astro/Starlight site at docs-next/)
-uv run python scripts/generate_all.py --skip-build   # regen API reference + tutorial pages
-cd docs-next && npm ci && npm run dev                 # local dev server
-uv run python scripts/generate_all.py                 # full regen + build
-
-# Deploy
-uv run modal deploy docs-next/docs_next_app.py        # docs site → gym.modal.dev
-uv run modal deploy dashboards/app.py                  # observability dashboard
-
-# Validate tutorials (runs on Modal — costs GPU time)
-uv run python scripts/validate_tutorials.py --list           # show discovered targets
-uv run python scripts/validate_tutorials.py --preflight-only # local checks only
-uv run python scripts/validate_tutorials.py --only slime_gsm8k  # single tutorial
+pip install -q git+https://github.com/modal-projects/training-gym.git@main
+training-gym --help
 ```
 
-## Architecture
+Then, we'll install the provided skills into our current project:
 
-### Two-class framework pattern
-
-Every framework exposes two config classes:
-
-- **`<F>FrameworkConfig`** — Modal infra (gpu, image, n_nodes) + framework CLI flags. Pydantic with `extra="forbid"`.
-- **`<F>Config`** — Composes `dataset: DatasetConfig`, `model: ModelConfig`, `wandb: WandbConfig`, and `framework_config`. Exposes `build_app()`.
-
-```
-SlimeConfig.build_app()
-  → build_slime_app(slime=self)  [in launcher.py]
-    → returns modal.App with:
-        app.download()          — ModelConfig.download()
-        app.prepare_dataset()   — DatasetConfig.prepare()
-        app.train()             — Ray cluster submit → TrainResult
+```bash
+training-gym skills install
 ```
 
-SlimeConfig is a Pydantic dataclass following the two-class composition pattern.
+The main skill agents should use is `agent-driven-training`, which lays out the RL training lifecycle:
 
-### Train pipeline
+- Ask before making choices that change model behavior or GPU cost.
+- Catch dataset and reward bugs locally before they waste GPU time.
+- Scale up only after smoke runs indicate the training pipeline is healthy.
+- Inspect actual model outputs to verify that higher rewards induce the intended behavior.
+- Investigate suspicious reward trends to prevent [reward hacking](https://en.wikipedia.org/wiki/Reward_hacking).
 
-All frameworks expose a single `train()` entry point. Calling `train()` handles model download, dataset preparation, and training automatically — if the model isn't cached or the dataset isn't materialized, `train()` runs those steps first.
+To learn more about the CLI and the provided skills, see the [reference page](https://gym.modal.dev/reference/cli).
 
-### Volume layout
+## Let it cook
 
-Every framework mounts three Modal Volumes:
-- `/root/.cache/huggingface` — shared HF model cache (read-mostly)
-- `/data` — training data (framework-specific, per-app)
-- `/checkpoints` — training outputs (per-app, persists across runs)
+Here's the example prompt:
 
-### Model presets
+```txt
+can you post-train a model to rhyme in its output
+```
 
-Models can declare `training: ModelTrainingConfig` or framework-specific presets (e.g. `SlimePreset`) with tuned parallelism/GPU settings. Framework configs apply these as defaults to unset fields during `__post_init__`.
+We leave it ambiguous to demonstrate that when empowered with the right tools and skills, agents are capable of making sensible choices. Here, it chose to train [Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B) on prompts taken from [tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca).
 
-### Cloudpickle caller resolution
+Since it is just writing Python code, we can easily inspect what it wrote. First, it loaded the dataset:
 
-`build_app()` factories use `resolve_caller_module()` (in `common/framework.py`) to find the user's tutorial module by walking the stack past `modal_training_gym.*` frames. This enables cloudpickle to serialize inline `DatasetConfig`/`ModelConfig` subclasses by value to remote containers.
+```python
+from modal_training_gym import HuggingFaceDataset
 
-### TrainResult persistence
+SYSTEM_PROMPT = (
+    "You are a poet who answers every question in rhyme. Answer the question "
+    "correctly and completely, but write the entire answer as verse: at least "
+    "four lines, one clause per line, with line endings that rhyme in couplets "
+    "(AABB). Do not write any prose, preamble, or explanation outside the verse."
+)
 
-`TrainResult` is a dataclass written to a `modal.Dict` (keyed by `{app_name}-train-results`). Created by each framework's `train()` on rank 0. Loaded by eval scripts via `TrainResult.load(app_name)`. The `.model` property reconstructs a `ModelConfig` pointing at the checkpoint for serving.
 
-### Tutorial system
+rhyme_dataset = HuggingFaceDataset(
+    hf_repo="tatsu-lab/alpaca",
+    hf_split=f"train[:512]",
+    input_column="instruction",
+    output_column="output",
+    input_format="text",
+    system_prompt=SYSTEM_PROMPT,
+)
+```
 
-Tutorials live in `tutorials/tutorial_generator/<bucket>/<name>.py` as decorator-annotated source files. The generator (`tutorials/generate_tutorial.py`) AST-walks each source and emits `tutorials/<bucket>/<name>/<name>.py` + `.ipynb`. The pre-commit hook auto-regenerates on commit.
+Next, it defined the reward function. Here, we care about the model's ability to both rhyme and answer the user's question. As our [intro tutorial](https://gym.modal.dev/tutorials/rl_basics) shows, NLTK’s [CMU Pronouncing Dictionary](https://github.com/prosegrinder/python-cmudict) is a useful library for measuring the former.
 
-Decorators: `@markdown` (docstring → md cell), `@code` (body → code cell), `@shell("...")` (verbatim cell), `@py_only` / `@notebook_only` (restrict output format).
+<details>
+<summary>What's going on here</summary>
 
-Each source declares `TUTORIAL_METADATA` dict with `framework`, `cluster_shape`, `summary`, `difficulty`, `order`, `api_classes` — this drives the catalog table in the repo-root README.md and backlinks in API reference pages.
+The reward function finds phonemes from each line's last stressed vowel onward and compares line endings under both the AABB and ABAB rhyme schemes. After some initial testing, the agent found two exploits the model took advantage of:
 
-### API reference generation
+- Words rhyme with themselves, so the model repeated the last word of the sentence.
+- One-word lines are easy to write and rhyme, so the model found that being concise was better than trying its best.
 
-`scripts/api_reference_manifest.py` contains a curated list of public classes. `scripts/generate_api_reference.py` introspects each class (fields, types, defaults, methods) and generates Starlight markdown pages. Run via `scripts/generate_all.py`.
+Luckily, these are simple problems that can be detected, and the agent implemented anti-gaming measures accordingly.
 
-### Dashboard
+</details>
 
+```python
+import re
+
+_CMUDICT: dict = {}
+_VOWELS = ("A", "E", "I", "O", "U")
+
+
+def _cmudict() -> dict:
+    if not _CMUDICT:
+        import nltk
+        from nltk.corpus import cmudict
+
+        nltk.download("cmudict", quiet=True)
+        _CMUDICT.update(cmudict.dict())
+    return _CMUDICT
+
+
+def _strip_thinking(text: str) -> str:
+    """Drop a ``<think>`` block and any stray markdown bullets/numbering."""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"</?think>", "", text)
+    return text.strip()
+
+
+def _lines(text: str) -> list[str]:
+    return [line.strip() for line in _strip_thinking(text).split("\n") if line.strip()]
+
+
+def _end_word(line: str) -> str:
+    words = re.findall(r"[a-zA-Z']+", line)
+    return words[-1].lower().strip("'") if words else ""
+
+
+def rhyme_tail(word: str) -> tuple:
+    """Phonemes from the last stressed vowel onward, stress markers removed.
+
+    Falls back to the last three letters for words the dictionary doesn't know
+    (names, coinages), which is a decent orthographic proxy.
+    """
+    if not word:
+        return ()
+    phones = _cmudict().get(word)
+    if not phones:
+        return ("~", word[-3:])
+    seq = phones[0]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [modal-projects/training-gym](https://github.com/modal-projects/training-gym) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
