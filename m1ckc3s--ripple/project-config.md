@@ -31,25 +31,22 @@ original is Metal/MSL; this is GLSL/WebGL with meaningful changes (see
 
 | File | Role |
 | --- | --- |
-| `src/components/RippleTransition.tsx` | Everything: GLSL source (VERT/FRAG), WebGL setup, texture loading, GSAP trigger/scrub, `Params` type, `DEFAULT_PARAMS`, `EASE_OPTIONS`. |
+| `src/components/RippleTransition.tsx` | The effect: GLSL source (VERT/FRAG), WebGL setup, texture loading, GSAP trigger/scrub. Default-exports only the component. |
+| `src/components/rippleParams.ts` | Non-component module: the `Params` / `RippleHandle` types, `DEFAULT_PARAMS`, `EASE_OPTIONS`. Split out of `RippleTransition.tsx` so that file only exports a component (satisfies `react-refresh/only-export-components` / Fast Refresh). |
 | `src/components/Controls.tsx` / `.css` | Collapsible, shadcn-style control panel (top-left) + Dev/Scrub section. Holds the `open` collapse state, the "Controls" pill, and the close (✕) button. |
 | `src/App.tsx` | Wires the component to the controls; holds `params` + `scrubValue` state. |
 | `public/image-a.png`, `image-b.png` | Demo images (Pinterest placeholders — not owned; see README). |
 
-## Running it
-
-- Dev server: `npm run dev` → **http://localhost:3000** (pinned via
-  `server.port: 3000` + `strictPort: true` in `vite.config.ts`, matching the
-  owner's other repos).
-- `.claude/launch.json` has a single `vite dev` entry on port 3000, started via
-  the Claude preview tool. Keep it to one entry — do not add a second
-  `vite preview` server.
-
 ## How the effect works (fragment shader)
 
-1. **Wavefront** — `waveFront = progress × waveSpeed`. Distance from `u_center`
-   (the normalized tap point) is compared to it. A Gaussian envelope around the
-   front × a `cos(delta × waveFreq)` term defines the bright ripple band.
+1. **Wavefront** — `waveFront = progress × coverage`, where
+   `coverage = 1.0 + 0.5*noiseWarp + 0.1` is auto-derived so the front always
+   reaches the farthest corner (normalized distance maxes at 1.0) plus the noise
+   margin by `progress` 1 — the sweep completes on any canvas/aspect. Distance
+   from `u_center` (the normalized tap point) is compared to it. A Gaussian
+   envelope around the front × a `cos(delta × waveFreq)` term defines the bright
+   ripple band. (There is no Wave Speed uniform — see "Wave Speed → Transition
+   Speed" below.)
 2. **Noise warp** — two cartesian FBM layers (`p*4` and `p*12`, value-noise +
    Hermite smoothing) perturb the distance field into cloud lobes. Amplitude is
    scaled by `warpScale = smoothstep(0.0, 0.05, progress)` so it starts as a
@@ -58,51 +55,43 @@ original is Metal/MSL; this is GLSL/WebGL with meaningful changes (see
 4. **Chromatic aberration** — R/G/B sampled at offset UVs (`caStrength`).
 5. **Color-dodge glow** — band blown toward white (`glow`).
 6. **Two-image reveal** — behind the front, `base` mixes into `target`.
-   `u_swap` (0/1) flips which texture is base vs target.
+   `u_swap` (0/1) flips which texture is base vs target. The reveal boundary is
+   feathered by `feather = 0.04 + 0.05·noiseLarge` so it reads as an organic edge,
+   not a hard ring.
 7. **Tail gate** — envelope fades out by `progress` 1 so nothing lingers.
 
 ## Interaction model
 
-- Click the canvas → ripple fires from the click point.
+- **Press the canvas → ripple + pinch fire from the press point.** The whole
+  effect is bound to `pointerdown` (mouse/touch/pen), not click — there is no
+  release/click path. `pointerdown` is guarded to the primary button, and pairs
+  with the image wrapper's `touch-action: none` so a press can't be a scroll.
+- **Pinch poke:** a snappy push-in dimple fires together with the wave when the
+  `pinch` toggle is on. Its depth is scaled by `pinchStrength` — the pinch tween
+  peaks at `pinchStrength` (no separate uniform; `u_pinch` already multiplies the
+  displacement). On by default at strength 0.3.
+  - **Geometry (shader).** The dimple is a Gaussian `pinchG = exp(-dist²/2σ²)`
+    with `pinchSigma = 0.10`. The radial displacement is its *slope*
+    (`pinchDisp = (dist/σ²)·pinchG·0.01·u_pinch`), so the pull is zero at the
+    exact contact point and far away, maxing around the rim — the sheet reads as
+    a physical lens dent that bends the picture, not painted-on shading. The
+    `0.01` factor is the hand-tuned displacement scale.
+  - **Sign convention.** `uvOffset = dir·(pushAmt − pinchDisp)` — *subtracting*
+    the pinch makes the band sample outward, so content gets sucked toward the
+    tap (the "pushed-in" look).
+  - **Frame pin / edge-fade.** `edgeFade = smoothstep(0, 0.14, dist-to-nearest-
+    border)` multiplies the dimple to zero as it nears any edge. Without it the
+    dent could drag the sample out of bounds, where `CLAMP_TO_EDGE` smears the
+    border and bleeds the other image in. Like paper anchored in a frame, the
+    very edge can't deform.
+  - **Contact shadow.** A soft `color.rgb *= 1 − 0.16·pinchG·edgeFade·u_pinch`
+    pools shade in the bottom of the dimple for depth. Pure Gaussian, no
+    high-frequency detail, so it never adds hard radiating lines; the `0.16`
+    depth is kept subtle so the geometric distortion stays the star.
 - **Ping-pong:** on tween complete, `state.swap` toggles and `progress` resets to
-  0 *in the same frame*. The new base equals the just-revealed image, so there's
-  no flicker — successive clicks alternate A→B, B→A, …
-- **Click guard:** `animating` flag ignores clicks until the current transition
-  finishes (no mid-animation restarts/double-swaps). `scrub()` clears it.
-- **Dev scrub slider** sets `progress` directly (kills any tween) for
-  frame-by-frame inspection. It scrubs the current direction.
-
-## Controls panel & responsiveness
-
-- **Collapse pattern** (matches the sibling `shimmering-dots` repo, but anchored
-  **top-left** instead of bottom-right): the panel and a "Controls" pill share
-  one fixed `.rc-root` anchor and cross-fade via scale + opacity, toggled by the
-  `open` state. The ✕ in the header collapses; the pill re-opens. Header buttons
-  (Reset + ✕) are matched to 26px; the bottom **Replay** uses the outlined
-  uppercase `.rc-secondary` style.
-- **`.rc-root` is `pointer-events: none`** — it's only a positioning anchor and
-  is sized to the (sometimes hidden) panel, so leaving it interactive made it
-  swallow taps over the canvas even while collapsed. The pill and the open panel
-  re-enable `pointer-events: auto` themselves.
-- **Breakpoint width:** mobile (`≤640px`) caps the panel at the **same 280px** as
-  desktop, not wider — otherwise the panel *grew* when crossing into mobile.
-  Below ~312px it shrinks via `calc(100vw - 32px)`.
-- **Image sizing** is computed once at mount from `window.innerWidth`: desktop
-  uses 0.7w / 0.86h, mobile (`≤640px`) uses 0.9w / 0.8h. It adapts on load /
-  rotation-then-reload, **not** live on desktop window drags (would require
-  re-running the WebGL setup on resize).
-- **Touch lock:** `html, body, #root` are `overflow: hidden` +
-  `overscroll-behavior: none`, and the image wrapper is `touch-action: none`, so
-  a touch-drag fires a tap (ripple) instead of scrolling/panning the canvas.
-
-## Deviations from the original Metal shader
-
-- **Removed the scatter/dissolve block.** In the original it flung pixels behind
-  the wave to random UVs and faded to black. It caused a "shake," a hard edge,
-  and a destructive image-scramble. Replaced with a clean two-image reveal.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [m1ckc3s/ripple](https://github.com/m1ckc3s/ripple) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
