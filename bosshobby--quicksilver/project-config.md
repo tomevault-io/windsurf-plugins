@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides repository guidance for coding agents working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides repository guidance for coding agents working in this repository.
 
 ## Build Commands
 - Build all targets: `pio run`
@@ -28,6 +28,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture Overview
 
 QUICKSILVER is FPV drone flight controller firmware supporting STM32 F4/F7/H7/G4 and AT32 F435 MCUs.
+
+### Shared Runtime State (Required Pattern)
+
+Subsystems publish their externally useful runtime values into the global `state` (`control_state_t` in `src/control/control.h`, defined in `src/control/control.cpp`). This is a shared blackboard: despite its name, it is the vehicle's common runtime data interface. The companion `flags` holds shared control/status flags. Consumers read published values without depending on the producer's implementation.
+
+Keep subsystem machinery private. For example, battery filter history stays local while voltage/current readings are published; PID history and integration bookkeeping stay local while P/I/D terms and output are published; GPS publishes decoded position, speed and fix information for consumers such as telemetry.
+
+When adding or changing subsystem behavior:
+
+- Publish runtime values needed by other subsystems or diagnostics through `state` (or `flags` for shared control/status flags). Reuse existing fields when their meaning matches; do not introduce parallel public globals or trivial getters for the same values.
+- Keep filter histories, parser buffers, counters used only internally, and algorithm bookkeeping local to the owning subsystem. Do not put private implementation details into `state` merely for convenience.
+- Give each published value a clear owning producer. Consumers should treat it as read-only. Document intentional alternate writers, such as simulator input or override paths, and the conditions under which they own the value.
+- Document units, coordinate frame or range where relevant, initialization/reset behavior, and validity semantics. Distinguish measurements, requested commands and applied outputs; do not silently repurpose a field between these roles.
+- Treat `state` as the latest available values, not a synchronized snapshot. Check producer/consumer order and task cadence in `src/core/tasks.cpp` and `src/core/scheduler.cpp`. Use validity/freshness information when a consumer requires it; do not assume a value was updated this loop. Any ISR or concurrent access needs an explicit synchronization decision.
+- Treat serialized state as an external interface. For additions or changes, review `STATE_MEMBERS`, QUIC encoding, and affected Configurator, telemetry and blackbox consumers. Update serialization deliberately and check payload capacity when expanding it; preserve existing field meanings unless the interface change is intentional.
+- During review, trace the changed fields' writers and readers and verify ownership, initialization, validity and scheduling assumptions. Preserve this pattern without adding a generic event bus, accessor layer or broad state refactor unless the task requires one.
 
 ### Core Modules (`src/core/`)
 - `main.c` - Entry point, hardware init sequence, starts scheduler
@@ -59,40 +75,9 @@ QUICKSILVER is FPV drone flight controller firmware supporting STM32 F4/F7/H7/G4
 - `blackbox.c` - Flight data logging
 
 ### Receiver Support (`src/rx/`)
-- Protocol implementations: CRSF/ELRS, FrSky, FlySky, DSM, SBUS, IBUS
-- `rx.c` - Receiver abstraction layer
-- `rx_spi.c` - SPI-based receiver interface
 
-### OSD (`src/osd/`)
-- `render.c` - OSD rendering engine
-- `menu.c` - Configuration menu system
-
-## Memory Sections
-
-Use these macros for performance-critical or DMA-accessible data:
-- `FAST_RAM` - Places variables in fast-access RAM for real-time code
-- `DMA_RAM` - Places buffers in DMA-accessible memory regions
-
-## Task Scheduler
-
-Tasks are defined in `src/core/tasks.c` with priorities and context masks:
-- `TASK_MASK_ON_GROUND` - Runs only when disarmed
-- `TASK_MASK_IN_AIR` - Runs only when armed
-- `TASK_MASK_ALWAYS` - Runs in all states
-
-REALTIME tasks (gyro, imu, pid, rx) run every loop iteration. Lower priority tasks are scheduled based on available CPU time.
-
-## Target Configuration
-
-Board configurations are in `targets/*.yaml`. Each defines:
-- MCU type and pin mappings
-- Gyro SPI bus and CS pin
-- Motor timer assignments
-- Serial port mappings
-- LED, buzzer, and peripheral configs
-
-The `targets/_index.json` contains the master board index.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [BossHobby/QUICKSILVER](https://github.com/BossHobby/QUICKSILVER) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
