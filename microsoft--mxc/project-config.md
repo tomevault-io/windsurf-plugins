@@ -1,124 +1,104 @@
 ---
 trigger: always_on
-description: The Rust toolchain version is pinned in [`src/rust-toolchain.toml`](../src/rust-toolchain.toml) to match what CI uses (currently 1.93). The pin is honored automatically by `rustup` — running any `cargo` command from `src/` (or below) downloads and selects that channel on first use. To opt out for one-off testing on a different toolchain, use `cargo +<channel> ...` or set `RUSTUP_TOOLCHAIN`. When bumping the pinned version, bump the matching `version: 'ms-prod-1.<N>'` lines in the two `.azure-pip
+description: description: 'Rust programming language coding conventions and best practices'
 ---
 
-# MXC (Microsoft eXecution Container) — Copilot Instructions
+---
+description: 'Rust programming language coding conventions and best practices'
+applyTo: '**/*.rs'
+---
 
-## Prerequisites
+# Rust Coding Conventions and Best Practices
 
-The Rust toolchain version is pinned in [`src/rust-toolchain.toml`](../src/rust-toolchain.toml) to match what CI uses (currently 1.93). The pin is honored automatically by `rustup` — running any `cargo` command from `src/` (or below) downloads and selects that channel on first use. To opt out for one-off testing on a different toolchain, use `cargo +<channel> ...` or set `RUSTUP_TOOLCHAIN`. When bumping the pinned version, bump the matching `version: 'ms-prod-1.<N>'` lines in the two `.azure-pipelines/templates/*.Build.Job.yml` files in the same commit.
+Follow idiomatic Rust practices and community standards when writing Rust code. 
 
-LSP servers are configured in `.github/lsp.json` for Rust and TypeScript. Install them before use:
+These instructions are based on [The Rust Book](https://doc.rust-lang.org/book/), [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/), [RFC 430 naming conventions](https://github.com/rust-lang/rfcs/blob/master/text/0430-finalizing-naming-conventions.md), and the broader Rust community at [users.rust-lang.org](https://users.rust-lang.org).
 
-```
-rustup component add rust-analyzer
-npm install -g typescript-language-server typescript
-```
+## General Instructions
 
-## Build Commands
+- Always prioritize readability, safety, and maintainability.
+- Use strong typing and leverage Rust's ownership system for memory safety.
+- Break down complex functions into smaller, more manageable functions.
+- For algorithm-related code, include explanations of the approach used.
+- Write code with good maintainability practices, including comments on why certain design decisions were made.
+- Handle errors gracefully using `Result<T, E>` and provide meaningful error messages.
+- For external dependencies, mention their usage and purpose in documentation.
+- Use consistent naming conventions following [RFC 430](https://github.com/rust-lang/rfcs/blob/master/text/0430-finalizing-naming-conventions.md).
+- Write idiomatic, safe, and efficient Rust code that follows the borrow checker's rules.
+- Ensure code compiles without warnings.
 
-### Full build (Windows)
+## Patterns to Follow
 
-```
-build.bat                  # Release build for current architecture
-build.bat --debug          # Debug build
-build.bat --all            # Release build for both x64 and ARM64
-build.bat --with-microvm   # Include NanVix micro-VM binaries
-```
+- Use modules (`mod`) and public interfaces (`pub`) to encapsulate logic.
+- Handle errors properly using `?`, `match`, or `if let`.
+- Use `serde` for serialization and `thiserror` or `anyhow` for custom errors.
+- Implement traits to abstract services or external dependencies.
+- Structure async code using `async/await` and `tokio` or `async-std`.
+- Prefer enums over flags and states for type safety.
+- Use builders for complex object creation.
+- Split binary and library code (`main.rs` vs `lib.rs`) for testability and reuse.
+- Use `rayon` for data parallelism and CPU-bound tasks.
+- Use iterators instead of index-based loops as they're often faster and safer.
+- Use `&str` instead of `String` for function parameters when you don't need ownership.
+- Prefer borrowing and zero-copy operations to avoid unnecessary allocations.
 
-### Full build (Linux)
+### Ownership, Borrowing, and Lifetimes
 
-```
-./build.sh                 # Release build
-./build.sh --debug         # Debug build
-./build.sh --rust-only     # Only Rust binaries, skip SDK/CLI
-```
+- Prefer borrowing (`&T`) over cloning unless ownership transfer is necessary.
+- Use `&mut T` when you need to modify borrowed data.
+- Explicitly annotate lifetimes when the compiler cannot infer them.
+- Use `Rc<T>` for single-threaded reference counting and `Arc<T>` for thread-safe reference counting.
+- Use `RefCell<T>` for interior mutability in single-threaded contexts and `Mutex<T>` or `RwLock<T>` for multi-threaded contexts.
 
-### Full build (macOS)
+## Patterns to Avoid
 
-```
-./build-mac.sh             # Release build for native architecture (seatbelt backend)
-./build-mac.sh --debug     # Debug build
-./build-mac.sh --all       # Build for both aarch64 and x86_64
-./build-mac.sh --rust-only # Only Rust binaries, skip SDK
-```
+- Don't use `unwrap()` or `expect()` unless absolutely necessary—prefer proper error handling.
+- Avoid panics in library code—return `Result` instead.
+- Don't rely on global mutable state—use dependency injection or thread-safe containers.
+- Avoid deeply nested logic—refactor with functions or combinators.
+- Don't ignore warnings—treat them as errors during CI.
+- Avoid `unsafe` unless required and fully documented.
+- Don't overuse `clone()`, use borrowing instead of cloning unless ownership transfer is needed.
+- Avoid premature `collect()`, keep iterators lazy until you actually need the collection.
+- Avoid unnecessary allocations—prefer borrowing and zero-copy operations.
 
-Requires Xcode Command Line Tools and Rust. Produces an unsigned `mxc-exec-mac` binary (codesigning + notarization happen at release time). Schema `0.7.0-alpha` or later required for macOS/Seatbelt backend.
+## Code Style and Formatting
 
-### Individual components
+- Follow the Rust Style Guide and use `rustfmt` for automatic formatting.
+- Keep lines under 100 characters when possible.
+- Place function and struct documentation immediately before the item using `///`.
+- Use `cargo clippy` to catch common mistakes and enforce best practices.
 
-```
-# Rust workspace (from src/)
-cargo build --release --target x86_64-pc-windows-msvc
-cargo build --release --target aarch64-pc-windows-msvc
-cargo build --release -p lxc          # Linux only — builds lxc-exec
-cargo build --release -p mxc_darwin --target aarch64-apple-darwin  # macOS only — builds mxc-exec-mac
+## Error Handling
 
-# SDK (from sdk/)
-npm install && npm run build
+- Use `Result<T, E>` for recoverable errors and `panic!` only for unrecoverable errors.
+- Prefer `?` operator over `unwrap()` or `expect()` for error propagation.
+- Create custom error types using `thiserror` or implement `std::error::Error`.
+- Use `Option<T>` for values that may or may not exist.
+- Provide meaningful error messages and context.
+- Error types should be meaningful and well-behaved (implement standard traits).
+- Validate function arguments and return appropriate errors for invalid input.
 
-# CLI (from cli/)
-npm install && npm run build
-```
+## API Design Guidelines
 
-### Lint and format
+### Common Traits Implementation
+Eagerly implement common traits where appropriate:
+- `Copy`, `Clone`, `Eq`, `PartialEq`, `Ord`, `PartialOrd`, `Hash`, `Debug`, `Display`, `Default`
+- Use standard conversion traits: `From`, `AsRef`, `AsMut`
+- Collections should implement `FromIterator` and `Extend`
+- Note: `Send` and `Sync` are auto-implemented by the compiler when safe; avoid manual implementation unless using `unsafe` code
 
-```
-# Rust (from src/)
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+### Type Safety and Predictability
+- Use newtypes to provide static distinctions
+- Arguments should convey meaning through types; prefer specific types over generic `bool` parameters
+- Use `Option<T>` appropriately for truly optional values
+- Functions with a clear receiver should be methods
+- Only smart pointers should implement `Deref` and `DerefMut`
 
-# CLI (from cli/)
-npx eslint src --ext .ts
-```
-
-### Tests
-
-```
-# Rust unit tests (from src/)
-cargo test --workspace
-cargo test -p wxc_common                    # Single crate
-cargo test -p wxc_common -- config_parser   # Filter by test name
-
-# SDK (from sdk/)
-npm test
-npm run test:integration
-
-# CLI (from cli/) — requires build first
-node --test dist/cli.test.js
-
-# Local PowerShell helpers — run from repo root, require built binaries
-tests\scripts\run_test_configs.ps1            # All test configs via wxc_test_driver
-tests\scripts\run_basicprocess_test.ps1            # Single process container test
-tests\scripts\run_isolation_session_tests.ps1                # IsolationSession one-shot E2E (requires host with the OS-side IsoSessionOps service)
-tests\scripts\run_isolation_session_state_aware_tests.ps1    # IsolationSession state-aware lifecycle E2E (multi-invocation provision/start/exec/stop/deprovision, same host requirements)
-tests\scripts\run_lxc_all_tests.sh            # All LXC tests (Linux)
-tests\scripts\run_bwrap_all_tests.sh          # All Bubblewrap tests (Linux, requires bwrap)
-
-# E2E test crate — Rust executor integration tests (from src/)
-cargo test -p wxc_e2e_tests                 # Invokes MXC binaries directly
-cargo test -p wxc_e2e_tests -- --ignored    # Include stress tests (run_on_repeat)
-```
-
-## Architecture
-
-MXC is a **sandboxed code execution system** with a Rust core and TypeScript SDK/CLI layer.
-
-### Containment backends
-
-The Rust workspace (`src/`) implements multiple sandboxing backends behind the `ScriptRunner` trait (`core/wxc_common/src/script_runner.rs`):
-
-| Backend | Binary | Platform | Module |
-|---------|--------|----------|--------|
-| AppContainer | `wxc-exec.exe` | Windows | `backends/appcontainer/common/src/appcontainer_runner.rs` |
-| BaseContainer (OS sandbox API) | `wxc-exec.exe` | Windows | `backends/appcontainer/common/src/base_container_runner.rs` — calls `Experimental_CreateProcessInSandbox` via FlatBuffer |
-| Windows Sandbox | `wxc-exec.exe` | Windows | `backends/windows_sandbox/common/src/windows_sandbox_runner.rs` |
-| MicroVM (NanVix) | `wxc-exec.exe` | Windows | `backends/nanvix/runner/src/lib.rs` — feature-gated behind `microvm` |
-| Hyperlight | `wxc-exec.exe` | Windows | `backends/hyperlight/common/src/lib.rs` — Hyperlight + Unikraft micro-VM backend |
+### Future Proofing
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/mxc](https://github.com/microsoft/mxc) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
