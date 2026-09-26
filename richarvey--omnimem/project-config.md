@@ -1,97 +1,67 @@
 ---
 trigger: always_on
-description: Self-hosted semantic memory MCP server for Claude Code. Provides persistent memory across sessions via four namespaces: episodic (decisions, bugs, patterns), project context (stack, goals, state), knowledge base (RSS articles auto-summarised by Claude Haiku), and preferences (prescriptive rules extracted from conversation, e.g. "always update README after a feature"). v6 adds a fifth, derived namespace: compiled skills (`mem:skill:`) — SKILL.md documents distilled from experience and graveyard m
+description: You have access to a persistent memory system via the `omnimem` MCP server. It is the primary persistent memory store for all sessions.
 ---
 
-# OmniMem Development Guide
+## OmniMem — Persistent Semantic Memory
 
-## What is this?
+You have access to a persistent memory system via the `omnimem` MCP server. It is the primary persistent memory store for all sessions.
 
-Self-hosted semantic memory MCP server for Claude Code. Provides persistent memory across sessions via four namespaces: episodic (decisions, bugs, patterns), project context (stack, goals, state), knowledge base (RSS articles auto-summarised by Claude Haiku), and preferences (prescriptive rules extracted from conversation, e.g. "always update README after a feature"). v6 adds a fifth, derived namespace: compiled skills (`mem:skill:`) — SKILL.md documents distilled from experience and graveyard memories per domain, gated behind a propose-and-accept write path.
+-----
 
-**Version**: 6.3.2
-**Stack**: Python 3.12, FastMCP (SSE transport), Valkey + valkey-search (HNSW vectors), sentence-transformers (all-MiniLM-L6-v2, 384-dim), Anthropic API (Claude Haiku for RSS summarisation), Pydantic v2, Docker Compose, APScheduler, feedparser, PyTorch CPU-only
+### Tool Priority
 
-## Project Structure
+Before using web_search or answering from training data, ALWAYS query OmniMem first:
 
-```
-mcp_server/           # MCP server — FastMCP SSE transport
-  server.py           # Entry point: init store/embedder/lifecycle/pipeline, register tools
-  memory/             # Core engine (shared with web_ui)
-    store.py          # ValkeyStore: connection pool, HNSW vector indexes, CRUD
-    embedder.py       # Singleton SentenceTransformer (all-MiniLM-L6-v2, 384-dim)
-    lifecycle.py      # MemoryState enum, state transitions, topic suppression
-    recall.py         # RecallPipeline: abandoned fast-path → vector search → scoring
-    dedup.py          # Cosine similarity duplicate detection (threshold 0.92)
-    maintenance.py    # Auto-maintenance: dedup + contradiction scan on briefing interval
-    contradiction.py  # Tier 1 heuristic + optional Tier 2 Claude Haiku API
-    skills.py         # v6 skill compiler engine: domain pools, lesson clustering, SKILL.md rendering, diffs
-    skill_compiler.py # Shared propose-and-accept compile flow (used by MCP compile_skill AND the web UI)
-  tools/              # 30+ MCP tool implementations
-    core.py           # remember, recall, recall_index, recall_detail, deprioritise, archive, forget
-    project.py        # set/get/update/compile project_context, list_projects, delete_project
-    experience.py     # record_experience, log_abandoned, warn_if_abandoned
-    briefing.py       # Session-start 5-in-1 aggregation
-    audit.py          # memory_audit, explain_memory, why_did_you_mention
-    backup.py         # dump_to_file, restore_from_file, list_backups
-    contradiction.py  # check_contradictions tool
-    topics.py         # suppress/unsuppress/list_suppressions
-    skills.py         # compile_skill (propose/write gate), find_skills, get_skill, bless + briefing surfaces
-  tests/              # pytest with in-memory fakes (no Docker needed)
-    conftest.py       # FakeValkeyClient, FakeEmbedder, FakeStore fixtures + web_client
-                      # (TestClient over the real web_ui app; neutralises load_dotenv so
-                      # a production .env further up the tree can't leak into tests)
+1. Call `recall("<relevant query>")` or `recall_index("<relevant query>")` to check for prior solutions, patterns, or knowledge articles
+2. Only fall back to web_search if OmniMem returns nothing useful
+3. Combine both when recency matters — use OmniMem for project context and prior decisions, web for the latest information
 
-web_ui/               # Starlette + Jinja2 + htmx dashboard
-  app.py              # ASGI app setup, route mounting
-  deps.py             # Shared init (mirrors server.py pattern)
-  routes/             # 17 route modules (memories, search, projects, skills, feeds, telemetry, metrics, etc.)
-  templates/          # Jinja2 templates with htmx partials
-  static/             # htmx.min.js, style.css
+-----
 
-rss_worker/           # Background RSS ingestion
-  worker.py           # APScheduler entry + feeds.yml file watcher
-  ingester.py         # Fetch → strip HTML → summarise → embed → store
-  summariser.py       # Claude Haiku summaries or truncation fallback
-  feeds.yml           # Feed definitions (url, name, topics, optional project label)
+### Session Start
 
-claude_config/        # CLAUDE.md template for end-users to copy into their projects
-scripts/              # health_check.sh, restore_backup.sh
-```
+At the beginning of every session:
 
-## Running Locally
+1. **Determine the project name** — use the current working directory name as the default. If uncertain, call `list_projects()` and match against known projects. If the project is genuinely ambiguous, ask the human before proceeding.
+1. Call `briefing(project="<project_name>")` — this single call aggregates project context, experience summary, stale memories, new knowledge articles, contradiction warnings, and reinstate candidates.
+1. If `briefing()` returns no project context but the project has episodic memories, call `compile_project_context("<project_name>", auto_save=True)` to auto-generate the context from stored memories. Review the compiled draft with the human and refine via `set_project_context()` if needed. If there are no episodic memories either (genuinely new project), call:
 
-```bash
-cp .env.example .env   # Edit: set VALKEY_PASSWORD, optionally ANTHROPIC_API_KEY
-docker compose up -d
-```
+   ```
+   set_project_context(
+     name="<project_name>",
+     description="<ask the human for a brief description>",
+     stack=["<technologies>"],
+     goals=["<current goals>"],
+     current_state="<starting point>",
+     domains=["<kinds of work, e.g. python, docker, design>"]
+   )
+   ```
+1. If the project context has no `domains`, call `compile_project_domains("<project_name>")` — it proposes them from the stack and the project's own recurring tags, with the evidence for each. Show the human the draft and only save with `auto_save=True` if they agree. Domains are what let a later session search across projects rather than inside one.
+1. Briefly summarise what you found:
+- Current project state and goals
+- Recent decisions and discovered patterns
+- Abandoned approaches to avoid (graveyard)
+- Stale memories that may need reviewing
+- **Contradiction warnings** — surface these explicitly and ask the human which version reflects current reality before proceeding with any work
+- **Skill suggestions** — if the briefing recommends compiled skills, offer them to the human; on a greenfield project (no context yet) lead with them. Load with `get_skill()` only if agreed — never auto-load
+- **Skill updates** — pending changes to compiled skills. Low-risk additions can be accepted in a batch; rewrites or removals of existing rules must be reviewed individually via `compile_skill(domain, mode="propose")`
+- **Knowledge watch** — if the briefing includes `skill_knowledge_watch`, recent articles look relevant to a compiled skill; entries flagged `possible_contradiction` may mean the world moved under a rule. Surface them and, if the human agrees an article belongs in the skill, call `promote_knowledge(key, domain="<domain>")` then recompile
+- **Auto-proposed skills** — if the briefing includes `auto_proposed_skills`, the server's periodic scan found recurring cross-project lessons worth a new skill (or a changed skill worth a fresh draft) and has already stashed the proposal. Surface each one; review with `compile_skill(domain, mode="propose")` and accept with `mode="write"` only if the human agrees. Ignoring a draft declines it
+1. If the MCP server seems unresponsive or recall is slow, call `health()` and report the status to the human before continuing.
 
-- MCP server: `http://localhost:8765/mcp`
-- Web UI: `http://localhost:8080`
-- Valkey: `localhost:6379`
+-----
 
-## Running Tests
+### During a Session
 
-```bash
-cd mcp_server && pytest tests/
-```
+**Before attempting any problem** where you would normally reach for documentation or a search engine:
 
-Tests use in-memory fakes (FakeValkeyClient, FakeEmbedder) — no running Valkey required.
-
-For Docker-based tests: `docker compose -f docker-compose.test.yml up --build`
-
-## Key Architecture Decisions
-
-- **ULIDs** for memory keys (sortable, collision-free)
-- **SSE transport** (stateless, simpler than WebSocket for MCP)
-- **Valkey** over Redis (open source fork)
-- **CPU-only PyTorch** (no GPU dependency)
-- **Shared `memory/` package** between MCP server and web UI (no code duplication)
-- **Debian-slim Docker base** — Alpine doesn't work (PyTorch has no musllinux wheels)
-- **In-memory fakes** for testing (no Docker-in-tests complexity)
+- Call `recall("<problem description>")` — you may find a prior solution, a relevant pattern, or a knowledge article that gives you a head start
+- If a recalled knowledge article seems relevant, mention it: *“I found an article from [source] about X — shall I use that as a research base?”*
+- **When the problem is about a kind of work rather than this project** — a Python gotcha, a CSS layout trap, a Docker build failure — add `domain_filter`: `recall("<problem>", domain_filter="python")` searches every project doing that kind of work. Compiled skills hold the lessons that already cleared the reinforcement gate; the domain filter reaches the raw memories underneath, including the ones that never became a rule. If the reply starts with a `domain_filter_notice` saying the filter was not applied, no project declares that domain and the results you are reading span everything — say so rather than presenting them as a targeted search
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [richarvey/OmniMem](https://github.com/richarvey/OmniMem) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
