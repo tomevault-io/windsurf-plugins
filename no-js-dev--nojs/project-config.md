@@ -7,105 +7,96 @@ description: This file provides guidance to Claude Code (claude.ai/code) when wo
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## What This Is
+
+Static HTML/CSS documentation site for the NoJS framework. No build step, no bundler, no package manager — just plain `.html` files and one shared `style.css`. Designed to be opened directly in a browser or served from any static host.
+
+## Development
 
 ```bash
-npm run build              # esbuild → dist/iife/no.js (minified + sourcemaps)
-npm test                   # Jest (jsdom)
-npm run test:watch         # Jest watch mode
-npm run test:coverage      # Jest with coverage
-npm run test:e2e           # Playwright (chromium, firefox, webkit)
-npm run test:e2e:headed    # Playwright with visible browser
-npm run test:all           # Jest + Playwright
-npm run bench              # Loop performance benchmarks (__benchmarks__/)
-npm start                  # Dev server for docs site (port 3000)
+# Serve locally (any static server works)
+npx serve .              # or python3 -m http.server 8000
+open index.html          # or just open files directly in a browser
 ```
 
-Run a single test file: `npx jest --no-coverage __tests__/filters.test.js`
-
-Coverage for a specific module: `npx jest --coverage --collectCoverageFrom='src/<module>.js' __tests__/<module>.test.js`
-
-No linter configured.
+There are no tests, no linting, and no CI. Changes are verified visually in a browser. After editing, open the affected page and check both desktop and mobile (≤600px) viewports.
 
 ## Architecture
 
-**No.JS** is an HTML-first reactive framework — one `<script>` tag, zero external dependencies, no build step for users. Walks the DOM on init, matches HTML attributes to directives, executes them by priority.
+### Architecture
 
-### Build outputs
+Single-page application (SPA) powered by NoJS's `route-view` directive with file-based routing. Two entry points (`index.html` and `404.html`) share the same layout shell and load page content from `templates/*.tpl` files.
 
-| Format | Entry | Output | Use case |
-|--------|-------|--------|----------|
-| IIFE | `src/cdn.js` | `dist/iife/no.js` | CDN `<script>` tag |
+| Route | Template | Purpose |
+|-------|----------|---------|
+| `/` (home) | `templates/home.tpl` | Landing page with hero, feature cards, directive showcases, and getting-started |
+| `/features` | `templates/features.tpl` | Feature overview grid |
+| `/docs` | `templates/docs.tpl` | Reference documentation with sidebar navigation and TOC |
+| `/examples` | `templates/examples.tpl` | Interactive code examples organized by directive category |
+| `/faq` | `templates/faq.tpl` | Accordion-style Q&A |
+| `/playground` | `templates/playground.tpl` | Split-pane code editor with live preview |
 
-`build.js` uses esbuild.
+### Shared Layout Pattern
 
-### Core modules (src/)
+Both `index.html` and `404.html` follow the same DOM skeleton:
 
-- **index.js** — Public API, plugin system, lifecycle. Exposes `NoJS.config()`, `init()`, `use()`, `directive()`, `filter()`, `validator()`, `router`, `store`, etc.
-- **globals.js** — Shared mutable state: `_config`, `_stores`, `_interceptors`, plugin registry. `_log()` only fires when `_config.debug` is true; `_warn()` always fires.
-- **context.js** — Reactive Proxy-based contexts with parent chain inheritance (lexical scoping). `createContext()`, `findContext()`, `$watch`. Batch operations via `_startBatch()` / `_endBatch()`.
-- **evaluate.js** — CSP-safe expression parser (no eval/Function). Allow-list approach: `_SAFE_GLOBALS` for JS builtins, `_BROWSER_GLOBALS` for curated browser APIs. Expression cache is LRU-bounded (`_config.exprCacheSize`, default 500). Functions: `evaluate()`, `resolve()`, `_interpolate()`.
-- **dom.js** — DOM walking, template loading (`_loadTemplateElement`), disposal (`_disposeTree`), `processTree()`. Templates with `route` attribute are treated as route templates; without it, they're content-includes that get injected inline.
-- **router.js** — SPA routing: hash/history mode, file-based routes, nested outlets, View Transition API, guards, prefetch, head management. `_loadNestedIndexRoutes()` handles `route-index` on nested outlets after VT completes.
-- **fetch.js** — HTTP with interceptors, caching, retries, CSRF, credential handling. Sentinel symbols: `CANCEL`, `RESPOND`, `REPLACE`.
-- **registry.js** — Directive registration via `registerDirective(name, handler)`. Core directives frozen after init — plugins can add but not override.
-- **filters.js** — 32+ built-in filters (currency, date, uppercase, etc.). Self-register on import. Custom: `NoJS.filter('name', fn)`.
-- **directives/** — 15+ directive files organized by category (state, http, binding, conditionals, loops, styling, events, refs, validation, i18n, dnd, head, animations). One file per category, side-effect imports for registration.
-  - **Loop/else pattern:** loop directives (`foreach`, `each`, `for`) support empty-state rendering via `else="templateId"` on the loop element, referencing a `<template>`. The sibling else pattern was removed in v1.15. The conditional `else` handler skips elements that carry a loop directive.
-
-### Directive priority order
-
-0 (state/store) → 1 (fetch/i18n/head) → 2 (computed/watch) → 5 (ref) → 10 (structural: if/each/for/use) → 15 (dnd) → 20 (bind/events/style/model) → 30 (validate)
-
-### Code style
-
-- Private API uses `_` prefix: `_config`, `_loadRemoteTemplates()`, `_disposeTree()`
-- Logging: `_log()` / `_warn()` from `globals.js` — never `console.log`
-- Global state: always import from `globals.js`
-- Caching: `Map` objects (`_templateHtmlCache`, `_i18nCache`, `_autoTemplateCache`)
-
-## Mandatory Safety Rules
-
-These rules exist because real bugs were found and fixed. Every rule has a tracked origin issue.
-
-### 1. Disposal before clearing DOM
-
-Always `_disposeTree()` children BEFORE `innerHTML = ""`. Iterate `el.children`, not the parent (disposing the parent breaks re-rendering).
-
-```js
-// WRONG — leaks contexts, listeners, watchers
-el.innerHTML = "";
-
-// RIGHT
-for (const child of [...el.children]) _disposeTree(child);
-el.innerHTML = "";
+```
+<div class="layout-container">
+  <div class="nojs-glow" />        ← radial glow background
+  <div class="nojs-grid" />        ← dotted grid background
+  <nav class="sticky-nav" />       ← shared sticky header (logo + links + GitHub)
+  <div class="page-transition-wrapper">
+    <div route-view />              ← SPA route outlet (loads templates/*.tpl)
+    <footer class="site-footer" />  ← 3-column footer
+  </div>
+</div>
 ```
 
-Applies to: every directive that swaps content (`if`/`else`, `each`/`foreach`, `get`/`post`, `switch`/`case`, `use`, `error-boundary`).
+The `route-view` element uses `src="templates/"` and `route-index="home"` for file-based routing. Page templates are `.tpl` files with i18n namespace auto-derivation via the `i18n-ns` attribute.
 
-### 2. Event listener cleanup
+### Inline JavaScript
 
-Always register cleanup via `_onDispose()` immediately after `addEventListener`. Exception: `{ once: true }` auto-removes.
+Minimal — only vanilla `<script>` blocks at the end of `<body>` in the entry HTML files:
 
-```js
-el.addEventListener(event, handler, opts);
-_onDispose(() => el.removeEventListener(event, handler, opts));
-```
+- **index.html / 404.html**: Playground engine lazy-loader, hero editor init, diamond animation delay shuffler, TOC builder + scrollspy, sticky nav scroll handler, custom `highlight` directive registration
+- **playground/engine.js**: Full playground engine (syntax highlighting, file management, preview iframe)
+- **playground/editor.js**: Reusable lightweight code editor component
 
-### 3. Watcher unsubscribe
+NoJS framework and NoJS Elements are loaded from CDN (`cdn.no-js.dev`, `cdn-elements.no-js.dev`).
 
-Always capture `$watch()` return value and register via `_onDispose()`.
+### CSS Design System (`style.css`)
 
-```js
-const unwatch = ctx.$watch(fn);
-_onDispose(() => { if (unwatch) unwatch(); _storeWatchers.delete(fn); });
-```
+Single 3000+ line file. Key tokens in `:root`:
 
-### 4. Timer guards
+- Fonts: `--font-sans` (Geist), `--font-mono` (Geist Mono) — loaded from Google Fonts
+- Colors: `--bg-color` (#07080b), `--accent-blue` (#2563eb), `--text-primary/secondary/muted`, `--glass-bg`, `--border-color`
+- Semantic: `--error` (#ef4444), `--success` (#22c55e)
+- Layout: `--max-width-section` (72rem / 1152px), `--max-width-content` (48rem / 768px)
 
+Major CSS features:
+- **View Transitions API**: `@view-transition { navigation: auto }` with named transitions on `.sticky-nav`, `.page-transition-wrapper`, and `.hero-header` for cross-page fades
+- **Isometric background**: `.nojs-diamond` elements use `scaleY(0.57735) rotate(±45°)` to create a projected grid; `moving-highlight` keyframe animation cycles border glow across 8 staggered delay classes
+- **Responsive breakpoints**: 768px (stack showcases, fade diamonds) and 600px (single-column, hide GitHub button, hide isometric overlay)
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Design Reference
+
+`DESIGN.md` contains the formal design system spec (YAML frontmatter + markdown) defining exact color values, typography scales, spacing tokens, component definitions, and isometric grid rules. Treat it as the source of truth for visual decisions.
+
+### Other Files
+
+- `index.bkp.html` — backup of an earlier index.html version
+- `isometric-grid.glsl` — GLSL fragment shader reference for the isometric grid visual (not used at runtime)
+- `design.pen` — Penpot design file export
+- `design-md-repo/` — cloned reference repo for the DESIGN.md spec format
+
+## Conventions
+
+- Dark theme only — all colors assume `--bg-color: #07080b` background
+- Syntax highlighting in code blocks uses manual `<span>` classes: `.hl-tag`, `.hl-attr`, `.hl-str`, `.hl-cmt`, `.hl-kw`, `.hl-fn`, `.hl-num`, `.hl-op`, `.hl-prop`, `.hl-sel` (docs pages). The landing page hero editor uses a legacy set: `.tok-tag`, `.tok-attr`, `.tok-str`, `.tok-punc`, `.tok-mustache`
+- SVG icons are inlined, not loaded from an icon library
+- No `<div>` soup — semantic elements (`<nav>`, `<main>`, `<header>`, `<footer>`, `<article>`, `<section>`, `<details>`) are used throughout
+- When adding a new page: create a new `templates/<name>.tpl` file — file-based routing resolves it automatically. Add a nav link with `route="/<name>"` and i18n keys to the shell locale files
 
 ---
 > Source: [no-js-dev/nojs](https://github.com/no-js-dev/nojs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
