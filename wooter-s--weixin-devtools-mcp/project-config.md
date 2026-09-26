@@ -1,258 +1,162 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - 本文档用于指导在本仓库中进行增量开发、调试、测试和发布。
 ---
 
-# CLAUDE.md
+# weixin-devtools-mcp AGENTS 指南
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 1. 文档定位与事实源
+- 本文档用于指导在本仓库中进行增量开发、调试、测试和发布。
+- 架构与行为以 `src/` 下的实现为唯一事实源，尤其是：
+  - `src/server.ts`
+  - `src/protocol/lean-server.ts`
+  - `src/protocol/tool-descriptor-manifest.ts`
+  - `src/tools/index.ts`
+  - `src/MiniProgramContext.ts`
+  - `src/tools.ts`
+- `docs/`、`claudedocs/`、`README.md` 可作为参考，但当与代码冲突时，必须以代码为准并同步修正文档。
 
-## Project Overview
+## 2. 项目架构总览
 
-微信开发者工具自动化 MCP 服务器，提供31个工具用于微信小程序的自动化测试。基于 TypeScript 和 `miniprogram-automator` SDK 实现。
+### 2.1 分层结构
+- 协议入口层：`src/server.ts`
+  - 基于官方 SDK `Protocol` 创建轻量 `LeanServer`
+  - 注册 `ListTools`、`CallTool`、`ListResources`、`ReadResource` handlers
+  - `ListTools` 从构建期静态 manifest 返回 descriptor；工具实现与结果运行时仅在首次有效 `CallTool` 时加载
+- 工具编排层：`src/tools/*.ts` + `src/tools/index.ts`
+  - 每个工具模块按功能域拆分
+  - 统一通过 `defineTool` 定义名称、schema、handler
+- 运行时状态层：`src/MiniProgramContext.ts`
+  - 管理 `miniProgram`、`currentPage`、`elementMap`
+  - 管理 console/network collector 生命周期
+  - 通过 page-state 队列原子管理 DOM epoch、revision、快照、ref registry 和状态摘要
+  - 查询、ref 注册、元素 I/O、导航与最终 observation 共用页面状态事务
+- 核心能力层：`src/tools.ts`
+  - 封装连接、导航、断言、交互等可复用能力
+  - 供工具层调用（包括连接增强逻辑、重试与健康检查）
+- 数据收集层：`src/collectors/*`
+  - `ConsoleCollector` 和 `NetworkCollector` 负责会话化数据采集与查询
+  - `console-runtime.ts` / `network-runtime.ts` 是通过 evaluate 序列化的自包含运行时函数，不得引用宿主模块变量
+  - 网络采集禁止使用 SDK `mockWxMethod`；日志采集禁止订阅 SDK console 事件触发 `App.enableLog`
+  - 安装与恢复必须核对 owner token 和包装函数身份；日志读取、导航分段和异步停止前必须同步远端队列
 
-## Common Commands
+### 2.2 目录职责
+- `src/`：生产代码（TypeScript）
+- `tests/protocol/`：MCP 协议层测试
+- `tests/tools/`：工具行为测试
+- `tests/utils/`：测试工具与辅助方法
+- `tests/integration/`：真实微信开发者工具环境集成测试
+- `scripts/`：构建辅助脚本（如可执行权限设置）
+- `build/`：编译产物，禁止手改
+- `playground/`：本地实验样例
 
-### 开发和构建
-```bash
-# 构建项目（TypeScript → JavaScript + 设置可执行权限）
-npm run build
+## 3. 运行时核心流程
 
-# 开发模式（监听文件变化自动重新构建）
-npm run watch
+### 3.1 启动流程
+1. 通过 `build/server.js` 启动 MCP 服务（stdio transport）。
+2. 初始化全局 `MiniProgramContext`。
+3. 读取 `build/protocol/tool-descriptors.generated.json`，按 profile 筛选静态 descriptor。
+4. 保持工具实现、automator 和结果运行时未加载，直到首次有效 `CallTool`。
 
-# 使用 MCP Inspector 调试
-npm run inspector
-```
+### 3.2 工具调用流程
+1. 客户端发起 `CallTool`。
+2. `src/server.ts` 先用静态 descriptor 判定工具是否存在、是否被 profile 禁用。
+3. 首次有效调用懒加载 `allTools` 和结果运行时，并校验实现与 manifest 一致。
+4. 使用 zod schema 校验输入参数，执行 handler 并写入 `SimpleToolResponse`。
+5. 成功与失败均返回 `schemaVersion: "2.0"` 全字段结构化信封；handler 已产生的文本、图片、partial data 和已提交 observation 在失败时继续保留，异常统一标记 `isError: true`。
 
-### 测试
+### 3.3 资源读取流程
+- `weixin://connection/status`：返回连接状态、最终工具 profile 和 console/network 监听状态机。
+- `weixin://page/snapshot`：始终出现在资源列表中；读取时要求已连接且有当前页面，并返回完整 `scopes`/`edges` 作用域图。
 
-项目采用分层测试架构，参考 chrome-devtools-mcp 模式：
+### 3.4 连接与监控流程
+- 连接入口工具：`connect_devtools`，请求使用 `project` / `wsEndpoint` / `browserUrl` / `discover` 判别式 target；`project` 固定按 `launch → connect` 尝试。
+- 状态工具：`get_connection_status`。
+- 生命周期工具：`reconnect_devtools`、`disconnect_devtools`；无参重连完整复用上次请求，有参重连执行完整替换而非字段合并。
+- Console/Network 监听策略只从最终启用的工具 category 派生；未启用类别保持 `disabled`，启用后由连接生命周期统一启动并公开 `idle/running/stopped/failed` 状态。
+- 每次连接返回完整 attempts 历史；`project` 不执行 discover 等隐式回退。
+- 项目启动由请求级 `ProjectStartup` 管理 CLI 与端口所有权，SDK 只在协议、SDKVersion 和页面就绪后连接。探测不得以 HTTP 200 或 TCP 占用替代自动化协议判断。
+- Context 仅保留最多 10,000 个已失效 ref token，不保留其 Element；同连接内返回 STALE_ELEMENT，断开时清空。仍有效的同页稳定地址保持重定位能力。
 
-```
-tests/
-├── protocol/          # 协议层测试（需要MCP服务器）
-│   ├── server.test.ts
-│   └── index.test.ts
-├── tools/            # 工具逻辑测试（直接调用handler，无需服务器）
-│   ├── connection.test.ts
-│   ├── console.test.ts
-│   ├── navigate.test.ts
-│   ├── network.test.ts
-│   ├── page.test.ts
-│   └── screenshot.test.ts
-├── integration/      # 集成测试（需要真实环境）
-│   ├── connect-devtools.integration.test.ts
-│   ├── console.integration.test.ts
-│   ├── enhanced-connection.integration.test.ts
-│   ├── navigation.integration.test.ts
-│   ├── network.integration.test.ts
-│   └── network-auto-start.integration.test.ts
-└── utils/            # 测试工具
-    └── test-utils.ts
-```
+## 4. 当前工具暴露策略（以 `src/tools/tools.ts` 与 `src/config/tool-profile.ts` 为准）
+- 总工具实现数：31（full profile）
+- 默认暴露：core profile（20）
+- 可选类别：`console` / `network` / `debug`
+- 最小集合：minimal profile（10）
 
-**测试命令**：
+### 4.1 core 默认工具（20）
+- `connect_devtools`
+- `reconnect_devtools`
+- `disconnect_devtools`
+- `get_connection_status`
+- `get_current_page`
+- `get_page_snapshot`
+- `find_elements`
+- `wait_for`
+- `click`
+- `input_text`
+- `get_value`
+- `set_form_control`
+- `assert_text`
+- `assert_attribute`
+- `assert_state`
+- `navigate_to`
+- `navigate_back`
+- `switch_tab`
+- `relaunch`
+- `evaluate_script`
 
-```bash
-# 单元测试（协议 + 工具 + 工具类，224个测试）
-npm test
+### 4.2 可选类别工具
+- `console`：`list_console_messages`、`get_console_message`
+- `network`：`list_network_requests`、`get_network_request`、`stop_network_monitoring`、`clear_network_requests`
+- `debug`：`screenshot`、`diagnose_connection`、`check_environment`、`debug_page_elements`、`debug_connection_flow`
 
-# 分类运行单元测试
-npm run test:protocol      # 协议层测试（19个）
-npm run test:tools         # 工具逻辑测试（196个）
+### 4.3 配置方式
+- `--tools-profile=core|full|minimal`
+- `--enable-categories=console,network,debug`
+- `--disable-categories=console,network,debug,core`
+- 环境变量：
+  - `WEIXIN_MCP_TOOLS_PROFILE`
+  - `WEIXIN_MCP_ENABLE_CATEGORIES`
+  - `WEIXIN_MCP_DISABLE_CATEGORIES`
 
-# 集成测试（需要微信开发者工具 + playground/wx/）
-npm run test:integration   # 46个集成测试
+## 5. 开发流程（必须执行）
 
-# 所有测试（单元 + 集成）
-npm run test:all
+### 5.1 新增或改造工具的标准路径
+1. 在 `src/tools/` 新增或修改对应模块。
+2. 使用 `defineTool` + zod schema 定义参数和行为。
+3. 在 `src/tools/tools.ts` 注册并分组导出（`src/tools/index.ts` 仅做入口转发）。
+4. 执行 `npm run build` 重新生成 descriptor manifest；禁止手改 `build/` 下生成物。
+5. 如涉及共享状态，更新 `MiniProgramContext` 或 collector，而不是在工具内散落状态。
+6. 为改动补齐测试：
+  - 工具行为：`tests/tools/`
+  - 协议/schema：`tests/protocol/`
+  - 真实链路（必要时）：`tests/integration/`
+7. 同步更新 `AGENTS.md`/`README.md`/`docs/` 中受影响章节。
 
-# 测试覆盖率
-npm run test:coverage
+### 5.2 质量门禁顺序
+1. 类型检查：`npm run typecheck`
+2. 单元测试：`npm test`
+3. 代码检查：`npm run lint` 或按文件执行 `npx eslint <changed-files>`
+4. 构建验证：`npm run build`（发布前必须）
+5. 集成测试（涉及连接、监控、导航链路时）：`npm run test:integration`
+  - 本地默认建议：`INTEGRATION_CLEANUP_MODE=reuse npm run test:integration`
+  - 需要强隔离时：`INTEGRATION_CLEANUP_MODE=force npm run test:integration`
+  - 如需禁用跨 suite 会话复用：`INTEGRATION_REUSE_SESSION=false npm run test:integration`
+  - 如需每个 suite 结束后强制断连：`INTEGRATION_FORCE_DISCONNECT_AFTER_EACH_SUITE=true npm run test:integration`
 
-# 监听模式
-npm run test:watch                # 单元测试监听
-npm run test:integration:watch    # 集成测试监听
-```
+### 5.3 文档变更校验
+- 仅文档改动时至少执行：
+  - 路径与命令有效性人工核对（对齐 `package.json` 与代码目录）
+  - UTF-8 编码检查
+- 如果同时包含代码改动，必须执行 5.2 全流程。
 
-**集成测试要求**：
-- 微信开发者工具已安装并开启自动化功能
-- 测试项目位于 `playground/wx/`
-- 通过环境变量 `RUN_INTEGRATION_TESTS=true` 控制执行
-- 不设置该环境变量时，集成测试会自动跳过
-
-### 运行单个测试
-
-```bash
-# 协议测试
-npx vitest tests/protocol/server.test.ts
-
-# 工具测试
-npx vitest tests/tools/console.test.ts
-
-# 集成测试
-RUN_INTEGRATION_TESTS=true npx vitest tests/integration/console.integration.test.ts
-
-# 指定测试用例
-npm test -- tests/tools/console.test.ts -t "测试用例名称"
-```
-
-### 诊断与手工验证脚本
-
-```bash
-# 诊断类脚本（scripts/diagnostics）
-npm run diagnose:devtools-connection
-npm run diagnose:mcp-config
-npm run diagnose:connection-flow
-
-# 手工验证脚本（tests/manual）
-npm run test:manual:mpx-runtime
-npm run test:manual:network-interception
-npm run test:manual:screenshot
-npm run test:manual:screenshot-diagnostic
-```
-
-## Architecture
-
-### MCP 服务器入口点
-
-**`build/server.js`**
-- 源文件：`src/server.ts`
-- 特点：完全模块化的工具系统，代码简洁
-- 代码量：~245行
-- 工具处理：所有31个工具统一通过 `allTools` 数组和 `ToolDefinition` 框架处理
-- 配置：`npm install -g weixin-devtools-mcp` 默认使用此入口（package.json bin配置）
-
-### 模块化工具系统
-
-核心设计模式参考 chrome-devtools-mcp：
-
-```
-src/tools/
-├── ToolDefinition.ts    # 核心框架
-│   ├── defineTool()     # 工具定义辅助函数
-│   ├── ToolContext      # 共享状态接口（5个字段）
-│   ├── ToolHandler      # 工具处理器类型
-│   └── ToolResponse     # 响应构建接口
-│
-├── index.ts             # 统一导出 allTools[] (31个工具)
-│
-└── [8个功能模块]
-    ├── connection.ts    # 连接管理（3工具）
-    ├── page.ts          # 页面查询（2工具：query_selector、wait_for）
-    ├── snapshot.ts      # 页面快照（1工具）
-    ├── input.ts         # 交互操作（7工具）
-    ├── assert.ts        # 断言验证（5工具）
-    ├── navigate.ts      # 页面导航（6工具）
-    ├── console.ts       # Console监听（6工具：含两阶段查询）
-    ├── network.ts       # 网络监控（5工具）
-    ├── screenshot.ts    # 截图工具（1工具）
-    └── diagnose.ts      # 诊断工具（4工具）
-```
-
-**工具定义模式**：
-```typescript
-// 每个工具都遵循相同的定义模式
-export const exampleTool = defineTool({
-  name: "tool_name",
-  description: "工具描述",
-  schema: z.object({ /* Zod schema */ }),
-  handler: async (request, response, context) => {
-    // 1. 从 context 获取共享状态
-    // 2. 执行业务逻辑
-    // 3. 通过 response.appendResponseLine() 返回结果
-    // 4. 更新 context 状态（自动同步到全局）
-  }
-});
-```
-
-### 状态管理（ToolContext）
-
-所有工具通过 `ToolContext` 共享5个关键状态：
-
-1. **`miniProgram`**: MiniProgram实例（来自miniprogram-automator）
-2. **`currentPage`**: 当前活动页面实例
-3. **`elementMap`**: Map<uid, ElementMapInfo> - 元素UID到选择器的映射
-4. **`consoleStorage`**: Console消息和异常存储（监听状态 + 消息数组）
-5. **`networkStorage`**: 网络请求拦截数据（监听状态 + 请求数组 + 原始方法）
-
-**关键设计**：
-- 工具间通过 context 传递状态，无全局变量污染
-- `elementMap` 支持 UID引用机制（`get_page_snapshot`生成UID，`click`等工具使用UID操作元素）
-- 网络监控在 `connect_devtools_enhanced` 连接时自动启动
-
-### UID 引用机制
-
-支持跨工具的元素引用：
-
-```typescript
-// 1. 获取页面快照（生成所有元素的UID）
-get_page_snapshot()
-// 输出：{ uid: "button.submit", tagName: "button", ... }
-
-// 2. 使用UID操作元素
-click({ uid: "button.submit" })
-input_text({ uid: "input#username", text: "user" })
-assert_text({ uid: ".message", text: "成功" })
-```
-
-UID生成规则：优先使用 id > class > nth-child 构建稳定的CSS选择器路径。
-
-## Technical Details
-
-### 关键依赖
-- `@modelcontextprotocol/sdk` (v0.6.0) - MCP协议实现
-- `miniprogram-automator` (^0.12.1) - 微信小程序自动化SDK
-- `zod` + `zod-to-json-schema` - 参数验证和schema转换
-- `vitest` - 测试框架
-
-### TypeScript配置
-- Target: ES2022, Module: Node16 (ESM)
-- `"type": "module"` in package.json
-- 严格模式启用
-- 输出目录：`./build`
-
-### 构建过程
-1. TypeScript编译（`tsc`）
-2. 自动设置可执行权限（`build/server.js`）
-3. prepare hook确保发布前构建
-
-### MCP服务器配置
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "weixin-devtools-mcp": {
-      "command": "npx",
-      "args": ["-y", "weixin-devtools-mcp"]
-    }
-  }
-}
-```
-
-或使用本地路径（开发者）：
-```json
-{
-  "mcpServers": {
-    "weixin-devtools-mcp": {
-      "command": "/path/to/weixin-devtools-mcp/build/server.js"
-    }
-  }
-}
-```
-
-## Development Notes
-
-### 添加新工具
-
-1. 在 `src/tools/` 下选择合适的功能模块（或创建新模块）
+## 6. 测试策略
+- 默认集成工程为公开 `tests/fixtures/monitoring-app`；不得依赖私有 playground 路由。
+- 本机验收使用 `npm run release:validate` 记录源码指纹和命令结果；真实场景阻塞时禁止发布。
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [wooter-s/weixin-devtools-mcp](https://github.com/wooter-s/weixin-devtools-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
