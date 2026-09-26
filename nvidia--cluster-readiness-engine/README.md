@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [NVIDIA/cluster-readiness-engine](https://github.com/NVIDIA/cluster-readiness-engine).
+Original source: `CLAUDE.md` in [NVIDIA/cluster-readiness-engine](https://github.com/NVIDIA/cluster-readiness-engine).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
