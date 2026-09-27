@@ -7,11 +7,11 @@ Experimental proot alternative that doesn't rely on ptrace(). Full native execut
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [sylirre/fake-chroot-ng](https://github.com/sylirre/fake-chroot-ng).
+Original source: `AGENTS.md` in [sylirre/fake-chroot-ng](https://github.com/sylirre/fake-chroot-ng).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
