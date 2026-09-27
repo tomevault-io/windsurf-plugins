@@ -15,4 +15,4 @@ description: - codexcomp 是 Codex CLI 与上游 Responses API 间的环回代�
 
 ---
 > Source: [dzshzx/codexcomp](https://github.com/dzshzx/codexcomp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
