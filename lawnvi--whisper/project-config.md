@@ -1,82 +1,69 @@
 ---
 trigger: always_on
-description: - Project: Whisper, a Flutter-based LAN collaboration app for nearby devices.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-## Project Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-- Project: Whisper, a Flutter-based LAN collaboration app for nearby devices.
-- Purpose: send text, files, clipboard content, Android notifications, desktop system audio, and keyboard/mouse input between trusted devices on the same local network.
-- Primary users: people moving work between their own computers and phones without a public relay.
-- Platforms: Android, macOS, Linux, Windows, and a Next.js product site under `whisper-web/`.
-- Important constraints: transfers stay on the LAN, authenticated application data is encrypted end to end (discovery metadata and local storage are not), Linux discovery depends on Avahi, Linux audio depends on PulseAudio or PipeWire Pulse, and Linux keyboard/mouse sharing currently expects X11.
+Two companion docs are authoritative and should be treated as part of these instructions:
+- `AGENTS.md` — setup/verification commands, project structure, code style, security notes, and commit conventions.
+- `DESIGN.md` — visual design system, color/typography tokens, and UI do's and don'ts.
 
-## Setup Commands
+This file focuses on the big-picture architecture that is not obvious from reading any single file.
 
-- Install Flutter dependencies: `flutter pub get`
-- Regenerate Drift database code after schema changes: `dart run build_runner build --delete-conflicting-outputs`
-- Regenerate localizations after ARB changes: `flutter gen-l10n`
-- Run the Flutter app on the current platform: `flutter run`
-- Run the signed macOS debug app used by this repo: `./script/build_and_run.sh`
-- Run macOS debug under LLDB: `./script/build_and_run.sh --debug`
-- Stream macOS app logs/telemetry: `./script/build_and_run.sh --logs`
-- Package a macOS DMG: `./script/build_and_run.sh package-macos`
-- Install product-site dependencies: `cd whisper-web && npm install`
-- Start the product site: `cd whisper-web && npm run dev`
-- Build the product site: `cd whisper-web && npm run build`
+## What this is
 
-## Verification Commands
+Whisper is a Flutter LAN-collaboration app (Android, macOS, Linux, Windows; iOS runner kept but untested) that moves text, files, clipboard, Android notifications, desktop system audio, and keyboard/mouse input between trusted devices on the same network over a direct WebSocket connection. It is **not** related to the OpenAI Whisper speech model. Authenticated application data uses X25519 and XChaCha20-Poly1305; discovery metadata and local storage are not encrypted, and the implementation has not had an independent cryptographic audit. `whisper-web/` is a separate Next.js 15 product site.
 
-- Analyze Dart/Flutter code: `flutter analyze`
-- Run all Flutter tests: `flutter test`
-- Run one focused test: `flutter test test/<name>_test.dart`
-- Run the remote-input key matrix suite: `./script/test_remote_input_keys.sh`
-- Verify the macOS app builds, signs, launches, and has a running process: `./script/build_and_run.sh --verify`
-- Check product-site linting when working in `whisper-web/`: `cd whisper-web && npm run lint`
+## Common commands
 
-CI currently runs `flutter pub get`, `flutter analyze`, and `flutter test` on pull requests and pushes to `main`.
+```bash
+flutter pub get                                          # install deps
+flutter analyze                                          # lint (CI gate)
+flutter test                                             # all tests (CI gate)
+flutter test test/<name>_test.dart                       # single test file
+flutter run                                              # run on current platform
+./script/build_and_run.sh                                # build+sign+run macOS debug app
+./script/build_and_run.sh --verify                       # verify macOS build/sign/launch
+./script/build_and_run.sh package-macos                  # package macOS DMG
+./script/test_remote_input_keys.sh                       # remote-input key matrix suite
 
-## Project Structure
+# Code generation — REQUIRED after the matching source change:
+dart run build_runner build --delete-conflicting-outputs # after Drift schema edits
+flutter gen-l10n                                          # after ARB (l10n) edits
+```
 
-- `lib/main.dart`: Flutter entry point, locale/theme bootstrapping, desktop window initialization.
-- `lib/page/`: main screens such as device discovery, conversation, app list, and settings.
-- `lib/widget/`: reusable UI pieces for chat, composer, banners, dialogs, and desktop workspace layout.
-- `lib/state/`: app state coordinators for connections, auto-connect, sessions, transfers, shutdown, and discovery throttling.
-- `lib/socket/`: WebSocket server/client orchestration, auth flow, message dispatch, file transfer, profile refresh, audio, and remote input routing. File path validation, portable names, and verified publication are separated into `file_path_policy.dart`, `transfer_file_name.dart`, and `verified_file_publisher.dart`.
-- `lib/model/`: Drift database, device/message/transfer models, and generated database code.
-- `lib/audio/`: audio sharing protocol, codecs, capture/playback abstractions, transport, and runtime coordinator.
-- `lib/remote_input/`: keyboard/mouse sharing protocol, topology/layout, native platform bridges, transport, and coordinator.
-- `lib/helper/`: platform helpers for files, settings, notifications, background services, desktop startup, and general utilities.
-- `lib/l10n/`: ARB files and generated Flutter localization classes for Chinese, English, and Spanish.
-- `lib/theme/`: Material 3 theme and `WhisperPalette` tokens.
-- `android/`, `ios/`, `macos/`, `linux/`, `windows/`: native runners and platform plugins.
-- `test/`: Flutter unit/widget/source tests; many tests verify source-level platform integration and protocol behavior.
-- `script/`: local build, run, signing, packaging, and focused test helpers.
-- `.github/workflows/`: CI and multi-platform release packaging.
-- `docs/superpowers/`: existing design specs and implementation plans.
-- `whisper-web/`: Next.js 15 product introduction site.
+`whisper-web/`: `cd whisper-web && npm install && npm run dev` (also `npm run build`, `npm run lint`).
 
-## Generated And Large Files
+## Architecture
 
-- Do not hand-edit `lib/model/LocalDatabase.g.dart`; update the Drift source and run build runner.
-- Do not hand-edit `lib/l10n/app_localizations*.dart`; update the ARB files and run `flutter gen-l10n`.
-- Treat Flutter generated plugin registrants under platform folders as generated unless the platform tooling requires a manual change.
-- Avoid touching `build/`, `.dart_tool/`, `.flutter-plugins-dependencies`, `dist/`, and other local build outputs.
-- `pubspec.lock` is tracked for this app; update it only as part of dependency changes.
+The app is built around **singleton coordinators**, not a DI/Provider tree. Most subsystems expose a single shared instance (e.g. `WsSvrManager()` returns a global singleton) and UI/state talk to them directly. When extending a flow, reuse the existing coordinator/manager rather than introducing a parallel one.
 
-## Code Style
+### Networking core — `lib/socket/`
+`WsSvrManager` (`svrmanager.dart`, ~4000 lines) is the central hub: it runs the `shelf` WebSocket server, manages outgoing client connections, drives the auth/trust handshake, and dispatches every message type (text, file transfer, clipboard, profile refresh, audio, remote input). A device can be both server and client to different peers simultaneously; per-peer state lives in `PeerConnectionRegistry` / `peer_connection.dart`. Key collaborators:
+- `auth_request_gate.dart` — dedupes/serializes pending connection-confirmation requests.
+- `whisper_frame_v3.dart` + `file_transfer_v3.dart` + `file_transfer_source.dart` + `peer_transfer_runtime.dart` — the framed, resumable multi-peer file-transfer protocol.
 
-- Follow the existing Flutter/Dart style and `flutter_lints` baseline in `analysis_options.yaml`.
-- Keep platform-specific behavior behind the existing helper, coordinator, or native plugin boundaries.
-- Prefer explicit protocol/state transitions over implicit side effects, especially in `lib/socket/`, `lib/audio/`, and `lib/remote_input/`.
-- Keep UI strings localized through ARB files; avoid adding hardcoded user-facing copy in widgets.
-- Use existing singleton coordinators and managers when extending current flows; introduce new abstractions only when they reduce real duplication.
-- Preserve current Material 3 theme tokens from `AppTheme` and `WhisperPalette` when adding UI.
+UI and app logic subscribe to networking events through the **`ISocketEvent` listener interface** (`onMessage`, `onAuth`, `onProgress`, `onTransferUpdated`, `onConnect`, `onClose`, …). This is the main seam between the socket layer and the rest of the app — add new cross-cutting events here.
+
+### App state — `lib/state/`
+Coordinators that sit above the socket layer: `connection_coordinator.dart` (connection lifecycle/models), `auto_connect_planner.dart`, `chat_session_list.dart`, `peer_profile.dart` (remote device profiles), `device_workspace_state.dart`, `resumable_transfer_window.dart`, `app_shutdown.dart`, `discovery_resolve_limiter.dart` (throttles mDNS resolution).
+
+### Feature subsystems (self-contained, protocol + coordinator + platform bridge)
+- `lib/audio/` — system-audio sharing. Capture → Opus codec → packet transport → fan-out to one or more playback sinks, with clock sync and channel/group roles. Entry points: `audio_share_coordinator.dart`, `audio_group_coordinator.dart`, `audio_share_manager.dart`.
+- `lib/remote_input/` — keyboard/mouse sharing. Screen-topology/layout drives edge-crossing between devices; native bridges per platform (Linux is X11-only). Entry points: `remote_input_coordinator.dart`, `remote_input_workspace_coordinator.dart`, `remote_input_layout.dart`.
+
+Each subsystem follows the same shape: a `*_protocol.dart` (wire format), a `*_coordinator.dart` / `*_manager.dart` (orchestration), a `*_packet_transport.dart`, and a `*_platform.dart` native abstraction. Prefer explicit protocol/state transitions over implicit side effects here.
+
+### Data — `lib/model/`
+Drift (SQLite) database in `LocalDatabase.dart`. `device.dart`, `message.dart` (`MessageEnum` typed messages), `file_transfer.dart` are the row models.
+
+### Other
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lawnvi/whisper](https://github.com/lawnvi/whisper) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
