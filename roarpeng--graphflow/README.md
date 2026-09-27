@@ -7,11 +7,11 @@ Local-first code knowledge graph and context harness for coding agents. MCP + De
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Roarpeng/GraphFlow](https://github.com/Roarpeng/GraphFlow).
+Original source: `AGENTS.md` in [Roarpeng/GraphFlow](https://github.com/Roarpeng/GraphFlow).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
