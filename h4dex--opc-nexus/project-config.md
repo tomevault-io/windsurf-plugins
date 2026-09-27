@@ -1,109 +1,73 @@
 ---
 trigger: always_on
-description: How to build Hermes Desktop well. This is a judgment guide, not an inventory —
+description: > **Hermes Agent — Implementation Notes**
 ---
 
-# Desktop Engineering Guide
+# Design System: Claude (Anthropic)
 
-How to build Hermes Desktop well. This is a judgment guide, not an inventory —
-it teaches the invariants and the reasoning behind them so a change fits the app
-even as files move. Read it with the repository `AGENTS.md` (root rules still
-apply) and [`DESIGN.md`](./DESIGN.md) for the visual and interaction contract.
 
-When a rule here and the code disagree, trust the code and fix whichever is
-wrong — but never break an invariant to make a change easier.
+> **Hermes Agent — Implementation Notes**
+>
+> The original site uses proprietary fonts. For self-contained HTML output, use these CDN substitutes:
+> - **Primary:** `Inter` | **Mono:** `JetBrains Mono`
+> - **Font stack (CSS):** `font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;`
+> - **Mono stack (CSS):** `font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;`
+> ```html
+> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+> ```
+> Use `write_file` to create HTML, serve via `generative-widgets` skill (cloudflared tunnel).
+> Verify visual accuracy with `browser_vision` after generating.
 
-## What this app is
+## 1. Visual Theme & Atmosphere
 
-Desktop is its own native chat surface. It is not the browser dashboard and it
-does not embed the TUI. Three parties, each authoritative for one thing:
+Claude's interface is a literary salon reimagined as a product page — warm, unhurried, and quietly intellectual. The entire experience is built on a parchment-toned canvas (`#f5f4ed`) that deliberately evokes the feeling of high-quality paper rather than a digital surface. Where most AI product pages lean into cold, futuristic aesthetics, Claude's design radiates human warmth, as if the AI itself has good taste in interior design.
 
-- **Electron** owns the machine: process lifecycle, native filesystem/git/
-  windows, install/update, and a narrow, typed capability bridge.
-- **The renderer** owns the experience: navigation, presentation, and ephemeral
-  interaction state.
-- **The agent backend** owns the work: sessions, tools, model calls, streaming.
+The signature move is the custom Anthropic Serif typeface — a medium-weight serif with generous proportions that gives every headline the gravitas of a book title. Combined with organic, hand-drawn-feeling illustrations in terracotta (`#c96442`), black, and muted green, the visual language says "thoughtful companion" rather than "powerful tool." The serif headlines breathe at tight-but-comfortable line-heights (1.10–1.30), creating a cadence that feels more like reading an essay than scanning a product page.
 
-Keep the seams clean. The renderer never reaches for Node or Electron directly;
-native power arrives through a deliberate capability, not a general escape hatch.
-Agent behavior lives behind the gateway, never reimplemented in React. When a
-change blurs a seam, that is the smell — fix the seam, don't widen it.
+What makes Claude's design truly distinctive is its warm neutral palette. Every gray has a yellow-brown undertone (`#5e5d59`, `#87867f`, `#4d4c48`) — there are no cool blue-grays anywhere. Borders are cream-tinted (`#f0eee6`, `#e8e6dc`), shadows use warm transparent blacks, and even the darkest surfaces (`#141413`, `#30302e`) carry a barely perceptible olive warmth. This chromatic consistency creates a space that feels lived-in and trustworthy.
 
-## Decide state by authority
+**Key Characteristics:**
+- Warm parchment canvas (`#f5f4ed`) evoking premium paper, not screens
+- Custom Anthropic type family: Serif for headlines, Sans for UI, Mono for code
+- Terracotta brand accent (`#c96442`) — warm, earthy, deliberately un-tech
+- Exclusively warm-toned neutrals — every gray has a yellow-brown undertone
+- Organic, editorial illustrations replacing typical tech iconography
+- Ring-based shadow system (`0px 0px 0px 1px`) creating border-like depth without visible borders
+- Magazine-like pacing with generous section spacing and serif-driven hierarchy
 
-The first question for any piece of state is *who is allowed to be right about
-it*, not where it is convenient to store it. Put state with its authority:
+## 2. Color Palette & Roles
 
-- The **backend** is authoritative for anything another Hermes surface can also
-  change. Treat the renderer's copy as a cache of that truth.
-- **Electron** is authoritative for machine and runtime facts.
-- The **renderer** owns only what is purely about this window's presentation.
+### Primary
+- **Anthropic Near Black** (`#141413`): The primary text color and dark-theme surface — not pure black but a warm, almost olive-tinted dark that's gentler on the eyes. The warmest "black" in any major tech brand.
+- **Terracotta Brand** (`#c96442`): The core brand color — a burnt orange-brown used for primary CTA buttons, brand moments, and the signature accent. Deliberately earthy and un-tech.
+- **Coral Accent** (`#d97757`): A lighter, warmer variant of the brand color used for text accents, links on dark surfaces, and secondary emphasis.
 
-From that, everything else follows: shared renderer state lives in small stores
-owned by the feature that owns the concern; request-shaped server data that wants
-invalidation lives in the query layer; short-lived interaction detail stays in
-the component; hot coordination that must not paint stays in a ref. Reach for the
-narrowest home that still lets the state be correct. A new global store is a
-claim that many distant surfaces need it — earn that claim.
+### Secondary & Accent
+- **Error Crimson** (`#b53333`): A deep, warm red for error states — serious without being alarming.
+- **Focus Blue** (`#3898ec`): Standard blue for input focus rings — the only cool color in the entire system, used purely for accessibility.
 
-Persisted state must declare its scope in its own key: is this global, or does it
-belong to a connection, a profile, a stored session, a project, or a window?
-Getting the scope wrong is how one profile's setting bleeds into another.
+### Surface & Background
+- **Parchment** (`#f5f4ed`): The primary page background — a warm cream with a yellow-green tint that feels like aged paper. The emotional foundation of the entire design.
+- **Ivory** (`#faf9f5`): The lightest surface — used for cards and elevated containers on the Parchment background. Barely distinguishable but creates subtle layering.
+- **Pure White** (`#ffffff`): Reserved for specific button surfaces and maximum-contrast elements.
+- **Warm Sand** (`#e8e6dc`): Button backgrounds and prominent interactive surfaces — a noticeably warm light gray.
+- **Dark Surface** (`#30302e`): Dark-theme containers, nav borders, and elevated dark elements — warm charcoal.
+- **Deep Dark** (`#141413`): Dark-theme page background and primary dark surface.
 
-## Identity is not incidental
+### Neutrals & Text
+- **Charcoal Warm** (`#4d4c48`): Button text on light warm surfaces — the go-to dark-on-light text.
+- **Olive Gray** (`#5e5d59`): Secondary body text — a distinctly warm medium-dark gray.
+- **Stone Gray** (`#87867f`): Tertiary text, footnotes, and de-emphasized metadata.
+- **Dark Warm** (`#3d3d3a`): Dark text links and emphasized secondary text.
+- **Warm Silver** (`#b0aea5`): Text on dark surfaces — a warm, parchment-tinted light gray.
 
-Sessions have more than one identity, and conflating them is a recurring source
-of "session not found" and vanishing history. Reason about which identity a
-surface needs: durable navigation and anything the user pins or persists key off
-the stable/durable identity; live streaming keys off the runtime identity; state
-that must outlive compression keys off the lineage root. Keep the mapping between
-them explicit and translate at the boundary rather than passing the wrong id
-inward.
-
-## Server truth is cached, not owned
-
-The renderer paints from a cache of backend truth, so it must reconcile, not
-assume:
-
-- **Merge, don't clobber.** A refresh is new information layered over what you
-  already know, not a replacement that can drop live or pinned rows.
-- **Be optimistic, then honest.** Direct manipulation should paint immediately
-  from a snapshot; a failed write rolls back visibly and an authoritative
-  refresh gets the last word.
-- **Guard against the past.** Async results can arrive out of order; a stale
-  response must never overwrite newer intent. Generation counters and request
-  tokens exist for this.
-- **Isolate the foreground.** Only the surface the user is looking at may publish
-  into the shared view; background work updates its own cache quietly.
-- **Coalesce noise, flush signal.** Batch high-frequency cosmetic updates, but
-  let terminal transitions (a turn finishing, needing input, failing) reach the
-  user immediately.
-- **Preserve reference identity on no-ops.** Handing React a fresh array that
-  contains the same data re-renders expensive trees for nothing.
-
-## Switching context is a re-home, not a reboot
-
-Changing profile, connection, or mode is a workspace switch, not a cold start.
-The shell and whatever the user was doing stay put; only the gateway-bound view
-is cleared and repopulated, and the previous context must not leak into the next
-one. Reserve the full-screen boot/connecting experience for a genuinely unusable
-backend.
-
-There are three distinct switch shapes, and conflating them is the classic bug:
-
-- A **connection/mode apply** (local ↔ remote ↔ cloud) is the soft re-home:
-  shell mounted, gateway-bound stores explicitly wiped, then reconnect. Query
-  invalidation alone cannot evict live session stores — wipe them.
-- A **runtime home change** (switching the underlying `HERMES_HOME` profile) is
-  a hard re-home: the window legitimately reloads and state resets by remount.
-- A **live profile swap** in the same window activates another profile's socket
-  while background profiles keep streaming; lists merge rather than wipe, and
-  only an explicit user selection starts a fresh foreground draft.
-
-Treating a soft switch as hard flickers the app; treating a hard one as soft
+### Semantic & Accent
+- **Border Cream** (`#f0eee6`): Standard light-theme border — barely visible warm cream, creating the gentlest possible containment.
+- **Border Warm** (`#e8e6dc`): Prominent borders, section dividers, and emphasized containment on light surfaces.
+- **Border Dark** (`#30302e`): Standard border on dark surfaces — maintains the warm tone.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [h4dex/opc-nexus](https://github.com/h4dex/opc-nexus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
