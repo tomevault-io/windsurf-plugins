@@ -7,11 +7,11 @@ Free, open source, realtime task manager. Issues, boards, sprints, projects and 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Noveum/orbit](https://github.com/Noveum/orbit).
+Original source: `AGENTS.md` in [Noveum/orbit](https://github.com/Noveum/orbit).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
