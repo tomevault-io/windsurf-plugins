@@ -7,11 +7,11 @@ Completion-focused LLM frontend
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [LordFoogThe4rd/miyapad](https://github.com/LordFoogThe4rd/miyapad).
+Original source: `AGENTS.md` in [LordFoogThe4rd/miyapad](https://github.com/LordFoogThe4rd/miyapad).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
