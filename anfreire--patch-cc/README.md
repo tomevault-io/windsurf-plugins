@@ -7,11 +7,11 @@ Interactive patcher for the Claude Code native binary. Live inline thinking, det
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [anfreire/patch-cc](https://github.com/anfreire/patch-cc).
+Original source: `AGENTS.md` in [anfreire/patch-cc](https://github.com/anfreire/patch-cc).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
