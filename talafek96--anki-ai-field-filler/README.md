@@ -7,11 +7,11 @@ An Anki addon that uses AI to intelligently auto-fill blank note fields.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [talafek96/anki-ai-field-filler](https://github.com/talafek96/anki-ai-field-filler).
+Original source: `AGENTS.md` in [talafek96/anki-ai-field-filler](https://github.com/talafek96/anki-ai-field-filler).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
