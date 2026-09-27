@@ -7,11 +7,11 @@ Everything you need to run TypeSafe's Jev with Claude Code: a tool-call guard, t
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [jonathanavis96/jev-kit](https://github.com/jonathanavis96/jev-kit).
+Original source: `AGENTS.md` in [jonathanavis96/jev-kit](https://github.com/jonathanavis96/jev-kit).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
