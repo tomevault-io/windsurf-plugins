@@ -7,11 +7,11 @@ Quake 4 简体中文汉化：全量翻译 + 字幕系统 + 思源黑体 + Strogg
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hazzzzzy/Quake4-Translate-Subtitle](https://github.com/hazzzzzy/Quake4-Translate-Subtitle).
+Original source: `AGENTS.md` in [hazzzzzy/Quake4-Translate-Subtitle](https://github.com/hazzzzzy/Quake4-Translate-Subtitle).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
