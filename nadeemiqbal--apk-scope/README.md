@@ -7,11 +7,11 @@ APK Scope — local-first APK inspection, managed Work Profile testing, network 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [NadeemIqbal/apk-scope](https://github.com/NadeemIqbal/apk-scope).
+Original source: `AGENTS.md` in [NadeemIqbal/apk-scope](https://github.com/NadeemIqbal/apk-scope).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
