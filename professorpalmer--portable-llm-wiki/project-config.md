@@ -1,8 +1,48 @@
 ---
 trigger: always_on
-description: Delegate multi-file refactors, audits, and reusable work to Puppetmaster MCP swarms; obey 'Use Puppetmaster to …' triggers.
+description: Guidance for humans and AI coding agents working in this repository.
 ---
 
+# Contributing conventions — portable-llm-wiki
+
+Guidance for humans and AI coding agents working in this repository.
+
+## Hard rules
+
+- **No emojis, ever.** Do not use emojis or decorative pictographs
+  anywhere — not in code, UI strings, button labels, log messages,
+  commit messages, comments, or documentation. This includes glyphs
+  like check marks, warning signs, clipboards, and similar
+  (`✓`, `⚠`, `📋`, etc.). Use plain words instead: render "copied",
+  not "copied ✓". Typographic punctuation (em dash `—`, en dash `–`,
+  directional arrows in prose) is acceptable; emoji and pictographs
+  are not.
+
+## Project layout
+
+- `backend/` — FastAPI app (Python). Tests under `backend/tests/`,
+  run with `backend/.venv/bin/python -m pytest`.
+- `frontend/` — Next.js app (TypeScript/React). Tests run with
+  `npx vitest run`; type-check with `npx tsc --noEmit`.
+- `render.yaml` — Render Blueprint for the backend. The hosted service
+  is Blueprint-managed with autoDeploy; keep this file in sync with the
+  live dashboard so the two never drift.
+
+## Testing
+
+- Run the full relevant suite before claiming work is done:
+  backend `pytest`, frontend `vitest run` + `tsc --noEmit`.
+- Prefer behavior/invariant assertions over change-detector snapshots.
+
+## Commits
+
+- Conventional commits: `fix:`, `feat:`, `refactor:`, `docs:`,
+  `chore:`. Concise subject, body explaining the why.
+- Never auto-commit; commit only when explicitly asked. Keep unrelated
+  work in separate commits.
+
+<!-- puppetmaster:rules:begin -->
+<!-- managed by `puppetmaster install-rules`; delete this whole block to disable -->
 
 # Puppetmaster orchestration
 
@@ -78,40 +118,6 @@ interact with, then explore the graph instead of crawling the tree:
    that shared context instead of letting multiple workers/agents each
    re-explore the same graphed code.
 
-Native search is fine for plain-text matches (log strings, config values,
-comments), a single known file path, or when the user says "just grep".
-If a codegraph MCP call returns a transport error, fall back to the CLI
-passthrough `python -m puppetmaster codegraph …` — never a bare
-`codegraph` from the shell (Node ABI mismatch).
-
-## When NOT to use Puppetmaster (stay inline)
-
-- Trivial single-file edits, typos, one-line fixes
-- Quick factual questions
-- Fast interactive iteration where the user is steering turn-by-turn
-
-Routing those through Puppetmaster wastes tokens and latency.
-
-## Fallback
-
-If `puppetmaster_*` tools are not connected, fall back to native
-tooling — do not pretend the tools exist.
-
-## Usage
-
-1. `puppetmaster_route_task <prompt> --role <role>` — dry-run that
-   returns the chosen model, estimated cost, and reasoning. Use
-   whenever spend matters or the task is ambiguous.
-2. `puppetmaster_start_cursor_swarm` / `puppetmaster_start_swarm` for
-   read-only analysis; `puppetmaster_start_implement` /
-   `puppetmaster_start_claude_implement` / `puppetmaster_start_codex` /
-   `puppetmaster_start_agentic` for full-edit builds. For keys-only
-   portability (no external agent CLI), prefer `puppetmaster_agentic` /
-   `puppetmaster_start_agentic` when you have a provider API key but no
-   vendor CLI installed.
-3. `puppetmaster_edit "<instruction>"` — a SINGLE focused in-place edit:
-   cheapest sufficient model, CodeGraph to locate the site, edits the
-   working tree directly, returns the diff synchronously, captures a
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
