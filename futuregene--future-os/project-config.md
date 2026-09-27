@@ -1,88 +1,42 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: FutureOS desktop app: Tauri + React + TypeScript, frontend `src/`, Tauri backend `src-tauri/` (Rust), connects to the repo-root agent via gRPC. For overall monorepo architecture/build, see **repo-root `CLAUDE.md`**; this file covers `desktop/` only.
 ---
 
-# CLAUDE.md
+# Desktop Development Guide (`desktop/`)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+FutureOS desktop app: Tauri + React + TypeScript, frontend `src/`, Tauri backend `src-tauri/` (Rust), connects to the repo-root agent via gRPC. For overall monorepo architecture/build, see **repo-root `CLAUDE.md`**; this file covers `desktop/` only.
 
-Rust (agent, channel) + TypeScript (TUI, CLI) + Tauri/React GUI + React Native Mobile. The Rust agent is the backend; the TS TUI provides the terminal interface. The TS CLI (`future`) handles auth, one-shot prompts (`run`), MCP tool calls, skills management, environment diagnostics (`doctor`), and account management. The GUI module (`gui/`) is a desktop app that connects to the agent over gRPC via its Tauri backend. The Android-first mobile app lives in `mobile/` and connects to the desktop remote bridge after scanning its pairing QR code. The channel binary bridges external messaging platforms (Feishu, DingTalk) to the agent via gRPC. The remote-control bridge is embedded in the GUI Tauri backend (`gui/src-tauri/src/remote/`) and relays desktop↔mobile/web over NATS; `remote/web/` is the verification web client it serves (design: `gui/DEV_MD/remote-control-*.md`).
+## Document Map (read relevant sections on demand — don't pull whole files into context)
 
-After `make install`, five independent binaries are available: `future-agent`, `future-channel`, `future-tui`, `future-gui`, `future`. Start components directly (e.g. `future-agent`) rather than through the CLI.
+> Development docs live under `docs/internals/desktop/` (repo-root-relative paths below; formerly `desktop/DEV_MD/`).
 
-## Build/Run/Test
+| Document | Content | When to Read / Modify |
+|---|---|---|
+| `docs/internals/desktop/PRODUCT.md` (~35KB) | Product positioning, module boundaries, workspace object semantics, desktop experience | **Read** when changing product behavior / adding features / confirming domain semantics; **modify** only when product decisions change |
+| `docs/internals/desktop/ER.md` (~42KB) | Data objects & relationships, table inventory, schema design decisions | **Read** when changing store / data flow; **modify** and keep in sync when schema changes |
+| `docs/internals/desktop/COLOR.md` (~5KB) | Color semantic tokens + quick usage reference | **Read** when picking colors / changing styles; **modify** only when adding/changing tokens |
+| `docs/internals/desktop/SANDBOX/COMMON.md` | Shared rules, tiers, approval UI/protocol, decisions and Codex references | **Read** for approval semantics; distinguish implemented behavior, accepted limitations and future plans |
+| `docs/internals/desktop/SANDBOX/MACOS.md` / `LINUX.md` / `WINDOWS.md` | Platform implementation, differences, diagnostics, progress, validation procedures and evidence | **Read** the relevant platform; historical PASS is not validation of a new candidate; preserve the accepted Windows unelevated and Linux snapshot boundaries |
+| `docs/internals/desktop/CONTEXT_COMPACTION.md` / `docs/internals/desktop/CONNECTION.md` | Compaction plans / remote product rationale, architecture, connection contract and implementation plan | **Read** for the corresponding feature; verify plan-vs-current against code |
+| `docs/internals/desktop/embedded-terminal.md` | Embedded terminal: architecture, wire protocol, security model, lifecycle, platform status | **Read** before touching `src-tauri/src/terminal/` or `src/features/terminal/`; **modify** when the protocol or its boundaries change |
 
-Prefer `make` targets from repo root. For more control, use cargo/npm directly.
+> `docs/internals/desktop/PRODUCT.md` / `docs/internals/desktop/ER.md` are large: use `Read` with `offset/limit` to read **specific sections** from the chapter index below — don't load the whole file.
 
-```bash
-# ─── Make targets (from repo root) ──────────────────────────────────────────
-make build              # Build agent, TUI, CLI, and GUI frontend
-make build-agent        # Build Rust agent only
-make build-tui          # Build TypeScript TUI only
-make build-cli          # Build TypeScript CLI only
-make build-gui          # Build React GUI frontend
-make build-channels      # Build channel bridge
-make build-mobile-android # Generate/build/install Android locally
-make test               # Run all tests (Rust crates + cli/tui/gui via bun/vitest)
-make lint               # Lint Rust + TypeScript + GUI
-make lint-agent         # cargo fmt --check && cargo clippy
-make lint-tui           # TUI: npx tsc --noEmit
-make lint-cli           # CLI: npx tsc --noEmit
-make lint-gui           # GUI: ESLint
-make stylelint-gui      # GUI: Stylelint
-make check-gui          # GUI lint/style/build + Tauri cargo check
-make check-mobile       # Mobile typecheck/lint/format-check/test
-make fmt                # Format Rust code with cargo fmt
-make run-agent          # Build and run Rust agent
-make run-tui            # Run TUI in dev mode (auto-installs npm deps)
-make run-cli            # Run CLI in dev mode (auto-installs npm deps)
-make run-gui            # Run Tauri GUI in dev mode (auto-installs npm deps)
-make run-mobile-android # Run Android app on a selected device
-make package-gui        # Build GUI desktop bundle via Tauri
-make run-channels        # Build and run channel bridge
-make profile-agent       # CPU profile: build + 90s bench → flamegraph SVG in profile-results/
-make profile-quick       # CPU profile: run N secs (PROFILE_SECS=30)
-make profile-heap        # Heap profile via dhat (feature dhat-heap) → dhat JSON in profile-results/
-make generate-models    # Fetch model data from APIs, regenerate models_generated.rs
-make generate-proto     # Compile proto/future.proto → Rust gRPC code
-make clean              # Remove target/, dist/, node_modules/
-make help               # Show all targets
+### Chapter Quick Reference
+- **PRODUCT.md**: §1 Positioning · §2 Module Boundaries · §3 Product Principles · §4 Work Objects (4.1 Workspace / 4.2 Chat / 4.3 Message / 4.4 Run / 4.5 Tool / 4.6 Approval / 4.7 Review / 4.8 Artifact / 4.9 Research / 4.10 Data / 4.11 Skill / 4.12 Attachment) · §5 Desktop Experience (5.1 Three-panel / 5.2 Left Nav / 5.3 Chat Area / 5.4 Right Context / 5.5 Colors / **5.6 Settings: Provider/Model/Login**) · §6 Agent Workflow · §9 Roadmap
+- **ER.md**: §2 Relationship Overview · §3 Naming Conventions · §4 Objects (4.1 Workspace … 4.8 Approval Request / 4.9 Review Changeset / 4.10 Review File Change (incl. **Shadow Review extension**: `review_snapshots` table + changeset/file_change extension columns) … 4.20 Object Reference) · §5 V1 Table Inventory · §6 Key Design Decisions (**6.8 Shadow Repo "Previous Change Set"** / **6.9 Provider/Model/Login Config**)
 
-# ─── Direct commands ────────────────────────────────────────────────────────
-cd agent && cargo run                  # Start gRPC server on 127.0.0.1:50051
-cd agent && cargo test                 # Run all Rust tests
-cd agent && cargo test <test_name>     # Run a single test
-cd channels && cargo run                # Start channel bridge (connects to agent gRPC)
-cd channels && cargo build              # Build channel bridge (debug)
-cd channels && cargo build --release    # Build channel bridge (optimized)
-cd tui && npm run dev                  # Run TUI in dev mode (connects to agent)
-cd cli && npm run dev -- <command>     # Run CLI in dev mode (e.g., `npm run dev -- auth login`)
-cd gui && npm run tauri:dev            # Run desktop GUI (connects to agent via FUTURE_AGENT_GRPC_ADDR)
-cd mobile && npm run android:device     # Generate, build, and run Android locally
+> **Shadow Review** (run-level "previous change set"): product semantics in docs/internals/desktop/PRODUCT.md §4.7, data model in docs/internals/desktop/ER.md §4.10, design tradeoffs in docs/internals/desktop/ER.md §6.8. Read all three before modifying shadow repo / snapshot / changeset code (`src-tauri/src/shadow_review/`, `store/review_snapshots.rs`).
 
-# Proto codegen — regenerated by build.rs on every cargo build
-# Agent proto: proto/future.proto → agent/src/grpc/generated/proto.rs
-# Channel proto: channels/proto/feishu_ws.proto (pbbp2 frames) + proto/future.proto (gRPC client)
-```
+> **Provider / Model / FutureGene Login**: product behavior in docs/internals/desktop/PRODUCT.md §5.6, storage & login implementation in docs/internals/desktop/ER.md §6.9, custom-provider field validation in `agent_providers/validate.rs` (frontend mirror: `CustomProviderDialog.tsx` + settings.json strings `idPattern`/`idLength`/`baseUrlInvalid`). Read these before modifying `agent_providers/` (Providers view + custom-provider upsert/delete) / `future_platform.rs` (platform / model-API URL resolution, shared by login/skills/debug) / `auth_store.rs` / `future_login.rs` / `commands/login.rs`.
 
-The Rust binary (`future-agent`) is the backend, always running as a gRPC server at `127.0.0.1:50051`. The TS TUI, GUI Tauri backend, and channel bridge all connect to it via gRPC. The Rust binary itself has only one CLI flag: `--grpc-addr`.
+## Code Structure (`src/`)
 
-The TypeScript CLI (`future`) is a separate management tool — see the CLI section below.
-
-## Config
-
-Agent config is under `~/.future/agent/`:
-- `settings.json` — model defaults, steering/followUp modes, compaction, thinking level
-- `models.json` — user model overrides/provider configs (merged over built-in catalog)
-- `auth.json` — API keys by provider, plus a default key
-- `sessions/` — JSONL conversation persistence
-
-Model config reads purely from these files. No model-related CLI flags or env vars.
-
+- `components/layout/` — `AppShell` (layout orchestration) + `ContextPanel` + `ActivityRail` (left nav) + dialog shells (`AppShellDialogs` / `WorkspaceDialogs` / `LeftPanelTitlebarToggle`); `hooks/` contains AppShell domain hooks: `useThreadStore` / `useAgentConnection` / `useApprovals` / `useAppSettings` / `useModelSelection` / `useNewConversation` (new-conversation create flow: pending prompt + `startNewConversation`) / `useThreadDialogs` / `useUnreadThreads` / `useWorkspaceDialogs` / `useDropUpMenu`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [futuregene/future-os](https://github.com/futuregene/future-os) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
