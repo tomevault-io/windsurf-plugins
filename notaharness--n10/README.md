@@ -7,11 +7,11 @@ AI Agent worktree and pull request manager
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [notaharness/n10](https://github.com/notaharness/n10).
+Original source: `AGENTS.md` in [notaharness/n10](https://github.com/notaharness/n10).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
