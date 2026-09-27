@@ -1,127 +1,85 @@
 ---
 trigger: always_on
-description: Poder. Eficiencia. Iberofonía. Interlingua.
+description: Lenguaje de bajo nivel *construido desde cero* sobre **Cranelift** (apuesta estratégica, no temporal). NO es traducción de Rust. Es **gramatipado** (la gramática española es el sistema de tipos) y **morfosemántico** (la morfología porta significado de máquina): género, tiempos verbales, ser/estar, subjuntivo.
 ---
 
 # Falcato — AGENTS.md
 
-## Filosofía del proyecto
+## Filosofía
+Lenguaje de bajo nivel *construido desde cero* sobre **Cranelift** (apuesta estratégica, no temporal). NO es traducción de Rust. Es **gramatipado** (la gramática española es el sistema de tipos) y **morfosemántico** (la morfología porta significado de máquina): género, tiempos verbales, ser/estar, subjuntivo.
 
-Poder. Eficiencia. Iberofonía. Interlingua.
-
-Falcato NO es una traducción de Rust al español. Es un lenguaje de bajo nivel
-*construido desde cero* sobre **Cranelift** — apuesta estratégica, no temporal.
-
-El sistema de tipos y semántica están diseñados aprovechando las dimensiones
-gramaticales del español que el inglés no tiene: género, tiempos verbales,
-ser/estar, subjuntivo, prefijos productivos, voz pasiva/activa, compuestos
-aglutinantes.
-
-### Visión estratégica
-
-Falcato + Cranelift + WASM = **toolchain nativa para código generado por IA**.
-
-- **Falcato**: lenguaje interlingua entre humanos (español), LLMs (lenguaje natural
-  estructurado, baja ambigüedad), y máquinas (WASM/Cranelift)
-- **Cranelift**: compilación ultra-rápida (JIT + AOT), ideal para ciclos LLM →
-  código → compilar → ejecutar → depurar
-- **WASM**: sandbox nativo para ejecución segura de código no confiable generado
-  por IA
-- **Bytecode Alliance** (Mozilla, Fastly, Intel, Arm, Google, Microsoft, Shopify):
-  alineación natural — necesitan ejecución rápida y segura de código arbitrario
-
-**Velocidad de compilación > velocidad de ejecución optimizada.**
-**Seguridad del sandbox > control total del hardware.**
-**Lenguaje cercano al humano > notación matemática.**
-
-Cranelift no es "lo que tocó" — es el backend oficial y estratégico.
-Contribuimos activamente a su ecosistema y roadmap. No planeamos migrar a LLVM.
-Si Cranelift necesita features para lenguajes nativos AOT, las implementamos.
-
-## Reglas de diseño
-
-1. **Cada palabra reservada debe aportar semántica, no solo sintaxis.**
-   No es `if` → `si`. Es usar el modo subjuntivo para codificar incertidumbre.
-   No es `fn` → `función`. Es usar el tiempo verbal para codificar modo de ejecución.
-
-2. **Cero abstracciones gratuitas.** Si una feature no se puede implementar
-   con costo cero en runtime, no pertenece al núcleo del lenguaje.
-
-3. **Explotar, no imitar.** Las features del español (género, ser/estar, etc.)
-   deben traducirse en *garantías de compilación*, no en azúcar sintáctico.
-
-4. **Iberofonía no es nacionalismo.** Es explorar si un idioma distinto al inglés
-   puede aportar algo nuevo a la ingeniería de lenguajes de programación.
+**Visión:** Falcato + Cranelift + WASM = toolchain nativa para código generado por IA. **Velocidad de compilación > velocidad de ejecución optimizada.**
 
 ## Los 5 Pilares
-
 | # | Pilar | Esencia | Estado |
 |---|-------|---------|--------|
-| I | **Género = Ownership** | `el`=owned mutable, `la`=borrowed immutable, `un`=option | ✅ Implementado |
-| II | **Ser/Estar = Const/Mut** | `es`=identidad permanente, `está`=estado temporal | ✅ Implementado (base) |
-| III | **Tiempos = Modos ejecución** | Presente=sync, Futuro=async, Subjuntivo=fallible | ✅ Subjuntivo + Futuro (18A MVP) |
-| IV | **C ABI por defecto** | Layout C, calling C, mangling off | ✅ Implementado |
-| V | **Prefijos semánticos** | `re-`=retry, `des-`=free, `pre-`=comptime | 📝 Documentados; `des-` parcial vía FFI manual |
+| I | Género = Ownership | `el`=owned mut, `la`=borrowed inmut, `un`=option | ✅ |
+| II | Ser/Estar = Const/Mut | `es`=permanente, `está`=temporal | ✅ |
+| III | Tiempos = Modos | Presente=sync, Futuro=async, Subjuntivo=fallible | ✅ |
+| IV | C ABI por defecto | Layout C, calling C, mangling off | ✅ |
+| V | ~~Prefijos semánticos~~ | ~~`re-`=retry~~ | ⛔ Retirado 2026-08-03 |
 
-### Estrategia de backend
+## Day-0 (no negociable)
+- **🚨 TODO EN ESPAÑOL**: lenguaje, errores, CLI, docs. Excepciones: términos técnicos sin traducción (Cranelift, CLIF, JSON, LSP, WASM).
+- **C ABI por defecto**: layout C, SystemV, mangling off, salida `.o`
+- **Span en cada nodo AST** — sin span no hay LSP
+- **Errores en español con códigos** `[T001] archivo.fc:7:12: mensaje` — S/T/O/C/M/I/W
+- **Documentar al agente**: cambios grandes → `falcato.md` + skill `falcato-language` en la misma tanda
+- **🚨 SEGURIDAD CRÍTICA**: red/sistema/entrada externa → revisión minuciosa antes de mergear
+- **NINGUNA ETIQUETA CAMBIA SEMÁNTICA** — etiqueta solo decide CÓMO se produce el binario
+- **`--destino` es la ÚNICA etiqueta de plataforma** — el `.fc` nunca sabe dónde corre
+- **Código portable o no compila**: builtin sin impl para target = error
+- **Impls juntas**: Windows + POSIX en la misma tanda
+- **VERSIONADO**: `MAYOR.menor.parche` — Bump en `Cargo.toml` + tag `vMAYOR.menor.parche`
+- **RELEASES EN ESPAÑOL** y **NOVEDADES POR EFECTO** (➕/🔧/🔁, no por fase)
 
-**Cranelift es el backend oficial y estratégico.** No es temporal ni migraremos a LLVM.
-Si Cranelift necesita features (mejor cold branch hinting, debug info AOT, etc.),
-las implementamos nosotros y contribuimos upstream. Bytecode Alliance comparte
-nuestra visión: código generado por IA necesita compilación rápida y ejecución segura.
+## Problemas abiertos de diseño de lenguaje
 
-### Innovación Fase 12: Concordancia de Posesión
+**Visión guía:** potencia de Rust · facilidad de Go · morfología española como superpoder para LLMs.
 
-Extensión del Pilar I con **tipos afines** como base teórica:
-- `el` = affine (usar 0 o 1 veces, owned)
-- `la` = no-lineal (usar N veces, borrowed)
-- `los`/`las` = shared ownership (reference-counted)
-- Lifetimes léxicos: `&dato Texto` en vez de `&'a T`
-- Borrow checker **gradual** (Nivel 0 permisivo → Nivel 2 estricto)
-- Diseño completo: `docs/diseno_ownership.md`
+Falcato no traduce Rust ni clona Go. Es **gramatipado y morfosemántico**: la gramática española ES el sistema de tipos, y la morfología verbal codifica modos de cómputo (presente=sync, futuro=async, subjuntivo=fallible). Eso da a los LLMs una propiedad única — el código se lee como español natural.
 
-## Innovación Implementada: Concordancia Lingüística
+Estamos en **"pasos de bebé"**: todavía hay tensiones de diseño que debemos resolver ANTES de comprometernos. Cada decisión acá es **casi irreversible** (cambia el "lenguaje sentido" durante años). Mejor resolver lento y bien que rápido y mal.
 
-Aprovechamos que en español los adjetivos **concuerdan** en género y número con
-el sustantivo. En Falcato, los valores deben "concordar" en tipo, ownership y estado.
+### Tensiones vivas
 
-**Errores intuitivos para hispanohablantes:**
-```
-[T001] test.fc:4:8: Disconcordancia de tipo: 'a' es 'Entero32' pero se declaró como 'Booleano'
-       │ sugerencia: Cambia el tipo a 'Entero32' o el valor
+| # | Tensión | Estado | Próximo paso |
+|---|---------|--------|--------------|
+| **P-001** | Stdlib: por tipos (Go: `texto`, `archivo`, `red`) vs por intención (verbos: `hacer.archivo.leer`) | ✅ **RESUELTO 2026-08-28**: tipos fragmentados + verbos consistentes + namespaces explícitos (`::`) + conjugación como azúcar | Implementar en 0.8.0 |
+| **P-002** | Sintaxis namespace: `.` (colisión con métodos/campos) vs `::` (Rust-like) vs `snake_case` | ✅ **RESUELTO 2026-08-28**: `::` (evidencia LLMs; coma descartada) | Implementar en 0.8.0 |
+| **P-003** | Auto-import: prelude pequeño (Rust) vs todo-std auto (Python) | 🟡 Vinculado a P-001 | Diferir a 1.0 |
+| **P-004** | Doble API método/función: `t.contiene(sub)` vs `texto.contiene(t, sub)` | 🟡 Diseño inestable | Formalizar regla antes de 1.0 |
+| **P-005** | Builtins inflados: 30+ en Capa 1 (FFI) vs reducir a ~15 | 🟢 Activo | Migración gradual 0.8.x |
+| **P-006** | Default `Entero` = 32 (rompe ABI) vs 64 | 🟡 Diferido | RFC 0.8.0 con aliases |
+| **P-007** | Keyword renames: `apodo`/`alias`, `rasgo`/`protocolo`, `retornar`/`devolver` | 🟡 Diferido | Requiere `MAYOR` (1.0) |
+| **P-008** | Mensajes de error: `T001 disconcordancia` vs `no coincide` | 🟡 Diferido | Decisión de estilo 0.8.0 |
 
-[O001] test.fc:5:5: 'constante' no es mutable: se declaró con 'la' (inmutable)
-       │ sugerencia: Usa 'el constante' para hacerlo mutable
-```
+#### Regla de migración de builtins (P-005)
 
-## Day-0: Decisiones arquitectónicas vinculantes
+**Regla:** Builtins de **solo lectura** → Falcato puro. Builtins de **creación/escritura** → C.
 
-### C ABI por defecto (no negociable)
-- Layout de structs = C layout (`repr(C)` es el default)
-- Calling convention = SystemV/C
-- Name mangling = desactivado (símbolos literales)
-- Salida `.o` compatible con `gcc`/`clang`/`link.exe`
+| Categoría | Builtins | ¿Por qué? |
+|-----------|----------|------------|
+| **Solo lectura** | `contiene`, `empieza_con`, `termina_con`, `longitud` | Solo comparan bytes, devuelven valores simples |
+| **Creación** | `mayusculas`, `minusculas`, `recortar`, `reemplazar` | Necesitan malloc para crear nuevo Texto |
+| **I/O** | `archivo_*`, `tcp_*`, `http_*` | Syscalls del SO |
+| **Hardware** | `lienzo_*`, `imagen_*`, `audio_*` | Win32/X11 APIs |
 
-### Span en cada nodo del AST (no negociable)
-- `Span { inicio: Posicion, fin: Posicion, archivo: Arc<str> }`
-- `Posicion { linea: u32, columna: u32, offset: u32 }`
-- Sin Span no hay errores con ubicación ni LSP futuro
-
-### Errores en español con códigos (no negociable)
-- Formato: `[T001] archivo.fc:7:12: mensaje`
-- Categorías: S (sintaxis), T (tipo), O (ownership), C (FFI), M (módulos), I (interno), W (warning)
-- Sugerencia opcional en cada error
-
-## Stack técnico
-
-- **CLI:** `clap` 4.5 (Rust)
-- **Lexer:** `logos` 0.14 — errores léxicos reportados con span real
-- **Parser:** descendente manual modular (Pratt parser), recovery de errores, spans reales
-- **AST:** Propio con Span obligatorio, métodos `span()` en nodos
-- **Semántica:** "Concordancia Lingüística" — tipos + ownership + bounds
+**Implementación Falcato puro:**
+```falcato
+// Solo lectura — loop + comparación de bytes
+el función texto_contiene(la t: Texto, la sub: Texto) -> Booleano {
+    el largo_sub: Entero32 = texto_longitud(sub);
+    si largo_sub == 0 { retornar verdadero; }
+    el largo_t: Entero32 = texto_longitud(t);
+    si largo_sub > largo_t { retornar falso; }
+    el limite: Entero32 = largo_t - largo_sub;
+    el i: Entero32 = 0;
+    mientras i <= limite {
+        el encontrado: Booleano = verdadero;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [CerebroCanibalus/falcato](https://github.com/CerebroCanibalus/falcato) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+> Source: [CerebroCanibalus/Falcato](https://github.com/CerebroCanibalus/Falcato) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
