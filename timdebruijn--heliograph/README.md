@@ -7,12 +7,12 @@ ESP32 firmware that autodiscovers solar inverters over their native RS485 protoc
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [Timdebruijn/heliograph](https://github.com/Timdebruijn/heliograph).
+Original source: `AGENTS.md` in [Timdebruijn/heliograph](https://github.com/Timdebruijn/heliograph).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
