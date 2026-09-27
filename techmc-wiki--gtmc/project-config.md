@@ -1,100 +1,108 @@
 ---
 trigger: always_on
-description: This file is the agent contract for the **GTMC website** repo. It complements `README.md` (human-facing) with the technical context, commands, and conventions an automated coding agent needs to make safe, useful changes.
+description: Agent context for the **GTMC website**, the public site for Graduate Texts in Minecraft (reader surfaces, drafts workspace, GitHub PR integration).
 ---
 
 # AGENTS.md
 
-This file is the agent contract for the **GTMC website** repo. It complements `README.md` (human-facing) with the technical context, commands, and conventions an automated coding agent needs to make safe, useful changes.
+Agent context for the **GTMC website**, the public site for Graduate Texts in Minecraft (reader surfaces, drafts workspace, GitHub PR integration).
 
-> Agent-managed blocks at the bottom of this file (`<!-- gitnexus:* -->`, `<!-- BEGIN/END:nextjs-agent-rules -->`) are written by external tooling. **Do not hand-edit them.**
+The site is live at <https://www.techmc.wiki>. The infra was provided by Vercel and DNS by Cloudflare.
 
-## Project Overview
+## Stack
 
-This repo contains the public website for **Graduate Texts in Minecraft (GTMC)** — a community-driven online textbook on technical Minecraft. It serves articles (tutorials, mechanics explanations, source-code analyses) and a draft/review hub for contributors.
+- Next.js 16 (App Router, Turbopack) on React 19, TypeScript strict mode
+- Tailwind CSS v4 (tokens in `DESIGN.md` / `app/globals.css`); shadcn/ui primitives in `components/ui/shadcn/`
+- Prisma 7 (Postgres) + NextAuth v5 (GitHub provider); next-intl i18n
+- Markdown pipeline (remark/rehype, KaTeX, Shiki) over the `articles/` and `glossary/` submodules
+- pnpm 12, Vite+ (`vp` for Oxlint, Oxfmt, Vitest)
 
-- **Framework**: Next.js 16 (App Router, Cache Components, Turbopack) on React 19
-- **Language**: TypeScript 7.0.2 (strict mode)
-- **Styling**: Tailwind CSS v4
-- **Motion**: `motion` (Framer Motion successor)
-- **Auth**: NextAuth v5 (GitHub provider) + Prisma adapter
-- **Database**: Prisma 7 against Supabase Postgres
-- **Content pipeline**: Markdown via remark/rehype, KaTeX math, Shiki code highlighting, gray-matter frontmatter
-- **Editor**: CodeMirror 6 (markdown, autocomplete, merge view)
-- **Schematics**: `schematic-renderer` + Three.js
-- **Search**: MiniSearch
-- **i18n**: `next-intl` with `en` and `zh` locales
-- **Hosting**: Vercel (Speed Insights, Analytics, Blob)
-- **Unified tooling**: pnpm 11 for package management, with Vite+ (`vp`) providing Oxlint, Oxfmt, and Vitest integration
-- **Tests**: Vitest, Playwright, Lighthouse CI
-
-The articles themselves live in a separate repo and are pulled in via a Git submodule at `articles/`, and the glossary CSV data is pulled in via a submodule at `glossary/`.
-
-### Repository layout
+## Layout
 
 ```text
-.
-├── app/                    Next.js App Router (locale-scoped routes)
-│   ├── [locale]/
-│   │   ├── (public)/       Articles, public pages
-│   │   ├── (private)/      Drafts, review hub, profile, admin
-│   │   ├── (auth)/         GitHub sign-in flow
-│   │   └── _homepage/      Hero card, foreground/background layers
-│   └── api/                Route handlers
-├── actions/                Server actions (drafts, reviews, profile, …)
-├── components/ui/          tech-card, tech-button, corner-brackets, …
-├── components/{articles,editor,glossary,layout,markdown,review,search,ui}/
-├── lib/                    Article pipeline, auth, db, search, GitHub helpers
-├── articles/               Article content (Git submodule)
-├── glossary/               Glossary CSV data (Git submodule)
-├── data/                   Generated manifest + rendered article content + glossary*.json
-├── i18n/                   next-intl request config + routing
-├── messages/               i18n catalogs (en.json, zh.json)
-├── public/                 Static assets including generated gtmc-en.pdf and gtmc-zh.pdf
-├── scripts/                Manifest, content, and PDF generators
-├── proxy.ts                Auth + i18n middleware
-├── schema.prisma           Database schema
-└── DESIGN.md               Visual system reference
+app/          App Router (locale-scoped [locale] routes, api/)
+actions/      Server actions
+components/   UI components (primitives in components/ui/shadcn/)
+lib/          Article pipeline, auth, db, search, GitHub helpers
+hooks/        Shared React hooks
+i18n/         next-intl config; catalogs in messages/ (en.json, zh.json)
+types/        Ambient type declarations
+content/      Static content (about, authors, pdf)
+articles/     Article content submodule
+glossary/     Glossary data submodule
+data/         Generated manifests, search indices, build caches
+scripts/      Manifest, content, and PDF generators (pdfgen/ is the Go PDF renderer)
+proxy.ts      Auth + i18n middleware
 ```
 
-## Setup Commands
-
-The project uses **pnpm v11** and runs on **Node 26** in CI. macOS, Linux, and Vercel build images are supported.
+## Setup
 
 ```bash
-git clone https://github.com/techmc-wiki/gtmc.git
-cd gtmc
-vp install              # delegates to pinned pnpm; also runs postinstall
-cp .env.example .env    # fill in GitHub OAuth, DATABASE_URL, etc.
-pnpm dev                # http://localhost:3000
+vp install              # Install dependencies with pinned pnpm + run postinstall
+cp .env.example .env    # All environment variables are documented there
+pnpm dev                # Start development server at http://localhost:3000
 ```
 
-`pnpm install` triggers `scripts/postinstall.ts`, which:
+## Commands
 
-1. Adds `.gitconfig` to the local Git config include path.
-2. Initializes the `articles/` and `glossary/` submodules at their pinned commits if needed.
-3. Generates the glossary manifest.
-4. Runs `prisma generate` (with a placeholder `DATABASE_URL` if none is set, to allow client codegen offline), unless heavy postinstall steps are explicitly skipped.
-5. Runs `tsx scripts/generate-article-manifest.ts`.
-6. Runs `playwright install chromium` for the PDF generator and any browser tests, unless `GTMC_SKIP_PLAYWRIGHT=1` (or heavy postinstall is already skipped).
+```bash
+pnpm check                       # vp check (oxfmt + oxlint) + tsc --noEmit
+pnpm typecheck                   # tsc --noEmit only
+vp check --fix                   # Auto-format and autofix lint findings
+pnpm test                        # All Vitest suites (vp test run)
+vp test run <file-path>          # Run a specific test file
+vp test run -t "<test-name>"     # Filter by test name
 
-CI notes for the Build workflow:
+pnpm build                       # Full build: content generation + next build
+pnpm build:content               # Phase 1: static content and manifest generation
+pnpm build:next                  # Phase 2: Next.js production build
+pnpm generate:manifest           # Rebuild data/manifest.json
+pnpm generate:content            # Re-render article content artifacts
+pnpm generate:glossary           # Rebuild data/glossary*.json
+pnpm articles:update             # Pull latest articles submodule commit
+pnpm glossary:update             # Pull latest glossary submodule commit
+```
 
-- Content/PDF artifacts are cached by articles SHA + glossary SHA + generator/lib hashes. Exact cache hits set `GTMC_SKIP_CONTENT_BUILD=true`.
-- Install uses `GTMC_SKIP_POSTINSTALL=1`; Prisma is generated in a dedicated step; Chromium is installed only on content-cache miss.
-- Superseded runs on the same ref are cancelled via `concurrency`.
+Before declaring any build-affecting change complete, run `pnpm check && pnpm test`.
 
-### Environment variables
+## Testing
 
-`.env.example` lists the required keys. None are committed.
+**Standing policy**: Do not add or propose tests unless explicitly requested.
 
-| Variable                                                   | Purpose                                                                          |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                             | Pooled Postgres connection string (Supabase in production)                       |
-| `DIRECT_URL`                                               | Direct Postgres connection used by Prisma migrations                             |
+## Code Style
+
+- Never bypass types with `as any`, `@ts-ignore`, or `@ts-expect-error`; fix root types.
+- Use existing shadcn/ui components from `components/ui/shadcn/` before creating custom primitives. Follow `DESIGN.md` for styling, tokens, and geometry.
+- Imports use the `@/*` path alias (repository root). Server actions in `actions/`; route handlers in `app/api/`; middleware in `proxy.ts` (not `middleware.ts`).
+- Monospace + uppercase + wide tracking is strictly for apparatus controls (buttons, badges, tabs, nav). Standard form labels, empty states, and dialog titles use normal sans capitalization.
+
+## Pull Request & Git Guidelines
+
+- Conventional Commits (`<type>(<scope>): <subject>`, max 72 chars; types: `feat`, `fix`, `refactor`, `docs`, `style`, `chore`, `test`, `perf`).
+- Never mix submodule pointer updates (`articles/`, `glossary/`) with feature or bugfix commits; commit them separately as `chore(articles): ...`.
+- Atomic, reversible commits are fine. **Never** run `git push` or `git pull`. **Never** use destructive Git commands (`reset --hard`, `clean -f`, force push) without explicit instruction.
+
+### Publishing GitHub releases
+
+Release tags use the `vX.Y.Z` format (semver) and are published from the `dev` branch. The target commit must already be present on the remote `dev` branch; agents must not push or pull, so stop for a user-managed push when the local branch is ahead. Before publishing, inspect the commits since the previous release, pick the next version (`feat` → minor, `fix`/`perf` → patch, breaking → major), and confirm the worktree is clean.
+
+1. Bump `version` in `package.json` to the new version (bare semver, no `v` prefix) in its own commit. A bump never touches `pnpm-lock.yaml`, so stage the manifest alone and never regenerate dependencies for it.
+
+   ```bash
+   git add package.json
+   git commit -m "chore: bump package version to vX.Y.Z"
+   ```
+
+2. Tag that same commit and push the tag. `-m ""` makes an empty-message annotated tag (signed, per `tag.gpgSign`) without opening an editor.
+
+   ```bash
+   git tag -m "" vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [techmc-wiki/gtmc](https://github.com/techmc-wiki/gtmc) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
