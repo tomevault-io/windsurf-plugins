@@ -1,152 +1,32 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - Use Go 1.27 or later, as declared in `go.mod`, `tests/go.mod`, and `go.work`. The workspace contains two modules: the root module and `tests/`. Root `go test ./...` does not include the E2E module.
 ---
 
-# CLAUDE.md
+# Repository Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Code Boundaries
 
-## Project Overview
+- Use Go 1.27 or later, as declared in `go.mod`, `tests/go.mod`, and `go.work`. The workspace contains two modules: the root module and `tests/`. Root `go test ./...` does not include the E2E module.
+- `container.Plugins()` in `container/plugins.go` defines the default plugin set for the Endure container. See Plugins And Endure below.
+- The CLI starts at `cmd/rr/main.go` and `internal/cli/root.go`. Lifecycle changes can affect three separate implementations: `internal/cli/serve/command.go` (non-Windows), `internal/cli/serve/command_windows.go` (Windows), and `lib/roadrunner.go` (embedding API).
 
-RoadRunner is a high-performance PHP application server and process manager written in Go. It supports running as a service with extensive plugin functionality for HTTP/2/3, gRPC, queues (RabbitMQ, Kafka, SQS, NATS), KV stores, WebSockets, Temporal workflows, and more.
+## Plugins And Endure
 
-## Development Commands
+- Every bundled plugin is a separate Go module and GitHub repository in the `roadrunner-server` organization with the import path `github.com/roadrunner-server/<name>/v6`. The Temporal plugin is `github.com/temporalio/roadrunner-temporal/v6`. Root `go.mod` pins every bundled plugin. `tests/go.mod` pins only the plugins that the E2E tests import.
+- Organization repositories: plugins at `https://github.com/roadrunner-server/<name>`, Endure at `https://github.com/roadrunner-server/endure`, error kinds at `https://github.com/roadrunner-server/errors`, cross-plugin contracts at `https://github.com/roadrunner-server/api-plugins`, generated protobuf Go bindings at `https://github.com/roadrunner-server/api-go`, protobuf sources at `https://github.com/roadrunner-server/api` (not a Go module), the worker pool at `https://github.com/roadrunner-server/pool`, example plugins at `https://github.com/roadrunner-server/samples`, the build tool at `https://github.com/roadrunner-server/velox`, and the user documentation at `https://github.com/roadrunner-server/docs`.
+- The build compiles plugins from the module cache. `go.work` covers both modules, so Go resolves each plugin to the highest version that `go.mod` or `tests/go.mod` requires. `go.mod` has no `replace` directives. To read a plugin's source at the pinned version, run `go list -m -f '{{.Dir}}' github.com/roadrunner-server/<name>/v6`. The `master` branch on GitHub can be ahead of that version.
+- To build or test against a local plugin checkout, write a `go.work` file outside this repository with absolute `use` paths for the repository root, `tests`, and the plugin directory. Run Go commands with `GOWORK=<absolute path to that file>`. Never commit a `replace` directive or a `use` entry that points outside this repository.
+- Run a plugin's unit tests with `go test ./...` from the plugin repository root. When the plugin has a `tests/` module, run its E2E tests from that directory, as the plugin CI does. That `tests/go.mod` replaces the plugin module with the parent directory.
+- Endure (`github.com/roadrunner-server/endure/v2`) is the dependency injection container. Its source is at `https://github.com/roadrunner-server/endure/blob/master/`: `container.go` declares the plugin interfaces, `edges.go` validates `Init` and builds the graph, `init.go` calls `Init`, handles disabled plugins, and registers `Provides` values, and `collects.go` runs the `Collects` callbacks. Read them at the pinned version before you change a plugin's `Init` parameters, `Provides`, or `Collects`.
+- Endure resolves dependencies by reflection over the `Init` method parameters. Every registered struct needs an `Init` method. Each `Init` parameter must be an interface type, and `Init` must return exactly one `error` value. A missing `Init`, a struct parameter, or a primitive parameter stops the whole container.
+- These interfaces are optional: `Service` (`Serve() chan error`, `Stop(context.Context) error`), `Named` (`Name() string`), `Provider` (`Provides() []*dep.Out`), `Collector` (`Collects() []*dep.In`), and `Weighted` (`Weight() uint`). Build `dep.Out` with `dep.Bind` and `dep.In` with `dep.Fits`. Both accept only a pointer to an interface type, such as `(*Middleware)(nil)`, and panic on other types. A method named in `Provides` takes no arguments and returns exactly one value.
+- Endure calls `Stop` of every active `Service` plugin concurrently, each with its own context that expires after `grace_period` (`stop.go` in the Endure repository). `grace_period` is a per-plugin timeout, not an overall deadline.
+- When two plugins satisfy the same `Init` parameter, Endure sorts the candidates by `Weight()` in descending order and takes the first. `tests/mock/logger.go` provides the `Logger` interface with weight 100 to replace the real logger plugin in E2E tests.
+- A plugin declares the interfaces it consumes in its own package, usually near the top of `plugin.go`. `http` and `grpc` declare most of them in `api/interfaces.go`. Shared contracts live in `github.com/roadrunner-server/api-plugins/v6`, and plugins import its `jobs`, `kv`, and `status` packages. A plugin that needs a logger declares its own interface with `NamedLogger(name string) *slog.Logger`.
 
-### Build
-```bash
-make build
-# Or manually:
-CGO_ENABLED=0 go build -trimpath -ldflags "-s" -o rr cmd/rr/main.go
-```
-
-### Test
-```bash
-make test
-# Or manually:
-go test -v -race ./...
-```
-
-### Debug
-```bash
-make debug
-# Uses delve to debug with sample config
-```
-
-### Run RoadRunner
-```bash
-./rr serve -c .rr.yaml
-```
-
-### Other Commands
-```bash
-./rr workers          # Show worker status
-./rr workers -i       # Interactive worker information
-./rr reset            # Reset workers
-./rr jobs             # Jobs management commands
-./rr stop             # Stop RoadRunner server
-```
-
-### Run Single Test
-```bash
-go test -v -race -run TestName ./path/to/package
-```
-
-## Architecture
-
-### Plugin System
-
-RoadRunner uses the **Endure** dependency injection container. All plugins are registered in `container/plugins.go:Plugins()`. The plugin architecture follows these principles:
-
-1. **Plugin Registration**: Plugins are listed in `container/plugins.go` and automatically wired by Endure
-2. **Plugin Dependencies**: Plugins declare dependencies via struct fields with interface types
-3. **Initialization Order**: Endure resolves the dependency graph and initializes plugins in correct order
-
-### Key Components
-
-- **`cmd/rr/main.go`**: Entry point that delegates to CLI commands
-- **`internal/cli/`**: CLI command implementations (serve, workers, reset, jobs, stop)
-- **`container/`**: Plugin registration and Endure container configuration
-- **Plugin packages**: External packages under `github.com/roadrunner-server/*` (imported in go.mod)
-
-### Configuration
-
-- Primary config: `.rr.yaml` (extensive sample provided)
-- Version 3 config format required (`version: '3'`)
-- Environment variable substitution supported: `${ENVIRONMENT_VARIABLE_NAME}`
-- Sample configs: `.rr-sample-*.yaml` for different use cases (HTTP, gRPC, Temporal, Kafka, etc.)
-
-### Core Plugins
-
-**Server Management:**
-- `server`: Worker pool management (NewWorker, NewWorkerPool)
-- `rpc`: RPC server for PHP-to-Go communication (default: tcp://127.0.0.1:6001)
-- `logger`: Logging infrastructure
-- `informer`: Worker status reporting
-- `resetter`: Worker reset functionality
-
-**Protocol Servers:**
-- `http`: HTTP/1/2/3 and FastCGI server with middleware support
-- `grpc`: gRPC server
-- `tcp`: Raw TCP connection handling
-
-**Jobs/Queue Drivers:**
-- `jobs`: Core jobs plugin
-- `amqp`, `sqs`, `nats`, `kafka`, `beanstalk`: Queue backends
-- `gps`: Google Pub/Sub
-
-**KV Stores:**
-- `kv`: Core KV plugin
-- `memory`, `boltdb`, `redis`, `memcached`: Storage backends
-
-**HTTP Middleware:**
-- `static`, `headers`, `gzip`, `prometheus`, `send`, `proxy_ip_parser`, `otel`, `fileserver`
-
-**Other:**
-- `temporal`: Temporal.io workflow engine integration
-- `centrifuge`: WebSocket/Broadcast via Centrifugo
-- `lock`: Distributed locks
-- `metrics`: Prometheus metrics
-- `service`: Systemd-like service manager
-
-### Worker Communication
-
-RoadRunner communicates with PHP workers via:
-- **Goridge protocol**: Binary protocol over pipes, TCP, or Unix sockets
-- **RPC**: For management operations (reset, stats, etc.)
-- Workers are PHP processes that implement the RoadRunner worker protocol
-
-### Testing
-
-- Tests use standard Go testing with `-race` flag
-- Test files follow `*_test.go` convention
-- Sample configs in `.rr-sample-*.yaml` are used for integration tests
-- Test directories: `container/test`, `internal/rpc/test`
-
-## Important Notes
-
-- Go version: 1.25+ required (see go.mod)
-- Module path: `github.com/roadrunner-server/roadrunner/v2025`
-- Some versions are explicitly excluded in go.mod (e.g., go-redis v9.15.0, viper v1.18.x)
-- Debug mode available via `--debug` flag (starts debug server on :6061)
-- Config overrides supported via `-o dot.notation=value` flag
-- Working directory can be set with `-w` flag
-- `.env` file support via `--dotenv` flag or `DOTENV_PATH` environment variable
-
-## Adding New Plugins
-
-1. Import the plugin package in `container/plugins.go`
-2. Add plugin instance to the `Plugins()` slice
-3. Plugin must implement appropriate RoadRunner plugin interfaces
-4. Endure will handle dependency injection and lifecycle management
-
-## Configuration Patterns
-
-- Each plugin has its own configuration section (named after plugin)
-- Pools configuration is consistent across plugins (num_workers, max_jobs, timeouts, supervisor)
-- TLS configuration follows similar pattern across plugins
-- Most plugins support graceful shutdown via timeouts
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [roadrunner-server/roadrunner](https://github.com/roadrunner-server/roadrunner) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
