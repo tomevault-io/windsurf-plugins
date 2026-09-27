@@ -7,11 +7,11 @@ Split expenses with a link. No accounts for anyone. Any currency, offline, PWA. 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [peanutprotocol/peanutsplit](https://github.com/peanutprotocol/peanutsplit).
+Original source: `AGENTS.md` in [peanutprotocol/peanutsplit](https://github.com/peanutprotocol/peanutsplit).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
