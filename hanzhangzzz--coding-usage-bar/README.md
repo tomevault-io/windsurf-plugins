@@ -7,11 +7,11 @@ macOS menu bar usage monitor for Claude Code, Codex, GLM, DeepSeek, and MiniMax
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hanzhangzzz/coding-usage-bar](https://github.com/hanzhangzzz/coding-usage-bar).
+Original source: `AGENTS.md` in [hanzhangzzz/coding-usage-bar](https://github.com/hanzhangzzz/coding-usage-bar).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
