@@ -7,11 +7,11 @@ Open-source dual-framework UI registry for Vue 3.5 / Nuxt 4 and React 19 / Next.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [uday-a/uipkge-registry](https://github.com/uday-a/uipkge-registry).
+Original source: `AGENTS.md` in [uday-a/uipkge-registry](https://github.com/uday-a/uipkge-registry).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
