@@ -7,11 +7,11 @@ Agent skills for design work: 3D build guides and more.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [SkylarKitchen/skills](https://github.com/SkylarKitchen/skills).
+Original source: `AGENTS.md` in [SkylarKitchen/skills](https://github.com/SkylarKitchen/skills).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
