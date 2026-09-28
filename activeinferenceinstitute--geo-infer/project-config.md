@@ -1,97 +1,86 @@
 ---
 trigger: always_on
-description: - [Overview](#overview)
+description: Use this file as the repository-level operating contract for automated agents working in GEO-INFER.
 ---
 
-# GEO-INFER Multi-Agent Systems Architecture
+# GEO-INFER Agent Instructions
 
-## Table of Contents
+Use this file as the repository-level operating contract for automated agents working in GEO-INFER.
 
-- [Overview](#overview)
-- [Agent Module Index](#agent-module-index)
-  - [Core Agent Modules](#core-agent-modules)
-  - [Agent-Enabled Domain Modules](#agent-enabled-domain-modules)
-  - [Agent Framework Support Modules](#agent-framework-support-modules)
-  - [Agent Architectures & Capabilities](#agent-architectures--capabilities)
-- [Implementation Status](#implementation-status)
-  - [Currently Implemented](#currently-implemented)
-  - [Aspirational/Planned Features](#aspirationalplanned-features)
-- [Architecture Overview](#architecture-overview)
-- [Core Agent Framework](#core-agent-framework)
-  - [Agent Types](#agent-types)
-  - [Agent Lifecycle Management](#agent-lifecycle-management)
-- [Multi-Agent Coordination](#multi-agent-coordination)
-  - [Coordination Strategies](#coordination-strategies)
-  - [Communication Protocols](#communication-protocols)
-  - [Negotiation Mechanisms](#negotiation-mechanisms)
-- [Spatial Intelligence](#spatial-intelligence)
-- [Security and Privacy](#security-and-privacy)
-- [Integration Patterns](#integration-patterns)
-  - [Module Integration Matrix](#module-integration-matrix)
-- [Performance Optimization](#performance-optimization)
-- [Use Cases](#use-cases)
-- [Testing and Validation](#testing-and-validation)
-- [Future Developments](#future-developments)
+## Cold Start (agent orientation)
 
-## Overview
+New to this repo? In order:
 
-This document describes the multi-agent systems architecture within the GEO-INFER framework. It covers design principles, agent types, coordination mechanisms, security protocols, and integration patterns that enable autonomous geospatial decision-making.
+1. **What this is**: a multi-module geospatial inference monorepo (uv workspace, Python 3.11+); see [README.md](README.md) "What's inside".
+2. **Module map**: [README.md Module Index](README.md#module-index) (source/test counts per module) and [GEO-INFER-INTRA/docs/modules/index.md](GEO-INFER-INTRA/docs/modules/index.md) (conceptual catalog).
+3. **Where to change what**: module behavior in `GEO-INFER-*/src/` (owning package); cross-module docs in `GEO-INFER-INTRA/docs/`; tests/validation in `GEO-INFER-TEST/`.
+4. **Health in one command**: `uv run python GEO-INFER-TEST/rewrite_readme_agents.py --check` (generated-signpost drift) plus the validators under Standard Commands.
+5. **Backlog with acceptance lines**: [TODO.md](TODO.md).
+6. **GNN companion pin**: to bump the paired-interchange GNN revision, follow
+   the [pair-pin bump procedure](GEO-INFER-TEST/docs/gnn_space_time_2026_09.md#gnn-pair-pin-bump-procedure).
 
-### 🧭 Quick Navigation
+## Repository Scope
 
-- **[Agent Module Index](#-agent-module-index)** - Index of agent-related modules
-- **[Implementation Status](#implementation-status)** - What's implemented vs. planned
-- **[Core Agent Framework](#core-agent-framework)** - Base agent types and lifecycle
-- **[Multi-Agent Coordination](#multi-agent-coordination)** - Coordination strategies and protocols
-- **[Integration Patterns](#integration-patterns)** - How agents integrate with other modules
-- **[Agent Architectures](#agent-architectures--capabilities)** - BDI, Active Inference, RL, Swarm
-- **[Use Cases](#use-cases)** - Real-world agent applications
-- **[Related Documentation](#related-documentation)** - Links to module-specific agent docs
+- Root path: repository root (`.`; resolve it from the checkout in use)
+- Modules: `GEO-INFER-ACT`, `GEO-INFER-AG`, `GEO-INFER-AGENT`, `GEO-INFER-AI`, `GEO-INFER-ANT`, `GEO-INFER-API`, `GEO-INFER-APP`, `GEO-INFER-ART`, `GEO-INFER-BAYES`, `GEO-INFER-BIO`, `GEO-INFER-CIV`, `GEO-INFER-CLIMATE`, `GEO-INFER-COG`, `GEO-INFER-COMMS`, `GEO-INFER-DATA`, `GEO-INFER-ECON`, `GEO-INFER-EDU`, `GEO-INFER-EMERGENCY`, `GEO-INFER-ENERGY`, `GEO-INFER-EXAMPLES`, `GEO-INFER-FOREST`, `GEO-INFER-GIT`, `GEO-INFER-HEALTH`, `GEO-INFER-INSURANCE`, `GEO-INFER-INTRA`, `GEO-INFER-IOT`, `GEO-INFER-LOG`, `GEO-INFER-MARINE`, `GEO-INFER-MATH`, `GEO-INFER-METAGOV`, `GEO-INFER-NORMS`, `GEO-INFER-OPS`, `GEO-INFER-ORG`, `GEO-INFER-PEP`, `GEO-INFER-PLACE`, `GEO-INFER-REQ`, `GEO-INFER-RISK`, `GEO-INFER-SEC`, `GEO-INFER-SIM`, `GEO-INFER-SPACE`, `GEO-INFER-SPM`, `GEO-INFER-TEST`, `GEO-INFER-TIME`, `GEO-INFER-TRANSPORT`, `GEO-INFER-WATER`
+- Package manager: `uv`
+- Python target: 3.11+
 
-### Related Documentation
+## Required Workflow
 
-**Core Agent Modules:**
+1. Inspect the relevant module before editing.
+2. Keep functionality in the owning module under `src/`.
+3. Keep scripts and examples as thin orchestration surfaces.
+4. Update README.md and AGENTS.md when behavior, commands, exports, or dependencies change.
+5. Run the narrowest relevant test first, then the repo contract validators.
 
-- **[GEO-INFER-ACT/AGENTS.md](./GEO-INFER-ACT/AGENTS.md)**: Active Inference agent implementations
-- **[GEO-INFER-AGENT/AGENTS.md](./GEO-INFER-AGENT/AGENTS.md)**: Core agent framework
-- **[GEO-INFER-ANT/AGENTS.md](./GEO-INFER-ANT/AGENTS.md)**: Swarm intelligence agents
+## Standard Commands
 
-**Infrastructure Modules:**
+```bash
+uv sync --all-packages --all-extras
+python -m compileall GEO-INFER-*/src GEO-INFER-*/examples
+uv run python GEO-INFER-TEST/validate_repo_contracts.py --strict-source-language --strict-import-smoke
+uv run python GEO-INFER-TEST/validate_logging_hygiene.py
+uv run python GEO-INFER-TEST/validate_documentation.py --strict
+uv run python GEO-INFER-TEST/validate_skills.py --check-xrefs --warnings-fatal
+uv run python manuscript/generate_research_artifacts.py
+uv run python GEO-INFER-TEST/run_unified_tests.py --category unit
+uv run python GEO-INFER-TEST/run_unified_tests.py --category integration
+uv run python GEO-INFER-TEST/run_unified_tests.py --category performance
+uv run python GEO-INFER-TEST/run_unified_tests.py --h3-migration
+uv run python GEO-INFER-TEST/validate_test_contracts.py --strict
+uv run python GEO-INFER-TEST/validate_model_contracts.py --strict --seed 42
+uv run python GEO-INFER-TEST/run_model_audit.py --seed 42 --reproducible
+uv run --with 'ruff>=0.15.6,<0.16' ruff check GEO-INFER-*/src --select F821,F823,E721,E722
+gitleaks detect --source . --config .gitleaks.toml --redact --verbose
+uv run python GEO-INFER-TEST/rewrite_readme_agents.py --check
+```
 
-- **[GEO-INFER-SPACE/AGENTS.md](./GEO-INFER-SPACE/AGENTS.md)**: Spatial intelligence for agents
-- **[GEO-INFER-TIME/AGENTS.md](./GEO-INFER-TIME/AGENTS.md)**: Temporal intelligence for agents
-- **[GEO-INFER-DATA/AGENTS.md](./GEO-INFER-DATA/AGENTS.md)**: Data management for agents
-- **[GEO-INFER-AI/AGENTS.md](./GEO-INFER-AI/AGENTS.md)**: AI/ML for agent learning
-- **[GEO-INFER-API/AGENTS.md](./GEO-INFER-API/AGENTS.md)**: Agent communication interfaces
+## Modular Hygiene Contract
 
-**Domain Applications:**
+- Use root `pyproject.toml`, `uv.lock`, and `.python-version` as the shared uv environment contract.
+- Sync the shared workspace with `uv sync --all-packages --all-extras`.
+- Keep module behavior in the owning `GEO-INFER-*` package under `src/`; keep scripts and examples as orchestration surfaces.
+- Treat `manuscript/generate_research_artifacts.py` as the only producer of manuscript variables, figure captions, figure registries, and resolved manuscript copies; never hand-edit ignored `output/`.
+- Keep every module's local test inventory above the minimum release gate of four pytest files.
+- Put planned work in root `TODO.md` or a tracked issue; do not leave task markers in module source or tests.
+- Use module loggers in libraries and configure handlers only from CLI entrypoints.
 
-- **[GEO-INFER-AG/AGENTS.md](./GEO-INFER-AG/AGENTS.md)**: Agricultural intelligence agents
-- **[GEO-INFER-HEALTH/AGENTS.md](./GEO-INFER-HEALTH/AGENTS.md)**: Health surveillance agents
-- **[GEO-INFER-CLIMATE/AGENTS.md](./GEO-INFER-CLIMATE/AGENTS.md)**: Climate analysis agents
-- **[GEO-INFER-TRANSPORT/AGENTS.md](./GEO-INFER-TRANSPORT/AGENTS.md)**: Transportation agents
-- **[GEO-INFER-EMERGENCY/AGENTS.md](./GEO-INFER-EMERGENCY/AGENTS.md)**: Emergency response agents
+## Documentation Contract
 
-## 📋 Agent Module Index
+Agent-facing documentation must be operational: current paths, commands, package names, public exports, test surfaces, and failure triage. Do not advertise planned APIs in AGENTS.md; use issues, roadmaps, or implementation status files for future work.
 
-### Core Agent Modules
+## Documentation Workflow
 
-| Module | Agent Type | Status | Implementation | Links |
-|--------|------------|--------|----------------|-------|
-| **[AGENT](./GEO-INFER-AGENT/)** | Multi-Agent Systems | ✅ Beta | `BaseAgent`, `BDIAgent`, `RLAgent`, `ActiveInferenceAgent`, `HybridAgent` | [README](./GEO-INFER-AGENT/README.md) \| [AGENTS.md](./GEO-INFER-AGENT/AGENTS.md) \| [Examples](./GEO-INFER-AGENT/examples/) |
-| **[ACT](./GEO-INFER-ACT/)** | Active Inference Agents | ✅ Beta | `ActiveInferenceModel`, `GenerativeModel`, `FreeEnergyCalculator` | [README](./GEO-INFER-ACT/README.md) \| [AGENTS.md](./GEO-INFER-ACT/AGENTS.md) \| [Examples](./GEO-INFER-ACT/examples/) |
-| **[ANT](./GEO-INFER-ANT/)** | Swarm Intelligence Agents | 🟡 Alpha | `SwarmAgent`, `AgentPopulation`, `PheromoneSystem`, `ABC`, `PSO`, `ACO` | [README](./GEO-INFER-ANT/README.md) \| [AGENTS.md](./GEO-INFER-ANT/AGENTS.md) \| [Examples](./GEO-INFER-ANT/examples/) |
-| **[SIM](./GEO-INFER-SIM/)** | Simulation Agents | 🟡 Alpha | Agent-based simulation environments | [README](./GEO-INFER-SIM/README.md) \| [Examples](./GEO-INFER-SIM/examples/) |
-| **[COG](./GEO-INFER-COG/)** | Cognitive Agents | 🟡 Alpha | Cognitive modeling for agent behavior | [README](./GEO-INFER-COG/README.md) \| [Examples](./GEO-INFER-COG/examples/) |
-
-### Agent-Enabled Domain Modules
-
-| Module | Agent Applications | Status | Links |
-|--------|-------------------|--------|-------|
-| **[AG](./GEO-INFER-AG/)** | Crop monitoring, irrigation, pest detection, harvest planning | ✅ Beta | [README](./GEO-INFER-AG/README.md) \| [AGENTS.md](./GEO-INFER-AG/AGENTS.md) |
+- Put conceptual, cross-module, and user-facing guidance in
+  `GEO-INFER-INTRA/docs/`.
+- Keep module READMEs focused on the current filesystem, imports, dependencies,
+  and verification commands; they are generated from tracked repository facts.
+- Keep `SKILL.md` action-oriented and synchronized with real public APIs.
+- Validate relative documentation links and generated signposts before handoff.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [ActiveInferenceInstitute/GEO-INFER](https://github.com/ActiveInferenceInstitute/GEO-INFER) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+> Source: [ActiveInferenceInstitute/GEO_INFER](https://github.com/ActiveInferenceInstitute/GEO_INFER) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
