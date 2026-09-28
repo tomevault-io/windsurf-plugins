@@ -1,0 +1,85 @@
+---
+trigger: always_on
+description: AI-powered alternative credit scoring for Saudi freelancers, embedded inside
+---
+
+# Mihan (مِهَن) — Claude Code Project Context
+
+AI-powered alternative credit scoring for Saudi freelancers, embedded inside
+Alinma Bank's app. Built for the AMAD 2026 hackathon (Alinma × Tuwaiq, July 16–18, Riyadh).
+Scores income capacity from Open Banking cash-flow data because freelancers have
+empty SIMAH files and no Mudad salary record.
+
+**Status: feature-complete.** Backend (FastAPI, port 9000) and frontend
+(Next.js 16 App Router, port 3000) are both done and demo-ready.
+
+## Running
+
+- Docker: `docker compose up --build` (both services)
+- Windows native: `.\start.ps1`
+- Manual: `cd backend && python -m uvicorn main:app --reload --port 9000` + `cd frontend && npm run dev`
+- Tests: `cd backend && python -m pytest tests/` (132 cases: scoring, factor derivation, PII exclusion, statement import, entity resolution, import explanation/roadmap, regulatory XAI, forward-outlook predictive model, underwriting agent incl. Arabic-chip parity — must stay green)
+- CI: `.github/workflows/ci.yml` runs tests + API smoke + docker build on push
+
+## Key facts
+
+- `backend/.env` (gitignored) holds real Wathq API credentials. Without it,
+  everything falls back to simulation — demo still works but the live-proof
+  button shows `"live": false`. See README Quick Start for the format.
+- **Wathq is LIVE** (`backend/wathq_api.py` → api.wathq.sa sandbox). Lean,
+  SIMAH, and Nafath are simulated in the demo. **Lean is NOT license-gated**:
+  Lean Technologies is the first SAMA-licensed Open Banking provider (Major
+  Payment Institution licence, Mar 27 2026) — Open Banking, incl. the AIS rail
+  Mihan uses, has graduated from SAMA's regulatory sandbox to a licensed
+  activity, so access for this platform depends on a **commercial bank-agent
+  agreement** rather than waiting on regulatory clearance. SIMAH and Nafath
+  remain genuinely license-gated. All use try-real-then-fallback.
+- The Trial-tier Wathq sandbox returns one fixed record with the company name
+  masked with literal `x` chars for ANY CR — that's why the persona narrative
+  uses simulated names while `/wathq-live-proof` shows the raw live response.
+- Determinism matters on stage: simulated data seeds use `zlib.crc32`, never
+  the built-in `hash()` (randomized per process → scores would change across restarts).
+- Frontend API base is `NEXT_PUBLIC_API_URL` (default `http://localhost:9000`),
+  defined once in `frontend/lib/config.ts`.
+- **Factors are derived, not hardcoded**: `income_stability` (CV over zero-filled
+  18-month window) and `client_diversity` (HHI) are computed live from transactions
+  in `backend/factor_analysis.py` on every scoring call. Persona composites:
+  mohammad 81.2 GREEN / noura 57.9 YELLOW / fahad 36.5 BUILDING.
+- **AI payload is zero-PII by construction**: `backend/ai_privacy.py` is the single
+  source of truth for what reaches Claude (five scores + tier, nothing else) —
+  used by both `generate_cache.py` and `/ai-privacy-proof`. Never add profile
+  fields to `build_ai_prompt`; `tests/test_ai_privacy.py` fails on any leak.
+- **Real-statement importer** (the "your cash flow is simulated" answer):
+  `backend/statement_pdf.py` (offline CLI) parses a real Saudi retail bank-statement
+  PDF and anonymizes it AT ingestion — names/accounts/cards/refs stripped, senders
+  pseudonymized, fail-closed `assert_no_pii` scan. The importer is a **medallion
+  pipeline**: bronze (raw parse, in-memory only) → silver (**entity resolution** —
+  narration variants and multi-rail payments of the same counterparty collapse to
+  ONE `ENTITY-` pseudonym) → gold (scoring). Deterministic rules only — Claude
+  never touches ingestion. Entity keying is deliberately split by risk direction:
+  `entity_key()` uses the FULL significant-token set (order-independent, legal
+  suffixes like CO/LLC/EST dropped, descriptors like TRADING/HOLDING kept because
+  they distinguish) so different clients sharing a first name never over-merge;
+  `is_self()` uses a lossy consonant skeleton (MHMD, AL/EL prefix dropped) so
+  spelling/transliteration variants of the ACCOUNT HOLDER are still caught and
+  excluded — needing ≥2 token matches so a shared first name never triggers it.
+  Arabic narrations are NFKC-folded from presentation forms so Arabic sender names
+  tokenize instead of vanishing. All self-transfer variants collapse to the single
+  holder in `silver_meta`. See `tests/test_statement_import.py::TestEntityResolution`.
+  `POST /import-statement` scores
+  the anonymized JSON through the same VANC pipeline with **4 of 5 factors computed
+  live** (stability CV, diversity HHI, expense ratio, savings) plus an integrity
+  check against the statement's own printed totals. The consented anonymized
+  statement for the demo lives in gitignored `team/real_statement_anonymized.json`
+  (bring it to the venue like the `.env`); it scores BUILDING/no-loan — honest, and
+  it demos the self-transfer / cash-deposit income-exclusion controls. Never commit
+  raw statements or statement PDFs. `POST /import-statement-pdf` is the
+  direct-upload variant: it accepts the raw PDF, runs the SAME anonymizer
+  in memory only (never persisted, fail-closed PII scan still gates scoring),
+  and returns the result plus the anonymized statement (zero-PII, reused by
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [MohammadYusif/amdhack](https://github.com/MohammadYusif/amdhack) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
