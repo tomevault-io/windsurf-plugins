@@ -1,0 +1,99 @@
+---
+trigger: always_on
+description: Rootbeer is a rust library and command line tool that executes a user-provided
+---
+
+Rootbeer is a rust library and command line tool that executes a user-provided
+lua script in a sandboxed environment, creating a system configuration. Think of
+it akin to a dotfile manager like home-manager or chezmoi.
+
+- `crates/rootbeer-cli`: The command line tool the user interacts with
+- `crates/rootbeer-core`: The core library that runs the lua script
+- `crates/rootbeer-store`: Shared content hashing and normalized storage
+- `crates/rootbeer-package`: Package models, recipe parsing, graph, resolution, and installation
+- `crates/rootbeer-build`: Build plans, backend phases, execution, and build caching
+- `crates/rootbeer-packaging`: Discovery, qualification, signing, and publication
+- `crates/rootbeer-forge`: The package-maintainer CLI (`rootbeer-forge`)
+
+Configuration must not depend on the build or packaging crates. Backends produce
+phases for the shared build executor. Coordinate recipe schema changes with the index repository and its engine pin.
+
+Production package recipes belong exclusively in `rootbeer-index/packages/`.
+Rootbeer contains generic package tooling and regression tests; never embed or
+duplicate production recipes in this repository.
+
+## Package CI and Publication
+
+- Verify changed package inputs once on each supported platform, then promote
+  those exact verified artifacts through merge and publication without rebuilding.
+- Reuse verified results for unaffected packages. Scope invalidation to changed
+  recipes, dependencies, relevant backend/executor behavior, and build environments;
+  an unrelated engine change must not force a full-catalog rebuild.
+- Do not run a cold baseline build merely to warm caches before a PR, or stack
+  baseline, PR, and post-merge full builds for the same publication. Check artifact
+  promotion eligibility and cache reuse before triggering expensive CI.
+- Retry only failed or affected work, preserving completed results. Reserve full
+  requalification for scheduled/explicit rechecks or changes that actually affect
+  the entire catalog. Never bypass integrity or provenance checks to save CI time.
+- If current tooling prevents reuse, identify and fix that limitation rather than
+  treating repeated full builds as a routine prerequisite for adding packages.
+
+User configuration is provided through a layering system in the core library,
+where the base fundamentals (such as symlinking files, creating new files,
+running commands, etc.) are provided by the library, callable from the user's
+lua script.
+
+Because the lua scripts are meant to run with 0 external dependencies, the core
+library also builds up fundamentals such as JSON serialization, string formats,
+and more (akin to Nix's stdlib).
+
+The highest API layer is mostly defined in Lua and wraps the lower level APIs
+in nice types, functions, and design patterns. For example, a `zsh` module is
+defined in the highest layer which consumes the lower level APIs, allowing the
+user to follow a nicely typed API to manage their zsh configuration.
+
+This pattern needs to remain consistent across all modules and there are a few
+different tools built around these assumptions defined below.
+
+## Require Syntax
+
+Standard Lua dot-separated require paths are used **everywhere** — stdlib
+modules, user scripts, docs, and examples:
+
+- `require("rootbeer.git")` — dot syntax, used in **all** code.
+- `require("helper")` — resolves from the user's source directory.
+
+A Rust-level require wrapper in `vm.rs` translates dot paths to Luau-native
+`@`-prefixed paths before they reach Luau's C++ layer. This is a hidden
+implementation detail — all Lua files look like vanilla Lua and work with
+lua-language-server without special configuration. Never use `@`-prefixed
+paths in `.lua` files.
+
+The LSP setup (`rb lsp` / `rb init`) writes type definitions to
+`~/.local/share/rootbeer/typedefs/` and a `.luarc.json` with
+`workspace.library` pointing there. A generated `init.lua` lets
+`require("rootbeer")` resolve to the `rootbeer` class type. No LuaLS plugin
+is needed — standard `workspace.library` resolution handles everything.
+
+- I/O operations run in a plan/execute mode, where calls only append to a log of
+  operations that need to be executed on the apply stage.
+- High-level Lua modules (zsh, git, ssh, …) MUST iterate user-supplied maps
+  with `rootbeer.tbl.sorted_pairs` (not `pairs`) so generated output is
+  deterministic across runs. Multi-line user input MUST be split with
+  `rootbeer.str.split_lines` (not `gmatch("[^\n]+")`) so blank lines are
+  preserved. See `docs/contributing/architecture.md` → "Authoring Principles"
+  for the full convention.
+- The lua language server is used to automatically generate markdown docs for
+  the documentation site defined in the `docs` directory (built with Vitepress).
+  The `docs/api/_generated/` directory is auto-generated from `lua/rootbeer/*.lua`
+  meta files via `scripts/lua2md.ts`. NEVER hand-edit files in `_generated/` and
+  NEVER manually write API field tables in doc pages. Instead, update or create
+  the corresponding `lua/rootbeer/*.lua` meta file with `@class`/`@field`
+  annotations, and use `<!--@include: ../api/_generated/<name>.md-->` in the doc
+  page (also taking care to ensure the path is added to the sidebar if necessary).
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [rootbeer-org/rootbeer](https://github.com/rootbeer-org/rootbeer) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
