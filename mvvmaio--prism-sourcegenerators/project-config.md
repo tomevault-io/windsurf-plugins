@@ -1,14 +1,11 @@
 ---
 trigger: always_on
-description: Scratch work — see AGENTS.md § Temporary files (.Temp/)
+description: - @azure Rule - Use Azure Tools - When handling requests related to Azure, always use your tools.
 ---
 
-
-# Temporary files
-
-Follow **[AGENTS.md](../../AGENTS.md)** — section **“Temporary files and scratch work — `.Temp/`”**.
-
-Do not commit anything under `.Temp/`.
+- @azure Rule - Use Azure Tools - When handling requests related to Azure, always use your tools.
+- @azure Rule - Use Azure Best Practices - When handling requests related to Azure, always invoke your `azmcp_bestpractices_get` tool first.
+- @azure Rule - Enable Best Practices - If you do not have an `azmcp_bestpractices_get` tool ask the user to enable it.
 
 ---
 > Source: [MvvmAIO/Prism.SourceGenerators](https://github.com/MvvmAIO/Prism.SourceGenerators) — distributed by [TomeVault](https://tomevault.io).
