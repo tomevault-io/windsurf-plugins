@@ -1,0 +1,42 @@
+---
+trigger: always_on
+description: These instructions apply to the whole repository, for human contributors and coding agents. Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), [docs/PORT_PLAN.md](docs/PORT_PLAN.md), [docs/STATUS.md](docs/STATUS.md), and the assigned packet in `docs/work_packets/` before changing the port. The goal is to run the actual Machinedrum firmware and its DSP programs on the Octatrack with the smallest measured adaptations.
+---
+
+# Working in octamachine
+
+These instructions apply to the whole repository, for human contributors and coding agents. Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), [docs/PORT_PLAN.md](docs/PORT_PLAN.md), [docs/STATUS.md](docs/STATUS.md), and the assigned packet in `docs/work_packets/` before changing the port. The goal is to run the actual Machinedrum firmware and its DSP programs on the Octatrack with the smallest measured adaptations.
+
+## One work packet at a time
+
+- Keep each prompt or work packet focused on one compatibility boundary, boot checkpoint, tool, or documentation correction. Preserve unrelated local changes.
+- Claim one numbered packet from the [plan index](docs/PORT_PLAN.md#work-packet-index), recording your owner name and branch. Check prerequisite evidence before implementing dependent work. For new scope or maintenance outside an existing packet, use the [packet template](docs/templates/WORK_PACKET.md); split broad work into children rather than silently dropping criteria. The [handoff template](docs/templates/AGENT_HANDOFF.md) provides a reusable assignment prompt.
+- Start contribution work from the target repository's current `main` on a descriptive branch such as `work/md-boot-trace`. That remote is usually `origin`, or `upstream` when `origin` is your fork. Continue on the existing branch when updating its PR or a managed worktree. Push directly to `main` only when the maintainer explicitly requests it.
+- Record evidence in [docs/RESEARCH_LOG.md](docs/RESEARCH_LOG.md) and update [docs/COMPATIBILITY_MATRIX.md](docs/COMPATIBILITY_MATRIX.md) when a measured conclusion changes. Distinguish observations from inferences; include source repository commits and the firmware revision used locally.
+- Keep changes to upstream projects reviewable. `vendor/octemu` is a pinned submodule; the other `vendor/` checkouts are ignored research copies. Propose octemu changes upstream or keep a separate patch here, then update the pin deliberately. Never stage a dirty submodule pointer by accident.
+
+## Keep status and checklists after every work prompt
+
+The packet file is authoritative for its lifecycle state and acceptance checklist. `docs/STATUS.md` summarizes project gates, active work, blockers, and the next dispatch queue. Keep both current in the same commit as the work, including prompts that only produce research, partial progress, or a blocker.
+
+1. At prompt start, inspect the working tree, read the current handoff, and reconcile previously merged PRs. Do not overwrite another owner's entries or discard earlier prompt history.
+2. Check an acceptance item only when linked evidence proves it. Keep incomplete items unchecked. Distinguish source documentation, measured behavior, and inference; a scaffold check or compiled emulator does not prove a firmware boot.
+3. Update owner, branch, date, and [lifecycle state](docs/PORT_PLAN.md#status-lifecycle-and-prompt-bookkeeping). Append a dated prompt history entry with the request, completed `[x]` items, remaining `[ ]` items, changed files, commands/results (including skips), findings, blockers, and precise next action.
+4. Refresh the packet's current handoff and `docs/STATUS.md`. Record prerequisite waits separately from a specific technical/input blocker. Use `in_review` for delivered work pending acceptance; `done` requires the packet criteria and accepted/merged delivery. Hardware feasibility gates need evidence independently of PR status.
+5. End each work-prompt reply with a concise completed/remaining checklist, packet ID/status, verification outcome, commit/branch/push result, and PR or compare link. State what the next owner should do.
+
+Use the enclosing commit as the delivery reference in the prompt entry and report its actual hash after committing. Reconcile that hash/PR on the next work prompt; do not create extra commits just to embed a commit's own hash. Pure questions and read-only status requests need an accurate checklist in the reply without artificial file edits or empty commits.
+
+## Finish each prompt with a commit and push
+
+For every prompt that changes repository files, make a focused commit and push it to the task branch before reporting completion. Several commits are fine when they represent separate logical steps. Do not create empty commits for read-only research or questions. Follow a user's explicit request to leave a change uncommitted.
+
+1. Inspect `git status --short --branch` before editing and again before staging. Stage only the files for this packet with explicit paths; never use `git add -A` in a workspace with unrelated changes.
+   Include the packet record and `docs/STATUS.md` for every work prompt; preserve other owners' updates in shared documents.
+2. Review `git diff --cached --name-status` and `git diff --cached`; check that no firmware, generated output, unrelated file, or unintended submodule change is staged.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [repeat98/octamachine](https://github.com/repeat98/octamachine) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
