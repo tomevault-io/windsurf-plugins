@@ -7,14 +7,14 @@ Thuế thu nhập cá nhân 2026: skill AI (Claude) tính thuế, quyết toán,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [tndvnn/tncn](https://github.com/tndvnn/tncn).
+Original source: `AGENTS.md` in [tndvnn/tncn](https://github.com/tndvnn/tncn).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/tndvnn/tncn](https://github.com/tndvnn/tncn)
