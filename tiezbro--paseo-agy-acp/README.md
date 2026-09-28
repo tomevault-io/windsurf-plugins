@@ -5,12 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `` in [tiezbro/paseo-agy-acp](https://github.com/tiezbro/paseo-agy-acp).
+Original source: `AGENTS.md` in [tiezbro/paseo-agy-acp](https://github.com/tiezbro/paseo-agy-acp).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
