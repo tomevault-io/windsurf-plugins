@@ -7,11 +7,11 @@ A phased development workflow for AI Agents that combats context rot.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [syncrea/viper-ai](https://github.com/syncrea/viper-ai).
+Original source: `AGENTS.md` in [syncrea/viper-ai](https://github.com/syncrea/viper-ai).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
