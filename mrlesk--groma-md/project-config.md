@@ -101,5 +101,5 @@ in-scope code change may remain part of that code task.
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [MrLesk/Groma.md](https://github.com/MrLesk/Groma.md) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+> Source: [MrLesk/groma.md](https://github.com/MrLesk/groma.md) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
