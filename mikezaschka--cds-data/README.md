@@ -7,11 +7,11 @@ Monorepo containing composable SAP CAP plugins for integrating remote services, 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [mikezaschka/cds-data](https://github.com/mikezaschka/cds-data).
+Original source: `AGENTS.md` in [mikezaschka/cds-data](https://github.com/mikezaschka/cds-data).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
