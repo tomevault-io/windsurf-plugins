@@ -1,0 +1,91 @@
+---
+trigger: always_on
+description: - `crates/` owns the native xcb (Excalibur) Rust kernel, local runtime, Ratatui
+---
+
+# Contents
+
+- `crates/` owns the native xcb (Excalibur) Rust kernel, local runtime, Ratatui
+  frontend, and CLI. Panes are bounded userspace data; executable hooks require
+  separate trust. Keep local metering separate from opt-in aiCharts publishing.
+- `src/` owns provider-neutral routing, account leases, model selection,
+  scoped tool contracts, the `router.ts` subscription-router entry point
+  (`createSubscriptionRouter`) that bundles the lease store and qualified task
+  adapters for embedding hosts, the unqualified Devin ACP task adapter
+  (`devin-acp.ts`, `devin-client.ts`, `devin-adapter.ts`, `devin-mcp.ts`),
+  per-account browser-session custody (`browser-session.ts`), and the
+  provider-neutral managed-account controller (`managed-account.ts`), and
+  the OS-confinement port every provider launcher plans through
+  (`os-sandbox.ts`; never add a silent unsandboxed fallback), and the
+  host-side unix-socket CONNECT egress bridge (`egress-bridge.ts`) that makes
+  `provider-tcp443-dns` plannable on Linux bwrap without unsharing the child's
+  network namespace — plus its two consumers: the public `egress-client.ts`
+  for cooperative runtimes and `sandbox/loopback-forwarder.cjs`, the shipped
+  in-namespace forwarder that gives stock binaries standard `HTTPS_PROXY`
+  egress through the socket — plus `judge.ts`, the provider-neutral jev-style
+  judgment port (`ask(state, questions)` → typed answers) with the System One
+  backend and the cross-platform local key vault. A judge orders
+  already-admitted routes, may veto auto-continuation only after every
+  deterministic safety gate passes, and may veto deterministic Gobstopper
+  elision without receiving tool-result bodies; it never qualifies or activates
+  a provider. Keep vaulted System One credentials bound to the canonical
+  endpoint; custom endpoints require an explicit environment key, and future
+  backends own separate credential custody.
+  `src/index.ts` is the package's complete public surface.
+- `src/cli/` is the standalone `xcb` terminal surface (`cli.ts` entry,
+  chat/run/resume/sessions/doctor/auth/judge/migrate commands) built on the same
+  task runtime; `claude-task-adapter.ts` and `cli/sandbox.ts` own the
+  seatbelted subscription route it drives. `cli/state.ts` resolves `~/.xcb`
+  (env `XCB_STATE`) and owns the explicit `migrate` copy from legacy
+  `~/.agentmixer`; SQLite `agentmixer_*` tables rename lazily at open.
+- `test/` contains synthetic boundary and concurrency tests.
+- `qualification/` holds the host qualification fixtures and native-tooling
+  checks; its `contact-workspace.ts` is a vendored synthetic fixture, not a
+  Textbutler import. `linux-sandbox.ts` is the bwrap kernel-boundary probe,
+  `linux-egress.ts` is the CONNECT-bridge boundary probe, and
+  `linux-loopback.ts` is the stock-binary forwarder probe; all are evidence,
+  not activation. The `Check` workflow's `Linux kernel-boundary probes` job
+  runs them on `ubuntu-24.04` when the probes or sandbox sources change (or on
+  `workflow_dispatch`) and uploads the JSON evidence.
+- `scripts/` holds the dist build, packed-package smoke check, and the
+  dependency-free release writers and admission checks.
+- `site/` is the informational xcb product page (Next.js, canonical origin
+  xcb.sh); it has no product-runtime connection. Its blog keeps post bodies
+  in `site/content/blog/` and titles, sources, and admission records in
+  `site/app/blog/posts.ts`. The `@hraness/xcb`
+  TypeScript package and its verified publication datum remain a separate
+  compatibility surface.
+- `.github/workflows/` holds the read-only CI matrix and the tag-gated
+  immutable release pipeline.
+- `README.md`, `MANAGED-CODEX.md`, `CONTRIBUTING.md`, `SECURITY.md`, and
+  `LICENSE` are the public contract.
+- `docs/publishing.md` records the release and repository-protection contract.
+
+# Guidelines
+
+- Use Bun 1.3.14 for the compatibility package and site, and Rust 1.97.1 for
+  native xcb. The owner selected a full Rust migration; Cargo.lock is the
+  native dependency lock and bun.lock remains the JavaScript lock. Run
+  `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets
+  --locked -- -D warnings`, `cargo fmt --all -- --check`, and `bun run check`.
+  The site has its own `bun run check` inside `site/`.
+- Keep account credentials and provider runtime state outside consumer
+  workspaces. Resolve authentication through a trusted host adapter.
+- Never equate a prompt, cwd, tool list or expired lease with OS isolation or
+  proof that a process stopped.
+- Admit a provider only after the host proves the exact runtime, effective tool
+  inventory, configuration isolation and read/write confinement. Unqualified
+  adapters remain disabled.
+- Exact-artifact admission has two sources: constants baked into a release and
+  `qualified-builds.json` at the repository root. The Codex catalog workflow
+  qualifies npm-published darwin-arm64 builds through
+  `qualification/codex-inventory.py` and opens an auto-merging catalog pull
+  request. To qualify a build by hand, run the inventory with
+  `--expect-version`/`--expect-sha256`, then append the reviewed pair with a
+  `qualifiedBy` naming the evidence source. Never append a pair whose
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [hraness/xcb](https://github.com/hraness/xcb) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-27 -->
