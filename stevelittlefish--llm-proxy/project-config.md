@@ -1,0 +1,85 @@
+---
+trigger: always_on
+description: `llm_proxy` is a Go proxy server that exposes Ollama-compatible endpoints and forwards requests to either an OpenAI-compatible backend or an Ollama backend. It also exposes basic OpenAI-compatible frontend endpoints for simple clients.
+---
+
+# AGENTS.md
+
+## Project Overview
+
+`llm_proxy` is a Go proxy server that exposes Ollama-compatible endpoints and forwards requests to either an OpenAI-compatible backend or an Ollama backend. It also exposes basic OpenAI-compatible frontend endpoints for simple clients.
+
+The server logs requests and responses to SQLite and serves a small web UI for browsing logs. The repository also includes a dependency-free terminal chat client in `cmd/chatclient`.
+
+## Important Commands
+
+- Run all tests:
+  ```bash
+  CGO_ENABLED=0 go test ./...
+  ```
+- Run the proxy from source:
+  ```bash
+  ./run.sh
+  ```
+- Run the chat client from source:
+  ```bash
+  ./client.sh
+  ```
+- Run the chat client against OpenAI-compatible frontend endpoints:
+  ```bash
+  ./client.sh --openai
+  ```
+- Build the proxy binary:
+  ```bash
+  CGO_ENABLED=0 go build -o llm_proxy .
+  ```
+
+If the Go build cache is not writable in a sandbox, set it explicitly:
+
+```bash
+GOCACHE=/tmp/llm_proxy_go_build CGO_ENABLED=0 go test ./...
+```
+
+## Repository Layout
+
+- `main.go` wires config, database, backend selection, HTTP routes, middleware, and shutdown.
+- `config/` loads and validates `config.toml`.
+- `backend/` contains the backend interface and the OpenAI/Ollama backend implementations.
+- `handlers/` contains the Ollama frontend handlers, OpenAI frontend handlers, web UI handlers, templates, and static assets.
+- `handlers/chat_features.go`, `request_sanitization.go`, and `stream_override.go` contain shared request-mutation behavior used across frontend endpoints.
+- `backend/gemma4_fix.go` contains the optional, self-contained Gemma 4/vLLM streaming-corruption mitigation.
+- `models/` contains shared request and response structs.
+- `database/` owns SQLite initialization and log queries.
+- `middleware/` contains CORS and verbose request logging middleware.
+- `cmd/chatclient/` contains the stdlib-only terminal chat client.
+- `run.sh` and `client.sh` are convenience wrappers for local manual testing.
+- `docs/` contains the JSON logs API reference and design notes for the Gemma 4 mitigation.
+
+## Streaming Architecture
+
+- `backend.Backend.Chat`/`Generate` always return a `<-chan` of response chunks terminated by one item with `Done: true`, regardless of whether the upstream backend itself streamed. Frontend handlers (`handlers/chat.go`, `handlers/generate.go`, `handlers/openai_frontend.go`) just range over the channel.
+- The *backend-facing* stream flag (does the proxy ask the upstream API for SSE) and the *client-facing* response format (does the proxy send the client SSE/NDJSON chunks or one JSON blob) are deliberately decoupled — `stream_override` only ever changes the former. **The client must always get back the format it originally requested**, regardless of `stream_override.mode`, because clients are coded against the format they asked for (e.g. an OpenAI SDK client that sent `stream:true` will error like "Stream ended without finish_reason" if it gets a plain JSON body instead).
+- All three handlers capture `clientWantsStream := req.Stream` *before* calling `resolveStream`, then use `clientWantsStream` (not the overridden value) to decide what to send the client, while the overridden value goes to `backend.Chat`/`Generate`:
+  - `handlers/openai_frontend.go`: `clientWantsStream` picks `streamResponse` (SSE) vs `writeResponse` (single JSON); both already aggregate/forward whatever the channel yields, so they work no matter how many chunks the backend actually produced.
+  - `handlers/chat.go` / `handlers/generate.go`: the response-writing loop always builds a `combined` aggregate alongside writing, then only flushes per-chunk if `clientWantsStream`; if not, it sends the aggregate once at the end. This reshapes N backend chunks into 1 client response, or 1 backend chunk into a valid 1-chunk client stream, as needed.
+- When adding new stream-related behavior, never let `stream_override` change `clientWantsStream` — only the value passed to the backend call.
+
+## Adding a Config Option
+
+Follow the existing pattern (see `RequestSanitizationConfig`, `StreamOverrideConfig` in `config/config.go`):
+1. Add the field to a `...Config` struct with a `toml:"..."` tag.
+2. If it's an enum-like string, validate allowed values in `Load()` and set its default there too (empty string from an unset TOML key is not validated against the enum).
+3. Mirror the new section/key in `config.toml.example` with a comment listing allowed values.
+4. Document it in `README.md` under "Configuration Options" (`config.toml` itself is gitignored — local/example only).
+5. Add `config_test.go` cases for: explicit value loads, default-when-omitted, and rejection of an invalid value.
+6. If it changes request handling, add a handler-level parity test across the three endpoints (`openai_chat`, `ollama_chat`, `ollama_generate`) using a spy backend — see `handlers/request_sanitization_test.go` or `handlers/stream_override_test.go` for the pattern.
+
+## Development Notes
+
+- Keep the chat client dependency-free. It should remain trivial to run with `go run ./cmd/chatclient`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [stevelittlefish/llm_proxy](https://github.com/stevelittlefish/llm_proxy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
