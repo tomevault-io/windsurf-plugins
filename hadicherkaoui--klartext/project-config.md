@@ -1,0 +1,62 @@
+---
+trigger: always_on
+description: SPDX-FileCopyrightText: Hadi Cherkaoui <contact@hide.cherkaoui.ch>
+---
+
+<!--
+SPDX-FileCopyrightText: Hadi Cherkaoui <contact@hide.cherkaoui.ch>
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
+# CLAUDE.md
+
+## What this is
+A native-Rust BMW diagnostic and coding tool for F-series BMWs, talking over Ethernet (ENET cable) directly to the car. Two real cars exist: the original target **F20 1-series** (gateway `169.254.90.33`, the 2026-07-03 captures) and an **F25 X3** (gateway `169.254.71.121`, CAS4 not FEM, car session 1 + the iOS probe) — same N47 DDE `d72n47a0`, so offline DDE work applies to both. Check a capture's ident VIN before assuming which car it is. Two faces: a library/CLI now, and later an MCP server so an agent can read faults and live data and reason about them. The long-term value is the semantic layer — turning raw protocol exchanges into "here's what's wrong and why" — not the protocol itself.
+
+The protocol spec lives in `docs/protocol-reference.md`. Treat it as the source of truth for frame layouts, the UDS service catalog, the HSFZ handshake, ports, and gateway addressing. Don't re-derive protocol details from memory; read the report.
+
+## Scope (decided — don't expand without being asked)
+In:
+- Diagnostics: read DTCs, read live data/identifiers, clear DTCs, run service functions (routine control). This is the recurring use and the priority.
+- Replay-coding: read a module's NCD, patch known byte changes, write it back. No coding-definition decoding.
+Out (do not build unless explicitly asked):
+- A general FDL/CAFD editor (editing any coding parameter by name). Deferred; needs a full PSdZData CAFD parser.
+- ECU flashing/programming (UDS transfer services 0x34–0x37). Out entirely beyond awareness.
+
+## Architecture
+Bottom to top:
+1. Transport — HSFZ (BMW-proprietary, F-series) over TCP. Implement concretely now.
+2. UDS (ISO 14229) — request/response service layer on top of transport.
+3. Semantic — meaning of the bytes (DID scaling, DTC meaning, service-function recipes), built from ISTA's data and captures. A later milestone.
+
+DoIP (ISO 13400) is the G-series transport and a FUTURE addition. Do NOT build a transport trait/abstraction for it yet — there is one transport today. Implement HSFZ as a concrete type behind a clean module boundary; extract a trait when DoIP is actually added. No speculative abstraction.
+
+## Hard rules
+- BYO-data. Never commit BMW's proprietary data: ISTA SQLiteDBs, PSdZData, or packet captures (they contain the VIN). Gitignore `captures/`, `*.pcap`, `*.pcapng`, and any data dirs. The repo ships empty of BMW data; the user supplies their own.
+- Safety by blast radius (encode as layers are built): reads (DTCs, live data, identifiers) are safe and may run autonomously. Writes — NCD coding writes and actuation (IO control, state-changing routine control) — must require explicit confirmation and must read+back-up the original bytes before writing. Flashing: unsupported.
+- License: AGPL-3.0. Implement protocols from the report and ISO standards (frame layouts and handshakes are facts, not copyrightable). Do NOT copy code from reference libraries — especially Scapy (GPLv2), which would force its license. Read them to understand; reimplement in your own code.
+
+## Stack
+- Latest stable Rust, edition 2024. Async via tokio.
+- Before hand-writing standardized layers, check crates.io: there may be usable UDS crates, and a Rust MCP SDK (check the current crate, e.g. rmcp) for the later MCP milestone. HSFZ is proprietary and niche — write it yourself regardless.
+- SQLite parsing for the semantic layer (later) via rusqlite or sqlx — defer until that milestone.
+- Cargo workspace (chosen up front for a reusable core that future binaries share). Layout convention: **library crates live under `crates/`; each binary lives in its own top-level directory** — no `bin/` grouping dir. Today: libraries `crates/uds` (pure UDS messages), `crates/hsfz` (concrete HSFZ transport), `crates/client` (managed UDS session + typed read/clear services over HSFZ), `crates/semantic` (ISTA-DB-backed DTC/DID decoding; exposes the general ECU map via `Catalog::ecus()`); binaries `cli/` (`klartext-cli`, builds the `klartext` binary) and `mcp/` (`klartext-mcp`, the read-only stdio MCP server over `klartext-client` + `klartext-semantic`). Dirs are short; package names keep the `klartext-` prefix. Shared versions/metadata via `[workspace.dependencies]` and `[workspace.package]`. Still do NOT pre-create empty crates for layers that don't exist yet — when a milestone needs it, add a new **library** under `crates/` (`klartext-doip`, or a `klartext` facade) and a new **binary** as its own top-level dir.
+
+## Conventions
+- Errors: thiserror for library types, anyhow at the binary boundary.
+- cargo fmt and cargo clippy -- -D warnings clean before a milestone is done.
+- Conventional commits.
+
+<anti-overengineering>
+Do NOT:
+  - Add traits/interfaces for things with one implementation today (no Transport trait until DoIP exists).
+  - Create config systems or plugin layers for values with one setting.
+  - Pre-create empty crates for the MCP or semantic layer before their milestone (the workspace exists; its future sibling crates do not — add each when its milestone needs it).
+  - Generate "future-proof" abstractions beyond what the current milestone asks.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [HadiCherkaoui/klartext](https://github.com/HadiCherkaoui/klartext) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-29 -->
