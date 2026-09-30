@@ -1,201 +1,53 @@
 ---
 trigger: always_on
-description: transformStrategy,
+description: The module structure, public API surface, data models, and recent behavioral
 ---
 
-# CLAUDE.md
+# AGENTS.md — for AI coding agents
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Architecture maps — read these first
 
-## Project Overview
+The module structure, public API surface, data models, and recent behavioral
+changes are documented in the generated maps in `codemaps/`. Load them before
+making edits:
 
-React-Grid-Layout is a draggable and resizable grid layout system for React with responsive breakpoints. It's a pure React implementation (no jQuery) used in production by BitMEX, Grafana, Metabase, HubSpot, and many others.
+- `codemaps/architecture.md` — module boundaries, package exports, dependency flow, recent changes
+- `codemaps/frontend.md` — React components + hooks, key behavior
+- `codemaps/backend.md` — core algorithms, config defaults, position strategies
+- `codemaps/data.md` — types, config interfaces, strategy contracts
 
-**Version 2** is a complete TypeScript rewrite with a modern hooks-based API while maintaining backwards compatibility through a dedicated legacy wrapper.
+Regenerate with `/update-codemaps` after substantial changes. These are
+generated derivatives — edit the source, not the maps.
 
-## Package Manager
+## Knowledge graph — for structural/impact queries
 
-**Always use `yarn`** instead of `npm` for all commands in this project.
+`graphify-out/` holds an AST knowledge graph of the codebase (nodes = symbols,
+edges tagged EXTRACTED/INFERRED). Useful when codemaps can't answer a
+structural question: `graphify explain "Symbol"`, `graphify affected "Symbol"`,
+`graphify path "A" "B"`, `graphify query "how does X work"`. Rebuild with
+`/graphify` or `graphify update .`. Note: `graphify-out/` is gitignored.
 
-## Development Commands
+## Key invariants
 
-### Testing
+- **Always use `yarn`** (v1 lockfile) — corepack yarn 4 breaks on it. Use
+  `npx -y yarn@1.22.22` for lock operations.
+- `src/core/` is pure TypeScript, no React dependencies.
+- `src/legacy/` is the v1 API compatibility layer wrapping v2 components.
+- All grid items need a unique `key` matching `i` in layout.
+- Run `yarn fmt` (prettier) before committing — CI fails otherwise.
 
-```bash
-# Run all tests with coverage
-make test
-yarn test
-
-# Watch mode for development
-make test-watch
-
-# Run specific test file
-NODE_ENV=test npx jest --testPathPatterns="compactors"
-```
-
-### Building
-
-```bash
-# Build the library (ESM, CJS, and TypeScript declarations)
-make build
-yarn build
-
-# Clean build artifacts
-make clean
-```
-
-### Development Server
+## Development commands
 
 ```bash
-# Start development server with hot reload (port 4002)
-make dev
-yarn dev
+make test          # full Jest suite
+make build         # ESM + CJS + DTS via tsup
+make dev           # dev server on :4002
+make e2e-build && yarn playwright test   # Playwright e2e
 ```
 
-### Linting & Formatting
-
-```bash
-# Run ESLint
-yarn lint
-
-# Format code with Prettier (run before committing!)
-yarn fmt
-```
-
-**Important**: Always run `yarn fmt` before committing. The CI will fail if code is not formatted.
-
-### Releasing
-
-```bash
-# Patch release (bug fixes) - bumps version, builds, publishes to npm
-make release-patch
-
-# Minor release (new features, backwards compatible)
-make release-minor
-
-# Major release (breaking changes)
-make release-major
-```
-
-**Important**: Always use `make release-*` commands, never `npm version` directly. The Makefile handles building, version bumping, and publishing correctly.
-
-## Architecture (v2)
-
-### Package Structure
-
-```
-src/
-├── core/                    # Pure TypeScript, no React dependencies
-│   ├── types.ts             # All type definitions
-│   ├── layout.ts            # Layout manipulation (move, clone, validate)
-│   ├── collision.ts         # Collision detection
-│   ├── sort.ts              # Sorting algorithms
-│   ├── compactors.ts        # Compaction algorithms (vertical, horizontal)
-│   ├── compact-compat.ts    # Legacy compact() function wrapper
-│   ├── constraints.ts       # Layout constraints (position, size, aspect ratio)
-│   ├── calculate.ts         # Grid calculations (grid units <-> pixels)
-│   ├── position.ts          # CSS positioning helpers
-│   ├── responsive.ts        # Breakpoint utilities
-│   └── index.ts             # Core exports
-│
-├── react/                   # React bindings
-│   ├── hooks/
-│   │   ├── useContainerWidth.ts   # Container width measurement
-│   │   ├── useGridLayout.ts       # Grid state management
-│   │   └── useResponsiveLayout.ts # Responsive breakpoint handling
-│   └── components/
-│       ├── GridItem.tsx           # Individual grid item
-│       ├── GridLayout.tsx         # Main grid component
-│       ├── ResponsiveGridLayout.tsx
-│       └── WidthProvider.tsx      # Width measurement HOC (internal)
-│
-├── legacy/                  # v1 API compatibility
-│   ├── ReactGridLayout.tsx        # Legacy component wrapper
-│   ├── ResponsiveReactGridLayout.tsx
-│   ├── WidthProvider.tsx          # Re-exports for backwards compat
-│   └── index.ts
-│
-└── index.ts                 # Main entry point
-```
-
-### Entry Points
-
-```typescript
-// New v2 API (recommended)
-import ReactGridLayout, {
-  Responsive,
-  useContainerWidth,
-  verticalCompactor,
-  horizontalCompactor
-} from "react-grid-layout";
-
-// With composable interfaces
-<ReactGridLayout
-  width={width}
-  layout={layout}
-  gridConfig={{ cols: 12, rowHeight: 30 }}
-  dragConfig={{ enabled: true, handle: '.handle' }}
-  resizeConfig={{ enabled: true, handles: ['se'] }}
-  compactor={verticalCompactor}
-/>
-
-// Core utilities (framework-agnostic)
-import {
-  moveElement,
-  collides,
-  transformStrategy,
-  absoluteStrategy,
-  createScaledStrategy,
-  getCompactor,
-  verticalCompactor,
-  horizontalCompactor
-} from "react-grid-layout/core";
-// Note: compact() is not exported. Use compactor.compact() instead.
-
-// Legacy v1 API (100% backwards compatible, flat props)
-import ReactGridLayout, {
-  WidthProvider,
-  Responsive
-} from "react-grid-layout/legacy";
-```
-
-### Core Components
-
-**GridLayout** (`src/react/components/GridLayout.tsx`)
-
-- Main grid layout component (functional, hooks-based)
-- Manages layout state, drag/drop, and resize operations
-- Handles compaction (vertical, horizontal, or none)
-- All grid items must have a unique `key` prop matching `i` in layout
-
-**ResponsiveGridLayout** (`src/react/components/ResponsiveGridLayout.tsx`)
-
-- Wraps GridLayout with responsive breakpoint support
-- Manages multiple layouts keyed by breakpoint
-- Automatically generates missing breakpoint layouts
-
-**GridItem** (`src/react/components/GridItem.tsx`)
-
-- Individual grid item wrapper
-- Integrates with react-draggable and react-resizable
-- Handles positioning via CSS transforms (default)
-
-### Core Algorithms
-
-**Compaction** (`src/core/compactors.ts`)
-
-- `verticalCompactor`: Items float up (default)
-- `horizontalCompactor`: Items float left
-- `noCompactor`: Free positioning
-- All implement the `Compactor` interface
-
-**Collision Detection** (`src/core/collision.ts`)
-
-- `collides()`: Check if two items overlap
-- `getFirstCollision()`: Find first collision
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Full project guidance, testing conventions, and custom skills live in
+[`CLAUDE.md`](CLAUDE.md).
 
 ---
 > Source: [react-grid-layout/react-grid-layout](https://github.com/react-grid-layout/react-grid-layout) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
