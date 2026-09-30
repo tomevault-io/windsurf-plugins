@@ -1,93 +1,196 @@
 ---
 trigger: always_on
-description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+description: Generates `WithToken(v Token) ParseOption` function.
 ---
 
-# Agent Guide for opentelemetry-go
+# AGENTS.md
 
-This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+## For Module Consumers
 
-Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
-Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
+If you are writing code that *uses* jwx (not developing jwx itself):
 
-## Core expectations
+- **Examples**: See `examples/` directory for runnable usage patterns
+- **Documentation**: See `docs/` directory and package READMEs
+- **API Reference**: Use `go doc` or https://pkg.go.dev/github.com/lestrrat-go/jwx/v3
 
-- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
-- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
-- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
-- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
-- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
-- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
-- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
-- Keep dependencies minimal and justified.
-- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
-- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
-- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
+The rest of this document focuses on developing the jwx library itself.
 
-## Default workflow
+---
 
-For new features and behavior changes, use this order unless the task explicitly says otherwise:
+## Go Version
 
-1. Read the relevant package, its tests, and any package docs or `README.md`.
-2. Add or update a failing unit test that captures the required behavior or regression.
-3. Implement the smallest change that makes the test pass.
-4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
-5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
-6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
-7. Run `make precommit` each time before considering the work complete.
+This project requires **Go 1.25.0** or later. Check `go.mod` for the exact version.
 
-For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
+## Module Path vs Physical Layout
 
-## Verification
+This repository uses a **flat layout** with vanity import paths. There is no physical `v3/` directory.
 
-- Use `make` as the canonical repository verification command. The default target is `precommit`.
-- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
-- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
-- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
+| Branch | Module Path | Physical Root |
+|--------|-------------|---------------|
+| `develop/v3` | `github.com/lestrrat-go/jwx/v3` | `/` (repo root) |
 
-## Documentation and changelog
+`import "github.com/lestrrat-go/jwx/v3/jwt"` → files are at `./jwt/`, not `./v3/jwt/`.
 
-- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
-- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
-- Prefer examples over long code snippets in GoDoc when practical.
-- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
-- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
+## Code Generation
 
-## Repository habits
+### Immutable Rule
 
-- Prefer focused diffs. Avoid drive-by cleanup.
-- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
-- Generated files are checked in. If your change affects generation, keep generated output up to date.
-- Prefer fast local search tools such as `rg` when exploring the repository.
-- When changing behavior, make the invariants explicit in tests.
+**NEVER edit files ending in `_gen.go` directly.** These are generated files. Edit the generator sources instead.
 
-## Personas
+### Generated Files Pattern
 
-### Feature Agent
+Files matching `*_gen.go` are generated. Examples:
+- `jwt/options_gen.go`
+- `jwt/token_gen.go`
+- `jws/headers_gen.go`
+- `jwk/rsa_gen.go`
+- `jwa/signature_gen.go`
 
-Use this persona for new behavior, new API surface, or spec-driven feature work.
+### Generator Locations
 
-- Start with a failing unit test.
-- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
-- Implement the smallest viable change.
-- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
-- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
+| Generator | Location | Input Files | Output |
+|-----------|----------|-------------|--------|
+| `genoptions` | `tools/cmd/genoptions/` | `{jwa,jwe,jwk,jws,jwt}/options.yaml` | `*/options_gen.go` |
+| `genjwt` | `tools/cmd/genjwt/` | `tools/cmd/genjwt/objects.yml` | `jwt/*_gen.go` |
+| `genjws` | `tools/cmd/genjws/` | `tools/cmd/genjws/objects.yml` | `jws/*_gen.go` |
+| `genjwe` | `tools/cmd/genjwe/` | `tools/cmd/genjwe/objects.yml` | `jwe/*_gen.go` |
+| `genjwk` | `tools/cmd/genjwk/` | `tools/cmd/genjwk/objects.yml` | `jwk/*_gen.go` |
+| `genjwa` | `tools/cmd/genjwa/` | `tools/cmd/genjwa/objects.yml` | `jwa/*_gen.go` |
+| `genreadfile` | `tools/cmd/genreadfile/` | - | ReadFile helpers |
 
-### Refactoring Agent
+### Regeneration Commands
 
-Use this persona when improving structure without intentionally changing behavior.
+```bash
+# Regenerate all code (includes options via `go generate .`)
+make generate
 
-- Treat behavior preservation as the default contract.
-- Add or tighten tests before moving code if current behavior is not already pinned down.
-- Avoid broad rewrites, clever abstractions, or package-wide cleanup unless explicitly requested.
-- If a refactor touches a hot path, benchmark before and after.
-- Keep API shape, semantics, concurrency guarantees, and failure modes unchanged unless the task says otherwise.
+# Regenerate specific package (objects/types only, NOT options)
+make generate-jwt
+make generate-jws
+make generate-jwe
+make generate-jwk
+make generate-jwa
 
-### Test Agent
+# Regenerate options only (options.yaml → options_gen.go for all packages)
+go generate .
+# or directly:
+./tools/cmd/genoptions.sh
+```
 
+**Important:** `make generate-<pkg>` does **not** regenerate options. If you
+edit an `options.yaml` file, run `make generate` or `go generate .`.
+
+## Functional Options Pattern
+
+Options are defined in `{package}/options.yaml` and generated into `{package}/options_gen.go`.
+
+Example `options.yaml` entry:
+
+```yaml
+options:
+  - ident: Token
+    interface: ParseOption
+    argument_type: Token
+    comment: |
+      WithToken specifies the token instance...
+```
+
+Generates `WithToken(v Token) ParseOption` function.
+
+## Multi-Module Structure
+
+This repository contains multiple Go modules. The nested modules use `replace` directives for local development.
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| Main | `./go.mod` | Core library |
+| Examples | `./examples/go.mod` | Usage examples |
+| CLI | `./cmd/jwx/go.mod` | Command-line tool |
+| Perf Bench | `./bench/performance/go.mod` | Performance benchmarks |
+| Comparison | `./bench/comparison/go.mod` | Library comparison |
+| Generators | `./tools/cmd/*/go.mod` | Code generators |
+
+### Local Development
+
+The `examples/go.mod` contains:
+```go
+replace github.com/lestrrat-go/jwx/v3 v3.0.0 => ../
+```
+
+No `go.work` file is committed. When working across modules, either:
+1. Create a temporary `go.work` file (it is .gitignored)
+2. Rely on the `replace` directives already in place
+
+## Development Commands
+
+```bash
+# Run all tests
+make test
+
+# Run tests with specific build tags
+make test-goccy       # Use goccy/go-json
+make test-es256k      # Enable ES256K support
+make test-alltags     # All optional features
+
+# Run short/smoke tests
+make smoke
+
+# Generate coverage report
+make cover
+make viewcover
+
+# Lint
+make lint
+
+# Format and tidy
+make imports
+make tidy
+```
+
+### Test Script Details
+
+Tests are run via `./tools/test.sh` which iterates over:
+- `.` (main module)
+- `./examples`
+- `./bench/performance`
+- `./cmd/jwx`
+
+## Package Directory Map
+
+| Package | Responsibility |
+|---------|----------------|
+| `jwa/` | Algorithm identifiers (e.g., `RS256`, `ES384`, `A128GCM`) |
+| `jwk/` | JSON Web Keys - key representation and management |
+| `jws/` | JSON Web Signatures - `Sign()` and `Verify()` |
+| `jwe/` | JSON Web Encryption - `Encrypt()` and `Decrypt()` |
+| `jwt/` | JSON Web Tokens - claims and validation |
+| `jwt/openid/` | OpenID Connect ID tokens |
+| `transform/` | Token transformation utilities |
+
+## Relevant RFCs
+
+- RFC 7515 - JWS (JSON Web Signature)
+- RFC 7516 - JWE (JSON Web Encryption)
+- RFC 7517 - JWK (JSON Web Key)
+- RFC 7518 - JWA (JSON Web Algorithms)
+- RFC 7519 - JWT (JSON Web Token)
+- OpenID Connect Core 1.0
+
+## Error Handling
+
+Sentinel errors are exposed via functions. Use `errors.Is()`:
+
+```go
+if errors.Is(err, jwt.TokenExpiredError()) { ... }
+```
+
+| Package | Function | Meaning |
+|---------|----------|---------|
+| `jwt` | `TokenExpiredError()` | `exp` claim not satisfied |
+| `jwt` | `TokenNotYetValidError()` | `nbf` claim not satisfied |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kubernetes-sigs/security-profiles-operator](https://github.com/kubernetes-sigs/security-profiles-operator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
