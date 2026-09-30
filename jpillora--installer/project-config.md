@@ -24,4 +24,4 @@ description: * short commentary, no fluff, void "You're absolutely right!" and o
 
 ---
 > Source: [jpillora/installer](https://github.com/jpillora/installer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
