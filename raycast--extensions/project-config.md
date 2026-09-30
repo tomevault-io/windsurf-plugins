@@ -1,147 +1,85 @@
 ---
 trigger: always_on
-description: You are tasked with ensuring that pull requests (PRs) submitted to the Raycast Extensions repository comply with the following guidelines and standards. Use these instructions to provide consistent, helpful feedback to contributors.
+description: A Raycast extension listing the internal commands of Chromium-based browsers (`chrome://`, `brave://`,
 ---
 
-# GitHub Copilot Review Instructions for Raycast Extensions
+# Secret Browser Commands
 
-You are tasked with ensuring that pull requests (PRs) submitted to the Raycast Extensions repository comply with the following guidelines and standards. Use these instructions to provide consistent, helpful feedback to contributors.
+A Raycast extension listing the internal commands of Chromium-based browsers (`chrome://`, `brave://`,
+`edge://`, …) and opening them in a chosen browser.
 
-## General Guidelines for Suggestions
+## Commands
 
-When providing feedback:
-- **Always provide specific code suggestions** instead of general advice
-- **Include exact code snippets** that can be copy-pasted
-- **Use proper JSON/TypeScript formatting** without unnecessary character escaping
-- **Be actionable** - show exactly what needs to be changed
-- **Reference documentation** when applicable
+- `npm run dev` — run in development mode
+- `npm run build` — build the extension
+- `npm run lint` / `npm run fix-lint` — lint
+- `npm run check-paths` — invariant check for the generated command data (see below); also runs as part of `build` and `lint`
+- `npm run publish` — publish to the Raycast Store
 
-For example, instead of saying "consider adding a subtitle", provide the exact JSON property to add: `"subtitle": "ServiceName"`
+## Layout
 
-## 1. CHANGELOG.md Entries
+| Path                               | What it holds                                                  |
+| ---------------------------------- | -------------------------------------------------------------- |
+| `src/listCommands.tsx`             | The single command: list, filters, detail pane, ActionPanel    |
+| `src/components/OpenInActions.tsx` | The "Open in…" submenu                                         |
+| `src/data/paths.ts`                | **Generated.** 307 command entries — see _The command data_ below |
+| `src/types/types.ts`               | `BrowserCommand`, the shape of every entry in `paths.ts`       |
+| `src/types/browsers.ts`            | `SUPPORTED_BROWSERS` — key, title, scheme, app name, bundle id |
+| `src/utils/browserApps.ts`         | Which browsers are installed; which icon each gets             |
+| `src/utils/browserUrl.ts`          | `buildBrowserUrl` — the only place a full URL is assembled     |
+| `src/utils/openUrlInBrowser.ts`    | Launching, macOS only                                          |
+| `src/utils/check-paths.mjs`        | Invariant check over the generated data                        |
+| `docs/paths.md`                    | The census this data came from, per browser                    |
+| `docs/solutions/`                  | Durable learnings from solved problems — read before re-solving |
+| `CONCEPTS.md`                      | Glossary of the terms that mean something specific here        |
 
-### Required Format
-- **Title Format**: New entries in `CHANGELOG.md` files MUST end with the template string `{PR_MERGE_DATE}`. 
-  - ✅ Correct: `## [Bug Fix] - {PR_MERGE_DATE}`
-  - ❌ Incorrect: `## [Bug Fix] - 2024-07-12`
-- **Do NOT suggest** editing or replacing the `{PR_MERGE_DATE}` string if it is already present
-- **If missing**: Provide this exact format to add: `## [Description] - {PR_MERGE_DATE}`
+## The command data
 
-When the format is missing, suggest adding this exact line at the top of the CHANGELOG.md file:
-```markdown
-## [Your Change Description] - {PR_MERGE_DATE}
-```
+`src/data/paths.ts` is **generated from a census**, not hand-maintained. Each browser's own
+`chrome://chrome-urls` page was read over the DevTools Protocol (2026-09-09), with _Internal
+debugging pages_ enabled, and that browser's list became its `supportedBrowsers` membership.
+`docs/paths.md` records the result and is the receipt for every provenance claim in this section. Vendor pages — `brave://wallet`, `opera://mods`,
+`comet://perplexity-spotlight` — appear in no Chromium source file, so the live census is the only
+source for them.
 
-### Positioning and Content
-- Ensure new entries are added **at the top** of the `CHANGELOG.md` file (newest entries first)
-- Only suggest changing the title in `[XX]` if there is a spelling error
-- The format must be: `## [Description] - {PR_MERGE_DATE}`
+Four flags model distinctions Chromium itself draws, and they are not interchangeable:
 
-### Examples
-```markdown
-# Extension Changelog
+- `isInternalDebugging` — in the _Internal Debugging Page URLs_ section. Harmless; needs
+  "Enable internal debugging pages" turned on at `chrome://chrome-urls` first.
+- `isDebugCommand` — in the _Command URLs for Debug_ section. Deliberately crashes, hangs, or quits
+  the browser. Hidden by preference, and `openUrlInBrowser` confirms before running one.
+- `isDeprecated` — advertised by no browser in the census and verified dead by navigation. Kept so
+  the answer to "what happened to `chrome://appcache-internals`?" is still in the list.
+- `notDirectlyReachable` — advertised but returns a network error when navigated to. Most are panels
+  drawn inside the browser's own interface; for some the reason was not identified, which is why the
+  UI labels these **Don't Use** rather than trying to name what they are. Tagged that way _except_
+  where `requiresFeatureFlag` is also set — that entry is tagged **Flag** instead and is exempt from
+  the ⌘⇧H filter, because naming the flag makes it actionable rather than a dead end. With the
+  detail pane open the tag collapses to an orange warning glyph, since the pane already explains it
+  and the list column is narrow.
 
-## [New Feature] - {PR_MERGE_DATE}
-- Added support for dark mode
-- Fixed memory leak in background processes
+`npm run build` and `npm run lint` both run this check, so invalid generated data fails the normal
+workflow rather than waiting for someone to remember it. Run `npm run check-paths` directly for the
+fast loop while regenerating. It catches what generators produce: duplicate ids (which silently
+break starring, since stars key on id), browser keys that match no browser, contradictory flag
+combinations, and preferences read in code but absent from the manifest.
 
-## [Bug Fix] - 2024-03-15
-- Fixed crash when loading preferences
-```
+## Conventions that are load-bearing
 
-## 2. package.json Updates
-
-### Command Name Changes
-When reviewing updates to existing extensions, check if command names have changed in `package.json`. If so, provide this specific comment:
-
-```markdown
-Can we keep the old `name`? It is the unique ID of the command where ranking, aliases, and hotkeys are saved. You can, of course, change the title :slightly_smiling_face:.
-```
-
-### Author Field Changes
-If the `author` field in `package.json` changes, provide this specific comment:
-
-```markdown
-I notice the author field has changed from "previous-author" to "new-author". Can you confirm this change is intentional? This affects the extension's attribution in the Raycast Store.
-```
-
-### New Extension Requirements
-For PRs labeled `new extension`:
-- Verify the extension includes a `metadata` folder with screenshots if there are any `view` commands in `package.json`
-- If missing, provide this exact feedback:
-
-```markdown
-This extension needs a `metadata` folder with screenshots since it includes view commands. Please see the [Raycast Documentation - Prepare Extension for Store](https://developers.raycast.com/basics/prepare-an-extension-for-store#how-to-use-it) for details on adding the required metadata.
-```
-
-- **Only mention this** if the PR has the `new extension` label
-
-## 3. Error Handling
-
-### launchCommand Usage
-Ensure `launchCommand` is always wrapped in a try-catch block. When you find unwrapped `launchCommand` calls, provide this specific suggestion:
-
-**Replace this:**
-```typescript
-await launchCommand({ name: "command-name", type: LaunchType.UserInitiated });
-```
-
-**With this:**
-```typescript
-try {
-  await launchCommand({ name: "command-name", type: LaunchType.UserInitiated });
-} catch (error) {
-  console.error("Failed to launch command:", error);
-}
-```
-
-### Lists and Grids
-Lists and Grids should use `isLoading` to avoid empty state flicker. When you find Lists or Grids without proper loading states, provide this specific suggestion:
-
-**Replace this:**
-```typescript
-<List>
-  {isLoading ? null : items.map(item => <List.Item key={item.id} title={item.title} />)}
-</List>
-```
-
-**With this:**
-```typescript
-<List isLoading={isLoading}>
-  {items.map(item => <List.Item key={item.id} title={item.title} />)}
-</List>
-```
-
-Reference: [Raycast Documentation - Empty States](https://developers.raycast.com/basics/prepare-an-extension-for-store#empty-states)
-
-### getSelectedText() Usage
-Ensure `getSelectedText()` has graceful error handling for cases where no text is selected or the operation fails. When you find unhandled `getSelectedText()` calls, suggest wrapping them like this:
-
-```typescript
-try {
-  const selectedText = await getSelectedText();
-  if (!selectedText) {
-    await showToast({
-      style: Toast.Style.Failure,
-      title: "No text selected",
-      message: "Please select some text first"
-    });
-    return;
-  }
-  // Use selectedText...
-} catch (error) {
-  await showToast({
-    style: Toast.Style.Failure,
-    title: "Failed to get selected text",
-    message: error instanceof Error ? error.message : "Unknown error"
-  });
-}
-```
-
-### Toast Error Handling
+- **One URL builder.** Everything that displays, copies, or opens a URL goes through
+  `buildBrowserUrl`. Some paths are already absolute (`chrome-untrusted://compose`) and must not be
+  prefixed; two copies of this logic once let the opened URL diverge from the copied one.
+- **Launch the discovered bundle path, not the app name.** `openUrlInBrowser` takes
+  `{ app, name }`; `app` is the absolute path found by `findInstalledBrowsers` when available, so
+  the browser that opens is the one whose icon was shown. A bare name is resolved by Launch
+  Services and can pick a different copy.
+- **`execFile`, never `exec`.** No shell, so no quoting boundary. And no `open -F` — that means
+  _fresh_ and discards the browser's restored windows.
+- **The destructive-URL confirmation lives in `openUrlInBrowser`, not at the call sites.** It was at
+  a call site once and the "Open in…" submenu did not have it, so a crash command launched from that
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [raycast/extensions](https://github.com/raycast/extensions) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
