@@ -2,8 +2,6 @@
 
 > Source: [loopx-project/loopx](https://github.com/loopx-project/loopx). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
-Long-horizon agent control plane for durable, governed work across Codex, Claude Code, and other harnesses.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
