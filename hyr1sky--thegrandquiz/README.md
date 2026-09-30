@@ -2,8 +2,6 @@
 
 > Tome by [Hyr1sky](https://github.com/Hyr1sky/TheGrandQuiz), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
-Local-first learning agent that turns your materials into grounded conversations, adaptive assessments, and durable memory—with observable, replayable traces.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
