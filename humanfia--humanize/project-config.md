@@ -1,41 +1,137 @@
 ---
 trigger: always_on
-description: - MUST pass `uv run pre-commit run --all-files` and `uv run pytest`. That second one is all
+description: Drives coding agent CLIs as agents and holds the conversations they keep: one contract every
 ---
 
-# AGENTS.md
+# `coganchor/agents`
 
-For code:
+Drives coding agent CLIs as agents and holds the conversations they keep: one contract every
+backend satisfies, and what a caller may put around a turn -- configuration, accounts, budgets
+and allowances, hooks, skills, flow-written tools, a watchdog, a board and a name. It knows
+nothing of flows or of runs, and MUST NOT import `hmz.flows` or `hmz.runtime`.
 
-- MUST pass `uv run pre-commit run --all-files` and `uv run pytest`. That second one is all
-  three tiers: CI leaves the system tier out with `--ignore=tests/system`, your own run does
-  not, and each test there says for itself what this machine could not give it.
-- MUST file a new test by what is on the other side of it: `tests/unit/` calls `hmz` and
-  nothing else, `tests/integration/` may talk to anything this repository wrote — a stand-in
-  CLI, a fake app server, a loopback socket, the mock LLM service — and `tests/system/` needs
-  the real thing.
-- MUST run the system tier by hand when the change is one it covers: `uv run pytest
-  tests/system --run-agents`. It drives real CLIs as `as local` and spends real tokens, so CI
-  will not run it and nothing else will run it for you.
-- PREFER use popular and well-maintained libraries rather than custom implementations.
-- MUST also update `humanfia/flowverse` to ensure them working if any changes affect flow impl.
+## API
 
-For `specs/*.md`:
+```python
+# __init__.py -- re-exports everything below, and:
+DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]]
 
-- MUST strictly adhere to specs at `specs/`.
-- MUST NOT modify any SPEC UNLESS explicitly instructed to do so.
-- MUST keep code minimal while strictly adhering to the SPEC.
+def driver(backend: str) -> tuple[type[AgentBase], type[AgentConfig]]: ...
 
-For version control:
+# base.py -- the contract every backend satisfies
+WINDOW = 300.0
 
-- MUST adhere to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
-- MUST delete local branches or worktrees once merged.
+class Journal(Protocol):
+    @property
+    def keeps(self) -> Path: ...
+    def opened(self, agent: AgentBase, session: str, parent: str = "") -> None: ...
 
-For docs:
+KEEPING = "HUMANIZE_SESSIONS"  # `off`, `0` or `no`: keep no session of humanize's own
 
-- MUST update docs once any impl changes to avoid misalignment between code and docs.
-- MUST adhere to the minimal spec of [Standard Readme](https://raw.githubusercontent.com/RichardLitt/standard-readme/refs/heads/main/spec.md) for `README.md`.
+class Meter:
+    def spend(self, usage: Usage, now: float | None = None, *, turn: bool = True) -> None: ...
+    def spent(self) -> Usage: ...
+    def rate(self, over: float = WINDOW, now: float | None = None) -> Usage: ...
+    def juice(self, over: float = WINDOW, now: float | None = None) -> float: ...
+
+class SessionBase(ABC):
+    shapes: ClassVar[bool] = False
+    takes_tools: ClassVar[bool] = False
+    steers: ClassVar[bool] = False
+    narrates: ClassVar[bool] = False
+    def __init__(self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def named(self) -> str | None: ...
+    @property
+    def cwd(self) -> str: ...
+    @property
+    def forks(self) -> bool: ...
+    @property
+    def skills(self) -> tuple[str, ...]: ...
+    @property
+    def tools(self) -> tuple[Tool, ...]: ...
+    @property
+    def effort(self) -> str: ...
+    @effort.setter
+    def effort(self, effort: str) -> None: ...
+    @property
+    def budget(self) -> Budget | None: ...
+    @budget.setter
+    def budget(self, budget: Budget | None) -> None: ...
+    def elsewhere(self) -> bool: ...
+    # Overloaded: `str` where no schema is given, `T | None` where one is.
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None: ...
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None: ...
+    def stream(self, prompt: str, *, schema: type[BaseModel] | None = None) -> Iterator[Event]: ...
+    def pursue(self, objective: str, *, suppress: bool = False) -> str: ...
+    async def apursue(self, objective: str, *, suppress: bool = False) -> str: ...
+    def interrupt(self, *, why: str) -> None: ...
+    def interject(self, text: str) -> None: ...
+    def steering(self, text: str, ticket: str = "") -> str: ...
+    def took(self, ticket: str) -> str | None: ...
+    def unsteered(self, text: str) -> None: ...
+    def fork(self) -> SessionBase: ...
+    def close(self) -> None: ...
+    def loads(self, skills: Iterable[str] | None) -> None: ...
+    def offers(self, tools: Iterable[Tool] | None) -> None: ...
+    def spent(self) -> Usage: ...
+    def rate(self, over: float = WINDOW) -> Usage: ...
+    def juice(self, over: float = WINDOW) -> float: ...
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]: ...  # abstract
+    def _pursue(self, objective: str) -> str: ...  # optional: raises NotImplementedError here
+    def _lets_go(self) -> None: ...  # optional: puts the transport down for the watchdog
+
+class CommandSessionBase(SessionBase):
+    protocol: ClassVar[bool] = False
+    def _turn(self, prompt: str) -> tuple[list[str], str | None]: ...  # abstract
+    def _read_session_id(self, transcript: str) -> str: ...  # abstract
+
+class StreamSessionBase(SessionBase):
+    def __init__(self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None) -> None: ...
+    def _command(self) -> list[str]: ...  # abstract
+    def _write(self, text: str, ticket: str = "") -> str: ...  # abstract
+    def _read(self, line: str) -> Iterable[Event]: ...  # abstract
+    def _restarted(self) -> None: ...  # optional: told a new process is up
+    def _stale(self) -> bool: ...  # optional: whether to end the process before this turn
+
+def identifying(config: type[AgentConfig], backend: str) -> dict[str, Any]: ...
+
+class AgentBase(ABC):
+    moments: ClassVar[frozenset[Moment]] = EVERYWHERE
+    pursues: ClassVar[bool] = False
+    spends: ClassVar[bool] = True
+    service_tiers: ClassVar[tuple[str, ...]] = ("default",)
+    rungs: ClassVar[tuple[str, ...]] = PERMISSIONS
+    counts: ClassVar[frozenset[str]] = frozenset()
+    def __init__(self, config: AgentConfig, *, name: str | None = None) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def backend(self) -> str: ...
+    @property
+    def spec(self) -> str: ...
+    @property
+    def config(self) -> AgentConfig: ...
+    @property
+    def sessions(self) -> list[SessionBase]: ...
+    @property
+    def opened(self) -> list[str]: ...
+    @property
+    def anchor(self) -> AnchorConfig | None: ...
+    @property
+    def provider(self) -> Provider | None: ...
+    @property
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [humanfia/humanize](https://github.com/humanfia/humanize) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
