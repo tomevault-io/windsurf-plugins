@@ -1,110 +1,141 @@
 ---
 trigger: always_on
-description: Rules about how the code is written, as opposed to what it must do. The rules
+description: An agent can answer "is this contract signed, and by whom" by reading the
 ---
 
-# Conventions
+# AI agents
 
-Rules about how the code is written, as opposed to what it must do. The rules
-that break the product live in [the invariants](invariants.md); these break the
-codebase slowly instead, which is why they are written down rather than left to
-whoever reviews.
+An agent can answer "is this contract signed, and by whom" by reading the
+document itself, and, with a person's approval, sign one. The package provides
+the tools for both, on top of Laravel's own AI packages. It does not provide
+the agent: instructions, provider, model and cost are yours to choose.
 
-Each is checked at review. Where a rule can be checked by a machine, it is, and
-that is noted.
+| | Needs | Reached by | What it does |
+|---|---|---|---|
+| `validate_pdf_signature` | `laravel/mcp` | MCP clients and AI SDK agents | verifies every signature, says who signed |
+| `list_signature_fields` | `laravel/mcp` | MCP clients and AI SDK agents | lists the fields, signed and empty |
+| `sign_pdf` | `laravel/ai` | AI SDK agents | signs, **after a person approves** |
 
----
+**Reading goes through MCP and signing through the AI SDK**, and the split is
+deliberate. The AI SDK runs MCP tools, so a read tool written once reaches both
+worlds. Signing needs a person to approve every call, and only the AI SDK lets
+a tool insist on that: on the MCP side, approval is whatever the client was set
+to do ([0040](/decisions/0040-agents-read-through-mcp-and-sign-through-the-ai-sdk)).
 
-# 1. Laravel first
+## Installing
 
-**This package is a Laravel package. Before writing a helper, check whether the
-framework already has it, and use that.**
+Both SDKs are optional. Install the ones you use:
 
-The package requires `illuminate/support`, `illuminate/http`, `illuminate/process`
-and `illuminate/filesystem` outright. Everything in them is already installed, already
-tested, already documented, and already familiar to the person reading the code.
-A private reimplementation of any of it is code this project has to maintain,
-test and explain, in exchange for nothing.
+```bash
+composer require laravel/mcp   # the two read tools, and the MCP server
+composer require laravel/ai    # the signing tool
+```
 
-This is a rule, not a preference. It is checked at review, and part of it is
-checked by `tests/Project/ArchTest.php`.
+The package requires `^1.0` of each and refuses to install beside anything
+else, so a version mismatch fails at `composer require` rather than on the
+first tool call. Nothing is registered for you: no route, no tool, no binding.
 
----
+## Opening a disk
 
-## The rule
+**Out of the box, no tool reaches anything.** Agents address documents by a
+`Storage` disk and a path, and a disk is reachable only once you list it:
 
-1. **Look in the framework first.** `Illuminate\Support\Str`, `Arr`,
-   `Collection`, `Facades\File`, `Facades\Process`, `Facades\Http`,
-   `Facades\Config`, `Facades\Cache`, the `Illuminate\Contracts\*` interfaces.
-2. **If it exists there, use it**, even when the native call is two characters
-   shorter.
-3. **If it does not, write it**, put it in `src/Support/`, and say in the
-   docblock what the framework does not provide. A helper whose docblock cannot
-   answer "why is this not `Str::something`" is a helper that should not exist.
+```php
+// config/a1-pdf-sign.php
+'agents' => [
+    'disks' => ['contracts'],
+],
+```
 
-Exceptions are below and they are narrow. Everything not listed there follows
-the rule.
+Open a disk that holds what agents should see and nothing else. A disk scoped to
+a directory is the simplest way to get there:
 
----
+```php
+// config/filesystems.php
+'contracts' => [
+    'driver' => 's3',
+    'bucket' => env('AWS_BUCKET'),
+    'root' => 'contracts',
+    // …
+],
+```
 
-## Reach for
+The disk list decides what is reachable at all. Who may reach which document
+is [your gate](#who-may-reach-which-document).
 
-| Instead of | Use | Why |
-|---|---|---|
-| `file_get_contents`, `file_put_contents` | `Support\Files::read()`, `File::put()` | `Files::read()` exists because both the native call and `File::get()` return `false`, and that `false` reaching a `string` parameter was this package's most common typing defect |
-| `is_dir`, `mkdir`, `unlink`, `glob` | `File::isDirectory()`, `File::makeDirectory()`, `File::delete()`, `File::glob()` | one filesystem abstraction, fakeable in a host application's tests |
-| `uniqid`, `random_bytes` for a name | `Str::orderedUuid()`, `Str::random()` | already how `Support\TemporaryFile` names its files |
-| `exec`, `shell_exec`, `proc_open` | `Support\ProcessRunner` on `Illuminate\Process` | invariant 8, and `Process::fake()` in a consuming application |
-| `curl_*`, `stream_context_create` + `file_get_contents` | `Illuminate\Support\Facades\Http` | timeouts, retries and `Http::fake()`, instead of a hand-rolled stream context |
-| `array_map` / `array_filter` / `array_merge` chained over one value | `collect()` | one pipeline instead of three nested calls, when it genuinely reads better |
-| a hand-written `get($array, 'a.b.c')` | `Arr::get()` | |
-| reading config with a cast and a default | `Illuminate\Contracts\Config\Repository`, injected | already how the package reads every configuration key |
-| a hand-rolled `toArray()` on a value object | `Illuminate\Contracts\Support\Arrayable` | `Data\BaseData` already implements it |
+### What is refused
 
-## Do not reach for
+Every path a model sends goes through `Agents\DocumentAccess` before a byte is
+read, and a tool's schema offers the open disks as an enum. The enum is a hint
+to the model; the guard is the control:
 
-These are the narrow exceptions, and each is load-bearing.
-
-| Keep the native call | Why |
+| Refused | Because |
 |---|---|
-| **`substr`, `strlen`, `strpos`, `str_replace` on PDF or DER bytes** | **`Str::substr()` and `Str::length()` are multibyte-aware.** Running them over a PDF or a CMS reinterprets binary as UTF-8 and returns the wrong offsets, which in this package means a corrupted signature. Byte work uses byte functions, always |
-| `preg_match`, `preg_match_all` | `Str::match()` returns the match and throws the offsets away, and offsets are what the incremental writer is built on. `Str::isMatch()` is fine where only the boolean is wanted |
-| `openssl_*` | the framework wraps none of it |
-| `pack`, `unpack`, `bin2hex`, `hex2bin`, `gzuncompress` | no framework equivalent, and all byte-exact |
-| `hash(..., binary: true)` | `Hash::` is password hashing, a different thing entirely |
+| a disk not in `agents.disks` | nobody opened it |
+| `/etc/deal.pdf`, `C:/deal.pdf` | absolute: a path is relative to its disk |
+| `2026/../../salaries.pdf` | `..` anywhere is refused, not normalised |
+| `contracts\deal.pdf`, a null byte | not a path a disk understands |
+| `notes.txt`, `deal.pdf.php` | only names ending in `.pdf` |
+| a document over `agents.max_bytes` | the model chooses the file, and the engine holds it in memory |
+| a destination that exists | a signed copy never overwrites |
 
-The first row is the one that matters. If a change swaps a byte-level `substr`
-for `Str::substr`, it will pass every test in this suite on ASCII fixtures and
-corrupt real documents in production.
+The refusal comes back to the model as the tool's error, worded so it can
+correct itself: it names the disks that are open, never a disk's root.
 
-*Enforced by* `tests/Project/ArchTest.php`, which fails when `Illuminate\Support\Str` is
-used inside `src/Signing` or `src/Validation` at all: those namespaces are where
-the byte work lives, and the rule is easier to keep as "not here" than as "here,
-but only these methods".
+**A path is relative to its disk, and never starts with the disk's name.**
+`deal.pdf` on the disk `contracts` is `deal.pdf`, not `contracts/deal.pdf`. The
+tools tell the model so in their schema, because a model left to guess glues
+the disk's name to the front, as DeepSeek did the first time this was tried
+against a real provider.
 
----
+The size limit is 50 MB by default, read from the disk's own metadata before a
+byte is loaded. Null removes it:
 
-## Known outstanding
+```php
+'agents' => [
+    'max_bytes' => 50 * 1024 * 1024,
+],
+```
 
-`Signing\Cades\HttpTransport` builds its own `stream_context_create` and calls
-`file_get_contents` for the TSA, OCSP and CRL requests. `Http::` is the right
-tool and `guzzlehttp/guzzle` is already in the tree, so this is a gap in the
-rule rather than an exception to it. It is called out here rather than left for
-someone to find, and moving it also makes the network surface fakeable, which is
-the same argument that put `ProcessRunner` on `Illuminate\Process`.
+## Who may reach which document
 
-Rationale and alternatives: [0018](../decisions/0018-prefer-the-platforms-own-constructs.md).
+A disk holds every customer's contracts; the user talking to the agent may see
+their own. That is a question Laravel already answers with a gate, so the tools
+ask yours ([0041](/decisions/0041-agents-are-authorised-per-document)):
 
----
+```php
+use LSNepomuceno\LaravelA1PdfSign\Agents\Ability;
 
-# 2. Enums, not class constants
+// AppServiceProvider::boot()
+Gate::define(Ability::Read->value, function (User $user, string $disk, string $path) {
+    return Contract::where('path', $path)->where('customer_id', $user->customer_id)->exists();
+});
 
-**A closed set of values is an enum.** A class constant is for the case where
-exactly one value can ever exist, and for nothing else.
+Gate::define(Ability::Sign->value, function (User $user, string $disk, string $path, string $destinationDisk, string $destinationPath) {
+    return $user->can('sign', Contract::firstWhere('path', $path));
+});
+```
 
+| Ability | Asked by | Receives |
+|---|---|---|
+| `a1-pdf-sign.agents.read` | `validate_pdf_signature`, `list_signature_fields` | the user, the disk, the path |
+| `a1-pdf-sign.agents.sign` | `sign_pdf` | the user, the disk, the path, and where the copy would go |
+
+What to know about it:
+
+- **An ability you have not defined allows.** Until you define one, the disk
+  list is the only control, exactly as in 3.1.0.
+- **Once defined, a guest is refused** unless the ability's user is nullable,
+  as Laravel does everywhere. An MCP server over stdio has no user, so a
+  `Mcp::local` server with a defined ability needs a nullable user to answer
+  anything.
+- **The gate is asked before the document is looked at.** A refused user reads
+  "you may not read", never "there is no document", so a refusal does not tell
+  them what exists.
+- The user is whoever authenticated the request: the MCP route's guard, or the
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lsnepomuceno/laravel-a1-pdf-sign](https://github.com/lsnepomuceno/laravel-a1-pdf-sign) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
