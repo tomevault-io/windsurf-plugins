@@ -1,61 +1,80 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: The Unit Testing library for [Vaadin](https://vaadin.com/).
 ---
 
-# CLAUDE.md
+# Karibu-Testing — AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What this is
 
-## What this project is
+The Unit Testing library for [Vaadin](https://vaadin.com/).
 
-Karibu-Testing is a browserless, containerless unit-testing library for Vaadin Flow. Tests run in the same JVM as JUnit — there is no servlet container, no browser, no JavaScript. `MockVaadin.setup()` fabricates `VaadinSession`, `UI`, `CurrentRequest`, etc., then tests call server-side Vaadin APIs directly (`UI.navigate()`, `_click()`, locator functions) and assert on the server-side component tree.
+Karibu-Testing only runs in JVM and only tests server-side code. There is no browser running
+and no JavaScript code running, which means that there is no communication between the browser and the server,
+which means that you don't even need to run the servlet container. You simply create new instance
+of your Vaadin form, modify the field values directly, then simulate a click to the "Save" button
+and see the binder validations running. You can even call `UI.navigate()` to
+navigate to a view; the navigation is handled completely server-side and adds components to `UI.getCurrent()`.
 
-The library is Kotlin-first and leans on Kotlin extension functions; Java consumers go through static helper classes (`LocatorJ`, `SearchSpecJ`); Groovy has its own modules.
+## Promises
 
-## Documentation — where each kind of doc lives
+- **Browserless and containerless.** Tests run in the JUnit JVM — no browser, no JavaScript, no servlet container; anything that needs one is out of scope.
+- **We fake Vaadin's environment, never its behaviour.** Where Flow has a real code path, Karibu drives it; we emulate the outcome only where no path is reachable.
+- **Kotlin-first with a first-class Java face.** Extension functions are the API surface; Java consumers get static mirrors, not a second-class subset.
 
-Four homes, by audience and lifecycle. Put content where it belongs and don't duplicate across them:
+## Design docs
 
-- **`README.md` (per-module, scattered)** — user-facing "book" prose: how to *use* the library. Kept current.
-- **Code KDoc/Javadoc** — the authoritative "how it works now" (mechanics). Lives with the code so it can't drift; the single source of truth for current behavior. Don't restate mechanics in standalone docs.
-- **`ideas/`** — forward-looking design notes, one markdown file per non-trivial idea, brainstormed before/alongside implementation. **Deleted once implemented** (ideas are forward-looking only).
-- **`DECISIONS.md`** — append-only, dated log of technical decisions and their *rationale* (the "why", alternatives rejected, evidence). Permanent; never edit an old entry — supersede it with a new one.
+| File | Owns | Loaded |
+|---|---|---|
+| `README.md` (root and per-module) | the pitch, and the user-facing book: how to *use* the library | — |
+| `AGENTS.md` (this) | promises, invariants, the module map, conventions, commands | every turn |
+| `design/architecture.md` | how the pieces compose — wiring, the lifecycle flows, the test battery; normative | lazy |
+| `design/decisions.md` | why this and not that — `D_` entries, FAQ-shaped | lazy |
+| `design/research.md` | what Vaadin, Spring and Gradle actually do — `R_` entries, each claim with provenance | lazy |
+| `design/ideas/` | ideas not yet acted on, one per file; deleted once they ship | lazy |
+| KDoc / Javadoc | what one symbol does and why it is shaped so | at the symbol |
 
-Handoff when an idea ships: delete its `ideas/` file, record the rationale as a new `DECISIONS.md` entry, and ensure the mechanics are covered by code KDoc.
+Every fact lives in exactly one of these; the others link to it.
 
-## Build / test commands
+## Invariants
 
-- `./gradlew test` — run all tests across all Vaadin-variant test-runner modules. This is the CI command (see `.github/workflows/gradle.yml`).
-- `./gradlew build` — default task chain is `clean`, `build`.
-- `./gradlew :karibu-testing-v24:testrun-stable-webapp:test` — run the stable-Vaadin test battery only. Substitute the module name for other variants.
-- `./gradlew :karibu-testing-v24:testrun-stable-webapp:test --tests "AllTests.flow-build-info-json exists"` — run a single test.
-- JDK 21 is the minimum (enforced in `build.gradle.kts`). CI matrix covers JDK 21 and 25 on Linux/macOS/Windows.
-- Dependency versions (Vaadin, Kotlin, JUnit, kaributools, etc.) live in `gradle/libs.versions.toml` — edit there, not in individual `build.gradle.kts` files.
-- **Supported Vaadin version.** Karibu-Testing **2.6.0+ (the current line, incl. the `2.7.x-SNAPSHOT` we ship) supports Vaadin 25+ *only*.** Vaadin 24 is supported only up to KT 2.4.x; 2.5.x is a do-not-use dead end. Full KT-version → Vaadin-version table: the compatibility chart at the top of `karibu-testing-v10/README.md` — treat it as the source of truth over any Vaadin-24 references that survive elsewhere.
+- **`MockVaadin` keeps the session, UI, request and response alive through `ThreadLocal` strong references.** Vaadin holds only soft refs, so dropping one lets a GC wipe the UI out mid-test.
+- **`tearDown()` never calls `VaadinService.destroy()`.** That would also shut the service's executor down, killing reuse across tests. See `D_service_event_bus_compat`.
+- **Anything reached inside Flow by reflection is probed at runtime, never assumed present.** A field that exists in `stable` may be gone in `next`. See `D_service_event_bus_compat`.
+- **Vaadin is `compileOnly` in every published module.** A transitive Vaadin would silently override the version the consuming app picked.
 
-## Release process
+## Module map
 
-See `CONTRIBUTING.md`. The current `-SNAPSHOT` version *is* the next release number: `2.7.2-SNAPSHOT`
-ships as `2.7.2` (or `2.8` for a major change). Use that when writing "since KT x.y" docs — don't bump it yourself.
-
-## Module layout
-
-The project is one Gradle multi-module build. Published artifacts live under group `com.github.mvysny.kaributesting`:
-
-- `karibu-testing-v10` — **core**. Vaadin 14+ compatible. All the component testing helpers (`Button.kt`, `Grid.kt`, `ComboBox.kt`, `Locator.kt`, `MockVaadin.kt`, `Routes.kt`, …) live here under package `com.github.mvysny.kaributesting.v10`. The `mock/` subpackage contains the fake Vaadin plumbing (`MockVaadinServlet`, `MockVaadinSession`, `MockService`, `MockNpmTemplateParser`, …). Java-facing API is in `src/main/java/.../LocatorJ.java` and `SearchSpecJ.java`. The `pro/` subpackage covers Grid Pro / ConfirmDialog (Vaadin Pro components).
-- `karibu-testing-v23` — thin layer on top of v10 adding helpers for components that only exist in Vaadin 23+ (`VirtualList`, `MultiselectComboBox`, `SideNav`, tabs extras). Package `com.github.mvysny.kaributesting.v23`.
-- `karibu-testing-v24` — **has no production code**; it exists as a container for the test-runner subprojects (see below) and republishes `karibu-testing-v23` so users get a stable Maven coordinate aligned to Vaadin 24+. **Module naming rule:** the `vNN` suffix marks the *highest Vaadin version whose version-specific APIs the module supports* — not the Vaadin version it runs against. `karibu-testing-v24` supports Vaadin APIs up to and including Vaadin 24 and nothing Vaadin 25+-specific; it still works fine *running* on Vaadin 25. The day we need to support a Vaadin 25+-specific API, we add a new `karibu-testing-v25` module rather than renaming this one. This coordinate is **published, so it never gets renamed.**
+- `karibu-testing-v10` — the core: component helpers, locators, and the fake Vaadin plumbing under `mock/`.
+- `karibu-testing-v23` — helpers for components that exist only from Vaadin 23 on.
+- `karibu-testing-v24` — no production code; republishes `v23` and hosts the test runners.
 - `karibu-testing-v10-groovy`, `karibu-testing-v10-pro-groovy` — Groovy extension modules.
-- `karibu-testing-v10-spring` — Spring integration (`SpringInstantiator` hooks, etc.). Only a compile-only dependency on `vaadin-spring`.
+- `karibu-testing-v10-spring` — Spring integration; `vaadin-spring` and `spring-security-core` compile-only.
+- `karibu-testing-v10/tests`, `karibu-testing-v23/tests` — the test battery as an unpublished library.
+- `karibu-testing-v24/testrun-{stable,next}-{webapp,module}` — the four environments that run the battery; see `design/architecture.md`.
 
-## How the test layout works (important)
+## Conventions
 
-Tests for the library itself do **not** live next to the code they test. Instead:
+- **Kotlin extension functions are the API surface.** Mirror a new helper in `LocatorJ` / `SearchSpecJ` wherever a Java-facing form makes sense.
+- **Every published module sets `explicitApi()`.** A public declaration without an explicit visibility modifier fails the build.
+- **Vaadin 25+ only, from 2.6.0 on.** The KT → Vaadin chart at the top of `karibu-testing-v10/README.md` outranks any surviving Vaadin-24 reference elsewhere.
+- **Mind which Vaadin version you are reasoning about.** The library compiles against `stable` while the battery runs on both it and `next`; inspect the jar the failing test actually uses, not the one on the compile path.
+- **A new test goes into `karibu-testing-v10:tests`** (or `karibu-testing-v23:tests` if it needs Vaadin 23+ APIs), never into a `testrun-*` project, or it runs in one environment instead of four.
+- **Dependency versions live in `gradle/libs.versions.toml`**, never in an individual `build.gradle.kts`.
+- **The `-SNAPSHOT` version is the next release number.** `2.7.3-SNAPSHOT` ships as `2.7.3`; use it when writing "since KT x.y" and don't bump it yourself. Releasing is `CONTRIBUTING.md`.
+
+## Commands
+
+- `./gradlew test` — the whole battery in all four environments.
+- `./gradlew` — bare, this is `clean build`: the battery plus the doc tripwires. What CI runs.
+- `./gradlew :karibu-testing-v24:testrun-stable-webapp:test` — one environment. Substitute another runner name.
+- `./gradlew :karibu-testing-v24:testrun-stable-webapp:test --tests "AllTests.flow-build-info-json exists"` — one test.
+- `design/verify_design_tripwires.sh` — the doc-layer checks alone.
+- CI (`.github/workflows/gradle.yml`) runs that bare `./gradlew` on JDK 21 and 25 across Linux, macOS and Windows, plus a `design-docs` job for the tripwires. JDK 21 is the minimum, enforced in `build.gradle.kts`.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mvysny/karibu-testing](https://github.com/mvysny/karibu-testing) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
