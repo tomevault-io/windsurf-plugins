@@ -1,153 +1,50 @@
 ---
 trigger: always_on
-description: We use a pull request–based workflow for all tasks.
+description: - **Always prefer SWC components if possible**: Use Spectrum Web Component React wrappers (`@swc-react/*`) and `@swc-uxp-wrappers/*` for UI elements (Button, ActionButton, Textfield, Card, Divider, ProgressCircle, StatusLight, Badge, Search, FieldLabel, HelpText, IllustratedMessage, ActionGroup, etc.) rather than hand-crafting custom HTML/CSS elements.
 ---
 
-# Developer Guide
+# Premiere UXP Plugin Guidelines
 
-We use a pull request–based workflow for all tasks.
+## Component Library (Spectrum Web Components / SWC)
 
-## Workflow
+- **Always prefer SWC components if possible**: Use Spectrum Web Component React wrappers (`@swc-react/*`) and `@swc-uxp-wrappers/*` for UI elements (Button, ActionButton, Textfield, Card, Divider, ProgressCircle, StatusLight, Badge, Search, FieldLabel, HelpText, IllustratedMessage, ActionGroup, etc.) rather than hand-crafting custom HTML/CSS elements.
+- **SWC Support**: `public/manifest.json` has `"featureFlags": { "enableSWCSupport": true }`.
+- **Package Versions**: Keep SWC packages aligned at version `0.37.0` (matching Adobe UXP compatibility).
+- **Bundler Aliases**: `build.ts` uses `swcAliasPlugin` with `aliases` from `@swc-uxp-wrappers/utils` to resolve internal SWC imports for Bun.
 
-Before starting any task, create and switch to a new feature branch:
+## Icons
 
-```bash
-git checkout -b <branch-name>
-```
+- **Always use Spectrum Workflow Icons (`@spectrum-web-components/icons-workflow`)**: Never use external icon libraries like `lucide-react`.
+- **Registration**: All workflow icons used must be imported and registered in `src/index.tsx` (e.g. `import '@spectrum-web-components/icons-workflow/icons/sp-icon-movie-camera.js'`). Note: Ensure the icon exists in `@spectrum-web-components/icons-workflow/icons/` (Spectrum 1 compatible) rather than only `icons-s2/` (which falls back to an empty circular DefaultIcon under Spectrum 1).
+- **Typing**: Add custom element declarations to `src/declarations.d.ts` under both `declare namespace React.JSX` and `declare global.JSX.IntrinsicElements` with `SpIconCustomElementProps`.
 
-Complete the task on that branch.
+## Adobe UXP Layout Engine Rules (Critical CSS Gotchas)
 
-After finishing the work and verifying that all checks pass:
+Adobe UXP's layout engine (Yoga-based) does **not** support several standard modern CSS features:
 
-1. Update `CHANGELOG.md` under `## [Unreleased]` for user-facing changes (see [Changelog Guidelines](#changelog-guidelines)).
-2. Stage and commit your changes.
-3. Push the branch to `origin`.
-4. Open a pull request using the GitHub CLI.
+1. **No CSS Grid**:
+   - `display: grid` and `grid-template-columns` are **unsupported / invalid**.
+   - Always use Flexbox (`display: flex; flex-direction: row | column;`).
+2. **No `aspect-ratio`**:
+   - `aspect-ratio` is invalid in UXP and collapses containers to `0px` height.
+   - Always specify explicit `width` and `height` on preview / thumbnail containers.
+3. **No `box-sizing: border-box`**:
+   - `box-sizing` is not supported (UXP elements are natively border-box). Specifying it logs invalid property warnings.
+4. **No `gap` in Flexbox**:
+   - `gap` is invalid in Premiere UXP flexbox. Items will render with 0px spacing.
+   - Use `margin-bottom` or `margin-right` on child items for spacing.
+5. **Always Set `flex-shrink: 0` on List Items**:
+   - Flex children default to `flex-shrink: 1`. When rendering lists with many items (>10 items), flexbox squishes the items down to slivers instead of scrolling.
+   - Always add `flex-shrink: 0` and an explicit `min-height` to list row cards (`.project-row-card`, `.file-row-card`, `.item-row`, etc.).
+6. **Scroll Containers**:
+   - Scrollable flex children (like `.view-content`) must have `min-height: 0` and `overflow-y: auto` to allow children to overflow and scroll vertically.
 
-```bash
-git add .
-git commit -m "<commit-message>"
-git push origin <branch-name>
-gh pr create --title "<pull-request-title>" --body "<pull-request-body>"
-```
+## Build and Packaging Commands
 
----
-
-## Commit Messages
-
-We follow the Conventional Commits specification.
-
-Commit messages MUST be formatted as:
-
-```text
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-Example:
-
-```text
-feat(auth): add OAuth login support
-```
-
-The commit contains the following structural elements, to communicate intent to the consumers of your library:
-
-1. `fix:` a commit of the type `fix` patches a bug in your codebase.
-2. `feat:` a commit of the type `feat` introduces a new feature to the codebase.
-3. `BREAKING CHANGE:` a footer or `!` after the type/scope introduces a breaking API change.
-4. Additional types are allowed (for example: `docs:`, `refactor:`, `test:`, `chore:`).
-
-Write commit messages in the imperative mood and keep descriptions concise and specific.
-
-Reference:
-https://www.conventionalcommits.org/en/v1.0.0/#summary
-
----
-
-## Changelog Guidelines
-
-We maintain `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-
-Before opening a pull request, add an entry under `## [Unreleased]` for any user-facing changes:
-
-- **End-User Friendly**: Make entries easy to understand for end users. For new features, explain what they actually do in plain language without heavy technical jargon. For bug fixes, describe what the bug was in a friendly, relatable way rather than focusing on internal code mechanics, file paths, or private symbols.
-- **Formatting**: `- **<scope>**: <Description>` (e.g. `- **asset**: Fix an issue where moving a video to trash while it was still transcoding could cause it to lose its trashed status`).
-- **No PR Numbers**: Do not include PR numbers or links; the release pipeline automatically appends the detailed PR list.
-- **Internal Changes**: Routine refactors, test additions, or internal chores without external behavior changes may omit changelog updates.
-
----
-
-## Pull Request Template
-
-```md
-## Summary
-
-Briefly describe what this PR changes and why.
-
-## Changes
-
-- List the main updates made in this branch.
-- Include any important implementation details.
-
-## Verification
-
-- Describe the checks or tests you ran.
-- Include relevant outputs if applicable.
-
-## Notes
-
-Add any additional context, caveats, or follow-up work.
-```
-
-## Submission Rules
-
-- **Strict Requirement**: A submission is considered complete **only** when there is a single final code state in which **all** of the following pass **simultaneously**:
-  - `bun run lint`
-  - `bun run format`
-  - `bun run typecheck`
-  - `bun run test`
-  - `bun run test:e2e:app`
-  - `bun run test:e2e:webui`
-  - `bun run test:e2e:workflow`
-
-- **Backend Testing Mandate**: Every backend feature, service method, workflow, and activity MUST be accompanied by comprehensive tests. Logic-heavy code without corresponding test coverage is considered incomplete.
-
-- Fixes must be iterated until **no check causes any other check to fail**.
-
-- **Type Safety**: The use of explicit `any` is strictly forbidden and will result in lint errors. You should use `unknown` instead when the type is not known. If you absolutely must use `any` due to a limitation (e.g. interacting with an untyped 3rd party library), you must add an eslint-disable comment (e.g., `// eslint-disable-next-line @typescript-eslint/no-explicit-any`) and include a comment directly above it clearly explaining _why_ we cannot be type-safe here.
-- Do **not** submit intermediate states where some checks pass and others fail, even temporarily.
-
-- **Cleanup Requirement**: Remove all verification related files (scripts, screenshots, `verification/` folder) before submit.
-
-## Backend Architecture
-
-The backend is built with:
-
-- **Runtime**: Bun
-- **Framework**: Hono
-- **ORM**: Prisma (with Pgvector18)
-- **Database**: Pgvector18
-
-## Workspace Architecture
-
-The project is a monorepo managed by **Bun Workspaces**. It follows a strictly decoupled architecture where each domain or layer is its own package:
-
-- **WebUI (`packages/webui`)**: React-based frontend.
-- **API (`packages/api`)**: Hono-based HTTP entry point. Handles requests and calls Core services.
-- **Core (`packages/core`)**: Business logic, services, and infrastructure utilities.
-- **Database (`packages/db`)**: Prisma client, schema, and migrations.
-- **DTOs (`packages/dtos`)**: Shared type definitions and Zod schemas used by both API and WebUI.
-- **Workers**: Specialized packages for background task execution:
-  - `@shumai/workflow-core`: Common workflow engine logic.
-  - `@shumai/agent`: AI agent workflows and activities.
-  - `@shumai/transcode`: Media processing workflows and activities.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Build**: `bun run --filter @shumai/premiere-uxp build`
+- **Watch mode**: `bun run --filter @shumai/premiere-uxp dev`
+- **Package CCX**: `bun run --filter @shumai/premiere-uxp package` (outputs `apps/premiere-uxp/shumai-premiere.ccx`)
 
 ---
 > Source: [shumaiOne/shumai](https://github.com/shumaiOne/shumai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
