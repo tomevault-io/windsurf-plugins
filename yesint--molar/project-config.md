@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Code analysis
 
@@ -58,87 +58,54 @@ cd molar_python && maturin build -r && python -m pip install .
 
 ## Architecture
 
-MolAR is a Cargo workspace with these crates:
+MolAR is a Cargo workspace (**Rust edition 2024**, MSRV 1.96) with these crates:
 
 | Crate | Purpose |
 |---|---|
-| `molar` | Core library: selections, IO, topology, analysis tasks |
-| `molar_molfile` | VMD molfile plugin bindings (PDB, DCD, XYZ) |
-| `molar_gromacs` | Gromacs bindings for TPR reading (optional, requires Gromacs source) |
-| `molar_powersasa` | SASA computation via PowerSASA algorithm |
+| `molar` | Core library: SoA atom storage, selections, IO, topology, analysis tasks |
+| `molar_gromacs` | Gromacs TPR support via a runtime-`dlopen`ed plugin (built only when Gromacs env vars are set; no compile-time dependency on Gromacs) |
+| `molar_ff` | Force-field atom typing (GAFF/GAFF2) and partial charges (espaloma) |
 | `molar_membrane` | Lipid membrane analysis (lipid order, curvature, etc.) |
 | `molar_bin` | CLI utility (`last`, `rearrange`, `solvate`, `tip3to4` commands) |
-| `molar_python` | Python bindings via PyO3/maturin |
+| `molar_python` | Python bindings via PyO3/maturin (wheel: `pymolar`) |
+
+All file formats are **pure Rust** (the former `molar_molfile` VMD-plugin crate has been removed).
+PowerSASA is an external git dependency, not a workspace crate.
 
 ### Core data model (`molar/src/`)
 
-- **`Topology`** (`topology.rs`) — atoms, bonds, molecules; usually read once from file
-- **`State`** (`state.rs`) — coordinates (`Vec<Pos>`), timestamp, optional `PeriodicBox`
-- **`System`** (`selection/system.rs`) — owns `Topology + State`; the primary user-facing container
+- **`Topology`** (`topology.rs`) — molecules, `atoms: AtomStorage`, and `bonds: BondStorage`; usually read once from file
+- **`AtomStorage`** (`atom_storage.rs`) — **Struct-of-Arrays** atom storage: one column per property.
+  Ten always-present *core* columns (`name`, `resname`, `resid`, `resindex`, `atomic_number`, `mass`,
+  `charge`, `chain`, `bfactor`, `occupancy`) plus four *optional* force-field/chemistry columns
+  (`type_name`, `type_id`, `formal_charge`, `flags`) stored as `Option<Vec<T>>` — a `None` column costs
+  nothing; when present it is full-length. Atoms are accessed through the borrowed **proxies**
+  `AtomRef` / `AtomRefMut` (a two-word `{storage, index}` handle) — there is **no `&Atom`** to borrow.
+- **`Atom`** (`atom.rs`) — the owned, densely-packed atom *row*, retained as the detached
+  construction/interchange type (builders, IO readers, `From<&AtomLike>`); `AtomStorage::push`
+  scatters it into the columns. `AtomFlags` holds the ring/aromatic bits (no longer packed into `type_id`).
+- **`AtomLike`** (read getters) / **`AtomLikeMut`** (setters) — the atom interface, implemented by
+  `Atom`, `AtomRef`, and `AtomRefMut`. Getters for the four *optional* properties return `Option`
+  (e.g. `get_type_name() -> Option<&str>`); `charge` is the partial/working charge, `formal_charge`
+  is the integer formal charge (kept separate).
+- **`BondStorage`** (`bond_storage.rs`) — **Struct-of-Arrays** bond storage, same discipline as
+  `AtomStorage`: an always-present pair column (`u32` internally, `usize` at every API boundary —
+  caps a system at 4·10⁹ atoms) plus an *optional* `Option<Vec<BondOrder>>` order column, absent for
+  connectivity-only sources (PDB CONECT / GRO / TPR) so MD systems allocate nothing for it. Bonds are
+  read through the borrowed **`BondRef`** proxy — there is **no `&Bond`** to borrow. The owned
+  `Bond` row (`bond.rs`) is the detached construction type; `BondStorage::push` scatters it.
+- **`BondAdjacency`** (`bond_storage.rs`) — the per-atom bonded-neighbor index (compressed rows),
+  cached inside `BondStorage`. `get_adjacency()` is cheap and parallel-safe; `ensure_adjacency(n_atoms)`
+  builds it (a plain `&mut` field, **not** a `OnceCell` — interior mutability would cost `Topology` its
+  `Sync`-through-`&` sharing across rayon). Structural change invalidates it, but **`set_order` does
+  not** — that asymmetry is the point of splitting the columns. Anything changing the *atom count*
+  must call `invalidate_adjacency()`, since `offsets` is sized `n_atoms + 1`.
+  Also usable standalone via `BondAdjacency::build(n, pairs)`, which is how `molar_ff` indexes a
+  remapped local subgraph. **Neighbor order within an atom's run is a guaranteed invariant**
+  (ascending bond index) — the GAFF port indexes neighbors positionally and truncates to the first
 
-### Selection system (`molar/src/selection/`)
-
-The key design: a `Sel` is just a sorted `SVec` of atom indices — it is **detached** from any `System`. To do work, it must be bound:
-
-- `sys.bind(&sel)` → `SelBound<'_>` (read-only, borrows system)
-- `sys.bind_mut(&sel)` → `SelBoundMut<'_>` (read-write, mutably borrows system)
-- `sys.select_bound("...")` → `SelOwnBound<'_>` (creates and binds in one step)
-- `sys.select_bound_mut("...")` → `SelOwnBoundMut<'_>`
-
-Borrow checking is enforced at compile time — you cannot hold a mutable and immutable bound selection simultaneously.
-
-**Empty selections are forbidden** — selection methods return `Err` instead of an empty selection.
-
-Traits that provide behavior live in `selection/traits.rs`:
-- `AtomPosAnalysis` — read-only iteration, `split`, `split_par`, particle access
-- `Selectable` / `SelectableBound` — creating sub-selections
-- Various `*Provider` traits for typed access
-
-### IO (`molar/src/io/`)
-
-`FileHandler` dispatches by file extension to format-specific handlers:
-- `.pdb`, `.dcd`, `.xyz` → VMD molfile plugin (C FFI via `molar_molfile`)
-- `.xtc` → custom XTC handler (random access supported)
-- `.gro` → GRO handler (single frame and multi-frame trajectory)
-- `.itp` → ITP handler (topology only)
-- `.tpr` → TPR handler (requires Gromacs; optional)
-
-`FileHandler` implements `IntoIterator` yielding `State` for trajectory iteration. IO runs in a background thread with a channel buffer of 10 frames.
-
-### Analysis task framework (`molar/src/analysis_task.rs`)
-
-Implement `AnalysisTask<UserArgs>` trait with three methods:
-- `new(context)` — called on first valid frame; create selections here
-- `process_frame(context)` — called per frame
-- `post_process(context)` — called after all frames
-
-Standard CLI args (`-f files -b begin -e end --log --skip`) are handled automatically by `TrajAnalysisArgs`. Invoke with `TaskType::run()`.
-
-### Parallel operations
-
-Two parallel patterns:
-1. **`par_iter_pos()` / `par_iter_atoms()`** — rayon parallel iteration within a single selection
-2. **`split_par(closure)`** — produces non-overlapping `ParSplit`; iterate with `sys.iter_par_split_mut(&par)` for parallel processing of distinct fragments (e.g., per-molecule unwrapping)
-
-### Optional Gromacs linking
-
-To enable TPR reading, create `.cargo/config.toml` (use `config.toml.template` as a starting point) with:
-```toml
-[env]
-GROMACS_SOURCE_DIR = "<path>"
-GROMACS_BUILD_DIR = "<path>"
-GROMACS_LIB_DIR = "<path>"
-```
-Without this, the crate compiles but TPR reading is unavailable.
-
-### Coordinate units
-
-All coordinates and distances use **nanometers** (matching Gromacs convention), not Angstroms.
-
-### Test data
-
-Integration test files live in `molar/tests/`: `protein.pdb`, `protein.xtc`, `membr.gro`, `topol.tpr`, etc.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yesint/molar](https://github.com/yesint/molar) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
