@@ -1,0 +1,101 @@
+---
+trigger: always_on
+description: pando is an open-source CLI and TUI that manages git worktrees and, for each
+---
+
+# CLAUDE.md
+
+## What this is
+
+pando is an open-source CLI and TUI that manages git worktrees and, for each
+one, a running dev environment: dev server, optional private services, logs,
+and a shareable URL. It is the generalization of `dwt`, a private tool that was
+built for a single project.
+
+## Current phase: all seven are built; the work now is edges
+
+Implementation ran 2026-09-20 to 2026-09-22 and every phase in
+`plans/00-master.md` is done: worktrees, start and stop, multiple processes,
+the log viewer, compose isolation, share, `init`/`doctor`/`signals`, native
+service recipes, and the agent layer. On 2026-09-23 the code was
+restructured for maintainability with no behaviour change
+(`plans/refactor-maintainability.md`), and 0.2.0 was built and tagged.
+On 2026-09-25 the TUI gained a pull request picker, and 0.3.0 was built
+and tagged with it: `p` lists the open ones, enter makes a worktree for one
+(`actions::new_for_pr`; a fork's is fetched from `pull/<n>/head` into
+`pr-<n>/<branch>`). Restarting only the selected process moved from `p`
+to `P`. There is no CLI flag for it yet.
+
+The same day, after the maintainer's first real run on the origin project
+failed, the first run was made to work without questions: `new`, `start`
+and the TUI take the rules' first choice and print it (`actions::
+recommended`), `init` still asks; a workspace whose root dev script is
+its own orchestration runs as that one script with its apps' ports; and a
+project that gitignores its lockfile gets the plain install. Proved on a
+temporary clone of the origin project: zero questions, web and api up.
+
+On 2026-09-26 namespaced mode was built, from
+`plans/database-per-branch.md`: a third, experimental start mode —
+`start --namespaced`, or the TUI's enter chooser — that keeps the main
+checkout's servers and gives a worktree a database and a Redis slot of its
+own in them. `state::ServiceMode` replaced the isolated flag; what a
+namespace is on an engine is a recipe's `[namespace]` table; every drop
+and flush goes through `namespace::may_drop`. It writes into a server the
+developer owns, which Invariant 1 does not cover: `docs/02-principles.md`
+says what holds it. Its tests against real servers are
+`tests/namespaced.rs`, gated like `tests/engines.rs` and run against
+throwaway MariaDB and Redis servers the tests start themselves. Proved on
+a temporary clone of the origin project against throwaway servers with
+real logins: the first namespaced start stopped with nothing made and
+printed the grant; run as printed, the next made the worktree's own
+database and Redis slot, ran its schema and seed steps into them, and the
+app came up on them — web and api answering, every connection on the
+worktree's own — with main's database and slot untouched. The TUI's `d`
+said what would go and dropped exactly that. The maintainer's own first
+run is next: the grant on their server, once.
+
+Later the same day the whole project was audited, by module and then
+by concern, and about 230 commits fixed what the audit and the reviews
+of its own fixes found: data safety in isolated and namespaced mode, the
+lifecycle, detection, share, the CLI, the TUI and doctor, and 0.4.0 was
+built and tagged with them. The findings it left for the maintainer,
+each with why, are in `plans/open-follow-ups.md`.
+
+On 2026-09-27 the guided first run was built, from
+`plans/first-run-setup.md`: the first `pando` in a project with nothing
+to run opens a setup screen whose one-line prompt hands the job to the
+developer's own coding agent; `pando init --agent` prints that job,
+`pando init --answers - --replace` corrects an answer, and `pando check`
+proves the setup in a throwaway detached worktree it removes again. The
+screen turns green by itself when a check passes; `esc` always skips it,
+and a project configured before this is never sent to it. Where a
+project's setup stands is `setup::read`, from files under `~/.pando`
+only. 0.5.0 was built and tagged with it on 2026-09-28. 0.5.1, the same
+day, is the first release with binaries: `brew install
+mertkaradayi/tap/pando`, or the install script, and no Rust needed.
+
+Later on 2026-09-27 the repository was made ready to open, at the
+maintainer's request: the licence is AGPL-3.0-only, and beside it are
+`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md`,
+issue and pull request templates, and CI (`.github/workflows/ci.yml`:
+rustfmt, then clippy and tests on macOS and on Linux, both required).
+A change to files no test reads runs nothing, and Dependabot comes
+monthly. Standard runners are free now that the repository is public;
+were it ever private again, a pull request would run Linux only, as
+`ci.yml` already does by itself.
+The README opens on `assets/pando.svg`,
+the setup screen's own wordmark and grove, animated; it is generated by
+`cargo run --example readme-art`, so regenerate it after changing
+`src/art/`. It was then pushed to a private GitHub repository,
+`github.com/mertkaradayi/pando`, for the maintainer to review before it
+goes public. CI's first runs found tests that passed only because of
+tools on the maintainer's machine, and two premises true on macOS only;
+all fixed, and the whole suite now passes on Linux too, run there for
+the first time. Nobody has used pando on Linux for real work yet.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [mertkaradayi/pando](https://github.com/mertkaradayi/pando) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
