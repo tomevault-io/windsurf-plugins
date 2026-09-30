@@ -35,4 +35,4 @@ PHPStan extension that finds unused class members (methods, constants, enum case
 
 ---
 > Source: [shipmonk-rnd/dead-code-detector](https://github.com/shipmonk-rnd/dead-code-detector) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
