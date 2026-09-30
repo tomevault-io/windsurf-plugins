@@ -3,13 +3,13 @@ trigger: always_on
 description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What This Is
 
-PromptUGUI is a Unity 6+ UPM package that translates compact `.ui.xml` files into runtime uGUI hierarchies. Target use case: pixel-art game that ships PC widescreen and mobile portrait from one description.
+PromptUGUI is a Unity 6+ UPM package that translates compact `.ui.xml` files into runtime uGUI hierarchies. Target use case: games that ship PC widescreen and mobile portrait from one description, with fully theme-swappable skins. Supports both **procedural high-definition surfaces** (the `<Style>`/`<Theme>` primitives drive SDF fills, glass, shaped corners and decorations — no textures required); **sprite-based aesthetics** such as pixel art (`.pxl`).
 
 The library is **content-agnostic at runtime**: it never reads the filesystem itself. Callers register a `Func<string, Awaitable<string>> SourceResolver` that maps an opaque `src` key to XML content; how the user obtains that content (Resources, Addressables, custom paths) is their concern. Built-in helpers: `UI.UseResourcesResolver(rootPath)` and (when `com.unity.addressables` ≥ 1.0 is installed) `UI.UseAddressableResolver()`.
 
@@ -33,32 +33,9 @@ Triggers requiring a SKILL update (route to the relevant file):
 - Public C# API surface changes (anything callers touch: `UI.*`, `IScreen`, `IControl`, `ControlRegistry`, `Variants`, `[UIAttr]` / `[Bind]`) → C# skill (Addressables skill if the change is `PROMPTUGUI_HAS_ADDRESSABLES`-gated)
 - Changes to the `id` path / scoping rules → both XML (declaration) and C# (`Get<T>` path) skills
 - New / changed parser-time errors that authors will hit → XML skill
-- Changes to a control / feature that has its own `reference/*.md` → edit **that file**, not (only) the main `SKILL.md`: `<Trigger>` / `<Animation>` → `reference/animations.md`; Btn/Tab/Toggle state visuals (`*Color` / `*Modulate` / `<Show on="state-*">` / `pressedSprite` / `selectedSprite`) → `reference/states.md`; `<TabBar>` / `<Tab>` → `reference/controls-tabs.md`; `<Carousel>` → `reference/controls-carousel.md`; `<Progress>` → `reference/controls-progress.md`; icon-name / SpriteSet discovery → `reference/icons.md`. Keep the main-doc primitive-catalog row + stub pointer in sync when attributes are added/removed.
-
-Internal refactors, test-only changes, performance work, and Editor tooling that doesn't affect XML or the public API do **not** require a SKILL update.
-
-## Project Layout
-
-| Asmdef | Where | Compiled into Player? |
-|---|---|---|
-| `PromptUGUI.Runtime` | `Runtime/` | yes |
-| `PromptUGUI.Editor` | `Editor/` | no (Editor-only) |
-| `PromptUGUI.Tests.EditMode` | `Tests/EditMode/` | no |
-| `PromptUGUI.Tests.EditorOnly` | `Tests/EditMode/Editor/` | no (tests for `PromptUGUI.Editor`) |
-| `PromptUGUI.Tests.PlayMode` | `Tests/PlayMode/` | no |
-| `PromptUGUI.Tests.EditMode.Addressables` | `Tests/EditMode/Addressables/` | no (gated by `PROMPTUGUI_HAS_ADDRESSABLES`) |
-
-`Runtime/AssemblyInfo.cs` exposes internals to `PromptUGUI.Tests.EditMode`, `PromptUGUI.Tests.PlayMode`, `PromptUGUI.Editor`, and `PromptUGUI.Tests.EditMode.Addressables` via `InternalsVisibleTo`.
-
-`Runtime/` is split into:
-- `Core/IR/` — pure POCOs (`UIDocument`, `ScreenDef`, `TemplateDef`, `ElementNode`, `ImportRef`, `VariantBlock`, `AddDirective`)
-- `Core/Parser/` — `UIDocumentParser` (XML → IR) + `ParseException`
-- `Core/Template/` — `TemplateExpander` (inlines Template invocations) + `Substitution` / `Truthy`
-- `Core/Variants/` — `VariantResolver` (last-active-wins for `attr.var` overrides)
-- `Core/Layout/` — `AnchorResolver` / `MarginResolver` / `SizeSpec`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Heerozh/PromptUGUI](https://github.com/Heerozh/PromptUGUI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
