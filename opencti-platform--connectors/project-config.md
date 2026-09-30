@@ -1,60 +1,111 @@
 ---
 trigger: always_on
-description: When reviewing code, focus on:
+description: Guidance for AI agents (and humans) working in this directory. Keep changes
 ---
 
+# AGENTS.md — Intel 471 v2 connector
 
-When reviewing code, focus on:
+Guidance for AI agents (and humans) working in this directory. Keep changes
+minimal and match the surrounding style.
 
-## Security Critical Issues
-- Check for hardcoded secrets, API keys, or credentials
-- Look for SQL injection and XSS vulnerabilities
-- Verify proper input validation and sanitization
-- Review authentication and authorization logic
+## Golden rule: changelog + version
 
-## Performance Red Flags
-- Identify N+1 database query problems
-- Spot inefficient loops and algorithmic issues
-- Check for memory leaks and resource cleanup
-- Review caching opportunities for expensive operations
+Every **user-facing change** (new/changed behaviour, new config option, bug fix)
+and every **dependency upgrade** (`src/requirements.txt`) must, in the same commit:
 
-## Code Quality Essentials
-- Functions should be focused and appropriately sized
-- Use clear, descriptive naming conventions
-- Ensure proper error handling throughout
+1. Add an entry to [`changelog.md`](changelog.md) under a **new version section**
+   at the top of the file.
+2. Update [`src/__version__`](src/__version__) to the **same** version.
 
-## Review Style
-- Be specific and actionable in feedback
-- Explain the "why" behind recommendations
-- Acknowledge good patterns when you see them
-- Ask clarifying questions when code intent is unclear
+By default, increment the **patch** bit (e.g. `2.2.1` → `2.2.2`). Bump a higher
+bit only when the change clearly warrants it.
 
-Always prioritize security vulnerabilities and performance issues that could impact users.
+**Exempt** (no changelog entry, no version bump): pure refactors, test-only
+changes, and internal/dev docs (including this file).
 
-Always suggest changes to improve readability. For example, this suggestion seeks to make the code more readable and also makes the validation logic reusable and testable.
+`changelog.md` format — newest version first, two-space `+ ` bullets:
 
-// Instead of:
-if (user.email && user.email.includes('@') && user.email.length > 5) {
-  submitButton.enabled = true;
-} else {
-  submitButton.enabled = false;
-}
+```
+# v2.2.2
 
-// Consider:
-function isValidEmail(email) {
-  return email && email.includes('@') && email.length > 5;
-}
+  + Short description of the change
+  + Link upgraded SDKs, e.g. Upgrade `verity471` to version [1.1.8](https://github.com/intel471/verity471-python/releases/tag/v1.1.8)
+```
 
-submitButton.enabled = isValidEmail(user.email);
+`src/__version__` is a single line, **no** `v` prefix (e.g. `2.2.2`). It is read
+by `src/intel471/version.py` and appended to the API client User-Agent, so it
+must always reflect the released version.
 
-Neither use a datetime for Note.generate_id(). This will prevent the generation of duplicate notes which can lead to the saturation of the RabbitMQ queue. For example:
+## What this connector does (and does not) do
 
-// Instead of:
-Note.generate_id(created=datetime.now(), content="the content")
+This connector is **OpenCTI logistics only**. The heavy lifting — turning
+Intel 471 API responses into STIX 2.1 — is done by the vendor SDKs:
 
-// Consider:
-Note.generate_id(created=None, content="the content")
+- **`titan-client`** (`titan_client.titan_stix`) — the legacy Titan backend.
+- **`verity471[stix]`** (`verity471.verity_stix`) — the newer Verity471 backend
+  (a superset of Titan).
+
+The connector calls `api_response.to_stix(...)` and ships the resulting bundle.
+**Do not add STIX mapping logic here.** If a mapping is wrong or missing, the fix
+belongs in the relevant SDK; here you typically only bump the SDK version (and
+add a changelog entry per the golden rule). The connector's job is: scheduling,
+paging/cursor management, OpenCTI state, and sending bundles.
+
+## Code map (`src/intel471/`)
+
+- `connector.py` — `Intel471Connector`: APScheduler `BackgroundScheduler` runs one
+  job per enabled stream on its configured interval. Streams run in threads, so
+  all OpenCTI **state** reads/writes are funnelled through `in_queue`/`out_queue`
+  and serviced by `handle_helper_state()` to avoid race conditions
+  (`HelperRequest` in `common.py`).
+- `settings.py` — pydantic config (`ConnectorSettings`) built on `connectors-sdk`.
+  Env vars are `INTEL471_*` / `CONNECTOR_*` / `OPENCTI_*`. A stream is enabled
+  only if its `interval_<group_label>` is set (non-zero). The `initial_history_*`
+  fields use the `EpochMillis` annotated type, which converts a value given in
+  epoch seconds and rejects one that is neither unit — see "Initial history units".
+- `backend.py` — `get_client(backend_name, ...)` returns a `ClientWrapper` that
+  bundles the chosen SDK module, its `Configuration`, its STIX mapper settings
+  class, its empty-bundle exception, and the tuple of stream classes. This is the
+  single switch between `titan` and `verity471`. Proxy (incl. authenticated
+  proxy) is wired here.
+- `streams/core/base.py` — `Intel471Stream` (ABC). Holds the fetch loop:
+  cursor + offset paging, calling the API method, calling `.to_stix(...)`, and
+  `send_to_server()`. This is where almost all shared logistics lives.
+- `streams/titan/` and `streams/verity471/` — thin per-stream subclasses. Most
+  just declare class vars; some override `_get_api_kwargs` / `_get_cursor_value`
+  / `_get_offsets`.
+
+## Reports-API auth / authorization errors
+
+The reports API returns four distinct auth/authorization responses. They are **not**
+distinguishable by HTTP status alone (1a and 3 are both 401; the backend even remaps
+1a's status internally), so `Intel471Stream.get_bundles()` (`streams/core/base.py`)
+discriminates on the **response body**:
+
+| # | HTTP | Body | Cause | Scope | Handling |
+|---|------|------|-------|-------|----------|
+| 1a | 401 | `<type> not in users access claims.` | Holds ≥1 report claim but not **this** type | one report type | **softened** |
+| 1b | 403 | `User does not have any report related claims.` | Zero report claims | all report types | raised |
+| 2  | 403 | `You cannot consume this service` *(Kong ACL)* | Reports API not added to the App | entire Reports API | raised |
+| 3  | 401 | `Unauthorized` *(Kong gateway)* | Bad/missing credentials | everything | raised |
+
+Only **case 1a** is softened: it is an expected, per-report-type entitlement gap, and
+each report type runs as its own scheduler job, so the others are unaffected. It is
+matched by the substring `ACCESS_CLAIMS_SIGNATURE = "access claims"` (which uniquely
+identifies 1a) and reported via a one-time `WARNING` (then `DEBUG`) instead of a
+recurring `ERROR` traceback, after which the stream's run ends cleanly.
+
+Everything else — 1b, 2, 3, and any unrecognised auth error — is **re-raised** on
+purpose: each means a whole stream/category cannot run, which is a real problem the
+operator should see. The exception classes caught per backend
+(`UnauthorizedException`, `ForbiddenException`) are supplied via
+`ClientWrapper.auth_exceptions` in `backend.py`, alongside `empty_bundle_exception`.
+
+## Initial history units
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [OpenCTI-Platform/connectors](https://github.com/OpenCTI-Platform/connectors) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
