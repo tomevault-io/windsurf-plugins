@@ -1,26 +1,80 @@
 ---
 trigger: always_on
-description: 🌐 **Languages:** 🇺🇸 [English](../../../GEMINI.md) · 🇪🇹 [am](../am/GEMINI.md) · 🇸🇦 [ar](../ar/GEMINI.md) · 🇦🇿 [az](../az/GEMINI.md) · 🇧🇬 [bg](../bg/GEMINI.md) · 🇧🇩 [bn](../bn/GEMINI.md) · 🇧🇦 [bs](../bs/GEMINI.md) · 🇨🇿 [cs](../cs/GEMINI.md) · 🇩🇰 [da](../da/GEMINI.md) · 🇩🇪 [de](../de/GEMINI.md) · 🇪🇸 [es](../es/GEMINI.md) · 🇪🇪 [et](../et/GEMINI.md) · 🇮🇷 [fa](../fa/GEMINI.md) · 🇫🇮 [fi](../fi/GEMINI.md) · 🇫🇷 [fr](../fr/GEMINI.md) · 🇮🇪 [ga](../ga/GEMINI.md) · 🇮🇳 [gu](../gu/GEMINI.md) · 🇳🇬 [ha](../ha/GE
+description: 🌐 **Languages:** 🇺🇸 [English](../../../AGENTS.md)
 ---
 
-# GEMINI.md (Ελληνικά)
+# OmniRoute agent guide (Bosanski)
 
-🌐 **Languages:** 🇺🇸 [English](../../../GEMINI.md) · 🇪🇹 [am](../am/GEMINI.md) · 🇸🇦 [ar](../ar/GEMINI.md) · 🇦🇿 [az](../az/GEMINI.md) · 🇧🇬 [bg](../bg/GEMINI.md) · 🇧🇩 [bn](../bn/GEMINI.md) · 🇧🇦 [bs](../bs/GEMINI.md) · 🇨🇿 [cs](../cs/GEMINI.md) · 🇩🇰 [da](../da/GEMINI.md) · 🇩🇪 [de](../de/GEMINI.md) · 🇪🇸 [es](../es/GEMINI.md) · 🇪🇪 [et](../et/GEMINI.md) · 🇮🇷 [fa](../fa/GEMINI.md) · 🇫🇮 [fi](../fi/GEMINI.md) · 🇫🇷 [fr](../fr/GEMINI.md) · 🇮🇪 [ga](../ga/GEMINI.md) · 🇮🇳 [gu](../gu/GEMINI.md) · 🇳🇬 [ha](../ha/GEMINI.md) · 🇮🇱 [he](../he/GEMINI.md) · 🇮🇳 [hi](../hi/GEMINI.md) · 🇭🇷 [hr](../hr/GEMINI.md) · 🇭🇺 [hu](../hu/GEMINI.md) · 🇦🇲 [hy](../hy/GEMINI.md) · 🇮🇩 [id](../id/GEMINI.md) · 🇳🇬 [ig](../ig/GEMINI.md) · 🇮🇹 [it](../it/GEMINI.md) · 🇯🇵 [ja](../ja/GEMINI.md) · 🇬🇪 [ka](../ka/GEMINI.md) · 🇰🇭 [km](../km/GEMINI.md) · 🇮🇳 [kn](../kn/GEMINI.md) · 🇰🇷 [ko](../ko/GEMINI.md) · 🇱🇹 [lt](../lt/GEMINI.md) · 🇱🇻 [lv](../lv/GEMINI.md) · 🇮🇳 [ml](../ml/GEMINI.md) · 🇮🇳 [mr](../mr/GEMINI.md) · 🇲🇾 [ms](../ms/GEMINI.md) · 🇲🇹 [mt](../mt/GEMINI.md) · 🇲🇲 [my](../my/GEMINI.md) · 🇳🇵 [ne](../ne/GEMINI.md) · 🇳🇱 [nl](../nl/GEMINI.md) · 🇳🇴 [no](../no/GEMINI.md) · 🇮🇳 [or](../or/GEMINI.md) · 🇮🇳 [pa](../pa/GEMINI.md) · 🇵🇭 [phi](../phi/GEMINI.md) · 🇵🇱 [pl](../pl/GEMINI.md) · 🇵🇹 [pt](../pt/GEMINI.md) · 🇧🇷 [pt-BR](../pt-BR/GEMINI.md) · 🇷🇴 [ro](../ro/GEMINI.md) · 🇷🇺 [ru](../ru/GEMINI.md) · 🇱🇰 [si](../si/GEMINI.md) · 🇸🇰 [sk](../sk/GEMINI.md) · 🇸🇮 [sl](../sl/GEMINI.md) · 🇷🇸 [sr](../sr/GEMINI.md) · 🇸🇪 [sv](../sv/GEMINI.md) · 🇰🇪 [sw](../sw/GEMINI.md) · 🇮🇳 [ta](../ta/GEMINI.md) · 🇮🇳 [te](../te/GEMINI.md) · 🇹🇭 [th](../th/GEMINI.md) · 🇹🇷 [tr](../tr/GEMINI.md) · 🇺🇦 [uk-UA](../uk-UA/GEMINI.md) · 🇵🇰 [ur](../ur/GEMINI.md) · 🇺🇿 [uz](../uz/GEMINI.md) · 🇻🇳 [vi](../vi/GEMINI.md) · 🇳🇬 [yo](../yo/GEMINI.md) · 🇨🇳 [zh-CN](../zh-CN/GEMINI.md) · 🇹🇼 [zh-TW](../zh-TW/GEMINI.md)
+🌐 **Languages:** 🇺🇸 [English](../../../AGENTS.md)
 
 ---
 
-> **Μοναδική πηγή αλήθειας:** όλοι οι κανόνες έργου για τους βοηθούς AI βρίσκονται στο
-> [`AGENTS.md`](AGENTS.md). Διαβάστε το ολόκληρο πριν από οποιαδήποτε αλλαγή — περιέχει τους 23 Αυστηρούς Κανόνες,
-> τις πύλες ποιότητας, τις συμβάσεις κώδικα, τους κανόνες τοποθέτησης αρχείων / υγιεινής ρίζας αποθετηρίου, τον χάρτη αποθετηρίου
-> και τις σημειώσεις τοπικής πρόσβασης ανάπτυξης που παλαιότερα βρίσκονταν σε αυτό το αρχείο.
+> **Jedinstveni izvor istine.** Ovaj fajl sadrži SVA pravila projekta, konvencije, bilješke o arhitekturi
+> i Stroga Pravila za svakog AI asistenta koji radi u ovom repozitoriju (Claude Code, Gemini, Codex,
+> Copilot i bilo koji drugi agent). `CLAUDE.md` i `GEMINI.md` samo dodaju specifične razlike za asistenta
+> i upućuju natrag ovdje. Kada pravilo treba promijeniti, promijenite ga OVDJE — nikada ga nemojte ponovo forkovati u
+> fajl specifičan za asistenta.
 
-Σημειώσεις ειδικές για το Gemini:
+## Brzi start
 
-- Οι δεξιότητες ενεργοποιούνται μέσω του εργαλείου `activate_skill` (τα μεταδεδομένα δεξιοτήτων φορτώνονται κατά την έναρξη της συνεδρίας και
-  το πλήρες περιεχόμενο ενεργοποιείται κατ' απαίτηση).
-- Δεν υπάρχουν άλλοι κανόνες αποκλειστικά για το Gemini σήμερα. Μην προσθέτετε ξανά κανόνες έργου εδώ — επεξεργαστείτε
-  το `AGENTS.md`, ώστε κάθε βοηθός να βλέπει τις ίδιες οδηγίες.
+```bash
+npm install                    # Instaliraj zavisnosti (automatski generiše .env iz .env.example)
+npm run dev                    # Dev server na http://localhost:20128
+npm run build                  # Production build (Next.js 16 standalone)
+npm run build:release          # Release build
+npm run lint                   # ESLint (očekivano 0 grešaka; upozorenja su već postojeća)
+npm run typecheck:core         # TypeScript provjera (treba biti čista)
+npm run typecheck:noimplicit:core  # Stroga provjera (bez implicitnog any)
+npm run test:coverage          # Unit testovi + coverage gate (60/60/60/60 — statements/lines/functions/branches)
+npm run check                  # lint + test kombinovano
+npm run check:cycles           # Detekcija kružnih zavisnosti
+npm run check:docs-all         # Pokreni nakon izmjene dokumentacije (uključuje fabricated-docs validaciju)
+```
+
+### Pokretanje testova
+
+Prvo pokrenite najprecizniji test za izmijenjeni kod:
+
+```bash
+# Pojedinačni test fajl (Node.js native test runner — većina testova)
+node --import tsx/esm --test tests/unit/your-file.test.ts
+
+# Vitest (MCP server, autoCombo, cache)
+npm run test:vitest
+
+# Svi suite-ovi
+npm run test:all
+```
+
+Ostali suite-ovi: `npm run test:e2e`, `npm run test:protocols:e2e`, `npm run test:ecosystem`.
+
+Za punu matricu testova, pogledajte `CONTRIBUTING.md` → "Running Tests". Za duboku arhitekturu, pogledajte sekcije
+Repository map i Reference Documentation u nastavku.
+
+---
+
+## Projekt na prvi pogled
+
+**OmniRoute** — jedinstveni AI proxy/router. Jedna krajnja tačka (endpoint), 359 LLM provajdera, auto-fallback.
+
+| Sloj          | Lokacija                | Svrha                                                                                                                                                                     |
+| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API Routes    | `src/app/api/v1/`       | Next.js App Router — ulazne tačke                                                                                                                                         |
+| Handlers      | `open-sse/handlers/`    | Obrada zahtjeva (chat, embeddings, itd)                                                                                                                                   |
+| Executors     | `open-sse/executors/`   | Provider-specifični HTTP dispatch                                                                                                                                         |
+| Translators   | `open-sse/translator/`  | Konverzija formata (OpenAI↔Claude↔Gemini)                                                                                                                                 |
+| Transformer   | `open-sse/transformer/` | Responses API ↔ Chat Completions                                                                                                                                          |
+| Services      | `open-sse/services/`    | Combo rutiranje, rate limiti, keširanje, itd                                                                                                                              |
+| Database      | `src/lib/db/`           | SQLite domenski moduli (176 migracija)                                                                                                                                    |
+| Domain/Policy | `src/domain/`           | Policy engine, pravila troškova, fallback logika                                                                                                                          |
+| MCP Server    | `open-sse/mcp-server/`  | 110 alata (45 kanonskih + memory/skill/GitHub/pool/gamification/plugin/Notion/Obsidian/local-corpus/RTK moduli), 3 transporta (stdio / SSE / Streamable HTTP), 33 scope-a |
+| A2A Server    | `src/lib/a2a/`          | JSON-RPC 2.0 agent protokol                                                                                                                                               |
+| Skills        | `src/lib/skills/`       | Proširivi framework vještina                                                                                                                                              |
+| Memory        | `src/lib/memory/`       | Persistent konverzacijska memorija                                                                                                                                        |
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [diegosouzapw/OmniRoute](https://github.com/diegosouzapw/OmniRoute) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
