@@ -31,8 +31,8 @@ ZUX-ZTool/
   build.gradle.kts             root build script
   settings.gradle.kts          Gradle module configuration
   gradle.properties            Gradle/Android build settings
-  ComposeRefactor.md           historical Compose refactor notes, UTF-8 encoding
-  README.md
+  compose_refactor.md           historical Compose refactor notes, UTF-8 encoding
+  readme.md
   UpdateCheck.json
   ZToolLogo.png
   ZToolLogoForeground.svg
@@ -82,7 +82,7 @@ app/src/main/assets/
 
 Use Compose as the long-term UI layer.
 
-- Use `ComposeRefactor.md` as the detailed migration plan and status log. Before selecting the next migration target, consult the latest plan and verification notes there; keep this file as the concise operating guide.
+- Use `compose_refactor.md` as the detailed migration plan and status log. Before selecting the next migration target, consult the latest plan and verification notes there; keep this file as the concise operating guide.
 - `MainActivity` should move toward only hosting `setContent { ZToolApp() }`.
 - Screens should become composable screen implementations.
 - XML Navigation has been replaced by `navigation-compose`; do not reintroduce XML navigation.
@@ -104,7 +104,7 @@ For example, logic from `HomeFragment` should be modeled around:
 - `EnvironmentRepository`
 - `UpdateRepository`
 
-For Phase 7, avoid adding new dependencies on `HomeFragment`; use the replacement Hook compatibility target documented in `ComposeRefactor.md` once it exists.
+For Phase 7, avoid adding new dependencies on `HomeFragment`; use the replacement Hook compatibility target documented in `compose_refactor.md` once it exists.
 
 ## Compose And Design-System Rules
 
@@ -152,4 +152,4 @@ inside feature screens. Instead, prefer project-level UI components and theme ad
 
 ---
 > Source: [qwqawa64/ZUX-ZTool](https://github.com/qwqawa64/ZUX-ZTool) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
