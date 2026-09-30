@@ -1,135 +1,90 @@
 ---
 trigger: always_on
-description: This project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
+description: Guide for coding agents working in this repository. The generated code standards that Ultracite itself enforces live in `.claude/CLAUDE.md`; this file covers how the repo is put together and how to change it safely.
 ---
 
-# Ultracite Code Standards
+# AGENTS.md
 
-This project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
+Guide for coding agents working in this repository. The generated code standards that Ultracite itself enforces live in `.claude/CLAUDE.md`; this file covers how the repo is put together and how to change it safely.
 
-## Quick Reference
+## What this is
 
-- **Format code**: `bun x ultracite fix`
-- **Check for issues**: `bun x ultracite check`
-- **Diagnose setup**: `bun x ultracite doctor`
+Ultracite is a zero-config linting and formatting preset for JS/TS projects, published to npm as `ultracite`. It ships:
 
-Oxlint + Oxfmt (the underlying engine) provides robust linting and formatting. Most issues are automatically fixable.
+- **Presets** for three linter backends: Oxlint + Oxfmt (recommended), Biome, and ESLint + Prettier + Stylelint, each with core and per-framework variants.
+- **A CLI** (`ultracite init | check | fix | doctor | upgrade`) that installs the toolchain, writes config files, wires editors, git hooks, and AI agent rules, and shells out to the chosen linter.
+- **An agent skill** (`skills/ultracite`) that ships inside the npm package.
 
----
+The docs site at https://www.ultracite.ai lives in this repo too.
 
-## Core Principles
+## Repo map
 
-Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
+```
+packages/cli/                 The published `ultracite` package
+  src/index.ts                Commander entry; every subcommand is registered here
+  src/commands/               check, fix, doctor, upgrade
+  src/initialize.ts           `ultracite init` orchestration (prompts + flags)
+  src/linters/                One adapter per tool: biome, eslint, oxlint, oxfmt, prettier, stylelint
+  src/integrations/           husky, lefthook, lint-staged, pre-commit
+  src/agent-fix/              `fix --claude` / `fix --codex`: hand remaining diagnostics to an agent CLI
+  src/data/                   Static tables: agents, editors, hooks, options, providers, rules (AGENTS.md template)
+  src/dependencies.ts         Toolchain versions + peer ranges read from package.json; what `init` installs
+  config/                     The presets (see "Presets" below)
+  __tests__/                  bun:test suite, one file per source module, plus lint-for-real fixtures
+  scripts/                    generate-dts, copy-skill, compare-rule-parity, vendor-anti-slop
+  build.ts                    Bun.build -> dist/index.js (single minified ESM file, deps external)
+apps/docs/                    Docs + marketing site (blume on Astro, deployed to Cloudflare Workers)
+  docs/**/*.mdx               Documentation content; meta.ts files order the sidebar
+  blume.config.ts             Site config, content sources, redirects under /docs/*
+packages/video/               Remotion release videos (private, not linted: vendored UI)
+packages/typescript-config/   Shared tsconfig bases (private)
+skills/ultracite/             Source of the agent skill; copied into packages/cli/skills on pack
+benchmark/                    PR-time performance regression gate for check/fix across all providers
+scripts/                      validate-configs (loads every preset + runs the ESLint/oxlint parity check)
+patches/                      bun patchedDependencies (currently oxfmt)
+.changeset/                   Changesets; every user-facing change needs one
+tmp/                          Gitignored scratch area for hand-testing the CLI against a sample project
+```
 
-### Type Safety & Explicitness
+## Toolchain
 
-- Use explicit types for function parameters and return values when they enhance clarity
-- Prefer `unknown` over `any` when the type is genuinely unknown
-- Use const assertions (`as const`) for immutable values and literal types
-- Leverage TypeScript's type narrowing instead of type assertions
-- Use meaningful variable names instead of magic numbers - extract constants with descriptive names
+- **Bun 1.4.x** is the package manager, test runner, script runner, and bundler. Never use npm/yarn/pnpm here. Lockfile is `bun.lock`.
+- **Turbo** fans out `build`, `test`, `types`, `dev` across workspaces.
+- **TypeScript** type checks run through `tsgo` (`@typescript/native-preview`), not `tsc`. `bun run types` at the root.
+- **The repo lints itself with Oxlint + Oxfmt** via `oxlint.config.ts` and `oxfmt.config.ts` at the root, which extend the shipped core, react, astro and anti-slop presets. Do not run Biome, ESLint or Prettier on repo source; those tools are dev dependencies only so the presets can be validated.
+- The published CLI must run on **Node 20, 22, 24 and Bun**, on Linux and Windows. It spawns the linters rather than bundling them, so keep new runtime dependencies to a minimum and avoid Bun-only APIs in `src/`. (Scripts, tests and `build.ts` may use Bun APIs.)
 
-### Modern JavaScript/TypeScript
+## Commands
 
-- Use arrow functions for callbacks and short functions
-- Prefer `for...of` loops over `.forEach()` and indexed `for` loops
-- Use optional chaining (`?.`) and nullish coalescing (`??`) for safer property access
-- Prefer template literals over string concatenation
-- Use destructuring for object and array assignments
-- Use `const` by default, `let` only when reassignment is needed, never `var`
+Run from the repo root unless noted.
 
-### Async & Promises
+| Task | Command |
+| --- | --- |
+| Install | `bun install` |
+| Build the CLI | `bun run build --filter ultracite` |
+| Build everything (incl. docs) | `bun run build` |
+| Run all tests | `bun test` |
+| Run one test file | `bun test packages/cli/__tests__/oxlint.test.ts` |
+| Coverage | `bun run test:coverage` |
+| Lint + format check (repo source) | `bun run check` |
+| Auto-fix lint + format | `bun run fix` |
+| Type check | `bun run types` |
+| Validate every preset + rule parity | `bun run validate:configs` |
+| Docs dev server | `bun run dev --filter docs` (or `cd apps/docs && bun dev`) |
+| Benchmark a packed build | See `benchmark/README.md` |
+| Add a changeset | `bun changeset` |
 
-- Always `await` promises in async functions - don't forget to use the return value
-- Use `async/await` syntax instead of promise chains for better readability
-- Handle errors appropriately in async code with try-catch blocks
-- Don't use async functions as Promise executors
+`bun run check` and `bun run fix` execute the CLI straight from source (`packages/cli/src/index.ts`), so they need no build step. The husky pre-commit hook runs, in order: CLI build, tests, check, types, validate:configs. Anything that fails there fails CI too.
 
-### React & JSX
+### Before you finish a change
 
-- Use function components over class components
-- Call hooks at the top level only, never conditionally
-- Specify all dependencies in hook dependency arrays correctly
-- Use the `key` prop for elements in iterables (prefer unique IDs over array indices)
-- Nest children between opening and closing tags instead of passing as props
-- Don't define components inside other components
-- Use semantic HTML and ARIA attributes for accessibility:
-  - Provide meaningful alt text for images
-  - Use proper heading hierarchy
-  - Add labels for form inputs
-  - Include keyboard event handlers alongside mouse events
-  - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
+1. `bun run fix` (formats and autofixes), then `bun run check` must be clean.
+2. `bun run types`
+3. `bun test`
+4. `bun run validate:configs` if you touched anything under `packages/cli/config`.
 
-### Error Handling & Debugging
-
-- Remove `console.log`, `debugger`, and `alert` statements from production code
-- Throw `Error` objects with descriptive messages, not strings or other values
-- Use `try-catch` blocks meaningfully - don't catch errors just to rethrow them
-- Prefer early returns over nested conditionals for error cases
-
-### Code Organization
-
-- Keep functions focused and under reasonable cognitive complexity limits
-- Extract complex conditions into well-named boolean variables
-- Use early returns to reduce nesting
-- Prefer simple conditionals over nested ternary operators
-- Group related code together and separate concerns
-
-### Security
-
-- Add `rel="noopener"` when using `target="_blank"` on links
-- Avoid `dangerouslySetInnerHTML` unless absolutely necessary
-- Don't use `eval()` or assign directly to `document.cookie`
-- Validate and sanitize user input
-
-### Performance
-
-- Avoid spread syntax in accumulators within loops
-- Use top-level regex literals instead of creating them in loops
-- Prefer specific imports over namespace imports
-- Avoid barrel files (index files that re-export everything)
-- Use proper image components (e.g., Next.js `<Image>`) over `<img>` tags
-
-### Framework-Specific Guidance
-
-**Next.js:**
-
-- Use Next.js `<Image>` component for images
-- Use `next/head` or App Router metadata API for head elements
-- Use Server Components for async data fetching instead of async Client Components
-
-**React 19+:**
-
-- Use ref as a prop instead of `React.forwardRef`
-
-**Solid/Svelte/Vue/Qwik:**
-
-- Use `class` and `for` attributes (not `className` or `htmlFor`)
-
----
-
-## Testing
-
-- Write assertions inside `it()` or `test()` blocks
-- Avoid done callbacks in async tests - use async/await instead
-- Don't use `.only` or `.skip` in committed code
-- Keep test suites reasonably flat - avoid excessive `describe` nesting
-
-## When Oxlint + Oxfmt Can't Help
-
-Oxlint + Oxfmt's linter will catch most issues automatically. Focus your attention on:
-
-1. **Business logic correctness** - Oxlint + Oxfmt can't validate your algorithms
-2. **Meaningful naming** - Use descriptive names for functions, variables, and types
-3. **Architecture decisions** - Component structure, data flow, and API design
-4. **Edge cases** - Handle boundary conditions and error states
-5. **User experience** - Accessibility, performance, and usability considerations
-6. **Documentation** - Add comments for complex logic, but prefer self-documenting code
-
----
-
-Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run `bun x ultracite fix` before committing to ensure compliance.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [haydenbleasel/ultracite](https://github.com/haydenbleasel/ultracite) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
