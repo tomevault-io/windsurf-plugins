@@ -1,157 +1,161 @@
 ---
 trigger: always_on
-description: This repository contains `jev-align`, an interactive active-learning CLI for
+description: ai-functions.dev is the public registry for portable AI Functions built with
 ---
 
-# AGENTS.md
+# ai-functions.dev agent guide
 
-This repository contains `jev-align`, an interactive active-learning CLI for
-building AI Functions from a user's judgments. Coding agents may help configure
-and operate the workflow, but must preserve the human labeling loop.
+ai-functions.dev is the public registry for portable AI Functions built with
+Jeva. The website is read-only. Create, improve, and publish functions with the
+`jeva` CLI.
 
-## Installation reference
+Project: https://github.com/sutro-sh/jev-align
+Registry: https://ai-functions.dev
 
-Requires Python 3.11 or newer. For a released build, prefer an isolated CLI
-installation:
+## Labeling rule
 
-```shell
-uv tool install jev-align
-# Without uv:
-pip install jev-align
-```
+The user controls how labels are created and decides whether to accept every
+optimized definition. In the guided flow, never infer or skip labels unless the
+user explicitly authorizes synthetic or agent-generated labeling. Do not
+describe generated labels as human-reviewed. A rationale is optional, and human
+review is encouraged for important tasks and boundary cases.
 
-From a local checkout, use `uv tool install .`; after pulling or changing the
-source, refresh it with `uv tool install --force .`. To install straight from
-GitHub, use `uv tool install "git+https://github.com/sutro-sh/jev-align.git"`.
-For editable development, run `uv sync --extra dev` and launch with
-`uv run jeva`.
+## Install
 
-Both `jeva` and `jev-align` invoke the same CLI. Interactive, non-editable
-installs check PyPI for newer releases at startup. In virtual environments the
-updater prefers `uv pip` when available and falls back to that environment's
-Python and pip. Set `JEVA_DISABLE_UPDATE_CHECK=1` to disable the check.
+Requires Python 3.11 or newer.
 
-## Operating the CLI for a user
+    uv tool install jev-align
 
-### Core rule
+Without uv:
 
-The user supplies every label. Do not skip examples, silently infer labels, or
-accept an optimized definition on the user's behalf. A rationale is optional,
-but encourage one when it explains an important boundary or corrects the
-model's reasoning.
+    pip install jev-align
 
-### Before starting
+Both `jeva` and `jev-align` invoke the same CLI. Use a real PTY for interactive
+menus, label selection, progress displays, and proposal review.
 
-1. Confirm that one Jev provider is configured: `TYPESAFE_API_KEY`,
-   `AI_GATEWAY_API_KEY`, or both `CLOUDFLARE_ACCOUNT_ID` and
-   `CLOUDFLARE_API_TOKEN`.
-2. Confirm a reflection provider is configured: `OPENAI_API_KEY`,
-   `ANTHROPIC_API_KEY`/`CLAUDE_API_KEY`, `GEMINI_API_KEY`, or the endpoint and
-   credentials required by a custom LiteLLM provider.
-3. Identify the intended CSV, Parquet, or JSONL file without modifying it.
-4. Establish the question, task type, input columns, and labels or score levels.
-5. If any choice would materially change the task semantics, ask the user.
+## Discover public functions
 
-Never display secret values. It is enough to report whether a required key is
-configured.
+Browse https://ai-functions.dev or read the public JSON APIs:
 
-### Starting a run
+    GET https://ai-functions.dev/api/v1/functions
+    GET https://ai-functions.dev/api/v1/functions/NAMESPACE/SLUG
 
-Use the guided home screen when the user wants to choose interactively:
+The detail response includes the public definition, input signature, backend,
+metrics, and version history. The website can show the labeled examples
+and rationales for a selected version. Published annotations are public data.
 
-```shell
-jeva
-```
+## Pull a function
 
-Use flags when the setup is already known:
+No login is required:
 
-```shell
-jeva optimize DATA \
-  --question "QUESTION" \
-  --column COLUMN
-```
+    jeva pull NAMESPACE/SLUG
+    jeva pull NAMESPACE/SLUG --version 2
 
-Relevant task shapes:
+Pull verifies the immutable artifact digest and creates a normal saved function
+under `.jev-align/runs/`. Do not overwrite or hand-edit its saved state. Existing
+published annotations are already labeled; do not ask the user to label them
+again.
 
-- Binary: provide `--question`; optionally add concrete `--true-criteria` and
-  `--false-criteria`.
-- Multiclass: repeat `--class "NAME=DESCRIPTION"` for mutually exclusive
-  labels.
-- Multilabel: repeat `--class "NAME=DESCRIPTION"` and add `--multilabel`.
-- Score: repeat `--score-level "DESCRIPTION"` in lowest-to-highest order.
+Use `jeva functions` to inspect, run, or resume a local function. Continuing
+learning requires new captured inputs; their model predictions are never labels.
 
-The installed package includes preconfigured Hacker News, support-ticket, and
-agent-trace examples. The guided dataset picker lists those first, followed by
-CSV, Parquet, and JSONL files discovered below the current directory.
+## Create and optimize a function
 
-Use `--batch-size` to choose the number of training annotations per round. The
-guided Advanced menu offers 5, 10, 15, or 20. Add `--holdout` only when the user
-wants a 20% reserved evaluation split; this adds 20% extra held-out annotations
-per round. Advanced also configures maximum GEPA metric calls, which defaults to
-300. For scripted runs, use `--max-metric-calls`; `--metric-budget` remains an
-alias.
+Start the guided flow:
 
-Use `--all-columns-concatenated` only when every field is useful. Prefer
-explicit `--column` values when IDs, timestamps, or metadata could distract the
-evaluator. The normal default is the first 1,000 rows or all rows for a smaller
-dataset; only set `--pool-size` when the user wants a different limit.
+    jeva
 
-Run the CLI in a real PTY when possible so arrow-key menus, progress displays,
-and prompts work correctly.
+Or provide known setup with flags:
 
-### Reflection providers
+    jeva optimize DATA.csv \
+      --question "Is the post related to aviation?" \
+      --column title \
+      --column text
 
-GEPA's reflection model is separate from the TypeSafe JEV evaluation model.
-Reflection uses LiteLLM model identifiers. OpenAI, Anthropic, and Gemini are
-listed automatically when their standard keys are present. For another
-provider, pass `--reflection-model provider/model`; in the wizard select
-**Choose a different model** and then **Enter a custom LiteLLM model**.
+Before starting, confirm that the user has configured a Jev evaluation provider
+and a GEPA reflection provider. Never print secret values.
 
-Fireworks example:
+During each guided labeling round:
 
-```shell
-export FIREWORKS_API_KEY="..."
-jeva optimize DATA \
-  --question "QUESTION" \
-  --column COLUMN \
-  --reflection-model \
-    "fireworks_ai/accounts/fireworks/models/llama-v3p1-8b-instruct"
-```
+1. Show the input, uncertainty, and whether it is a random audit sample.
+2. Ask the user for the label, or follow the synthetic/agent-labeling method they
+   explicitly authorized.
+3. Ask for an optional rationale.
+4. Enter exactly the supplied or authorized generated answer.
+5. After GEPA runs, summarize the metric change, certainty change, regression
+   risk, and definition diff.
+6. Ask the user to accept, reject, or stop and resume later.
 
-For a local or hosted vLLM server exposing an OpenAI-compatible `/v1` API:
+There is no skip action. At the label picker, `b` goes backward. At the
+rationale prompt, `/back` returns to the label picker; a literal `b` is valid
+rationale text.
 
-```shell
-export HOSTED_VLLM_API_BASE="http://localhost:8000/v1"
-export HOSTED_VLLM_API_KEY="..." # Omit when the endpoint has no authentication.
-jeva optimize DATA \
-  --question "QUESTION" \
-  --column COLUMN \
-  --reflection-model "hosted_vllm/Qwen/Qwen3-8B"
-```
+## Authenticate and publish
 
-For a generic OpenAI-compatible endpoint:
+    jeva login
+    jeva push .jev-align/runs/RUN_ID
 
-```shell
-export OPENAI_API_BASE="http://localhost:8000/v1"
-export OPENAI_API_KEY="local" # Replace when the endpoint requires a real key.
-jeva optimize DATA \
-  --question "QUESTION" \
-  --column COLUMN \
-  --reflection-model "openai/Qwen/Qwen3-8B"
-```
+The registry derives the namespace from the authenticated GitHub identity. A
+push publishes the accepted definition, safe backend identity, learning
+configuration, and labeled inputs, labels, splits, and rationales. It does
+not publish unlabeled source rows, local source paths, pending proposals,
+backend credentials, or reflection-provider credentials.
 
-The provider/model identifier and environment variables must follow the
-[LiteLLM provider configuration](https://docs.litellm.ai/docs/providers).
-Jev evaluation requires the credentials for the selected evaluation backend;
-the reflection provider is separate.
+Publishing requires the human's explicit confirmation that labeled inputs and
+rationales may be public. Do not provide that confirmation on the user's behalf.
 
-### Labeling rounds
+For agent-driven noninteractive publishing, the user must have already approved
+the exact public operation. Then use:
 
-For each displayed item:
+    jeva push .jev-align/runs/RUN_ID \
+      --name "Function name" \
+      --description "Short public discovery description." \
+      --yes \
+      --confirm-public-data
 
+Owners can remove a function from discovery and future public pulls without
+deleting its immutable versions:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+    jeva unpublish NAMESPACE/SLUG
+
+Pushing the function again restores it. Unpublishing cannot revoke artifacts
+that another user already downloaded.
+
+Descriptions are optional plain text up to 280 characters. Pushing again with
+`--description` updates the description by creating a new immutable version.
+Omitting the option preserves the current description.
+
+## Continual learning
+
+Applications may load a saved function with capture enabled:
+
+    from jev_align import AIFunction
+
+    function = AIFunction.load(
+        ".jev-align/runs/RUN_ID",
+        capture=True,
+    )
+
+Captured calls are unlabeled observations. Resume with `jeva functions` or:
+
+    jeva optimize --resume .jev-align/runs/RUN_ID
+
+Let the user decide whether to import newly captured calls, then preserve the
+same explicit labeling and proposal-acceptance rules.
+
+## Safety and data handling
+
+- Never expose API keys, GitHub tokens, session cookies, or keychain contents.
+- Never treat a model prediction as a confirmed label without explicit user
+  authorization.
+- Never mutate saved run files by hand.
+- Never publish without explicit public-data approval.
+- Never claim training metrics are held-out generalization results.
+- Prefer the CLI over direct write requests to the registry API.
+
+For repository development instructions, read:
+https://github.com/sutro-sh/jev-align/blob/main/AGENTS.md
 
 ---
 > Source: [sutro-sh/jev-align](https://github.com/sutro-sh/jev-align) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
