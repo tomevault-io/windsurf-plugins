@@ -5,17 +5,17 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [crmne/archspec](https://github.com/crmne/archspec).
+Original source: `AGENTS.md` in [crmne/archspec](https://github.com/crmne/archspec).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [crmne/archspec](https://github.com/crmne/archspec) — a repo with 238+ stars on GitHub.
+From [crmne/archspec](https://github.com/crmne/archspec) — a repo with 244+ stars on GitHub.
 
 ---
 
