@@ -1,18 +1,18 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project overview
 
 PenShot (`penshot`) is a multi-agent system that converts screenplays/scripts of arbitrary format into shot-level, AI-video-ready prompt fragments (bilingual prompt + negative prompt + duration + audio prompt), ensuring character/scene/plot continuity across fragments. It sits between upstream scriptwriting and downstream text-to-video models (Sora/Veo/Runway/Kling).
 
 Naming — all refer to the same project:
-- `video-shot-agent` — local workspace directory
+- `story-shot-agent` — local workspace directory
 - `story-shot-agent` — GitHub repo name
 - `penshot` — PyPI package name AND Python package (`src/penshot`)
 - `neopen` — core domain module (`src/penshot/neopen`), also the org name
@@ -91,9 +91,10 @@ Layered, top-to-bottom (deepest details in `docs/ARCHITECTURE.md`; Chinese desig
 2. `shot_segmenter` — narrative units → shot sequence with durations (`estimator/` subpackage)
 3. `video_splitter` — shots → ≤5s video fragments (AI video model limit)
 4. `prompt_converter` — fragments → English prompt + negative + audio prompt
+5. `quality_auditor` — rule + LLM audit of duration/format/content
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [neopen/story-shot-agent](https://github.com/neopen/story-shot-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
