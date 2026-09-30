@@ -2,16 +2,14 @@
 
 > Tome by [get-tmonier](https://github.com/get-tmonier/argot), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
-A statistical code analyzer built from your repository's history.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [get-tmonier/argot](https://github.com/get-tmonier/argot).
+Original source: `AGENTS.md` in [get-tmonier/argot](https://github.com/get-tmonier/argot).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
