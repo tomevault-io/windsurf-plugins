@@ -1,106 +1,75 @@
 ---
 trigger: always_on
-description: Cypress Documentation: a **Docusaurus 3** (TypeScript) docs site. Content is in
+description: The root [`AGENTS.md`](../../AGENTS.md) still applies; this file adds the rules
 ---
 
-# Repository Guide for AI Agents
+# Agent rules: GitHub Actions workflows
 
-Cypress Documentation: a **Docusaurus 3** (TypeScript) docs site. Content is in
-`docs/**/*.mdx`. These are the always-apply rules. For examples and the full
-detail behind each rule, read **[`AGENTS_REFERENCE.md`](./AGENTS_REFERENCE.md)**
-(and the section links below).
+The root [`AGENTS.md`](../../AGENTS.md) still applies; this file adds the rules
+specific to `.github/workflows/`. What each job in `ci.yml` runs, and why the
+branch protection set looks the way it does, is in
+[`AGENTS_REFERENCE.md`](../../AGENTS_REFERENCE.md#continuous-integration).
 
-## Commands
+## Pinning actions
 
-```bash
-npm i                 # install (runs patch-package via postinstall)
-npm run start         # local dev server at http://localhost:3000
-npm run build         # production build into dist/ (also rebuilds plugins)
-npm run lint:fix      # Prettier autofix on **/*.{md,mdx}
-npm run typecheck     # tsc
-npm test              # cypress e2e (needs the dev server running)
-npm run test:plugins  # vitest unit tests for plugins/
+- Look up the current major version of every action you use, on that action's
+  own GitHub repository, at the time you write the workflow. Do not carry a
+  version over from another file.
+- Pin to the latest major tag (`uses: <owner>/<action>@v<major>`), matching the
+  style already in these files. A commit SHA is not required here.
+- After a new or changed workflow runs, read its logs and bump any action the
+  runner flags with a deprecation warning.
+
+## Forks copy these files
+
+This repository is frequently forked, and every workflow here, scheduled `cron`
+jobs included, is copied into each fork and runs there with reduced permissions.
+GitHub Actions cannot create or approve pull requests in a fork by default, so
+an unguarded job fails with a fatal error in somebody else's repository.
+
+Guard any job that pushes commits, opens pull requests, or reads repo secrets so
+it runs only on the default branch of the parent repository:
+
+```yml
+jobs:
+  my-job:
+    if: (github.ref == 'refs/heads/main') &&
+      (github.repository == 'cypress-io/cypress-documentation')
 ```
 
-## Verify ladder (cheap → authoritative)
+The same split is why `ci.yml` carries two E2E jobs. The recorded one needs
+`CYPRESS_RECORD_KEY` to split the suite through Cypress Cloud, and GitHub
+withholds secrets from a pull request opened from a fork, so those runs get
+`E2E (fork, not recorded)` instead: the whole suite in one container, reporting
+nothing to the Cloud.
 
-1. `npm run lint:fix` — **required before every commit** (a Husky/lint-staged
-   hook and CI both enforce Prettier on `*.{md,mdx}`).
-2. `npm run build` — the real safety net for content: `onBrokenLinks` and
-   `onBrokenMarkdownLinks` are `throw`, so any bad link or anchor fails the build.
-3. `npm run test:plugins` — only when you touched `plugins/`.
-4. `npm test` (with `npm run start` running) — for nav/routing or broad changes.
+## Required checks and skipped jobs
 
-## Pull requests
+Exactly one of those two E2E jobs runs and the other is skipped, so **neither
+can be a required status check**. GitHub reports a skipped job as Success, so
+requiring the eight containers would go green on a fork pull request that ran no
+tests at all.
 
-When opening a PR, fill out **[`.github/pull_request_template.md`](./.github/pull_request_template.md)**
-(GitHub loads it into the PR body automatically). It is the historical record of
-the change: complete every section, explaining _why_ the change was made, not
-just _what_ changed.
+`e2e-status` exists for that. It runs `always()`, reads both results, and fails
+unless one of them actually succeeded, including when both were skipped because
+the build failed. Require it rather than the jobs feeding it, and keep
+`fail-fast: false` on the matrix so all eight containers report and its
+aggregate result is true.
 
-For a **release PR** (opened from a `releases/*` branch to document a specific
-product release), use the release template instead:
-**[`.github/PULL_REQUEST_TEMPLATE/release.md`](./.github/PULL_REQUEST_TEMPLATE/release.md)**.
-Select it by appending `?template=release.md` to the compare URL. Name the
-target release, list every included change, and make sure a new changelog entry
-is one of them.
+Apply the same reasoning to any new job you add behind a condition: if it can
+skip, the thing branch protection requires has to be an aggregator that reads
+its result, not the job itself.
 
-## Rules
+## Workflows that trigger no CI
 
-Each rule is a hard convention. See the linked section for the how and why.
+GitHub raises no workflow run for an event caused by `GITHUB_TOKEN`. The nightly
+pull request that `update-plugins-data.yml` opens therefore triggers `ci.yml`
+not at all, on the `automation/update-plugins-data` branch or anywhere else.
 
-**Pages** — [details](./AGENTS_REFERENCE.md#adding-moving--removing-pages)
-
-- A page is an `.mdx` file under `docs/<section>/`; sidebars are autogenerated, so
-  never hand-edit `sidebars.js` to add one.
-- Include the standard frontmatter (`title`, `description`, `sidebar_label`,
-  `slug`). `title` and `description` are the page's `<title>` and meta
-  description, so make them **SEO-friendly**: lead with the key term and
-  summarize the page accurately. Match the section's house style — API reference
-  pages are terse (`'name | Cypress Documentation'` + one short sentence); guides
-  are more descriptive. Mirror a sibling file when unsure. Never add a `keywords`
-  field to frontmatter — Docusaurus only emits it as a `<meta name="keywords">`
-  tag that modern search engines ignore and that the site's own search doesn't
-  index, so it adds noise with no benefit.
-- Order with `sidebar_position` and `_category_.json`, not `sidebars.js`. Without
-  a `sidebar_position`, pages sort alphabetically; if sibling files don't define
-  one, match them and skip it rather than introducing positions.
-- Moving/renaming/deleting a page **requires** a `301` in `netlify.toml`, plus
-  updating in-repo links to it.
-
-**Authoring** — [components](./AGENTS_REFERENCE.md#mdx-components),
-[partials](./AGENTS_REFERENCE.md#partials),
-[naming](./AGENTS_REFERENCE.md#product-heading--naming),
-[code blocks](./AGENTS_REFERENCE.md#code-blocks),
-[alt text](./AGENTS_REFERENCE.md#accessible-image-alt-text)
-
-- Use the MDX components, not raw HTML: `<DocsImage>` / `<DocsVideo>` / `<Icon>`.
-  Always give images meaningful `alt` (describe purpose, not "screenshot of…").
-- Start every product page with `<ProductHeading product="…" />`. Use canonical
-  names: Cypress App, Cypress Cloud, Cypress Accessibility, UI Coverage.
-- Reuse `docs/partials/_*.mdx` instead of repeating content.
-- End related pages with a `## See also` section (sentence-case H2, as the page's
-  last section): a short bulleted list of doc-to-doc links to closely related
-  pages, command names in backticks, with an optional `- short description` after
-  a link. It's standard on API reference pages (link 2–5 sibling
-  commands/utilities); add it to guides and other pages only when there are
-  genuinely related pages worth surfacing. Don't pad it with tangential links or
-  repeat links already prominent in the page body.
-- Tag every code block with a language; add `title="file.ext"` for file snippets.
-- Never use em dashes — they read as AI-generated; use commas, periods, or
-  parentheses instead.
-- Use **bold** only for real UI controls the reader acts on in a walkthrough
-  (actual buttons, links, tabs, and flows in Cypress Cloud or the Cypress App,
-  e.g. the **App Quality** tab). Put hypothetical UI labels from illustrative
-  examples in `"quotes"` instead (e.g. an `"Add to cart"` button in a sample),
-  so invented examples stay distinct from the real UI a tutorial navigates. See
-  [Writing style](./AGENTS_REFERENCE.md#writing-style).
-- Don't use minimizing words like "simply", "just", "easy", or "obviously" in
-  instructions. They undermine a reader who is struggling and add nothing; state
-  the step plainly instead.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+That workflow typechecks, builds, and runs `plugins_list.cy.ts` itself before
+opening the pull request. Anything that would newly break on a change to
+`src/data/plugins-generated.json` belongs there, not only in `ci.yml`.
 
 ---
 > Source: [cypress-io/cypress-documentation](https://github.com/cypress-io/cypress-documentation) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
