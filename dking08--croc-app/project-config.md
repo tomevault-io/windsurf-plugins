@@ -1,93 +1,150 @@
 ---
 trigger: always_on
-description: This document helps AI agents work effectively in this codebase. It explains the philosophy, patterns, and pitfalls behind the code, so you can make good decisions on any task, not just scenarios explicitly covered.
+description: generates Go client/server/shape code from Smithy models.
 ---
 
-# Agents
+# AGENTS.md
 
-This document helps AI agents work effectively in this codebase. It explains the philosophy, patterns, and pitfalls behind the code, so you can make good decisions on any task, not just scenarios explicitly covered.
+## Project overview
 
-## Philosophy
+smithy-go is the Go code generator and runtime for [Smithy](https://smithy.io/).
+It has two major components:
 
-This is a minimal, idiomatic WebSocket library. Simplicity is a feature.
+1. **Codegen** (`codegen/`) — A Smithy build plugin written in Java that
+   generates Go client/server/shape code from Smithy models.
+2. **Runtime** (`./`, top-level Go module) — The Go packages that generated
+   code depends on at runtime.
 
-Before adding code, articulate why it's necessary in one sentence. If you cannot justify the addition, it probably isn't needed.
+The primary downstream consumer is
+[aws-sdk-go-v2](https://github.com/aws/aws-sdk-go-v2).
 
-Before adding a dependency, don't. Tests requiring external packages are isolated in `internal/thirdparty`.
+## Repository layout
 
-## Workflow
+```
+.                               # Root Go module (github.com/aws/smithy-go)
+├── auth/                       # Auth identity + scheme interfaces
+│   └── bearer/                 # Bearer token auth
+├── aws-http-auth/              # Separate module: AWS SigV4/SigV4A HTTP signing
+├── codegen/                    # Java/Gradle: Smithy code generator
+│   ├── smithy-go-codegen/      # Main codegen source (Java)
+│   └── smithy-go-codegen-test/ # Codegen integration tests
+├── container/                  # Generic container types
+├── context/                    # Context helpers
+├── document/                   # Smithy document type abstraction
+│   └── json/                   # JSON document codec
+├── encoding/                   # Wire format encoders/decoders
+│   ├── cbor/                   # CBOR (used by rpcv2Cbor)
+│   ├── httpbinding/            # HTTP binding serde helpers
+│   ├── json/                   # JSON encoder/decoder
+│   └── xml/                    # XML encoder/decoder
+├── endpoints/                  # Endpoint resolution types
+├── internal/                   # Internal utilities (singleflight, etc.)
+├── io/                         # I/O helpers
+├── logging/                    # Logging interfaces
+├── metrics/                    # Metrics interfaces
+│   └── smithyotelmetrics/      # Separate module: OpenTelemetry metrics adapter
+├── middleware/                 # Middleware stack (the core of the operation pipeline)
+├── ptr/                        # Pointer-to/from-value helpers
+├── testing/                    # Test assertion helpers for generated protocol tests
+│   └── xml/                    # XML comparison utilities
+├── time/                       # Smithy timestamp format helpers
+├── tracing/                    # Tracing interfaces
+│   └── smithyoteltracing/      # Separate module: OpenTelemetry tracing adapter
+└── transport/
+    └── http/                   # HTTP request/response types and middleware
+```
 
-Every task follows phases. Do not skip phases; if you realize you missed something, return to the appropriate phase.
+## Building and testing
 
-**Making changes:**
+### Runtime (Go)
 
-1. **Research** - Understand the problem and codebase before acting
-2. **Plan** - Articulate your approach before implementing (when asked, or for complex changes)
-3. **Implement** - Make changes in small, verifiable steps
-4. **Verify** - Confirm correctness using external tools
+```bash
+# Run unit tests
+make unit
+```
 
-For trivial changes (typo fixes, comment updates), an abbreviated workflow is acceptable.
+### Codegen (Java)
 
-## Research
+```bash
+# Build and test codegen
+cd codegen && ./gradlew build
 
-Research in sequential passes. Each pass has one focus. Don't skip ahead to code until you've completed the earlier passes.
+# Publish to local Maven for downstream use
+cd codegen && ./gradlew publishToMavenLocal
+```
 
-**Pass 1: Read the issue.** If you were given a link, read it now. Do not explore code, do not pass go. Fetch the linked issue or document first. Summarize what it asks for. If you cannot restate the problem, you are not ready to proceed.
+The codegen artifact version is fixed at `0.1.0` and is not published to
+Maven Central — you **MUST** `publishToMavenLocal`.
 
-**Pass 2: Read linked references.** Follow every link in the issue: related issues, RFCs, external docs. Document what you learn. Code comments reference RFC 6455 (WebSocket), RFC 7692 (compression), and RFC 8441 (HTTP/2).
+## Runtime architecture
 
-**Pass 3: Trace the code.** Start from public API inward: `Accept` (server) or `Dial` (client) → `Conn` → `Reader`/`Writer`. Read tests for intent; the autobahn-testsuite (`autobahn_test.go`) validates protocol compliance.
+### Middleware stack
 
-**Pass 4: Check both platforms.** Native Go files have `//go:build !js`. WASM lives in `ws_js.go`. Same API, different implementations. WASM wraps browser APIs and cannot control framing, compression, or masking.
+The operation pipeline is built on a middleware stack defined in `middleware/`.
+Steps execute in order: Initialize → Serialize → Build → Finalize →
+Deserialize. Each step is a `middleware.Step` that holds an ordered list of
+middleware. The codegen generates middleware registrations for each operation.
 
-**Pass 5: Search exhaustively.** If the change affects a pattern used in multiple places, grep for all instances. Missing one creates inconsistent behavior.
+### Encoding packages
 
-**Pass 6: Document unknowns.** List what you still don't know. Unknown unknowns become known unknowns when you ask "what am I still unsure about?"
+Each wire format has its own encoder/decoder under `encoding/`. These are
+low-level — they produce/consume raw tokens or values, not full Smithy shapes.
+Generated serde code calls into these packages.
 
-**After all passes:** Can you restate the problem in your own words? If not, return to Pass 1. Gaps in earlier passes will cause problems later.
+## Codegen: GoWriter and template system
 
-## Plan
+GoWriter extends Smithy's `SymbolWriter` and is the primary mechanism for
+generating Go source. It has **two distinct writing styles** that must not be
+confused.
 
-When asked to plan, write to `PLAN.md`. Write for someone else, not yourself; don't skip context you already know.
+### Style 1: Positional args (`writer.write` / `writer.openBlock`)
 
-**Pass 1: Document research.** Summarize what you learned in Research. Follow every reference; document findings so the implementer can verify. If the research section is empty, you haven't researched enough.
+Inherited from `SymbolWriter`. Arguments are positional and referenced with
+`$`-prefixed format characters. Each `$X` consumes the next argument in order.
 
-**Pass 2: Consider approaches.** For non-trivial problems, enumerate at least two approaches. For each, note: what would change, what could go wrong, what's the tradeoff.
+Format characters:
+- `$L` — Literal (toString). Strings, names, anything that should be inserted
+  verbatim.
+- `$S` — String, quoted. Wraps the value in Go double-quotes.
+- `$T` — Type (Symbol). Inserts the symbol name and auto-adds its import.
+- `$P` — Pointable type (Symbol). Like `$T` but prepends `*` if the symbol is
+  marked pointable.
+- `$W` — Writable. Evaluates a `Writable` (lambda/closure) inline.
+- `$D` — Dependency. Adds a `GoDependency` import, expands to empty string.
 
-**Pass 3: Detail the chosen approach.** Explain what and why, not step-by-step how. Point to specific files, functions, line numbers. Make claims verifiable. Leave room for the implementer to find a better solution.
+Numbered variants (`$1L`, `$2T`, etc.) allow reusing the same argument
+multiple times. The number is 1-indexed and refers to the position in the
+argument list:
 
-**Pass 4: List open questions.** What's still unclear? What assumptions are you making? What would change your approach?
+```java
+// $1L is used twice, $2L once — only 2 args needed
+writer.write("type $1L struct{}\nvar _ $2L = (*$1L)(nil)",
+    DEFAULT_NAME, INTERFACE_NAME);
+```
 
-**After all passes:** Review from the implementer's perspective. Could they start work with only this document? If not, add what's missing.
+`openBlock`/`closeBlock` manage indentation for braced blocks. Arguments are
+positional:
 
-## Implement
+```java
+writer.openBlock("func (c $P) $T(ctx $T) ($P, error) {", "}",
+    serviceSymbol, operationSymbol, contextSymbol, outputSymbol,
+    () -> {
+        writer.write("return nil, nil");
+    });
+```
 
-Implement in sequential passes. Don't write code until you've completed the verification passes.
+### Style 2: Named template args (`goTemplate` / `writeGoTemplate`)
 
-**Pass 1: Verify understanding.** Did you do your research? Can you state your approach in one sentence? If requirements are ambiguous, stop and ask. A wrong assumption wastes more time than a quick question.
+Uses `$name:X` syntax where `name` is a key in a `Map<String, Object>` and `X`
+is the format character. Arguments are passed as one or more maps. This is the
+**preferred style for new code** — it is more readable and less error-prone
+than positional args.
 
-**Pass 2: Check scope.** Does this need to exist? Check if it already exists in the API. Is this the library's job or the user's job? The library handles protocol correctness; application concerns (reconnection, auth, routing) belong in user code.
-
-**Pass 3: Check invariants.** Walk through Key Invariants before writing code:
-
-- Reads: Will something still read from the connection?
-- Pools: Will pooled objects be returned on all paths?
-- Locks: Are you using context-aware `mu`, not `sync.Mutex`?
-- Independence: Are you coupling reads and writes unnecessarily?
-
-**Pass 4: Implement.** Make the change. Every change needs a reason; if you can't articulate why it improves things, don't make it. Preserve existing comments unless you can prove they're wrong.
-
-**Pass 5: Verify examples.** Trace through usage examples as if writing real code. If an example wouldn't compile, the design is wrong. Check edge cases: what happens on error? On cancellation?
-
-**After all passes:** If feedback identifies a problem, fix that specific problem. Don't pivot to a new approach without articulating what failed and why the new approach avoids it.
-
-## Verify
-
-Verify using external signals. Self-assessment is unreliable; these tools are the ground truth.
-
+```java
+return goTemplate("""
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Dking08/croc-app](https://github.com/Dking08/croc-app) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
