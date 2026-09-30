@@ -1,82 +1,102 @@
 ---
 trigger: always_on
-description: Custom Bazel rules (`wd_*` macros) for C++, TypeScript, Rust, Cap'n Proto, and test orchestration. Uses bzlmod (`MODULE.bazel`), not WORKSPACE. This is build system definitions, NOT build output (`bazel-bin/`).
+description: An informal specification of how a `node:http` `Server` drives the web
 ---
 
-# build/ — Bazel Build Rules
+# node:http server × web streams
 
-## OVERVIEW
+An informal specification of how a `node:http` `Server` drives the web
+streams underneath it — the `Request` body it pumps into the
+`IncomingMessage`, and the `ReadableStream` the `ServerResponse` builds as
+the body of the `Response` it hands back to `fetch()` — derived from and
+kept in lockstep with the test suite in this directory. **The tests are
+the normative artifact**; this document maps behaviors to the tests that
+assert them. Every test runs against the C++ streams implementation
+(`http-server-cpp.wd-test`) and the TypeScript one
+(`http-server-ts.wd-test`). The general server surface (headers, options,
+ports, `listen`/`close` lifecycle, `cloudflare:node` helpers) is owned by
+`src/workerd/api/node/tests/http-server-nodejs-test.js`; this suite owns
+the STREAMS interaction only.
 
-Custom Bazel rules (`wd_*` macros) for C++, TypeScript, Rust, Cap'n Proto, and test orchestration. Uses bzlmod (`MODULE.bazel`), not WORKSPACE. This is build system definitions, NOT build output (`bazel-bin/`).
+The implementation under test is `src/node/internal/internal_http_server.ts`
+(`Server#onRequest`/`#toReqRes` and its `[captureRejectionSymbol]`, and
+`ServerResponse`: the Response promise, `#toFetchResponse`,
+`destroy`/`#emitClose`),
+`internal_http_incoming.ts` (`IncomingMessage#tryRead`, `_read`,
+`_destroy`) and the `OutgoingMessage` write path in
+`internal_http_outgoing.ts`.
 
-## KEY RULES
+## Infrastructure
 
-| Rule                                       | Purpose                                                                                           |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `wd_cc_library.bzl`                        | Wraps `cc_library`; `strip_include_prefix="/src"`, arch-specific CPU flags (CRC32C)               |
-| `wd_cc_binary.bzl`                         | Wraps `cc_binary`; macOS dead-strip linkopts; creates `_cross` alias for prebuilt arm64 binaries  |
-| `wd_cc_embed.bzl`                          | Binary/text data -> C++ via C23 `#embed`; auto-detects text vs binary by extension                |
-| `wd_cc_benchmark.bzl`                      | Google Benchmark wrapper; generates CSV report genrule                                            |
-| `wd_test.bzl`                              | `.wd-test` config test runner; generates up to 3 variants per test                                |
-| `kj_test.bzl`                              | C++ unit test wrapper; also generates test variants                                               |
-| `wpt_test.bzl`                             | Web Platform Tests; generates JS runner + `.wd-test` config from WPT tree; delegates to `wd_test` |
-| `wd_ts_bundle.bzl`                         | TypeScript compilation + JS bundle generation                                                     |
-| `wd_js_bundle.bzl`                         | JS bundle -> Cap'n Proto `Modules.Bundle` embedding via generated `.capnp`                        |
-| `wd_capnp_library.bzl`                     | Cap'n Proto schema compilation                                                                    |
-| `wd_rust_crate.bzl` / `wd_rust_binary.bzl` | Rust build rules                                                                                  |
-| `lint_test.bzl`                            | ESLint integration                                                                                |
-| `//tools/clang-tidy:workerd-lint`          | Custom clang-tidy plugin (source: `tools/clang-tidy/workerd-lint.c++`); ships the `jsg-visit-for-gc`, `workerd-consume`, and `workerd-unsafe-continuation-capture` checks |
+No sidecar. The worker is bound to itself as `SERVICE`; its default
+handler (`main.js`) routes every incoming Request to the current test's
+server through `handleAsNodeRequest`. `harness.js` offers the two ways a
+Request reaches a server:
 
-**Conventions:**
+- `env.SERVICE.fetch(...)`: through the service binding. The runtime pumps
+  bodies across it (the production shape); a cancellation on one side
+  reaches the other only once the exchange completes.
+- `dispatch(new Request(...))`: an in-isolate Request handed to the server
+  directly, so its body stream IS the test's stream and cancellation is
+  observable at once. Tests that need it call `remember(env, ctrl)` first.
 
-- `_cross` alias pattern: every `wd_cc_binary` gets a `name_cross` alias selecting prebuilt arm64 or source build
-- Test tags: `off-by-default`, `requires-container-engine`, `no-asan`, `no-coverage`
-- Variant generation controllable per-test via `generate_*_variant` booleans
-- `BUILD.*` files: overlay build files for third-party deps (sqlite3, zlib, simdutf, pyodide, wpt)
+Tests run sequentially, one server (`withServer`) at a time.
 
-## CLANG-TIDY PLUGIN
+## Core semantics
 
-`//tools/clang-tidy:workerd-lint` builds a shared-object clang-tidy plugin
-that adds workerd-specific static checks:
+### The request body
 
-- `jsg-visit-for-gc`: flags JSG resource types whose visitable fields
-  (`jsg::Ref`, `jsg::JsRef`, `jsg::V8Ref`, `jsg::Function`, `jsg::Promise`,
-  `jsg::BufferSource`, `jsg::Value`, etc., plus `kj::Maybe`/`Array`/`Vector`/
-  `OneOf` and `jsg::Optional` wrappers thereof) are missing from `visitForGc()`.
-- `workerd-consume`: flags calls to methods annotated with `WD_CONSUME` when
-  the call is made directly through `kj::Ptr` instead of through
-  `consume(kj::mv(ptr))->method(...)`.
-- `workerd-unsafe-continuation-capture`: flags lambdas passed to async sinks
-  (e.g. `kj::Promise::then`) that capture bare references, raw pointers, or
-  non-owning views.
+- The `Request` body is pumped into the `IncomingMessage` by one default
+  reader, acquired on the first `_read()` and held for the message's
+  lifetime; the pump reads until `push()` reports backpressure or EOF and
+  `_read()` restarts it with the same reader. A request without a body
+  (GET) ends at once with `complete` set.
+- Chunks arrive as Buffers (strings under `setEncoding`), whole and in
+  order; a body the client streams arrives incrementally and is chunked
+  (no Content-Length), a `FixedLengthStream` body announces its length. A
+  'data' listener attached inside the handler still sees the body.
+- `pause()` holds delivery, `resume()` continues it without loss, also for
+  a body larger than the high-water mark. `pipe()` to one or several node
+  destinations and `pipeline(req, TransformStream, res)` work; `pipe()` is
+  the Readable's: a destination's backpressure pauses the body and 'drain'
+  resumes it, the destination hears 'pipe'/'unpipe', a destination that
+  errors is unpiped (no further write reaches it), `unpipe()` stops
+  delivery and pauses a source left without destinations, and a source
+  error is not forwarded to the destination (that is `pipeline()`'s job).
+- `destroy()`: 'aborted' when the body was not complete, 'error' only when
+  the message has an 'error' listener (an unlistened `destroy(err)` is
+  swallowed), 'close' always; the body stream is cancelled with the destroy
+  reason (`undefined` for a bare `destroy()`), through the held reader when
+  the pump had acquired one, unless the body was already read to completion.
+  A read pending across `destroy()` is dropped, however the stream settles
+  it — also on the runtime's stream across the binding (ledger #1).
+- The body stream failing under the message — erroring mid-upload, or while
+  the handler has the message paused with a read pending underneath, or
+  yielding a chunk the message cannot take (a view over a detached
+  ArrayBuffer: the conversion's `TypeError`) — aborts it: 'aborted', the
+  error, 'close' with `complete` false; the response can still be sent.
+  `pause()` then `resume()` inside every 'data' loses nothing.
 
-Usage:
+### The response body
 
-- Run via `just clang-tidy <target>` (e.g., `just clang-tidy //src/workerd/api/...`).
-- Plugin sources live in `tools/clang-tidy/workerd-lint.c++` and
-  `tools/clang-tidy/unsafe-continuation-capture.c++`, built as a
-  `cc_shared_library` target `//tools/clang-tidy:workerd-lint`. The sources are
-  also exported via `exports_files` so downstream projects can rebuild
-  against their own clang/LLVM headers.
-- The clang-tidy binary itself is published to `cloudflare/workerd-tools`
-  releases (see `deps/build_deps.jsonc`, entries `clang_tidy_*`); the matching
-  `*_dev.tar.xz` archive provides the clang/LLVM headers needed to build the
-  plugin out-of-tree. Available for Linux amd64/arm64 and macOS arm64; a
-  single archive (linux-amd64) serves all platforms since the AST-matching
-  plugin doesn't depend on the arch-specific config macros that vary.
-- Wrapper script `build/tools/clang_tidy/clang_tidy_wrapper.sh` loads the
-  plugin via `--load=`.
-- Suppress an intentional non-visit with `// NOLINT(jsg-visit-for-gc)` plus a
-  comment explaining why the field is safe to skip (see `src/workerd/api/streams/queue.h`
-  for `ByteQueue::Entry::store` and `src/workerd/api/node/diagnostics-channel.h`
-  for `Channel::name`).
-
-### Incremental check rollout
-
-Some checks produce many warnings on existing code and need incremental rollout.
+- Headers go out at the first `write()`/`end()` (`writeHead()` only formats
+  them; the first write sends them implicitly if needed), which resolves
+  the `Response` — while the handler is still writing. The body is a
+  `new ReadableStream({ type: 'bytes' })`: writes before the headers are
+  buffered and flushed into it at that point, later writes are enqueued
+  as they come, so a client reads chunks before `end()`.
+- Every chunk type is delivered (string, Buffer, `Uint8Array`, explicit
+  encoding), empty writes contribute nothing, many small and large writes
+  arrive whole. A declared Content-Length caps the body (extra bytes
+  dropped, fewer sent as they are) at `parseInt`'s reading of it — a
+  non-numeric value leaves the body uncapped, zero or a negative value
+  drops every chunk, a fraction or padded number caps at its integer part.
+  (The header value itself is not validated; whether a malformed one keeps
+  reaching the client is deliberately unpinned.) 204 and 304, and the reply to a HEAD
+  (marked bodiless before the handler runs), have a null body and drop
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cloudflare/workerd](https://github.com/cloudflare/workerd) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
