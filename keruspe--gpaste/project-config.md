@@ -1,41 +1,31 @@
 ---
 trigger: always_on
-description: Three libraries, each exporting what is marked `G_PASTE_VISIBLE` (hidden default visibility) and each with GIR and Vala bindings:
+description: This file covers both the library under `src/libgpaste/gpaste-daemon/` and the executable under `src/daemon/`. The D-Bus interface rules it implements are in [`src/libgpaste/AGENTS.md`](../AGENTS.md).
 ---
 
-# `src/libgpaste/` — shared libraries
+# `src/daemon/` — `gpaste-daemon` + **libgpaste-daemon**
 
-Three libraries, each exporting what is marked `G_PASTE_VISIBLE` (hidden default visibility) and each with GIR and Vala bindings:
+This file covers both the library under `src/libgpaste/gpaste-daemon/` and the executable under `src/daemon/`. The D-Bus interface rules it implements are in [`src/libgpaste/AGENTS.md`](../AGENTS.md).
 
-- `gpaste-3/` → **libgpaste**: the daemon-agnostic types — `GPasteClient` (the D-Bus client), `GPasteClientItem` (an item as it travels over D-Bus), `GPasteSettings` (the GSettings wrapper), enums and utilities.
-- `gpaste-gtk4/` → **libgpaste-gtk4**: GTK4 + Adwaita helpers, the preferences widgets.
-- `gpaste-daemon/` → **libgpaste-daemon**: the daemon's objects, documented in [`gpaste-daemon/AGENTS.md`](gpaste-daemon/AGENTS.md).
+Most of the rationale behind what is described here is written as comments beside the code it explains; this file says what exists, where it lives, and the invariants that span several files. Read the comments of a function before changing it.
 
-## Headers, layout and pkg-config
+## Layout
 
-- **Every library splits its headers into an installed half and an internal one**, and a new header joins the internal half unless something outside the library names it. libgpaste-gtk4 installs exactly two types — the preferences dialog, and the preferences widget `prefs.js` embeds — while its groups, shortcut row and pages stay internal; its GIR is generated from `libgpaste_gtk4_public_sources` alone. The four pages are plain functions returning an `AdwPreferencesPage`, not types: they carry no state, and both callers build them from one list (`g_paste_gtk_preferences_pages_new()`). libgpaste's own lists are in `src/libgpaste/meson.build`, and libgpaste-daemon's split is described in its own `AGENTS.md`.
-- **The core library's directory carries `apiversion`**, so it is renamed on every major bump (`gpaste-2/` → `gpaste-3/` for 51.0), and its includes are spelled `<gpaste-3/gpaste-macros.h>`. The same include text resolves in-tree (through `include_directories('.')` = `src/libgpaste`) and against the install prefix, which is what makes a broken installed header a build failure here rather than downstream. `gpaste-gtk4/` and `gpaste-daemon/` are named for their library and never move.
-- **The installed layout** is one shared directory:
+The background service owns the clipboard history and exposes it over D-Bus (`org.gnome.GPaste`).
 
-  ```
-  include/gpaste/{gpaste.h, gpaste-gtk4.h, gpaste-daemon.h}   <- the three umbrellas
-  include/gpaste/{gpaste-3/, gpaste-gtk4/, gpaste-daemon/}    <- per-library headers
-  ```
+- Almost all of its objects live in the installed, introspectable **libgpaste-daemon** library: sources under `src/libgpaste/gpaste-daemon/`, umbrella header `src/libgpaste/gpaste-daemon.h`, `GPasteDaemon-1` GIR/typelib. Its types keep the `GPaste`/`g_paste_` prefix, so the GIR passes an explicit `identifier_prefix: 'GPaste'` / `symbol_prefix: 'g_paste'` to place them in the `GPasteDaemon` namespace.
+- **Headers are split in `meson.build`**, and the distinction is real. `gpaste_daemon_public_headers` are installed, introspected and included by the `gpaste-daemon.h` umbrella: seven because the extension drives them (`GPasteBus`, `GPasteDaemon`, `GPasteSearchProvider`, `GPastePrompt` — which `prompt.js` implements — `GPastePassphrase`, `GPasteStorageMigration`, and `GPasteStorageBackend` for its static passphrase helpers), and eight more only because those pull them in (`g_paste_daemon_new()` needs the clipboard provider, hence the history, hence the items). `gpaste_daemon_internal_headers` are compiled in but **never installed nor introspected**; in-tree consumers (`src/daemon/`, `src/ui/`, `tests/`) reach them through `gpaste_daemon_headers_dep`'s `include_directories`. The optional features append to the internal lists, so the GIR does not change shape with the feature set. **A new header is internal unless the extension needs it**: the umbrella may only include installed headers, and a public header is a commitment in the GIR.
+- The utility helpers nothing outside the library calls live in `gpaste-daemon-util.h` (the history-path helpers, the file backend's XML escaping). `g_paste_util_history_name_is_valid()` is not one of them: a client asks it too before sending a name, so it is installed in `gpaste-3/gpaste-util.h` beside `G_PASTE_DEFAULT_HISTORY`.
+- `src/daemon/gpaste-daemon.c` is the thin executable entry point that links it. What stays in `src/daemon/` is what only that executable uses: the **GDK clipboard backend** (`gpaste-clipboard-gdk.{c,h}` and its `gpaste-text-content-provider.{c,h}`) — which is why `gtk4-x11` is a dependency of the executable and not of the library — and the Adwaita prompt (below). They are compiled straight into the binary, include each other with quoted local includes, and carry no `G_PASTE_VISIBLE`: nothing exports them.
 
-  so all three `.pc` files declare `Cflags: -I${includedir}/gpaste` (meson `subdirs: 'gpaste'`), the line to check when the layout changes. `libgpaste` is versioned all the way through from `apiversion` (`libgpaste-3.so`, `gpaste-3.pc`, `GPaste-3`, `gpaste-3.vapi`); `libgpaste-gtk4`'s `4` is GTK's and `GPasteDaemon-1`'s is its own, so neither tracks the GPaste major.
-- **Each library ships a `.pc`** (`gpaste-3`, `gpaste-gtk4`, `gpaste-daemon`). `requires:` is what a *consumer* must also satisfy — what the installed headers name, not what the library links — so `gpaste-daemon` requires only `gpaste-3`: no public daemon header names a GTK, GDK or GCR type, and those stay in the `Requires.private:` meson derives from `dependencies:`, with the optional libsodium, sqlite3, libsecret-1 and libmutter (`pwquality` is on `gpaste-3`, where the rating lives). Use `requires:`, never `libraries:`, which means `Libs:`.
+## Items, keybindings and the history model
 
-## Settings
-
-**Observe a setting with `notify::<key>`.** Every setting is a GObject property named exactly like its GSettings key, so there is no separate `changed` signal and `g_object_bind_property()` works directly; the callback takes a `GParamSpec *`, not the key. Prefer the detailed form: undetailed `notify` fires for all twenty-nine keys. `GPasteSettings`' one signal of its own, **`rebind::<key>`**, is an action to take (re-register a keybinding), carried only by the keybinding settings.
-
-## D-Bus
-
-Every interface GPaste speaks is described by an XML file that `gdbus-codegen` turns into both halves of the wire. **`data/dbus/org.gnome.GPaste3.xml` is the contract**: its comments document every method, signal and property, and are the first thing to read and to update when the interface changes. What follows is how the tree is built around it.
-
-- **The XML is the source of truth**, installed to `$datadir/dbus-1/interfaces` (`dbus-1.pc`'s `interfaces_dir`, overridable with `-Ddbus-interfaces-dir`). `src/libgpaste/gpaste-daemon/org.gnome.Shell.SearchProvider2.xml` is gnome-shell's interface, kept only to feed codegen and deliberately **not** installed.
-- **The generated code is internal**: produced by `gnome.gdbus_codegen()` from `src/libgpaste/gpaste-3/meson.build` and `src/libgpaste/gpaste-daemon/meson.build` (which exist so the output lands where the `<gpaste-3/…>` include style works), never installed, never introspected. `GPasteClient` is the whole public story. `grep -c Daemon3 build/src/libgpaste/GPaste-3.gir` must stay `0`.
-- **`org.gnome.GPaste3` is generated into libgpaste**, the lowest library, because a GType registers once per process and gnome-shell loads libgpaste and libgpaste-daemon together. libgpaste-daemon uses the skeleton, so the declarations carry `G_PASTE_VISIBLE` through `--symbol-decorator`.
+- **Clipboard watching** (primary + clipboard selections) goes through the backend-agnostic `GPasteClipboardProvider` interface (see Clipboard backends).
+- **Items**: the abstract `GPasteItem` base and the five kinds deriving from it directly — `GPasteTextItem`, `GPastePasswordItem`, `GPasteColorItem`, `GPasteImageItem`, `GPasteUrisItem` — plus the `GPasteSpecialMime`/`GPasteBinaryData` helpers and `GPasteSensitiveMime`. The UI and client use libgpaste's lightweight `GPasteClientItem` instead. **The hierarchy is flat on purpose**: a kind deriving from `GPasteTextItem` without inheriting anything from it would make `G_PASTE_IS_TEXT_ITEM()` true for something that is not text, and would force `g_paste_item_equals()` to dispatch both ways. The base's `equals` compares kind and value, which is symmetric; only the image (checksum) and the password (a named one never matches, a nameless one matches by value) override it.
+- **Keyboard shortcuts** are registered through the XDG GlobalShortcuts portal alone (`GPasteGlobalShortcutClient`, used directly by `GPasteKeybinder`); when the portal is unavailable, they are disabled. The keybinder, whose comments carry the reasons (`gpaste-keybinder.c`):
+  - honours the `keybindings-enabled` master switch by handing the client an empty set, caching in `self->enabled` the value it last applied (seeded in `g_paste_keybinder_new()`), and rebinding only when the setting no longer matches it;
+  - debounces rebinds on a 250 ms timeout re-armed by every write, the source holding the keybinder weakly;
+  - deactivates every keybinding before activating them (edited accelerators are only re-parsed that way), but never ungrabs: `grab_all()` replaces the client's whole set in one call, which is what lets it recognise an unchanged set and stay put. That is also why a switch flipped and flipped back, or an accelerator written back to its own value, needs no special case — and why there is no public `deactivate_all()` counterpart to `g_paste_keybinder_activate_all()`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
