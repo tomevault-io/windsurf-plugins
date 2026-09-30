@@ -1,63 +1,111 @@
 ---
 trigger: always_on
-description: Claude Command Center is a multi-session Claude Code terminal orchestrator built with Electron 33, React 18, TypeScript, and Tailwind CSS v4. It manages multiple Claude Code CLI sessions in parallel, with features like SSH remoting, vision/browser control, cloud agents, tokenomics tracking, and a memory visualizer.
+description: Canonical instructions for any AI agent or contributor working in this repo. This
 ---
 
-# Copilot Instructions - Claude Command Center
+# AI Code Conductor — agent & contributor brief
 
-## Project Overview
+Canonical instructions for any AI agent or contributor working in this repo. This
+is the cross-tool standard file (read by Claude Code via `@AGENTS.md` in
+`CLAUDE.md`, and directly by Codex, Cursor, Copilot, and others). Read it before
+making changes.
 
-Claude Command Center is a multi-session Claude Code terminal orchestrator built with Electron 33, React 18, TypeScript, and Tailwind CSS v4. It manages multiple Claude Code CLI sessions in parallel, with features like SSH remoting, vision/browser control, cloud agents, tokenomics tracking, and a memory visualizer.
+Multi-session Claude Code terminal orchestrator built with Electron 42 + React 19
++ TypeScript.
 
-## Tech Stack
+## Session isolation — do this FIRST
 
-- **Runtime**: Electron 33 (main + renderer + preload)
-- **UI**: React 18 with Zustand 5 for state management
-- **Styling**: Tailwind CSS v4 with `@theme` directive in `src/renderer/styles.css` (no tailwind.config)
-- **Terminal**: xterm.js 5.5 with WebGL addon, node-pty for PTY management
-- **Build**: electron-vite, electron-builder for packaging
-- **Testing**: Vitest (unit), Playwright (E2E)
-- **Color palette**: Catppuccin Mocha - use theme tokens (base, mantle, crust, surface0-2, overlay0-2, subtext0-1, text, blue, green, red, yellow, peach, mauve, teal, etc.)
+Several agents run against this repo simultaneously. **One session = one worktree
+= one branch.** Before changing anything, claim your own:
 
-## Architecture Rules
+```bash
+node scripts/session-guard.mjs claim --base beta   # or: adopt (already in one)
+```
 
-- All renderer↔main communication goes through IPC channels defined in `src/shared/ipc-channels.ts`
-- Never import Node.js modules (fs, path, os, child_process) in renderer code - use the preload bridge
-- IPC handlers live in `src/main/ipc/` with one file per domain
-- Config is persisted as JSON files via `src/main/config-manager.ts`
-- Stores are in `src/renderer/stores/` using Zustand - hydrated from config on startup
+Work only in the directory it prints, and prefer `git -C "<that dir>" …` over
+relying on the current directory. Never work in the primary checkout or another
+session's worktree — their branch can change under you and they may hold
+uncommitted work. A `PreToolUse` hook denies writes and mutating git outside the
+worktree you own; `CCC_SESSION_GUARD=off` is the escape hatch. See
+`docs/session-isolation.md` and ADR-012.
 
-## Coding Style
+## Ticket creation & premise review — policy
 
-- Use named exports. Default exports only for React components that are the sole export of their file
-- Prefer `const` over `let`. No `var`
-- Use TypeScript strict mode patterns - avoid `any` where possible
-- Keep components focused - if a file exceeds ~400 lines, consider splitting
-- Use Catppuccin color tokens in Tailwind classes, not raw hex values
-- Inline SVG icons - no icon library dependencies
+**Every repo change starts from a GitHub issue, and every issue carries a premise
+review.** Two standing gates bracket a change: a *premise* review at creation, and
+an *adversarial* review before merge (ADR-009). This is the first one.
 
-## Common Gotchas
+Before you file an issue — whether you are a human or an agent — state its
+**premise** and check it holds:
 
-- esbuild (used by electron-vite) does not support `\u{...}` Unicode escapes in JSX - use `String.fromCodePoint()` or inline SVGs instead
-- PTY write chunking: only chunk large writes (>256 bytes, 12ms delay). Never queue all PTY writes - this was tried in v1.2.113 and caused severe input lag
-- xterm.js scrollback must stay at 10000 max - higher values cause ~1GB RAM per terminal
-- Modal backdrop clicks: never put `onClick={onCancel}` on backdrop divs because Ctrl+C triggers click events
-- SSH sessions use base64-encoded setup scripts - comments in the script body break single-lining
+- **The problem, and the evidence it is real.** Not "X would be nice" but "X is
+  broken/absent, here is where (`file:line`), here is what happens." Ground it in
+  the code as it is now, not as you remember it.
+- **Why it is still open.** This repo moves fast; a surprising amount of proposed
+  work is already shipped or half-shipped. Check recent merges before asserting a
+  problem exists — a STALE premise is the most common and most wasteful defect.
+- **Why now / what it blocks.** Enough for triage to place it on a release line.
 
-## Testing
+An agent that files an issue **must** include a short premise-assessment section in
+the body (problem · evidence · still-open · why-now). An issue without one is
+incomplete and should be sent back, exactly as a security-sensitive PR without an
+adversarial pass would be.
 
-- Unit tests in `tests/unit/` using Vitest with mocked Electron APIs
-- E2E tests in `tests/e2e/` using Playwright
-- Run `npx vitest run` for unit tests, `npx playwright test` for E2E
-- When adding IPC handlers, add corresponding Zod validation schemas
+For the existing backlog that predates this policy, the `/LoopReady` skill runs the
+premise review in bulk (a cheap Fable fan-out) and labels each ticket
+`loop-ready` / `loop-needs-human`; `/StartLoop` re-checks the premise once more
+before spending real model budget executing it. See
+`.claude/skills/LoopReady/SKILL.md` and `.claude/skills/StartLoop/SKILL.md`. These
+are AI Code Conductor-only; they encode this repo's `beta` / session-guard /
+ADR-009 / label conventions and are not the aai-core loop skills.
 
-## Branching Model
+## Build & Run
 
-- `beta` is the working branch - all features land here first
-- `main` is stable-only - updated via reviewed PRs from beta
-- Beta releases: `npm run release -- --beta` from beta branch
-- Stable releases: merge beta→main, then `npm run release -- --stable --no-bump` from main
+```bash
+npm run dev          # Development with HMR (prefer the `ccc` launcher — see below)
+npm run build        # Production build (electron-vite)
+npm run typecheck    # tsc --noEmit
+npm run test:unit    # vitest
+npm run test:e2e     # playwright
+npm run test         # both
+```
+
+- Prefer the `ccc` launcher for dev — it isolates dev data from prod and cleans
+  up all dev processes on exit. See `docs/dev-alongside-prod.md`.
+- **Never run `npm install` in a worktree — use `npm ci` (#226).** `npm install`
+  rewrites the tree and can leave it looking fully installed while Electron's own
+  binary is absent: `node_modules/electron/` exists, `package.json` is satisfied
+  and `npm ls` is clean, but `path.txt` and `dist/electron.exe` are gone. The
+  repo's `postinstall` only rebuilds the two native addons, so nothing replaces
+  them. electron-vite then dies with an opaque `Error: Electron uninstall`, the
+  launcher window closes instantly, and the real message is only in
+  `dev-logs/ccc-dev-*.log`. `predev` (`scripts/preflight-electron.mjs`) now
+  detects this and re-runs Electron's installer before dev starts, but the rule
+  stands: `npm ci`, and it must be run in the worktree you are working in.
+
+## Architecture
+
+- **Main process** (`src/main/`): Electron main, PTY management (node-pty), IPC handlers, config persistence, statusline, vision MCP server, cloud agents, tokenomics
+- **Renderer** (`src/renderer/`): React 19 SPA with Zustand stores, xterm.js terminals, Tailwind CSS v4
+- **Preload** (`src/preload/`): IPC bridge - all renderer↔main communication goes through typed channels
+- **Shared** (`src/shared/`): Types and IPC channel constants used by both processes
+
+### Key patterns
+
+- IPC handlers are in `src/main/ipc/` - one file per domain (pty, config, logs, etc.)
+- Config persistence via `src/main/config-manager.ts` - JSON files in a user-selected resources directory
+- Stores in `src/renderer/stores/` - Zustand, hydrated from config on startup
+- Terminal rendering via xterm.js with WebGL addon
+- SSH sessions use node-pty to spawn ssh.exe, with automated setup scripts for statusline/vision
+
+## Coding Conventions
+
+- No default exports (except React components that are the sole export of their file)
+- Tailwind v4 with `@theme` in `src/renderer/styles.css` - no tailwind.config file
+- Catppuccin Mocha color palette (base, mantle, crust, surface0-2, overlay0-2, subtext0-1, text, etc.)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nubbymong/claude-command-center](https://github.com/nubbymong/claude-command-center) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
