@@ -4,85 +4,47 @@ description: <!-- Parent: ../../AGENTS.md -->
 ---
 
 <!-- Parent: ../../AGENTS.md -->
-<!-- Generated: 2026-08-27 | Updated: 2026-08-27 -->
+<!-- Generated: 2026-09-26 | Updated: 2026-09-27 -->
 
-# replication-store-worker
+# obsidian-plugin
 
 ## Purpose
 
-Runs a headless replica of the editor document off the main thread, so the VSCode host can persist
-`.erd` files without serializing on the UI thread. The webview forwards the raw action stream in; the
-worker feeds it to `createReplicationStore` from `@dineug/erd-editor/engine.js` and emits the
-serialized document back only when the store reports a `change`. Consumed by both IDE webviews,
-`vscode-webview` and `intellij-webview`, through `mountWebview` in `webview-client`, which calls `createReplicationStoreWorker`;
-the VSCode one inlines the worker file in its own build, the IntelliJ one loads it from its URL.
-`private: true`.
+The Obsidian plugin: a `TextFileView` that puts `<erd-editor>` in a tab for `.erd` / `.vuerd` files, and for `.erd.json` / `.vuerd.json` through a wrapped `WorkspaceLeaf.openFile`. Each vault window also serves the document hub `agent-hub` specifies, over `agent-hub-host`, so a coding agent running `@dineug/erd-editor-mcp` edits the diagrams open in that window live, as it does in VS Code; the Coding agents setting turns it off. The theme (appearance, gray and accent color) is a per-vault setting the editor's own theme builder changes too, as in VS Code. `dist/` (`main.js`, `manifest.json`, `styles.css`) is the whole plugin folder. It is released from `dineug/erd-editor-obsidian-plugin`, which carries this repository as a submodule, keeps a copy of `manifest.json` at its root for Obsidian's version check, and attaches `dist/` to a GitHub release tagged with the manifest version.
 
 ## Key Files
 
 | File | Description |
 | --- | --- |
-| `src/index.ts` | Exports `createReplicationStoreWorker(options)`, which is `new Worker(new URL('./services/replicationStore.worker.ts', import.meta.url), { type: 'module', name })` |
-| `src/services/replicationStore.worker.ts` | Worker body — builds the store, registers the two inbound commands, and dispatches `hostSaveValueCommand` after a replica change |
-| `vite.config.ts` | `defineLibraryConfig(import.meta.url, { dts, workers: true })` — the standard factory plus its worker half, so `dist/` is `index.js` and `workers/replicationStore.worker.js`, and the URL in `index.js` is the relative spelling `tools/vite/worker-url.ts` writes |
-
-## Subdirectories
-
-| Directory | Purpose |
-| --- | --- |
-| `src/services/` | The worker entry itself |
-| `src/utils/` | `toWidth`, the text-metrics function handed to the engine context |
+| `src/main.ts` | The plugin: view and extension registration, the `openFile` wrapper, the export callback, the create command, the registry from load on, the theme (`ThemeHost`, `setTheme`, `applyTheme` over every ERD leaf, the `css-change` handler), the one `quit` and one `pagehide` handler, which write every ERD tab's unsaved value (`saveBeforeExit`) and then release the hub, the hub (`startHub`, none in a Flatpak), the vault adapter the hub opens and creates files through, the settings tab |
+| `src/ErdView.ts` | The tab: load, the replica worker that serializes every save, the live relay between tabs of one file, the seeding of a tab opened beside others, `saveBeforeExit` (the synchronous write of the unsaved value on quit and pagehide, a quit task only while a write is under way), the read-only fallback, the theme builder's `changePresetTheme`, the `scope` that keeps Obsidian's hotkeys off the editor's shortcuts; implements `HubTab` |
+| `src/settings.ts` | `PluginSettings` (`data.json`), `DEFAULT_SETTINGS`, `readSettings` / `readTheme` (unknown values fall back), `resolveTheme` (auto against Obsidian's light or dark), `themeFromBuilder`, the `ThemeHost` a tab themes through |
+| `src/tabSave.ts` | `viewData`, `currentValue`, `hasUnsavedValue`: what a tab hands Obsidian to save, as pure functions of `TabSaveState`; `exitSave`, whether the window going writes that value now, leaves it to a quit task or leaves the file as it is; `seedValue`, the text a waiting tab loads |
+| `src/keys.ts` | `scopeKeysOf` / `toScopeKey`: the editor's tinykeys shortcuts as the modifiers and key `Scope.register` takes, each press once |
+| `src/icon.ts` | `ERD_ICON` / `ERD_ICON_SVG`: the icon of the tab and of the New ERD menu item, the logo's two tables and their link in lines |
+| `src/loadErdEditor.ts` | Requires `@dineug/erd-editor` once per window |
+| `src/hub/registry.ts` | `DocumentRegistry`: the tabs of each file, the writer, readiness, relays, the content mirror, the quiet state, joins, `seedWhenQuiet`, the active document (`setActive`, `keepActive`), renames, the lock's documents, `shutdown` |
+| `src/hub/handlers.ts` | `createDocumentHandler`: `listDocuments`, `openDocument`, `join`, `applyActions`, `leave`, `save`, `disconnect` over the registry and the vault |
+| `src/hub/host.ts` | `HubSwitch` (the Coding agents setting with listeners), `createObsidianHost` (ide `obsidian`, the vault folder), `pidSandbox` (Flatpak, where the window starts no hub) |
+| `src/hub/runtime.ts` | `createHubRuntime`: one `ManagedRuntime` of the registry's layers and `documentHubLayer`; `start`, `dispose`, `releaseSync` |
+| `src/hub/lifecycle.ts` | `HubLifecycle`: start after an earlier instance of the window closed, stop in order (`documentClosed`, drain, dispose), `releaseSync` |
+| `src/hub/types.ts` | `HubTab`, `HubVault`, `VaultFile`, `CreateOutcome` — what `main.ts` and `ErdView.ts` implement |
+| `src/hub/imports.test.ts` | Holds `src/hub/` to no runtime import of `obsidian` and effect to its named entries |
+| `src/__test-utils__/hub.ts` | `createHubHarness` (a registry and handler over a memory disk and a vault double), `FakeTab`, connection doubles, `servePeer` (the shipping `serveConnection` on a real socket) |
+| `vite.config.ts` | CommonJS library build into `dist/`, `inlineUrlWorkers` with the shared `base64InlineWorkers`, `pluginFiles`, `noBrowserExternal`, `run.tasks.build` and `run.tasks.test` |
+| `vitest.config.ts` | Node environment; coverage over `src/hub/**`, `src/keys.ts`, `src/settings.ts` and `src/tabSave.ts`, perFile 80% on all four metrics |
+| `manifest.json` / `versions.json` | Obsidian's plugin metadata; the release repository copies both to its root |
+| `styles.css` | The tab layout and the containment override |
+| `e2e/smoke.mjs` | `pnpm --filter @dineug/erd-editor-obsidian-plugin smoke` (see Testing Requirements) |
+| `e2e/mcp.mjs` | The smoke's MCP client: JSON-RPC lines over the real server's stdio |
 
 ## For AI Agents
 
 ### Working In This Directory
 
-- **The worker is a file; the VSCode webview inlines it, IntelliJ loads it.** `dist/workers/replicationStore.worker.js`
-  imports `@dineug/erd-editor/engine.js` and the bridge bare, because both are `dependencies` and the
-  worker build keeps the page's external list; a consumer's bundler treats it as an entry of its own,
-  and `vscode-webview`, which cannot load a worker across its two origins, turns the URL back into an
-  inline worker through `tools/vite/inline-worker.ts`.
-- Import `@dineug/erd-editor/engine.js` (DOM-free), never the package root, which registers custom
-  elements and throws in a worker. `tsconfig.json` replaces the inherited `lib` with
-  `["ES2022", "WebWorker"]`, so `document` does not typecheck here.
-- `toWidth` measures with a lazy `OffscreenCanvas(0, 0)` 2d context at `400 12px`, falling back to
-  `text.length * 10`. It is the one copy both IDE webviews replicate with — a divergent font or
-  `TEXT_PADDING` drifts replicated column widths in both.
-- Three commands cross this boundary: in `webviewInitialValueCommand` and
-  `webviewReplicationCommand`, out `hostSaveValueCommand`. A fourth means editing `webview-bridge`
-  and `vscode-webview` too.
-- The webview sends both the initial value and raw editor actions into this worker. The worker's
-  `change` callback serializes the current value and sends it back to the host; it does not own the
-  VSCode document or perform transport-level replication.
 
-### Testing Requirements
-
-- No test task and no scripts. Verify with
-  `pnpm exec vp run --filter @dineug/erd-editor-replication-store-worker --fail-if-no-match build` (`tsc --noEmit`, then `vp build`).
-- Nothing automated exercises the worker at runtime. Real verification is the VSCode Extension Host:
-  open a `.erd` file, edit, confirm the file on disk changes — failure is silent, edits never persist.
-- Changing `createReplicationStore`'s signature also breaks `app` — `pnpm build`; `intellij-webview` reaches it through this package.
-
-### Common Patterns
-
-- Messaging is raw `globalThis.postMessage` / `addEventListener('message')` plus `Bridge`, not Comlink.
-- Both listeners destructure their payload straight into `store.setInitialValue` / `store.dispatch`;
-  the disposer `Bridge.mergeRegister` returns is dropped — the worker lives as long as the page.
-
-## Dependencies
-
-### Internal
-
-`@dineug/erd-editor` (the `engine.js` entry) and `@dineug/erd-editor-webview-bridge` are `dependencies`,
-so the worker file imports them bare and the consuming webview resolves them once for page and worker
-alike.
-
-### External
-
-Build-only: `vite-plugin-dts` with `@typescript/typescript6`.
-
-<!-- MANUAL: notes added below this line are preserved on regeneration -->
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dineug/erd-editor](https://github.com/dineug/erd-editor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
