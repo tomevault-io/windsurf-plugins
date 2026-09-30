@@ -98,8 +98,8 @@ Access modules statically: `App::mod<Renderer>()`, `App::has_mod<Physics>()`. Co
 modules and have their own accessors: `App::get_vfs()`, `get_job_manager()`, `get_event_system()`,
 `get_rendercontext()`, `get_window()`, `get_timestep()`. `App::defer_to_next_frame(fn)` queues work.
 
-`Core/DefaultModules.hpp` is the canonical registration order: LuaManager, AssetManager, AudioEngine,
-Physics, Input, NetworkManager, Renderer, DebugRenderer, ImGuiRenderer, RmlUI.
+`Core/DefaultModules.hpp` is the canonical registration order: LuaManager, AudioEngine, AssetManager,
+Physics, Input, NetworkManager, Renderer, ImGuiRenderer, RmlUI.
 
 `EventSystem` (`Core/EventSystem.hpp`) is a typed pub/sub bus keyed on `std::type_index`; event types
 are plain copyable structs (`WindowResizeEvent`, `AppCloseEvent`, `Editor::ScenePlayEvent`, ...).
@@ -109,4 +109,4 @@ are plain copyable structs (`WindowResizeEvent`, `AppCloseEvent`, `Editor::Scene
 
 ---
 > Source: [oxylusengine/Oxylus](https://github.com/oxylusengine/Oxylus) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
