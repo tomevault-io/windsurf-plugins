@@ -1,17 +1,17 @@
 ---
 trigger: always_on
-description: 本文档为 Claude Code (claude.ai/code) 提供仓库开发指南。
+description: **R2 Web** — 纯客户端 Cloudflare R2 存储桶文件管理器，零构建、零框架、零后端。
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-本文档为 Claude Code (claude.ai/code) 提供仓库开发指南。
+本文档为本仓库提供开发指南。
 
 ## 项目速览
 
 **R2 Web** — 纯客户端 Cloudflare R2 存储桶文件管理器，零构建、零框架、零后端。
 
-**核心特性** 文件上传、目录浏览、文件预览、文件操作、图片压缩、PWA、多语言（zh/en/ja）、浅色/深色主题、多选批量操作。
+**核心特性** 文件上传、目录浏览、文件预览、文件操作、图片压缩、PWA、多语言（zh/zh_TW/en/ja）、浅色/深色主题、多选批量操作。
 
 **快速启动**
 
@@ -25,16 +25,16 @@ python3 -m http.server 5500 --directory src
 
 ### 快速定位表
 
-| 任务               | 文件                                        |
-| ------------------ | ------------------------------------------- |
-| 修改文件名模板逻辑 | `src/js/utils.js` — `applyFilenameTemplate` |
-| 修改图片压缩逻辑   | `src/js/upload-manager.js` — `compressFile` |
-| 添加 i18n 文案     | `src/js/i18n.js` — `const I18N`             |
-| 修改按钮样式       | `src/css/components.css` — `.btn`           |
-| 添加设计 Token     | `src/css/tokens.css`                        |
-| 修改 R2 API 操作   | `src/js/r2-client.js`                       |
-| 修改文件浏览逻辑   | `src/js/file-explorer.js`                   |
-| 修改上传管理逻辑   | `src/js/upload-manager.js`                  |
+| 任务               | 文件                                                                        |
+| ------------------ | --------------------------------------------------------------------------- |
+| 修改文件名模板逻辑 | `src/js/utils.js` — `applyFilenameTemplate`                                 |
+| 修改图片压缩逻辑   | `src/js/upload-manager.js` — `compressFile`                                 |
+| 添加 i18n 文案     | `src/js/i18n.js` — `const I18N`                                             |
+| 修改按钮样式       | `src/css/components.css` — `.btn`                                           |
+| 添加设计 Token     | `src/css/tokens.css`                                                        |
+| 修改 R2 API 操作   | `src/js/r2-client.js`                                                       |
+| 修改文件浏览逻辑   | `src/js/file-explorer.js`                                                   |
+| 修改上传管理逻辑   | `src/js/upload-manager.js`                                                  |
 | 多选批量操作逻辑   | `src/js/file-explorer.js` — `toggleSelect` / `selectAll` / `clearSelection` |
 
 ### 工具函数列表
@@ -81,34 +81,6 @@ r2-web/
           └── animations.css  — 动画与过渡
 ```
 
-## 开发环境
-
-### 依赖管理
-
-**重要** `package.json` 依赖仅用于类型提示，运行时通过 `import map` 从 CDN 加载。
-
-添加新依赖：
-
-```bash
-# 1. 安装获取类型定义
-pnpm add -D package-name@x.y.z
-
-# 2. 在 src/index.html 的 <script type="importmap"> 中添加映射
-# {
-#   "imports": {
-#     "package-name": "https://esm.sh/package-name@x.y.z"
-#   }
-# }
-
-# 3. 在对应模块（如 src/js/utils.js）中导入使用
-# import { something } from 'package-name'
-```
-
-### 类型检查
-
-- JSDoc 注释提供类型信息
-- 运行 `pnpm typecheck` 验证类型
-
 ## 架构速查
 
 ### JavaScript 类架构
@@ -126,71 +98,49 @@ pnpm add -D package-name@x.y.z
 | `FileOperations` | `file-operations.js` | 重命名、复制、移动、删除（递归删除目录）     |
 | `App`            | `app.js`             | 主协调器、i18n 处理                          |
 
-**应用初始化** 在 `src/main.js`：
+## i18n 速查
 
-```javascript
-// 启动应用，构造函数内部自动创建所有管理器并初始化
-new App()
-```
+### 多语言机制
 
-`App` 构造函数内部会自动创建 `ConfigManager`、`R2Client`、`UIManager`，然后根据配置状态决定是否初始化文件浏览器等其他管理器。
+- **I18N 对象** `src/js/i18n.js`（zh / zh_TW / en / ja 四语言）
+- **翻译函数** `t(key, vars)` 支持变量替换
+- **支持语言** zh（中文）、zh_TW（繁体）、en（英语）、ja（日语）
+- **语言切换** `App.updateLanguage()` 自动更新所有文案
 
-### 列表缓存机制
+### 添加新文案
 
-`FileExplorer` 类内置缓存机制（搜索 `#cache`），缓存文件列表 5 分钟，减少 API 请求。
-
-```javascript
-/** @typedef {{ data: { folders: FileItem[], files: FileItem[], isTruncated: boolean, nextToken: string }, ts: number }} CacheEntry */
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
-#cache = new Map()
-
-// 缓存键包含 continuationToken，分页独立缓存
-const cacheKey = `${prefix}::${continuationToken}`
-
-// 刷新时可传 bypassCache = true 强制重新加载
-await #loadPage(isInitial, bypassCache = false)
-```
-
-## CSS 速查
-
-### CSS Layers
-
-样式通过 `@layer` 组织优先级（`src/style.css`）：
-
-```css
-@layer reset, tokens, base, layout, components, utilities, animations;
-
-@import './css/reset.css';
-@import './css/tokens.css';
-/* ... */
-```
-
-### 设计 Token
-
-所有样式值通过 CSS 自定义属性定义（`src/css/tokens.css`）：
-
-**Token 类别**
-
-- **间距** `--sp-*`（1/2/3/4/5/6/8/10/12）
-- **字体** `--text-*`（xs/sm/base/md/lg/xl）
-- **颜色** `--bg-*`、`--text-*`、`--border-*`（light-dark 自适应）
-- **圆角** `--radius-*`（sm/md/lg/xl/full）
-- **动画** `--duration-*`（fast/normal/slow）、`--ease-*`（out/in-out）
-- **Z-index** `--z-*`（dropzone/upload-panel/context-menu/dialog/toast/tooltip）
-
-**使用方式** 在 `src/css/tokens.css` 查看完整定义。
+1. 在 `src/js/i18n.js` 的 `I18N` 对象添加 zh / zh_TW / en / ja 键值
+2. 代码中使用 `t('key')` 或 `t('key', { var: 'value' })`
+3. HTML 元素使用 `data-tooltip-key="key"` 支持动态更新
 
 **示例**
 
-```css
-.card {
-  padding: var(--sp-4);
-  gap: var(--sp-2);
-  font-size: var(--text-base);
-  color: var(--text-primary);
+```javascript
+// 1. 在 I18N 对象添加
+const I18N = {
+  zh: {
+    deleteConfirm: '确定删除 {name} 吗？',
+    deleteSuccess: '删除成功',
+  },
+  en: {
+    deleteConfirm: 'Delete {name}?',
+    deleteSuccess: 'Deleted successfully',
+  },
+  ja: {
+    deleteConfirm: '{name} を削除しますか？',
+    deleteSuccess: '削除しました',
+  },
+}
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+// 2. 代码中使用
+const message = t('deleteConfirm', { name: fileName })
+uiManager.toast(t('deleteSuccess'), 'success')
+
+// 3. Tooltip 使用
+button.dataset.tooltipKey = 'deleteConfirm'
+button.dataset.tooltip = t('deleteConfirm')
+```
 
 ---
 > Source: [vikiboss/r2-web](https://github.com/vikiboss/r2-web) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
