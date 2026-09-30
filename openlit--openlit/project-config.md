@@ -1,11 +1,16 @@
 ---
 trigger: always_on
-description: Authorization, input validation, CE boundary, secrets, and test guidance for OpenLIT server code.
+description: These instructions supplement the repository-root `AGENTS.md`.
 ---
 
+# OTLP receiver instructions
 
-@agent-guides/security-testing.md
+These instructions supplement the repository-root `AGENTS.md`.
+
+- This is an independent Go module. Validate with `go test ./...`.
+- Do not log API keys, Authorization headers, or ClickHouse passwords.
+- Tenant writes must stay isolated by OpenLIT API key → organisation → project → environment → DatabaseConfig.
 
 ---
 > Source: [openlit/openlit](https://github.com/openlit/openlit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
