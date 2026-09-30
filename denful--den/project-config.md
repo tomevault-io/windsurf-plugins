@@ -28,9 +28,9 @@ modules/                   — NixOS-module-style option declarations and batter
   options.nix              — den.hosts, den.homes, den.schema, den.classes, den.quirks
   aspects/batteries/       — built-in batteries (define-user, home-manager, hostname, etc.)
   policies/                — core and flake-level policy declarations
-templates/                 — example flakes + CI test suite
-  ci/                      — 133+ test files in modules/features/, deadbugs/ for regressions
-  minimal/, default/, example/, noflake/, microvm/, nvf-standalone/
+templates/                 — example flakes (one per directory) + the CI test suite
+  ci/modules/              — tests, bucketed: public-api/, internal-api/, features/,
+                             deadbugs/ (regressions), deprecated/
 ```
 
 ## Core concepts
@@ -75,6 +75,8 @@ nix develop -c just ci nested-aspects
 nix develop -c just ci nested-aspects.test-direct-nesting-basic
 
 # run tests directly via nix-unit (more control)
+# the attr is the SUITE. Appending a cell (…#.tests.<suite>.<cell>) reports
+# `🎉 0/0 successful` and exits 0 — a false green. Use `just ci <suite>.<cell>`.
 nix-unit --override-input den . --flake ./templates/ci#.tests.<suite>
 
 # check a template
@@ -84,35 +86,15 @@ nix flake check --override-input den . ./templates/<template>
 just repl
 ```
 
+`just ci` writes `✅` to stdout and `❌`, the failure list and the summary to **stderr**. A stdout-only pipeline therefore reads a red run as a short green one — always `2>&1`, and read the exit code unpiped.
+
 ## Testing
 
-Tests live in `templates/ci/modules/features/`. Bug regressions go in `deadbugs/`.
-
-Test files export `flake.tests.<suite>.<test-name>` using the `denTest` helper:
-
-```nix
-{ denTest, ... }:
-{
-  flake.tests.my-suite = {
-    test-something = denTest (
-      { den, igloo, ... }:
-      {
-        den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.aspects.igloo.nixos.networking.hostName = "test";
-
-        expr = igloo.networking.hostName;
-        expected = "test";
-      }
-    );
-  };
-}
-```
-
-Key `denTest` args: `den`, `igloo` (nixosConfigurations.igloo.config), `tuxHm` (igloo.home-manager.users.tux), `ns` (when a namespace is imported).
+Tests live in `templates/ci/modules/`, bucketed by what they pin: `public-api/`, `internal-api/`, `features/`, `deprecated/`, and `deadbugs/` for regressions.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [denful/den](https://github.com/denful/den) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
