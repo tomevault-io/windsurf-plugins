@@ -1,80 +1,126 @@
 ---
 trigger: always_on
-description: Devex is a cloud development IDE with sandboxed “repl” sessions. The system is split into services. The core service handles auth and session orchestration, while the runner provides the interactive sandbox (WebSocket + PTY). Session data is persisted to S3-compatible storage when a repl is deactivated.
+description: Next.js 15 (App Router) · React 19 · Tailwind v4 · `motion` v12.
 ---
 
-# Devex Agent Guide
+# Frontend Agent Guide (`apps/web`)
 
-**Summary**
-Devex is a cloud development IDE with sandboxed “repl” sessions. The system is split into services. The core service handles auth and session orchestration, while the runner provides the interactive sandbox (WebSocket + PTY). Session data is persisted to S3-compatible storage when a repl is deactivated.
+Next.js 15 (App Router) · React 19 · Tailwind v4 · `motion` v12.
 
-**Architecture (High Level)**
-- Core service (`apps/core`) is deployed to a VPS via Docker Swarm and is the control plane.
-- Runner service (`apps/runner`) is the data plane sandbox image. Each repl is a Kubernetes Deployment with a single pod.
-- Pod layout:
-  - `initContainer` pulls workspace files from S3.
-  - `runnerContainer` is the interactive sandbox (WebSocket + PTY).
-- Deactivation flow:
-  - Core injects an ephemeral container into the pod to upload workspace data to S3.
-  - Core then deletes Deployment/Service/Ingress/Middleware.
-- Routing:
-  - Base host: `repl.parthkapoor.me`
-  - Route pattern: `repl.parthkapoor.me/<repl-id>/<route>`
-  - Uses `hostNetwork: true` to avoid a load balancer and save cost.
+The animated, high-contrast look is a deliberate product asset — a large part of
+why this project gets attention. **Do not flatten it into a generic minimal
+template.** The standing brief is: keep it distinctive, make it cheap. Every
+rule below exists so those two can coexist.
 
-**Key Entry Points**
-- Core API: `apps/core/cmd/main.go`
-- Runner API: `apps/runner/cmd/main.go`
-- MCP service: `apps/mcp/cmd/main.go`
+## Build constraints
 
-**Repo Layout**
-- `apps/core/`: Control-plane service (auth + session orchestration + k8s + s3 + redis).
-- `apps/runner/`: Sandbox service (WebSocket, PTY, file operations, shutdown manager).
-- `apps/mcp/`: MCP server.
-- `apps/web/`: Frontend web app.
-- `apps/agent/`: Agent-related app (check README inside).
-- `packages/`: Shared Go packages and generated protobufs.
-  - `packages/logging`: Shared logger wrapper.
-  - `packages/proto` + `packages/pb`: Proto sources and generated code.
-- `infra/`: Deployment and infrastructure.
-  - `infra/core/`: Swarm dockerfile + stack config.
-  - `infra/runner/`: Runner dockerfiles (base + language variants).
-  - `infra/mcp/`: MCP dockerfile.
-  - `infra/k8s/`: K8s manifests, cert-manager, ingress, traefik.
-- `templates/`: Repl templates synced to object storage.
+**This app builds on webpack, not Turbopack.** `npm run dev` intentionally omits
+`--turbopack`. On the Next 15 line `@next/mdx` hands plugin functions to
+`@mdx-js/loader`, and Turbopack serialises loader options across a process
+boundary — the function arrives as `null` and MDX compilation dies with *"Cannot
+use 'in' operator to search for 'plugins' in null"*. The string plugin form
+Turbopack accepts is not resolved by this loader version, and
+`experimental.mdxRs` cannot take arbitrary remark/rehype plugins. See the
+comment at the top of `next.config.ts`. Revisit on Next 16.
 
-**Data Stores**
-- Redis: repl/session state.
-- S3-compatible storage: workspace persistence on session end.
+Before proposing a Next 16 upgrade: `fumadocs-ui@16` and several other packages
+hard-pin `next@16` / `react@^19.2`. It is a coordinated bump, not a one-liner.
 
-**Build and Test (Local)**
-- Core build:
-  - `cd apps/core`
-  - `go build -o /tmp/core ./cmd/main.go`
-- Runner build:
-  - `cd apps/runner`
-  - `go build -o /tmp/runner ./cmd/main.go`
-- Docker images:
-  - `docker build -f infra/core/dockerfile -t devex/core:local .`
-  - `docker build -f infra/runner/dockerfile -t devex/runner:local .`
+## Design tokens — the one hard rule
 
-**CI/CD**
-- Workflows live in `.github/workflows/`.
-- Core pipeline builds/pushes and deploys via Docker Swarm.
-- Runner pipeline builds runner + env images.
-- Templates pipeline syncs `templates/` to DigitalOcean Spaces.
+`app/globals.css` is the single source of truth for colour, radius, motion and
+elevation. **Use semantic tokens. Never reach for a raw Tailwind palette shade
+in component code.**
 
-**Where to Look First**
-- Auth/session logic: `apps/core/services/auth/`
-- Repl lifecycle: `apps/core/services/repl/` and `apps/core/internal/k8s/`
-- Runner WS/PTY: `apps/runner/pkg/ws/`, `apps/runner/pkg/pty/`
-- Shared logging: `packages/logging/`
+```tsx
+// Wrong — this is how the codebase ended up with five neutral ramps
+<div className="bg-zinc-900 border-neutral-800 text-gray-400">
+<span className="text-emerald-400">
 
-**Notes for Agents**
-- The system relies on `hostNetwork: true` for simplicity and cost.
-- The core service is the orchestrator; runner instances are ephemeral and created per repl session.
-- If you change protobufs in `packages/proto/`, regenerate via `make generate-proto`.
+// Right
+<div className="bg-surface border-edge text-ink-muted">
+<span className="text-brand">
+```
+
+| Purpose | Token |
+| --- | --- |
+| Page background | `bg-canvas` |
+| Card / panel | `bg-surface` |
+| Hover / inset | `bg-raised` |
+| Popover, dialog | `bg-overlay` |
+| Primary text | `text-ink` |
+| Secondary text | `text-ink-muted` |
+| Tertiary text | `text-ink-subtle` |
+| Hairline | `border-edge` |
+| Stronger line | `border-edge-strong` |
+| Brand accent | `text-brand`, `bg-brand`, ramp `brand-50`…`brand-950` |
+| On the accent | `text-brand-fg` |
+| Status | `success`, `warning`, `danger`, `info` |
+| Terminal chrome | `term-bg`, `term-chrome`, `term-edge`, `term-ink`, `term-muted`, `term-accent` |
+
+### Graphite + Signal: the accent is rationed
+
+The palette is near-monochrome — surfaces are true neutral at **zero chroma** —
+with a single **amber** accent. That only works if the accent stays scarce.
+
+**Amber means one thing: *this is the thing you are on*.** The primary action,
+the live state, the selected row, the cursor. Aim for roughly **1–2% of the
+pixels on screen**. If you are reaching for `text-brand` a third time on one
+screen, the answer is `text-ink` or `text-ink-muted`.
+
+Things that are explicitly *not* the accent's job:
+
+- **Decoration.** No amber borders on every card, no amber icon on every list
+  item, no gradient-filled headings.
+- **Status.** `success`, `warning`, `danger`, `info` exist for that. Note
+  `warning` sits at a yellower hue than the brand on purpose — amber-on-amber
+  would make "provisioning" indistinguishable from "primary action".
+- **Terminal output.** The 16 ANSI colours and `term-accent` follow shell
+  convention. Green means passed, red means failed. Do not rebrand them.
+
+Colour that is *not* the accent belongs in the backdrop. The landing hero's
+CRT (`components/landing/hero/crt-backdrop.tsx`), the login wave panel
+(`components/Auth/LoginShell.tsx`) and `AppBackdrop` carry the expressiveness
+so the chrome can stay quiet.
+
+Two naming traps:
+
+- **`brand` is the amber accent. `accent` is not.** `accent` keeps its shadcn
+  meaning — a subtle raised background for menu and dropdown hover — because a
+  lot of vendored Radix code depends on it. Mapping `accent` to the brand colour
+  turns every dropdown row bright amber.
+- Prefer the existing utilities over re-deriving an effect inline: `glass`,
+  `glow-brand`, `surface-card`, and `label` for the uppercase-mono UI voice.
+  **Do not change `glass`** — it is the footer's original treatment, which
+  the maintainer asked to keep as-is.
+
+### Colour outside CSS
+
+Canvas 2D, WebGL shaders, Satori (`next/og`) and the web manifest all parse
+colour by hand and **cannot resolve `var()` or `oklch()`**. Passing a token to
+`strokeStyle` silently paints black; passing one to a shader silently paints
+its fallback. Import the hex mirrors from **`lib/tokens.ts`** instead, and if
+you change a `--ds-*` value in globals.css, regenerate the matching entry
+there — nothing enforces it at build time.
+
+## Typography
+
+Three families, declared in `app/fonts.ts`. Do not add a fourth.
+
+| Role | Face | Utility |
+| --- | --- | --- |
+| Display — headlines, eyebrows | Space Grotesk | `font-display` |
+| Body and UI | Geist | `font-sans` (default) |
+| Code, terminal, paths, identifiers | Commit Mono | `font-mono` |
+
+- **`font-display` means a display face, not a second mono.** It used to point
+  at JetBrains Mono, and fifteen `<kbd>` and terminal call sites were relying on
+  that. They now use `font-mono`, which is what they meant.
+- Space Grotesk is display-only: x-height 0.486em, so it thins out below ~20px,
+  and it has **no italic** — `font-style: italic` synthesises a slant.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ParthKapoor-dev/devex](https://github.com/ParthKapoor-dev/devex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
