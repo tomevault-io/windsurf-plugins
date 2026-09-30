@@ -1,35 +1,49 @@
 ---
 trigger: always_on
-description: Two applications, each its own pnpm workspace, plus product docs. Each area keeps its own guide; this file holds only what is true everywhere.
+description: Harbor is the Spaces server: orgs, spaces, members, an append-only log, three faces. This file is the mechanics — where things live, the invariants, the slice a capability cuts through, how to run and ship. What Spaces *is* and why is [SPEC.md](./SPEC.md); what the wire *means* is [CONTRACT.md](./CONTRACT.md). One kind of fact per document; link, never restate.
 ---
 
-# Rowboat monorepo
+# Harbor — how it is built
 
-Two applications, each its own pnpm workspace, plus product docs. Each area keeps its own guide; this file holds only what is true everywhere.
+Harbor is the Spaces server: orgs, spaces, members, an append-only log, three faces. This file is the mechanics — where things live, the invariants, the slice a capability cuts through, how to run and ship. What Spaces *is* and why is [SPEC.md](./SPEC.md); what the wire *means* is [CONTRACT.md](./CONTRACT.md). One kind of fact per document; link, never restate.
 
-| Path | What | Guide |
-|---|---|---|
-| `apps/x/` | The Rowboat desktop app (Electron + React) and its packages, including the mobile app | none yet — read `apps/x/package.json` scripts and the package READMEs |
-| `apps/harbor/` | Harbor, the Spaces server, and the spaces protocol package | [`apps/harbor/AGENTS.md`](apps/harbor/AGENTS.md) |
-| `docs/` | Product docs that belong to no one app (the Spaces design language, notes) | — |
+## Layout
 
-## How the two apps relate
+Two pnpm workspace packages under `packages/`:
 
-`apps/x` consumes `@rowboat/spaces-protocol` and `@rowboat/harbor` from `apps/harbor` as **`link:` dependencies** — never `file:`, which pnpm copies at install time and which then goes stale during co-development. Build harbor before installing or testing x:
+- **`protocol/`** — `@rowboat/spaces-protocol`, the contract: zod schemas imported by the server *and* the app, so drift is structurally impossible. `core.ts` (the objects), `ids.ts` (ids, the link grammar and its one parser), `changeset.ts`, `events.ts` (`SpaceEvent` and the live frames), `api.ts` (`routes`), `mcp.ts` (`mcpTools`), `mentions.ts`, `search.ts`, `invite.ts`, `errors.ts`, `fixtures/merge/` (the golden merge cases every engine must pass).
+- **`server/`** — `@rowboat/harbor`:
 
-```sh
-cd apps/harbor && pnpm install && pnpm -r build
-cd ../x && pnpm install && npm test
-```
+| `src/` | Owns |
+|---|---|
+| `core/kernel.ts` | store, hub, org, the read-only knob, the space lock with its publish-after-commit outbox, `append` / `nextOffset` / `appendNext`, `requireSpace` / `requireReadableSpace` / `requireMember`, `guardWrite`, `attributionOf` |
+| `core/spaces.ts` | spaces, direct messages, invites and the bind ceremony, the roster, `me`, agent members (`createAgent`), push registration, the read-gated replay and membership-gated live relays |
+| `core/agents.ts` | agent members' owners and keys: add an agent, list the ones a member manages, create and revoke keys |
+| `core/assets.ts` | assets by id, versions, the change log, blobs, history, diff |
+| `core/feed.ts` | messages, threads, topics, reactions, polls, search, mention stamps and their backfill |
+| `core/read-state.ts` | read marks, follows, unread, Activity, read-all |
+| `service.ts` | `HarborService`, the facade: one delegate per public method, `org` / `readOnly` accessors |
+| `policy.ts` | who may do what — pure decisions over facts the core loads; `enforce` throws |
+| `store.ts`, `pg-store.ts` | the data boundary and its one driver; `PgStore.transaction(fn)` for an org-level all-or-nothing write the caller shares (`directory.ts`); `sql.ts` (node-postgres), `sql-pglite.ts` (Postgres in-process) |
+| `migrations.ts` | the append-only schema ladder |
+| `http.ts`, `ws.ts`, `mcp.ts` | the three faces; `origin.ts` (the public origin behind the proxy) |
+| `auth.ts`, `auth-oidc.ts` | the drivers, `bindAuth` / `OrgAuth` (which resolves agent keys ahead of any driver), `authenticateRequest`, the RFC 9728 helpers; `consent.ts` (the login page); `agent-keys.ts` (minting and hashing an agent key) |
+| `runtime.ts` | `buildOrgRuntime` — the one assembly of an org |
+| `server.ts`, `main.ts` | `startHarbor` (one org) and the dev seed; the binary (dev, or `HARBOR_MODE=deployment`) |
+| `deployment.ts`, `directory.ts`, `apex.ts` | many orgs from one process: host → org runtime; the org directory; the apex face (create org, my orgs) |
+| `notify.ts`, `push.ts` | the one notification decision; Expo delivery |
+| `hub.ts`, `blobs*.ts`, `mime.ts`, `merge.ts`, `search.ts`, `mentions-backfill.ts` | in-process fan-out, blob drivers, sniffing, the three-way merge, query parsing, the mentions backfill |
+| `stats.ts`, `internal.ts` | the live-load counters (connections, subscriptions, frames per minute by kind, deliveries) and the operator face that reads them, `GET /internal/stats` behind `HARBOR_INTERNAL_KEY` |
 
-**zod is pinned to one version (4.2.1) in both workspaces.** A mismatch breaks type identity across the link. CI (`.github/workflows/x-tests.yml`) builds harbor first in every job, including release builds.
+`test/` has one file per feature, every one on in-process Postgres. `helpers.ts` gives `startTestHarbor` (a harbor over a fresh database, closed with it), `restClient`, `agentClient`, `liveClient`, `startFakeAs` (a fake authorization server: discovery, JWKS, minted JWTs). `day-in-the-life.test.ts` is spec §11 as code; `mcp-parity.test.ts` proves the agent face; `policy.test.ts` pins every rule without a store.
 
-## Rules that hold everywhere
+## Invariants
 
-- Comments explain **why**, with the date and the decision or PR they implement. The code says what.
-- Documents own one kind of fact each and link to each other rather than restate. There are no status documents: status is the PR description and `git log`.
-- A PR that changes a documented behavior changes the document in the same PR. For harbor the three questions are in its guide.
-- Nothing speculative: no seat reserved for a rule or a feature that has no route yet.
+- **One core, three doors.** The faces hold `{ service, auth: OrgAuth }` and never the store. Rowboat's own agent uses the same MCP tools as any agent; there is no privileged path.
+- **Rules live in `policy.ts`.** Every question of the form "may this actor do this to this space or message" is a pure decision there; the core loads the facts and asks; no face decides anything.
+- **Reading and acting have separate gates (2026-09-23, spec §5).** `requireReadableSpace` loads the space, membership, and org member for `canReadSpace`; only shared open spaces admit nonmembers. `requireMember` and `lockedAs` retain the membership-only `canAccessSpace` rule. `requireOrgMember` guards browse/self-join. Durable events use the transaction outbox, never publish an uncommitted write.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rowboatlabs/rowboat](https://github.com/rowboatlabs/rowboat) — distributed by [TomeVault](https://tomevault.io).
