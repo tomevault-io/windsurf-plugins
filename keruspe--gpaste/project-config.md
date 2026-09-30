@@ -1,83 +1,44 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Three libraries, each exporting what is marked `G_PASTE_VISIBLE` (hidden default visibility) and each with GIR and Vala bindings:
 ---
 
-# CLAUDE.md
+# `src/libgpaste/` — shared libraries
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Three libraries, each exporting what is marked `G_PASTE_VISIBLE` (hidden default visibility) and each with GIR and Vala bindings:
 
-## Build
+- `gpaste-3/` → **libgpaste**: the daemon-agnostic types — `GPasteClient` (the D-Bus client), `GPasteClientItem` (an item as it travels over D-Bus), `GPasteSettings` (the GSettings wrapper), enums and utilities.
+- `gpaste-gtk4/` → **libgpaste-gtk4**: GTK4 + Adwaita helpers, the preferences widgets.
+- `gpaste-daemon/` → **libgpaste-daemon**: the daemon's objects, documented in [`gpaste-daemon/AGENTS.md`](gpaste-daemon/AGENTS.md).
 
-GPaste uses Meson + Ninja:
+## Headers, layout and pkg-config
 
-```sh
-mkdir build && cd build
-meson ..
-ninja
-```
+- **Every library splits its headers into an installed half and an internal one**, and a new header joins the internal half unless something outside the library names it. libgpaste-gtk4 installs exactly two types — the preferences dialog, and the preferences widget `prefs.js` embeds — while its groups, shortcut row and pages stay internal; its GIR is generated from `libgpaste_gtk4_public_sources` alone. The four pages are plain functions returning an `AdwPreferencesPage`, not types: they carry no state, and both callers build them from one list (`g_paste_gtk_preferences_pages_new()`). libgpaste's own lists are in `src/libgpaste/meson.build`, and libgpaste-daemon's split is described in its own `AGENTS.md`.
+- **The core library's directory carries `apiversion`**, so it is renamed on every major bump (`gpaste-2/` → `gpaste-3/` for 51.0), and its includes are spelled `<gpaste-3/gpaste-macros.h>`. The same include text resolves in-tree (through `include_directories('.')` = `src/libgpaste`) and against the install prefix, which is what makes a broken installed header a build failure here rather than downstream. `gpaste-gtk4/` and `gpaste-daemon/` are named for their library and never move.
+- **The installed layout** is one shared directory:
 
-Common build options (`meson .. -Doption=value`):
+  ```
+  include/gpaste/{gpaste.h, gpaste-gtk4.h, gpaste-daemon.h}   <- the three umbrellas
+  include/gpaste/{gpaste-3/, gpaste-gtk4/, gpaste-daemon/}    <- per-library headers
+  ```
 
-| Option | Default | Description |
-|---|---|---|
-| `gnome-shell` | true | Build the GNOME Shell extension |
-| `introspection` | true | Generate GIR data |
-| `vapi` | true | Generate Vala bindings (requires introspection) |
-| `systemd` | true | systemd user unit |
+  so all three `.pc` files declare `Cflags: -I${includedir}/gpaste` (meson `subdirs: 'gpaste'`), the line to check when the layout changes. `libgpaste` is versioned all the way through from `apiversion` (`libgpaste-3.so`, `gpaste-3.pc`, `GPaste-3`, `gpaste-3.vapi`); `libgpaste-gtk4`'s `4` is GTK's and `GPasteDaemon-1`'s is its own, so neither tracks the GPaste major.
+- **Each library ships a `.pc`** (`gpaste-3`, `gpaste-gtk4`, `gpaste-daemon`). `requires:` is what a *consumer* must also satisfy — what the installed headers name, not what the library links — so `gpaste-daemon` requires only `gpaste-3`: no public daemon header names a GTK, GDK or GCR type, and those stay in the `Requires.private:` meson derives from `dependencies:`, with the optional libsodium, sqlite3, libsecret-1 and libmutter (`pwquality` is on `gpaste-3`, where the rating lives). Use `requires:`, never `libraries:`, which means `Libs:`.
 
-For a lighter build that skips the GNOME Shell extension, GIR introspection data
-and Vala bindings (the daemon, UI and preferences apps are always built):
+## Settings
 
-```sh
-meson .. -Dgnome-shell=false -Dintrospection=false -Dvapi=false
-```
+**Observe a setting with `notify::<key>`.** Every setting is a GObject property named exactly like its GSettings key, so there is no separate `changed` signal and `g_object_bind_property()` works directly; the callback takes a `GParamSpec *`, not the key. Prefer the detailed form: undetailed `notify` fires for all twenty-nine keys. `GPasteSettings`' one signal of its own, **`rebind::<key>`**, is an action to take (re-register a keybinding), carried only by the keybinding settings.
 
-Run tests from the build directory:
+## D-Bus
 
-```sh
-ninja test          # or: meson test -C build
-```
+Every interface GPaste speaks is described by an XML file that `gdbus-codegen` turns into both halves of the wire. **`data/dbus/org.gnome.GPaste3.xml` is the contract**: its comments document every method, signal and property, and are the first thing to read and to update when the interface changes. What follows is how the tree is built around it.
 
-Tests live under `tests/`. `tests/history/` unit-tests the `GPasteHistory` model
-(add/dedup/size-enforcement/remove/select) against an in-memory `GSettings`
-(`GSETTINGS_BACKEND=memory` + the schema compiled into the build tree) and a
-throwaway `XDG_DATA_HOME`, so they need no display server or dconf. The `eslint`
-test lints the GNOME Shell extension JS.
-
-Check header include ordering:
-
-```sh
-tools/check-includes.sh
-```
-
-## Code style
-
-- C standard: GNU17
-- Formatting: ClangFormat (see `.clang-format`). Key rules: Allman braces, 4-space indent, no column limit, space before parens, no tabs.
-- clang-format is not yet enforced; do not run it automatically.
-- **Braces**: Remove braces from `if`/`else if`/`else` branches whose body is a single statement on a single line. Keep braces when the body has multiple statements OR spans multiple lines (e.g. a nested if-else chain). Multi-statement macros that need to appear as a single statement must use the `do { ... } while (0)` idiom — `SWITCH_STATE` in `gpaste-file-backend.c` does this and can safely appear without surrounding braces.
-
-### JavaScript (GNOME Shell extension)
-
-The `src/gnome-shell/` extension follows upstream GNOME Shell's JS conventions, enforced by the **same tooling, layout, and configuration** as upstream:
-
-- The npm project lives in `tools/` (`tools/package.json`, `tools/package-lock.json`, `tools/eslint.config.js`), mirroring gnome-shell. The repo-root `eslint.config.js` is a **symlink** to `tools/eslint.config.js`.
-- **ESLint** with [`eslint-config-gnome`](https://gitlab.gnome.org/World/javascript/eslint-config-gnome) (`recommended` + `jsdoc` configs) and the [`ci-run-eslint`](https://gitlab.gnome.org/World/javascript/ci-run-eslint) runner, both pinned to the same commits upstream uses. The config mirrors upstream's custom rule overrides (`camelcase`, `consistent-return`, `eqeqeq: smart`, `key-spacing`, `prefer-arrow-callback`, `prefer-const`, jsdoc tweaks). Shell-extension globals (`global`, `_`, `C_`, `N_`, `ngettext`) are declared for `src/gnome-shell/**`.
-- Style basics live in `src/gnome-shell/.editorconfig` (LF, UTF-8, trim trailing whitespace, 4-space indent for `*.js`).
-- Run it with `tools/run-eslint.sh` — exactly the upstream wrapper. It `npm clean-install`s into `tools/` on first run, symlinks `node_modules` into the repo root for import resolution, then lints `src/gnome-shell`. Pass `--fix` to auto-fix formatting.
-- The same script is the single entry point everywhere: the meson `eslint` test (`meson test -C build eslint`, skipped when `npm` is absent) and the GitHub Actions workflow (`.github/workflows/eslint.yml`, runs on pushes/PRs touching the JS or tooling) both invoke it. Upstream runs lint from GitLab CI; GPaste runs it from GitHub Actions, but the toolchain, config, layout, and `run-eslint.sh` are otherwise identical.
-- This tooling applies **only** to the JavaScript code; it does not affect the C/meson sources.
-
-Code conventions (also following upstream):
-- **Don't version-pin core `gi://` imports** — write `gi://GObject`, `gi://GLib`, `gi://Gio`, `gi://Pango`, `gi://Clutter`, `gi://St`. Only pin typelibs that genuinely ship multiple versions: `gi://GPaste?version=2`, `gi://GPasteGtk?version=4`.
-- **Manage signal lifecycles with `connectObject`/`disconnectObject`** (owner = `this`) for connections to long-lived non-actor GObjects (settings, the `GPaste.Client`), rather than tracking handler ids and disconnecting them by hand. They auto-disconnect when the owner actor is destroyed.
-- **Use a standard `constructor()` (calling `super(...)`) in `GObject.registerClass` classes**, not `_init()`/`super._init()`. GJS bridges to the `_init()`-based shell/St/Clutter base classes transparently (positional args like `super(0.0, 'GPaste')` and property dicts like `super({...})` both work).
-
-Async / `Gio._promisify` conventions (these bit us — keep them):
+- **The XML is the source of truth**, installed to `$datadir/dbus-1/interfaces` (`dbus-1.pc`'s `interfaces_dir`, overridable with `-Ddbus-interfaces-dir`). `src/libgpaste/gpaste-daemon/org.gnome.Shell.SearchProvider2.xml` is gnome-shell's interface, kept only to feed codegen and deliberately **not** installed.
+- **The generated code is internal**: produced by `gnome.gdbus_codegen()` from `src/libgpaste/gpaste-3/meson.build` and `src/libgpaste/gpaste-daemon/meson.build` (which exist so the output lands where the `<gpaste-3/…>` include style works), never installed, never introspected. `GPasteClient` is the whole public story. `grep -c Daemon3 build/src/libgpaste/GPaste-3.gir` must stay `0`.
+- **`org.gnome.GPaste3` is generated into libgpaste**, the lowest library, because a GType registers once per process and gnome-shell loads libgpaste and libgpaste-daemon together. libgpaste-daemon uses the skeleton, so the declarations carry `G_PASTE_VISIBLE` through `--symbol-decorator`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Keruspe/GPaste](https://github.com/Keruspe/GPaste) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
