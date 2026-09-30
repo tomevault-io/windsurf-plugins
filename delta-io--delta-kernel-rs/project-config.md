@@ -1,94 +1,98 @@
 ---
 trigger: always_on
-description: Delta-kernel-rs is a Rust library for building Delta Lake connectors. It encapsulates the
+description: The `delta_kernel_ffi` crate exposes the kernel to C/C++ via a stable FFI boundary using
 ---
 
-# AGENTS.md
+# FFI Layer
 
-## Project Overview
+The `delta_kernel_ffi` crate exposes the kernel to C/C++ via a stable FFI boundary using
+cbindgen-generated headers (`.h` and `.hpp`).
 
-Delta-kernel-rs is a Rust library for building Delta Lake connectors. It encapsulates the
-Delta protocol so connectors can read and write Delta tables without understanding protocol
-internals. Kernel never does I/O directly: it defines _what_ to do via its APIs
-(`Snapshot`, `Scan`, `Transaction`) and delegates _how_ to the `Engine` trait.
+## Handle System
 
-Current capabilities include table reads with predicates, data skipping, deletion vectors,
-change data feed, incremental scans (`incremental_scan_builder`) and commit ranges, checkpoints
-(V1 & V2), version checksums, blind appends, file removals, table creation (including clustered
-tables), limited schema alteration, and catalog-managed tables. Log compaction remains disabled
-(#2337).
+Objects crossing the FFI boundary may be wrapped in **handles** -- opaque pointers with
+ownership semantics:
+- **Exclusive handles** (`mutable=true`, `Box`-like) -- one owner, neither `Copy` nor `Clone`
+- **Shared handles** (`Arc`-like) -- shared ownership via reference counting
 
-## Build & Test Commands
+A handle is needed when a value might outlive the function call that passes it across the
+FFI boundary, or when the type is not representable in C/C++ (dyn trait references, slices,
+options, etc.). Short-lived "plain old data" types like `ExternResult`, `FFIKernelError`,
+`KernelStringSlice`, and `EngineIterator` do not need handles.
 
-> **`datafusion-executor` and `integration-tests` are separate workspaces.** Root `--workspace`
-> commands do not include them. For `datafusion_executor` commands, see
-> `datafusion-executor/CLAUDE.md`. `integration-tests/test-all-arrow-versions.sh` tests each
-> supported Arrow version.
+Borrowed record arrays use `FfiSlice<T>`: empty slices accept null or non-null pointers, while
+non-empty slices require a non-null pointer. The pointed-to storage is never owned.
+Descriptive aliases identify each public array's element type.
 
-```bash
-# Build
-cargo build --workspace --all-features
+Every handle has a corresponding `free_*` function (e.g. `free_engine`, `free_snapshot`).
 
-# Run all tests (prefer nextest over cargo test)
-cargo nextest run --workspace --all-features
+Handle parameters follow one of two ownership contracts:
 
-# Run tests for a specific crate
-cargo nextest run -p delta_kernel --all-features
+1. **Borrow:** Rust accesses the handle with `as_ref()` or `as_mut()`. The caller retains
+   ownership and remains responsible for passing the handle to its `free_*` function.
+2. **Unconditional consume:** Rust calls `into_inner()` before any fallible work. Rust owns the
+   value from native entry onward and is responsible for dropping it on every result, including
+   errors. The caller must not use or free the handle after the call.
 
-# Run a single test in a specific crate (fastest: only compiles that crate)
-cargo nextest run -p delta_kernel --lib --all-features test_name_here
+Do not conditionally consume a handle only when a fallible operation succeeds. Every function's
+safety documentation must state whether each handle is borrowed or consumed regardless of the
+result. For consuming functions, perform string parsing, visitor decoding, validation, and other
+fallible work only after all consumed handles have been converted with `into_inner()`.
 
-# Run a test by name, searching all crates (slow: compiles everything)
-cargo nextest run --workspace --all-features test_name_here
+## Error Handling
 
-# Format, lint, and doc check (always run after code changes)
-cargo +nightly fmt \
-  && cargo clippy --workspace --benches --tests --all-features -- -D warnings \
-  && cargo doc --workspace --all-features --no-deps
+Fallible functions return `ExternResult` (tagged union of Ok/Err). The caller provides an
+`allocate_error` callback when creating the engine; kernel calls this to allocate errors in
+the caller's memory space.
 
-# Split no-default-features CI checks (cargo aliases from .cargo/config.toml)
-cargo clippy-no-default-kernel-dependents
-cargo check-no-default-kernel
-cargo check-no-default-engine
-cargo clippy-no-default-kernel-leaves
+## Key Files
 
-# Quick pre-push check (mimics CI)
-cargo +nightly fmt \
-  && cargo clippy --workspace --benches --tests --all-features -- -D warnings \
-  && cargo doc --workspace --all-features --no-deps \
-  && cargo nextest run --workspace --all-features
+- `src/lib.rs` -- main FFI entry points and type definitions
+- `src/delta_types.rs` -- reusable borrowed C representations of Delta state and actions
+- `src/handle.rs` -- opaque handle system for passing Rust objects across FFI
+- `src/column_default.rs` -- column-default (`allowColumnDefaults`) reads and the write-path ack
+- `src/scan.rs` -- scan FFI interface
+- `src/schema_visitor.rs` -- visitor pattern for schema traversal
+- `src/ffi_tracing.rs` -- log, metrics, and frame callback registration
+  (`#[cfg(feature = "tracing")]`)
+- `src/ffi_metrics.rs` -- `repr(C)` mirror of kernel `MetricEvent` types (`#[cfg(feature = "tracing")]`)
+- `src/alloc_stats.rs` -- `peak_alloc` global allocator and native-heap FFI getters
+  (`alloc-tracking`)
+
+## Read Flow
+
+```
+get_default_engine() -> get_snapshot_builder() -> snapshot_builder_build() -> scan() -> scan_metadata() -> read + transform
 ```
 
-### Crate Names for `-p` Flag
+Snapshot builder API (`ffi/src/lib.rs`):
+- `get_snapshot_builder(path, engine)` -- fresh snapshot from a table path
+- `get_snapshot_builder_from(old_snapshot, engine)` -- incremental update reusing an existing snapshot (avoids re-reading the log)
+- `snapshot_builder_with_version(builder, version)` -- optional: pin to a specific version
+- `snapshot_builder_with_log_tail(builder, log_tail)` -- optional: set log tail (for catalog-managed tables)
+- `snapshot_builder_with_max_catalog_version(builder, version)` -- optional: set max catalog version (for catalog-managed tables)
+- `snapshot_builder_with_snapshot_hint(builder, hint)` -- optional: validate and copy a complete
+  typed snapshot hint into the builder. Log paths may name published or staged commits, checkpoint
+  files, or CRC files; log compaction paths are rejected. Kernel cannot verify that supplied log
+  paths belong to the builder's table, so the caller must ensure every path addresses that table.
+  A failed call consumes and drops the builder
+- `snapshot_builder_build(builder)` -- consume the builder and produce a `SharedSnapshot`
+- `free_snapshot_builder(builder)` -- discard without building (e.g. on error paths)
 
-| Crate                                | Directory                             | Description                                                              |
-|--------------------------------------|---------------------------------------|--------------------------------------------------------------------------|
-| `delta_kernel`                       | `kernel/`                             | Core library                                                             |
-| `delta_kernel_default_engine`        | `default-engine/`                     | Default Arrow/Tokio `Engine` implementation                              |
-| `delta_kernel_default_engine_test_utils` | `default-engine/test-utils/`      | Default-engine test utilities                                            |
-| `delta_kernel_ffi`                   | `ffi/`                                | C/C++ FFI bindings                                                       |
-| `delta_kernel_ffi_macros`            | `ffi-proc-macros/`                    | FFI proc macros                                                          |
-| `delta_kernel_derive`                | `derive-macros/`                      | Proc macros                                                              |
-| `acceptance`                         | `acceptance/`                         | Acceptance tests (DAT)                                                   |
-| `test_utils`                         | `test-utils/`                         | Shared test utilities                                                    |
-| `delta_kernel_workloads`             | `workloads/`                          | Shared workload spec types + SQL predicate parser                        |
-| `delta_kernel_benchmarks`            | `benchmarks/`                         | Workload benchmarks                                                      |
-| `feature_tests`                      | `feature-tests/`                      | Feature flag tests                                                       |
-| `mem-test`                           | `mem-test/`                           | Memory-usage test executable                                             |
-| `delta-kernel-unity-catalog`         | `delta-kernel-unity-catalog/`         | Unity Catalog integration (UCCommitter, snapshot + create-table helpers) |
-| `unity-catalog-delta-client-api`     | `unity-catalog-delta-client-api/`     | Transport-agnostic UC client traits + wire models                        |
-| `unity-catalog-delta-rest-client`    | `unity-catalog-delta-rest-client/`    | REST/HTTP client for the Unity Catalog Delta Tables API                  |
+Each `snapshot_builder_with_*` call consumes its input handle and returns the updated handle on
+success. The caller must replace the input handle with that result. On error, the builder is
+dropped. Snapshot-hint inputs and all nested pointers are borrowed only for the call and copied
+into the builder. Cross-component and table validation occurs when the builder is built. The caller
+must eventually pass the final returned handle to either `snapshot_builder_build` or
+`free_snapshot_builder`.
 
-Packages under `kernel/examples/` are also workspace members. Use the package name from the
-example's `Cargo.toml` with `-p`.
-
-### Feature Flags
-
-Some noteworthy ones (see `[features]` in `kernel/Cargo.toml` for the full list):
-
+Snapshot accessors (`ffi/src/lib.rs`) read a built `SharedSnapshot` without I/O -- e.g. `version`,
+`snapshot_timestamp`, and `snapshot_file_stats`, which returns `OptionalValue<FfiFileStats>` (scalar
+`num_files` / `table_size_bytes` from the CRC; `None` when the snapshot has no CRC, or its CRC lacks
+complete file stats). `visit_file_size_histogram` exposes the optional variable-length histogram in
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [delta-io/delta-kernel-rs](https://github.com/delta-io/delta-kernel-rs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
