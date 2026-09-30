@@ -1,89 +1,95 @@
 ---
 trigger: always_on
-description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+description: This repository provides the foundational hub and managed-cluster components for
 ---
 
-# Agent Guide for opentelemetry-go
+# multicloud-operators-foundation Agent Instructions
 
-This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+This repository provides the foundational hub and managed-cluster components for
+Red Hat Advanced Cluster Management (ACM). It is a Go/Kubernetes codebase using
+controller-runtime, client-go, and Open Cluster Management APIs.
 
-Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
-Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
+## Repository layout
 
-## Core expectations
+- `cmd/controller/`: hub-side foundation controller and controller-runtime manager.
+- `cmd/agent/`: managed-cluster work-manager agent and its controllers.
+- `pkg/controllers/`: hub-side reconcilers for cluster information, cluster sets,
+  RBAC, image registries, add-ons, garbage collection, and managed service accounts.
+- `pkg/klusterlet/`: agent-side action, view, cluster information, and node collection
+  controllers.
+- `pkg/webhook/`: admission webhook implementations.
+- `hack/`: CRD, code-generation, and protobuf update/verification scripts.
+- `deploy/`, `examples/`, and `docs/`: deployment manifests, examples, and component
+  documentation.
+- `test/`: unit, envtest integration, end-to-end, and performance tests.
 
-- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
-- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
-- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
-- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
-- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
-- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
-- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
-- Keep dependencies minimal and justified.
-- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
-- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
-- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
+For system architecture, data flows, and module boundaries, see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Default workflow
+## Development commands
 
-For new features and behavior changes, use this order unless the task explicitly says otherwise:
+Run commands from the repository root:
 
-1. Read the relevant package, its tests, and any package docs or `README.md`.
-2. Add or update a failing unit test that captures the required behavior or regression.
-3. Implement the smallest change that makes the test pass.
-4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
-5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
-6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
-7. Run `make precommit` each time before considering the work complete.
+```bash
+make build
+go test ./pkg/...
+make test-integration
+make verify
+```
 
-For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
+- `make build` builds the Go binaries through the OpenShift build-machinery include.
+- `go test ./pkg/...` runs the package unit tests without requiring a cluster.
+- `make test-integration` provisions envtest assets, compiles `test/integration`, and
+  runs the integration suite.
+- `make test-e2e` requires configured Hub and managed clusters and deployment assets.
+- `make verify` checks generated CRDs and generated code; use `make update` only when
+  intentionally regenerating them.
+- `make images` builds the `quay.io/stolostron/multicloud-manager:latest` image.
 
-## Verification
+Changes to generated CRDs or code must be made through the corresponding source and
+generation scripts, then verified with `make verify`. Keep controller behavior,
+RBAC, health probes, and leader-election semantics covered by tests when changing
+reconciliation logic.
 
-- Use `make` as the canonical repository verification command. The default target is `precommit`.
-- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
-- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
-- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
+## Tool availability
 
-## Documentation and changelog
+- GitHub operations: GitHub MCP tools are available; the `gh` CLI is not assumed.
+- Jira operations: Jira MCP tools are available; the `jira` CLI is not assumed.
+- If multiple GitHub organization tokens are configured, use the `GH_TOKEN_<ORG>`
+  convention without printing token values.
 
-- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
-- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
-- Prefer examples over long code snippets in GoDoc when practical.
-- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
-- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
-  - Always put the PR number at the end of the line (e.g., `(#1234)`), NOT the issue number.
-  - If the PR number is not yet known, omit it until the PR is created, then update the changelog entry before merging.
-  - Always use references to the go module that is updated (e.g., `go.opentelemetry.io/otel/sdk/metric`), instead of just the path (e.g., `sdk/metric`).
+## Personal configuration
 
-## Repository habits
+Read personal config at the start of any task that needs an assignee, email, or
+project key. Canonical path: `~/.config/user.local.md` (tool-agnostic, global).
+If the file does not exist, fall back to agent memory (`user-config`), then
+placeholders. Run `make personalize` to generate or update the file when Fleet
+Engineering tooling is available; this repository does not currently define that
+target.
 
-- Prefer focused diffs. Avoid drive-by cleanup.
-- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
-- Generated files are checked in. If your change affects generation, keep generated output up to date.
-- Prefer fast local search tools such as `rg` when exploring the repository.
-- When changing behavior, make the invariants explicit in tests.
+## Fleet Engineering Skills
 
-## Personas
+Fetch and apply the relevant skill when the task matches its domain. The canonical
+catalog is [Fleet Engineering skills](https://github.com/OpenShift-Fleet/agentic-sdlc/blob/main/skills/README.md).
 
-### Feature Agent
-
-Use this persona for new behavior, new API surface, or spec-driven feature work.
-
-- Start with a failing unit test.
-- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
-- Implement the smallest viable change.
-- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
-- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
-
-### Refactoring Agent
-
-Use this persona when improving structure without intentionally changing behavior.
-
-- Treat behavior preservation as the default contract.
+| Skill | When to use |
+|---|---|
+| [bug-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/bug-specialist/SKILL.md) | Bug triage, reproduction, and fix planning |
+| [epic-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/epic-specialist/SKILL.md) | Multi-sprint epics with outcomes |
+| [feature-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/feature-specialist/SKILL.md) | Large customer-facing capabilities |
+| [initiative-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/initiative-specialist/SKILL.md) | Multi-team strategic programs |
+| [jira-create](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/jira-create/SKILL.md) | Interactive Jira issue creation |
+| [jira-qe-readiness](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/jira-qe-readiness/SKILL.md) | Check whether a Jira ticket is ready for QE |
+| [jira-report](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/jira-report/SKILL.md) | Produce Jira portfolio and quality reports |
+| [jira-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/jira-specialist/SKILL.md) | General Jira triage and issue management |
+| [jira-type-audit](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/jira-type-audit/SKILL.md) | Audit Jira issue types across a hierarchy |
+| [outcome-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/outcome-specialist/SKILL.md) | Strategic outcomes tied to OKRs |
+| [release-dod](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/release-dod/SKILL.md) | Build a release Definition of Done checklist |
+| [risk-report](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/risk-report/SKILL.md) | Detect risk signals and draft a status report |
+| [risk-specialist](https://raw.githubusercontent.com/OpenShift-Fleet/agentic-sdlc/main/skills/risk-specialist/SKILL.md) | Manage risk registers and mitigations |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [stolostron/multicloud-operators-foundation](https://github.com/stolostron/multicloud-operators-foundation) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
