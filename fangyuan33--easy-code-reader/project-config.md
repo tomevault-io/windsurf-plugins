@@ -1,119 +1,47 @@
 ---
 trigger: always_on
-description: This guide helps AI coding agents work productively in the Easy Code Reader codebase. It summarizes architecture, workflows, conventions, and integration points unique to this project.
+description: - `src/easy_code_reader/server.py` implements the MCP server, exposing `search_group_id` and `read_jar_source`, plus a usage-guide resource.
 ---
 
-# Copilot Instructions for Easy Code Reader
+# Repository Guidelines
 
-This guide helps AI coding agents work productively in the Easy Code Reader codebase. It summarizes architecture, workflows, conventions, and integration points unique to this project.
+## Project Structure & Module Organization
 
-## Architecture Overview
-**Purpose:** MCP (Model Context Protocol) server that extracts Java source code from Maven dependencies and local projects.
+- `src/easy_code_reader/server.py` implements the MCP server, exposing `search_group_id` and `read_jar_source`, plus a usage-guide resource.
+- `__main__.py` handles CLI arguments; `config.py` resolves Maven settings; `decompiler.py` selects CFR/Fernflower and manages caches.
+- `src/easy_code_reader/decompilers/` contains bundled decompiler JARs. Preserve their package-data configuration in `pyproject.toml`.
+- `tests/` contains JAR, decompiler, Maven-search, SNAPSHOT, and integration tests; shared fixtures belong in `conftest.py`.
+- `README.md`, `.github/`, `imges/`, and `icon.png` contain documentation, automation, and illustrations. Release helpers live in `scripts/`.
 
-**Core Components:**
-- `src/easy_code_reader/server.py`: MCP server implementation (4 tools: `read_jar_source`, `read_project_code`, `list_all_project`, `list_project_files`)
-- `decompiler.py`: Auto-selects CFR (Java 8-20) or Fernflower (Java 21+) based on `_detect_java_version()`
-- `config.py`: Maven repo path resolution via `MAVEN_HOME`, `M2_HOME`, or `MAVEN_REPO` env vars
-- `decompilers/`: Bundled `fernflower.jar` and `cfr.jar` via setuptools package_data
+## Build, Test, and Development Commands
 
-**Data Flow:**
-1. MCP request → `server.py` tool handler (`_read_jar_source` or project tools)
-2. Maven path lookup: `group.id/artifact/version/artifact-version.jar` (handles SNAPSHOT timestamps)
-3. Source extraction priority: sources JAR → decompilation → fallback class info
-4. Decompilation cache: `{jar_dir}/easy-code-reader/{jar_name}/` (cleaned for SNAPSHOT updates)
-5. Return JSON response with class/file code
+Use Python 3.10+ and a JDK on `PATH` for decompilation. Run from the repository root:
 
-**SNAPSHOT Handling:** For `-SNAPSHOT` versions, searches for timestamped JARs (e.g., `artifact-1.0.0-20251030.085053-1.jar`) for decompilation but caches under timestamped name. Old SNAPSHOT caches auto-deleted via `_cleanup_old_snapshot_cache` when newer timestamps detected.
-
-## Developer Workflows
-**Run Service:**
 ```bash
-# Recommended (if published to PyPI)
-uvx easy-code-reader [--maven-repo PATH] [--project-dir PATH]
-
-# Development mode
-python -m easy_code_reader [--maven-repo PATH] [--project-dir PATH]
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]" "mcp<2"
+python -m easy_code_reader --maven-repo /path/to/repository
+python -m pytest -q
+python -m pytest tests/test_search_group_id.py -v
+python -m build
+python -m twine check dist/*
 ```
 
-**Testing:**
-```bash
-pytest tests/                     # All tests
-pytest tests/test_jar_reader.py -v  # Specific test file
-```
+These commands create a development environment, start the stdio server, run all or targeted tests, build distributions, and validate package metadata. The current server uses MCP 1 APIs; MCP 2 is incompatible despite the unrestricted dependency declaration. Release scripts contain legacy `easy-jar-reader` references; inspect them before use.
 
-**Development Install:**
-```bash
-pip install -e .           # Editable install
-pip install -e ".[dev]"    # With dev dependencies (pytest, build, twine)
-```
+## Coding Style & Naming Conventions
 
-**Publishing (maintainers only):**
-```bash
-./scripts/pre-publish-check.sh  # Validate before publish
-./scripts/publish.sh            # Build and upload to PyPI
-```
+Use four-space indentation, `snake_case` for modules/functions/variables, `PascalCase` for classes, and uppercase constants. Follow surrounding Python style, retain type hints and concise docstrings, and prefix internal helpers with `_`. MCP handlers are asynchronous and return `TextContent` responses. Keep tool schemas, error hints, README examples, and the embedded guide consistent. No formatter or linter is configured.
 
-**Java Requirement:** JDK must be on PATH. Decompiler selection:
-- Java < 21: CFR (backward compatible)
-- Java ≥ 21: Fernflower (better for modern bytecode)
-- Detection failure: defaults to CFR, logs warning
+## Testing Guidelines
 
-## Project-Specific Conventions
-**Source Extraction Strategy:**
-1. Check `artifact-version-sources.jar` (if `prefer_sources=True`, default)
-2. Fallback to decompile `artifact-version.jar`
-3. Last resort: `_fallback_class_info()` returns bytecode metadata stub
+Tests use pytest and pytest-asyncio with automatic asyncio mode. Name files `test_*.py` and functions `test_<behavior>`. Create temporary Maven repositories and synthetic JARs rather than relying on personal dependencies. Cover changed behavior, including source extraction, decompiler fallback, cache handling, and SNAPSHOT selection where relevant. No numeric coverage threshold is configured.
 
-**Path Patterns (local projects):**
-- Input: `com.example.MyClass` (Java class) or `pom.xml` or `src/main/resources/application.yml`
-- Search order for Java classes: `src/main/java/`, `src/`, root, then submodules (detects via `pom.xml`/`build.gradle`)
-- Search order for config files: root, `src/main/resources/`, `src/`, `config/`, then submodules
-- Module detection: `_search_in_modules()` recursively checks subdirs with Maven/Gradle markers
-- Supports all file types: `.java`, `.xml`, `.properties`, `.yaml`, `.json`, `.gradle`, `.md`, `.sql`, etc.
+## Commit & Pull Request Guidelines
 
-**File Filtering (list_project_files):**
-- **Include:** `.java`, `.xml`, `.properties`, `.yaml`, `.json`, `.gradle`, `.md`, `pom.xml`
-- **Exclude:** `src/test`, `target/`, `build/`, `.git/`, `.idea/`, `node_modules/`
-- **Sub-path mode:** Use `sub_path` param to scope to `{project}/{sub_path}` for large projects (e.g., `"core"`)
-
-**Caching Behavior:**
-- Cache key: actual JAR path (Fernflower outputs to same dir, CFR uses temp dir then repackaged to ZIP → renamed to JAR)
-- Cache invalidation: SNAPSHOT version timestamp changes trigger cleanup of old caches via `_cleanup_old_snapshot_cache()`
-- Location: `{maven_repo}/{group}/{artifact}/{version}/easy-code-reader/{jar_name}.jar`
-- Cache contains: Full JAR with decompiled `.java` files preserving package structure
-
-## Integration Points
-**MCP Protocol:**
-- Uses `mcp>=0.9.0` via `stdio_server()` for Claude Desktop integration
-- Tool schemas defined in `handle_list_tools()` (inputSchema = JSON Schema)
-- Responses: JSON strings wrapped in `TextContent(type="text", text=...)`
-
-**Claude Desktop Config Example:**
-```json
-{
-  "mcpServers": {
-    "easy-code-reader": {
-      "command": "uvx",
-      "args": ["easy-code-reader", "--maven-repo", "/custom/path"],
-      "env": {}
-    }
-  }
-}
-```
-
-**External Dependencies:**
-- `uv`: Recommended for fast installs/runs (`uvx` command)
-- Java: Must be in PATH for `subprocess.run(['java', '-jar', ...])` calls
-- Decompiler JARs: Bundled via `package_data` in `pyproject.toml`
-
-## Key Patterns & Examples
-**AI-Friendly Error Messages:**
-- Tools include intelligent, structured hints when queries fail with clear actionable steps
-- `read_project_code` not found → Suggests using `list_project_files` with `file_name_pattern` for fuzzy matching first (reduces context size)
-- `list_all_project` with `project_name_pattern` but no matches → Provides structured hint with emoji indicators (⚠️/✓) and numbered steps
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+History uses short, descriptive subjects such as “Fix links and references in README”; no mandatory prefix scheme is evident. Keep commits focused. PR descriptions should explain the problem, resulting behavior, validation commands/results, and configuration changes. Link related issues when applicable and update affected documentation. Preserve unrelated working-tree changes.
 
 ---
 > Source: [FangYuan33/easy-code-reader](https://github.com/FangYuan33/easy-code-reader) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
