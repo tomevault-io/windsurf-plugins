@@ -1,107 +1,92 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Instructions for coding agents (Claude Code, Codex and others) working in this repository.
 ---
 
-# CLAUDE.md
+# settings_ui: agent instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Instructions for coding agents (Claude Code, Codex and others) working in this repository.
+`CLAUDE.md` only imports this file (`@AGENTS.md`); edit this file, and keep `CLAUDE.md` as that one line.
 
 ## About this project
 
-`settings_ui` is a published Flutter package (pub.dev: `settings_ui`, current version: `2.0.3`) that renders native-looking settings screens for Android, iOS, macOS, Windows, Linux, Fuchsia, and Web — all from a single API. It is used in production by thousands of apps.
+`settings_ui` is a published Flutter package (pub.dev: `settings_ui`, current version: `4.0.0`) that renders native-looking settings screens for iOS, macOS, Windows, Android, Linux, Fuchsia and the web from a single API. It is used in production by thousands of apps, so treat every public API and default-look change as a breaking change for someone.
+
+- Requires Flutter >=3.44 and Dart >=3.12.
+- Built on the decoupled [`material_ui`](https://pub.dev/packages/material_ui) and [`cupertino_ui`](https://pub.dev/packages/cupertino_ui) packages. In `lib/`, `test/` and `example/`, import `package:material_ui/material_ui.dart` and `package:cupertino_ui/cupertino_ui.dart` (plus non-design libraries such as `package:flutter/widgets.dart`, `foundation.dart`, `services.dart`). Never import `package:flutter/material.dart` or `package:flutter/cupertino.dart`: their `Theme`/`CupertinoTheme` are different classes, so the package would stop seeing the app theme.
+- Apps that have not moved to material_ui stay on `settings_ui ^3.0.1`.
 
 ## Commands
 
 ```bash
-# Get dependencies
 flutter pub get
 
-# Run all tests
-flutter test
+# Format (CI fails on unformatted code). `flutter format` no longer exists.
+dart format .
+dart format --output=none --set-exit-if-changed .   # CI check
 
-# Run a single test file
-flutter test test/widget_test.dart
-
-# Run tests with coverage
-flutter test --coverage --test-randomize-ordering-seed random
-
-# Analyze for lint errors
+# Lint
 flutter analyze .
 
-# Fix formatting
-flutter format .
+# All unit/widget tests, as CI runs them
+flutter test --coverage --test-randomize-ordering-seed random
 
-# Check formatting without changing files (CI-style)
-flutter format --set-exit-if-changed .
+# One group or test (the files in test/settings_tests have no main())
+flutter test test/widget_test.dart --name "CupertinoSettingsSwitch"
 
-# Run the example app
+# Example app, and its integration test (needs a running device, simulator or emulator)
 cd example && flutter run
+# Open a screen in a style and brightness directly (example/lib/utils/launch_options.dart):
+# options screen, platform, page, theme, from the web URL's query, the initial route
+# (--route, or #/... on the web; its path is the screen) or --dart-define
+cd example && flutter run -d chrome   # then /?screen=split-view&platform=macOS&theme=dark
+cd example && flutter run -d macos --route '/split-view?platform=windows&page=system'
+cd example && flutter run -d macos --dart-define=SCREEN=macos --dart-define=THEME=dark
+cd example && flutter test integration_test/integration_test.dart -d <device-id>
+cd example && flutter test integration_test/split_view_flows_test.dart -d <device-id>
 ```
 
 ## Architecture
 
-### Rendering strategy: platform dispatch
+### Platform dispatch
 
-Every public widget (`SettingsList`, `SettingsSection`, `SettingsTile`) is a thin dispatcher. At build time each checks `SettingsTheme.of(context).platform` and returns one of three concrete platform implementations:
+Every public widget (`SettingsSection`, `SettingsTile`) is a thin dispatcher. At build time it reads `SettingsTheme.of(context).platform` and returns one of six implementations:
 
-- `Android/Fuchsia/Linux` → Material widgets
-- `iOS/macOS/Windows` → Cupertino widgets
-- `Web` → Web-specific widgets (rounded cards, adjusted padding)
-
-Platform implementations live alongside their dispatcher:
+- `iOS` → iOS style (`platforms/ios_*`)
+- `macOS` → macOS System Settings style (`platforms/macos_*`)
+- `windows` → Windows 11 (Fluent) style (`platforms/fluent_*`)
+- `android`, `fuchsia` → Android style (`platforms/android_*`)
+- `linux` → GNOME (libadwaita) style (`platforms/adwaita_*`)
+- `web` → web style (`platforms/web_*`)
 
 ```
 lib/src/tiles/
-  settings_tile.dart          ← dispatcher
+  settings_tile.dart              ← dispatcher
   platforms/
     android_settings_tile.dart
     ios_settings_tile.dart
     web_settings_tile.dart
+    macos_settings_tile.dart
+    fluent_settings_tile.dart
+    adwaita_settings_tile.dart
+    cupertino_settings_switch.dart  ← public, used by the iOS tile
+    macos_settings_switch.dart      ← public, used by the macOS tile
+    fluent_settings_switch.dart     ← public, used by the Windows tile
+    adwaita_settings_switch.dart    ← public, used by the GNOME tile
+    adwaita_symbolic_icons.dart     ← AdwaitaPanDownIcon public; go-next internal
 ```
 
-Same pattern for `sections/` and `list/`.
+Same pattern for `lib/src/sections/`. `lib/src/list/settings_list.dart` resolves the platform, brightness and default padding.
 
-### Theme propagation via `InheritedWidget`
+### Theme propagation
 
-`SettingsList` resolves platform and brightness, calls `ThemeProvider.getTheme()` to get hardcoded platform defaults, merges in any user-supplied `lightTheme`/`darkTheme` (`SettingsThemeData`), then pushes the result down the tree via `SettingsTheme` (an `InheritedWidget`).
+`SettingsList` resolves the platform and brightness, gets the style defaults from `ThemeProvider.getTheme()`, merges the user's `lightTheme`/`darkTheme` (`SettingsThemeData`) over them, and pushes the result down through `SettingsTheme` (an `InheritedWidget`). Tiles and sections read `SettingsTheme.of(context).themeData`; never pass theme values through constructors.
 
-All platform tile/section widgets read theme from `SettingsTheme.of(context).themeData`. Never pass theme as a constructor argument.
+`ThemeProvider` (`lib/src/utils/theme_provider.dart`) holds the defaults: Android and web derive colors from the Material 3 `ColorScheme`; iOS, macOS, Windows and GNOME use fixed system colors (iOS system colors, `NSColor` label colors, WinUI theme resources from `lib/src/utils/fluent_tokens.dart`, libadwaita colors) and ignore `ColorScheme`.
 
-`ThemeProvider` (`lib/src/utils/theme_provider.dart`) contains all hardcoded color values for each platform/brightness combination. This is the main place to touch when fixing theme issues.
 
-### `DevicePlatform.device` is a sentinel
-
-`DevicePlatform.device` means "auto-detect at runtime" and is valid only as input to `SettingsList`. It must never reach the platform switch statements inside tiles/sections — doing so throws. `PlatformUtils.detectPlatform()` resolves it to a real platform.
-
-### `IOSSettingsTileAdditionalInfo`
-
-An extra `InheritedWidget` injected by `IOSSettingsSection` to tell each `IOSSettingsTile` whether to draw top/bottom border radius and whether to show the inter-tile divider. This is iOS/macOS/Windows only.
-
-### Public API surface (the only exports)
-
-`lib/settings_ui.dart` re-exports exactly:
-- `SettingsList` (+ `ApplicationType` enum)
-- `SettingsSection`, `AbstractSettingsSection`, `CustomSettingsSection`
-- `SettingsTile` (+ `SettingsTileType` enum), `AbstractSettingsTile`, `CustomSettingsTile`
-- `DevicePlatform`, `PlatformUtils`
-- `SettingsTheme`, `SettingsThemeData`
-
-Platform-specific implementations are internal and should not be part of the public API.
-
-## Testing conventions
-
-- Tests live in `test/` with a flat `widget_test.dart` entry point that calls helper functions grouped by concern (`settingsListTests`, `settingsSectionsTests`, `settingsTileTests`, etc.).
-- Helper test functions are parameterised over `DevicePlatform` and called for every platform value.
-- The `_wrapWithMaterialApp` / `TestWidgetScreen` helper wraps a tile or section in a `SettingsList` inside a `MaterialApp` and passes the desired platform explicitly so tests are platform-deterministic.
-- CI requires ≥ 35% line coverage (`very_good_coverage`).
-
-## CI / Release
-
-- **CI** runs on every push: format check → `flutter analyze` → `flutter test --coverage` → coverage gate (35%).
-- **PR titles** must follow Conventional Commits (enforced by `action-semantic-pull-request`).
-- There is currently no automated publish workflow; a new version requires bumping `version` in `pubspec.yaml`, updating `CHANGELOG.md`, tagging, then running `flutter pub publish`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yako-dev/flutter-settings-ui](https://github.com/yako-dev/flutter-settings-ui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
