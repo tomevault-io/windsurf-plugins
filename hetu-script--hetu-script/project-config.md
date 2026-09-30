@@ -108,4 +108,4 @@ To bind Dart code into Hetu:
 
 ---
 > Source: [hetu-script/hetu-script](https://github.com/hetu-script/hetu-script) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
