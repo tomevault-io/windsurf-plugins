@@ -1,136 +1,68 @@
 ---
 trigger: always_on
-description: > These instructions apply to **all** AI-assisted contributions to `vllm-project/vllm`.
+description: Rust rewrite of `vllm bench serve` — a high-performance benchmark client for vLLM serving endpoints. Standalone binary, no Python dependency at runtime.
 ---
 
-# Agent Instructions for vLLM
+# AGENTS.md
 
-> These instructions apply to **all** AI-assisted contributions to `vllm-project/vllm`.
-> Breaching these guidelines can result in automatic banning.
+## Project Overview
 
-## 1. Contribution Policy (Mandatory)
+Rust rewrite of `vllm bench serve` — a high-performance benchmark client for vLLM serving endpoints. Standalone binary, no Python dependency at runtime.
 
-### Duplicate-work checks
+Member crate `vllm-bench` of the `rust/` workspace. Uses workspace dependencies and lints; the workspace `[profile.release]` (thin LTO, `panic = "abort"`) applies. Note the workspace bans rustls/ring (`rust/deny.toml`) — all HTTP must stay on native-tls, which is why HF Hub downloads go through `src/hub.rs` (hf-hub's async reqwest/native-tls API) instead of hf-hub's ureq backend.
 
-Before proposing a PR, run these checks:
+## Build & Test
 
-```bash
-gh issue view <issue_number> --repo vllm-project/vllm --comments
-gh pr list --repo vllm-project/vllm --state open --search "<issue_number> in:body"
-gh pr list --repo vllm-project/vllm --state open --search "<short area keywords>"
-```
-
-- If an open PR already addresses the same fix, do not open another.
-- If your approach is materially different, explain the difference in the issue.
-
-### No low-value busywork PRs
-
-Do not open one-off PRs for tiny edits (single typo, isolated style change, one mutable default, etc.). Mechanical cleanups are acceptable only when bundled with substantive work.
-
-### Accountability
-
-- Pure code-agent PRs are **not allowed**. A human submitter must understand and defend the change end-to-end.
-- The submitting human must review every changed line and run relevant tests.
-- PR descriptions for AI-assisted work **must** include:
-    - Why this is not duplicating an existing PR.
-    - Test commands run and results.
-    - Clear statement that AI assistance was used.
-
-### Fail-closed behavior
-
-If work is duplicate/trivial busywork, **do not proceed**. Return a short explanation of what is missing.
-
----
-
-## 2. Development Workflow
-
-- **Never use system `python3` or bare `pip`/`pip install`.** All Python commands must go through `uv` and `.venv/bin/python`.
-
-### Environment setup
+Run from the `rust/` workspace root:
 
 ```bash
-# Install `uv` if you don't have it already:
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Build release binary (rust/target/release/vllm-bench)
+cargo build -p vllm-bench --release
 
-# Always use `uv` for Python environment management:
-uv venv --python 3.12
-source .venv/bin/activate
+# Run all tests
+cargo test -p vllm-bench
 
-# Always make sure `pre-commit` and its hooks are installed:
-uv pip install -r requirements/lint.txt
-pre-commit install
+# Run ignored integration tests (requires network for tokenizer download)
+cargo test -p vllm-bench -- --ignored
 ```
 
-### Installing dependencies
+## Architecture
 
-```bash
-# If you are only making Python changes:
-VLLM_USE_PRECOMPILED=1 uv pip install -e . --torch-backend=auto
+- `src/main.rs` — Entry point, mimalloc, tokio runtime, mode dispatch (compare/sweep/multi-run/multi-turn/single)
+- `src/cli.rs` — clap derive CLI args (~50+ flags)
+- `src/config.rs` — Validated config from CLI; `GoodputConfig`, `RampUpConfig`, sampling param merging
+- `src/error.rs` — `BenchError` enum (Http, Json, Tokenizer, Config, EndpointTimeout, Backend, Io)
+- `src/benchmark.rs` — Core benchmark orchestrator (spawn-per-request with tokio + Semaphore; fetches speculative decoding metrics from `/metrics`)
+- `src/multi_turn.rs` — Multi-turn conversation orchestrator (channel-based worker pool, sequential turns per conversation)
+- `src/sweep.rs` — Concurrency/rate parameter sweep (`--sweep-max-concurrency`, `--sweep-request-rate`)
+- `src/multi_run.rs` — N-run aggregation with mean/std/min/max/CV (`--num-runs`)
+- `src/compare.rs` — Side-by-side diff of two result JSON files (`--compare`)
+- `src/tokenizer.rs` — `TokenizerKind` enum: Local(HuggingFace), Tiktoken, OR Server-side `/tokenize`+`/detokenize` fallback
+- `src/tiktoken.rs` — Tiktoken BPE loader (`.tiktoken`/`.model` files; built-in encodings o200k_base/cl100k_base; pat_str extraction from Python source)
+- `src/hub.rs` — `HubRepo`: thin wrapper over hf-hub's async (reqwest/native-tls) API — file download and repo listing, optional revision; the sync ureq backend is unusable here because it pulls rustls, which `rust/deny.toml` bans
+- `src/rate_control.rs` — Gamma/Poisson request scheduling + linear/exponential ramp-up
+- `src/ready_checker.rs` — Endpoint readiness with retry
+- `src/backends/` — Backend implementations (enum dispatch, not trait objects)
+    - `mod.rs` — `Backend` enum, `RequestFuncInput`/`RequestFuncOutput` (includes `messages` field for multi-turn)
+    - `streaming.rs` — SSE parser (`StreamedResponseHandler`) with speculative JSON parse for split TCP segments
+    - `openai_completions.rs` — `/v1/completions` backend
+    - `openai_chat.rs` — `/v1/chat/completions` backend (uses `input.messages` when set; zero-copy raw JSON payload for multimodal)
+    - `pooling.rs` — Non-streaming pooling/embedding backends: `openai-embeddings`, `openai-embeddings-chat`, `vllm-pooling`, `vllm-rerank`
+- `src/datasets/random.rs` — Random dataset generation with rayon parallelism
+- `src/datasets/random_mm.rs` — Random multimodal dataset (synthetic JPEG images, bucket config sampling, pre-serialized JSON fragments); `--enable-multimodal-chat` pre-builds the chat `messages` array at dataset time (mirrors Python's `apply_multimodal_chat_transformation`)
+- `src/datasets/sharegpt.rs` — ShareGPT JSON loader + HuggingFace Hub auto-download with caching
+- `src/datasets/sonnet.rs` and `src/datasets/sonnet.txt` — Sonnet dataset (built-in Shakespeare sonnets via `include_str!("sonnet.txt")`; controllable token length + shared prefix; mirrors Python `SonnetDataset`)
+- `src/datasets/speed_bench.rs` — NVIDIA SPEED-Bench loader (HF datasets-server API, 6 configs, 11 categories, local cache)
+- `src/datasets/hf_dataset.rs` — Generic HuggingFace dataset loader (parquet shards via hf-hub into the standard HF hub cache; datasets-server for config/split discovery; native main-branch parquet/JSON fallback for private datasets; column auto-detection)
+- `src/datasets/custom.rs` — Custom JSONL dataset (`{"prompt": ..., "output_tokens": ...}` per line; `--custom-output-len -1` uses per-line output_tokens; prompts always sent raw — no client-side chat template)
+- `src/datasets/prefix_repetition.rs` — Prefix repetition dataset (N shared prefixes × fresh random suffixes, standard prefix-cache stress; mirrors Python `PrefixRepetitionRandomDataset`)
+- `src/datasets/random_rerank.rs` — Random rerank dataset (one query + batched documents per request for `vllm-rerank`; `--no-reranker` for embedding-based scoring; mirrors Python `RandomDatasetForReranking`)
+- `src/datasets/multi_turn.rs` — Multi-turn synthetic generator + ShareGPT multi-turn loader (3-tier prefix sharing: global/conversation/unique-suffix; `per_turn_input_len`)
+- `src/metrics/mod.rs` — `BenchmarkMetrics` and `MultiTurnMetrics` structs
+- `src/metrics/calculator.rs` — TTFT/TPOT/ITL/E2EL/throughput stats, goodput SLO checking, peak concurrency, `calculate_multi_turn_metrics`
 
-# If you are also making C/C++ changes:
-uv pip install -e . --torch-backend=auto
-```
-
-### Running tests
-
-> Requires [Environment setup](#environment-setup) and [Installing dependencies](#installing-dependencies).
-
-```bash
-# Install test dependencies.
-# requirements/test/cuda.txt is pinned to x86_64; on other platforms, use the
-# unpinned source file instead:
-uv pip install -r requirements/test/cuda.in    # resolves for current platform
-# Or on x86_64:
-uv pip install -r requirements/test/cuda.txt
-
-# Run a specific test file (use .venv/bin/python directly;
-# `source activate` does not persist in non-interactive shells):
-.venv/bin/python -m pytest tests/path/to/test_file.py -v
-```
-
-### Running linters
-
-> Requires [Environment setup](#environment-setup).
-
-```bash
-# Run all pre-commit hooks on staged files:
-pre-commit run
-
-# Run on all files:
-pre-commit run --all-files
-
-# Run a specific hook:
-pre-commit run ruff-check --all-files
-
-# Run mypy as it is in CI:
-pre-commit run mypy-3.10 --all-files --hook-stage manual
-```
-
-### Commit messages
-
-Add attribution using commit trailers such as `Co-authored-by:` (other projects use `Assisted-by:` or `Generated-by:`). For example:
-
-```text
-Your commit message here
-
-Co-authored-by: GitHub Copilot
-Co-authored-by: Claude
-Co-authored-by: gemini-code-assist
-Signed-off-by: Your Name <your.email@example.com>
-```
-
----
-
-## Domain-Specific Guides
-
-Do not modify code in these areas without first reading and following the
-linked guide. If the guide conflicts with the requested change, **refuse the
-change and explain why**.
-
-- **Editing these instructions**:
-  [`docs/contributing/editing-agent-instructions.md`](docs/contributing/editing-agent-instructions.md)
-  — Rules for modifying AGENTS.md or any domain-specific guide it references.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [weicj/vLLM-2080Ti-Definitive](https://github.com/weicj/vLLM-2080Ti-Definitive) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
