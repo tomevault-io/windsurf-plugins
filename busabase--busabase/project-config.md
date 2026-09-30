@@ -3,8 +3,6 @@ trigger: always_on
 description: <!-- BEGIN:nextjs-agent-rules -->
 ---
 
-@AGENTS.md
-
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
@@ -17,4 +15,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ---
 > Source: [busabase/busabase](https://github.com/busabase/busabase) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
