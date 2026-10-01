@@ -1,215 +1,68 @@
 ---
 trigger: always_on
-description: Singleton manager pattern for system-wide resource management
+description: This is the workspace repo (`libnativeapi/nativeapi`, formerly `nativeapi-flutter` and `nativeapi-workspace`) for the [libnativeapi](https://github.com/libnativeapi) project family. Every binding (`bindings/dart/`, `bindings/rust/`, `bindings/csharp/`, `bindings/js/`, `bindings/python/`), the code generator (`tools/codegen/`), the `./codegen` script, the specs and the shared tooling live directly in this repo (the Rust and C# histories were merged in from `nativeapi-rust` and `nativeapi-csharp`)
 ---
 
+# libnativeapi workspace
 
-# Singleton Manager Pattern Rules
+This is the workspace repo (`libnativeapi/nativeapi`, formerly `nativeapi-flutter` and `nativeapi-workspace`) for the [libnativeapi](https://github.com/libnativeapi) project family. Every binding (`bindings/dart/`, `bindings/rust/`, `bindings/csharp/`, `bindings/js/`, `bindings/python/`), the code generator (`tools/codegen/`), the `./codegen` script, the specs and the shared tooling live directly in this repo (the Rust and C# histories were merged in from `nativeapi-rust` and `nativeapi-csharp`); only `core/` is a git submodule of an independent repository. Work inside `core/` is committed and pushed from that subdirectory; everything else is committed here.
 
-System-wide resources (windows, displays, tray icons, keyboard monitoring) are managed by singleton manager classes. This ensures consistent state management and centralized event emission across the application.
+## Layout
 
-## Manager Classes
-
-The following managers use the singleton pattern:
-
-- **[WindowManager](mdc:src/window_manager.h)** - Manages all application windows
-- **[DisplayManager](mdc:src/display_manager.h)** - Manages display/monitor information
-- **[TrayManager](mdc:src/tray_manager.h)** - Manages system tray icons
-- **[AccessibilityManager](mdc:src/accessibility_manager.h)** - Manages accessibility permissions
-
-## Singleton Pattern Structure
-
-### Meyer's Singleton Pattern
-
-All managers use Meyer's singleton (thread-safe in C++11+):
-
-```cpp
-class WindowManager : public EventEmitter<WindowEvent> {
-public:
-    // Get singleton instance
-    static WindowManager& GetInstance() {
-        static WindowManager instance;  // Created on first call
-        return instance;
-    }
-
-    virtual ~WindowManager();
-
-    // Prevent copying and moving
-    WindowManager(const WindowManager&) = delete;
-    WindowManager& operator=(const WindowManager&) = delete;
-    WindowManager(WindowManager&&) = delete;
-    WindowManager& operator=(WindowManager&&) = delete;
-
-private:
-    // Private constructor
-    WindowManager();
-};
+```
+core/               # submodule: nativeapi-core — the C++ core library
+bindings/
+├── dart/           # the Dart binding: nativeapi/, cnativeapi/, nativeapi_flutter/
+├── rust/           # the Rust binding: crates/{nativeapi,cnativeapi}
+├── csharp/         # the C# binding: src/, tests/, NativeAPI.slnx
+├── js/             # the JS/TS binding: a Node-API addon (src/) + TypeScript (lib/)
+└── python/         # the Python binding: ctypes package (nativeapi/) + native shim (src/)
+examples/           # every binding's example apps, prefixed dart_*, flutter_*, rust_*, csharp_*, js_*, python_*
+pubspec.yaml        # pub workspace + melos root: Dart packages and Flutter examples
+Cargo.toml          # cargo workspace root: Rust crates and examples
+tools/codegen/      # in-repo Rust workspace: the code generator
+tools/gui/          # GUI tests and demo scenarios for the examples (built on the skills)
+codegen             # Python entry point orchestrating the generators
+.agents/skills/     # agent skills: core API changes, GUI testing, demo recording (see below)
+.claude/skills      # symlink → ../.agents/skills, so Claude Code discovers the same skills
 ```
 
-**Key Points:**
-- Static local variable ensures single instance
-- Thread-safe initialization (C++11 guarantee)
-- Private constructor prevents direct instantiation
-- Deleted copy/move prevents duplication
-- Returns reference (not pointer) to prevent deletion
+## Architecture
 
-## Complete Manager Template
+- `core` — the C++ core library (repo: `nativeapi-core`). The source of truth for the native API surface (windows, tray icons, menus, displays, keyboard, dialogs, storage, etc.) with per-platform implementations (macOS/Windows/Linux).
+- `tools/codegen` — three crates: `shared` (libclang parser, IR, naming), `capi` (C ABI + umbrella header), `bindings` (Rust/Dart/C#/JS/Python generators, consuming the IR JSON emitted by `capi`). Only `capi` depends on libclang. See tools/codegen/README.md.
+- `bindings/*` — language bindings wrapping the core library. All live in this repo and build against the `core/` submodule directly (Rust `build.rs`, the Dart `cnativeapi` package's build hook, the C# native CMake, the JS addon's and the Python binding's `CMakeLists.txt`). Only a published package carries its own copy of core, in `cxx_impl/`, which the release workflows vendor and never commit. The Rust binding layers `nativeapi` (safe API) over `cnativeapi` (FFI). The Python binding has no compiled extension: generated `ctypes` code (`nativeapi/_capi.py` plus one module per header) calls a shared library built from core and a small event loop shim, which `Application.run_async()` pumps from asyncio.
 
-### Header File Pattern ([window_manager.h](mdc:src/window_manager.h))
+## Design specs
 
-```cpp
-#pragma once
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include "foundation/event_emitter.h"
-#include "window.h"
-#include "window_event.h"
+`specs/` holds the settled design rules for `core/` — layering, the identity/value object
+model, the public API style, the platform seam, the event system, managers, and the C ABI.
+Start at [specs/README.md](specs/README.md); read the relevant spec before adding or
+reshaping public API in `core/src/`.
 
-namespace nativeapi {
+Any diff that touches a public header in `core/src/` must pass the checklist at the end of
+[specs/api-style.md](specs/api-style.md) — naming vocabulary, parameter and return types,
+failure reporting, platform-availability notes, and the codegen constraints. When existing
+headers disagree with each other, follow the spec, not the nearest neighbour: it records
+which side of each split is the rule and which is legacy.
 
-class WindowManager : public EventEmitter<WindowEvent> {
-public:
-    // Singleton access
-    static WindowManager& GetInstance();
+There is no separate issue list: each spec carries the open questions and known legacy
+gaps of its own area inline (an "未决" section, or a "存量缺口" note next to the rule it
+breaks). When one is resolved, edit the spec text itself.
 
-    virtual ~WindowManager();
+## Code generation
 
-    // Public API
-    std::shared_ptr<Window> Create(const WindowOptions& options);
-    std::shared_ptr<Window> Get(WindowId id);
-    std::vector<std::shared_ptr<Window>> GetAll();
-    bool Destroy(WindowId id);
+Always drive the generators through `./codegen` at the workspace root:
 
-    // Prevent copying and moving
-    WindowManager(const WindowManager&) = delete;
-    WindowManager& operator=(const WindowManager&) = delete;
-    WindowManager(WindowManager&&) = delete;
-    WindowManager& operator=(WindowManager&&) = delete;
+- `./codegen` — full run: C ABI, then all bindings
+- `./codegen capi` / `./codegen bindings [--lang rust,dart,csharp,js,python]`
+- `./codegen check` — read-only verification, non-zero exit when stale (CI mode)
+- `./codegen readme` — copy the shared README sections (`tools/readme/*.md`, e.g. Contributing) into core and every binding; `check` flags drift, `sync` runs it. Edit the snippet, never the copies.
+- `./codegen sync [-m "msg"] [--push]` — full downstream propagation, see below
 
-private:
-    // Private constructor
-    WindowManager();
-
-    // PIMPL for platform-specific details
-    class Impl;
-    std::unique_ptr<Impl> pimpl_;
-
-    // Shared state (not platform-specific)
-    std::unordered_map<WindowId, std::shared_ptr<Window>> windows_;
-
-    // Platform event monitoring
-    void SetupEventMonitoring();
-    void CleanupEventMonitoring();
-    void DispatchWindowEvent(const WindowEvent& event);
-};
-
-}  // namespace nativeapi
-```
-
-### Implementation Pattern ([window_manager.cpp](mdc:src/window_manager.cpp))
-
-```cpp
-#include "window_manager.h"
-
-namespace nativeapi {
-
-WindowManager& WindowManager::GetInstance() {
-    static WindowManager instance;
-    return instance;
-}
-
-WindowManager::WindowManager() : pimpl_(std::make_unique<Impl>(this)) {
-    SetupEventMonitoring();
-}
-
-WindowManager::~WindowManager() {
-    CleanupEventMonitoring();
-}
-
-std::shared_ptr<Window> WindowManager::Create(const WindowOptions& options) {
-    // Platform-specific creation
-    auto window = pimpl_->CreatePlatformWindow(options);
-
-    if (window) {
-        // Store in registry
-        windows_[window->GetId()] = window;
-
-        // Emit event
-        Emit<WindowCreatedEvent>(window->GetId());
-    }
-
-    return window;
-}
-
-std::shared_ptr<Window> WindowManager::Get(WindowId id) {
-    auto it = windows_.find(id);
-    return (it != windows_.end()) ? it->second : nullptr;
-}
-
-std::vector<std::shared_ptr<Window>> WindowManager::GetAll() {
-    std::vector<std::shared_ptr<Window>> result;
-    result.reserve(windows_.size());
-
-    for (const auto& [id, window] : windows_) {
-        result.push_back(window);
-    }
-
-    return result;
-}
-
-bool WindowManager::Destroy(WindowId id) {
-    auto it = windows_.find(id);
-    if (it == windows_.end()) {
-        return false;
-    }
-
-    // Platform-specific cleanup happens in Window destructor
-    windows_.erase(it);
-
-    // Emit event
-    Emit<WindowClosedEvent>(id);
-
-    return true;
-}
-
-}  // namespace nativeapi
-```
-
-## Usage Patterns
-
-### Pattern 1: Accessing the Singleton
-
-```cpp
-// Get reference to manager
-auto& manager = WindowManager::GetInstance();
-
-// Use manager
-auto window = manager.Create(options);
-```
-
-**Never:**
-```cpp
-// Don't create pointers to singleton
-WindowManager* manager = &WindowManager::GetInstance();  // Unnecessary
-
-// Don't try to create instances
-WindowManager manager;  // Won't compile - private constructor
-```
-
-### Pattern 2: Registering Event Listeners
-
-Managers inherit from `EventEmitter`, so you can add listeners:
-
-```cpp
-auto& manager = WindowManager::GetInstance();
-
-// Register listener for specific event
-auto listener_id = manager.AddListener<WindowCreatedEvent>(
-    [](const WindowCreatedEvent& event) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [libnativeapi/nativeapi](https://github.com/libnativeapi/nativeapi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
