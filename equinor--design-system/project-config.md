@@ -1,95 +1,74 @@
 ---
 trigger: always_on
-description: Conventions for AI agents working in `apps/design-system-docs` — the public
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md — EDS Documentation Site
+# CLAUDE.md
 
-Conventions for AI agents working in `apps/design-system-docs` — the public
-EDS documentation site (eds.equinor.com), built with **Docusaurus 3.10**.
-Repo-wide conventions (commits, secrets, formatting, component code style)
-live in the root [`AGENTS.md`](../../AGENTS.md); this file covers only what is
-specific to this app.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What this app is
+## What this is
 
-A versioned Docusaurus site documenting EDS. Three doc versions exist:
+`@equinor/eds-color-palette-generator` — a Next.js (App Router) tool that generates accessible color scales for the Equinor Design System. Each scale has 15 semantic steps (backgrounds, fills, borders, text). Colors are generated in **OKLCH space** with chroma shaped by a **Gaussian curve** across lightness, and validated against **APCA** and **WCAG 2.1** contrast targets.
 
-| Version                             | Content dir                          | URL path                                            | Status                                                   |
-| ----------------------------------- | ------------------------------------ | --------------------------------------------------- | -------------------------------------------------------- |
-| `current` (labelled **3.0.0-beta**) | `docs/`                              | `/docs/Next/…` (capital N, baked into footer links) | where new work goes                                      |
-| `2.0.0-beta`                        | `versioned_docs/version-2.0.0-beta/` | `/docs/2.0.0-beta/…`                                | frozen snapshot, rendered with the redesign              |
-| `1.1.0`                             | `versioned_docs/version-1.1.0/`      | `/docs/…`                                           | **frozen archive — never restyle or edit its rendering** |
+This is a standalone app inside the `design-system` monorepo. The repo-wide component conventions in `../../AGENTS.md` are about EDS 2.0 components and largely **do not** apply here — this is an application, not a component package. It consumes the published workspace packages `@equinor/eds-tokens`, `@equinor/eds-tailwind`, and `@equinor/eds-utils`.
 
-**Version scoping is the #1 footgun.** Anything that styles doc _content_
-must be scoped so 1.1.0 keeps its stock rendering. Current and the frozen
-2.0.0-beta both render with the redesign, so every scope names both:
+## Commands
 
-- CSS: pair `html:is([class*='docs-version-current'], [class*='docs-version-2.0.0-beta'])`
-  (the redesigned versions) with `html:not([class*='docs-version-'])`
-  (unversioned pages: landing, /foundation, /getting-started, /about).
-  Per-element rules use `html:where(…)` to keep specificity at 0,0,2 so
-  single-class component rules still win. The one exception is the version
-  badge in `site-chrome.css`, hidden on current only so frozen pages still
-  say which version they are.
-- React: the DocItem hero gate checks `REDESIGN_VERSIONS` (`'current'` and
-  `'2.0.0-beta'`).
-- Freezing another version means adding its `docs-version-*` class and name
-  to both lists.
-- Chrome (navbar, sidebar, TOC, footer) is deliberately version-independent.
+Use `pnpm` (monorepo uses pnpm workspaces).
 
-**The current and 1.1.0 paths are pinned explicitly, and both must stay that way.**
-`docusaurus.config.ts` sets `lastVersion: 'current'` plus
-`'1.1.0': { path: '' }`. Neither is decoration:
+```bash
+pnpm dev                       # Next dev server (Turbopack) on :3000
+pnpm build                     # Next production build
+pnpm lint                      # ESLint
+pnpm types                     # tsc --noEmit type check
 
-- Without `lastVersion`, Docusaurus defaults it to the newest entry in
-  `versions.json` (`2.0.0-beta`), which silently makes a frozen snapshot the target
-  of every `type: 'docSidebar'` navbar item and of the version dropdown — while
-  the footer and landing pages link to `/docs/Next/…`. The site then
-  contradicts its own chrome and the redesign is unreachable from the primary
-  navigation.
-- With `lastVersion: 'current'`, a non-last version takes its version _name_ as
-  its path, so `'1.1.0': { path: '' }` is what keeps the archive at `/docs/…`
-  instead of relocating it to `/docs/1.1.0/…` and breaking every existing link.
+pnpm test                      # Vitest watch (unit tests)
+pnpm test:run                  # Vitest single run
+pnpm test:run src/utils/color.test.ts   # run one unit test file
+pnpm test:e2e                  # Playwright e2e (start `pnpm dev` first — no webServer configured)
+pnpm test:e2e:ui               # Playwright UI mode
 
-Two sanctioned changes to the archive's rendering, and only these two:
+pnpm build:cli                 # Build the CLI to dist/ via Vite (rolldown)
 
-1. It carries Docusaurus's standard "no longer actively maintained" banner,
-   because it genuinely is not the latest version. Suppress with
-   `banner: 'none'` on the `1.1.0` entry if that is ever unwanted.
-2. It has no breadcrumbs. `breadcrumbs: false` is a docs-**plugin** option,
-   not a per-version one, so the redesign's choice to drop them necessarily
-   applies to the archive too. There is no way to scope it; re-enabling for
-   1.1.0 alone would mean a second plugin instance.
-
-Anything else that changes how 1.1.0 renders is a bug.
-
-## Directory map
-
-```
-docs/                      current-version content (md/mdx)
-versioned_docs/1.1.0/      frozen archive — do not touch
-versioned_docs/version-2.0.0-beta/  frozen snapshot — content not edited
-src/css/                   the five global stylesheets (see below)
-src/components/            shared site components (docs- prefixed CSS)
-src/theme/                 Docusaurus swizzles + MDXComponents registry
-src/pages/                 unversioned React pages (index, foundation, …)
-src/clientModules/         syncColorScheme (data-theme → data-color-scheme),
-                           pageTransitions (View Transitions on route change)
-scripts/                   check-viewport-overflow.mjs (needs a running
-                           server) and check-story-references.mjs (static)
-sidebars.ts                hand-maintained; category link docs must NOT be
-                           repeated in their own items array
-docusaurus.config.ts       aliases + webpack rules (see Config)
+pnpm generate:palette-config-in-markdown   # regenerate PALETTE_OVERVIEW.md
+pnpm generate:palette-contrast-report      # regenerate PALETTE_CONTRAST_REPORT.md
 ```
 
-## Global CSS — five files, strict responsibilities
+**Two test runners, separate scopes:** Vitest covers `src/**/*.{test,spec}.ts` in a Node environment (color math, utils, CLI). Playwright covers `tests/e2e/**` against the running dev server. `vitest.config.ts` excludes `tests/**`, so the two never overlap. Playwright has no `webServer` block — start the dev server manually before `pnpm test:e2e`.
 
-| File                           | Owns                                                                                                                                                        |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+## Architecture
+
+### Generation pipeline (the core)
+
+`src/utils/color.ts` is the heart. `generateColorScale(baseColor, lightnessValues, mean, stdDev, format)` is the single entry point used by both the web UI and the CLI:
+
+- A color is either a **single value** (`{ name, value }`) or **multiple anchors** (`{ name, anchors: [{ value, step }] }`). `generateColorScale` branches on `Array.isArray(baseColor)`; the anchor path calls `generateColorScaleWithInterpolation`, which interpolates between anchors in OKLCH space (shorter-hue) per step.
+- For every step, hue + base chroma are extracted, then `createColorWithGaussianChroma` sets the step's target lightness and multiplies chroma by `gaussian(lightness, mean, stdDev)`. So **lightness is fixed per step; chroma follows the bell curve**.
+- All functions fail soft: on any error they fall back to a gray (`getFallbackColor`) rather than throwing, so the UI never crashes on bad input.
+
+### Step definitions (`src/config/`)
+
+The 15 semantic steps live in `config.ts` as individual exported `StepDefinition` constants (`BG_CANVAS`, `TEXT_STRONG`, …) collected into `PALETTE_STEPS`. Each carries a `lightValue`, `darkValue`, and a `contrastWith` list of contrast requirements (target step + APCA `lc` + WCAG level). This config is the source of truth for both lightness arrays (`getLightnessValues` in `helpers.ts`) and the contrast report. `palette.ts` holds the default color set (`paletteConfig`).
+
+To change which steps exist, their lightness, or their contrast targets, edit `config.ts` — not the components.
+
+### Web app (`src/app`, `src/components`)
+
+- `src/app/page.tsx` is a `'use client'` component holding all state: Gaussian params (separate mean/stdDev for light vs dark), lightness value arrays, the colors array, and display toggles. Every piece of state is mirrored to `localStorage` via `src/utils/localStorage.ts` (keys prefixed `colorPalette_`).
+- Scales are computed in `useMemo` keyed on a `valueKey` (color values only) so renaming a color doesn't recompute the (expensive) scales.
+- Light/dark scheme comes from `ColorSchemeContext`; the page generates both light and dark scales and picks one. Mounting is gated on `useIsMounted()` to avoid hydration mismatches from localStorage.
+- `~13` presentational components in `src/components` (`ColorScale`, `DisplayOptionsPanel`, `GaussianParametersPanel`, `QuickActionsPopover`, etc.). Import/export of full configs (`ConfigFile`) flows through `QuickActionsPopover` → `handleConfigUpload`.
+
+### CLI (`src/cli/generate-colors.ts`)
+
+Standalone Node script (shebang banner added at build time). Reads a palette config JSON, reuses `generateColorScale` + `PALETTE_STEPS`, and writes two W3C-design-token files (light + dark). Same single-value/anchor formats as the UI. Built separately via `vite.config.ts` (lib build, externals: node builtins + `colorjs.io`), output to `dist/`, exposed as the `generate-colors` bin. See `src/cli/README.md` for config format.
+
+### Types
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [equinor/design-system](https://github.com/equinor/design-system) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
