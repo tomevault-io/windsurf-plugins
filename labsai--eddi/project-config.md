@@ -1,97 +1,69 @@
 ---
 trigger: always_on
-description: > **This directory is part of [labsai/EDDI](https://github.com/labsai/EDDI).** It was the separate `labsai/EDDI-Manager` repository until 2026-09-15; its full history was imported here (`git log -- ui/manager`). Issues and pull requests go to `labsai/EDDI`. The UI is built into the EDDI jar by Maven from the repository root — see the root `AGENTS.md` (Build & Test Commands).
+description: Start with **[AGENTS.md](AGENTS.md)**. It owns workflow, branch policy, quality gates, the
 ---
 
-# EDDI Manager — AI Agent Instructions
+# CLAUDE.md — EDDI Manager
 
-> **This directory is part of [labsai/EDDI](https://github.com/labsai/EDDI).** It was the separate `labsai/EDDI-Manager` repository until 2026-09-15; its full history was imported here (`git log -- ui/manager`). Issues and pull requests go to `labsai/EDDI`. The UI is built into the EDDI jar by Maven from the repository root — see the root `AGENTS.md` (Build & Test Commands).
+@AGENTS.md
 
-> **This file is automatically loaded by AI coding assistants. Follow ALL rules below.** The [root `AGENTS.md`](../../AGENTS.md) applies here too — branching, push approval, commit attribution and the changelog rule are defined there once and not repeated below.
+Start with **[AGENTS.md](AGENTS.md)**. It owns workflow, branch policy, quality gates, the
+i18n mandate, architecture, API conventions and constraints — all of it applies. This file
+adds the layer AGENTS.md does not cover: **what UI should be built from and what it should
+look like.**
 
-## 1. Project Context
+## Load a skill before writing UI
 
-**EDDI Manager** is the admin dashboard for the [EDDI](https://github.com/labsai/EDDI) conversational AI platform. It is a **React/TypeScript SPA** served from the EDDI backend at `/manage`.
+| Task | Skill |
+|---|---|
+| Anything that renders — a component, a card, a dialog | `.claude/skills/eddi-ui` |
+| A whole page — list, detail, config editor, wizard | `.claude/skills/eddi-screens` |
+| Data, routes, forms, i18n, tests | `.claude/skills/eddi-data` |
 
-### Ecosystem
+## The five rules that catch most mistakes
 
-The Manager, the Chat UI and the backend are one repository, `labsai/EDDI`:
+1. **Compose, don't recreate.** `src/components/ui/` (primitives) and
+   `src/components/shared/` (app-level components) already exist — list the directories;
+   `eddi-ui` describes each. Import them. Do not
+   pull in a fresh shadcn/ui component, and do not hand-roll a button, badge, card,
+   dialog, empty state or error state.
+2. **Colors come from tokens, never hex.** `bg-primary`, `text-muted-foreground`,
+   `border-border`, `bg-card`, `text-destructive`. Tokens are declared in `@theme` in
+   `src/index.css` and flip in dark mode. A literal `#f59e0b` in a component is a bug.
+3. **Logical properties only.** `ps-*` / `pe-*` / `ms-*` / `me-*` / `start-*` / `end-*` /
+   `text-start` / `text-end`. Never `pl-`, `pr-`, `ml-`, `mr-`, `left-`, `right-`. The app
+   ships Arabic; `e2e/rtl.spec.ts` will catch you.
+4. **Every user-visible string goes through `t("key", "Fallback")`** — then into
+   `en.json` and all 10 other locales in the same commit (AGENTS.md §2).
+5. **`data-testid` on anything a test asserts on** — rows, buttons, inputs, states.
+   Existing naming: `channel-row-${id}`, `create-channel-btn`, `view-toggle-card`.
 
-| Location | Tech | Purpose |
-| --- | --- | --- |
-| **repo root** | Java 25, Quarkus, MongoDB or PostgreSQL | Backend engine, REST API, lifecycle pipeline, integration tests (`src/test/java/**/*IT.java`) |
-| **`ui/manager`** (this) | React 19, Vite, Tailwind | Admin dashboard — agents, workflows, extensions, chat |
-| **`ui/chat`** | React, TypeScript | Standalone chat widget |
-| **eddi-website** | Astro | Marketing site at eddi.labs.ai |
+## Variant props, not restyling
 
-### Tech Stack
+`<Button variant="outline" size="sm">` — not `<Button className="border bg-transparent">`.
+Same for `Badge`. If a variant is missing, add it to the `cva` config in the primitive so
+the whole app gets it; don't patch it at the call site.
 
-| Layer | Technology |
-| --- | --- |
-| **Build** | Vite 8 |
-| **UI** | React 19 + TypeScript 5 (strict) |
-| **Styling** | Tailwind CSS v4 + CSS variables (black/gold) |
-| **State (server)** | TanStack Query v5 |
-| **State (UI)** | Zustand (chat/debug), `useState` / `useCallback` elsewhere |
-| **Routing** | React Router v7 (`react-router-dom` 7.x, declarative mode — no data router) |
-| **i18n** | react-i18next (11 locales: en, de, fr, es, ar, zh, th, ja, ko, pt, hi) |
-| **Test (unit)** | Vitest + React Testing Library + MSW |
-| **Test (e2e)** | Playwright |
-| **Editor** | Monaco (@monaco-editor/react) |
-| **DnD** | @dnd-kit (workflow pipeline builder) |
+## Design system mirror
 
----
+The synced surface is whatever `.design-sync/config.json`'s `componentSrcMap` lists — most
+of `ui/` and `shared/` plus five pieces of chrome from `src/components/layout/` (`Sidebar`,
+`TopBar`, `PlatformStatus`, `PageLoader`, `MockDataBanner`). Read that map rather than a count
+here. `AppLayout` and `ConfigEditorLayout` are excluded on purpose — both pull Monaco into the
+bundle. Others are unsynced too: `UpdateCheckCard` and `UpdateBanner` are newer than the last
+sync, `ChipInput` and `StepDots` are left out deliberately (NOTES.md says why), and
+`ResizeHandle` and the two `ConnectionReference*` components have not been considered yet. `.design-sync/conventions.md` is the styling contract;
+`.design-sync/NOTES.md` explains the build wiring. (`.ds-sync/` is the vendored converter
+toolchain that reads this configuration — not a second design system.)
 
-## 2. Workflow
-
-### Before Starting Any Work
-
-1. **Check state**: `git status`, `git log -5 --oneline`, `git branch --show-current`
-2. **Recent context**: the top entries of the root [`docs/changelog.md`](../../docs/changelog.md) and anything pending in [`docs/changelog.d/`](../../docs/changelog.d/README.md) — that is where Manager work is recorded (root rule 8)
-3. **Backend context**: the [root `AGENTS.md`](../../AGENTS.md) when touching API contracts
-4. **[`HANDOFF.md`](HANDOFF.md)** is the Manager's running log from before the monorepo move — about 180 KB. **Do not read it end to end.** Search it for the screen or feature you are touching; its deep dives (the operator, secrets grants, the Workforce decisions) are worth finding when you need them
-
-### During Work
-
-- **Branch** per root rule 3 — never commit to `main`, branch from `origin/main`, name it `feat/…`/`fix/…` (never a tool-generated `claude/…` name).
-- **Commit often** with conventional commits scoped to the area: `feat(manager): …`, `fix(manager): …`, or a feature scope such as `fix(operator): …`. Use `(ui)` only for a change that spans both UIs.
-- **Record the change** in a new `docs/changelog.d/YYYY-MM-DD-<slug>.md` fragment at the repository root (root rule 8), in the same commit as the work. Do not add entries to `HANDOFF.md` — every PR editing the same file is the merge conflict the fragments exist to avoid.
-
-### ⚠️ Dependency changes on Windows break CI's `npm ci`
-
-`@tailwindcss/oxide-wasm32-wasi` is an optional package that Windows skips, so npm
-on Windows never resolves its children and **prunes them from
-`package-lock.json`** on any `npm install` / `npm uninstall`. The Linux CI runner
-then fails before it runs anything:
-
-```
-npm error `npm ci` can only install packages when your package.json and
-npm error package-lock.json are in sync.
-npm error Missing: @emnapi/core@1.11.3 from lock file
-```
-
-Neither `npm install --package-lock-only` nor `--os=linux --cpu=x64` re-adds them.
-After changing any dependency on Windows, check the lock still carries all four:
-
-```bash
-node -e "const l=require('./package-lock.json');Object.keys(l.packages).filter(k=>k.includes('emnapi')||k.includes('wasm-runtime')).forEach(k=>console.log(k,l.packages[k].version))"
-```
-
-Expect `@emnapi/core`, `@emnapi/runtime`, `@emnapi/wasi-threads` and
-`@napi-rs/wasm-runtime` nested under
-`node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/`. If any are gone,
-restore them from the last lockfile CI accepted rather than regenerating.
-
-### Quality Gates
-
-There is no pre-commit hook (the husky + lint-staged hook did not survive the move into the
-EDDI monorepo). CI's `UI Manager Checks` job runs these on every PR into `main` that touches `ui/`
-(`ci.yml` runs on no other base branch), in this order — run them yourself before pushing:
-
-```bash
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Adding a component to `ui/`, `shared/` or `layout/` does not add it to the design system**
+— it must also be added to `.design-sync/ds-entry.tsx`, `config.json`'s `componentSrcMap`
+**and `dtsPropsFor`** (the hand-written props contract — the repo has no `.d.ts` tree, so
+without an entry the component ships an empty API), and a preview in
+`.design-sync/previews/`. If it reads a token no other synced file uses,
+check that token still reaches `:root` in the compiled CSS: Tailwind v4 tree-shakes `@theme`
+tokens, so an unscanned utility means a missing variable (see NOTES.md).
 
 ---
 > Source: [labsai/EDDI](https://github.com/labsai/EDDI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
