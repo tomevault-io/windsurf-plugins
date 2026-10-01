@@ -1,0 +1,105 @@
+---
+trigger: always_on
+description: Najświeższy punkt wznowienia po zakończeniu dnia:
+---
+
+# Stałe zasady projektu Strażnik
+
+## Aktualne przekazanie — 2026-09-08 wieczór
+
+Najświeższy punkt wznowienia po zakończeniu dnia:
+`docs/WZNOWIENIE_2026-09-09.md`. Przeczytaj go przed dalszą pracą;
+nie zaczynaj biblioteki zdjęć ani prototypu miejsc od nowa.
+
+Stan prac i ograniczenia: `docs/STAN_PRAC_2026-09-08.md`.
+Oddzielna sesja dotycząca schronienia ma wyłącznie zbadać wykonalność:
+`docs/PROMPT_ANALIZA_SCHRONIENIA.md`. Nie wdrażać jej propozycji ani alarmów.
+Projektować lokalizacje użytkownika lokalnie na urządzeniu; bez przekazywania
+wybranych miejsc, adresów i GPS na VPS. Przepływy do dostawców zewnętrznych
+także wymagają jawnej analizy, nie obiecywać prywatności bez sprawdzenia.
+
+## Plan odłożonej pracy — 2026-09-08
+
+Przed wznowieniem prac nad eskalacją alarmów przeczytaj
+`docs/PLAN_POWROTU_2026-09-08.md`. Testy tylko offline na Pixelu;
+zatwierdzenie progów 2,5 / 3,0 / 3,5 nie stanowi zgody na produkcję.
+Nie wysyłaj alarmów testowych do użytkowników. Wdrożenie wymaga osobnej zgody.
+
+## Instrukcja jest częścią wydania
+
+Ustalenie z użytkownikiem: każde wydanie z istotną zmianą funkcji, zachowania
+lub wyglądu aplikacji wymaga aktualizacji instrukcji. Nie uznawaj takiego
+release za zakończony, jeśli dokumentacja nadal opisuje poprzedni interfejs.
+
+Przy takim wydaniu:
+
+1. Porównaj zmiany z instrukcją polską (`docs/index.html`) i angielską
+   (`docs/en.html`). Aktualizuj obie wersje równolegle: działanie funkcji,
+   nazwy przycisków, ograniczenia, progi i wymagane zgody zgodnie z kodem.
+2. Odśwież zrzuty wszystkich ekranów dotkniętych zmianą. Wykonuj prawdziwe
+   zrzuty aktualnego APK na emulatorze Pixel 7; dla zachowań zależnych od
+   urządzenia, np. alarmów, użyj odpowiednio zweryfikowanego urządzenia.
+   Nie retuszuj interfejsu ani nie przedstawiaj makiety jako działającej apki.
+3. Zachowaj przyjęty projekt instrukcji: ciemny responsywny układ, przełącznik
+   PL/EN, lekko odchylone trójwymiarowe ramki telefonów z `docs/guide.css`.
+   W ramce umieszczaj niezmieniony zrzut; kliknięcie ma otwierać oryginał
+   w pełnej rozdzielczości. Nie zastępuj tego stylu bez uzgodnienia.
+4. Aktualizuj podpisy, teksty alternatywne, numer wersji oraz rzeczywiste daty
+   wykonania zrzutów. Instrukcja angielska powinna używać angielskiego UI;
+   zachowane etykiety źródłowe lub nieprzetłumaczone opisz uczciwie.
+5. Uzgodnij README i opis wydania z dokumentacją. Zachowaj działające linki
+   i kotwice; pobieranie APK powinno prowadzić do najnowszego wydania.
+6. Uruchom `scripts/test_guide.py` (Python + Pillow), dostosowując test do
+   świadomych zmian zestawu ekranów. Sprawdź wizualnie PL/EN na komputerze
+   i w wąskim widoku mobilnym: czytelność, ramki, brak poziomego przepełnienia,
+   przełączanie języków i otwieranie zdjęć.
+7. Przed wydaniem uruchom CAŁY zestaw testów, nie tylko te dotyczące zmiany:
+   wszystkie `scripts/test_*.cjs` i `scripts/test_*.py`, a testy wymagające
+   `firebase-admin` na serwerze (na kopii w `/tmp`, nie na wdrożonym kodzie).
+   Decyduj po kodzie wyjścia. Test, który padł przed Twoją zmianą, też jest
+   do naprawienia — 28.09.2026 znalazły się trzy zastałe naraz, w tym jeden
+   pilnujący, że ikony nie wyprzedzają meldunku, podczas gdy sprawdzał tylko
+   połowę ścieżki i przez dwanaście dni świecił na zielono nad zepsutym
+   mechanizmem. Gdy poprawka rozbija wywołanie na dwie linie i test przestaje
+   je rozpoznawać, uodpornij test — nie naginaj kodu pod dosłowne porównanie
+   i nie usuwaj asercji.
+8. W ramach zatwierdzonej publikacji dołącz dokumentację do wydania i sprawdź
+   jej publikację na GitHub Pages. W podsumowaniu podaj linki PL i EN.
+   Jeśli czegoś nie udało się zweryfikować, wyraźnie zaznacz brak.
+
+Przy poprawkach niewidocznych dla użytkownika oceń wpływ na opisy; nie wymieniaj
+bez potrzeby niezmienionych zrzutów. Procedura zrzutów: `docs/screens/README.md`.
+Ta zasada nie upoważnia do wysyłania testowych alarmów do użytkowników ani do
+zmniejszania zabezpieczeń aplikacji lub systemu.
+
+## Dostęp do stron internetowych — Firecrawl CLI
+
+Do wyszukiwania, otwierania i odczytywania bieżących stron internetowych używaj
+w pierwszej kolejności lokalnie skonfigurowanego `firecrawl-cli`. Nie korzystaj
+z wbudowanego konektora Firecrawl obciążającego oddzielny miesięczny limit,
+jeżeli lokalny CLI może wykonać zadanie. Innego narzędzia sieciowego użyj dopiero,
+gdy CLI jest niedostępny albo nie obsługuje wymaganej operacji; zaznacz wtedy
+użytkownikowi przyczynę zmiany narzędzia.
+
+Klucz API ma pozostać wyłącznie w ignorowanej konfiguracji lokalnej. Nigdy nie
+wpisuj go do `AGENTS.md`, dokumentacji, kodu, commita, logu ani odpowiedzi.
+
+## Przegląd bezpieczeństwa — co tydzień szybki, co miesiąc gruntowny
+
+Ustalenie z użytkownikiem z 26.09.2026, po audycie, który znalazł m.in. sekrety
+zostawione na starym serwerze i logowanie roota hasłem na nowym. Oba problemy
+istniały od tygodni i nikt ich nie zauważył, bo nikt nie patrzył.
+
+**Co tydzień — szybki przebieg** (kilkanaście minut, wyłącznie odczyt):
+
+1. Zależności: baza OSV dla `backend/requirements.lock` i
+   `android-app/package-lock.json`, otwarte alerty Dependabota i skanowania
+   sekretów na GitHubie.
+2. VPS: zaległe poprawki bezpieczeństwa, czy nocna instalacja poprawek
+   działa (jej log), czy któraś usługa czeka na restart po aktualizacji
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [cukierrro/Straznik](https://github.com/cukierrro/Straznik) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
