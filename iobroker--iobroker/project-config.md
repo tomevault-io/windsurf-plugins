@@ -1,123 +1,115 @@
 ---
 trigger: always_on
-description: ioBroker is a comprehensive home automation and IoT integration platform installer and management system. This repository contains cross-platform installation scripts, diagnostic tools, and the NPX package for setting up complete ioBroker instances.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# ioBroker Platform Installer
+# CLAUDE.md
 
-ioBroker is a comprehensive home automation and IoT integration platform installer and management system. This repository contains cross-platform installation scripts, diagnostic tools, and the NPX package for setting up complete ioBroker instances.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+## What this repository is
 
-## Working Effectively
+This is **not** the ioBroker platform itself — it is the **installer/maintenance tooling** for it. The
+ioBroker runtime lives in separate repos (`iobroker.js-controller`, `iobroker.admin`, …) and is pulled in
+from npm at installation time.
 
-### Bootstrap and Build
-- Install dependencies: `npm install` -- takes 30 seconds
-- Build distribution scripts: `node tasks --create` -- takes 1 second. Creates scripts in `dist/` directory
-- Lint code (DEPRECATED): ESLint config uses old .eslintrc.json format incompatible with ESLint 9.x. Do NOT run `npx eslint` - it will fail. Code quality checks are handled in CI.
-- Test basic functionality: `node test.js` -- tests if admin interface is reachable on localhost:8081
+One source tree feeds two delivery channels:
 
-### Installation Testing (Linux/macOS)
-- **NEVER CANCEL**: Installation takes 6-10 minutes. NEVER CANCEL. Set timeout to 15+ minutes.
-- Install ioBroker: `curl -sL https://iobroker.net/install.sh | bash -` -- takes 6-10 minutes. Creates system user, installs Node.js, sets up systemd service.
-- Test installation: `chmod +x installer.sh && ./installer.sh` -- takes 6-10 minutes. NEVER CANCEL.
-- Manual verification after install: `curl -s http://127.0.0.1:8081 | grep '<title>Admin</title>'` -- should return Admin interface
+- **Linux/macOS/FreeBSD**: bash scripts, built into `dist/` and uploaded via SFTP to `https://iobroker.net/`.
+  End users run `curl -sL https://iobroker.net/install.sh | bash -`.
+- **Windows**: the `lib-npx/` Node.js package, published to npm as `@iobroker/install` (and, with a renamed
+  `package.json`, as `@iobroker/fix`). End users run `npx @iobroker/install`.
 
-### Windows NPX Installation
-- **NEVER CANCEL**: NPX installation takes 3-8 minutes. Set timeout to 12+ minutes.
-- Create test directory: `mkdir C:\iobroker && cd C:\iobroker`
-- Install via NPX: `npx @iobroker/install` -- downloads and installs ioBroker platform
-- Windows service setup: `node install.js` -- registers Windows service
-- Test: Start ioBroker service and verify admin interface
+## Commands
 
-### Diagnostic Tools
-- System diagnosis: `./diag.sh` -- comprehensive system health check
-- Language options: `./diag.sh --de` for German output, `./diag.sh --help` for options
-- Fix common issues: `./fix_installation.sh` -- repairs permissions, updates Node.js, compresses databases
-- Node.js update: `./node-update.sh` -- updates Node.js to recommended version
-
-## Validation
-
-### Critical Validation Steps
-- **ALWAYS** run complete installation test before making changes to installer scripts
-- **NEVER CANCEL** long-running installations - they take 6-10 minutes minimum
-- Test both Linux and Windows installation paths when modifying core logic
-- **MANDATORY**: After any changes to installer scripts, run: `./installer.sh` and wait for completion
-- Verify admin interface: `curl -s http://127.0.0.1:8081 | grep '<title>Admin</title>'`
-- Check service status: `sudo systemctl status iobroker` on Linux
-
-### Known Installation Issues
-- SSL certificate errors: Use `npm install --strict-ssl=false` if npm fails with certificate errors
-- File lock errors: Normal during installation, installer handles retries automatically
-- Service startup delays: ioBroker service may take 1-2 minutes to fully start after installation
-
-## Common Tasks
-
-### Build and Deploy Scripts
-The following are critical build operations:
-
-#### Build Process
 ```bash
-# Create distribution scripts (always run this after modifying source scripts)
-node tasks --create
-
-# Deploy to production (requires SFTP credentials)
-npm run deploy
+npm install                 # ~30 s
+node tasks --create         # build dist/install.sh, dist/fix.sh, dist/diag.sh, dist/node-update.sh
+node tasks --deploy         # SFTP upload of dist/ (needs SFTP_HOST/PORT/USER/PASS env vars)
+npm run deploy              # = create + deploy (what the release workflow runs)
+npm run make-fix            # rewrites package.json name to @iobroker/fix, for the second npm publish
+node test.js                # polls http://localhost:8081 for "<title>Admin</title>", 10x with 5 s waits
 ```
 
-#### Script Structure
-- `installer.sh` + `installer_library.sh` → `dist/install.sh` (combined)
-- `fix_installation.sh` + `installer_library.sh` → `dist/fix.sh` (combined)
-- `diag.sh` → `dist/diag.sh` (copied)
-- `node-update.sh` → `dist/node-update.sh` (copied)
+Useful env vars for `tasks.js`: `DEBUG=true` (verbose SFTP), `FAST_TEST=true` (connect but simulate the
+upload instead of writing).
 
-### Repository Structure
+### Testing
+
+There is **no unit test suite**. `mocha`/`chai` are devDependencies but no spec files exist, and
+the CI step that used to install them is gone. Verification is end-to-end only:
+
 ```bash
-ls /                   # Repository root
-.
-..
-README.md              # Project overview and installation instructions
-package.json           # NPM package configuration
-installer.sh           # Main Linux/macOS installation script
-installer_library.sh   # Shared library functions
-fix_installation.sh    # System repair and maintenance script
-diag.sh               # Diagnostic tool
-node-update.sh        # Node.js update utility
-lib-npx/              # Windows NPX installation logic
-  install.js          # Main NPX entry point
-  installCopyFiles.js # File copying logic
-  installSetup.js     # Service setup
-  checkVersions.js    # Version validation
-  tools.js           # Utility functions
-install/windows/      # Windows-specific files
-tasks.js             # Build and deploy script
-test.js              # Basic functionality test
-versions.json        # Supported Node.js/npm versions
-.github/workflows/   # CI/CD pipelines
+node tasks --create && bash ./installer.sh --silent   # 6-10 min; do not cancel, use 15+ min timeouts
+bash .github/testFiles.sh                             # asserts ownership/permissions under $IOB_DIR
+curl -s http://127.0.0.1:8081 | grep '<title>Admin</title>'
 ```
 
-### Key Configuration Files
+The service takes 1-2 minutes to come up after the installer finishes.
 
-#### versions.json
-```json
-{
-    "nodeJsAccepted": [18, 20, 22, 24],
-    "nodeJsRecommended": 22,
-    "npmRecommended": 10
-}
+**`installer.sh` and `fix_installation.sh` download `installer_library.sh` from `master` at runtime**, so a
+plain `bash ./installer.sh` does not exercise local library changes. To test them, build the self-contained
+artifact first and run that:
+
+```bash
+node tasks --create && bash dist/install.sh --silent
 ```
 
-#### package.json Dependencies
-- Core: fs-extra, semver, yargs
-- Dev: eslint (deprecated config), mocha, chai, ssh2
-- Optional: dotenv, windows-shortcuts (Windows only)
+CI does the same: `test.yml` builds `dist/` and runs `dist/install.sh`, so library changes on a branch are
+what actually gets tested. (Until that was fixed, a `sed`-strip step that never worked meant CI ran
+master's library, and a PR touching only `installer_library.sh` got a green run that executed none of its
+changes.)
 
-### CI/CD Workflows
-- `test.yml`: Runs installation tests on Ubuntu/macOS with Node.js 18/20/22/24
-- `npx_install.yml`: Tests Windows NPX installation
+The same used to apply one level up, to `versions.json`, which the library downloads from `master` at
+runtime: a PR editing it was exercised against master's values rather than its own, and contradicted the
+matrix, which is built from the local file. `VERSIONS_URL` now falls back to the GitHub URL instead of
+hardcoding it, and both `Install ioBroker` steps point at the checkout:
+
+```yaml
+env:
+  VERSIONS_URL: file://${{ github.workspace }}/versions.json
+```
+
+So a change to `versions.json` is verified before it is merged. In `node-update.sh` the default is
+applied *before* `readonly` — the other order silently discards a value from the environment.
+The variable is for testing; end users have no reason to set it.
+
+### Linting
+
+`npx eslint` does **not** work. The repo has an ESLint 8-style `.eslintrc.json` and no `eslint.config.js`,
+while `eslint` 9.x is the installed devDependency. Do not add lint steps expecting it to run.
+
+## Architecture
+
+### The bash build pipeline (`tasks.js`)
+
+`installer.sh` and `fix_installation.sh` each contain a block delimited by
+`# get and load the LIB => START` / `# get and load the LIB => END` that, at runtime, curls
+`installer_library.sh` from GitHub and sources it. `node tasks --create` **replaces that block with the
+literal contents of `installer_library.sh`**, producing self-contained `dist/install.sh` and `dist/fix.sh`.
+`diag.sh` and `node-update.sh` have no library dependency and are copied verbatim.
+
+So: shared bash helpers (platform detection, package install, user creation, Node.js install, permissions,
+Redis) belong in `installer_library.sh`; each entry-point script keeps only its own flow.
+
+### The deployment loop — why edits do not take effect locally
+
+The installed `iob` wrapper does **not** call scripts from this repo. It downloads them from
+`https://iobroker.net/` at invocation time (`FIXER_URL`, `DIAG_URL`, `NODE_UPDATER_URL` in
+`installer_library.sh`). A change to `fix_installation.sh`, `diag.sh` or `node-update.sh` reaches users only
+after a GitHub release triggers `deploy.yml` → `npm run deploy` → SFTP. Test locally by running the script
+directly (`./fix_installation.sh`), not via `iob fix`.
+
+### `iob` / `iobroker` wrapper
+
+`installer.sh` generates an executable at `$IOB_DIR/iobroker`, symlinked into `/usr/bin` (or
+`/usr/local/bin`) as both `iob` and `iobroker`. It:
+
+- routes `start`/`stop`/`restart` (exactly one argument) to `systemctl`, `launchctl`, or init.d;
+- intercepts `fix`, `diag`, `nodejs-update` and downloads + runs the remote script as `$IOB_USER` —
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ioBroker/ioBroker](https://github.com/ioBroker/ioBroker) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
