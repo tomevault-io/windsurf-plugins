@@ -1,97 +1,66 @@
 ---
 trigger: always_on
-description: Attract/3D transform stack — uplifted camera + MAME as reference, not gold standard
+description: Require i960 static RE for geometry; forbid ROM signature/span heuristics
 ---
 
 
-# Attract / 3D transform stack
+# Geometry discovery: i960 RE, not ROM signatures
 
-## Goal
+## Required approach
 
-Original-or-better fidelity for attract (and later race) 3D. **Not** “same as MAME including its limitations.” Decomp exists so lifted game semantics can exceed a broken or incomplete emulator.
+Derive **catalog indices**, **draw order**, **transforms**, and **data addresses** from:
 
-## Sources of truth (priority)
+1. **i960 maincpu disassembly** (`tools/disasm/`, `decomp/disasm/`, `python -m tools.i960_decode`)
+2. **ROM xref / immediate scans** tied to known symbols (`tools/i960_scan.py`, `tools/i960_geo_feed.py`, `tools/i960_xrefs.py`)
+3. **Typed ROM tables** (e.g. vehicle descriptors `0x43830`, draw lists `0x34E40`/`0x34E88`)
+4. **main_data catalog** (`0x2864B40`) and **confirmed streams** (placement `@ 0x02867C20`)
+5. **Descriptor / part-record blobs** in main_data (`tools/model2_vehicle_transforms.py`)
 
-1. **Uplifted i960** — camera composition (`comm_attract_geo_script_finish` modes, TGP markers, `copy_catalog` pose).
-2. **MAME Model 2 sources as reference only** — operator contracts for GEO (`0x0B` matrix, `0x09` focal, `0x03` window/centers, project formula). Never acceptance criteria.
-3. **Decoded point geometry** — catalog/PRG meshes and the Python track viewer for structural checks.
+Do **not** use MAME or emulator runtime captures — see rule `no-mame-runtime-capture.mdc`.
 
-Do **not** use MAME runtime captures (see `no-mame-runtime-capture.mdc`).
+## Forbidden for discovery or export logic
 
-## Closed transform stack
+Do **not** add or extend logic that infers geometry by:
 
-| Stage | Source |
-|-------|--------|
-| View | Uplifted attract/TGP composition → current matrix |
-| Upload | TGP `0x05` → GEO `0x0B` + 12 floats (`copy_catalog` `+0x34`) |
-| Object pose | `copy_catalog` push / translate / rotate / draw / pop |
-| Project | GEO `0x09` + `0x03`; MAME `model2_3d_project` as formula reference |
+- Scanning polygon ROM for “likely meshes” (vertex count, bounding span, peak coordinate)
+- Fingerprinting raw ROM byte patterns to guess catalog indices or part roles
+- Walking `walk_polygon_rom` / open-ended ROM sweeps to **find** vehicles, tracks, or assemblies
+- `discover_placements` / placement-group heuristics as a **primary** source (legacy only)
+- Span thresholds alone to classify or select body shells, wheels, or trim for export
 
-Apply **only** transforms the lifted code and GEO commands issue. No invented FOV, look-at, or mesh auto-frame.
+```python
+# BAD — discovery from mesh shape
+for index in range(782):
+    if verts >= 1000 and span < 10:
+        body_indices.append(index)
 
-## Viewer role
+# GOOD — indices from RE-backed tables, mesh stats only for reporting
+indices = parse_vehicle_catalog_tables(rom_dir)["race_draw_list"]
+for index in indices:
+    report.append({**catalog_mesh_report_row(index), "source": "re_catalog_index"})
+```
 
-OpenGL (or any host display) is a **transform debugger**, not a second renderer. Prefer:
+## Allowed uses of mesh stats
 
-- Modelview: identity when verts are already view-space (post-`0x0B` object draws)
-- Projection: latched focal + window only
+- **Validation / reporting** on indices already linked by RE (`tools/i960_vehicles.catalog_mesh_report`)
+- **Viewer metadata** (span, vertex count) on exported OBJs
+- **Sanity checks** after parse — not to choose what to export
 
-Defer a full rasterizer port until this stack is trusted.
+## Canonical pipelines (extend these, don’t bypass)
 
-## Current work order
+| Asset | Source of truth |
+|-------|-----------------|
+| Track placements | `parse_placement_stream` @ `0x02867C20`, geo feeder `0x023CC8` |
+| Vehicles | ROM descriptors + `copy_catalog` / `draw_catalog` / `draw_car_primary` chain |
+| Transforms | Descriptor 20-word records + workram `0x5E3E00` (not raw 12-float at word 0 alone) |
 
-1. Camera modes from disasm (`script_finish` jump table @ `0x11C20`), starting with modes 7 and 4
-   — `script_finish` locals (`0x40(fp)`…`0x88(fp)`) must be a **private host frame**
-     (stack buffer), not `fp = sp`. Attract `bind_fp` uses a shadow buffer while
-     `script_frame_setup` was leaking `sp += 0x30`; tying locals to `sp` segfaulted.
-     `ld (g0)` still reads the caller’s string_draw object; scene stays in the
-     private frame.
-   — `geo_attract_copro_vec_scale` is a real `call` (`0x123B0`→`0x11A80`): give it a
-     **private host frame**. Unit temps at callee `0x40(fp)` must not share the
-     caller's scene; `a2` (pre-call `lda 0x40(fp)`) keeps the scene pointer.
-     Shared global `fp` was a lift bug (wrong eye.xy; eye.z overwritten by unit.z).
-   — **Modes 4 never rotate R in script_finish.** Mode 7/8 `vec_scale` issues
-     TGP `0x54` then `0x2f` then `0x27` with **no** following `0x25`. Race
-     `geo_view_scene_frame` does `0x2f` then explicit `0x25` (normalize
-     readback only). Host `0x2f` is **normalize-only**; look-along R comes from
-     `0x54` (mode 7 keeps that R). Bare race `0x2f` (table_index_b, force_slot)
-     must not orient — that invented side effect spun chase after road hits.
-   — Mode 4: `0x54(scene)` then `T = −(obj−scene)`. `0x54` orients R along
-     scene so cars at cam≈scene sit on +Z (close-up). Focus `@ 0x20220c` stores
-     the delta (pen yaw), not a look target.
-   — Mode 7: dolly `eye = scene − scale·normalize(obj−scene)` with
-     `scale = radius − |delta|·falloff` from float pair at `lda 0x5acbe0[idx]`.
-     `0x54(delta)` look-along, `0x2f` unit readback, then `0x27`.
-   — Modes 2/8/9/11 read the **pair** object (`g1` / `pair_obj` from
-     `0xa0(fp)`), not `g0`. Mode 7/1/4/5/10 use `g0`. Banner calls pass
-     `g1=0` — those modes must not run (or no-op). Mode 7/8 share
-     `vec_scale` @ `0x11A80` with private callee frame + restored `sp`.
-   — Modes 5/6: `geo_attract_fp_series` @ `0x33C00` is cubic **B-spline**
-     (N_i,3), not Bezier. At `t=0` cam ≠ table P0; for mode-6 table
-     `@ 0x5ae400` smoke is `≈(-114, 38, -553)`. Load table via `i960_ld`
-     (ROM mirror); `stl`/`ldl` at `0x50(fp)` are full g8:g9 pairs; private
-     callee frame. Mode 6: `t=link/412`, endpoint immediates, `0x54(end−cam)`
-     then `0x27(−cam)`. Mode 5: indexed base `0x5ae3d0+…`.
-   — TGP `0x54`: store direction **and** set R to look along the unit (Y-up).
-     `0x2f`: normalize readback only. Race `geo_view_scene_frame` clears with
-     `0x25` after `0x2f` when it only wants the unit. Attract modes that
-     translate after `0x54` without `0x25` keep that R — not an invented look-at.
-   — Race `road_span_basis` @ `0x31320`: nested `0x25`/`0x27(bx,0,cx)` then
-     TGP `0x51(bz,0,by)` orients R (fw `@ 0x48E`) before `0x2c(ox)` →
-     `node+0x90/98` world XZ. Host must HLE `0x51` (look-along family as
-     `0x54`); no-op left local snaps that pitch-wind chase. `0x60` stores
-     matrix only (no R effect).
-2. Keep TGP HLE tied to uplifted call sites
-3. Validate mesh against Python track viewer; if points match and camera differs, fix uplift/TGP/GEO — not the rasterizer
-4. Attract inner loop: 0→9 lifted (`inner_8` @ `0xF7D0` resets `0x20209c`;
-   `inner_9` @ `0x13810` → `comm_attract_board_tick` @ `0x16540`, flags/scene
-   tick — not on cam path). After `vec_scale` private-frame fix: re-check mode
-   7/8 framing; if still off, audit object pose / GEO project, not invented look-at.
-   — `geo_draw_frame_entry` @ `0x4E90`: GEO `0x09` is `stl (450,450)` (both lanes);
-     attract path uses `geo_fifo_bootstrap` focal **350** directly — correct for
-     first shot. Feeder early path must `ldq`/`stq` catalog (word3 → `0x20b940`).
+## Legacy code — do not extend
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `tools/model2_placements.discover_placements` — scenes legacy scan only
+- `tools/extract/scenes.py` “Heuristic placement scan” block
+- `tools/model2_geo.walk_polygon_rom` — debug / bulk mesh export, not vehicle/track RE
+
+When removing ambiguity, prefer disassembling the calling function and wiring a new xref over adding another ROM heuristic.
 
 ---
 > Source: [xandoxan65/segarally95-recomp](https://github.com/xandoxan65/segarally95-recomp) — distributed by [TomeVault](https://tomevault.io).
