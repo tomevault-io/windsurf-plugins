@@ -1,23 +1,99 @@
 ---
 trigger: always_on
-description: Scope: this image, its compose services, and `configureKeycloakWsfed()` in `common/common.sh`. The test it exists for (`tests/wsfed_sso.js`) is described in `tests/CLAUDE.md`; the two landings that receive the IdP's POST are in `infra/CLAUDE.md`.
+description: **The consumer is the mock STS** (`rcbj/iya-sts`, the `sts/` submodule here).
 ---
 
-# keycloak-wsfed/ — the WS-Federation IdP side-car
+# embedded/ — the debugger as the mock STS embeds it
 
-Scope: this image, its compose services, and `configureKeycloakWsfed()` in `common/common.sh`. The test it exists for (`tests/wsfed_sso.js`) is described in `tests/CLAUDE.md`; the two landings that receive the IdP's POST are in `infra/CLAUDE.md`.
+**The consumer is the mock STS** (`rcbj/iya-sts`, the `sts/` submodule here).
+It serves this debugger's UI as STATIC FILES from a listener of its own — its
+own origin, e.g. `https://host:8444/` — behind an OIDC sign-in, and proxies
+everything under `https://host:8444/api/*`, after checking an access token and
+with **`/api` stripped**, to this debugger's api, which it runs as a **forked
+child process listening on a unix socket, plain HTTP**. All authentication
+lives in the mock STS; the api has none and needs none, because its only peer
+is that proxy.
 
-**This side-car is no longer the only WS-Federation IdP, and reading it as one will mislead you.** Since 2026-08 the mock STS answers the Passive Requestor Profile as well (`sts/ws-federation/wsfed.js`), and **every one of the test's 21 combinations runs twice, once against each** — 42 jobs. Nothing below changes, because none of it is about the protocol; what changes is what a failure means. A case that fails *here* and passes at the mock is an interoperability finding against a real (if EOL) server, which is the whole reason this container is kept alive. A case that fails at the *mock* and passes here usually is not an incompatibility at all: the cloudtrust extension ignores `wreq` entirely, accepts any `wauth` and never states a token type, so it will accept a request the mock correctly refuses — the mock is the only thing in this suite that reads what the debugger actually sends. `docs/wsfed.md` records the four places the two genuinely differ (all marked `IDP:` in the test) and why each IdP is needed.
+**Nothing here changes the standalone debugger.** client:3000 / api:4000, the
+compose stacks and the idptools.com static build behave exactly as before:
+every change is additive and off unless `DEPLOYMENT=embedded` or one of the
+`DEBUGGER_*` variables below is set. `tests/embedded_deployment.js` and the
+allow-list section of `tests/api_ssrf_guard.js` hold this side; a static build
+with and without these changes was compared file by file when they landed and
+was identical.
 
-**`/keycloak-wsfed/`** — A **dedicated Keycloak 8.0.1 (WildFly) side-car** carrying the [cloudtrust `keycloak-wsfed`](https://github.com/cloudtrust/keycloak-wsfed) extension, which is the IdP for the WS-Federation workflow and its test (`tests/wsfed_sso.js`). It exists because the main stack's Keycloak 26.x (Quarkus) has **no WS-Federation support at all** and the extension only targets 8.0.1. The image is built from the Keycloak 8.0.1 *server distribution* rather than the 2019 `quay.io/keycloak/keycloak:8.0.1` image, whose Docker Schema-1 manifest modern Docker and CI runners reject; the master-realm admin is created offline at build time (`add-user-keycloak.sh`), and `install-wsfed.sh` registers the module. Under host networking (`local-tests.yml`) it runs with a WildFly **port-offset of 2**, so HTTP is **8082** — not 8080, which the main Keycloak holds; under the containerized stack it is plain 8080 behind a `8082:8080` mapping. `configureKeycloakWsfed()` in `common/common.sh` provisions the `wsfed-testing` realm, a **`protocol: "wsfed"`** relying-party client whose `clientId` *is* the `wtrealm`, and the `wsfed` user, then exports `WSFED_METADATA_URL` / `WSFED_REALM` / `WSFED_USER`; `tests/run-report.js` **skips** the job when `WSFED_METADATA_URL` is unset, so a missing side-car costs a skip rather than a failure. The round trip needs a **landing** at the debugger's `/wsfed` to receive the IdP's auto-POST of the `wresult`, and there are two implementations of it — the api's Express route (stash, then `wsfed_response.html?id=…`) and, on the static deployments, a **Lambda@Edge** (`infra/edge/wsfed_landing.js`; sessionStorage, then `wsfed_response.html?posted=1`). See *Static hosting, and the POSTs that have nowhere to land* in `infra/CLAUDE.md` for why the second one has to exist.
+This file is the CONTRACT between the two repositories. Changing any name,
+path or variable in it is a change to the mock STS too.
 
-Its `container_name` is hard-coded **identically in both compose files** while the two configure it completely differently — host networking with a WildFly port-offset of 2 (binding 8082/8445) locally, a bridge network with no offset (8080/8443, published `8082:8080`) in the containerized stack. A container left over from one run is therefore the wrong container for the other, and the giveaway is a log showing WildFly bound to **8082 when the containerized stack expects 8080**. `docker-run-tests.sh` now tears down `local-tests.yml`'s containers as well as its own before starting.
+| File | What it is |
+|---|---|
+| `build.sh` | `embedded/build.sh --out <dir>` — writes the tree below, WITHOUT docker |
+| `Dockerfile` | the same tree in a `FROM scratch` image, by running `build.sh` |
 
-**Two host-networking traps, both fatal to its boot and both fixed in the image/compose rather than worked around.** Keycloak 8's H2 datasource URL ends in `AUTO_SERVER=TRUE`, which makes H2 open a shared server socket and resolve **its own hostname** to advertise it; `local-tests.yml` also set `hostname: keycloak-wsfed`, and under host networking Docker adds no `/etc/hosts` entry for that name — so the name did not resolve, `KeycloakDS` never bound (`Failed to connect to database`), and the whole boot rolled back. The `keycloak-wsfed/Dockerfile` now strips `AUTO_SERVER` from `standalone.xml` (guarded so the build fails if the pattern is absent or survives) and the local service no longer sets `hostname`, inheriting the host's, which resolves. Nothing shares that database, so AUTO_SERVER bought nothing. The containerized service keeps its `hostname` — there it is the DNS name other services use (`http://keycloak-wsfed:8080`) and Docker does resolve it.
+## A. The tree
+
+```
+<OUT>/ui/            client/build.js, DEPLOYMENT=embedded, CONFIG_FILE=./env/embedded.js
+<OUT>/api/           a runnable api: `cd <OUT>/api && node server.js`
+<OUT>/common/        tls_listener.js and spiffe/ — what the api requires as ../common/...
+<OUT>/version.json   the build's M.N.O (the same record as api/version.json)
+```
+
+`<OUT>/api` is what `api/Dockerfile` stages at `/usr/src/app`: every file under
+`api/` (its `env/embedded.js` included), production `node_modules` with the
+`ldapjs` link to `node-ldapjs` inside the package root, `data.js` and
+`xmldsig.js` from `common/`, the repo-root `VERSION`, the client's `version.js`
+and the stamped `version.json`. `<OUT>/common` is that Dockerfile's two COPYs
+into `/usr/src/common` and nothing more. **When `api/Dockerfile` stages
+something new beside the api, `build.sh` needs the same line**, or the image
+works and the embedded api dies at startup with `Cannot find module`.
+
+**`build.sh` touches nothing in the checkout.** It copies `VERSION`, `client/`,
+`api/` and `common/` to a temporary directory (minus `node_modules`, build
+output and the per-build files the images write), runs `npm ci`, `build.js`,
+`npm install --omit=dev` and the version stamp THERE, copies the result to
+`<OUT>` and deletes the temporary directory however it exits. The reason is
+that all four of those steps write into the tree they run in, and several
+stacks run from one checkout concurrently. It copies what is ON DISK, so
+uncommitted work is in the build, as it would be in a `docker build`. It sets
+`BUILD_NUMBER` once so the UI's and the api's `version.json` agree.
+
+**`Dockerfile`** — build context is the repo root, classic builder only (no
+BuildKit on the machines this runs on, so no `# syntax`, `--mount` or
+`--build-context`), Node 24.16.0 installed as the other images do, and a final
+`FROM scratch` stage holding exactly `/debugger/ui`, `/debugger/api`,
+`/debugger/common` and `/debugger/version.json`. Tag it
+`rcbj/id-proto-debugger-embedded:<tag>`; the mock STS's Dockerfile does
+`COPY --from=rcbj/id-proto-debugger-embedded:<tag> /debugger/ …`. Pass
+`--build-arg GIT_COMMIT=…` — there is no `.git` in the context to ask.
+
+## B. The api child's environment
+
+The mock STS forks `<OUT>/api/server.js` with cwd `<OUT>/api` and sets:
+
+| Variable | Read by | Effect |
+|---|---|---|
+| `CONFIG_FILE` | `api/server.js` | absolute path of `<OUT>/api/env/embedded.js` |
+| `DEBUGGER_LISTEN_SOCKET` | `common/tls_listener.js` | bind plain HTTP on this unix socket (see below) |
+| `DEBUGGER_UI_URL` | `api/env/embedded.js` | the debugger origin, no trailing slash; `uiUrl` = it, `apiUrl` = it + `/api`, `spEntityId` = it + `/saml/sp`, `acsUrl`/`sloUrl`/`wsfedAcsUrl` = apiUrl + `/samlacs`, `/samlslo`, `/wsfed` |
+| `DEBUGGER_ALLOWED_ADDRESS_RANGES` | `api/env/embedded.js` → `api/ssrf_guard.js` | a JSON array of ranges; non-empty = allow-list mode |
+| `DEBUGGER_BLOCK_PRIVATE_NETWORK_CALLS` | `api/env/embedded.js` | `"true"`/`"false"`, only without an allow-list; default true |
+| `DEBUGGER_LOG_LEVEL` | `api/env/embedded.js` | default `info` |
+| `NODE_EXTRA_CA_CERTS` | node | the anchor for the mock STS's own certificate |
+
+**The socket.** `tls_listener.listen()` takes `options.socketPath` or
+`DEBUGGER_LISTEN_SOCKET`, and a socket OUTRANKS `https` and `TLS_ENABLED` —
+it is always plain HTTP, and `materialFor()` is never asked, so a config left
+at `https: true` with no certificate cannot stop it starting. It removes a
+stale SOCKET at the path first (and refuses anything else there — a regular
+file is somebody's), binds with the umask narrowed, chmods 0600, and when
+`process.send` exists sends `{ type: 'debugger-api-listening', socket }` once.
+`serverCertificate()` is null. The filesystem mode IS the access control, there
+being no address to firewall.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rcbj/id-proto-debugger](https://github.com/rcbj/id-proto-debugger) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
