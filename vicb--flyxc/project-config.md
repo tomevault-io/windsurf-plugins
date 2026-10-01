@@ -29,4 +29,4 @@ description: <!-- nx configuration start-->
 
 ---
 > Source: [vicb/flyXC](https://github.com/vicb/flyXC) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
