@@ -1,93 +1,44 @@
 ---
 trigger: always_on
-description: This document helps AI agents work effectively in this codebase. It explains the philosophy, patterns, and pitfalls behind the code, so you can make good decisions on any task, not just scenarios explicitly covered.
+description: **Important**: Always load the root `CLAUDE.md` at the repository root for general monorepo conventions before working on this project.
 ---
 
-# Agents
+# betterleaks - Secret-Scanning Configuration Guide
 
-This document helps AI agents work effectively in this codebase. It explains the philosophy, patterns, and pitfalls behind the code, so you can make good decisions on any task, not just scenarios explicitly covered.
+**Important**: Always load the root `CLAUDE.md` at the repository root for general monorepo conventions before working on this project.
 
-## Philosophy
+This project has no Go or TypeScript of its own. It owns the `betterleaks` configuration the monorepo is scanned with, a thin Nix wrapper that bakes that configuration into the pinned upstream binary, and a fixture-based test suite for the configuration. The upstream build itself is pinned in `nixops/overlays/go.nix`.
 
-This is a minimal, idiomatic WebSocket library. Simplicity is a feature.
+## Core Principles
 
-Before adding code, articulate why it's necessary in one sentence. If you cannot justify the addition, it probably isn't needed.
+- **CI runs the base revision's config and toolchain.** `.github/workflows/ci_betterleaks.yaml` checks out the *base* revision and fetches the PR's commits as data only, so `betterleaks.toml`, the Nix toolchain and the base `.betterleaksignore` all come from already-merged code. Do not reintroduce a PR-head checkout for these. **Deliberate exception:** the scan *merges* the base `.betterleaksignore` with the copy on the PR head (`git show refs/nhost/under-review:...`), so a PR can add a fingerprint to suppress its own reviewed false positive. The merge only adds — a PR cannot drop or empty a base suppression — but it does mean a PR can suppress a finding in its own run, so the reviewer must read the `.betterleaksignore` diff. This is gated by `check-permissions` (write access or the `safe_to_test` label).
+- **The path filter must cover this whole directory.** When the config is supplied through `--config`/`BETTERLEAKS_CONFIG` (which the wrapper does) its own git history is scanned, and `betterleaks.toml`, `README.md` and `tests/` all contain fake secrets. The global `filter` excludes the directory with a single anchored prefix, `` `^tools/betterleaks/` ``. Keep it anchored (`^`); a non-anchored or optional-group form (e.g. `\.?`) was observed to stop matching.
+- **The wrapper is a separate derivation.** Never copy the configuration into the Go build in `nixops/overlays/go.nix`: that puts the file in the Go derivation's hash, so every allowlist tweak forces a full recompile and a Nix cache miss. `project.nix` feeds the two files to a `runCommand` wrapper instead.
+- **Every *reported* rule gets a fixture.** `tests/<rule-id>.sh` holds a few inline files the rule must report and a few it must not; add a fixture for the case you are changing and run `make test`. The three `skipReport` component rules (`nhost-project-url`/`-subdomain`/`-region`) have no script — they produce no findings to assert, and are exercised indirectly whenever the admin-secret validator resolves a target. If one regresses, validation silently falls back to the hard-coded projects; tighten them with care.
+- **The test does not cover validation.** CI runs `--validation-status valid,none`; the admin-secret rule has a validator, so its findings fail CI only when confirmed live. The test proves matching and filtering, nothing more.
+- **Prefer `betterleaks:allow` over `.betterleaksignore`.** An inline comment documents the false positive where it lives. The ignore file is for reviewed false positives that cannot carry a comment, one fingerprint per line.
 
-Before adding a dependency, don't. Tests requiring external packages are isolated in `internal/thirdparty`.
+## Directory Structure
 
-## Workflow
+```
+tools/betterleaks/
+├── betterleaks.toml      # Global CEL path/secret filter, per-rule allowlists, nhost-hasura-admin-secret rule + validator
+├── .betterleaksignore    # Reviewed false positives by fingerprint
+├── project.nix           # check (config check + tests/*.sh), package (wrapper), devShell
+├── tests/
+│   └── nhost-hasura-admin-secret.sh   # Inline fixtures: detect/ must be reported, ignore/ must not
+└── Makefile              # check, test, develop
+```
 
-Every task follows phases. Do not skip phases; if you realize you missed something, return to the appropriate phase.
+## Commands
 
-**Making changes:**
-
-1. **Research** - Understand the problem and codebase before acting
-2. **Plan** - Articulate your approach before implementing (when asked, or for complex changes)
-3. **Implement** - Make changes in small, verifiable steps
-4. **Verify** - Confirm correctness using external tools
-
-For trivial changes (typo fixes, comment updates), an abbreviated workflow is acceptable.
-
-## Research
-
-Research in sequential passes. Each pass has one focus. Don't skip ahead to code until you've completed the earlier passes.
-
-**Pass 1: Read the issue.** If you were given a link, read it now. Do not explore code, do not pass go. Fetch the linked issue or document first. Summarize what it asks for. If you cannot restate the problem, you are not ready to proceed.
-
-**Pass 2: Read linked references.** Follow every link in the issue: related issues, RFCs, external docs. Document what you learn. Code comments reference RFC 6455 (WebSocket), RFC 7692 (compression), and RFC 8441 (HTTP/2).
-
-**Pass 3: Trace the code.** Start from public API inward: `Accept` (server) or `Dial` (client) → `Conn` → `Reader`/`Writer`. Read tests for intent; the autobahn-testsuite (`autobahn_test.go`) validates protocol compliance.
-
-**Pass 4: Check both platforms.** Native Go files have `//go:build !js`. WASM lives in `ws_js.go`. Same API, different implementations. WASM wraps browser APIs and cannot control framing, compression, or masking.
-
-**Pass 5: Search exhaustively.** If the change affects a pattern used in multiple places, grep for all instances. Missing one creates inconsistent behavior.
-
-**Pass 6: Document unknowns.** List what you still don't know. Unknown unknowns become known unknowns when you ask "what am I still unsure about?"
-
-**After all passes:** Can you restate the problem in your own words? If not, return to Pass 1. Gaps in earlier passes will cause problems later.
-
-## Plan
-
-When asked to plan, write to `PLAN.md`. Write for someone else, not yourself; don't skip context you already know.
-
-**Pass 1: Document research.** Summarize what you learned in Research. Follow every reference; document findings so the implementer can verify. If the research section is empty, you haven't researched enough.
-
-**Pass 2: Consider approaches.** For non-trivial problems, enumerate at least two approaches. For each, note: what would change, what could go wrong, what's the tradeoff.
-
-**Pass 3: Detail the chosen approach.** Explain what and why, not step-by-step how. Point to specific files, functions, line numbers. Make claims verifiable. Leave room for the implementer to find a better solution.
-
-**Pass 4: List open questions.** What's still unclear? What assumptions are you making? What would change your approach?
-
-**After all passes:** Review from the implementer's perspective. Could they start work with only this document? If not, add what's missing.
-
-## Implement
-
-Implement in sequential passes. Don't write code until you've completed the verification passes.
-
-**Pass 1: Verify understanding.** Did you do your research? Can you state your approach in one sentence? If requirements are ambiguous, stop and ask. A wrong assumption wastes more time than a quick question.
-
-**Pass 2: Check scope.** Does this need to exist? Check if it already exists in the API. Is this the library's job or the user's job? The library handles protocol correctness; application concerns (reconnection, auth, routing) belong in user code.
-
-**Pass 3: Check invariants.** Walk through Key Invariants before writing code:
-
-- Reads: Will something still read from the connection?
-- Pools: Will pooled objects be returned on all paths?
-- Locks: Are you using context-aware `mu`, not `sync.Mutex`?
-- Independence: Are you coupling reads and writes unnecessarily?
-
-**Pass 4: Implement.** Make the change. Every change needs a reason; if you can't articulate why it improves things, don't make it. Preserve existing comments unless you can prove they're wrong.
-
-**Pass 5: Verify examples.** Trace through usage examples as if writing real code. If an example wouldn't compile, the design is wrong. Check edge cases: what happens on error? On cancellation?
-
-**After all passes:** If feedback identifies a problem, fix that specific problem. Don't pivot to a new approach without articulating what failed and why the new approach avoids it.
-
-## Verify
-
-Verify using external signals. Self-assessment is unreliable; these tools are the ground truth.
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```sh
+make check            # nix build of checks.<system>.betterleaks (config check + tests/*.sh)
+make test             # per-rule tests, in the dev shell
+nix develop .\#betterleaks --command betterleaks git . \
+  --log-opts='--diff-merges=first-parent origin/main..HEAD'   # what CI runs, without validation
+```
 
 ---
 > Source: [nhost/nhost](https://github.com/nhost/nhost) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
