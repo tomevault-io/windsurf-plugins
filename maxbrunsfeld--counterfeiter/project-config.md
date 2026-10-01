@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance for working with code in this repository.
 ---
 
-# CLAUDE.md
+# Repository guidance
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for working with code in this repository.
 
 ## What this is
 
@@ -63,4 +63,4 @@ Key supporting pieces:
 
 ---
 > Source: [maxbrunsfeld/counterfeiter](https://github.com/maxbrunsfeld/counterfeiter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-13 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
