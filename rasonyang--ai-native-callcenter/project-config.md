@@ -1,76 +1,90 @@
 ---
 trigger: always_on
-description: `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) carry the same text; change them together.
+description: This app must look like a product from the Linear / Vercel / Stripe family:
 ---
 
-# AGENTS.md
+# Design System — NON-NEGOTIABLE. Read before writing any UI code.
 
-`CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) carry the same text; change them together.
+## Aesthetic reference
+This app must look like a product from the Linear / Vercel / Stripe family:
+quiet, dense, precise, professional. It is an operations tool used 8 hours a
+day, NOT a marketing site.
 
-## What this is
+## Tokens (define once in `src/index.css` as CSS variables; never invent new values)
+- Background:        #FAFAFA (app) / #FFFFFF (surfaces/cards)
+- Border:            #E5E7EB (1px solid; borders instead of shadows everywhere)
+- Text primary:      #18181B
+- Text secondary:    #71717A
+- Accent (single):   #4F46E5 — used ONLY for primary actions, active nav, focus rings
+- Semantic (call states only):
+  - Available #16A34A · On-call #4F46E5 · Ringing #F59E0B
+  - ACW/Wrap-up #8B5CF6 · AUX/Break #71717A · Offline #D4D4D8 · SLA-breach #DC2626
+- Radius: 6px (cards, inputs, buttons), 9999px (status pills only)
+- Shadow: none, except dropdowns/modals (shadow-md)
+- Font: Inter. Sizes allowed: 12 / 13 / 14 / 16 / 20 px ONLY. Base = 13px.
+  All numbers (timers, KPIs, phone numbers) use tabular-nums.
+- Spacing: 4px grid. Page padding 24px. Card padding 16px. Gap between cards 16px.
 
-An open-source AI-native call center: one Go binary (chi/pgx/sqlc/slog/OTel) serving a REST API, an SSE stream and an embedded React SPA. It drives FreeSWITCH over ESL for human agents (WebRTC agents on the web-sip-phone Chrome extension, queues on mod_callcenter) and terminates its own SIP/RTP for AI calls. Single tenant: no `tenant_id` anywhere. Apache-2.0: new Go, SQL, Lua and script files start with an `SPDX-License-Identifier: Apache-2.0` line.
+## Density rules (this is an ops console — dense by default)
+- Table row height 36px, cell text 13px, header 12px uppercase tracking-wide text-secondary
+- Sidebar width 220px, nav item height 32px, icon 16px
+- KPI stat cards: label 12px secondary on top, value 24px semibold below, delta 12px
+- Buttons: h-8 (32px) default, h-9 for primary page actions only
 
-Requirements and owner decisions (A1, A6, A7, …): `docs/phase1-decisions.md`. Design: `docs/design/NN-*.md`. Live findings that amended the design: `docs/design/*-findings.md`; check them before trusting a design doc's original claim. `docs/design/07-naming.md` is the **mandatory naming spec**: Go `CallID` ↔ JSON `callId` ↔ TS `callId` ↔ DB `call_id`; SCREAMING_SNAKE enum values byte-identical across JSON/TS/DB; `xxxAt`/`xxxMs`/`xxxSec`; `is_`/`has_` booleans; no upstream FreeSWITCH/Genesys tokens outside boundary layers.
+## Never do (hard bans)
+- No gradients, no emoji in UI, no hero sections, no marketing copy
+- No colored card backgrounds; color appears only in pills, dots, and small accents
+- No shadows on cards, no centered text in tables, no skeleton rainbow palettes
+- No more than ONE accent color; never use accent for decoration
+- No 16px+ body text, no airy landing-page spacing
 
-## The API is the product; the UI is optional (owner directive)
+## Consistency rule
+After the first page is approved, every new page MUST reuse its exact patterns:
+same page-header component, same table component, same card component. Never
+re-implement a variant.
 
-`docs/openapi.json` is the product surface. The embedded SPA is one consumer of it, with no more privilege than a customer's integration. When a screen and the contract disagree about what an operation means, the contract is right.
+## Navigation is partitioned by role, not ranked
+- `src/lib/nav.ts` gives every item the exact set of roles it belongs to
+  (`roles: Role[]`), never a floor. An administrator configures the platform,
+  a supervisor watches the floor, an agent takes calls — the sidebar is a job
+  description, not a seniority ladder.
+- ADMIN: Overview, Users, Extensions, Queues & Routing, Numbers,
+  Bot Flows / CDR, Reports, Audit Log, Webhooks, API Keys.
+  SUPERVISOR: Wallboard, Agents, Queues / CDR, Reports.
+  AGENT: Dashboard, My Calls, Contacts, Callbacks.
+  CDR and Reports are the only overlap, and only between the two senior roles.
+- The route guard uses the same sets (`requireRole(user, ...roles)`): a page
+  hidden from the menu but reachable by URL is half a rule. A refused visitor
+  is sent to their own `roleHomeFor(role)` — never towards the door that just
+  closed, which is how a redirect loop starts.
+- `src/lib/nav.test.ts` pins all three menus literally. Adding a page means
+  adding it there too.
 
-- No route exists that the contract does not declare, and every operation is routed (`TestEveryMountedRouteDeclaresItsAuthorization` in `internal/httpapi/contract_gate_test.go`, `TestEveryContractOperationIsRouted`).
-- Anything a session cookie can reach, a properly scoped API key can reach (`TestASystemCanReachWhatAPersonCan`, two registered exceptions). A rule written because "the panel does not need it" is in the wrong place.
-- Authorization is scopes. Each operation's `security` block is generated into `api.OperationSecurityByRoute` and enforced by one middleware inside the generated wrapper. There are no role guards on routes; a role only decides which scopes a login is granted (`grantedScopes`, derived by `docs/auth/scopemap.py`). A session cookie and `Authorization: Bearer <key>` are equal credentials. Design: `docs/design/04-api-sse.md` §2.
-
-## Language
-
-Commit messages, code comments and documentation are in English (owner directive; the repository is public). Other languages appear only in product content: the `zh` half of bilingual flows, prompts and UI labels, `README.zh-CN.md`, and the `zh` i18n resources.
-
-## Commands
-
-```sh
-go build ./...
-go test -race ./...                               # always -race (`make test` runs this, then the web tests)
-go test -race -run TestName ./internal/voice/     # one test
-go test -run XXX -bench . -benchmem ./internal/media/ ./internal/aicall/  # hot paths: 0 allocs/op, CI fails otherwise
-make lint                                         # go vet + gofmt + oxlint
-sqlc generate                                     # after editing internal/store/sql/*.sql
-# migrations: add internal/store/migrations/NNNNN_name.sql (goose); they run at server startup
-
-# dev server; prerequisites, order and ports: docs/dev-stack.md
-make dev-up                                       # PostgreSQL 18 + SeaweedFS containers
-deploy/dev/restart.sh                             # build web/dist and /tmp/aicc, restart, wait until it serves
-/tmp/aicc useradd -username admin -password … -role ADMIN
-/tmp/aicc flowadd -file internal/seed/flows/x.json -did 95001   # load + publish; same slug = update + republish
-go run ./cmd/aicc-mockbackend                     # business APIs the reference flows call (127.0.0.1:8770); the app uses it when AICC_BOT_BACKEND_BASE points there
-# logs: stderr and logs/aicc-<starttime>.log (read the file to analyse a run)
-
-# live provider tests: real money (OPENAI_/ALIYUN_/DOUBAO_/GEMINI_API_KEY)
-AICC_LIVE_PROVIDER_TEST=1 go test -count=1 -run Live -v ./internal/provider/...
-
-cd web && npm run dev                             # Vite on 5173
-cd web && npm run build                           # web/dist, embedded via go:embed
-cd web && npm run test                            # vitest
-
-make stack-up                                     # the whole product in containers, seeded (deploy/README.md)
-```
-
-Load harness: `docs/load-tests.md`.
-
-## Database and migrations
-
-PostgreSQL runs in a container (`make dev-up`), never as a host install. Database tests (store, seed, httpapi) skip unless `AICC_TEST_DATABASE_URL` is set; CI sets it.
-
-```sh
-AICC_TEST_DATABASE_URL='postgres://aicc:aicc@127.0.0.1:5432/aicc?sslmode=disable' go test -race ./internal/store/
-```
-
-**A migration is not reviewed until it has run.** The store tests apply every migration from zero, roll them all back, re-apply them, and migrate databases that already hold rows. A migration that narrows a CHECK must rewrite existing rows before installing the constraint, or PostgreSQL rejects it ("is violated by some row") on every deployment with history. A migration that changes an enum's allowed values gets a fixture test in `migrate_test.go` or a sibling `migrate_*_test.go`: migrate to the previous version, insert old-shape rows, migrate up, assert.
-
-## Config
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Topbar breadcrumb (all pages)
+- Pattern: Group / Section / Detail — e.g. "Manage / Bot Flows / novanet_support".
+- The first segment is the **sidebar group** (Workspace, Supervise, Manage,
+  System), which is the word the reader just clicked, not their role. A role
+  name there claims something the page is in no position to claim, and on a
+  screen two roles share (the ledger) it claims it wrongly.
+- Every segment except the last is a LINK with a FIXED target (never history
+  back): Group → the first page in it **this reader may open** (a group has no
+  page of its own, and the answer differs by role — never link somewhere they
+  would be bounced from); Section → its sidebar-nav route (Bot Flows →
+  /admin/bots), so a detail page is always one click from its list.
+- The Detail segment is the record's own name or id, supplied by the page
+  through `useNameThisPage()` (`src/lib/breadcrumb.tsx`) — it cannot be derived
+  from a path that carries a uuid. A page still loading passes undefined and
+  the trail simply stops at the section.
+- The last segment is the current location: font-medium, never a link.
+  Detail segments show the entity id/name verbatim.
+- Interaction must distinguish clickable from non-clickable:
+  clickable segments = text secondary at rest, accent on hover;
+  current segment = text primary + medium, no hover change;
+  "/" separators = muted at 50% (weaker than both).
+- The breadcrumb derives from the sidebar nav config (src/lib/nav.ts);
+  every new page must be reachable from a nav item so the breadcrumb
+  resolves correctly.
 
 ---
 > Source: [rasonyang/ai-native-callcenter](https://github.com/rasonyang/ai-native-callcenter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
