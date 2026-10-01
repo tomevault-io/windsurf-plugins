@@ -15,6 +15,27 @@ docs/               — Documentation (GitHub Pages / Jekyll)
 
 Each plugin is a folder under `receiver/` or `map/` containing at minimum `pluginname.js` and optionally `pluginname.css`. The CSS is auto-loaded unless `Plugins.pluginname.no_css = true`.
 
+## Plugin manifest
+
+- `receiver/plugins.json` lists every receiver plugin and every built-in OpenWebRX+ plugin. It is used by `plugin_loader` and to generate the README plugin tables.
+- When adding, renaming, deprecating or changing the description/dependencies of a receiver plugin, update `receiver/plugins.json` and run `python3 tools/plugins.py`.
+- Never edit the README tables between `<!-- plugins:<category>:start -->` and `<!-- plugins:<category>:end -->` by hand.
+- New built-in OpenWebRX+ plugins get a `"category": "builtin"` entry and a commented-out line in `receiver/init.js.sample`.
+- Third-party plugins get `"category": "thirdparty"` with `homepage`; add `url` only for single-file plugins that work with `Plugins.load()` and need no server-side setup.
+- Map plugins are not in the manifest; their README table is edited by hand.
+- Field reference: `DEVELOPMENT.md`, section "Adding a New Plugin to This Repository".
+- Plugins that cannot work without administrator configuration use `"setup": "required"` in the manifest. `plugin_loader` only offers them when `plugin_options.<id>` is configured and invokes their `setup()` after loading.
+- Developer documentation (plugin API, utils API, conventions) lives in `DEVELOPMENT.md`; keep it in sync when utils or the OpenWebRX+ plugin API change.
+
+## Plugin options
+
+- Plugins that take options from `init.js` expose `Plugins.<name>.setup(options)`, called after `Plugins.load()`.
+- Options that are only read at runtime may be plain properties set after `Plugins.load()`.
+- Never create `Plugins.<name>` before `Plugins.load()` - the loader then skips the plugin as already loaded.
+- When migrating an existing plugin to `setup()`, keep the old way of passing options working as a fallback.
+- `setup()` must also work after `init()` and apply the options to existing UI.
+- Known plugins still to migrate: `uikit` (`Plugins.uikit.settings` before load), `tune_precise` (`Plugins.tune_precise_steps`).
+
 ## Plugin conventions
 
 - **Namespace**: `Plugins.pluginname = Plugins.pluginname || {};`
@@ -31,6 +52,21 @@ Each plugin is a folder under `receiver/` or `map/` containing at minimum `plugi
 - **uikit** (`receiver/uikit/uikit.js`) — Dockable panel, settings modal, plugin modals, toasts, loading overlays. Version 0.3+.
 - **notify** (`receiver/notify/notify.js`) — Deprecated in favor of `uikit.toast()`. Has backward-compat shim.
 
+## Utility plugin governance
+
+- When adding **new functionality** to a utility plugin (for example `receiver/utils/utils.js`), always bump that plugin's `_version` and add a matching changelog entry in the file header comments.
+- Always document new utility functions in two places:
+  - thorough inline function comments in the JS source
+  - plugin README updates with usage and examples
+- Any plugin that depends on newly added utility functionality must require the exact new minimum version with `Plugins.isLoaded('utils', x)`.
+- Keep utility functions backward-compatible.
+- If backward compatibility cannot be preserved, stop and ask for direction before implementing a breaking change.
+
+## Instruction alignment
+
+- Always follow these project instructions together with `copilot-instructions.md` and any higher-priority assistant/system instructions.
+- When new stable conventions are learned during implementation, update this file and related utility/plugin docs to keep guidance in sync.
+
 ## uikit migration
 
 Existing plugins are being migrated to use uikit for their UI. Rules:
@@ -39,54 +75,14 @@ Existing plugins are being migrated to use uikit for their UI. Rules:
 - The original plugin is left untouched for backward compatibility.
 - Migrated plugins capture `_baseUrl` at load time via `document.currentScript.src` and use it for auto-loading dependencies.
 - Migrated plugins require `uikit >= 0.3` and `utils >= 0.6`.
-- **Only bump dependency version checks** (`Plugins.isLoaded('uikit', x)` and `Plugins.isLoaded('utils', x)`) when the plugin actually uses a feature introduced in that version. Do not blindly bump to latest just because you touched the plugin. Current versions: `uikit = 0.5`, `utils = 0.7`.
+- **Only bump dependency version checks** (`Plugins.isLoaded('uikit', x)` and `Plugins.isLoaded('utils', x)`) when the plugin actually uses a feature introduced in that version. Do not blindly bump to latest just because you touched the plugin. Current versions: `uikit = 0.5`, `utils = 0.9`.
 - Use `var ui = Plugins.uikit;` as the local shorthand alias inside migrated plugin `init()` functions.
 
 ## uikit specifics
 
-- `example_uikit` plugin version MUST always match `uikit` version and be incremented together. When adding new uikit features, add corresponding demos to `example_uikit`.
-- Keep the changelog in `uikit.js` header comments up to date (same style as `utils.js`) — add an entry for every version bump.
-- CSS classes are scoped under `.owrx-uikit` (BEM-like naming: `__element`, `--modifier`).
-- Plugin modal class prefix: `.owrx-uikit__pm-*`
-- Toast class prefix: `.owrx-uikit__toast*` and `.owrx-uikit-toasts` (container)
-- Loading overlay: `.owrx-uikit__loading*`
-- Toast containers are appended to `document.body` (independent of uikit root).
-- Plugin modals are appended to `#owrx-uikit-root`.
-- The root element has `pointer-events: none`; interactive children must set `pointer-events: auto`.
 
-## Code style
-
-- Plain ES5-compatible JavaScript (no modules, no build step, no TypeScript).
-- jQuery is available globally (`$`).
-- Use `var` not `let`/`const` for broad browser compatibility (except in `async` functions where `const`/`let` are acceptable).
-- Indent with tabs.
-- Use `Plugins.pluginname.method = function () { ... };` pattern (not class syntax).
-- Each plugin's README has YAML frontmatter for Jekyll (GitHub Pages).
-- **Always update a plugin's README** when adding new functionality, changing behaviour, or touching the plugin in any significant way.
-- **Always update the copyright year** in the JS file header when touching a plugin (e.g. `Copyright (c) 2023-2026`).
-- Every plugin README must include a `## Code` section with a link to the Github repo: `[Github repo](https://github.com/0xAF/openwebrxplus-plugins/tree/main/receiver/<plugin_name>)` (use `map/` for map plugins).
-
-## OpenWebRX+ integration points
-
-- DOM selectors: `#openwebrx-panel-receiver`, `#openwebrx-sdr-profiles-listbox`, `.openwebrx-modes`
-- Global vars: `center_freq`, `currentprofile`, `clock`
-- WebSocket events via `Plugins.utils.wrap_func('on_ws_recv', ...)` or `$(document).on('server:type:before', ...)`
-- jQuery-based UI framework
-- Demodulator: `$("#openwebrx-panel-receiver").demodulatorPanel().getDemodulator()`
-- Theme system: CSS custom properties (`--theme-color1`, etc.) on `body.theme-*`
-
-## Remote hosting
-
-- Base URL: `https://0xaf.github.io/openwebrxplus-plugins/`
-- Plugins can be loaded from this CDN or locally.
-
-## Testing
-
-- No test framework. Test by loading in a local OpenWebRX+ instance.
-- `Plugins._enable_debug = true` enables loader debug output.
-- `Plugins.utils._DEBUG_ALL_EVENTS = true` logs all events.
-- The `example_uikit` plugin provides interactive tests for all uikit features.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [0xAF/openwebrxplus-plugins](https://github.com/0xAF/openwebrxplus-plugins) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
