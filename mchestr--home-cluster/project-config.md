@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Guidance for AI coding agents (Claude Code, Codex, etc.) working in this repository. `CLAUDE.md` imports this file, so keep all agent guidance here.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents (Claude Code, Codex, etc.) working in this repository. `CLAUDE.md` imports this file, so keep all agent guidance here.
 
 ## Overview
 
-Home Kubernetes cluster running on 3x MS-01 (i9-13900H, 96GB RAM) nodes with Talos Linux. Flux CD watches `kubernetes/` and reconciles all manifests. Infrastructure uses Rook-Ceph for block storage, Cilium for CNI, Envoy Gateway for ingress, and 1Password/External-Secrets for secret management.
+Home Kubernetes cluster running on 3x MS-01 (i9-13900H, 96GB RAM) nodes (`m0`, `m1`, `m2`) with Talos Linux. Flux CD watches `kubernetes/` and reconciles all manifests. Infrastructure uses Rook-Ceph for block storage, Cilium for CNI, Envoy Gateway for ingress, Authelia + LLDAP for SSO, and 1Password/External-Secrets for secret management.
 
 ## Common Commands
 
@@ -22,7 +22,7 @@ task kubernetes:hr:restart         # Restart all failed HelmReleases
 task kubernetes:sync-secrets       # Force sync all ExternalSecrets
 task kubernetes:cleanse-pods       # Delete pods in Failed/Pending/Completed state
 task kubernetes:browse-pvc NS=default CLAIM=<name>   # Mount PVC in temp container
-task kubernetes:node-shell NODE=<ip>                 # Shell into a Talos node
+task kubernetes:node-shell NODE=<m0|m1|m2>           # Shell into a node
 task kubernetes:nfs-pod NS=default                   # Start pod with NFS mounts
 ```
 
@@ -32,21 +32,32 @@ task volsync:snapshot APP=<app> NS=default           # Trigger immediate backup
 task volsync:restore APP=<app> NS=default PREVIOUS=1 # Restore from snapshot
 task volsync:list APP=<app> NS=default               # List available snapshots
 task volsync:unlock                                  # Unlock all restic repos
+task volsync:state-suspend / volsync:state-resume    # Pause/resume all VolSync sources
 ```
 
 **Talos:**
 ```sh
-task talos:apply-node NODE=<ip>                      # Apply config to a node
-task talos:upgrade-node NODE=<ip> VERSION=<ver>      # Upgrade Talos on a node
-task talos:upgrade-k8s                               # Upgrade Kubernetes cluster-wide
+task talos:apply-node NODE=<m0|m1|m2>                # Render + apply machine config to a node
+task talos:upgrade-node NODE=<m0|m1|m2> VERSION=<v> # Manually upgrade Talos (normally tuppr does this)
+task talos:upgrade-k8s                               # Manually upgrade Kubernetes (normally tuppr does this)
 task talos:kubeconfig                                # Regenerate kubeconfig
-task talos:reboot-node NODE=<ip>                     # Reboot a node
+task talos:reboot-node NODE=<m0|m1|m2>               # Reboot a node
+task talos:regen-certs                               # Regenerate Talos admin client certs (machine CA from 1Password)
+task talos:reset-node NODE=<node> / talos:reset-cluster / talos:shutdown-cluster  # Destructive
 ```
 
 **Terraform (Cloudflare):**
 ```sh
+task terraform:cf:init             # Init the Cloudflare workspace
 task terraform:cf:plan             # Show planned Cloudflare changes
 task terraform:cf:apply            # Apply Cloudflare changes
+```
+
+**GitHub / Renovate PRs:**
+```sh
+task github:pr:list                # List open PRs
+task github:pr:merge ID=<n>        # Merge a PR
+task github:pr:merge:all SKIP_IDS= # Merge all open PRs (use with care)
 ```
 
 **Bootstrap (initial cluster only):**
@@ -60,56 +71,45 @@ task bootstrap:apps ROOK_DISK=<model>  # Deploy core apps
 ```
 kubernetes/
 ├── flux/
-│   ├── cluster/ks.yaml        # Flux entry point — loads meta then all apps
+│   ├── cluster/ks.yaml        # Flux entry point: loads meta, then every namespace under apps/
 │   └── meta/
 │       ├── crds/              # Gateway API and other CRDs
 │       └── repositories/      # Helm and OCI repository definitions
-├── apps/<namespace>/<app>/
-│   ├── ks.yaml                # Flux Kustomization (depends, components, postBuild vars)
-│   └── app/
-│       ├── kustomization.yaml # Lists resources in this dir
-│       ├── helmrelease.yaml   # HelmRelease referencing app-template or a chart
-│       └── externalsecret.yaml  # Pulls secrets from 1Password
+├── apps/<namespace>/
+│   ├── kustomization.yaml     # Lists each app's ks.yaml in this namespace
+│   └── <app>/
+│       ├── ks.yaml            # Flux Kustomization (dependsOn, components, postBuild vars)
+│       └── app/
+│           ├── kustomization.yaml   # Lists resources in this dir
+│           ├── helmrelease.yaml     # HelmRelease referencing app-template or a chart
+│           └── externalsecret.yaml  # Pulls secrets from 1Password
 └── components/
     ├── common/                # Namespace, shared repos, cluster-secrets, alert configs
     ├── volsync/               # Adds VolSync (Restic→R2) backup + PVC to an app
-    ├── cnpg/                  # Adds CloudNative-PG database + ExternalSecret
+    ├── cnpg/                  # Adds a CloudNative-PG database + backup CronJob + ExternalSecret
     └── dragonfly/             # Adds DragonflyDB (Redis-compat) cluster + NetworkPolicy
 talos/
 ├── controlplane.yaml          # Base Talos machine config (rendered with minijinja-cli + op inject)
-├── controlplane/<node>.yaml   # Per-node config patches
+├── controlplane/<m0|m1|m2>.yaml  # Per-node config patches
 └── schematic.yaml             # Talos image factory schematic
 terraform/cloudflare/          # DNS records, Cloudflare tunnels, access policies
 bootstrap/                     # helmfile + resources for initial cluster setup
+docs/                          # mdBook operations docs (published by the docs workflow)
 ```
 
 ## Architecture Patterns
 
 ### Adding a New App
 
-1. Create `kubernetes/apps/<namespace>/<appname>/ks.yaml` — a `Kustomization` pointing to `./app`, listing `dependsOn`, `components`, and `postBuild.substitute` vars.
-2. Create `kubernetes/apps/<namespace>/<appname>/app/` with `kustomization.yaml`, `helmrelease.yaml`, and optionally `externalsecret.yaml`.
-3. Add the new app directory to the namespace's parent `kustomization.yaml` resources list.
+1. Create `kubernetes/apps/<namespace>/<app>/ks.yaml`: a `Kustomization` pointing to `./app`, listing `dependsOn`, `components`, and `postBuild.substitute` vars.
+2. Create `kubernetes/apps/<namespace>/<app>/app/` with `kustomization.yaml`, `helmrelease.yaml`, and optionally `externalsecret.yaml`.
+3. Add `./<app>/ks.yaml` to `kubernetes/apps/<namespace>/kustomization.yaml`. New namespace directories are discovered automatically; there is no top-level `kubernetes/apps/kustomization.yaml`.
 
 ### HelmReleases
 
-Nearly all apps use the `app-template` chart (`oci://ghcr.io/bjw-s-labs/helm/app-template`) sourced via the `OCIRepository` defined in `components/common/repos/app-template/`. The `chartRef` in HelmReleases references `kind: OCIRepository, name: app-template`.
-
-### Ingress / Routing
-
-Apps expose themselves via Gateway API `HTTPRoute` (or similar) under `spec.route` in the app-template values. The external gateway is `envoy-external` in namespace `networking`. Hostnames follow the pattern `<appname>.chestr.dev`. NetworkPolicies on each app should allow ingress from the Envoy pods in `networking`.
-
-### Secrets
-
-All secrets come from 1Password via `ExternalSecret` resources referencing `ClusterSecretStore: onepassword`. Cluster-wide variables (e.g. `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_TUNNEL_ID`) are injected into child Kustomizations via `postBuild.substituteFrom` pointing to the `cluster-secrets` Secret.
-
-### Reusable Components
-
-Add components to a `ks.yaml` under `spec.components`:
-- `../../../../components/volsync` — adds a PVC + VolSync `ReplicationSource` to Cloudflare R2. Requires `postBuild.substitute` vars: `APP`, `VOLSYNC_CAPACITY`, and optionally `VOLSYNC_CACHE_CAPACITY`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mchestr/home-cluster](https://github.com/mchestr/home-cluster) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
