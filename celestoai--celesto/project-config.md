@@ -141,4 +141,4 @@ in doubt, use the skill.
 
 ---
 > Source: [CelestoAI/celesto](https://github.com/CelestoAI/celesto) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
