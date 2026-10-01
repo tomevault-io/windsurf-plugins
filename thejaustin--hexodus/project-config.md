@@ -37,5 +37,5 @@ We have an automated versioning system in place via GitHub Actions (`.github/wor
 *   Never use `lateinit var` for Android system services in Objects; use `lazy { ... }` initialization instead.
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/thejaustin) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
+> Source: [thejaustin/hexodus](https://github.com/thejaustin/hexodus) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
