@@ -1,175 +1,167 @@
 ---
 trigger: always_on
-description: This file provides guidance to coding agents when working with code in this repository.
+description: 本文档描述 zenstory Agent 系统的架构、流程和关键组件。
 ---
 
-# CLAUDE.md
+# Agent 模块架构文档
 
-This file provides guidance to coding agents when working with code in this repository.
+本文档描述 zenstory Agent 系统的架构、流程和关键组件。
 
-## Project Overview
+## 目录结构
 
-**zenstory** is an AI-assisted novel writing workbench with a conversational AI interface. Files (outlines, drafts, characters, lores) are the central unit, with AI conversations driving content generation.
-
-**Architecture**: Monorepo with React frontend (apps/web) and FastAPI backend (apps/server). Three-panel layout: File tree (left), Editor (middle), AI Chat (right).
-
-**Related Documentation**:
-- `apps/server/agent/CLAUDE.md` - Detailed Agent system architecture (multi-agent workflow, tools, SSE events)
-
-## Development Commands
-
-### Backend (FastAPI/Python)
-
-```bash
-cd apps/server
-
-# Install dependencies (first time only)
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Start backend server (port 8000)
-python3 main.py
-
-# Run specific Alembic migration
-alembic upgrade head
-
-# Create new migration
-alembic revision --autogenerate -m "description"
+```
+agent/
+├── service.py              # 主服务入口
+├── suggest_service.py      # 智能建议生成服务
+├── stream_adapter.py       # LangGraph 事件适配器
+├── context/                # 上下文组装模块
+│   ├── assembler.py        # 上下文组装器
+│   ├── budget.py           # Token 预算管理
+│   ├── compaction.py       # 上下文压缩（长会话总结）
+│   └── prioritizer.py      # 优先级管理
+├── core/                   # 核心基础设施
+│   ├── events.py           # SSE 事件定义
+│   ├── llm_client.py       # OpenAI 兼容 LLM 客户端
+│   ├── message_manager.py  # 消息和系统提示管理
+│   ├── session_loader.py   # 会话加载器
+│   └── stream_processor.py # 文件流处理器
+├── graph/                  # LangGraph 工作流
+│   ├── state.py            # 工作流状态定义
+│   ├── writing_graph.py    # 图执行入口
+│   ├── nodes.py            # 流式节点实现
+│   └── router.py           # 意图路由
+├── llm/                    # LLM 集成
+│   └── openai_agents/     # openai-agents-python / DeepSeek 写作 Agent 适配层
+├── prompts/                # 提示词模板
+│   ├── base.py             # 基础提示
+│   ├── novel.py            # 小说项目提示
+│   ├── screenplay.py       # 剧本项目提示
+│   ├── short_story.py      # 短篇故事提示
+│   ├── subagents.py        # 子代理提示 (planner/writer/quality_reviewer)
+│   └── suggestions.py      # 建议生成提示
+├── schemas/                # 数据模型
+│   ├── context.py          # 上下文数据模型
+├── skills/                 # 技能系统（标准 SKILL.md，渐进式加载，永不执行脚本）
+│   ├── active_skills.py    # 当前用户启用中的技能视图（目录/工具/显式选择共用）
+│   ├── context_injector.py # L1 技能目录（只含名称 + 用途）
+│   ├── loader.py           # 内置技能加载（builtin/<id>/SKILL.md）
+│   ├── package.py          # SKILL.md 解析、zip 导入安全检查、导出打包
+│   └── builtin/            # 官方技能（由 services/builtin_skill_seed.py 写入 PublicSkill）
+└── tools/                  # 工具实现
+    ├── tool_schemas.py     # provider-neutral 工具 schema 定义
+    ├── file_executor.py    # 文件操作执行器
+    ├── mcp_tools.py        # MCP 格式工具函数
+    └── permissions.py      # 权限检查
 ```
 
-### Frontend (React/Vite)
+## 核心流程
 
-```bash
-cd apps/web
+### 1. 请求处理流程
 
-# Install dependencies
-pnpm install  # or npm install
-
-# Start development server (port 5173)
-pnpm dev  # or npm run dev
-
-# Build for production
-pnpm build
-
-# Type-check + build
-pnpm run build:typecheck
-
-# Lint
-pnpm lint
+```
+用户消息
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  AgentService.process_stream() [service.py]             │
+│  - 设置 ToolContext                                      │
+│  - 组装上下文 (ContextAssembler)                         │
+│  - 加载会话历史 (SessionLoader)                          │
+│  - 构建系统提示 (MessageManager)                         │
+│  - 调用工作流                                            │
+└─────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  run_writing_workflow_streaming() [writing_graph.py]    │
+│  - 路由策略选择初始 agent（默认 llm，可配置 off）           │
+│  - 循环执行 agent 直到完成或达到最大迭代次数              │
+└─────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  router (llm / off) [router.py]                         │
+│  - llm: 调用 router_node()（DeepSeek Chat Completions）   │
+│  - off: 固定从 writer 开始                               │
+│  - 返回: initial_agent + workflow_plan + workflow_agents │
+└─────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  run_streaming_agent() [nodes.py]                       │
+│  - 组合基础提示 + 专业 agent 提示                        │
+│  - 调用 openai_agents.runner                            │
+│  - 通过 openai-agents-python 处理工具调用和 handoff       │
+└─────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  StreamAdapter.adapt_langgraph_events() [stream_adapter]│
+│  - 转换 LangGraph 事件为 SSE 事件                        │
+│  - 处理文件流式写入 (<file>...</file>)                   │
+│  - 发送事件到前端                                        │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Running Both Services
+### 2. 多 Agent 协作流程
 
-From project root (requires two terminals):
-```bash
-# Terminal 1: Backend
-cd apps/server && source venv/bin/activate && python3 main.py
-
-# Terminal 2: Frontend
-cd apps/web && pnpm dev
+```
+┌─────────────┐
+│   Router    │ ─── 分析意图，确定工作流
+└─────────────┘
+       │
+       ▼
+   ┌───────────────────────────────────────┐
+   │         工作流类型 (workflow_plan)      │
+   ├───────────────────────────────────────┤
+   │ quick       : writer（必要时再 review）  │
+   │ standard    : planner → writer（必要时再 review）│
+   │ full        : planner → hook_designer → writer（必要时再 review）│
+   │ hook_focus  : hook_designer → writer（必要时再 review）│
+   │ review_only : quality_reviewer          │
+   └───────────────────────────────────────┘
+       │
+       ▼
+┌─────────────┐     handoff      ┌─────────────┐     handoff      ┌─────────────┐
+│   Planner   │ ───────────────► │   Writer    │ ───────────────► │ Quality Reviewer │
+│  大纲规划师  │                  │  内容创作者  │                  │   质量审稿人     │
+└─────────────┘                  └─────────────┘                  └─────────────┘
 ```
 
-### Database Migrations
+### 3. Agent 交接机制
 
-The backend uses Alembic for database migrations:
-- Migrations are in `apps/server/alembic/versions/`
-- Configuration: `apps/server/alembic.ini`
-- After schema changes: `alembic revision --autogenerate -m "description"` then `alembic upgrade head`
+Agent 可以通过两种方式交接：
 
-## Architecture Overview
+1. **显式 handoff**: Agent 调用 `handoff_to_agent` 工具
+2. **工作流自动交接**: 按照 router 规划的 workflow_agents 顺序执行
 
-### Backend (apps/server)
+## 关键组件详解
 
-**Tech Stack**: FastAPI, SQLModel (Pydantic + SQLAlchemy), SQLite (dev) / PostgreSQL (production), DeepSeek OpenAI-compatible API with openai-agents-python, LlamaIndex, ChromaDB
+### AgentService (service.py)
 
-**Key Directories**:
-- `main.py` - App entry point, registers all routers and middleware
-- `api/` - API route handlers (auth, projects, files, versions, agent, chat, export, voice)
-- `models/` - SQLModel database models (entities, file_model, file_version)
-- `services/` - Business logic layer (file_version_service, snapshot_service, verification_service, export_service)
-- `agent/` - AI Agent system (service.py, suggest_service.py, tools/, context/, schemas/)
-- `database.py` - Database connection and session management
-- `config/` - Configuration modules (logger, settings)
+主服务类，处理用户消息的流式响应。
 
-**Important**: The codebase uses a service layer pattern. Route handlers in `api/` should be thin and delegate business logic to `services/`.
+```python
+async def process_stream(
+    session: Session,
+    project_id: str,
+    user_message: str,
+    ...
+) -> AsyncIterator[str]:
+    # 1. 设置工具上下文
+    ToolContext.set_context(session, user_id, project_id, session_id)
 
-### Frontend (apps/web)
+    # 2. 组装项目上下文
+    context_data = session_loader.assemble_context(...)
 
-**Tech Stack**: React 19, TypeScript, Vite, Tailwind CSS 4.x, Zustand, TanStack React Query, Tiptap editor, react-arborist (file tree)
+    # 3. 构建系统提示
+    system_prompt = message_manager.build_system_prompt(...)
 
-**Key Directories**:
-- `components/` - React components (Layout, FileTree, Editor, ChatPanel, MessageList, etc.)
-- `contexts/` - React Context providers (AuthContext, ProjectContext, ThemeContext)
-- `hooks/` - Custom hooks (useAgentStream, useVoiceInput, useExport)
-- `lib/` - Utilities (api.ts, apiClient.ts, agentApi.ts, errorHandler.ts)
-- `types/` - TypeScript type definitions
-
-**State Management**:
-- `AuthContext` - User authentication state
-- `ProjectContext` - Active project and file state
-- `Zustand` stores - Additional state management
-- `TanStack Query` - Server state caching and synchronization
-
-### Agent System
-
-The AI Agent system is the core feature:
-
-**Backend (apps/server/agent/)**:
-- `service.py` - Main agent orchestration with streaming response
-- `suggest_service.py` - AI-powered content suggestions
-- `context/` - Context assembly and prioritization for RAG
-- `tools/` - Agent tools (file_executor.py for file operations)
-- `schemas/` - Request/response models
-- `prompts/` - System prompts for different agent behaviors
-
-**Frontend**:
-- `useAgentStream.ts` - SSE (Server-Sent Events) streaming hook
-- `ChatPanel.tsx` - Main AI chat interface
-- `MessageList.tsx` - Message rendering with tool results
-- `ToolResultCard.tsx` - Display tool execution results
-
-### File Search
-
-Global file search functionality for quickly finding files within the current project.
-
-**Components**:
-- `FileSearchInput` - Search input with debounce and IME support
-- `SearchResultsDropdown` - Keyboard-navigable results dropdown
-- `FileTypeFilter` - File type filtering dropdown
-
-**Hook**: `useFileSearch`
-- Client-side search with fuzzy matching
-- 300ms debounce
-- Max 50 results
-- Case-insensitive
-
-**Context**: `FileSearchContext`
-- Global search state management
-- Keyboard shortcut support
-
-**Trigger**: Cmd+K (Mac) / Ctrl+K (Windows/Linux)
-
-**Scope**: Current project files
-
-**Matching**: Fuzzy, case-insensitive title search with relevance ranking (exact > prefix > contains)
-
-**Features**:
-- Real-time search with debouncing
-- File type filtering (outline, draft, character, lore, material)
-- Keyboard navigation (ArrowUp/Down, Enter, Escape)
-- Global keyboard shortcut
-- Mobile-responsive design
-- i18n support (EN/ZH)
-- IME composition support for Chinese input
-
-## Key Configuration Files
-
-### Backend Configuration
-
+    # 4. 执行工作流
+    async for event in run_writing_workflow_streaming(state):
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zenstory-ai/zenstory](https://github.com/zenstory-ai/zenstory) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
