@@ -4,7 +4,6 @@ description: Guidance for AI agents (including Claude Code) working in this repo
 ---
 
 # AGENTS.md
-
 Guidance for AI agents (including Claude Code) working in this repository.
 
 ## Project Overview
@@ -27,7 +26,7 @@ FastAPI Guard is a production-ready security library for FastAPI applications th
 
 As of v5.0.0, fastapi-guard is a **thin adapter** over [guard-core](https://github.com/rennf93/guard-core). All security logic (models, handlers, decorators, detection engine, protocols, utilities) lives in the `guard_core` package. This repo contains only the FastAPI/Starlette integration layer.
 
-```text
+```
 guard-core (engine, PyPI dependency)   <- all security logic
 └── fastapi-guard (this repo)          <- ASGI middleware adapter for FastAPI/Starlette
     ├── flaskapi-guard                 <- sibling adapter (Flask extension, sync mirror)
@@ -100,4 +99,4 @@ make fix
 
 ---
 > Source: [rennf93/fastapi-guard](https://github.com/rennf93/fastapi-guard) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
