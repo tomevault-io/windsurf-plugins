@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [DemonGatanjieu/Anomalous_Model_Browser](https://github.com/DemonGatanjieu/Anomalous_Model_Browser).
+Original source: `GEMINI.md` in [DemonGatanjieu/Anomalous_Model_Browser](https://github.com/DemonGatanjieu/Anomalous_Model_Browser).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [DemonGatanjieu/Anomalous_Model_Browser](https://github.com/DemonGatanjieu/Anomalous_Model_Browser) — a repo with 63+ stars on GitHub.
