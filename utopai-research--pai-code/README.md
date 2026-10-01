@@ -7,11 +7,11 @@ Local AI filmmaking studio — skills, canvas, timeline — driven from your cod
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Utopai-Research/pai-code](https://github.com/Utopai-Research/pai-code).
+Original source: `AGENTS.md` in [Utopai-Research/pai-code](https://github.com/Utopai-Research/pai-code).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
