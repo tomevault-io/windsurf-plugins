@@ -3,7 +3,7 @@ trigger: always_on
 description: Nova Wallet iOS. This file is a router only — read the doc that matches the task before doing
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 Nova Wallet iOS. This file is a router only — read the doc that matches the task before doing
 anything else. Docs live in `.claude/docs/`.
@@ -44,4 +44,4 @@ anything else. Docs live in `.claude/docs/`.
 
 ---
 > Source: [novasamatech/nova-wallet-ios](https://github.com/novasamatech/nova-wallet-ios) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
