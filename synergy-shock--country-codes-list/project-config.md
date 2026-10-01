@@ -73,4 +73,4 @@ Templates use `{placeholder}` syntax with any string or number field. Array fiel
 
 ---
 > Source: [Synergy-Shock/country-codes-list](https://github.com/Synergy-Shock/country-codes-list) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
