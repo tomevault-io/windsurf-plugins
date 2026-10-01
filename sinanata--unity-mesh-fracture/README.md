@@ -5,12 +5,12 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sinanata/unity-mesh-fracture](https://github.com/sinanata/unity-mesh-fracture).
+Original source: `copilot-instructions.md` in [sinanata/unity-mesh-fracture](https://github.com/sinanata/unity-mesh-fracture).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Codex** — `AGENTS.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
