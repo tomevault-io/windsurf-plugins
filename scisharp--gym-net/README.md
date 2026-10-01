@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [SciSharp/Gym.NET](https://github.com/SciSharp/Gym.NET).
+Original source: `GEMINI.md` in [SciSharp/Gym.NET](https://github.com/SciSharp/Gym.NET).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [SciSharp/Gym.NET](https://github.com/SciSharp/Gym.NET) — a repo with 141+ stars on GitHub.
