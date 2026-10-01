@@ -58,4 +58,4 @@ Raise suspected non-public vulnerabilities privately with the human contributor,
 
 ---
 > Source: [containerd/containerd](https://github.com/containerd/containerd) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
