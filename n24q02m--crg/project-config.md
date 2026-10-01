@@ -12,15 +12,14 @@ See `AGENTS.md` va `README.md` de hieu architecture va configuration.
 ## Cau truc
 
 - `src/better_code_review_graph/` -- Package chinh (src layout)
-  - `server.py` -- FastMCP server, 6 tools: graph + query + review (3 main) + config + security + help
+  - `server.py` -- FastMCP server, 6 tools: graph + query + review (3 main) + config (incl. setup_*) + security + help
   - `tools.py` -- MCP tool implementations (build, query, impact, review, search, embed, stats, docs, large functions)
   - `parser.py` -- Tree-sitter parsing (14 langs) + call target resolution
   - `graph.py` -- SQLite GraphStore, search, impact radius, NetworkX cache
   - `incremental.py` -- Git integration, file watching, incremental updates
   - `embeddings.py` -- Dual-mode embedding: local ONNX through the fastretrieval registry + cloud chain (`EMBEDDING_MODELS`) via OpenAI-compatible HTTP clients (`hull_core.providers`)
-  - `docs/` -- Help tool documentation (graph.md, query.md, review.md, config.md)
+  - `docs/` -- Help tool documentation (graph.md, query.md, review.md, config.md, recipes.md, security.md)
 - `cli.py` -- local CLI: no args starts MCP stdio; positional subcommands expose graph/query/review/security over the same domain services
-
   - `__init__.py` -- Version export
   - `__main__.py` -- `python -m` entry (calls cli.main)
   - `py.typed` -- PEP 561 marker
@@ -66,7 +65,6 @@ Source files --> Tree-sitter parser --> SQLite graph (nodes + edges)
                                      NetworkX BFS --> Impact radius
                                           |
                                      Embedding store --> Semantic search
-                                          |
                                      FastMCP server --> secondary MCP adapter (6 tools: graph + query + review + config + security + help)
 ```
 
@@ -74,10 +72,9 @@ Source files --> Tree-sitter parser --> SQLite graph (nodes + edges)
 - **Graph** (graph.py): SQLite with WAL mode. Multi-word AND-logic search. GraphNode/GraphEdge dataclasses.
 - **Incremental** (incremental.py): Git diff detection, file hash tracking, re-parses only changed files.
 - **Embeddings** (embeddings.py): Dual-mode -- local ONNX through the fastretrieval registry (default, zero-config) or cloud via the `EMBEDDING_MODELS` chain (OpenAI-compatible HTTP clients; order = fallback, empty = local). Fixed 768-dim storage.
-- **Tools** (tools.py): Implementation layer for all graph operations. Output pagination via max_results.
-- **Server** (server.py): 6 tools — graph (build/update/stats/embed/export/summarize), query (query/search/impact/large_functions/spot_check/renamed_in_diff/diff), review, config, security, help. Returns structured dict payloads over MCP; the CLI serializes them as JSON.
+- **Server** (server.py): 6 tools — graph (build/update/stats/embed/export/summarize), query (query/search/impact/large_functions/spot_check/renamed_in_diff/diff), review, config (status/set/cache_clear + setup_status/setup_start/setup_skip/setup_reset/setup_complete), security (scan/report/suppress/rule_list), help. Returns structured dict payloads over MCP; the CLI serializes them as JSON.
 
-## Embedding backends
+## Embedding + LLM backends
 
 Embedding (cloud backend) + the LLM summarizer dispatch through
 OpenAI-compatible HTTP clients (`hull_core.providers.openai_spec`).
@@ -85,15 +82,15 @@ OpenAI-compatible HTTP clients (`hull_core.providers.openai_spec`).
 Per-task model chains, CSV `provider/model,provider/model`, order = fallback. Provider is inferred from the model prefix.
 
 - `EMBEDDING_MODELS` -- chain embedding. Empty = local ONNX from the fastretrieval built-in registry.
+- `SUMMARY_MODELS` -- chain summarizer (graph `summarize` action). Empty = summaries disabled.
 - **Local (default)**: fastretrieval ONNX registry -- zero-config, ~570MB download on first use, 768-dim MRL truncation
-- API key follows the `<PROVIDER>_API_KEY` convention. The 7 providers documented below:
+- API key theo convention `<PROVIDER>_API_KEY`. 7 provider servers goi y:
 
   | model prefix | key env var | get it at |
   |---|---|---|
-  | `gemini/` | `GEMINI_API_KEY` | aistudio.google.com/apikey |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [n24q02m/crg](https://github.com/n24q02m/crg) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
