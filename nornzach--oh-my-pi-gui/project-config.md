@@ -1,0 +1,71 @@
+---
+trigger: always_on
+description: This file governs the **omp GUI sub-repository**. Read it before any edit here — the directory layout (a repo nested inside the omp monorepo) is unusual and getting it wrong breaks builds or leaks commits into the wrong remote.
+---
+
+# GUI Development Rules
+
+This file governs the **omp GUI sub-repository**. Read it before any edit here — the directory layout (a repo nested inside the omp monorepo) is unusual and getting it wrong breaks builds or leaks commits into the wrong remote.
+
+## Repository Identity
+
+- **This repo is the real product repo:** [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh-my-pi-gui). It owns all GUI code, commits, tags, and GitHub Releases.
+- **Remote layout:** `origin` = `nornzach/oh-my-pi-gui` (push here). The surrounding monorepo's remotes are NOT this repo's remotes — never `git push` from inside `packages/gui/` expecting monorepo changes to go anywhere, and never push anything to `can1357`.
+
+### The three repos — never confuse them
+
+| Repo | Role | Push? | Pull/sync from? |
+|---|---|---|---|
+| [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh-my-pi-gui) | **This repo** — GUI product, releases. | ✅ all GUI work | only own commits |
+| [`nornzach/oh-my-pi`](https://github.com/nornzach/oh-my-pi) | **Monorepo fork** (`origin` of the enclosing checkout) — agent source; the only sidecar build source, and the monorepo the README's build-from-source flow clones. | ✅ (from the monorepo root, not from here) | only own commits |
+| [`can1357/oh-my-pi`](https://github.com/can1357/oh-my-pi) | **Upstream** (`upstream` of the enclosing checkout) — where new omp features come from. | ❌ **NEVER** | ✅ `scripts/sync-upstream.sh` |
+
+- **All GUI work commits to this repo and pushes to `origin/main`.** Never commit GUI paths into the enclosing monorepo's git — from its perspective this directory is an intentionally untracked, self-contained checkout.
+- Agent-side work (RPC commands, session logic, `packages/agent|coding-agent|ai|…`) belongs to the **monorepo**, commits at the monorepo root, and pushes to `nornzach/oh-my-pi` (fork) — it does not exist in this repo's history even though the files sit above this directory.
+
+### Upstream sync (pulling new omp features)
+
+Always the script (it re-provisions what a plain merge misses), from anywhere:
+
+```bash
+bash packages/gui/scripts/sync-upstream.sh   # run from the GUI repo; it cds to the monorepo root
+# fetch upstream → incoming list → merge upstream/main → bun install →
+# pi_natives re-provision on version bump → gen:stats → build:omp → GUI build + tests
+```
+
+- Conflicts: resolve, commit the merge, re-run with `SKIP_MERGE=1`.
+- A sync touches monorepo files only until step 6; the sidecar rebuild (`build:omp`) and GUI build/tests close the loop. Push monorepo results from the monorepo root (fork), GUI results from here.
+- **Every release starts with a sync** (README → Release process step 1) so the DMG's sidecar carries current upstream.
+
+## Nested Checkout Layout
+
+This repo lives at `packages/gui/` inside a clone of the omp monorepo:
+
+```
+oh-my-pi/                    ← monorepo (upstream sync + sidecar source)
+├── packages/coding-agent/   ← agent source compiled into the sidecar
+├── packages/natives/        ← native addon compiled into the sidecar
+└── packages/gui/            ← THIS repo (own .git, tags, releases)
+    ├── .git/                ← GUI repo — do not confuse with monorepo .git
+    ├── src/                 ← GUI code (commits land here)
+    └── resources/omp*       ← sidecar binaries (gitignored, built locally)
+```
+
+- The monorepo exists for **upstream feature sync and building the sidecar**; the GUI repo is **the only commit/release target**.
+- `git status` / `git log` / `git push` run inside `packages/gui/` act on the GUI repo. Anything outside `packages/gui/` acts on the monorepo.
+- Do not move this directory out of the monorepo: `scripts/build-bundled-omp.ts` resolves `../../coding-agent` relative to it. If you clone standalone, building the sidecar requires the monorepo next to it (see README → Build from source).
+
+## Sidecar & Packaging Rules
+
+The GUI runs the agent as a **bundled sidecar** (`resources/omp`, a compiled `Bun.build --compile` binary of `packages/coding-agent`). Rules that keep packaging sane:
+
+- `resources/omp` and `resources/omp.*` are **gitignored build artifacts** (~120 MB each). Never commit them; never hand-edit them.
+- Build the arm64 sidecar with `bun run build:omp`; cross-build Intel with `bun run build:omp:x64` (outputs `resources/omp.x64`). The script auto-stages the matching `pi_natives` addon — including replacing stale addons whose version sentinel doesn't match — downloads it from npm when missing, and restores the natives directory afterwards. It requires the monorepo neighbors and fails with setup instructions when they're absent.
+- The sidecar embeds the `pi_natives` native addon. After syncing the monorepo with upstream (version bump), re-provision natives **before** `build:omp` — `scripts/sync-upstream.sh` automates this.
+- Packaging reads the sidecar via `extraResources` (`electron-builder.yml` → `resources/omp` for arm64, `electron-builder.x64.yml` → `resources/omp.x64` for Intel). Building x64 from the default config ships the wrong-arch sidecar — always package Intel with `bun run package:mac:x64` (the x64 config), never plain `package:mac`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [nornzach/oh-my-pi-gui](https://github.com/nornzach/oh-my-pi-gui) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
