@@ -1,127 +1,45 @@
 ---
 trigger: always_on
-description: Before analyzing the code, check whether `compile_commands.json` exists in this
+description: - Public interfaces, all `cp0_signal_*` commands, arguments, callback results, and thread rules: read [`docs/cp0_lvgl.en.md`](../../docs/cp0_lvgl.en.md).
 ---
 
-# APPLaunch development guidance
+# cp0_lvgl Work Entry
 
-## Before code analysis: ensure `compile_commands.json` exists
+## Read First
 
-Before analyzing the code, check whether `compile_commands.json` exists in this
-directory (`projects/APPLaunch/compile_commands.json`). If it does not, follow
-the cross-compilation instructions in `../../README_ZH.md` (repo root): load
-the config matching your current platform, then run one cross-compilation:
+- Public interfaces, all `cp0_signal_*` commands, arguments, callback results, and thread rules: read [`docs/cp0_lvgl.en.md`](../../docs/cp0_lvgl.en.md).
+- Chinese and Japanese references: [`docs/cp0_lvgl.md`](../../docs/cp0_lvgl.md) and [`docs/cp0_lvgl.ja.md`](../../docs/cp0_lvgl.ja.md).
+- Authoritative signal signatures: `include/signal_register_plan.h`.
+- C ABI: `include/cp0_lvgl_app.h`; LVGL pages and runner: `include/cp0_lvgl_app_runner.hpp` and `include/ui_app_page.hpp`.
+- The README files are call-site references. When fixing a bug, changing behavior, or checking a platform difference, inspect the relevant implementation under `src/` and its `*_contract.*` files, then compare the device and SDL backends.
 
-```bash
-export CONFIG_DEFAULT_FILE=linux_x86_cross_cp0_config_defaults.mk
-bbear -- scons -j22
-```
+## Module Boundary
 
-`linux_x86_cross_cp0_config_defaults.mk` corresponds to the current platform
-(Linux x86_64 host, CP0 cross toolchain). Pick the matching
-`*_config_defaults.mk` for your platform from `../../README_ZH.md` — for
-example `linux_x86_sdl2_config_defaults.mk` for the SDL2 simulator on Linux.
+`cp0_lvgl` provides the LVGL runner, reusable page bases, and eventpp callback-list services for audio, PTY, configuration, filesystem, LoRa, Wi-Fi, Bluetooth, settings, process execution, OS information, time, battery, screenshots, camera, soundcard, and sudo. Whether a service is installed is controlled by `CONFIG_CP0_LVGL_INIT_*`; never assume a disabled service exists.
 
-This command generates `compile_commands.json` in this directory. Then use the
-source files that actually participate in the cross-compilation (as listed in
-`compile_commands.json`) to confirm which code the project really uses, before
-working on the coding task.
+Request signals normally take `std::list<std::string>` with the command name at element zero and a `std::function<void(int, std::string)>` callback. `code == 0` means success; interpret `data` using the wire format documented in the README. Callbacks may run on worker threads, so UI code must marshal back to the LVGL thread. Stop background threads, timers, PTYs, camera work, and sudo requests before service teardown.
 
-## Scoped-enum conversions
+## Public Interface Quick Reference
 
-`cp0_lvgl` exports the public header `cp0_enum_cast.h`. Include it directly in
-any C++ file that uses the conversion macro:
+- Runner: `cp0_lvgl_init()`, `cp0_lvgl_run()`, `cp0_lvgl_wake()`; pages: `AppPageRoot`, `AppPage`, `AppPageWithBottomBarLayout`, `cp0_lvgl_start_app_page()`, and `cp0_lvgl_start_app<PageT>()`.
+- C wrappers: `cp0_file_*` / `cp0_dir_*`, `cp0_network_list`, `cp0_wifi_*`, `cp0_process_*`, `cp0_system_shutdown/reboot`, `cp0_sudo_*`, `cp0_battery_read`, `cp0_bq27220_calibrate`, `cp0_backlight_*`, `cp0_time_*`, `cp0_eth_info_read`, `cp0_account_info_read`, and background update functions. Full declarations are in `include/cp0_lvgl_app.h`.
+- Request/response signals: `cp0_signal_audio_api`, `cp0_signal_audio_setup`, `cp0_signal_pty_api`, `cp0_signal_config_api`, `cp0_signal_filesystem_api`, `cp0_signal_lora_api`, `cp0_signal_wifi_api`, `cp0_signal_bt_api`, `cp0_signal_settings_api`, `cp0_signal_process_api`, `cp0_signal_osinfo_api`, `cp0_signal_timedate_api`, `cp0_signal_bq27220_api`, `cp0_signal_screenshot_api`, `cp0_signal_camera_api`, and `cp0_signal_soundcard_api`.
+- One-way/event signals: `cp0_signal_audio_play(std::string)`, `cp0_signal_audio_cap(bool)`, `cp0_signal_system_play(std::string)`, `cp0_signal_battery_pub(std::function<void()>)`, `cp0_signal_network()`, and `cp0_signal_forkexec()`.
+- Async-specialized signals: `cp0_signal_bt_agent(uint64_t, method, device, value, reply)`, `cp0_signal_sudo_argv_async(args, auth_timeout_ms, exec_timeout_ms, complete, started)`, `cp0_signal_sudo_cancel(request_id, done)`, and `cp0_signal_system_admin_async(args, auth_timeout_ms, exec_timeout_ms, complete, started)`.
+- `cp0_signal_network` and `cp0_signal_forkexec` currently have only plan declarations and no `cp0_lvgl` registration. Confirm an implementation exists before calling them. Bluetooth Agent requests originate on a worker thread; sudo calls `started` before `complete`; neither callback may directly manipulate LVGL objects.
 
-```cpp
-#include "cp0_enum_cast.h"
-```
+For command details, argument counts, return encoding, and platform differences, use the “Complete `cp0_signal_*` Usage” section in [`docs/cp0_lvgl.en.md`](../../docs/cp0_lvgl.en.md).
 
-Use the general `CP0_ENUM_CAST(target_type, enum_value)` for an explicit
-conversion from an `enum class` value. Convenience macros are available for
-common targets, including `CP0_ENUM_CAST_INT`, `CP0_ENUM_CAST_SIZE_T`,
-`CP0_ENUM_CAST_UINT8`, `CP0_ENUM_CAST_UINT16`, `CP0_ENUM_CAST_UINT32`, and
-`CP0_ENUM_CAST_UINT64`:
+## Modification Rules
 
-```cpp
-enum class LayoutMetric : int { Width = 320 };
+- A new signal exposed to external modules must be declared in `include/signal_register_plan.h` with `def_hal_fun`, and must include registration, teardown, device and SDL behavior, and tests. Example:
 
-constexpr int width = CP0_ENUM_CAST_INT(LayoutMetric::Width);
-constexpr auto count = CP0_ENUM_CAST_SIZE_T(LayoutMetric::Width);
-constexpr auto raw = CP0_ENUM_CAST(uint32_t, LayoutMetric::Width);
-```
+  `def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_xxx_api)`
 
-This macro is the shared replacement for repeated enum-only `static_cast`
-expressions and conversion helpers that only wrap an enum cast. Use the
-type-specific convenience macro when it exists; use the general macro for any
-other target type. Do not add a project-local helper solely to wrap one of
-these macros; if an existing helper is part of a broader API, keep it and use
-the macro in its implementation.
-
-Do not use these macros for pointer casts, arbitrary integer conversions, or
-untrusted values read from an external API. Validate and range-check an
-external integer before converting it to an enum. Pass a side-effect-free enum
-value or enumerator as the macro argument, and do not redefine a project-local
-macro with the same name.
-
-The `cp0_lvgl` component publishes `include/` through its `SConstruct`
-dependency, so consumers should include `cp0_enum_cast.h` by name rather than
-using a relative path into `ext_components`. After migrating a conversion,
-keep the surrounding API and numeric behavior unchanged and run the APPLaunch
-tests/build.
-
-## Keyboard input systems
-
-APPLaunch has two keyboard delivery systems. They share the same CP0 keyboard
-backend and `key_item` queue; they are not two independent device readers. A
-single physical, SDL, or injected key can be delivered through both paths:
-
-1. The native LVGL path produces `LV_EVENT_KEY` for the focused object in the
-   active input group.
-2. The CP0 custom path sends `LV_EVENT_KEYBOARD` to the active screen with a
-   complete `struct key_item` as the event parameter.
-
-### Choose the event by capability
-
-Use the native LVGL `LV_EVENT_KEY` path for ordinary UI operations: focus and
-group navigation, list or menu movement, button activation, confirmation,
-cancellation, and standard widget behavior. Bind the callback to the object
-that belongs to the page input group and read the key with `lv_event_get_key()`:
-
-```cpp
-static void handle_key(lv_event_t *event)
-{
-    if (!event || lv_event_get_code(event) != LV_EVENT_KEY) return;
-    const uint32_t key = lv_event_get_key(event);
-    if (key == LV_KEY_ESC) close_page();
-}
-```
-
-The native path receives the context-normalized key and CP0-to-LVGL mapping,
-such as `LV_KEY_UP`, `LV_KEY_DOWN`, `LV_KEY_LEFT`, `LV_KEY_RIGHT`,
-`LV_KEY_ENTER`, and `LV_KEY_ESC`. Make sure the keypad indev is assigned to the
-page input group and that the intended object is focused. Prefer this path when
-the operation needs no physical-key identity, text, modifiers, or explicit
-press/release/repeat state.
-
-Use the custom `LV_EVENT_KEYBOARD` path for text entry, Unicode input, terminal
-input, application shortcuts, global shortcuts, physical-key-specific behavior,
-modifier combinations, games, and any action that distinguishes pressed,
-released, and repeated states. Register it on the current/root screen and read
-the event parameter as a `const struct key_item *`. The CP0 backend registers
-the shared event ID during input initialization; consumers must use the existing
-`LV_EVENT_KEYBOARD` value rather than hard-coding or registering a second ID.
-
-```cpp
-static void handle_keyboard(lv_event_t *event)
-{
-    if (!event || lv_event_get_code(event) !=
-            static_cast<lv_event_code_t>(LV_EVENT_KEYBOARD)) return;
-    const auto *item = static_cast<const struct key_item *>(
-        lv_event_get_param(event));
-    if (!item || item->key_state != KBD_KEY_PRESSED) return;
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- When changing an argument or return format, update the English, Chinese, and Japanese documents in `docs/`, the corresponding contract, C wrappers, all call sites, and tests.
+- Do not add new uses of deprecated `cp0_process_run_sudo` or `cp0_signal_process_api` `RunSudo`; use the asynchronous sudo signals.
+- Run `ext_components/cp0_lvgl/tests/run_tests.sh` for module regression. Changes involving Linux commands, BlueZ, libcamera, framebuffer, or sudo also require target-platform validation.
 
 ---
 > Source: [CardputerZero/launcher](https://github.com/CardputerZero/launcher) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
