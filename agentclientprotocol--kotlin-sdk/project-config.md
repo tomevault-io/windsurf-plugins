@@ -108,4 +108,4 @@ Stable ACP and protocol v2 coexist in this repository. Preserve their boundaries
 
 ---
 > Source: [agentclientprotocol/kotlin-sdk](https://github.com/agentclientprotocol/kotlin-sdk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
