@@ -7,11 +7,11 @@ AI儿童绘本生成器（AI children's storybook generator）
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [valleylmh/storybloom](https://github.com/valleylmh/storybloom).
+Original source: `CLAUDE.md` in [valleylmh/storybloom](https://github.com/valleylmh/storybloom).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
