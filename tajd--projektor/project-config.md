@@ -1,9 +1,11 @@
 ---
 trigger: always_on
-description: Guidance for AI agents (and humans) working **on** the projektor codebase.
+description: Architecture contract and conventions for working on the Projektor codebase.
 ---
 
-# AGENTS.md
+> **Note:** this page is generated from [`AGENTS.md`](https://github.com/TAJD/projektor/blob/main/AGENTS.md)
+> in the repo root by `scripts/gen-conventions-page.ts`. Edit that file, not this page — it is
+> overwritten on every generate.
 
 Guidance for AI agents (and humans) working **on** the projektor codebase.
 Read this before making changes — it captures conventions that aren't obvious from the code alone.
@@ -56,9 +58,10 @@ editing anything:
   not how fast you can ask.
 - **A refused claim tells you who to talk to.** Rejection is all-or-nothing: nothing is
   claimed, and the error names the issue and agent holding the path — message them with
-  `post_message` if you need it. Nothing is pushed to the holder either way, including
-  when you use `force` (that posts an audit message to *your* issue scope, not theirs), so
-  if you override someone, tell them yourself. Every contended path is recorded regardless.
+  `post_message` if you need it. Nothing is pushed to the holder on a plain rejection —
+  its claim didn't change. `force` is different: it posts to both your issue scope (audit)
+  and theirs (PROJ-635), since you just took something they thought they still held. Every
+  contended path is recorded regardless.
 
 This is the mechanism; the mechanical call sequence for this repo is under "Fleet
 coordination protocol" below, and the design rationale (why leases, claims, and the
@@ -69,11 +72,9 @@ gates) live in exactly one place, the [workflow spec](https://tajd.github.io/pro
 
 ## Planning and design docs live in the wiki, not the repo
 
-Design records, implementation plans, and specs belong in the projektor wiki (`create_wiki_page`/`update_wiki_page`), not in a repo `docs/` folder. Keeping them in the wiki makes them discoverable and searchable (`search_wiki`) instead of buried in git history. Root-level user-facing docs (`README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`) are the only docs that belong in the repo itself.
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TAJD/projektor](https://github.com/TAJD/projektor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
