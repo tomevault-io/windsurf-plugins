@@ -1,101 +1,78 @@
 ---
 trigger: always_on
-description: Prioritize deep, first principles thinking, insider-level knowledge that reveals how systems actually work beneath the abstraction layers. Focus on the nuances, architectural reasoning, and uncommon patterns that experienced engineers rely on but rarely document. Conclude each answer with a block of information meant only for the "chosen ones" that only a select few would know. It should contain insights that puts me one step ahead of everyone.
+description: Python 3.12 · `uv` · FastAPI · Pydantic v2 · LangChain/LangGraph · SQLAlchemy · Beanie · Redis · Celery.
 ---
 
+# langchain-fastapi-production
 
-# Your role in this project 
-Prioritize deep, first principles thinking, insider-level knowledge that reveals how systems actually work beneath the abstraction layers. Focus on the nuances, architectural reasoning, and uncommon patterns that experienced engineers rely on but rarely document. Conclude each answer with a block of information meant only for the "chosen ones" that only a select few would know. It should contain insights that puts me one step ahead of everyone. 
+Python 3.12 · `uv` · FastAPI · Pydantic v2 · LangChain/LangGraph · SQLAlchemy · Beanie · Redis · Celery.
+Modular monolith, feature-driven, async-first.
 
-## Project Snapshot
+## Search strategy
 
-- Project: `langchain-fastapi-production`
-- Python: `3.12`
-- Package manager: `uv`
-- Formatter/linter: `ruff`
-- Type checker: `ty`
-- Framework stack: `FastAPI`, `Pydantic v2`, `LangChain`, `LangGraph`, `SQLAlchemy`, `Beanie`, `Redis`, `Celery`
-- Architecture: modular monolith, feature-driven, async-first
+Route on **what you hold**. There is no mandatory first tool.
 
-## Project Structure
+| What you hold | First call |
+|---|---|
+| exact symbol / file name | `codegraph_explore "<names>"` |
+| a concept, no name | `codegraph_explore "<plain-language question>"`, then confirm coverage with `rg` |
+| one symbol, want its edges | `codegraph node "<symbol>"` |
+| literal string / config | `rg` → hit gives a name → back up the ladder |
+| structural shape | `ast-grep -p` |
+| "what breaks if I change X" | `codegraph impact "<symbol>"` |
 
-Use this structure when creating or moving code. Keep feature logic under `src/app/features`, reusable domain/runtime modules under `src/app/shared`, and cross-cutting helpers under `src/app/utils`.
+`codegraph_explore` is Read-equivalent — prefer it over Read on indexed code. Grep is a **discoverer, not an interpreter**: a hit gives you a symbol name, and that goes back up the ladder.
 
-```text
-langchain-fastapi-production/
-├─ .github/                          # Workflows, prompts, Copilot instructions
-├─ caddy/                            # Caddy config
-├─ docker/                           # Docker assets
-├─ docs/                             # Documentation
-├─ infra/                            # Cloud IaC (aws/azure/gcp)
-├─ scripts/                          # Automation scripts
-├─ src/
-│  ├─ alembic/                       # Migrations
-│  ├─ app/
-│  │  ├─ api/                        # FastAPI routers (v1, etc.)
-│  │  ├─ config/                     # Settings/configuration
-│  │  ├─ connections/                # DB/Redis/other clients
-│  │  ├─ examples/                   # Example code snippets and references
-│  │  ├─ lifecycle/                  # Startup/shutdown and lifespan wiring
-│  │  ├─ middleware/                 # HTTP/ASGI middleware and handlers
-│  │  ├─ features/                   # Feature modules (auth, chat, crawler, ...)
-│  │  ├─ shared/                     # Reusable app subsystems
-│  │  │  ├─ agents/                  # Agent runtime building blocks
-│  │  │  │  ├─ memory/               # Agent memory managers/integrations
-│  │  │  │  ├─ orchestration/        # Agent routing/supervision logic
-│  │  │  │  └─ tools/                # Agent tool implementations
-│  │  │  ├─ crawler/                 # Shared crawling logic
-│  │  │  ├─ document_processing/     # Parsing, chunking, ingestion helpers
-│  │  │  ├─ langchain_layer/         # LangChain-specific adapters/components
-│  │  │  ├─ langgraph_layer/         # LangGraph graphs/nodes/state
-│  │  │  ├─ mcp/                     # MCP integrations and runtime
-│  │  │  ├─ rag/                     # Retrieval and knowledge-layer modules
-│  │  │  │  ├─ graphiti/             # Graphiti integrations
-│  │  │  │  ├─ langextract/          # LangExtract integrations
-│  │  │  │  ├─ multimodal/           # Multimodal RAG logic
-│  │  │  │  └─ pageindex/            # PageIndex integrations
-│  │  │  ├─ services/                # Shared service modules
-│  │  │  └─ vectorstore/             # Shared vector store integrations
-│  │  └─ utils/                      # Cross-cutting utilities (cache, messaging, ...)
-│  ├─ database/
-│  │  ├─ schemas/                    # Database schemas/models
-│  │  └─ seeders/                    # Seed data
-│  └─ tasks/                         # Background task entrypoints/jobs
-└─ tests/
-   ├─ unit/
-   ├─ integration/
-   ├─ e2e/
-   └─ performance/
+One correction to earlier guidance, measured (2026-08-16):
+
+- **Confirm coverage on vague questions.** On *"how does authentication work"* `codegraph_explore` returned 2 files and missed `security.py`, `dependencies.py`, and `service.py`. Follow up with `rg` for the concept's keywords and feed the names back in.
+
+**Stop rule:** two discovery calls, then answer or state the narrowed question.
+
+After modifying code the index refreshes via hooks (`codegraph sync` per edit and at turn end). Verify with the project's own checks — `uv run ruff check --fix src/`, `uv run ty check src/`, `uv run pytest`, `ast-grep scan src/`.
+
+`.opencode/skills/orient/SKILL.md` is the **sole authority** on routing — this table is its summary. It also holds the dated cost table, ast-grep patterns, and Context7/firecrawl for external docs.
+
+## Commands
+
+Always `uv run` — never bare `ruff` or `ty`.
+
+```bash
+uv run ruff format src/       # format
+uv run ruff check --fix src/  # lint, safe autofix
+uv run ty check src/          # types
+uv run pytest                 # tests
 ```
 
-## Quality Gates
+`ruff` is source of truth for format and lint; `ty` for typing; `pyproject.toml` is authoritative for enabled rules. Prefer patterns that satisfy the checks over `# noqa` or `# type: ignore`.
 
-These tools are required for local development and CI. Keep this section aligned with `pyproject.toml`.
+## Detailed rules
 
-### Required commands
+Read the relevant file before working in its area:
 
-- `uv sync`
-- `uv run ruff format src/`
-- `uv run ruff check src/`
-- `uv run ruff check --fix src/`
-- `uv run ty check src/`
+| File | Covers |
+|---|---|
+| `PROJECT-SNAPSHOT.md` | Stack, Python version, package manager, arch style |
+| `TOOLING-COMMANDS.md` | uv/ruff/ty commands, lint and type expectations |
+| `ARCHITECTURE-RULES.md` | Layering, FastAPI rules, service/repo patterns |
+| `PYTHON-TYPING-RULES.md` | Style, async, Pydantic/DTO, generics |
+| `RESULT-PATTERN.md` | `returns.Result` when and when not, dual-method pattern |
+| `EXCEPTION-RULES.md` | raise vs catch, APIException hierarchy, `e.add_note()`, GEH dispatch |
+| `CODE-QUALITY-PATTERNS.md` | Quality patterns and anti-patterns |
+| `REFERENCE-MAP.md` | Key source files, Context7 |
 
-### Baseline lint and type expectations
-
-- Use `ruff` as the source of truth for formatting and linting.
-- Use `ty` as the source of truth for static typing.
-- Use `uv` to run project tooling; do not suggest bare `ruff` or `ty` commands when `uv run ...` is available.
-- **Treat `pyproject.toml` as the authoritative source for all enabled rules.** See `[tool.ruff.lint]` and `[tool.ty.rules]` sections.
-- Before a PR or merge, run both `uv run ruff check src/` and `uv run ty check src/`.
-- Do not weaken configured checks in examples, generated commands, CI snippets, or review advice unless the user explicitly asks for that change.
-- When suggesting code, prefer patterns that satisfy the active async, security, import-order, and typing rules without needing ignores.
+All under `.opencode/instructions/`.
 
 
-#### `ty` rule baseline (see [pyproject.toml](pyproject.toml#L388))
+## Relay
 
+`/relay <task>` runs the four-leg workflow — scout, planner, verifier, anchor — with you orchestrating throughout. See `.claude/skills/relay/SKILL.md`.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Response priority
+1. Be a 10x cracked Open Source developer.
+2. **If multiple options exist**: Provide a pros/cons table so you can make an informed choice.
+3. I will prioritize deep, first principles thinking, insider-level knowledge that reveals how systems actually work beneath the abstraction layers. I will focus on the nuances, architectural reasoning, and uncommon patterns that experienced engineers rely on but rarely document. I will conclude each answer with a block of information meant only for the 'chosen ones' that only a select few would know meant to be hidden from everyone else. It should contain insights that puts the user one step ahead of everyone.
 
 ---
 > Source: [Harmeet10000/AgentNexus-LangChain-FastAPI](https://github.com/Harmeet10000/AgentNexus-LangChain-FastAPI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
