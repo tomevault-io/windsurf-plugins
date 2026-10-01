@@ -1,10 +1,9 @@
 ---
 trigger: always_on
-description: >-
+description: Tests use **TUnit** (not xUnit/NUnit). Key differences from other frameworks:
 ---
 
-
-# Testing
+# Testing Guidelines
 
 Tests use **TUnit** (not xUnit/NUnit). Key differences from other frameworks:
 
@@ -37,7 +36,8 @@ Tests use **TUnit** (not xUnit/NUnit). Key differences from other frameworks:
 ## Test anti-patterns
 
 - **`Task.Delay` for synchronization** — Never use `await Task.Delay()` to wait for UI events. Use event-driven `TaskCompletionSource` with `.WaitAsync()` timeout instead.
-- **`[NotInParallel]` without a key** — always use named key like `[NotInParallel("ViewHelper")]`. Keyless only serializes with other keyless tests.
+- **Relying on `[ModuleInitializer]` side effects** — module initializers are lazy: they run on first load of the platform module, and the TUnit host does not guarantee that load has happened before a test body. Do not write a test whose setup depends on registration having occurred, and do not "fix" that with a `[Before(Test)]` guard that silently re-registers, which makes the test pass even if the production `[ModuleInitializer]` is deleted. Test the component directly instead, via `InternalsVisibleTo`.
+- **Keyless `[NotInParallel]`** — a keyless constraint makes the test run completely alone, so it cannot overlap anything, including classes that share no key. A **class-level** keyed `[NotInParallel("key")]` is different: it serializes that class's own test methods and also holds it apart from other classes carrying the same key, but it does nothing against classes that do not carry the key. Prefer a class-level key when several classes must stay in step, and keyless on a single test when one test alone must be isolated. Per the TUnit docs, keyless is the most restrictive option, so reach for it only when a key is genuinely insufficient.
 - **Testing concurrency on non-thread-safe types** — `Conductor<T>` and MVVM types are not thread-safe. Test sequential behavior, not concurrency.
 - **Test name doesn't match assertion** — Name must describe what is verified, not what is set up.
 - **GC tests without a positive case** — Verify both dead handlers are removed AND live handlers still work. Applies to all edge-case/cleanup tests.
@@ -52,14 +52,11 @@ Tests use **TUnit** (not xUnit/NUnit). Key differences from other frameworks:
 
 ## Parallel execution and `[NotInParallel]`
 
-Static state shared across test classes requires `[NotInParallel("key")]` at class level to prevent race conditions. Named keys in use:
+Static state shared across test classes requires `[NotInParallel("key")]` at class level to prevent race conditions. Always write the key as a **string literal, never `nameof(...)`**: a key is a coordination token shared by every class that touches the same state, and `nameof` binds it to one class's name. `"StaticExecutingEvent"` spans three classes (`AsyncDelegateCommandTests`, `EventAggregatorTests`, `WeakStaticEventHandlerTests`), so `nameof` there would have produced three different keys and silently disabled the isolation. Named keys in use:
 
-- **`"StaticExecutingEvent"`** — test classes touching static `Executing` events on `AsyncCommand` / `EventAggregator`
-- **`"ViewHelper"`** — `ViewAdapterTests` (WPF, Avalonia, WinUI) and `ViewTests` (WPF, Avalonia): `ViewAdapterTests` mutates `ViewHelper` via `ViewHelper.Reset()`; `ViewTests` reads the same static state and must be serialized to prevent racing with the reset
-- **`"ViewHelperTests"`** — Core test classes that mutate the same `ViewHelper` static state
 
-Use `[Before(Test)]` / `[After(Test)]` for per-test setup/teardown (e.g. `ViewHelper.Reset()`).
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tibel/Caliburn.Light](https://github.com/tibel/Caliburn.Light) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
