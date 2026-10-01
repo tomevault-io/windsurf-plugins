@@ -1,91 +1,60 @@
 ---
 trigger: always_on
-description: Guidance for autonomous coding agents working in `crosspoint-reader-cjk`.
+description: Development instructions for Claude and other assistants in `crosspoint-reader-cjk`.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for autonomous coding agents working in `crosspoint-reader-cjk`.
-This repository is a CJK-focused fork of CrossPoint Reader. A successful upstream merge must preserve the fork's user-visible behavior, not merely compile.
+Development instructions for Claude and other assistants in `crosspoint-reader-cjk`.
+Read `AGENTS.md` first; it is the authoritative repository guide. This file highlights the rules most likely to be missed during automated work.
 
-## 1. Project and hardware
+## Repository identity
 
-- Firmware: PlatformIO + Arduino, primarily C++20 (`-std=gnu++2a`) with Python build/test utilities.
-- Main target: Xteink X4/X3, ESP32-C3, 16 MB flash, no PSRAM.
-- Additional CI target: Seeed Studio XIAO ePaper Display Board / "Sticky", ESP32-S3.
-- Main entry point: `src/main.cpp`; recovery entry point: `src/recovery/RecoveryMain.cpp`.
-- The C3 is memory-constrained. The display buffer is required baseline memory, not a leak. Avoid file-sized buffers, repeated hot-path allocation, and unbounded containers.
-- Exceptions are disabled. Allocation and I/O failures must be handled explicitly.
+This is the CJK-focused CrossPoint Reader fork, not a stock upstream checkout. It targets memory-constrained Xteink ESP32-C3 hardware and also keeps the ESP32-S3 `sticky` target buildable. Upstream code may be a useful baseline, but upstream behavior does not automatically supersede this fork's tested behavior.
 
-## 2. Clone and submodules
-
-Clone recursively:
+Before work begins:
 
 ```bash
-git clone --recursive <repo-url>
-cd crosspoint-reader-cjk
-git submodule update --init --recursive
-```
-
-Required submodules:
-
-- `freeink-sdk/`: mandatory for all firmware builds. `platformio.ini` consumes SDK libraries through `symlink://freeink-sdk/...`, including display, input, storage, power, board configuration, UI, icons, and secure networking.
-- `freeink-sdk/libs/assets/Icons/lucide`: nested source asset submodule used when regenerating Lucide-derived SDK icons. It is not needed to compile already-generated icon headers, but recursive initialization keeps the SDK checkout complete and matches CI.
-`.gitmodules` names this fork's SDK update branch; the repository gitlink pins the reproducible SDK commit. Do not replace that gitlink with upstream SDK HEAD or edit the SDK incidentally. If an SDK change is required, verify the API in the checked-out submodule, commit it in the SDK repository first, and then update this repository's gitlink in a separate, intentional change.
-
-Quick verification:
-
-```bash
+git branch --show-current
+git remote -v
+git status --short
 git submodule status --recursive
 ```
 
-A leading `-` means the submodule is not initialized. A leading `+` means the checkout differs from the recorded gitlink.
+Preserve unrelated changes. Do not assume branch or remote names. Never rewrite shared history, force-push, or perform destructive device flashing without explicit authorization.
 
-## 3. Tooling and first build
+## Submodules are build inputs
 
-Required tools:
-
-- Python 3 (CI uses 3.14)
-- PlatformIO Core (`pio`)
-- clang-format 21+
-- Pillow for built-in CJK font generation
-
-The first build is slower because `custom_sdkconfig` rebuilds Arduino/ESP-IDF components. On macOS, retain any machine-specific CMake/toolchain workaround in gitignored `platformio.local.ini`; never commit that file.
-
-Enable the repository's local Git hooks once per checkout:
+Initialize recursively:
 
 ```bash
-./bin/install-git-hooks
+git submodule update --init --recursive
 ```
 
-The pre-commit hook formats tracked C/C++ changes, and the pre-push hook runs the
-same cppcheck command as CI. A push is blocked when cppcheck reports any low, medium,
-or high defect. For an exceptional one-off push when PlatformIO cannot run, explicitly
-use `CROSSPOINT_SKIP_PRE_PUSH_CHECKS=1 git push`; CI still remains authoritative.
+- `freeink-sdk/` is mandatory. `platformio.ini` references its libraries with local `symlink://` dependencies; a non-recursive or missing checkout will not produce a valid build.
+- `freeink-sdk/libs/assets/Icons/lucide` is a nested source asset submodule used when regenerating Lucide-derived icons. Ordinary compilation can use the existing generated icon headers, but recursive initialization keeps the SDK checkout complete and matches CI.
+- The recorded SDK gitlink belongs to this fork. Do not silently advance it to another SDK branch or upstream HEAD.
+- Verify uncertain display, storage, network, board, and input APIs against the checked-out SDK source before using them.
+- SDK implementation changes and the main-repository gitlink update should be deliberate and separately reviewable.
 
-If an interrupted core rebuild reports multiple definitions of `app_main`, follow the cleanup command documented in `platformio.ini`. Do **not** use `git clean -fdX`, because it can delete local configuration and other intentionally ignored assets.
+## Build environments
 
-## 4. PlatformIO environments
+Use the correct environment:
 
-Use the environment that matches the artifact or test:
+- `default`: normal ESP32-C3 development firmware; EN/SC/TC/JA.
+- `gh_release` / `gh_release_rc`: Simplified Chinese release line; EN/SC/JA.
+- `gh_release_tc` / `gh_release_rc_tc`: Traditional Chinese release line; EN/TC/JA.
+- `slim`: C3 size-focused build without serial logging.
+- `device_test`: device automation with serial input injection; test-only and never a release artifact.
+- `recovery`: minimal English SD recovery firmware with a separate source filter.
+- `sticky`: ESP32-S3 target used by CI; it is not an X4-compatible binary.
 
-| Environment | Purpose | Languages / notes |
-|---|---|---|
-| `default` | Normal ESP32-C3 development build | EN, Simplified Chinese, Traditional Chinese, Japanese; debug serial logging |
-| `gh_release` | Simplified Chinese release | EN, SC, JA |
-| `gh_release_rc` | Simplified Chinese release candidate | Inherits the SC release language set |
-| `gh_release_tc` | Traditional Chinese release | EN, TC, JA |
-| `gh_release_rc_tc` | Traditional Chinese release candidate | Inherits the TC release language set |
-| `slim` | Size-focused C3 build | All four shipping languages; serial logging disabled |
-| `device_test` | Physical-device automation | Test-only serial input injection; never publish this artifact |
-| `recovery` | Minimal SD recovery firmware | English-only, separate source filter |
-| `sticky` | ESP32-S3 Sticky development/CI build | Different MCU/toolchain; not interchangeable with X4 firmware |
-
-Common commands:
+Useful commands:
 
 ```bash
-pio run -e default
-pio run -e sticky
+./bin/clang-format-fix -g
+pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high
+pio run -e default -e sticky
 pio run -e gh_release
 pio run -e gh_release_tc
 pio run -e recovery
@@ -93,18 +62,45 @@ pio run -e default --target upload
 pio device monitor
 ```
 
-The registered upload target is partition-aware for Xteink C3 environments. It writes application partitions and updates OTA selection while preserving the bootloader, partition table, and data partitions such as NVS, SPIFFS, and coredump; it does not preserve old application images in factory/OTA slots. Do not bypass `scripts/register_safe_upload.py` / `scripts/upload_ota_slots.py` with an arbitrary whole-flash command unless the task explicitly requires and validates the complete partition layout.
+CI intentionally builds `default` and `sticky` in one `pio` invocation. Reproduce that shape when checking CI failures because separate invocations can invalidate artifacts as toolchains change.
 
-After physical tests with `device_test` or screenshot-only configurations, remove temporary overrides and restore a `default` development firmware to the device.
+For Xteink C3 uploads, retain the registered safe upload path. It writes application partitions and updates OTA selection while preserving the bootloader, partition table, and data partitions such as NVS, SPIFFS, and coredump; it does not preserve old factory/OTA application images. After testing `device_test` or temporary screenshot configurations, remove temporary overrides and restore `default` firmware.
 
-## 5. Build-time scripts and generated files
+`platformio.local.ini` is machine-local and gitignored. Never commit it. Do not use `git clean -fdX`; it can remove this file and other intentionally ignored assets.
 
-`platformio.ini` wires these scripts into every applicable build:
+## Generated sources
 
-- `scripts/patch_wolfssl.py`: applies/checks the constrained-heap wolfSSL integration.
+PlatformIO runs these pre/post scripts:
+
+- `scripts/patch_wolfssl.py`
+- `scripts/build_html.py` (walks `src/`; generates adjacent headers from Web `.html` and `.js` inputs)
+- `scripts/gen_i18n.py`
+- `scripts/gen_builtin_cjk_font.py`
+- `scripts/git_branch.py`
+- `scripts/patch_jpegdec.py`
+- `scripts/register_unit_tests_target.py`
+- `scripts/register_safe_upload.py`
+
+Do not hand-edit generated outputs:
+
+- `src/**/*.generated.h`: edit the adjacent Web `.html` or `.js` input.
+- `lib/I18n/I18nKeys.h`, `I18nStrings.h`, `I18nStrings.cpp`: edit `lib/I18n/translations/*.yaml` or the generator.
+- `lib/GfxRenderer/cjk_ui_font_*.h`: edit the tracked font inputs/generation scripts and regenerate.
+- `lib/Epub/Epub/hyphenation/generated/*`: change the source/generator path.
+
+The active PlatformIO environment filters translation tables and the CJK glyph corpus. An i18n change that builds only `default` is insufficient release verification: build both SC and TC release environments and check generated glyph coverage. Those environment-specific builds rewrite tracked CJK headers, so finish by regenerating/restoring the canonical all-shipping-language headers (for example with `python3 scripts/gen_builtin_cjk_font.py`) and run `python3 scripts/check_cjk_ui_font_charset.py` before committing.
+
+## Fork preservation contract
+
+Read `docs/fork-features.md` before an upstream merge or a refactor in a high-risk subsystem. Preserve behavior, not merely symbol names.
+
+### Fonts and catalog
+
+- Reader SD font and UI SD font are independent persisted selections and runtime roles.
+- Official UI packages contain physical 8, 10, and 12 pt faces. Load UI faces 12 -> 10 -> 8; incomplete manually installed families may use the nearest size within the same family.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [CrossPoint-CJK/crosspoint-reader-cjk](https://github.com/CrossPoint-CJK/crosspoint-reader-cjk) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
