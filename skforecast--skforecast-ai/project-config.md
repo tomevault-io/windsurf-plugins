@@ -1,118 +1,110 @@
 ---
 trigger: always_on
-description: <!-- AUTO-GENERATED FILE. DO NOT EDIT MANUALLY. -->
+description: `skforecast-ai` wraps the `skforecast` engine in a deterministic forecasting
 ---
 
-<!-- AUTO-GENERATED FILE. DO NOT EDIT MANUALLY. -->
-<!-- Source: tools/ai/llms-base.txt + tools/ai/ai_context_header.md -->
-<!-- Regenerate with: python tools/ai/generate_ai_context_files.py -->
+# skforecast-ai: conventions for coding agents
 
-# Skforecast — Development Context
+`skforecast-ai` wraps the `skforecast` engine in a deterministic forecasting
+assistant (`ForecastingAssistant`) with an optional LLM layer that explains
+decisions but never makes them. PyPI name `skforecast-ai`, import name
+`skforecast_ai`. This file is the entry point for any coding agent; the
+detailed docstring and testing rules live in `.github/instructions/` and are
+shared with the `skforecast` repository.
 
-## For Contributors Working Inside This Repository
+## Core principles
 
-### Testing
+1. Deterministic first, LLM second. Every forecasting decision (forecaster,
+   estimator, lags, metric, cross-validation) comes from rule-based code in
+   `recommendation/` and is reproducible without an LLM. The LLM explains,
+   refines lags and window features on request, and translates a
+   natural-language scenario into `TimeSeriesFold` parameters; its output is
+   always validated by a Pydantic model before it touches execution.
+2. The code you see is the code that ran. `forecast()` and `backtest()`
+   execute the same script that `forecast_code()` and `backtest_code()`
+   return (minus the CSV loading preamble). Rendering lives in `rendering/`,
+   execution in `execution/`; never let them drift apart.
+3. No silent automation. When something cannot be validated, warn or raise.
+   Degrade to a deterministic result only when that result is valid on its
+   own (`refine_plan()`, `create_cv()`); `ask()` raises `LLMCallError`
+   because it has no answer without the LLM.
+4. Privacy by default. Datasets never reach the LLM: profiles hold summary
+   statistics only. Results ship the values they own (predictions, metrics)
+   and `ask()` warns about it with `DataSentToLLMWarning` when
+   `send_data_to_llm=False`.
+5. Everything crossing a module boundary is a Pydantic model (`schemas/`),
+   and every result is a `DisplayMixin` (renders itself) and an
+   `ExplainableResult` (describes itself to the LLM).
+
+## Layout
+
+```
+skforecast_ai/
+  assistant.py        ForecastingAssistant: public facade, orchestration only
+  _utils.py           input resolution and validation helpers
+  _display.py         rich rendering shared by every result
+  schemas/            Pydantic models: profiles, plans, results, typed overrides
+  profiling/          deterministic data inspection (DataProfile)
+  recommendation/     rule engine: forecaster, estimator, lags, metric, CV
+  rendering/          script generation from a plan (one module per family)
+  execution/          runs rendered scripts; comparison helpers
+  llm/                pydantic-ai agents, prompts, context, skills, runtime
+  skills/, resources/ synced from skforecast (do not edit by hand)
+  cli.py              Typer CLI mirroring the Python API
+tests/                mirrors the package: tests_<subpackage>/, fixtures_*.py
+tools/                maintenance scripts; ask_context_reports/ keeps one
+                      reviewed ask() evaluation per release and dataset
+```
+
+## Python environment
+
+Before running any Python command (tests, scripts, notebooks, `pip install`)
+for the first time in a session, run `conda env list` and ask which
+environment to use. Do not assume the active environment. Once the user
+confirms an environment, reuse it for the rest of the session.
+
+## Commands
 
 ```bash
-pytest skforecast/recursive/tests/ -vv           # Run a specific module's tests
-pytest --cov=skforecast --cov-report=html         # Coverage report
-pytest -n auto                                    # Parallel execution (pytest-xdist)
+pytest -n auto                                   # full suite
+pytest tests/test_assistant_ask.py -q            # one file
+ruff check skforecast_ai tests                   # lint (must be clean; CI runs it)
+python tools/update_golden_llm_contexts.py       # regenerate LLM context goldens
+python tools/ask_context_check.py --dry-run      # ask() contexts, no LLM call
+PYTHONPATH=. mkdocs build -q -d /tmp/site        # docs build check
 ```
 
-Markers: `@pytest.mark.slow` for long-running tests (skip with `-m "not slow"`).
+## Code style
 
-### Code Style
+- PEP 8, max line length 88, enforced by ruff (`E`, `F`). Double quotes.
+- Type hints on every public function and method; `X | None`, `list[...]`.
+- Relative imports inside the package.
+- Aligned keyword arguments in long calls, as in skforecast
+  (`profile = self.profile(\n    data   = data,\n    target = target,\n)`).
+- NumPy-style docstrings on every public class, method and function. Follow
+  `.github/instructions/docstrings.instructions.md`: single backticks,
+  readable type names (`pandas DataFrame`), `name : type, default value`.
+- No en dashes or em dashes anywhere: code, comments, docstrings, string
+  literals, error messages, tests or documentation. Use commas, colons,
+  semicolons or parentheses. `tests/test_source_conventions.py` enforces it.
+- Comments explain why, not what. No emojis in source or messages.
+- pydantic-ai is the only LLM abstraction; never import a provider SDK.
+- Importing `skforecast_ai` must work without the `[llm]` extra: keep
+  pydantic-ai imports inside functions.
 
-- NumPy-style docstrings
-- Type hints for function signatures
-- PEP 8 compliant (max line length 88, enforced by ruff)
-- Double quotes for strings (ruff `quote-style = "double"`)
-- Relative imports within package
-- When generating code comments, docstrings, and documentation, do not use en dashes (–), or em dashes (—). Use commas, colons, semicolons, or parentheses for punctuation instead.
+## Testing
 
-### Dependencies
+Follow `.github/instructions/testing.instructions.md`. In short:
 
-Core: numpy>=1.26, pandas>=2.1,<3.0, scikit-learn>=1.4, scipy>=1.12, optuna>=4.0, joblib>=1.3, numba>=0.59, tqdm>=4.66, rich>=13.9
-Optional: statsmodels>=0.13,<0.15 (stats), matplotlib>=3.7,<3.11 + seaborn>=0.12,<0.14 (plotting), keras>=3.0,<4.0 (deep learning)
-
-### Python environment
-
-Before running any Python command (tests, scripts, notebooks, `pip install`, etc.)
-for the first time in a session, run `conda env list` and ask which environment to
-use. Do not assume the active environment. Once the user confirms an environment,
-reuse it for the rest of the session without asking again.
-
----
-
-# Skforecast — Complete API & Workflow Reference
-
-(The content below is the full `llms-base.txt` and applies to any user of skforecast)
-
-# Skforecast
-
-> Python library for time series forecasting using scikit-learn compatible models, statistical methods, and foundation models
-
-This document is for skforecast v0.23.0+. If you are using an older version, check the documentation at skforecast.org.
-
-Skforecast is a Python library for time series forecasting using scikit-learn compatible models, statistical methods, and foundation models. It works with any estimator compatible with the scikit-learn API (LightGBM, XGBoost, CatBoost, Keras, etc.).
-
-## Quick Info
-
-- Version: 0.23.0
-- License: BSD-3-Clause
-- Python: 3.10, 3.11, 3.12, 3.13, 3.14
-- Repository: https://github.com/skforecast/skforecast
-- Documentation: https://skforecast.org
-- PyPI: https://pypi.org/project/skforecast/
-
-## Installation
-
-```bash
-pip install skforecast
-```
-
-Optional dependencies:
-```bash
-pip install skforecast[stats]        # For ARIMA, SARIMAX, ETS models
-pip install skforecast[plotting]     # For visualization
-pip install skforecast[deeplearning] # For RNN/LSTM models
-```
-
-## Project Structure
-
-```
-skforecast/
-├── base/                    # ForecasterBase - abstract parent class for all forecasters
-├── recursive/               # ForecasterRecursive, ForecasterRecursiveMultiSeries,
-│                            # ForecasterRecursiveClassifier, ForecasterStats, ForecasterEquivalentDate
-├── direct/                  # ForecasterDirect, ForecasterDirectMultiVariate
-├── deep_learning/           # ForecasterRnn, create_and_compile_model
-├── foundation/              # FoundationModel, ForecasterFoundation
-│                            # (zero-shot: Chronos-2, TimesFM 2.5, Moirai-2, TabICL, TabPFN-TS, TFC-T0)
-├── stats/                   # Arima, Sarimax, Ets, Arar, acf, pacf, calculate_lag_autocorrelation
-├── preprocessing/           # TimeSeriesDifferentiator, RollingFeatures, CalendarFeatures,
-│                            # QuantileBinner, ConformalIntervalCalibrator, reshape_* functions
-├── model_selection/         # backtesting_forecaster, grid/random/bayesian search, TimeSeriesFold
-├── feature_selection/       # select_features, select_features_multiseries
-├── metrics/                 # MASE, RMSSE, sMAPE, CRPS, coverage, pinball loss
-├── datasets/                # 30+ built-in datasets (fetch_dataset, load_demo_dataset)
-├── drift_detection/         # RangeDriftDetector, PopulationDriftDetector
-├── utils/                   # Shared validation and transformation functions
-├── exceptions/              # Custom warnings and exceptions
-├── plot/                    # plot_residuals, plot_prediction_intervals, plot_prediction_distribution,
-│                            # plot_multivariate_time_series_corr, set_dark_theme, backtesting_gif_creator
-└── experimental/            # Experimental features (API may change)
-```
-
-### Module Relationships
-
-- **Forecasters inheriting from `ForecasterBase`**: ForecasterRecursive, ForecasterRecursiveMultiSeries, ForecasterRecursiveClassifier, ForecasterDirect, ForecasterDirectMultiVariate, ForecasterRnn
-- **Standalone forecasters (no inheritance)**: ForecasterStats, ForecasterEquivalentDate, ForecasterFoundation
-- Statistical models in `stats/` are wrapped by `ForecasterStats` (in `recursive/`)
-- `ForecasterFoundation` (in `foundation/`) wraps a `FoundationModel`, which delegates to an adapter class (`ChronosAdapter`, `TimesFMAdapter`, `MoiraiAdapter`, `TabICLAdapter`, `TabPFNAdapter`, `T0Adapter`) resolved from the HuggingFace `model_id`
+- One test file per public function or method, header `# Unit test <name>`.
+- Fixtures are module-level variables in `fixtures_<module>.py`.
+- Every test has a docstring saying what it verifies; names follow
+  `test_<method>_<scenario>` / `test_<method>_<ErrorType>_when_<condition>`.
+- Hardcoded expected values; `pd.testing` and `np.testing` for comparisons;
+  errors and warnings with `re.escape()` plus `pytest.raises(match=...)`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [skforecast/skforecast-ai](https://github.com/skforecast/skforecast-ai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
