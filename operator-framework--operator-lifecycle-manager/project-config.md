@@ -1,93 +1,66 @@
 ---
 trigger: always_on
-description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Agent Guide for opentelemetry-go
+# CLAUDE.md
 
-This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
-Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
+## What this is
 
-## Core expectations
+`counterfeiter` is a CLI (module `github.com/maxbrunsfeld/counterfeiter/v6`) that generates Go test doubles ("fakes") for interfaces, function types, and whole packages. It is typically invoked via `//go:generate` directives. Requires Go modules; CI runs on `stable` and `oldstable` Go on Linux and Windows.
 
-- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
-- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
-- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
-- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
-- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
-- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
-- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
-- Keep dependencies minimal and justified.
-- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
-- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
-- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
+## Commands
 
-## Default workflow
+Full CI pipeline (vet → regenerate fakes → verify clean git tree → tests):
 
-For new features and behavior changes, use this order unless the task explicitly says otherwise:
+```shell
+./scripts/ci.sh          # Linux/macOS
+.\scripts\ci.ps1         # Windows
+```
 
-1. Read the relevant package, its tests, and any package docs or `README.md`.
-2. Add or update a failing unit test that captures the required behavior or regression.
-3. Implement the smallest change that makes the test pass.
-4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
-5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
-6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
-7. Run `make precommit` each time before considering the work complete.
+Individual steps:
 
-For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
+```shell
+go vet ./...
+go generate ./...                  # regenerate all fakes under fixtures/ (directives use `go run`, so no install needed)
+./scripts/checkclean.sh            # fail if regenerated fakes differ from committed ones
+./scripts/cleanfakes.sh            # delete every */*fakes/fake*.go (then `go generate ./...` to rebuild)
+go test -race . ./fixtures/...   # packages that exercise fakes or the generator concurrently
+go test ./arguments/ ./command/ ./generator/ ./integration/
+```
 
-## Verification
+Run a single package's tests or a single spec. Tests use `sclevine/spec` + `gomega`; spec names are nested, so match with a regex on the top-level test function and the spec path:
 
-- Use `make` as the canonical repository verification command. The default target is `precommit`.
-- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
-- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
-- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
+```shell
+go test ./generator/ -run TestGenerator
+go test ./integration/ -run 'TestIntegration/round_trip_as_module/working_with_a_module'
+go test ./arguments/ -run TestParsingArguments -v
+go test ./command/ -run TestRunner
+go test -run TestFakes .                           # generated_fakes_test.go at repo root
+go test -race -run TestConcurrency .              # concurrency_test.go at repo root; only meaningful with -race
+go test -bench . -benchmem .                       # benchmark_test.go at repo root
+```
 
-## Documentation and changelog
+Debug env vars: `COUNTERFEITER_DEBUG=1` enables log output; `COUNTERFEITER_DISABLECACHE=1` bypasses the package-load cache; `COUNTERFEITER_PROFILE=1` writes `counterfeiter.profile`; `COUNTERFEITER_NO_GENERATE_WARNING=1` silences the "use -generate" warning. In tests, `log.SetOutput(io.Discard)` is set in the top-level test functions — comment it out to see generator logs.
 
-- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
-- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
-- Prefer examples over long code snippets in GoDoc when practical.
-- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
-- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
+## Architecture
 
-## Repository habits
+Pipeline for one run (`main.go` is intentionally thin and should stay that way):
 
-- Prefer focused diffs. Avoid drive-by cleanup.
-- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
-- Generated files are checked in. If your change affects generation, keep generated output up to date.
-- Prefer fast local search tools such as `rg` when exploring the repository.
-- When changing behavior, make the invariants explicit in tests.
+1. **`command.Detect`** (`command/runner.go`) turns the process into a list of `Invocation`s. In normal mode that is the single CLI invocation (it reads `GOFILE`/`GOLINE` from `go generate`). In `-generate` mode it scans every `.go` file in the cwd package for lines starting with `//counterfeiter:generate ` and builds one invocation per line. This is why `-generate` is much faster than many `//go:generate` lines: one process, one package load.
+2. **`arguments.New`** (`arguments/parser.go`) parses each invocation's flags and positional args into `ParsedArguments`: source package dir, package path, interface name, fake name (`Fake` + exported interface name), output path (default `<pkgdir>/<pkg>fakes/fake_<snake_case>.go`), destination package name, and modes (`-p` package mode, `-` print to stdout, `-q`, `-header`). A `-header` on the top-level `-generate` line is inherited by directives that lack one (handled in `main.go`).
+3. **`generator.NewFake`** (`generator/fake.go`) loads packages with `golang.org/x/tools/go/packages` (`loader.go`), finds the target `types.TypeName` (`findPackage`), and populates the `Fake` struct: `Methods` (from `interface_loader.go` / `package_loader.go`) or a single `Function` (`function_loader.go`), `Params`/`Returns` (`param.go`, `return.go`), and `Imports`.
+4. **`Fake.Generate`** executes one of three `text/template`s — `interface_template.go`, `function_template.go`, `package_template.go` — then runs `goimports` (`imports.Process`) on the output. `main.go` runs `go/format` again and writes the file.
 
-## Personas
+Key supporting pieces:
 
-### Feature Agent
-
-Use this persona for new behavior, new API surface, or spec-driven feature work.
-
-- Start with a failing unit test.
-- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
-- Implement the smallest viable change.
-- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
-- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
-
-### Refactoring Agent
-
-Use this persona when improving structure without intentionally changing behavior.
-
-- Treat behavior preservation as the default contract.
-- Add or tighten tests before moving code if current behavior is not already pinned down.
-- Avoid broad rewrites, clever abstractions, or package-wide cleanup unless explicitly requested.
-- If a refactor touches a hot path, benchmark before and after.
-- Keep API shape, semantics, concurrency guarantees, and failure modes unchanged unless the task says otherwise.
-
-### Test Agent
-
+- **`generator.Imports`** (`import.go`) dedupes imports by package path and guarantees unique aliases (appends `a`, `b`, … on collision). `addImportsFor` in `loader.go` walks `types.Type` recursively to collect every package a fake needs; add a case there when a new `types.Type` kind shows up (it logs `!!! WARNING: Missing case`).
+- **Generics**: `findPackage` / `getGenericTypeData` (`loader.go`) extract type params/constraints into `GenericTypeParameters*` strings used by the template. The compile-time assertion for a generic fake is emitted inside a blank generic func (`func _[T C]() { var _ pkg.I[T] = new(FakeI[T]) }`) so any constraint kind works. A target that is itself a constraint interface (unions or `~T`) is rejected up front because it cannot be implemented.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [operator-framework/operator-lifecycle-manager](https://github.com/operator-framework/operator-lifecycle-manager) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
