@@ -1,95 +1,125 @@
 ---
 trigger: always_on
-description: - **Build**: `npm run build` (Next.js 16 + Turbopack)
+description: > This document is mainly for agents and LLMs to follow when implementing
 ---
 
-# Reach — Project Notes
+# React View Transitions
 
-## Build & Deploy
+**Version 1.0.0**
+Vercel Engineering
+March 2026
 
-- **Build**: `npm run build` (Next.js 16 + Turbopack)
-- **Deploy to Vercel**: `vercel build --prod && vercel deploy --prebuilt --prod`
-- **Node runtime**: several `/api/*` routes require `export const runtime = 'nodejs'` because they rely on Node.js fetch streaming / S3 / PostgreSQL.
+> **Note:**
+> This document is mainly for agents and LLMs to follow when implementing
+> view transitions in React applications. Humans may also find it useful,
+> but guidance here is optimized for automation and consistency by
+> AI-assisted workflows.
 
-## Self-Authored Articles
+---
 
-The site publishes original articles alongside mirrors — see
-`docs/article-publishing.md` for the full picture. Key facts for anyone touching
-adjacent code:
+## Abstract
 
-- Articles live in `content_items` with `type='article'` and are reachable at
-  the public `/p/<slug>` URL (no access control, no expiry) rather than the
-  mirror's `/s/<token>`. Article-only columns (`slug`, `status`, `excerpt`,
-  `cover_image_url`, `updated_at`, `comments_enabled`) are all nullable.
-- **Any query over `content_items` now needs a type scope.** Use `isArticle` /
-  `isNotArticle` from `lib/article/queries.ts`. `isNotArticle` deliberately
-  keeps `type IS NULL` rows — early mirrors predate the column, and a bare
-  `ne(type,'article')` silently drops them.
-- Visitor comments go to `article_comments`, not `comments` (which stays the
-  platform-scraped mirror table).
-- The archive lives at `/post`; individual articles stay at `/p/<slug>` (a
-  permanent redirect covers the old bare `/p`). Articles with `listed=false`
-  are readable at their URL but excluded from the archive — use
-  `listPublishedArticles(limit, includeUnlisted)` when that matters.
-- Article slugs are random lowercase ASCII. They used to be derived from the
-  title, which produced CJK slugs — and Next hands dynamic segments to the page
-  **still percent-encoded**, so `测试1` arrived as `%E6%B5%8B%E8%AF%951`, missed
-  the lookup, and the article 404'd while still listing on `/p`. `/p/[slug]`
-  decodes params for that reason; don't remove it, older articles rely on it.
-- Article media is uploaded browser → storage directly, never through a Route
-  Handler (Vercel's ~4.5MB body cap). Videos need CORS on the R2/S3 bucket —
-  the rule must include `AllowedHeaders: ["content-type"]`, or the preflight is
-  rejected and every upload fails in the browser.
-- Remote import ("从链接转存") is the only place a user-supplied hostname
-  reaches the server's network stack. It must go through
-  `lib/article/remote-fetch.ts`, which rejects non-http schemes and any host
-  resolving to a private/loopback/link-local address, and re-validates every
-  redirect hop. Do not swap it for a plain `fetch` with `redirect: 'follow'` —
-  that validates only the first URL. The resolver walks up to 4 HTML pages
-  (embedded media URL → meta-refresh/JS redirect → the AI fallback in
-  `lib/article/ai-resolver.ts`, off by default); **anything the model returns is
-  remote input and goes back through the same validation** before it is fetched.
-- The transfer itself lives in `lib/article/remote-import.ts` and reports stages
-  through a callback. `/api/article-import` streams those as NDJSON so the
-  editor can show per-item progress; the `importRemoteMedia` Server Action calls
-  the same function and just awaits the result. A stream that ends without a
-  `done` event is a failure, not a success — that is what a Vercel function
-  timeout looks like from the browser.
-- `/api/article-media` is the single entry point for article media: it decides
-  both access (public asset → open; otherwise a signed `?t=` token from the
-  rendered page, or an admin session) and delivery (stream vs 302 to a
-  presigned storage URL, per `article_media_direct`). Pages emit only that
-  path — don't reintroduce URL rewriting on the page side.
-- Direct delivery redirects to a **presigned** S3 GET, so the bucket does not
-  need public read.
-- The 「插入素材」 panel's 素材库 tab lists **every** article asset, not the open
-  article's. That is the point: an asset uploaded into another article (or one
-  whose article no longer references it) is otherwise unreachable. Nothing in
-  the access path is scoped by owning article — `findGatedMediaIds` signs by
-  media id and the route checks `shared`/token/session — so cross-article
-  references render correctly. Don't add an owner check there without also
-  killing this tab.
-- Which assets are still in use is derived by scanning article text for
-  `/api/article-media/<id>.<ext>`, not from a join table — the author edits
-  Markdown freely and no API sees those edits. `lib/article/assets.ts` owns
-  that; the cleanup path re-scans before deleting and skips uploads younger
-  than 24h.
-- Markdown bodies are rendered **without** raw HTML (no `rehype-raw`). Don't add
-  it without a reason — it reopens the injection surface.
-- Password gate (`lib/content/password.ts`) covers articles and mirrors: per-item
-  mode none/inherit/custom, unlock scoped by password hash via an HMAC cookie.
-  On mirrors it must run **before** `checkAccess`, which is what consumes a view
-  and burns a one-shot link.
-- `checkAccess` mutates (view count, burn); `peekAccess` is the read-only twin.
-  Anything running per-request before the visitor sees the page — notably
-  `generateMetadata` — must use peek, or it spends a view for the title alone.
+Guide for implementing smooth, native-feeling animations using React's View Transition API. Covers the `<ViewTransition>` component, `addTransitionType`, CSS view transition pseudo-elements, shared element transitions, Suspense reveals, list reorder, directional navigation, and Next.js integration. Includes a step-by-step implementation workflow, ready-to-use CSS animation recipes, and common mistake warnings.
 
-## Video proxy health check
+---
 
-`probeVideoProxy` (`lib/health/checks.ts`) asks the proxy's own `/healthz` (then
+## Table of Contents
+
+1. [Core Reference](#when-to-animate)
+   - [When to Animate](#when-to-animate)
+   - [Availability](#availability)
+   - [Core Concepts](#core-concepts)
+   - [Styling with View Transition Classes](#styling-with-view-transition-classes)
+   - [Transition Types](#transition-types)
+   - [Shared Element Transitions](#shared-element-transitions)
+   - [Common Patterns](#common-patterns)
+   - [How Multiple VTs Interact](#how-multiple-vts-interact)
+   - [Next.js Integration](#nextjs-integration)
+   - [Accessibility](#accessibility)
+2. [Implementation Workflow](#implementation-workflow)
+   - [Step 1: Audit the App](#step-1-audit-the-app)
+   - [Step 2: Add CSS Recipes](#step-2-add-css-recipes)
+   - [Step 3: Isolate Persistent Elements](#step-3-isolate-persistent-elements)
+   - [Step 4: Add Directional Page Transitions](#step-4-add-directional-page-transitions)
+   - [Step 5: Add Suspense Reveals](#step-5-add-suspense-reveals)
+   - [Step 6: Add Shared Element Transitions](#step-6-add-shared-element-transitions)
+   - [Step 7: Verify Each Navigation Path](#step-7-verify-each-navigation-path)
+   - [Common Mistakes](#common-mistakes)
+3. [Patterns and Guidelines](#patterns-and-guidelines)
+4. [CSS Animation Recipes](#css-animation-recipes)
+5. [View Transitions in Next.js](#view-transitions-in-nextjs)
+
+---
+
+Animate between UI states using the browser's native `document.startViewTransition`. Declare *what* with `<ViewTransition>`, trigger *when* with `startTransition` / `useDeferredValue` / `Suspense`, control *how* with CSS classes. Unsupported browsers skip animations gracefully.
+
+## When to Animate
+
+Every `<ViewTransition>` should communicate a spatial relationship or continuity. If you can't articulate what it communicates, don't add it.
+
+Implement **all** applicable patterns from this list, in this order:
+
+| Priority | Pattern | What it communicates |
+|----------|---------|---------------------|
+| 1 | **Shared element** (`name`) | "Same thing — going deeper" |
+| 2 | **Suspense reveal** | "Data loaded" |
+| 3 | **List identity** (per-item `key`) | "Same items, new arrangement" |
+| 4 | **State change** (`enter`/`exit`) | "Something appeared/disappeared" |
+| 5 | **Route change** (layout-level) | "Going to a new place" |
+
+This is an implementation order, not a "pick one" list. Implement every pattern that fits the app. Only skip a pattern if the app has no use case for it.
+
+### Choosing Animation Style
+
+| Context | Animation | Why |
+|---------|-----------|-----|
+| Hierarchical navigation (list → detail) | Type-keyed `nav-forward` / `nav-back` | Communicates spatial depth |
+| Lateral navigation (tab-to-tab) | Bare `<ViewTransition>` (fade) or `default="none"` | No depth to communicate |
+| Suspense reveal | `enter`/`exit` string props | Content arriving |
+| Revalidation / background refresh | `default="none"` | Silent — no animation needed |
+
+Reserve directional slides for hierarchical navigation (list → detail) and ordered sequences (prev/next photo, carousel, paginated results). For ordered sequences, the direction communicates position: "next" slides from right, "previous" from left. Lateral/unordered navigation (tab-to-tab) should not use directional slides — it falsely implies spatial depth.
+
+---
+
+## Availability
+
+- **Next.js:** Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
+- **Without Next.js:** Install `react@canary react-dom@canary` (`ViewTransition` is not in stable React).
+- Browser support: Chromium 111+, Firefox 144+, Safari 18.2+. Graceful degradation.
+
+---
+
+## Core Concepts
+
+### The `<ViewTransition>` Component
+
+```jsx
+import { ViewTransition } from 'react';
+
+<ViewTransition>
+  <Component />
+</ViewTransition>
+```
+
+React auto-assigns a unique `view-transition-name` and calls `document.startViewTransition` behind the scenes. Never call `startViewTransition` yourself.
+
+### Animation Triggers
+
+| Trigger | When it fires |
+|---------|--------------|
+| **enter** | VT first inserted during a Transition |
+| **exit** | VT first removed during a Transition |
+| **update** | DOM mutations inside a VT. With nested VTs, mutation applies to the innermost one |
+| **share** | Named VT unmounts and another with same `name` mounts in same Transition |
+
+Only `startTransition`, `useDeferredValue`, or `Suspense` activate VTs. Regular `setState` does not animate.
+
+### Critical Placement Rule
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [fujioky/reach](https://github.com/fujioky/reach) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-12 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
