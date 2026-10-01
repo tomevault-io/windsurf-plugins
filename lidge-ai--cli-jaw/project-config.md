@@ -1,33 +1,40 @@
 ---
 trigger: always_on
-description: > 📚 [INDEX](INDEX.md) · [Sync Checklist](AGENTS.md) · [Commands](commands.md) · [Server API](server_api.md) · [Stream Events](stream-events.md) · [str_func](str_func.md)
+description: - The canonical desktop release workflow must Developer ID-sign macOS with Team `U9ATA49N28`, notarize, staple, verify the final app, and verify channel metadata plus the update ZIP SHA-512 before upload. `electron:dist:mac:signed` is the equivalent opt-in local path; ordinary `electron:dist:mac` remains ad-hoc. Windows remains unsigned. Keep README and `structure/infra.md` aligned; fixture tests do not prove a signed/notarized artifact, and the first signed release is a manual-DMG bootstrap bef
 ---
 
-> 📚 [INDEX](INDEX.md) · [Sync Checklist](AGENTS.md) · [Commands](commands.md) · [Server API](server_api.md) · [Stream Events](stream-events.md) · [str_func](str_func.md)
+# CLI-JAW Claude Guide
 
-# structure/ — Sync Guide
+- The canonical desktop release workflow must Developer ID-sign macOS with Team `U9ATA49N28`, notarize, staple, verify the final app, and verify channel metadata plus the update ZIP SHA-512 before upload. `electron:dist:mac:signed` is the equivalent opt-in local path; ordinary `electron:dist:mac` remains ad-hoc. Windows remains unsigned. Keep README and `structure/infra.md` aligned; fixture tests do not prove a signed/notarized artifact, and the first signed release is a manual-DMG bootstrap before in-app updates can be trusted.
 
-- The canonical desktop release workflow must Developer ID-sign macOS with Team `U9ATA49N28`, notarize, staple, verify the final app, and verify channel metadata plus the update ZIP SHA-512 before upload. `electron:dist:mac:signed` is the equivalent opt-in local path; ordinary `electron:dist:mac` remains ad-hoc. Windows remains unsigned. Keep README and `infra.md` aligned; fixture tests do not prove a signed/notarized artifact, and the first signed release is a manual-DMG bootstrap before in-app updates can be trusted.
+This repository is a Node.js ESM orchestration runtime for boss/employee dispatch, Web UI, browser/CDP automation, Telegram/Discord/Slack channels, memory, heartbeat, and PABCD orchestration.
 
-- Auto (`permissions:auto`) grants qualified direct-local Jaw API authority across supported runtimes, independently of per-turn secrets. Keep actual/effective loopback, exact browser origin, proxy provenance, explicit outbound destinations and server-only resource options. Safe/custom keep existing scoped/operator paths; full API authority is instance-wide, distinct from provider Safe and task scope. Preserve no-descendant/read-only assignments, captured worker context and honest capability/receipt evidence. See `../docs/slack-tools.md` and `server_api.md`.
-- Slack group DMs use `message.mpim`, which requires `mpim:history` — without it group DMs do not arrive at all; existing IM/channel installs keep working and merely report the optional capability gap. Exact `channel_type: mpim` mentions retain channel allowlist and thread policy, never the one-to-one DM bypass. an absent scope header is unknown and a present empty header is a known empty grant. Keep `telegram.md` and the validation API docs synchronized.
+The `/api/code` API owns isolated Codex/Claude/Cursor/Grok sessions through `src/code-mode/host.ts`. Use its dedicated store, native adapters and captured turn/resource ownership; keep full snapshots, compact replay and byte limits synchronized with the runtime and API architecture docs. Claude conversation rollback is the one replay carve-out: removed items and their events are deleted, replay below the replay floor answers `invalid_sequence`, and a higher `historyGeneration` requires a new snapshot.
 
-- Native Code: synchronize `runtime-integration.md`, `server_api.md`, `INDEX.md` and root guides for `src/code-mode/` and `/api/code`. Code uses separate per-backend storage and direct native adapters; preserve append/status replay, complete active snapshots, byte budgets, early resource registration and physical-exit proof. Interruption must seal callbacks before owner-checked accepted-buffer persistence; both hosts use `src/routes/code-body-parser.ts` for Code envelope/decoded limits. Compact replay has one carve-out: a Claude rollback deletes the removed items and their events, so replay from below its `replay_floor_sequence` answers `invalid_sequence` and a higher `historyGeneration` means a new snapshot. Private prompt boundaries never reach the wire, the fork is verified before one CAS commit, and the source native session is never changed.
+Native Code interruption seals callbacks before persisting accepted buffered content under the captured store owner. Worker and Manager share the Code JSON body policy in `src/routes/code-body-parser.ts` (1MiB decoded prompt, 6MiB + 4KiB envelope); generic API limits stay separate. Settings navigation guards the drafts actually being discarded, including keyboard and desktop subscriptions.
 
-- Linux `/api/file/open` acknowledges asynchronous `xdg-open` launch, not desktop application success. Keep detached/ignored-stdio dispatch and launch-error handling; never wait synchronously for the opener. See `server_api.md`.
+## Documentation Map
 
-- Sidecar build/smoke: sync `infra.md` and root notes for transactional source/stage/lock ownership, runtime-candidate/seal matching, outside-checkout target-Node execution, preserved asset/prune/native/no-JWC gates and explicit retained evidence/cleanup. Ordinary import, live server readiness and final packaged native UI are separate proofs; no timeout or skipped green.
+- Start at `structure/INDEX.md` for the current architecture map.
+- Architecture contract notes live in `structure/AGENTS.md` §Root contract notes.
+- Workbench modernization uses a one-row Activity header with Codex-style expanded rows/groups; the Workbench Settings tab is replaced by a ZCode-style full settings page that swaps the workspace (header gear / Meta+,, `← Back to workspace`, grouped icon nav, card content), persisted as Manager registry `ui.instanceSettingsOpen`. A unified settings registry separates Instance/Manager scopes and the same page is served standalone from `dist/settings` behind the Classic header gear (the right-panel 설정 tab is gone); Classic uses the t3 token shell. Preserve per-page save owners, dirty guards, Preview iframe identity and independent live Requests; see `structure/frontend.md`.
+- Keep `README.md`, `AGENTS.md`, this file, and `structure/AGENTS.md` aligned when command/API/orchestration behavior changes. Concurrent inbound gateway changes belong in `structure/INDEX.md`, `structure/infra.md`, `structure/telegram.md`, and the messaging runtime docs.
+- `docs/` and `structure/` contain public product documentation only. Private plans, audits, evidence, and history belong only in a separate sibling clone of [cli-jaw-internal](https://github.com/lidge-jun/cli-jaw-internal); request access through an [issue](https://github.com/lidge-ai/cli-jaw/issues).
+- Never create private records inside this checkout, including `devlog`, `_plan`, `_fin`, or `.jwc` aliases at any depth. This overrides generic skill defaults. Do not include private record paths in public docs or source.
+- Before public pushes, check the index with `npm run check:private-boundary` and outgoing commit trees with `node scripts/check-private-boundary.mjs --range <remote-base> HEAD`; enable the checkout-local pre-push hook as described in [CONTRIBUTING.md](CONTRIBUTING.md#local-private-path-check). Review content separately. CI runs after upload and cannot prevent initial disclosure.
 
-- Isolated desktop QA: `src/shared/isolated-qa.ts` owns opt-in role paths/strict ports/child env; Electron, dashboard CLI and Manager enforce the captured launch policy before their owned side effects. Keep the supervisor-before-import boundary, no global registration/installer or foreign scan/peer/lifecycle actions, normal-mode compatibility and lifetime-safe QA cleanup explicit in `infra.md` and root docs. Do not conflate mocked/compiled launch checks with final packaged native UI proof.
+- Manager sidebar selection and Sessions/Stop/Open use separate interactive targets. Keep list navigation scoped to the focused row selector, stable session-disclosure links, and preferred width separate from viewport clamping. Pointer and keyboard resize completion persist the latest value; see `structure/frontend.md`.
+- Manager terminal presentation preserves backend PTY ownership across hide/unmount. Keep hydration-first bounded creation, explicit recovery, stable tab identity and focus ownership separate from native Code API sessions; theme updates must not recreate shells. See `structure/frontend.md`.
 
-- Keep this folder aligned with the live `cli-jaw` tree; `INDEX.md` lists the public architecture docs and support tools.
-- Private plans, audits, evidence, and history belong only in a separate sibling clone of [cli-jaw-internal](https://github.com/lidge-jun/cli-jaw-internal); request access through an [issue](https://github.com/lidge-ai/cli-jaw/issues). Never create private records inside this checkout, including `devlog`, `_plan`, `_fin`, or `.jwc` aliases at any depth, even when generic skill defaults suggest them. `docs/` and `structure/` are for public product documentation; omit private record paths from public docs and source.
-- Update `INDEX.md` whenever a doc is added, removed, renamed, or re-scoped. Keep the doc map, tier list, and quick links in sync.
-- Update `str_func.md` file-tree entries when files are added, removed or renamed in `server.ts`, `src/routes/*`, `src/cli/handlers*.ts`, `src/cli/api-auth.ts`, `src/manager/*` (multi-instance dashboard), `bin/commands/*`, `bin/star-prompt.ts`, `tests/`, `public/`, or generated-dist exclusions change. `verify-counts.sh` checks that every file-tree entry in `str_func.md` points at a real file (it records no line counts).
-- `stream-events.md` is the SSE/WS/event-trace companion for `frontend.md`, `server_api.md`, and the ProcessBlock pipeline. Keep `GET /api/events`, replay behavior, and fallback WS current.
+## Build & Deploy Contract
+
+- The running server executes compiled `dist/` (`jaw serve` → `dist/server.js`), never the TS sources. After changing `server.ts`/`src/**`/`bin/**`, run `npm run build` before telling anyone to restart; frontend changes additionally need `npm run build:frontend`. Full rules: `AGENTS.md` § Build & Deploy Contract.
+
+## Current Runtime Notes
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lidge-ai/cli-jaw](https://github.com/lidge-ai/cli-jaw) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
