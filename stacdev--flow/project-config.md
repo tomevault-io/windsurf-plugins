@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
 
@@ -29,6 +29,8 @@ The theme, the conversation components (message, thread, streaming text, actions
 
 ## Commands
 
+**Don't write tests for now.** `packages/flow_ui` has no `test/` yet: the component surface is still being reshaped design-first, so tests written now would mostly encode values about to change. Verify a change with `flutter analyze` and by exercising it in the `playground/` app, not by adding a test file. If something seems to genuinely need one, say so and let the user decide.
+
 **Don't write comments unless asked.** No doc comments, file headers or inline explanations in new or edited code; the code and the commit message carry the intent. The one exception is a comment a lint requires (for example `document_ignores` above an `// ignore`), kept to one line. Public API dartdoc is written only when the user asks for it.
 
 From the repo root:
@@ -51,12 +53,9 @@ flutter run -d chrome    # or any device
 
 ## SDK package
 
-`packages/stacflow` is the StacFlow SDK: `StacFlowChat` (the controller) and `StacFlowChatView` on flow_ui, wired to Gemini, OpenAI and Claude with the developer's own key. One entrypoint, `package:stacflow/stacflow.dart`, which also re-exports flow_ui. Layout: `src/chat` (controller, state, view, and the flow_ui-to-wire reduction in `wire_history.dart`), `src/transport` (the `TurnTransport` seam, `TurnRequest` and the wire types, ids, the SSE parser; pure Dart), `src/providers` (the interface, the shared HTTP runner, one adapter per provider; pure Dart), `src/tools` (`Tool`, the call records and `runToolLoop`, the client-side tool loop shared by the controller and the smoke script; pure Dart). Rules:
-
-- `stacflow` depends on `flow_ui`, never the reverse (CI grep).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [StacDev/flow](https://github.com/StacDev/flow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
