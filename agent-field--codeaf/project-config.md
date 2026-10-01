@@ -99,4 +99,4 @@ for, and it is the one thing `git log` cannot tell you. They do not say what
 
 ---
 > Source: [Agent-Field/CodeAF](https://github.com/Agent-Field/CodeAF) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
