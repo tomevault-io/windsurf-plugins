@@ -1,118 +1,141 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: **Category 3 (programmatic).** 100% reliable when implemented.
 ---
 
-# CLAUDE.md
+# Google Gemini CLI / Gemini Code Assist — programmatic prepend
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Category 3 (programmatic).** 100% reliable when implemented.
 
-## Required Reading at Session Start (AI agents)
+Google's Gemini CLI is the reference command-line entry point for the
+Gemini API and Gemini Code Assist. There is no documented session-start
+hook today, and MCP support is not native (the CLI is partially
+OpenAI-API-compatible in some variants but not an MCP host). The
+integration is at the application boundary: shell out to `ai-memory boot`
+and prepend the result to the system instruction (or the first message
+of the conversation when no system slot exists).
 
-Before proposing any change to this repository, load the following into context:
+> **Cross-reference — using Gemini as ai-memory's own LLM backend?** That's the inverse direction (ai-memory's smart/autonomous tiers calling out to Gemini for query expansion / auto-tag / contradiction detection). Post-[#1146](https://github.com/alphaonedev/ai-memory-mcp/issues/1146) (v0.7.0) the recommended path is a `[llm]` section in `~/.config/ai-memory/config.toml` (`backend = "gemini"`, `model = "gemini-2.0-flash"`, `api_key_env = "GEMINI_API_KEY"`); see [`../CONFIG_SCHEMA.md`](../CONFIG_SCHEMA.html) for the canonical schema and [`llm-backends.md` § Google Gemini](llm-backends.html#google-gemini) for the override env-block recipe. The shell-out pattern below uses Gemini as the AI client; that's a separate concern.
 
-- [`docs/AI_DEVELOPER_WORKFLOW.md`](docs/AI_DEVELOPER_WORKFLOW.md) — the eight-phase
-  workflow every AI session must follow (recall → plan → branch → implement → gates →
-  self-review → PR → handoff).
-- [`docs/AI_DEVELOPER_GOVERNANCE.md`](docs/AI_DEVELOPER_GOVERNANCE.md) — authority
-  classes (Trivial / Standard / Sensitive / Restricted), attribution rules, security
-  policy, memory governance, and the hard prohibitions you must never violate.
-- [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) — code, test,
-  security, and release standards.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor procedures.
+The canonical Rust-native cross-platform replacement for the wrapper
+script below is `ai-memory wrap gemini` (PR-6 of issue #487) — same
+semantics, no shell required, works on Windows / Docker / Kubernetes.
 
-### Loading project memory at session start
+## Wrapper script
 
-The mechanical guarantee is the SessionStart hook documented in
-[`docs/integrations/claude-code.md`](docs/integrations/claude-code.md).
-Install it once; every fresh Claude Code session boots with relevant
-memory context already in the system prompt — no model proactivity
-required. See the full agent matrix in
-[`docs/integrations/README.md`](docs/integrations/README.md).
-
-If the hook is not installed (cold-start fallback), call
-`memory_session_start` followed by `memory_recall <task topic>` before
-responding. Text directives are best-effort; the hook is the load-bearing
-mechanism. See [issue #487](https://github.com/alphaonedev/ai-memory-mcp/issues/487)
-for the RCA.
-
-Default namespace for this repo is `ai-memory-mcp`.
-
-Every commit you author must end with a `Co-Authored-By:` trailer naming the model.
-Every PR you open must include the **AI involvement** section described in
-[`AI_DEVELOPER_WORKFLOW.md` §8.2](docs/AI_DEVELOPER_WORKFLOW.md).
-
-## Build & Test Commands
+Save as `~/.local/bin/gemini-with-memory` and make it executable:
 
 ```bash
-cargo build                    # Debug build
-cargo build --release          # Release build (thin LTO, stripped)
+#!/usr/bin/env bash
+# Wraps `gemini` (Google Gemini CLI) with ai-memory boot context on the
+# system instruction. Recipe shown in bash for clarity; PR-6 of issue
+# #487 ships an `ai-memory wrap gemini` Rust subcommand with identical
+# semantics.
+set -euo pipefail
 
-# All four gates must pass before PR submission:
-cargo fmt --check
-cargo clippy -- -D warnings -D clippy::all -D clippy::pedantic
-AI_MEMORY_NO_CONFIG=1 cargo test
-cargo audit
+BOOT_CONTEXT=$(ai-memory boot --quiet --no-header --format text --limit 10 || true)
 
-# Run a single test
-AI_MEMORY_NO_CONFIG=1 cargo test test_name
+# Some Gemini CLI builds accept --system, others use GEMINI_SYSTEM_INSTRUCTION
+# env var or a -s short form. Check `gemini --help` to confirm. The
+# OpenAI-compatible variants accept --system verbatim.
+if [[ -n "$BOOT_CONTEXT" ]]; then
+  PREAMBLE="You have access to ai-memory. Recent context follows; reference it when relevant to the request."
+  exec gemini --system "${PREAMBLE}
 
-# Benchmarks
-cargo bench --bench recall
+${BOOT_CONTEXT}" "$@"
+else
+  exec gemini "$@"
+fi
 ```
 
-`AI_MEMORY_NO_CONFIG=1` prevents loading user config which may trigger embedder/LLM initialization during tests.
-
-## Dogfooding release branches
-
-Every `release/v0.6.x.y` branch should be dogfooded by the maintainer for at least 24h before tag-cut so any migration / capability / wire-format regression surfaces in real use, not just CI. The script that does this on this node:
+Then alias `gemini` to this wrapper, or invoke `gemini-with-memory`
+instead. For the Rust-native version (no shell, works on Windows):
 
 ```bash
-scripts/dogfood-rebuild.sh
+ai-memory wrap gemini -- <gemini args>
 ```
 
-What it does (idempotent — safe to re-run after every commit):
-1. `cargo build --release`
-2. Backs up the live MCP DB to `/tmp/ai-memory-dogfood-test-<ts>.db`
-3. Dry-runs migrations against the backup (proves v17→v18→v19 etc. round-trip cleanly on real data)
-4. Re-points `/opt/homebrew/bin/ai-memory` → `target/release/ai-memory` (via `brew unlink` + symlink)
-5. Lists running MCP processes that need a Claude Code restart to pick up the new binary
+## Programmatic — Gemini API directly
 
-What it does NOT do:
-- Touch the live DB (migrations only run when an actual ai-memory process opens it on the next MCP restart)
-- Kill the running MCP (would self-DOS the in-flight Claude Code session)
-- Bump `Cargo.toml` version (that's a tag-cut concern)
+If you are calling the Gemini API from your own application (Python, Go,
+TypeScript, etc.), prepend the boot context to `system_instruction` on
+session start:
 
-Reverting to the brew-managed binary: `brew link --overwrite ai-memory`.
+```python
+import subprocess
+import google.generativeai as genai
 
-## Architecture
+def boot_context() -> str:
+    try:
+        return subprocess.check_output(
+            ["ai-memory", "boot", "--quiet", "--no-header",
+             "--format", "text", "--limit", "10"],
+            text=True,
+        ).strip()
+    except Exception:
+        return ""
 
-**ai-memory** is a Rust-based persistent memory system exposing three interfaces over a shared SQLite database layer:
+memory = boot_context()
+system_instruction = "You are a helpful assistant."
+if memory:
+    system_instruction += f"\n\n## Recent context (ai-memory)\n{memory}\n"
 
-1. **MCP Server** (`src/mcp.rs`) — stdio JSON-RPC 2.0 with 43 tools + 2 prompts
-2. **HTTP API** (`src/handlers.rs`) — Axum REST server on port 9077, 50 endpoints at `/api/v1/`
-3. **CLI** (`src/main.rs`) — clap-based, 40 subcommands with optional `--json` output
+model = genai.GenerativeModel(
+    model_name="gemini-2.0-flash",
+    system_instruction=system_instruction,
+)
+response = model.generate_content(user_message)
+```
 
-All three interfaces share the same database (`src/db.rs`) and validation (`src/validate.rs`) layers. Shared state is `Arc<Mutex<(Connection, PathBuf, ResolvedTtl, bool)>>` — a single SQLite connection protected by a mutex. Lock contention is the bottleneck under concurrent HTTP + MCP load.
+100% reliable when implemented.
 
-### Key Modules
+## Quick install
 
-| Module | Role |
-|--------|------|
-| `main.rs` | CLI parsing, daemon setup (Axum + GC scheduler), command dispatch |
-| `mcp.rs` | MCP server: stdin/stdout JSON-RPC loop, tool definitions |
-| `db.rs` | All SQLite operations: CRUD, FTS5 queries, recall scoring, GC, schema migrations |
-| `handlers.rs` | HTTP request handlers (Axum extractors), error sanitization |
-| `models.rs` | Core data structures: Memory (15 fields), MemoryLink, request/response types |
-| `validate.rs` | Input validation for all write paths |
-| `config.rs` | Feature tier system (keyword/semantic/smart/autonomous), TTL config |
-| `reranker.rs` | Hybrid recall: blends semantic (cosine) + keyword (BM25-like FTS5) scores |
-| `embeddings.rs` | HuggingFace model loading, vector generation, cosine similarity |
-| `hnsw.rs` | In-memory HNSW vector index for approximate nearest-neighbor search |
-| `llm.rs` | LLM integration via Ollama: query expansion, auto-tagging, contradiction detection |
+Manual install only until PR-2's installer follow-up adds explicit
+Gemini support. The wrapper script above is the manual form; track the
+installer issue for one-line bootstrap.
+
+## End-user diagnostic
+
+Every wrapper invocation emits `ai-memory boot`'s status header on
+stdout (when `--no-header` is omitted). The four headers documented in
+[`README.md`](README.html) tell `ok` / `info-empty` / `info-greenfield`
+/ `warn-db` apart. If you see no header at all, the wrapper itself
+isn't firing — check `which gemini` resolves to the wrapper and not the
+upstream binary.
+
+## Limitations
+
+- The exact flag (`--system`, `-s`, `GEMINI_SYSTEM_INSTRUCTION` env var)
+  varies across Gemini CLI builds. Check `gemini --help` for your
+  install before committing the wrapper to production.
+- Gemini CLI does not have an MCP host today. `ai-memory-mcp` cannot be
+  registered as an MCP server here. Mid-session recall would require
+  adding function-calling support pointing at `ai-memory`'s HTTP API —
+  out of scope for the boot recipe.
+- This recipe loads memory **once per CLI invocation**. Multi-turn
+  conversations within one invocation share the boot context.
+- Gemini Code Assist (the IDE plug-in surface) does not yet expose a
+  user-configurable system prompt or hook, so the wrapper recipe does
+  not apply to that surface — track upstream for developer hooks.
+
+## Better, when Gemini CLI lands a session-start hook
+
+We have an open feature request at the Google Gemini CLI repo to add a
+documented session-start hook (cross-filed from issue #487). When that
+ships, replace the wrapper with a hook entry pointing at:
+
+```bash
+ai-memory boot --quiet --no-header --limit 10 --budget-tokens 4096
+```
+
+This recipe will be updated in place once the hook lands.
+
+## Related
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [alphaonedev/ai-memory-mcp](https://github.com/alphaonedev/ai-memory-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
