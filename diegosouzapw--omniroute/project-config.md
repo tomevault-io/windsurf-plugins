@@ -1,80 +1,59 @@
 ---
 trigger: always_on
-description: 🌐 **Languages:** 🇺🇸 [English](../../../AGENTS.md)
+description: 🌐 **Languages:** 🇺🇸 [English](../../../CLAUDE.md) · 🇪🇹 [am](../am/CLAUDE.md) · 🇸🇦 [ar](../ar/CLAUDE.md) · 🇦🇿 [az](../az/CLAUDE.md) · 🇧🇬 [bg](../bg/CLAUDE.md) · 🇧🇩 [bn](../bn/CLAUDE.md) · 🇧🇦 [bs](../bs/CLAUDE.md) · 🇨🇿 [cs](../cs/CLAUDE.md) · 🇩🇰 [da](../da/CLAUDE.md) · 🇩🇪 [de](../de/CLAUDE.md) · 🇬🇷 [el](../el/CLAUDE.md) · 🇪🇸 [es](../es/CLAUDE.md) · 🇪🇪 [et](../et/CLAUDE.md) · 🇮🇷 [fa](../fa/CLAUDE.md) · 🇫🇮 [fi](../fi/CLAUDE.md) · 🇫🇷 [fr](../fr/CLAUDE.md) · 🇮🇪 [ga](../ga/CLAUDE.md) · 🇮🇳 [gu](../gu/CL
 ---
 
-# OmniRoute agent guide (Bosanski)
+# CLAUDE.md (Hausa)
 
-🌐 **Languages:** 🇺🇸 [English](../../../AGENTS.md)
-
----
-
-> **Jedinstveni izvor istine.** Ovaj fajl sadrži SVA pravila projekta, konvencije, bilješke o arhitekturi
-> i Stroga Pravila za svakog AI asistenta koji radi u ovom repozitoriju (Claude Code, Gemini, Codex,
-> Copilot i bilo koji drugi agent). `CLAUDE.md` i `GEMINI.md` samo dodaju specifične razlike za asistenta
-> i upućuju natrag ovdje. Kada pravilo treba promijeniti, promijenite ga OVDJE — nikada ga nemojte ponovo forkovati u
-> fajl specifičan za asistenta.
-
-## Brzi start
-
-```bash
-npm install                    # Instaliraj zavisnosti (automatski generiše .env iz .env.example)
-npm run dev                    # Dev server na http://localhost:20128
-npm run build                  # Production build (Next.js 16 standalone)
-npm run build:release          # Release build
-npm run lint                   # ESLint (očekivano 0 grešaka; upozorenja su već postojeća)
-npm run typecheck:core         # TypeScript provjera (treba biti čista)
-npm run typecheck:noimplicit:core  # Stroga provjera (bez implicitnog any)
-npm run test:coverage          # Unit testovi + coverage gate (60/60/60/60 — statements/lines/functions/branches)
-npm run check                  # lint + test kombinovano
-npm run check:cycles           # Detekcija kružnih zavisnosti
-npm run check:docs-all         # Pokreni nakon izmjene dokumentacije (uključuje fabricated-docs validaciju)
-```
-
-### Pokretanje testova
-
-Prvo pokrenite najprecizniji test za izmijenjeni kod:
-
-```bash
-# Pojedinačni test fajl (Node.js native test runner — većina testova)
-node --import tsx/esm --test tests/unit/your-file.test.ts
-
-# Vitest (MCP server, autoCombo, cache)
-npm run test:vitest
-
-# Svi suite-ovi
-npm run test:all
-```
-
-Ostali suite-ovi: `npm run test:e2e`, `npm run test:protocols:e2e`, `npm run test:ecosystem`.
-
-Za punu matricu testova, pogledajte `CONTRIBUTING.md` → "Running Tests". Za duboku arhitekturu, pogledajte sekcije
-Repository map i Reference Documentation u nastavku.
+🌐 **Languages:** 🇺🇸 [English](../../../CLAUDE.md) · 🇪🇹 [am](../am/CLAUDE.md) · 🇸🇦 [ar](../ar/CLAUDE.md) · 🇦🇿 [az](../az/CLAUDE.md) · 🇧🇬 [bg](../bg/CLAUDE.md) · 🇧🇩 [bn](../bn/CLAUDE.md) · 🇧🇦 [bs](../bs/CLAUDE.md) · 🇨🇿 [cs](../cs/CLAUDE.md) · 🇩🇰 [da](../da/CLAUDE.md) · 🇩🇪 [de](../de/CLAUDE.md) · 🇬🇷 [el](../el/CLAUDE.md) · 🇪🇸 [es](../es/CLAUDE.md) · 🇪🇪 [et](../et/CLAUDE.md) · 🇮🇷 [fa](../fa/CLAUDE.md) · 🇫🇮 [fi](../fi/CLAUDE.md) · 🇫🇷 [fr](../fr/CLAUDE.md) · 🇮🇪 [ga](../ga/CLAUDE.md) · 🇮🇳 [gu](../gu/CLAUDE.md) · 🇮🇱 [he](../he/CLAUDE.md) · 🇮🇳 [hi](../hi/CLAUDE.md) · 🇭🇷 [hr](../hr/CLAUDE.md) · 🇭🇺 [hu](../hu/CLAUDE.md) · 🇦🇲 [hy](../hy/CLAUDE.md) · 🇮🇩 [id](../id/CLAUDE.md) · 🇳🇬 [ig](../ig/CLAUDE.md) · 🇮🇹 [it](../it/CLAUDE.md) · 🇯🇵 [ja](../ja/CLAUDE.md) · 🇬🇪 [ka](../ka/CLAUDE.md) · 🇰🇭 [km](../km/CLAUDE.md) · 🇮🇳 [kn](../kn/CLAUDE.md) · 🇰🇷 [ko](../ko/CLAUDE.md) · 🇱🇹 [lt](../lt/CLAUDE.md) · 🇱🇻 [lv](../lv/CLAUDE.md) · 🇮🇳 [ml](../ml/CLAUDE.md) · 🇮🇳 [mr](../mr/CLAUDE.md) · 🇲🇾 [ms](../ms/CLAUDE.md) · 🇲🇹 [mt](../mt/CLAUDE.md) · 🇲🇲 [my](../my/CLAUDE.md) · 🇳🇵 [ne](../ne/CLAUDE.md) · 🇳🇱 [nl](../nl/CLAUDE.md) · 🇳🇴 [no](../no/CLAUDE.md) · 🇮🇳 [or](../or/CLAUDE.md) · 🇮🇳 [pa](../pa/CLAUDE.md) · 🇵🇭 [phi](../phi/CLAUDE.md) · 🇵🇱 [pl](../pl/CLAUDE.md) · 🇵🇹 [pt](../pt/CLAUDE.md) · 🇧🇷 [pt-BR](../pt-BR/CLAUDE.md) · 🇷🇴 [ro](../ro/CLAUDE.md) · 🇷🇺 [ru](../ru/CLAUDE.md) · 🇱🇰 [si](../si/CLAUDE.md) · 🇸🇰 [sk](../sk/CLAUDE.md) · 🇸🇮 [sl](../sl/CLAUDE.md) · 🇷🇸 [sr](../sr/CLAUDE.md) · 🇸🇪 [sv](../sv/CLAUDE.md) · 🇰🇪 [sw](../sw/CLAUDE.md) · 🇮🇳 [ta](../ta/CLAUDE.md) · 🇮🇳 [te](../te/CLAUDE.md) · 🇹🇭 [th](../th/CLAUDE.md) · 🇹🇷 [tr](../tr/CLAUDE.md) · 🇺🇦 [uk-UA](../uk-UA/CLAUDE.md) · 🇵🇰 [ur](../ur/CLAUDE.md) · 🇺🇿 [uz](../uz/CLAUDE.md) · 🇻🇳 [vi](../vi/CLAUDE.md) · 🇳🇬 [yo](../yo/CLAUDE.md) · 🇨🇳 [zh-CN](../zh-CN/CLAUDE.md) · 🇹🇼 [zh-TW](../zh-TW/CLAUDE.md)
 
 ---
 
-## Projekt na prvi pogled
+@AGENTS.md
 
-**OmniRoute** — jedinstveni AI proxy/router. Jedna krajnja tačka (endpoint), 359 LLM provajdera, auto-fallback.
+**Dukkan ƙa'idojin aikin suna cikin [`AGENTS.md`](AGENTS.md)** — shi ne tushen gaskiya guda ɗaya ga kowane mataimakin AI
+(gine-gine, ƙa'idojin aiki, gwaji, matakan tabbatar da inganci, tsarin aikin git, Ƙa'idoji Masu Tsauri 23,
+abubuwan da aka koya game da PII). Karanta shi gaba ɗaya; kada ka sake ƙara ƙa'idojin aikin a nan. Duk abin da ke ƙasa ya shafi Claude Code KAWAI
+— gyare-gyaren gudanarwa na ƙa'idojin da aka riga aka bayyana a cikin `AGENTS.md`.
 
-| Sloj          | Lokacija                | Svrha                                                                                                                                                                     |
-| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API Routes    | `src/app/api/v1/`       | Next.js App Router — ulazne tačke                                                                                                                                         |
-| Handlers      | `open-sse/handlers/`    | Obrada zahtjeva (chat, embeddings, itd)                                                                                                                                   |
-| Executors     | `open-sse/executors/`   | Provider-specifični HTTP dispatch                                                                                                                                         |
-| Translators   | `open-sse/translator/`  | Konverzija formata (OpenAI↔Claude↔Gemini)                                                                                                                                 |
-| Transformer   | `open-sse/transformer/` | Responses API ↔ Chat Completions                                                                                                                                          |
-| Services      | `open-sse/services/`    | Combo rutiranje, rate limiti, keširanje, itd                                                                                                                              |
-| Database      | `src/lib/db/`           | SQLite domenski moduli (176 migracija)                                                                                                                                    |
-| Domain/Policy | `src/domain/`           | Policy engine, pravila troškova, fallback logika                                                                                                                          |
-| MCP Server    | `open-sse/mcp-server/`  | 110 alata (45 kanonskih + memory/skill/GitHub/pool/gamification/plugin/Notion/Obsidian/local-corpus/RTK moduli), 3 transporta (stdio / SSE / Streamable HTTP), 33 scope-a |
-| A2A Server    | `src/lib/a2a/`          | JSON-RPC 2.0 agent protokol                                                                                                                                               |
-| Skills        | `src/lib/skills/`       | Proširivi framework vještina                                                                                                                                              |
-| Memory        | `src/lib/memory/`       | Persistent konverzacijska memorija                                                                                                                                        |
+## Keɓewar worktree — takamaiman bayanai na Claude Code
 
+Cikakkiyar ƙa'idar worktree ta dole (tabbatar da reshen tushe, hanyar `.claude/worktrees/` ta ƙa'ida,
+`cp -al` node_modules, ƙa'idojin rushewa) tana cikin `AGENTS.md` → Git Workflow → "Worktree
+isolation". Abubuwan da suka shafi Claude Code kaɗai:
+
+- Tabbatar da reshen tushe tare da mai gudanarwa ta hanyar `AskUserQuestion` (Ƙa'ida Mai Tsauri #19) sai dai idan ya
+  riga ya gaya maka.
+- Fi son amfani da kayan aikin asali na `EnterWorktree` — ya riga ya ƙirƙiri worktrees a ƙarƙashin
+  `.claude/worktrees/` (hanyar ƙa'ida). Ƙirƙiri worktree da umarnin `git
+worktree add` da aka rubuta, sannan ka kira `EnterWorktree` tare da `path` ɗinsa.
+
+## Tsaro tsakanin zaman aiki — takamaiman bayanai na Claude Code
+
+Ƙa'idoji Masu Tsauri #19/#21/#22 (a cikin `AGENTS.md`) suna tafiyar da zaman aiki masu gudana a lokaci guda. Tunatarwar gudanarwa ga wannan
+tsari:
+
+- **Maimaita haramcin `git stash` kalma-da-kalma a cikin umarnin kowane ƙaramin wakili da zai taɓa git**
+  (kayan aikin Agent / rubutun Workflow) — ƙananan wakilai ba sa gadon wannan fayil, kuma maimaituwar
+  matsalar stash da aka rubuta ta faru ne ta hannun ƙaramin wakili.
+- Kafin haɗawa ko turawa zuwa kowane PR da ba ka ƙirƙira ba _a wannan zaman_, gudanar da `git worktree list`
+  sannan ka sake duba `gh pr view <N> --json state,headRefOid` (Ƙa'ida Mai Tsauri #22b).
+- Ƙare kowane zaman aiki tare da babban wurin checkout a reshen da ya fara a kai.
+
+## Superpowers / kayan tsarawa — sauya hanyoyi
+
+An bayyana tsarin `_tasks/` a cikin `AGENTS.md` → "Planning & Research Artifacts". Ƙwarewar
+superpowers suna zuwa da tsoffin saituna masu nuni zuwa `docs/…` — waɗannan tsoffin saitunan an **sauya su
+a nan**. Idan wata ƙwarewar superpowers ta sanar da hanya kamar "an adana a `docs/superpowers/plans/…`",
+sake rubuta ta zuwa makamanciyar hanyar `_tasks/…` kafin rubutawa:
+
+| Kayan aiki (ƙwarewa)                         | Tsohuwar hanya (KADA a yi amfani da ita) | Ajiye a nan maimakon haka                                     |
+| -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| Tsare-tsare (`writing-plans`)                | `docs/superpowers/plans/`                | `_tasks/superpowers/plans/YYYY-MM-DD-<feature>.md`            |
+| Ƙayyadaddun bayanai / ƙira (`brainstorming`) | `docs/superpowers/specs/`                | `_tasks/superpowers/specs/YYYY-MM-DD-<topic>-design.md`       |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [diegosouzapw/OmniRoute](https://github.com/diegosouzapw/OmniRoute) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
