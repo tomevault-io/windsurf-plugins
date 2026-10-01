@@ -1,196 +1,66 @@
 ---
 trigger: always_on
-description: Generates `WithToken(v Token) ParseOption` function.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-## For Module Consumers
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-If you are writing code that *uses* jwx (not developing jwx itself):
+## What this is
 
-- **Examples**: See `examples/` directory for runnable usage patterns
-- **Documentation**: See `docs/` directory and package READMEs
-- **API Reference**: Use `go doc` or https://pkg.go.dev/github.com/lestrrat-go/jwx/v3
+`counterfeiter` is a CLI (module `github.com/maxbrunsfeld/counterfeiter/v6`) that generates Go test doubles ("fakes") for interfaces, function types, and whole packages. It is typically invoked via `//go:generate` directives. Requires Go modules; CI runs on `stable` and `oldstable` Go on Linux and Windows.
 
-The rest of this document focuses on developing the jwx library itself.
+## Commands
 
----
+Full CI pipeline (vet → regenerate fakes → verify clean git tree → tests):
 
-## Go Version
-
-This project requires **Go 1.25.0** or later. Check `go.mod` for the exact version.
-
-## Module Path vs Physical Layout
-
-This repository uses a **flat layout** with vanity import paths. There is no physical `v3/` directory.
-
-| Branch | Module Path | Physical Root |
-|--------|-------------|---------------|
-| `develop/v3` | `github.com/lestrrat-go/jwx/v3` | `/` (repo root) |
-
-`import "github.com/lestrrat-go/jwx/v3/jwt"` → files are at `./jwt/`, not `./v3/jwt/`.
-
-## Code Generation
-
-### Immutable Rule
-
-**NEVER edit files ending in `_gen.go` directly.** These are generated files. Edit the generator sources instead.
-
-### Generated Files Pattern
-
-Files matching `*_gen.go` are generated. Examples:
-- `jwt/options_gen.go`
-- `jwt/token_gen.go`
-- `jws/headers_gen.go`
-- `jwk/rsa_gen.go`
-- `jwa/signature_gen.go`
-
-### Generator Locations
-
-| Generator | Location | Input Files | Output |
-|-----------|----------|-------------|--------|
-| `genoptions` | `tools/cmd/genoptions/` | `{jwa,jwe,jwk,jws,jwt}/options.yaml` | `*/options_gen.go` |
-| `genjwt` | `tools/cmd/genjwt/` | `tools/cmd/genjwt/objects.yml` | `jwt/*_gen.go` |
-| `genjws` | `tools/cmd/genjws/` | `tools/cmd/genjws/objects.yml` | `jws/*_gen.go` |
-| `genjwe` | `tools/cmd/genjwe/` | `tools/cmd/genjwe/objects.yml` | `jwe/*_gen.go` |
-| `genjwk` | `tools/cmd/genjwk/` | `tools/cmd/genjwk/objects.yml` | `jwk/*_gen.go` |
-| `genjwa` | `tools/cmd/genjwa/` | `tools/cmd/genjwa/objects.yml` | `jwa/*_gen.go` |
-| `genreadfile` | `tools/cmd/genreadfile/` | - | ReadFile helpers |
-
-### Regeneration Commands
-
-```bash
-# Regenerate all code (includes options via `go generate .`)
-make generate
-
-# Regenerate specific package (objects/types only, NOT options)
-make generate-jwt
-make generate-jws
-make generate-jwe
-make generate-jwk
-make generate-jwa
-
-# Regenerate options only (options.yaml → options_gen.go for all packages)
-go generate .
-# or directly:
-./tools/cmd/genoptions.sh
+```shell
+./scripts/ci.sh          # Linux/macOS
+.\scripts\ci.ps1         # Windows
 ```
 
-**Important:** `make generate-<pkg>` does **not** regenerate options. If you
-edit an `options.yaml` file, run `make generate` or `go generate .`.
+Individual steps:
 
-## Functional Options Pattern
-
-Options are defined in `{package}/options.yaml` and generated into `{package}/options_gen.go`.
-
-Example `options.yaml` entry:
-
-```yaml
-options:
-  - ident: Token
-    interface: ParseOption
-    argument_type: Token
-    comment: |
-      WithToken specifies the token instance...
+```shell
+go vet ./...
+go generate ./...                  # regenerate all fakes under fixtures/ (directives use `go run`, so no install needed)
+./scripts/checkclean.sh            # fail if regenerated fakes differ from committed ones
+./scripts/cleanfakes.sh            # delete every */*fakes/fake*.go (then `go generate ./...` to rebuild)
+go test -race . ./fixtures/...   # packages that exercise fakes or the generator concurrently
+go test ./arguments/ ./command/ ./generator/ ./integration/
 ```
 
-Generates `WithToken(v Token) ParseOption` function.
+Run a single package's tests or a single spec. Tests use `sclevine/spec` + `gomega`; spec names are nested, so match with a regex on the top-level test function and the spec path:
 
-## Multi-Module Structure
-
-This repository contains multiple Go modules. The nested modules use `replace` directives for local development.
-
-| Module | Path | Purpose |
-|--------|------|---------|
-| Main | `./go.mod` | Core library |
-| Examples | `./examples/go.mod` | Usage examples |
-| CLI | `./cmd/jwx/go.mod` | Command-line tool |
-| Perf Bench | `./bench/performance/go.mod` | Performance benchmarks |
-| Comparison | `./bench/comparison/go.mod` | Library comparison |
-| Generators | `./tools/cmd/*/go.mod` | Code generators |
-
-### Local Development
-
-The `examples/go.mod` contains:
-```go
-replace github.com/lestrrat-go/jwx/v3 v3.0.0 => ../
+```shell
+go test ./generator/ -run TestGenerator
+go test ./integration/ -run 'TestIntegration/round_trip_as_module/working_with_a_module'
+go test ./arguments/ -run TestParsingArguments -v
+go test ./command/ -run TestRunner
+go test -run TestFakes .                           # generated_fakes_test.go at repo root
+go test -race -run TestConcurrency .              # concurrency_test.go at repo root; only meaningful with -race
+go test -bench . -benchmem .                       # benchmark_test.go at repo root
 ```
 
-No `go.work` file is committed. When working across modules, either:
-1. Create a temporary `go.work` file (it is .gitignored)
-2. Rely on the `replace` directives already in place
+Debug env vars: `COUNTERFEITER_DEBUG=1` enables log output; `COUNTERFEITER_DISABLECACHE=1` bypasses the package-load cache; `COUNTERFEITER_PROFILE=1` writes `counterfeiter.profile`; `COUNTERFEITER_NO_GENERATE_WARNING=1` silences the "use -generate" warning. In tests, `log.SetOutput(io.Discard)` is set in the top-level test functions — comment it out to see generator logs.
 
-## Development Commands
+## Architecture
 
-```bash
-# Run all tests
-make test
+Pipeline for one run (`main.go` is intentionally thin and should stay that way):
 
-# Run tests with specific build tags
-make test-goccy       # Use goccy/go-json
-make test-es256k      # Enable ES256K support
-make test-alltags     # All optional features
+1. **`command.Detect`** (`command/runner.go`) turns the process into a list of `Invocation`s. In normal mode that is the single CLI invocation (it reads `GOFILE`/`GOLINE` from `go generate`). In `-generate` mode it scans every `.go` file in the cwd package for lines starting with `//counterfeiter:generate ` and builds one invocation per line. This is why `-generate` is much faster than many `//go:generate` lines: one process, one package load.
+2. **`arguments.New`** (`arguments/parser.go`) parses each invocation's flags and positional args into `ParsedArguments`: source package dir, package path, interface name, fake name (`Fake` + exported interface name), output path (default `<pkgdir>/<pkg>fakes/fake_<snake_case>.go`), destination package name, and modes (`-p` package mode, `-` print to stdout, `-q`, `-header`). A `-header` on the top-level `-generate` line is inherited by directives that lack one (handled in `main.go`).
+3. **`generator.NewFake`** (`generator/fake.go`) loads packages with `golang.org/x/tools/go/packages` (`loader.go`), finds the target `types.TypeName` (`findPackage`), and populates the `Fake` struct: `Methods` (from `interface_loader.go` / `package_loader.go`) or a single `Function` (`function_loader.go`), `Params`/`Returns` (`param.go`, `return.go`), and `Imports`.
+4. **`Fake.Generate`** executes one of three `text/template`s — `interface_template.go`, `function_template.go`, `package_template.go` — then runs `goimports` (`imports.Process`) on the output. `main.go` runs `go/format` again and writes the file.
 
-# Run short/smoke tests
-make smoke
+Key supporting pieces:
 
-# Generate coverage report
-make cover
-make viewcover
-
-# Lint
-make lint
-
-# Format and tidy
-make imports
-make tidy
-```
-
-### Test Script Details
-
-Tests are run via `./tools/test.sh` which iterates over:
-- `.` (main module)
-- `./examples`
-- `./bench/performance`
-- `./cmd/jwx`
-
-## Package Directory Map
-
-| Package | Responsibility |
-|---------|----------------|
-| `jwa/` | Algorithm identifiers (e.g., `RS256`, `ES384`, `A128GCM`) |
-| `jwk/` | JSON Web Keys - key representation and management |
-| `jws/` | JSON Web Signatures - `Sign()` and `Verify()` |
-| `jwe/` | JSON Web Encryption - `Encrypt()` and `Decrypt()` |
-| `jwt/` | JSON Web Tokens - claims and validation |
-| `jwt/openid/` | OpenID Connect ID tokens |
-| `transform/` | Token transformation utilities |
-
-## Relevant RFCs
-
-- RFC 7515 - JWS (JSON Web Signature)
-- RFC 7516 - JWE (JSON Web Encryption)
-- RFC 7517 - JWK (JSON Web Key)
-- RFC 7518 - JWA (JSON Web Algorithms)
-- RFC 7519 - JWT (JSON Web Token)
-- OpenID Connect Core 1.0
-
-## Error Handling
-
-Sentinel errors are exposed via functions. Use `errors.Is()`:
-
-```go
-if errors.Is(err, jwt.TokenExpiredError()) { ... }
-```
-
-| Package | Function | Meaning |
-|---------|----------|---------|
-| `jwt` | `TokenExpiredError()` | `exp` claim not satisfied |
-| `jwt` | `TokenNotYetValidError()` | `nbf` claim not satisfied |
+- **`generator.Imports`** (`import.go`) dedupes imports by package path and guarantees unique aliases (appends `a`, `b`, … on collision). `addImportsFor` in `loader.go` walks `types.Type` recursively to collect every package a fake needs; add a case there when a new `types.Type` kind shows up (it logs `!!! WARNING: Missing case`).
+- **Generics**: `findPackage` / `getGenericTypeData` (`loader.go`) extract type params/constraints into `GenericTypeParameters*` strings used by the template. The compile-time assertion for a generic fake is emitted inside a blank generic func (`func _[T C]() { var _ pkg.I[T] = new(FakeI[T]) }`) so any constraint kind works. A target that is itself a constraint interface (unions or `~T`) is rejected up front because it cannot be implemented.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kubernetes-sigs/security-profiles-operator](https://github.com/kubernetes-sigs/security-profiles-operator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
