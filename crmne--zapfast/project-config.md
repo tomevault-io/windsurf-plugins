@@ -1,94 +1,83 @@
 ---
 trigger: always_on
-description: ZapFast is a small native WhatsApp client: Rust, egui, and the
+description: Read and follow `AGENTS.md` and `CONTRIBUTING.md` before reviewing or changing
 ---
 
-# ZapFast agent guide
+# Copilot instructions
 
-ZapFast is a small native WhatsApp client: Rust, egui, and the
-[whatsapp-rust](https://github.com/oxidezap/whatsapp-rust) library for the
-protocol. These notes are for coding agents and new contributors.
+Read and follow `AGENTS.md` and `CONTRIBUTING.md` before reviewing or changing
+this repository. `AGENTS.md` is the canonical architecture, product-boundary,
+privacy, testing, and release guide. Keep changes narrowly scoped and preserve
+existing behavior unless the task explicitly changes it.
 
-## Product boundaries
+## Pull request scope and evidence
 
-- Keep it a small native client. No browser engine, no telemetry, no
-  hosted backend, no ZapFast-operated account system. Features never send
-  message content to a third party.
+Check these first, and report each failure as a blocker at the top of the
+review, before any line comments:
+
+- One concern per pull request. When a pull request bundles unrelated fixes or
+  features, name the separate changes and ask for one pull request each. Do
+  not review the rest in depth until it is split.
+- Start every review with `User-visible UI impact: none` or a list of the
+  visible changes. Treat changes to navigation, control placement, menus,
+  panel sizing, spacing, or visual hierarchy as an interface change even when
+  the code is correct.
+- Any visible change needs before-and-after screenshots or a recording in the
+  pull request description, captured with the `demo` feature (synthetic data,
+  never real chats), in light and dark themes when colours or layout change.
+  Ask for them when they are missing.
+- Screenshots, recordings, and other media must not be committed to the
+  repository. Flag any added image or video file that is not an app asset.
 - Do not vendor, fork, or patch upstream crates (egui, epaint, whatsapp-rust)
-  in this repository. Fix them upstream.
-- The protocol comes from whatsapp-rust. Do not reimplement pieces of it
-  here, and do not advertise a capability merely because a protobuf field
-  for it exists.
-- Do not broaden a task into adjacent features or a general refactor.
-  Preserve existing user behaviour unless the task changes it.
+  inside this repository. Changes those crates need go upstream.
+- Flag any feature that sends message content, audio, or contacts to a third
+  party. That is outside the product boundaries.
 
-## Privacy
+## Review priorities
 
-- The user's archive is personal data. Do not read chat rows, message
-  bodies, contacts, or other user content out of `archive.db` or any
-  exported log, not even read-only. Schema, column existence, and row
-  counts are fine; message contents are not.
-- When a bug report or feature needs the user's data, hand the user the
-  query or command to run and let them report the result back.
-- Never log message contents, phone numbers, keys, or QR payloads at a
-  level that ships (see the definition of done); treat existing
-  captures of them the same way.
+- Treat privacy and local data integrity as release blockers. Never log message
+  contents, phone numbers, device keys, authorization material, or QR payloads.
+  Preserve the linked-device session, the message archive, raw attachment
+  protobufs, and backward compatibility of settings and state files.
+- Keep the UI/runtime boundary intact. Views in `src/ui/` draw and emit
+  `model::Action`s, `src/app.rs` applies them after drawing, and WhatsApp or
+  other blocking work runs through `Command` and `Event` on the backend
+  runtime. Every backend event that affects the interface must wake the window.
+- Use whatsapp-rust for protocol behavior. Do not treat protobuf fields as
+  supported features, reimplement protocol pieces locally, or imply that an
+  unsupported WhatsApp capability works.
+- Keep protobufs out of `src/ui/` and `src/model.rs`. Translate them in the
+  backend, canonicalize every arriving `Jid` through `Worker::canonical`, and
+  retain raw messages where attachment recovery depends on their keys.
+- Check optimistic and asynchronous state carefully. A delayed backend answer
+  must not undo a newer action the person already sees.
+- Keep Linux, macOS, and Windows compiling. Isolate platform behavior with
+  target-specific modules or `cfg` blocks and call out platform coverage
+  accurately.
+- Route text that can contain emoji through the existing rich-text and markup
+  paths. Preserve selectable transcript behavior, nested click targets, and
+  right-aligned bubble layout rules described in `AGENTS.md`.
+- For visual changes, use the deterministic `demo` feature and inspect the
+  affected screens in representative sizes and both themes. Do not accept an
+  interface redesign without explicit maintainer approval of its visual scope.
+- Prefer existing dependencies. Flag new crates, changes to network access,
+  storage formats, permissions, or release packaging for explicit scrutiny.
+- Follow the trunk-based branch policy in `AGENTS.md`. Maintainer and agent
+  work goes directly to a linear `main`; do not create a branch unless the
+  maintainer explicitly requests one. Every ordinary release tag, including a
+  prerelease, must already be reachable from `origin/main`.
+- Require focused regression tests and the full checks from `AGENTS.md` for
+  code changes. Do not weaken a lint or test to make a change pass.
 
-## Architecture
+## Review communication
 
-- `src/ui/` draws views and pushes `model::Action`s; `src/app.rs` applies
-  them after the frame. Never mutate application state from inside a view
-  beyond the view's own fields (composer text, search text, flags).
-- `src/backend.rs` is the interface's handle to a tokio runtime on its own
-  thread; `src/backend/worker.rs` runs there. It owns the whatsapp-rust
-  `Bot`, the message archive, downloads, and profile pictures. The two
-  sides talk only through `Command` (interface to runtime) and `Event`
-  (runtime to interface); every event wakes the window through `Waker`.
-- `src/archive.rs` is the SQLite store of chats, messages, contacts, and
-  privacy-id mappings. WhatsApp replays history once, at link time, so the
-  archive is the only copy. It keeps each message's raw protobuf because
-  the keys to fetch an attachment live in it. `src/archive/encryption.rs` opens
-  the archive with SQLCipher and a random key stored in the OS keyring. Plaintext
-  migration checkpoints the old WAL and verifies an encrypted staging file before
-  atomic replacement. A locked or missing key stops linking; never fall back to
-  a disposable archive. Tests use fixtures and mock credentials only.
-- `src/model.rs` holds the app's own types. Views never touch a protobuf;
-  the worker translates in `classify()` and `parse_conversation()`.
-- Favorite chats sync with the phone through the `favorites` app-state action
-  (RegularHigh), which carries the whole ordered list: `Event::FavoritesUpdate`
-  replaces ours and `send_app_state_action(&schemas::FAVORITES, ..)` writes it.
-  `archive/favorites.rs` keeps the list in order with each entry's JID as the
-  phone named it, plus a queue of changes made here; a phone list applies
-  (unless older than the newest applied) and the queue replays on top.
-  `backend/worker/favorite_chats.rs` sends one list at a time with backoff and
-  never before the phone's list is known: the first connection reads
-  RegularHigh once as a snapshot, and its completion on the same queue as the
-  replayed mutations means a phone without favorites. A blind write would
-  replace the phone's list. Channels are never favorites. The Favorites chip
-  follows the list order; pins stay global and first in every chip.
-- Interactive messages are parsed in `backend/worker/interactive.rs`. Views receive
-  labels and local capabilities, never protocol option ids. `ReplyInteractive`
-  carries only the archived message id and visible button/choice indices;
-  `interactive/replies.rs` re-resolves them from raw protobuf and uses the library's
-  quote context and normal send path. Only known quick replies and single-select
-  lists may send responses. Copy-code actions stay local. Do not turn arbitrary
-  flow JSON into replies or fall back to sending its visible label as plain text.
-  The versioned archive backfill must preserve downloaded image paths and edits.
-  Carousel cards retain independent images and local actions. Download commands
-  carry an optional card index, and the archive stores each image path separately.
-  The version-4 backfill preserves those paths when rebuilding derived content.
-  See [compatibility notes](docs/interactive-message-actions.md) for response
-  families, source references, and live-test limits.
-- Poll creation, voting, and decryption use whatsapp-rust's `Client::polls()`.
-  `backend/worker/polls.rs` retains the original creator identity and key in the
-  encrypted archive; `archive/polls.rs` keeps each voter's latest timestamp and
-  message id, including encrypted updates whose parent has not arrived yet.
-  History replay must not undo a newer vote or withdrawal. Decryption runs in
-  batches of eight, with failures retried after reconnecting. The interface receives
-  option counts, its own selection, and the latest decrypted voter names/times
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+After the scope and evidence checks, lead with concrete, actionable defects
+introduced by the change. Distinguish confirmed bugs from questions, avoid
+speculative redesigns and adjacent refactors, and do not claim a platform was
+tested when it was only inspected or compiled. CI passing is necessary but not proof that a change is correct. Never
+approve, close, or merge a pull request; the maintainer decides. Never use em
+dashes in repository-facing prose.
 
 ---
 > Source: [crmne/zapfast](https://github.com/crmne/zapfast) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
