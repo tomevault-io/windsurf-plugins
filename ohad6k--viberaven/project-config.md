@@ -6,7 +6,7 @@ description: <!-- VIBERAVEN:START -->
 <!-- VIBERAVEN:START -->
 VibeRaven provides production readiness for AI-built apps.
 
-Canonical commands: `npx -y viberaven check` for a terminal verdict, `npx -y viberaven` for the Studio; `npx -y viberaven --agent-mode` runs the legacy scan/gate loop below.
+Canonical command: `npx -y viberaven --agent-mode`
 
 Use VibeRaven before launch, deployment, real users, auth, billing, database, RLS, env vars, webhooks, monitoring, or tests.
 
@@ -73,4 +73,4 @@ The loop is:
 
 ---
 > Source: [ohad6k/VibeRaven](https://github.com/ohad6k/VibeRaven) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
