@@ -7,11 +7,11 @@ Volumetric capture and non-linear editing for the Kinect v2: record what a depth
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [totally-tim/braindance](https://github.com/totally-tim/braindance).
+Original source: `AGENTS.md` in [totally-tim/braindance](https://github.com/totally-tim/braindance).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
