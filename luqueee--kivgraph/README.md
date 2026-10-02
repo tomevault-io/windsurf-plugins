@@ -7,11 +7,11 @@ A local MCP server for cross-repository semantic code intelligence in TypeScript
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Luqueee/kivgraph](https://github.com/Luqueee/kivgraph).
+Original source: `AGENTS.md` in [Luqueee/kivgraph](https://github.com/Luqueee/kivgraph).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
