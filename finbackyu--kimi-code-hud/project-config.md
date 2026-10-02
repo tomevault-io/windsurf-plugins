@@ -1,0 +1,42 @@
+---
+trigger: always_on
+description: This is a zero-dependency Node.js ESM CLI. `bin/kimi-hud.mjs` is the executable entry point and command router: the render data plane lives in `src/render-runtime.mjs` + `src/runtime-snapshot.mjs` (one shared config snapshot and a 220ms internal deadline per frame), and the config-mutation control plane in `src/management-service.mjs` (install/uninstall/on/off). `src/render.mjs` turns the runtime snapshot into HUD text. Metrics sit behind the `src/metrics.mjs` facade, split into state storage (`
+---
+
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+This is a zero-dependency Node.js ESM CLI. `bin/kimi-hud.mjs` is the executable entry point and command router: the render data plane lives in `src/render-runtime.mjs` + `src/runtime-snapshot.mjs` (one shared config snapshot and a 220ms internal deadline per frame), and the config-mutation control plane in `src/management-service.mjs` (install/uninstall/on/off). `src/render.mjs` turns the runtime snapshot into HUD text. Metrics sit behind the `src/metrics.mjs` facade, split into state storage (`metrics-state.mjs`), session location (`session-locator.mjs`), bounded wire reading (`wire-reader.mjs`), per-concern reducers (`metrics-throughput.mjs`, `metrics-turn.mjs`, `metrics-compaction.mjs`, `cache-hit.mjs`, `goal.mjs`, `metrics-session-meta.mjs`, `metrics-tasks.mjs` — the background-task registry over wire `task.started`/`task.terminated` Ops plus `tasks/<taskId>.json` sidecar reconcile), and output shaping (`metrics-summary.mjs`). Remaining modules cover payload parsing, quota access, Git state, plugin state, TOML editing, host config model-table parsing (`model-config.mjs`), theme resolution (`theme.mjs`), and thinking-level resolution. `hooks/sync-status-line.mjs` implements the plugin `SessionStart` hook. Tests live in `test/`, mostly mirroring source modules (`test/render.test.mjs`) plus cross-cutting contract, CLI-error, and release-metadata suites. Plugin metadata is in `kimi.plugin.json`; user documentation is maintained in both `README.md` and `README.en.md`, while footer compatibility and open parity gaps are canonical in `CAPABILITIES.md` and `KNOWN_ISSUES.md`.
+
+## Build, Test, and Development Commands
+
+- `npm test` — run the complete `node:test` suite. There is no build step.
+- `npm run bench` — run the render hot-path benchmark (`scripts/bench-render.mjs`): spawn-to-exit latency percentiles over synthetic sandboxed sessions, cold/warm cache, long wire, multi-agent, oversized unfinished line, and slow-I/O via FIFO; `--json` gives a machine-readable report. Results are machine-specific evidence — record them outside the repo and never turn them into CI gates.
+- `node --test --experimental-test-coverage` — run tests with Node’s built-in coverage report.
+- `node bin/kimi-hud.mjs --help` — verify the CLI entry point and supported options.
+- `printf '' | node bin/kimi-hud.mjs` — smoke-test the empty-input fallback.
+- `node --check src/render.mjs` — syntax-check an edited module; repeat for other changed `.mjs` files.
+
+Node.js 18 or newer is required.
+
+## Coding Style & Naming Conventions
+
+Use two-space indentation, semicolons, single-quoted strings, and ESM `import`/`export`. Follow existing JSDoc patterns for exported functions. Use `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for constants, and kebab-case filenames. No formatter or linter is configured, so match nearby code and run syntax checks before submitting.
+
+## Testing Guidelines
+
+Use `node:test` with `node:assert/strict`. Name files `test/<module>.test.mjs` and give each test a behavior-focused description. Use temporary directories for filesystem scenarios; never touch the user’s real Kimi configuration. Add regression tests for bug fixes, including exact boundary behavior. There is no enforced coverage threshold, but new branches should receive focused tests.
+
+## Commit & Pull Request Guidelines
+
+Write short, imperative commit subjects. History uses both direct subjects (`Add SessionStart self-heal hook`) and Conventional Commit prefixes (`fix: harden state and config handling`). Keep each commit scoped to one behavior. Pull requests should explain the user-visible change, list verification commands, link relevant issues, and include terminal output or screenshots for HUD layout changes. A release commit must first regenerate the showcase images (`node docs/showcase/render-states.mjs && python3 docs/showcase/export-assets.py`) and confirm the header title bar shows the new HUD version while the welcome-box Version matches the `CAPABILITIES.md` Kimi Code baseline. The full release runbook — version bump, changelog links, image verification, tag, push and `gh release create` — lives in `.agents/skills/release/SKILL.md`; follow it for every release.
+
+## Issue Workflow
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [FinbackYu/kimi-code-hud](https://github.com/FinbackYu/kimi-code-hud) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
