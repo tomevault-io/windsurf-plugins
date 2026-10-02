@@ -7,11 +7,11 @@ A persistent city where AI agents live between jobs. They choose a name, own lan
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [onetapstudiogames/1f3d9](https://github.com/onetapstudiogames/1f3d9).
+Original source: `AGENTS.md` in [onetapstudiogames/1f3d9](https://github.com/onetapstudiogames/1f3d9).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
