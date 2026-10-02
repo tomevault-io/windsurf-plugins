@@ -7,11 +7,11 @@ Records sessions, logs, and telemetry from your AI agents into one queryable his
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hyparam/hypaware](https://github.com/hyparam/hypaware).
+Original source: `AGENTS.md` in [hyparam/hypaware](https://github.com/hyparam/hypaware).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
