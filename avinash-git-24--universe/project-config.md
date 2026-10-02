@@ -1,0 +1,94 @@
+---
+trigger: always_on
+description: <!-- BEGIN:nextjs-agent-rules -->
+---
+
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+
+# 🏛️ UniVerse Engineering Standards & Agent Operational Protocols
+*Maintained by the Lead Architect & Engineering Team for UniVerse (Campus Super-App)*
+
+---
+
+## 🧭 Project Identity & Overview
+**UniVerse** is a high-performance, real-time campus super-application built specifically for university students (Marwadi University):
+- **Core Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Supabase (PostgreSQL, Realtime WebSockets, RLS, Auth), Framer Motion, Vitest.
+- **Production URL:** `https://universe-brown-seven.vercel.app`
+- **Current Test Suite:** 20 test files, 208 tests — 100% PASSING.
+
+### 📦 Key Production Modules:
+1. **Authentication & Identity (`src/app/(auth)/`, `src/app/api/auth/*`):**
+   - Student sign-in/up with Marwadi University email domain validation (`@marwadiuniversity.ac.in`).
+   - Secure server-side password reset via custom 6-digit OTP verification flow.
+2. **Campus Delivery & Food Requests (`src/app/dashboard/requests/`, `src/components/requests/`):**
+   - Live order creation with pickup/destination tagging and delivery tip incentives.
+   - Real-time campus runner broadcasting and instant order acceptance.
+   - Interactive Live Radar Tracker (`/dashboard/requests/[id]`) with real-time status progression (`pending` ➔ `accepted` ➔ `picked_up` ➔ `in_transit` ➔ `delivered`).
+3. **P2P Student Marketplace (`src/app/dashboard/marketplace/`, `src/components/resale/`):**
+   - Student product listings, multi-angle image galleries, condition ratings, and price negotiations.
+   - Anti-fraud Escrow security protocol requiring buyer 6-digit OTP verification to release handover.
+   - Buyer and seller rating/review system guarded by strict Supabase RLS policies.
+4. **Real-Time Notification Center (`src/components/notifications/`):**
+   - Glassmorphic slide-out center with category filters (`All`, `Unread`, `Delivery`, `Request`, `Runner`).
+   - Audio alert chimes with user mute toggle.
+   - Elevated server endpoint (`/api/notifications/create`) using `createAdminClient` to guarantee delivery across client RLS boundaries.
+   - Auto-synchronization on page load for active in-flight delivery requests.
+5. **Real-Time WebSockets Chat (`src/components/chat/`, `src/providers/RealtimeProvider.tsx`):**
+   - Sub-second peer messaging between students, delivery runners, and resale buyers.
+
+---
+
+## 🛡️ Senior Engineer Production Protocols (MANDATORY)
+
+### 🔒 Protocol 1: Zero-Trust Security & Data Integrity
+1. **Never Expose Service Role Keys:**
+   - The `SUPABASE_SERVICE_ROLE_KEY` must NEVER be imported or used in client components (`'use client'`), public hooks, or browser bundles.
+   - Elevated operations requiring bypass of client RLS must strictly live in server route handlers (`src/app/api/*`) utilizing `createAdminClient()`.
+2. **RLS on All Tables:**
+   - Every table in `public` schema MUST have Row Level Security enabled (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`).
+   - Client queries must strictly resolve under `auth.uid()`.
+3. **Financial & Handover Integrity:**
+   - Resale orders and deliveries must never transition to terminal status (`completed` / `delivered`) without cryptographic OTP or server-validated confirmation.
+4. **Sanitize Inputs:**
+   - All external user inputs, URLs, and redirect targets must pass `sanitizeString()` and `isSafeRedirectUrl()` before storage or navigation.
+
+---
+
+### 🏗️ Protocol 2: Layered Architecture & Next.js 16 Discipline
+1. **Server Components by Default:**
+   - All route pages, layouts, and data containers must be Server Components unless client interactivity (`useState`, `useEffect`, `onClick`) is explicitly required.
+   - Push `'use client'` directives to the lowest possible leaf components in the component tree.
+2. **Strict Layer Separation:**
+   - **Presentation Layer:** `src/app/` (pages, layouts, route handlers).
+   - **Domain Components:** `src/components/<module>/` (composed feature widgets).
+   - **Primitive UI Components:** `src/components/ui/` (stateless, reusable building blocks).
+   - **Data Layer:** `src/lib/database/<module>.ts` (Supabase queries and mutations — never write raw Supabase calls directly inside presentation components).
+   - **State Layer:** `src/providers/` (React context providers for global cross-cutting state).
+3. **Zero Unapproved Dependencies:**
+   - Do NOT run `npm install <package>` without explicit user consent. Always favor native Web APIs, standard React 19 primitives, and existing utility libraries (`date-fns`, `lucide-react`, `clsx`).
+
+---
+
+### 🧪 Protocol 3: Quality Gates (Pre-Flight Verification)
+Before finalizing any code change, generating a pull request, or claiming completion of a task, you MUST execute and pass all three quality gates:
+1. **TypeScript Static Analysis:**
+   ```bash
+   npx tsc --noEmit
+   ```
+   *Gate:* Must exit with **0 errors**.
+2. **ESLint Code Standards:**
+   ```bash
+   npm run lint
+   ```
+   *Gate:* Must exit with **0 errors**.
+3. **Automated Unit & Integration Test Suite:**
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [avinash-git-24/universe](https://github.com/avinash-git-24/universe) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
