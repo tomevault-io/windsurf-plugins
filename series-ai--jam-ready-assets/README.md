@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [series-ai/jam-ready-assets](https://github.com/series-ai/jam-ready-assets).
+Original source: `AGENTS.md` in [series-ai/jam-ready-assets](https://github.com/series-ai/jam-ready-assets).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
