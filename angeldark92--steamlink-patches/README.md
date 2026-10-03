@@ -7,12 +7,12 @@ Repo for steamlink Galaxy XR or other brands patches
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [AngelDark92/steamlink-patches](https://github.com/AngelDark92/steamlink-patches).
+Original source: `AGENTS.md` in [AngelDark92/steamlink-patches](https://github.com/AngelDark92/steamlink-patches).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
