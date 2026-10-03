@@ -7,11 +7,11 @@ OmniForge AI：大模型、RAG、Agent 与多语言服务学习合集
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ytt070666/OmniForge-AI](https://github.com/ytt070666/OmniForge-AI).
+Original source: `AGENTS.md` in [ytt070666/OmniForge-AI](https://github.com/ytt070666/OmniForge-AI).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
