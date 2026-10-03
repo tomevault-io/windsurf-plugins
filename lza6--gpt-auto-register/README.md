@@ -7,11 +7,11 @@ GPT的自动注册，微软无限邮箱+CF人机挑战+GPT网页的账号密码�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [lza6/GPT-Auto-Register](https://github.com/lza6/GPT-Auto-Register).
+Original source: `AGENTS.md` in [lza6/GPT-Auto-Register](https://github.com/lza6/GPT-Auto-Register).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
