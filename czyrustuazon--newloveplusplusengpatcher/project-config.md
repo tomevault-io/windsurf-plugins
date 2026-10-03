@@ -1,85 +1,29 @@
 ---
 trigger: always_on
-description: description: How to work in the NLPP dump + EngPatcher repos — addresses, images, TRB, deploy, safety.
+description: Never git stash; preserve WIP with commits instead
 ---
 
----
-description: How to work in the NLPP dump + EngPatcher repos — addresses, images, TRB, deploy, safety.
-alwaysApply: true
----
 
-# NLPP repo workflow
+# No git stash — commit instead
 
-Two sibling trees:
+## Never
 
-| Tree | Role |
-|------|------|
-| `New Love Plus Plus/` | Vanilla dump, `extracted/`, Ghidra `code.bin`, this Cursor workspace |
-| `../NewLovePlusPlusEngPatcher/` | Patcher scripts, `assets/`, `src/`, LayeredFS outputs |
+- `git stash`, `git stash push`, `git stash pop`, `git stash apply`, `git stash drop`
+- Stashing to “clean the tree”, switch branches, or park unfinished EngPatch / name-input / bake work
+- Advising the user to stash as the default way to save progress
 
-Title ID: `00040000000F4E00`. Prefer editing/patching via EngPatcher; treat the dump as read-only unless intentionally replacing `extracted/`.
+## Always
 
-## Memory / Ghidra conventions
+- **Commit** unfinished or experimental work on the current branch (e.g. a ticket branch) so it stays in history and is recoverable
+- If commit permission is unclear, **ask to commit** rather than stashing
+- Use a normal commit message that marks WIP when needed (e.g. `WIP: title EngPatch badge — black-screen bisect`)
+- Prefer a branch or WIP commit over stash when switching tasks
 
-- Program: `extracted/exefs/code.bin` (also open as `/code.bin` in Ghidra MCP `user-ghidra`).
-- **Image base = 0.** File offsets in Ghidra ≈ offsets in `code.bin`.
-- **Runtime VA ≈ file offset + `0x100000`.** Pointers stored in binaries are usually runtime VAs; convert with `file = va - 0x100000` before seeking in `code.bin`.
-- Thumb/ARM mix; prefer decompile + xrefs over guessing BL targets.
-- Softkey Pos strings live around `0x006c3d88` / `0x0073a76e` (file). Layout names near `0x0073d8ac` (`Lyt_ClockPop_01`, etc.).
-- String APIs: `FUN_005c0e7c` (TextResource by pack+slot), `FUN_0056ed00` (hierarchy resolve), `FUN_005a1ec8` (MakeStr), `FUN_0054b880` (DrawTextToPane), `FUN_0024842c` (header-pane drawer).
-- Do **not** deploy global MakeStr hooks (`patch_clock_text.py`); restore from `exefs/code.bin.bak_clocktext` if needed.
+## Why
 
-## img.bin packages (textures / layouts)
+Stashed EngPatch / name-menu work (`deploy_title_engpatch_*`, `Eng_Patch.png`) was orphaned off Bleeding-Edge and missing from gold bake. Commits keep WIP on the branch.
 
-- Source of truth: `extracted/romfs/img.bin` (~680MB).
-- Tools (Python scripts, not native exes):  
-  `EngPatcher/tools/nlpp-tools/bin/ie` (unpack package from img)  
-  `EngPatcher/tools/nlpp-tools/bin/pe` (unpack/repack package → `.arc`)  
-  Invoke as: `python ie --src_img <img.bin> --img_dir <dir> unpack --idx N` then `python pe <dir>/NNNN unpack`.
-- Folder → package map: `EngPatcher/src/image_map.py` (e.g. `ncommonicon` → 5238 `NCommonIcon.arc`).
-- Asset roots: `EngPatcher/assets/images/<Folder>/` or `<Folder>.check/`. Prefer `.check` dumps when both exist (`pack_images.prefer_asset_folders`).
-- PNGs should live under `timg/` when mirroring DARC paths; stem must match `timg/<name>.bclim`.
-
-### Packing images (safe path)
-
-```bash
-cd NewLovePlusPlusEngPatcher
-python src/pack_images.py --only ncommonicon --img-bin "<vanilla or azahar img.bin>" --out cache/new_img.bin
-# optional: --deploy-azahar
-# Prefer feature deploy scripts under tools/deploy_*_en.py for Options/softkeys/headers.
-```
-
-Rules:
-
-1. **Default = same-size package splice.** Never use `--full-repack` / `Image.write()` unless explicitly experimenting (known black-screen boot).
-2. BCLIM output **must** match original file length/format. `bclimutil.png_to_bclim_same_size` handles fmt **1 (A8), 8 (RGBA4444), 0xB/11 (ETC1A4)**; other fmts may go through `png2bclim` but still require exact size.
-3. Azahar dump “fmt 13” ≠ EngPatcher CLIM enum — always `parse_bclim` from the archive, don’t trust dump filenames for format.
-4. Scope with `--only <key>` so you don’t skip-fail hundreds of unrelated PNGs.
-5. After splice, deploy `img.bin` to  
-   `%AppData%\Azahar\load\mods\00040000000F4E00\romfs\img.bin`.
-6. Exact-zlib / bak-wipe rules: see `img-exact-zlib-deploy`. Feature backups: `img.bin.bak_pre_<name>` beside LayeredFS `romfs/img.bin`.
-
-### Matching textures to dumps
-
-1. Dump from Azahar: `%AppData%\Azahar\dump\textures\00040000000F4E00\tex1_*`.
-2. Score PNGs/BCLIMs against dumps (text-region MAD / Jaccard); **MAD ≈ 0** means exact asset.
-3. Alpha-only dumps (mean RGB 0): composite alpha onto a light background before judging glyphs.
-4. Custom texture overrides are for RE only; they misbind/crash — prefer archive splice for real patches.
-
-## TextResource (strings)
-
-- Main table: `extracted/romfs/SystemData/TextResource/textresource_jpn.trb` (STRI/STRB/INDX/…). `code.bin` loads this plus `textresource_config.trb` under `/SystemData/TextResource/`.
-- **Resident / TOP blob (verified 2026-07-28):** RomFS `textresource_resident_jpn.trb` is **not** referenced in `code.bin` — treat as a **dev leftover**. Same custom `TOP` format (date/time fragments, name tables, day-counter `日目`) ships live as **`img.bin` pkg 5508**. Patch **5508** for runtime; the loose file is only a convenient same-size edit source (`deploy_day_counter_en.py`).
-- Lookup codebook: `EngPatcher/tools/Trb2xlsx/TrbExport/lookup.txt` (deaknaew/Trb2xlsx; **`Trb2xlsx.exe` not invoked** — rebuild is `patch_textresource.py`).
-- Scripts: `python src/patch_textresource.py dump|inplace|rebuild|…` from EngPatcher.
-- Hierarchy: `FUN_005c0e7c(dst, maxlen, pack, slot)` → cat=`(pack>>8)&0xff`, sub=`pack&0xff`, then INDX slot. Flat STRI idx ≠ hierarchy pack.
-- If TRB already has EN but UI stays JP, the chrome is likely a **texture** or **runtime DrawText** from another source — don’t keep re-translating the same TRB keys.
-- To-Do / quest list **titles** are TRB (`FUN_005c0e7c` pack `0x0600`+slot → DrawText into `Txt_Title`). Overflow = shorten EN in `translations.json` (font size is pane-global, not per-string). Example: STRI **2837** カノジョ専属カメラマン.
-
-### Unverified / pending (external RE notes — do not treat as fact yet)
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Still follow the user’s commit gate: only create commits when they ask or when they explicitly want WIP preserved this way — never stash as a substitute.
 
 ---
 > Source: [czyrustuazon/NewLovePlusPlusEngPatcher](https://github.com/czyrustuazon/NewLovePlusPlusEngPatcher) — distributed by [TomeVault](https://tomevault.io).
