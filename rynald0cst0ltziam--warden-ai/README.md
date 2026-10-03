@@ -7,13 +7,13 @@ The structurally-verified context layer for AI coding agents. Cut 50-90% of your
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [rynald0cst0ltziam/Warden-AI](https://github.com/rynald0cst0ltziam/Warden-AI).
+Original source: `copilot-instructions.md` in [rynald0cst0ltziam/Warden-AI](https://github.com/rynald0cst0ltziam/Warden-AI).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
