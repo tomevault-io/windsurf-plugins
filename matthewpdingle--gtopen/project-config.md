@@ -1,0 +1,97 @@
+---
+trigger: always_on
+description: GTOpen is a from-scratch NLHE solver: Rust workspace (`crates/solver` = CFR
+---
+
+# AGENTS.md — working with GTOpen as a coding/analysis agent
+
+GTOpen is a from-scratch NLHE solver: Rust workspace (`crates/solver` = CFR
+engine + multiway Preflop Lab; `crates/server` = HTTP API that also serves the
+`web/` UI). Read `README.md` for the architecture; this file is the agent
+quickstart. Recent study outputs and a findings summary live in
+`C:\Storage\dev\coinpoker\gtopen-studies\` (Windows) — read `FINDINGS.md` there
+before redoing analysis that already exists.
+
+## Build / run / test
+
+```bash
+cargo build --release -p server --features gpu   # the desktop: native Windows + CUDA (see README "Windows")
+GTOpen.cmd                                       # Windows launcher: builds, puts nvrtc on PATH, serves :3737, opens the browser
+cargo test --release -p solver                   # full suite; keep green
+cargo test --release --features gpu --test gpu --test preflop_gpu -- --test-threads=1   # GPU equivalence suites
+```
+
+- Home desktop (2026-09): Windows 11, Ryzen 5950X (16 solver threads), 64 GB,
+  RTX 3090 (24 GB). Repo at `T:\Dev\GTOpen`; nvrtc DLLs in `.cuda-nvrtc/`
+  (pip wheel, gitignored). Everything runs on the GPU: postflop solves,
+  reports, the Preflop Lab with calibrated realization, profiles/locks/hero.
+  Current performance: `research/autoresearch/gpu-pass.md`. On the measured
+  RTX 3090 cases, preflop 6/8 uses 503/1309 MB and compressed postflop
+  rainbow/two-tone uses 5906/3624 MB. These are workload-specific device
+  allocations; UI VRAM is a conservative estimate and the final plan may be
+  smaller. Actual fit is checked at solve time; oversized or unavailable
+  CUDA falls back to CPU and reports retain the chosen engine.
+- Laptop notes (kept for the road): WSL server reachable at
+  `http://localhost:3737` via `wsl -d Ubuntu-22.04 -- bash -lc "cd ~/dev/gtopen && ./target/release/gto-server"`;
+  8 threads, ~0.4–1.5 it/s on 0.5–1.5M-node preflop trees; set
+  `PREFLOP_MAX_ARENA_MB=2600` for batch studies (the dynamic cap never
+  rebounds after a big session is freed; known issue).
+- Only ONE preflop session lives at a time; building a new spot replaces it.
+  Free a large session by building a tiny spot first, or restart the server.
+- Desktop maintenance authorization (user, 2026-09-08): perform routine local
+  rebuilds, server starts/restarts and session restoration without asking again.
+  Preserve current work: wait for active solves, save both sessions, verify the
+  target process and check restored results. This does not authorize bypassing
+  tool/system restrictions; report a continuing block if no permitted route exists.
+- The laptop had a cron autosyncing this repo to GitHub every 30 min; the
+  desktop pushes by hand (SSH remote). If both machines are live, make sure
+  the cron is off or it will fight the desktop's pushes.
+
+## Preflop Lab HTTP API (the analysis workhorse)
+
+All POST bodies/responses are JSON. Request bodies reject unknown keys with
+a 422 (a misspelled field used to be silently defaulted into a different
+game). Config shape (see `PreflopConfig` in
+`crates/solver/src/preflop/mod.rs`):
+
+```json
+{"positions":["UTG","HJ","CO","BTN","SB","BB"],"stack":100.0,
+ "posts":[0,0,0,0,0.5,1.0],"ante":0.0,"limp":true,
+ "open_raises":[2.5],"raise_mults":[3.0],"max_raises":4,"add_allin":false,
+ "rake_pct":5.0,"rake_cap":10.0,"no_flop_no_drop":true,
+ "realization":"calibrated","call_only_seats":[],
+ "open_raises_by_seat":null,"raise_mults_by_seat":null}
+```
+
+- The UI/scenario fields `smallBlind` and `bigBlind` are stake denominations;
+  convert to `posts` in bb before calling the engine (2/2 = SB 1, BB 1;
+  2/5 = SB 0.4, BB 1). API config remains normalized. Old saves retain their
+  original posts. Call action `to` remains the total, while UI labels show
+  the incremental call/completion, excluding antes.
+- `max_raises` counts ALL raises (open=1 … 5-bet=4). Re-raise TO = to_call ×
+  mult, min-raise clamped; sizes ≥ 85% of stack become jams.
+- Per-seat overrides: `open_raises_by_seat`/`raise_mults_by_seat` (len-6 lists
+  of lists; empty inner list = use global). Lets one seat explore a size menu
+  while others stay pinned. `call_only_seats` bans raising for listed seats.
+- `realization`: new UI scenarios use "balanced" (relative class priors,
+  pot-conserving HU shares, explicit configured rake). It is not a newly
+  trained rake-free model. "calibrated" retains embedded training rake;
+  "static" (the API omission default) and "raw" retain legacy behavior.
+  See `docs/preflop_balanced_model.md`. Optional `fourbet_mults` and
+  `fourbet_mults_by_seat` split later raises from the 3-bet menu; omission
+  retains the original all-round multiplier inheritance. These features
+  save as v4, which older binaries refuse.
+- New games use `coupled_deck_v1` for 3+ live-player leaves: 1,024 deterministic
+  latent-strength samples (seed 90210), whole-pot shares net configured rake,
+  no positional realization multiplier. This is not a shared physical deal;
+  overlapping premium ranges still expose large card-removal errors. Do not
+  claim full multiway postflop solving or exact equity. Legacy saves retain
+  `legacy_product`; RE-SOLVE preserves that model. Build a fresh game to change
+  models. V2 saves require model metadata and are refused by old binaries.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [MatthewPDingle/GTOpen](https://github.com/MatthewPDingle/GTOpen) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-10-03 -->
