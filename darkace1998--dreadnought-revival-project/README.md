@@ -7,11 +7,11 @@ A community-operated private server for the discontinued game Dreadnought. The g
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [darkace1998/Dreadnought-Revival-project](https://github.com/darkace1998/Dreadnought-Revival-project).
+Original source: `AGENTS.md` in [darkace1998/Dreadnought-Revival-project](https://github.com/darkace1998/Dreadnought-Revival-project).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
