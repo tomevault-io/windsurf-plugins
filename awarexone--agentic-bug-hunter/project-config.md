@@ -26,6 +26,8 @@ This repo is an agent-portable bug bounty plugin for professional hunting across
 | `skills/mobile-pentest/` | Android/iOS app pentest — runtime-first proxy workflow, APK/IPA decompile, deeplink injection, WebView bridge |
 | `skills/cicd-security/` | CI/CD pipeline hunting — GitHub Actions injection, secret exfil, self-hosted runner poisoning |
 | `skills/graphql-audit/` | GraphQL hunting — introspection, field suggestions, batching DoS, IDOR via aliasing, injection |
+| `skills/mcp-server-audit/` | MCP server audit — tool poisoning, param→sink injection, missing approval gates, secret leaks, rug-pull/confused-deputy, transport config |
+| `skills/cloud-pentest/` | Post-access cloud exploitation (AWS/GCP/Azure) — IAM enum + privesc, IMDS metadata creds, impersonation, bucket takeover, secrets harvest, impact proof |
 
 ### Commands (slash commands)
 
@@ -69,13 +71,9 @@ This repo is an agent-portable bug bounty plugin for professional hunting across
 - `report-writer` — generates H1/Bugcrowd/Immunefi reports
 - `validator` — 4-gate checklist on a finding
 - `web3-auditor` — smart contract bug class analysis
-- `chain-builder` — builds A→B→C exploit chains
-- `autopilot` — autonomous hunt loop (scope→recon→rank→hunt→validate→report)
-- `recon-ranker` — attack surface ranking from recon output + memory
-- `token-auditor` — fast meme coin/token rug pull and security analysis
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [Awarexone/Agentic-Bug-Hunter](https://github.com/Awarexone/Agentic-Bug-Hunter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-29 -->
+> Source: [awarexone/Agentic-Bug-Hunter](https://github.com/awarexone/Agentic-Bug-Hunter) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-10-04 -->
