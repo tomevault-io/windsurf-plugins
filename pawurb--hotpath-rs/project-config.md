@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to AI agent when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI agent when working with code in this repository.
 
 ## Project Overview
 
@@ -67,4 +67,4 @@ Each subsystem has a dedicated background worker thread named `hp-<subsystem>`, 
 
 ---
 > Source: [pawurb/hotpath-rs](https://github.com/pawurb/hotpath-rs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-08 -->
