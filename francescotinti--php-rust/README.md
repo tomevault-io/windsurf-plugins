@@ -7,11 +7,11 @@ PHP 8.5 reimplemented from scratch in Rust: bytecode VM, cycle-collecting GC, na
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [francescotinti/php-rust](https://github.com/francescotinti/php-rust).
+Original source: `AGENTS.md` in [francescotinti/php-rust](https://github.com/francescotinti/php-rust).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
