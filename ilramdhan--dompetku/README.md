@@ -7,11 +7,11 @@ Dompetku — a private, self-hosted personal finance tracker: budgets, goals, re
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ilramdhan/dompetku](https://github.com/ilramdhan/dompetku).
+Original source: `AGENTS.md` in [ilramdhan/dompetku](https://github.com/ilramdhan/dompetku).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
