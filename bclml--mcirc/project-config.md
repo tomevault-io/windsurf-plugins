@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Writing and submitting mcIRC addons
+description: mcIRC is an mIRC-style chat client for MeshCore mesh radios (Python 3 + tkinter, Windows). Chat is the core; every other
 ---
 
 # mcIRC - instructions for AI coding assistants
