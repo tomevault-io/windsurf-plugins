@@ -7,11 +7,11 @@ I’m a helpful assistant
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [834063245-creator/LantaiAgent](https://github.com/834063245-creator/LantaiAgent).
+Original source: `AGENTS.md` in [834063245-creator/LantaiAgent](https://github.com/834063245-creator/LantaiAgent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
