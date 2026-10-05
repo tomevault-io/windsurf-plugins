@@ -43,6 +43,7 @@ lifx-emulator --help                             # Full CLI reference
 - Pyright in standard mode
 - Pre-commit hooks run format, lint, and type-check on every commit
 - Never use the term "wide tile device" -- use "large matrix device" or "chained matrix device" instead
+- Call the device identifier the "serial", never the "serial number" -- LIFX defines the field as "serial". A serial looks like a MAC address but is not one
 - The public factory entry points in `packages/lifx-emulator-core/src/lifx_emulator/factories/factory.py` -- `create_device()` and the seven typed factories -- are exempt from the five-argument limit; each argument is a user-facing device option, and replacing them with a keyword-options object would be a breaking change to a published API (precedent: the `advertised_services` parameter added in PR #156)
 
 ## Architecture
@@ -70,18 +71,16 @@ All layers depend on Protocol interfaces, not concrete implementations. `Emulate
 - **Handlers return packets, not (header, packet) tuples** -- `process_packet()` constructs response headers
 - **Handlers can return lists** for multi-packet responses (multizone/tile)
 - **res_required flag** passed to handlers to decide whether to return state
-- **Serial format**: 12-char hex string (e.g., "d073d5000001") → 6-byte MAC + 2 null bytes
+- **Serial format**: 12-char hex string (e.g., "d073d5000001") → 6-byte serial + 2 null bytes in the header `target` field. A serial looks like a MAC address but is not one
 - **Switches** return `StateUnhandled` (type 223) for Light/MultiZone/Tile packets; handle Device.\* packets normally
 
 ### Core Library Modules (`packages/lifx-emulator-core/src/lifx_emulator/`)
 
 - **`devices/`**: `EmulatedLifxDevice` (packet processing), `DeviceManager` (lifecycle/routing), `DeviceState` (state dataclasses with capability flags: `has_color`, `has_infrared`, `has_multizone`, `has_matrix`, `has_hev`, `has_relays`, `has_buttons`)
 - **`handlers/`**: Packet handlers split by protocol namespace -- `device_handlers.py` (types 2-59), `light_handlers.py` (101-149), `multizone_handlers.py` (501-512), `tile_handlers.py` (701-720). Registry in `registry.py` maps packet types to handlers.
-- **`protocol/`**: Auto-generated `packets.py` (nested classes `Device.*`, `Light.*`, `MultiZone.*`, `Tile.*` with `PKT_TYPE`, `pack()`/`unpack()`), `header.py` (36-byte header), `serializer.py` (struct-based binary packing), `protocol_types.py` (LightHsbk, TileStateDevice, enums)
-- **`products/`**: Auto-generated `registry.py` (137+ products), `specs.py`/`specs.yml` (product-specific defaults like zone counts and tile dimensions)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Djelibeybi/lifx-emulator](https://github.com/Djelibeybi/lifx-emulator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-05 -->
