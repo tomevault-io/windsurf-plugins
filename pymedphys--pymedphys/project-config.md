@@ -1,11 +1,12 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Guidance for every coding agent working in this repository. Follow it, and
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for every coding agent working in this repository. Follow it, and
+the [contributor language policy](CONTRIBUTING.md#language), for every change.
 
 ## Development Commands
 
@@ -13,32 +14,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Install with uv (required for development)
-uv sync --extra all --group dev
+uv sync --python 3.14 --locked
 
 # Install pre-commit hooks
 uv run -- pre-commit install
 
 # Install for user use only
-pip install pymedphys[user]
+python -m pip install "pymedphys[user]"
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
+# Run default tests (slow/database selection has separate options)
 uv run -- pymedphys dev tests
 
-# Run specific test file or directory
+# Run specific test file or directory (relative to lib/pymedphys or the cwd)
 uv run -- pymedphys dev tests tests/path/to/test.py
 
 # Run with specific pytest options
 uv run -- pymedphys dev tests -v -s -k "test_name"
 
+# Add the slow tests to the default selection, or run only the slow tests
+uv run -- pymedphys dev tests --include-slow
+uv run -- pymedphys dev tests --slow
+
+# Run tests in parallel, one worker per CPU (pytest-xdist)
+uv run -- pymedphys dev tests --slow -n auto
+
 # Run doctests
 uv run -- pymedphys dev doctests
-
-# Run E2E tests with Cypress
-uv run -- pymedphys dev tests --cypress
 ```
 
 ### Code Quality
@@ -67,29 +72,64 @@ uv run -- pymedphys dev docs
 # The docs use Jupyter Book and are located in lib/pymedphys/docs/
 ```
 
+Documentation notebooks must use declared, locked dependencies rather than
+installing packages while running. Add documentation dependencies to the
+`docs` dependency group and regenerate `uv.lock`; CI and ReadTheDocs both
+install the documentation environment from it.
+Unexpected notebook errors and documentation build warnings fail the build.
+An install cell kept for readers running a notebook elsewhere (for example on
+Colab) must carry the `skip-execution` cell tag. Sphinx configuration is
+generated into `lib/pymedphys/docs/conf.py` from `_config.yml`; the generated
+file is gitignored, so edit `_config.yml`.
+
+Write procedures as instructions with their success criteria. State each
+fact once and link to it, prefer fixing a defect over documenting a workaround
+for it, and keep incident history and evidence caveats on the pull request
+rather than in the guide. Open a long procedure with a short checklist for
+readers who already know it, and move one-time setup into an appendix.
+
+Documents, decision logs, changelog entries, and pull request descriptions
+describe the state being merged. Fold revisions made while a pull request is
+open into the text; do not record them as superseded decisions, review logs,
+or construction history.
+
+Write changelog entries as informative release notes: state what changed, its effect, and what users should do, in declarative sentences. Do not phrase entries as answers to review questions or pre-empt objections ("is not limited to ...", "does not use ...", "has not been measured"); state the scope directly instead. When a fix changes results that earlier versions returned without an error, open the release section with a warning that says which inputs and functions were affected, by how much, and what to re-check, and also list the changed results and any changed return shapes or array order under (Potentially) breaking changes.
+
+Use ordinary Markdown links in Markdown pages and notebook Markdown cells.
+Follow the relative source-path and published-URL guidance in
+[Writing portable links](lib/pymedphys/docs/contrib/info/docs-guide.rst#writing-portable-links).
+
+Historical, site-specific deployment pages (for example the iCom listener,
+tunnelling, and rsync how-tos) record what was done at the time. Do not
+modernise, correct, or test their commands, versions, or links. Keep their text
+as originally written, or at the latest as it stood before the September 2025
+switch from Poetry to uv, and confine changes to a note marking the page as a
+historical record.
+
 ## Architecture Overview
 
 ### Project Structure
 
-PyMedPhys is a medical physics library organized as follows:
+PyMedPhys is a medical physics library organised as follows:
 
 - **lib/pymedphys/**: Main library code
   - `_<module>/`: Private implementation modules (e.g., `_dicom/`, `_gamma/`, `_mosaiq/`)
   - `<module>.py`: Public API modules that expose the private implementations
   - `cli/`: Command-line interface implementations
-  - `tests/`: Test suite organized by module
+  - `tests/`: Test suite organised by module
   - `_experimental/`: Experimental features not yet stable
   - `_streamlit/`: Streamlit web app components
 
 ### Project Maintainers
 
 PyMedPhys is maintained by:
+
 - SimonBiggs
 - sjswerdloff
 - Matthew-Jennings
 - pchlap
 
-When creating conda recipes, pull requests, or other metadata that requires maintainer information, use this list.
+Use this list wherever metadata needs the maintainers.
 
 ### Key Architectural Patterns
 
@@ -97,75 +137,9 @@ When creating conda recipes, pull requests, or other metadata that requires main
 
 2. **Delivery Abstraction**: The `Delivery` class (`_base/delivery.py`) provides a unified interface for treatment delivery data from various sources (DICOM, TRF files, Mosaiq, Monaco).
 
-3. **CLI Architecture**: The CLI is modular with subcommands defined in `cli/` subdirectory. Each major feature has its own CLI module (e.g., `dicom_cli`, `trf_cli`).
-
-4. **Data Management**:
-   - External data is managed through Zenodo with hashes stored in `_data/hashes.json`
-   - The `_data` module provides utilities for downloading and caching external datasets
-
-5. **Vendor-Specific Integrations**:
-   - **Mosaiq**: SQL-based integration for Elekta's oncology information system
-   - **Monaco**: Support for Elekta Monaco treatment planning system files
-   - **Pinnacle**: DICOM export functionality for Philips Pinnacle
-   - **iCOM**: Real-time treatment delivery monitoring for Elekta linacs
-
-### Testing Strategy
-
-- Unit tests are in `lib/pymedphys/tests/` mirroring the source structure
-- Tests use pytest with fixtures defined in `conftest.py`
-- Mock data and fixtures are in `_mocks/` and test data directories
-- E2E tests use Cypress for Streamlit app testing
-
-### Dependencies and Extras
-
-The project uses uv with optional dependency groups:
-- `user`: Standard user installation
-- `all`: All features including development tools
-- `dev`: Development tools (linting, formatting)
-- `docs`: Documentation building
-- `tests`: Testing dependencies
-- Specific features: `dicom`, `mosaiq`, `icom`, etc.
-
-## Important Implementation Notes
-
-1. **Beta Status**: PyMedPhys is in beta (version 0.x.x). APIs may change between releases.
-
-2. **DICOM Handling**: The library provides extensive DICOM functionality including anonymization, coordinate systems, dose calculations, and RT plan manipulation.
-
-3. **Gamma Analysis**: Core functionality for dose distribution comparison using efficient shell-based algorithm implementation.
-
-4. **Anthropic Integration**: Built-in Claude integration for AI-assisted features (requires API key).
-
-5. **Streamlit Apps**: Web-based tools for various tasks (anonymization, metersetmap, dose analysis) in `_streamlit/apps/`.
-
-6. **Database Connections**: Mosaiq integration requires appropriate database credentials and SQL Server access.
-
-## Common Development Patterns
-
-When implementing new features:
-
-1. Place implementation in appropriate `_module/` directory
-2. Expose public API through module-level `__init__.py` or dedicated public module
-3. Add corresponding CLI command if user-facing
-4. Include comprehensive tests following existing patterns
-5. Use type hints and follow existing code style
-6. Document with docstrings following NumPy style
-
-When modifying DICOM functionality, be aware of:
-- Coordinate system transformations
-- Anonymization requirements
-- VR (Value Representation) handling
-- RT-specific DICOM objects (RTDose, RTPlan, RTStruct)
-
-## Claude Code Workflow Guidelines
-
-### CRITICAL META-INSTRUCTION: Always Document General Feedback
-
-**EXCEPTIONALLY IMPORTANT**: When maintainers provide ANY general feedback, guidance, or principles:
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pymedphys/pymedphys](https://github.com/pymedphys/pymedphys) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
