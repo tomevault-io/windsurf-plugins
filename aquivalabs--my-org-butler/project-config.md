@@ -42,38 +42,38 @@ nothing else. Coding standards live in `.claude/rules/`.
    | "NOT for: …" negative routing in descriptions | subagent split (`data`, `data_cloud`, `org_dev`, `files_web`, `memory`, `automation`) + router |
    | Headless "NEVER create another plan" rules | dedicated `automation` subagent, visible only after transition |
 
-   Known agent bugs this must fix (from test runs): claims "Noted" without calling
-   StoreCustomInstruction; answers memory questions without calling LoadCustomInstructions;
-   doesn't surface memory content.
-   Syntax authority: `trailheadapps/agent-script-recipes` → `.airules/AGENT_SCRIPT.md`.
+   Memory store/load are now stable: `StoreCustomInstruction` is gated on a flag only a
+   successful store sets (no more fake "Noted"), and the load is tested against a known
+   email + a seeded Memory__c (see Learnings).
 2. **Packaging**: AiAuthoringBundle and AiTestingDefinition are NOT 2GP-packageable
    (confirmed against the 2GP Agentforce packaging doc). Plan: ship the `.agent` (and
    optionally the test XMLs) as plain-text static resources — admins open
    `<org-url>/resource/AgentScript` in the browser, copy, paste into Agent
    Studio. No LWC viewer (decided against vendoring forcedotcom/lwc-agentscript-viewer).
-   Namespace caveat: the packaged copy needs `apex://aquiva_os__…` targets (and
-   `aquiva_os__AnswerFromFile`); the inject transform does NOT exist yet — only the
-   strip in create-scratch-org.sh.
+   Namespace: the packaged copy needs `apex://aquiva_os__…` targets (and
+   `aquiva_os__AnswerFromFile`); `scripts/sync-agent-static-resource.sh` injects the
+   `aquiva_os__` prefix when it regenerates the static resources, and
+   `create-package-version.sh` runs it before building. (The scratch-org flow does the
+   opposite — strips the namespace in create-scratch-org.sh.)
 3. **README** showcase: "one agent, two implementations".
 
 ## Testing
 
 Test definitions live in `unpackaged/main/default/aiTestingDefinitions/`, eval configs
-in `scripts/`. All on the **Agentforce Studio (NGT) test runner**
+in `scripts/`. All on the **Agentforce Studio test runner**
 (Beta — the legacy AiEvaluationDefinition flow is officially "legacy" and was deleted here):
 
-- `AgentRegression.aiTestingDefinition-meta.xml` — 14
+- `AgentRegression.aiTestingDefinition-meta.xml` — 15
   per-action cases. Run: `sf agent test run --api-name AgentRegression --wait 30`.
-  Every case (except the dedicated LoadCustomInstructions test) presets the
-  `custom_instructions` context variable so the router's deterministic load is skipped
-  and the case asserts ONLY its own action. `action_sequence_match` is strict — stray
-  planner action calls fail it.
+  Every expected action sequence starts with `LoadCustomInstructions`: the router runs
+  it deterministically at the start of every session and the Agentforce Studio runner does not skip it.
+  `action_sequence_match` is strict — stray planner action calls fail it.
 - `PromptRegression.aiTestingDefinition-meta.xml` —
   prompt-template smoke tests (ConsolidateMemory via conversationHistory, AnswerFromFile).
 - `scripts/demo-story.yaml` — the multi-turn conference-demo conversation, driven over the REST
   endpoint below, judged by Claude in-memory. Covers what single-turn can't.
 
-NGT format facts: testCases have `inputs:` (utterance + optional contextVariables /
+Agentforce Studio test format facts: testCases have `inputs:` (utterance + optional contextVariables /
 conversationHistory — **every** history turn needs a `topic`, even user turns) and
 `scorers:` (topic_sequence_match, action_sequence_match, agent_handoff_match,
 bot_response_rating, response_match, coherence, conciseness, factuality, completeness,
@@ -83,12 +83,9 @@ in the Studio UI. YAML specs are transient: `sf agent generate test-spec
 --from-definition <xml>` ⇄ `sf agent test create --spec <yaml> --test-runner
 agentforce-studio`. Repo keeps only the XML.
 
-Smoke-test channel (works for classic and script agents):
-
-    POST /services/data/v66.0/actions/custom/generateAiAgentResponse/MyOrgButler
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aquivalabs/my-org-butler](https://github.com/aquivalabs/my-org-butler) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
