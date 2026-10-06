@@ -85,7 +85,7 @@ To build one or more targets:
 tools/ninja -C out/linux_clang_release -k 10000 trace_processor_shell perfetto_unittests
 ```
 
-All the C++ projects share the same "base" target (include/perfetto/base, include/ext/perfetto/base) and can share some other targets (See GN).
+All the C++ projects share the same "base" target (include/perfetto/base, include/perfetto/ext/base) and can share some other targets (See GN).
 
 ### C++ Code style
 
@@ -101,4 +101,4 @@ Highlights:
 
 ---
 > Source: [google/perfetto](https://github.com/google/perfetto) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
