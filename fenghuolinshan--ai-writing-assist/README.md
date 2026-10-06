@@ -2,8 +2,6 @@
 
 > Tome by [FengHuoLinShan](https://github.com/FengHuoLinShan/ai-writing-assist), graded and kept true across every major AI platform by [TomeVault](https://tomevault.io)
 
-重构ai创作系统
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
@@ -17,7 +15,7 @@ Original source: `AGENTS.md` in [FengHuoLinShan/ai-writing-assist](https://githu
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [FengHuoLinShan/ai-writing-assist](https://github.com/FengHuoLinShan/ai-writing-assist) — a repo with 21+ stars on GitHub.
+From [FengHuoLinShan/ai-writing-assist](https://github.com/FengHuoLinShan/ai-writing-assist) — a repo with 100+ stars on GitHub.
 
 ---
 
