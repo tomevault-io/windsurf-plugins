@@ -1,78 +1,122 @@
 ---
 trigger: always_on
-description: You are an AWS Well-Architected advisor. Apply the Well-Architected Framework whenever reviewing architectures, writing infrastructure code, or advising on design decisions.
+description: Steering file for agents and peers working in this repository. Covers contribution workflows, release process, open source community standards, and data hygiene rules.
 ---
 
-# Well-Architected Framework
 
-## Role
+# Agent Steering — WA Skills & Steering Docs
 
-You are an AWS Well-Architected advisor. Apply the Well-Architected Framework whenever reviewing architectures, writing infrastructure code, or advising on design decisions.
+## Deprecation status
 
-## When to Apply
+This repository's skill is deprecated in favor of the actively maintained
+`aws-well-architected-review` skill in
+[Agent Toolkit for AWS](https://github.com/aws/agent-toolkit-for-aws)
+([product page](https://aws.amazon.com/products/developer-tools/agent-toolkit-for-aws/)).
+See [SUCCESSOR_HANDOFF.md](SUCCESSOR_HANDOFF.md) and
+[issue #147](https://github.com/aws-samples/sample-well-architected-skills-and-steering/issues/147)
+for the migration plan. Practical implications for anyone working in this repo:
 
-Apply this guidance whenever the user:
-- Asks for an architecture review or design feedback
-- Requests help designing a new workload or system
-- Asks about best practices for reliability, security, cost, performance, or sustainability
-- Mentions "Well-Architected" or "WA review"
+- **New skills and features are not being accepted.** Do not open PRs adding
+  a new skill under `skills/` or new steering guidance.
+- **Bug fixes, security reports, and corrections are still welcome** and follow
+  the normal PR process below.
+- The "release after every merged PR" rule and the SLA table further down
+  still apply to accepted fix PRs, but are no longer a commitment for new
+  feature work, since none is being merged.
+- The evaluation harness under `evals/` keeps running as the
+  compatibility/regression suite `SUCCESSOR_HANDOFF.md` calls for.
 
-## Pillars
+## Overview
 
-Always consider all six pillars when evaluating or proposing architectures:
+Guidance for any agent or peer working in this repository. Read this before adding a skill, editing a steering file, merging a PR, or responding to a community issue.
 
-1. **Operational Excellence** — Automate operations, make frequent small reversible changes, refine procedures, anticipate failure, learn from operational events.
-2. **Security** — Implement a strong identity foundation, enable traceability, apply security at all layers, automate security best practices, protect data in transit and at rest, keep people away from data, prepare for security events.
-3. **Reliability** — Automatically recover from failure, test recovery procedures, scale horizontally, stop guessing capacity, manage change through automation.
-4. **Performance Efficiency** — Democratize advanced technologies, go global in minutes, use serverless architectures, experiment more often, consider mechanical sympathy.
-5. **Cost Optimization** — Implement cloud financial management, adopt a consumption model, measure overall efficiency, stop spending money on undifferentiated heavy lifting, analyze and attribute expenditure.
-6. **Sustainability** — Understand your impact, establish sustainability goals, maximize utilization, anticipate and adopt new more efficient offerings, use managed services, reduce downstream impact.
+## Usage
 
-## Design Principles
+Read this file before:
 
-When proposing solutions:
-- Favor managed services over self-managed infrastructure
-- Design for failure — assume any component can fail at any time
-- Decouple components to reduce blast radius
-- Use multiple Availability Zones for high availability
-- Implement least-privilege access for all identities
-- Automate everything that can be automated
-- Use infrastructure as code for all environments
-- Design for observability from day one
+- Adding or modifying a skill under `skills/`
+- Editing a steering file under `steering/`
+- Merging a pull request
+- Responding to an issue or pull request from an external contributor
+- Running evaluations
 
-## Trade-off Guidance
+## Instructions
 
-Acknowledge trade-offs explicitly:
-- Security controls may add latency — quantify the impact
-- High availability increases cost — present options at different tiers
-- Performance optimization may reduce portability — state the lock-in risk
-- Cost optimization may reduce resilience — make the risk visible
+### Tooling
 
-## Response Format
+Always use `uv` to run Python scripts. Never use bare `pip`, `python -m venv`, or `python` directly.
 
-When delivering Well-Architected guidance:
-- Lead with the most critical finding or recommendation
-- Group findings by pillar
-- Use severity labels: 🔴 High Risk, 🟡 Medium Risk, 🟢 Best Practice
-- Include "Why it matters" for each finding
-- Provide a concrete next step for each recommendation
+```bash
+uv run python run.py --skill my-new-skill --verbose
+```
 
-## Skills
+### Adding a New Skill
 
-For structured assessments, read and follow the step-by-step instructions in the corresponding `skills/{skill-name}/SKILL.md` file:
+Skills must conform to the [Agent Skills Open Specification](https://agentskills.io/specification).
 
-- `wa-review` — Full 6-pillar review with prioritized findings report
-- `security-assessment` — Deep-dive security posture assessment
-- `reliability-improvement-plan` — Find SPOFs and produce remediation plan
-- `cost-optimization-review` — Identify waste and right-sizing opportunities
-- `performance-efficiency` — Resource selection, scaling, caching assessment
-- `sustainability-optimization` — Utilization and carbon reduction assessment
-- `migration-readiness` — 7 Rs assessment with migration plan
-- `operational-excellence` — CI/CD, observability, incident management, operational maturity
-- `architecture-decision-record` — ADR with WA pillar impact analysis
-- `wa-builder` — Understand Well-Architected for your workload and generate visual artifacts (annotated diagrams, decision trees, roadmaps)
-- `wa-guardrails` — Generate preventive guardrails (Config rules, SCPs, CI policy checks, alarms) to keep a workload aligned with Well-Architected best practices over time
+1. Create a directory under `skills/` with a descriptive kebab-case name (e.g., `skills/my-new-skill/`).
+2. Add a `SKILL.md` file following the format in `skills/example-skill/SKILL.md`:
+   - YAML frontmatter: `name`, `description`, `version`, `tags`
+   - Sections: Overview, Usage, Instructions, Troubleshooting, Supporting Files, Core Concepts, Quick Reference, Common Mistakes
+   - Cross-references to relevant sections in `steering/well-architected.md`
+3. Add evaluations in `skills/my-new-skill/evals/evals.json`:
+   - At least 3 test cases with realistic user prompts
+   - 5–7 concrete PASS/FAIL assertions per case
+   - Cover critical gaps, WA baselines, and edge cases
+   - Run evals before opening a PR: `uv run python run.py --skill my-new-skill --verbose`
+4. Open a PR describing what the skill does and which WA pillar(s) it covers.
+
+### Modifying a Steering File
+
+1. Edit files under `steering/`.
+2. Guidance must be actionable and specific to the AWS Well-Architected Framework.
+3. Open a PR explaining what changed and why.
+
+### Pull Request Process
+
+1. Fork the repository and create a feature branch.
+2. Verify changes render correctly as Markdown.
+3. Submit a PR with a short title, a description of what changed, and which WA pillar(s) are covered.
+4. At least one project team member must review every PR. Large features should have additional reviewers.
+5. After a PR merges, create a new GitHub release (see below).
+
+### GitHub Releases
+
+Create a new GitHub release after every merged PR — no exceptions, including small changes.
+
+- Tag format: `vMAJOR.MINOR.PATCH`
+  - `PATCH` — documentation fixes, typo corrections, minor clarifications
+  - `MINOR` — new skills, new steering guidance, new evals
+  - `MAJOR` — breaking changes to skill format or steering structure
+- Release notes must list what was added, changed, or removed.
+
+### Design Principles
+
+- **Review and guidance, not code mutation.** Skills produce findings, plans, controls, or visual artifacts — never a PR-ready diff applied to the user's codebase. Keep the user in control of implementation decisions.
+- **Aligned, not compliant.** Do not use "compliant" or "compliance" as customer outcomes. Use "aligned with best practices," "adherent to WA guidance," or similar phrasing.
+- **Occam's razor.** Prefer the simplest skill design that satisfies the requirement. Avoid adding steps that do not add measurable value.
+- **Data-driven.** Findings must be grounded in evidence from the user's codebase or configuration. Cite the specific resource, file, or configuration that supports each finding.
+
+### Style Guidelines
+
+- Use clear, imperative language (e.g., "Evaluate whether…" not "You might want to evaluate…").
+- Include severity labels for findings: 🔴 High Risk, 🟡 Medium Risk, 🟢 Improvement.
+- Reference specific AWS services where applicable.
+- Keep steps concise — each step should represent a distinct action or evaluation.
+
+### Open Source Community Standards
+
+Respond to all issues and pull requests on schedule:
+
+| Situation | Target |
+|---|---|
+| New issue or PR opened | Review within 1 business day |
+| Security vulnerability | Respond immediately |
+| General issues / PRs | Respond within 1 week |
+| Non-urgent resolution | Resolve within 3 weeks |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [aws-samples/sample-well-architected-skills-and-steering](https://github.com/aws-samples/sample-well-architected-skills-and-steering) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
