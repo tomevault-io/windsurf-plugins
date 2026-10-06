@@ -1,0 +1,98 @@
+---
+trigger: always_on
+description: dashu is a library set of arbitrary precision numbers implemented in pure Rust, aiming to be a Rust-native alternative to GNU GMP + MPFR.
+---
+
+## Overview
+
+dashu is a library set of arbitrary precision numbers implemented in pure Rust, aiming to be a Rust-native alternative to GNU GMP + MPFR.
+
+**MSRV is a hard constraint for core crates only.** Core crates are the `dashu` meta-crate and its direct dependencies: `dashu-base`, `dashu-int`, `dashu-float`, `dashu-ratio`, `dashu-macros`, `dashu-cmplx`. The current MSRV is maintained in each crate's `Cargo.toml` and the top-level `README.md`. When modifying code in core crates, ensure it remains MSRV-compatible.
+
+Secondary crates (`dashu-python`, `benchmark/`, fuzz tests) are **not** bounded by the workspace MSRV policy. They may use newer Rust versions and dependency versions as needed.
+
+## Workspace structure
+
+| Crate | Directory | Description |
+|---|---|---|
+| `dashu-base` | `base/` | Common trait definitions and utilities |
+| `dashu-int` | `integer/` | Arbitrary precision integers (`UBig`, `IBig`) |
+| `dashu-float` | `float/` | Arbitrary precision floats (`FBig`, `DBig`, `CachedFBig`) |
+| `dashu-ratio` | `rational/` | Arbitrary precision rationals (`RBig`, `Relaxed`) |
+| `dashu-macros` | `macros/` | Procedural macros for literal big numbers |
+| `dashu-cmplx` | `complex/` | Arbitrary precision complex numbers (`CBig`) |
+| `dashu-python` | `python/` | PyO3 Python bindings (not in default members) |
+| *(benchmark)* | `benchmark/` | Profiling scratchpad, not a comprehensive benchmark suite |
+
+The `dashu` crate at the root is a meta-crate that re-exports all types from the sub-crates as nested modules (`dashu::base`, `dashu::integer`, etc.).
+
+## Build & test
+
+```sh
+# Check (matches CI for stable)
+cargo check --all-features --tests
+
+# Test (for local testing, differ from CI)
+cargo test --workspace --exclude dashu-python
+
+# Lint (warnings are errors)
+cargo clippy --all-features --all-targets --workspace --exclude dashu-python -- -D warnings
+
+# Format check
+cargo fmt --all -- --check
+```
+
+Note: always `--exclude dashu-python` when running workspace-wide commands, since `dashu-python` is in early development.
+
+## Code style
+
+- Rust edition 2021
+- `rustfmt.toml`: `fn_call_width = 80` (only config)
+- Every crate supports `no_std` via `#![cfg_attr(not(feature = "std"), no_std)]` — avoid using `std` APIs in default code paths
+- Doc comments use `# Examples` sections with runnable code — every public function on primitive number types must include a usage example
+- Modules are organized by operation (add, div, mul, cmp, convert, etc.)
+- Third-party trait implementations go in a `third_party/` module per crate, feature-gated
+- When borrowing an algorithm idea from GMP (or any other library), do **not** reference its function names in our docstrings or comments. Describe the algorithm in our own terms and use our own function names (e.g. write `add_mul_dword_same_len_in_place`, never `addmul_2` / `mpn_addmul_2`). External function names must not appear anywhere in the repo.
+- Tests for a specific algorithm/kernel belong in the same source file as the implementation, as a `#[cfg(test)] mod tests` block at the bottom — not in a separate integration test file under `tests/`. Reserve `tests/` for cross-cutting or public-API tests.
+- When debugging or writing test assertions, use `{:?}` (or `{:#?}` for the verbose form with digit/bit counts) to inspect arbitrary precision values. The [`Debug`] format prints a compact head‥tail representation (most significant digits `..` least significant digits) instead of dumping the entire number, making it readable even for thousand-digit integers.
+
+## Feature flags
+
+Feature flags are defined in each crate's `Cargo.toml` — read them directly for the current list. The top-level `dashu` crate forwards features to sub-crates.
+
+When adding a new feature that integrates a third-party crate, support each major version as a separate feature with a versioned suffix (e.g. `rand_v08` for rand 0.8.x, `num-traits_v02` for num-traits 0.2.x). Add an unversioned alias feature that points to the default/latest version. Update all relevant crate Cargo.tomls and the top-level `Cargo.toml`.
+
+## Changelog
+
+Each sub-crate has its own `CHANGELOG.md` (e.g. `integer/CHANGELOG.md`). **Every change must be documented** in the `## Unreleased` section of the affected crate's changelog as part of the same commit.
+
+Format:
+
+```markdown
+## Unreleased
+
+### Add
+- Description of new feature
+
+### Fix
+- Description of bug fix
+
+## 0.4.2
+- Change descriptions (older entries use flat lists)
+```
+
+Keep the `## Unreleased` section updated as you go. 
+
+## dashu-float internals
+
+- Estimating the number of digits can be costly — prefer using `log2_bounds` and `repr.digits_ub`/`digits_lb` instead of computing exact digit counts.
+- The number of digits in an `FBig` significand is at most the context precision, with one intentional exception: the result of an inexact addition or subtraction may carry a single **guard digit** (up to `precision + 1` digits). During internal calculations the bound can be violated more freely; use the methods on `Context` instead of the public API in that case.
+
+## Cached wrappers (`CachedFBig`, `CachedCBig`)
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [cmpute/dashu](https://github.com/cmpute/dashu) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
