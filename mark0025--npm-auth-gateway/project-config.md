@@ -1,347 +1,441 @@
 ---
 trigger: always_on
-description: Use when:
+description: Below is a **production-grade Cursor Project Rule** for **Next.js 16 project structure** based on the official documentation you provided, but rewritten as **strict architectural rules** (including anti-patterns).
 ---
 
-Below is a **Cursor rule aligned with the official Next.js 16.1 caching model** based directly on the documentation you provided.
-It enforces the **correct modern approach**:
+Below is a **production-grade Cursor Project Rule** for **Next.js 16 project structure** based on the official documentation you provided, but rewritten as **strict architectural rules** (including anti-patterns).
 
-* `fetch` caching
-* `use cache`
-* `cacheTag`
-* `revalidateTag('tag','max')`
-* `updateTag`
-* `revalidatePath`
-* **avoiding `unstable_cache` unless legacy**
+This rule is designed to **standardize large Next.js codebases** and prevent Cursor from generating messy folder structures.
 
-This prevents Cursor from generating **old Next.js 13/14 caching patterns**.
-
-Place this rule at:
+Place it at:
 
 ```
-.cursor/rules/nextjs16-caching-and-revalidation.mdc
+.cursor/rules/nextjs16-project-structure.mdc
 ```
 
 ---
 
-# `.cursor/rules/nextjs16-caching-and-revalidation.mdc`
+# `.cursor/rules/nextjs16-project-structure.mdc`
 
-````mdc
+```mdc
 ---
-description: "Defines correct caching and revalidation patterns for Next.js 16 using fetch, Cache Components, cacheTag, revalidateTag, updateTag, and revalidatePath."
-alwaysApply: false
+description: "Defines the required project structure, routing conventions, and file organization for Next.js 16 applications using the App Router."
+alwaysApply: true
 ---
 
-# Next.js 16 Caching and Revalidation Architecture
+# Next.js 16 Project Structure Rules
 
-This rule defines how caching and revalidation must be implemented in Next.js 16 applications.
+This rule enforces **consistent project structure and file conventions** for all Next.js 16 applications.
 
-Next.js provides several APIs for caching and invalidating cached data:
+The goal is to ensure:
 
-- fetch
-- use cache
-- cacheTag
-- revalidateTag
-- updateTag
-- revalidatePath
+- scalable architecture
+- predictable routing
+- maintainable codebases
+- compatibility with Next.js 16 features
 
-Legacy API:
-- unstable_cache (should generally be avoided)
-
-The goal is to:
-
-- minimize repeated work
-- reduce database load
-- enable partial data updates
-- support stale-while-revalidate patterns
+All generated code must follow these structural rules.
 
 ---
 
-# 1. Default Fetch Behavior
+# 1. Required Root Structure
 
-By default, fetch requests are **not cached**.
+Every project must follow this structure.
 
-Example:
+```
 
-```tsx
-const data = await fetch("https://api.example.com/data")
-````
+/
+app/
+components/
+lib/
+services/
+actions/
+types/
+public/
+next.config.ts
+package.json
+tsconfig.json
 
-To cache the request, set:
+```
 
-```tsx
-const data = await fetch("https://api.example.com/data", {
-  cache: "force-cache"
-})
+Optional:
+
+```
+
+src/
+
+```
+
+If `src` is used:
+
+```
+
+src/app
+src/components
+src/lib
+
+```
+
+ever mix both patterns.
+
+---
+
+# 2. The `app` Directory
+
+The `app` directory defines the **routing system**.
+
+Rules:
+
+- Every folder represents a **route segment**
+- A route becomes public only when it contains:
+
+```
+
+page.tsx
+
+```
+
+or
+
+```
+
+route.ts
+
+```
+
+Allowed files in route segments:
+
+```
+
+layout.tsx
+page.tsx
+loading.tsx
+error.tsx
+not-found.tsx
+template.tsx
+route.ts
+default.tsx
+
+```
+
+Never place random files at the route root.
+
+---
+
+# 3. Root Layout Requirement
+
+The root layout must exist:
+
+```
+
+app/layout.tsx
+
+```
+
+This layout must define:
+
+```
+
+<html>
+<body>
+```
+
+Example structure:
+
+```
+app/
+  layout.tsx
+  page.tsx
+```
+
+Without a root layout the application is invalid.
+
+---
+
+# 4. Route File Hierarchy
+
+The rendering hierarchy must follow this order:
+
+1. layout.tsx
+2. template.tsx
+3. error.tsx
+4. loading.tsx
+5. not-found.tsx
+6. page.tsx
+
+Never attempt to bypass this hierarchy.
+
+---
+
+# 5. Dynamic Routes
+
+Dynamic segments must use brackets.
+
+Examples:
+
+```
+app/blog/[slug]/page.tsx
+app/shop/[...slug]/page.tsx
+app/docs/[[...slug]]/page.tsx
 ```
 
 Rules:
 
-Use `force-cache` when:
+`[slug]` → single parameter
+`[...slug]` → catch-all
+`[[...slug]]` → optional catch-all
 
-* data changes infrequently
-* API responses can be reused
-* rendering static pages
+Parameters must be accessed asynchronously:
 
-Do not cache requests that contain:
+```
+const { slug } = await params
+```
 
-* authentication tokens
-* user-specific data
-* session data
+Never access params synchronously.
 
 ---
 
-# 2. Time-Based Revalidation
+# 6. Route Groups
 
-Fetch supports time-based revalidation using:
+Route groups organize routes **without affecting the URL**.
+
+Syntax:
 
 ```
-next.revalidate
+(folderName)
 ```
 
 Example:
 
-```tsx
-const data = await fetch("https://api.example.com/products", {
-  next: { revalidate: 3600 }
-})
+```
+app/(marketing)/page.tsx
+app/(shop)/cart/page.tsx
 ```
 
-Meaning:
+Use route groups for:
 
-```
-cache result
-revalidate every 3600 seconds
-```
+* separating product areas
+* separate layouts
+* large app organization
 
-Use this for:
-
-* CMS content
-* product listings
-* blog posts
-* marketing pages
+Never use route groups as a replacement for normal folders.
 
 ---
 
-# 3. Tagging Fetch Requests
+# 7. Private Folders
 
-Fetch requests may include **cache tags**.
-
-Example:
-
-```tsx
-const data = await fetch("https://api.example.com/users", {
-  next: {
-    tags: ["users"]
-  }
-})
-```
-
-Tags allow cache invalidation across multiple resources.
-
-Example use case:
-
-```
-getUsers()
-getUserById()
-getUserPosts()
-```
-
-All can share the same tag:
-
-```
-users
-```
-
-When the tag is invalidated, all cached entries refresh.
-
----
-
-# 4. Cache Components With "use cache"
-
-Next.js 16 introduced **Cache Components**.
-
-This allows caching **any server computation**, not only fetch.
+Private folders start with `_`.
 
 Example:
 
-```tsx
-import { cacheTag } from "next/cache"
-
-export async function getProducts() {
-  "use cache"
-
-  cacheTag("products")
-
-  const products = await db.query("SELECT * FROM products")
-
-  return products
-}
 ```
+app/blog/_components
+app/blog/_lib
+```
+
+Purpose:
+
+* colocated utilities
+* internal UI
+* helpers
+
+Private folders are **never routable**.
 
 Rules:
 
-Use `"use cache"` for:
-
-* database queries
-* expensive computations
-* filesystem reads
-* external APIs
-
-This replaces many previous `unstable_cache` usages.
+Never place `page.tsx` inside private folders.
 
 ---
 
-# 5. Using cacheTag
+# 8. Colocation Rules
 
-`cacheTag` associates cached work with a tag.
+Next.js allows colocating files inside route segments.
 
 Example:
 
-```tsx
-import { cacheTag } from "next/cache"
-
-export async function getPosts() {
-  "use cache"
-
-  cacheTag("posts")
-
-  return db.post.findMany()
-}
+```
+app/blog/
+  page.tsx
+  _components/
+    PostCard.tsx
+  _lib/
+    getPosts.ts
 ```
 
-Tags enable centralized invalidation.
+Only the output of:
 
-Multiple functions can reuse the same tag.
+```
+page.tsx
+route.ts
+```
+
+is exposed publicly.
+
+Everything else remains internal.
 
 ---
 
-# 6. Revalidating Cache With revalidateTag
+# 9. API Routes
 
-`revalidateTag` is used after a mutation to refresh cached data.
+APIs must use the `route.ts` convention.
 
 Example:
 
-```tsx
-import { revalidateTag } from "next/cache"
-
-export async function updateUser(id: string) {
-  await db.user.update({ where: { id } })
-
-  revalidateTag("users", "max")
-}
+```
+app/api/users/route.ts
 ```
 
-Rules:
-
-Always use:
+Bad:
 
 ```
-revalidateTag(tag, "max")
+app/api/users.ts
+pages/api/*
 ```
 
-Reason:
+Handlers must export HTTP methods:
 
-This enables **stale-while-revalidate** behavior:
-
-* users see cached content
-* background refresh occurs
-* avoids blocking requests
-
-Never omit `"max"` unless legacy behavior is required.
+```
+export async function GET() {}
+export async function POST() {}
+```
 
 ---
 
-# 7. Immediate Cache Expiration With updateTag
+# 10. Parallel Routes
 
-`updateTag` is designed specifically for **Server Actions**.
-
-Example:
-
-```tsx
-import { updateTag } from "next/cache"
-
-export async function createPost(formData: FormData) {
-  const post = await db.post.create({
-    data: {
-      title: formData.get("title"),
-      content: formData.get("content")
-    }
-  })
-
-  updateTag("posts")
-  updateTag(`post-${post.id}`)
-}
-```
-
-Rules:
-
-Use `updateTag` when:
-
-* user immediately expects to see the change
-* implementing **read-your-own-writes**
+Parallel routes use the `@slot` pattern.
 
 Example:
 
 ```
-createPost()
-redirect("/posts")
+app/dashboard/
+  @analytics/page.tsx
+  @team/page.tsx
 ```
 
-The new post appears instantly.
+Every slot **must include a default.tsx fallback**.
+
+Example:
+
+```
+@analytics/default.tsx
+```
+
+If not needed:
+
+```
+return null
+```
 
 ---
 
-# 8. Revalidating Routes With revalidatePath
+# 11. Intercepting Routes
 
-`revalidatePath` refreshes a specific route.
+Intercepting routes allow rendering routes inside other layouts.
 
-Example:
+Patterns:
 
-```tsx
-import { revalidatePath } from "next/cache"
-
-export async function updateProfile() {
-  await db.user.update()
-
-  revalidatePath("/profile")
-}
+```
+(.)folder
+(..)folder
+(..)(..)folder
+(...)folder
 ```
 
-Use when:
+Typical usage:
 
-* page depends on multiple data sources
-* route must refresh entirely
+* modal navigation
+* previews
+* overlays
 
-Prefer tag-based invalidation when possible.
+These should only be used for UI routing patterns.
 
 ---
 
-# 9. Server Actions and Cache Invalidation
+# 12. Metadata Files
 
-Mutations should follow this pattern:
+Metadata files must follow official naming conventions.
+
+Allowed examples:
 
 ```
-Server Action
-   ↓
-mutate database
-   ↓
-updateTag OR revalidateTag
-   ↓
-redirect or return
+favicon.ico
+icon.png
+apple-icon.png
+opengraph-image.png
+twitter-image.png
+robots.txt
+sitemap.xml
+```
+
+Dynamic metadata can be generated using:
+
+```
+opengraph-image.ts
+twitter-image.ts
+sitemap.ts
+robots.ts
+```
+
+Never invent custom metadata filenames.
+
+---
+
+# 13. Public Assets
+
+Static assets must live in:
+
+```
+public/
 ```
 
 Example:
 
-```tsx
-"use server"
-
-export async function createPost(data: FormData) {
-  await db.post.create()
-
-  updateTag("posts")
-}
 ```
+public/images/logo.png
+public/fonts/inter.woff2
+```
+
+Access via:
+
+```
+/images/logo.png
+```
+
+Never import assets from outside `public`.
+
+---
+
+# 14. Configuration Files
+
+Required configuration files:
+
+```
+next.config.ts
+package.json
+tsconfig.json
+eslint.config.mjs
+```
+
+Optional but recommended:
+
+```
+instrumentation.ts
+proxy.ts
+.env.local
+```
+
+Never commit:
+
+```
+.env
+.env.local
+.env.production
+```
+
+---
+
+# 15. Components and Shared Code
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
