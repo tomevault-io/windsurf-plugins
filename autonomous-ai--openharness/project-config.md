@@ -1,94 +1,54 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Follow [CONTRIBUTING.md](CONTRIBUTING.md) and the component's instructions. For
 ---
 
-# CLAUDE.md
+# Development and release work
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Follow [CONTRIBUTING.md](CONTRIBUTING.md) and the component's instructions. For
+validation and shipping, use [docs/validation-and-release.md](docs/validation-and-release.md).
 
-## What this is
+For product names, terminology, and visible copy, follow the
+[Naming System](docs/naming-system.md).
 
-Harness Desktop — a Flutter app that lists Harness machines and attaches xterm terminals to the
-agents running on them. **macOS and Linux (Ubuntu) are both real, released targets** — first-run
-provisioning (`lib/bootstrap/environment_provisioner.dart`), self-update
-(`lib/update/desktop_updater.dart`), and packaging (`scripts/upload-desktop.sh` /
-`scripts/upload-desktop-linux.sh`, see RELEASE.md) all branch per-OS internally rather than being
-separate code paths. The Windows runner exists but is unexercised. Package name is `harness`
-(`import 'package:harness/...'`). It lives under `desktop/` in the `autonomous-harness` repo, beside
-the CLI (`../cli`) and the backend (`../backend`); a few comments still point at `autonomous-code`,
-the older backend checkout, which is a sibling of this repo rather than part of it.
-
-**Grid was removed on 2026-09-11, when the project was killed**: no `lib/grid/`, no `lib/share/`, no
-Settings ▸ Providers or Share Intelligence, no provider pill, model picker, node dashboard or
-usage-limit card, and first-run setup no longer installs the Grid CLI. The last commit that still
-has all of it is the `archive/grid` branch — bring anything back from there rather than rewriting
-it from memory. The harness CLI (`autonomous-harness`) still carries its own grid code
-(`gridLaunch.ts`, `gridWebMcp.ts`, `agent_retarget`, `harness grid login`); nothing here calls it.
-
-## Toolchain and commands
-
-`pubspec.yaml` pins `sdk: ^3.13.0`, i.e. **Flutter ≥ 3.47 / Dart ≥ 3.13**. An older Flutter fails at
-`flutter pub get` ("version solving failed") and every command below fails with it — check
-`flutter --version` first.
-
-The macOS project is migrated to **Swift Package Manager** (`macos/Runner.xcodeproj` references
-`FlutterGeneratedPluginSwiftPackage`). Run `flutter config --enable-swift-package-manager` once, then
-`flutter pub get` — the generated `macos/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift`
-only lists the plugin dependencies when SPM is on at `pub get` time. With SPM off, `flutter run` falls
-back to CocoaPods and rewrites tracked files (`project.pbxproj`, `contents.xcworkspacedata`, the
-`Flutter-*.xcconfig`s) and adds `macos/Podfile`; revert those rather than committing them.
-
-```bash
-flutter pub get
-flutter analyze                                   # lints: package:flutter_lints, no custom rules
-flutter test                                      # whole unit/widget suite (test/)
-flutter test test/terminal_session_test.dart      # one file
-flutter test test/ws_conn_test.dart --plain-name "reconnects"   # one test by name substring
-flutter run -d macos                              # or: flutter run -d linux
-bash scripts/build-macos-debug.sh                  # pins the host's release renderer
-flutter build macos --release
-flutter build linux --release                     # Ubuntu build host only — no cross-compiling
-```
-
-Native integration fixtures need a device and the test-mode environment:
-
-```bash
-FLUTTER_TEST=1 flutter test -d macos --no-pub integration_test/native_terminal_e2e_test.dart
-FLUTTER_TEST=1 flutter test -d macos --no-pub integration_test/native_workspace_e2e_test.dart
-```
-
-Both use in-memory state and fake terminal traffic; the workspace fixture also simulates agent
-creation and machine-link responses. They refuse to run without `FLUTTER_TEST=1`, which disables
-production-only pollers and persistence. The workspace fixture exercises the native macOS titlebar; its injected
-Flutter keys do not establish physical AppKit keyboard/IME behavior. A fixture build replaces
-`Harness.app`, so rebuild the normal review artifact afterward with
-`bash scripts/build-macos-debug.sh --no-pub --target lib/main.dart`.
-
-**Local macOS renderer:** Intel review builds need Skia, just like the Intel release.
-Plain `flutter build macos --debug` leaves Impeller enabled and can produce invisible
-bitmap artwork on Intel. The script above pins the built bundle's renderer and re-signs
-it so Finder launches work too; Apple Silicon keeps Impeller. For `flutter run` and
-native integration tests on Intel, add `--no-enable-impeller`. Check companion artwork
-on the real renderer with `integration_test/companion_art_native_test.dart`; headless
-image tests alone do not catch this failure.
-
-Local stack / E2E scripts (the CLI comes from this repo's `../cli`; the backend from a sibling
-`autonomous-code` checkout next to `autonomous-harness` — override with `AUTONOMOUS_CODE_ROOT` /
-`HARNESS_REPO_ROOT`; see README):
-
-```bash
-make terminal-local-manual   # boots backend+CLI locally and runs lib/main_local_manual.dart
-make terminal-local-e2e
-make terminal-prod-e2e       # opt-in, refuses without PROD_TERMINAL_E2E=1 + release evidence vars
-```
-
-Release (`make release-desktop` from the repo root, which tags `vX.Y.Z_desktop` and lets CI build; `make upload-desktop VERSION=…` and
-`make upload-desktop-linux` are the by-hand escape hatches, the latter on an Ubuntu host only) is
-documented in RELEASE.md. **macOS ships TWO builds of one universal app**, differing only in
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Measure the user's request through completion. Record implementation, validation,
+  merge, publication, and waiting separately; an Actions duration is not the total.
+- Choose the necessary checks before starting them. Run affected tests and relevant
+  integration checks; use full suites for broad changes. Start independent checks
+  together within the machine's capacity. Do not add a second full local suite after
+  equivalent CI has passed just because it is time to merge or release.
+- Reuse evidence only for the source and environment it covers. A squash with the same
+  tree does not invalidate it; conflict resolutions, dependencies, or relevant code
+  changes do. For deterministic checks, declare complete input/toolchain scopes in
+  the validation plan and pass the prior receipt with `--reuse`; inspect the diff
+  for new interactions. See the validation guide for recording that evidence.
+- Time-bound tests and baseline diagnosis. An unchanged, already documented failure
+  does not need another full baseline run for every release. New failures and failures
+  in changed behavior still need investigation. Never describe an incomplete or failed
+  suite as passing, and never silently skip a required check to meet a time target.
+- Once required checks pass, carry out the authorized merge/release without another
+  validation cycle. Verify published versions and checksums, then report completion.
+  Desktop's `--wait` follows the exact tag/SHA through the workflow's six-artifact
+  verification; reuse that receipt instead of repeating the downloads manually.
+- Prepare the PR and review while checks run. For an authorized merge after review
+  and required non-CI checks, use `make merge-pr` with the reviewed head/main SHAs,
+  CI run/scope, and `--merge` (see the validation guide). It collects CI evidence,
+  rechecks the source, merges, and verifies the resulting tree. For evidence only,
+  use `scripts/record-ci-validation.py RUN_ID --scope SCOPE --pr PR_NUMBER --wait`.
+  Retain routine results in the ignored receipt and PR body instead of another
+  documentation commit. Resolve source differences explicitly before reusing evidence.
+  Process and Desktop VM CI can retain the original run across unrelated changes
+  when their verified source-input contracts match; pass that run to the same
+  collector/merge helper. Check its changed-path list and validate other affected
+  scopes separately. Changes to included tests, dependencies or workflows require
+  new evidence; see the validation guide for the complete input boundaries.
+- For an authorized Desktop release, start `make release-desktop ARGS="--prepare"`
+  from the final pushed PR branch alongside validation and review. It prepares
+  verified packages without publishing; merge and release only after checks pass.
+  Avoid starting candidates while implementation is still changing. The release
+  automatically reuses matching Desktop build inputs/version and otherwise builds
+  normally; unrelated CLI, firmware or documentation merges do not force a rebuild.
 
 ---
 > Source: [autonomous-ai/openharness](https://github.com/autonomous-ai/openharness) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
