@@ -132,4 +132,4 @@ Other core modules:
 
 ---
 > Source: [safe-global/safe-eth-py](https://github.com/safe-global/safe-eth-py) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
