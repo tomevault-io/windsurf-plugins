@@ -1,119 +1,36 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code when working with this repository.
+description: Every RPC in `FileSystemServiceImpl` must call `IpcCall.requireHost()` before
 ---
 
-# CLAUDE.md
+# Filesystem service authorization
 
-This file provides guidance to Claude Code when working with this repository.
+Every RPC in `FileSystemServiceImpl` must call `IpcCall.requireHost()` before
+logging paths, validating paths or performing I/O. A refused caller must not gain
+path-existence information or put its supplied path into a log or exception.
+`FileSystemServiceAuthorizationTest` pins the descriptor method set and exercises
+both non-host roles over authenticated TLS; keep that coverage when adding RPCs.
 
-## Project Overview
+Watch collection checks authority before registration and again before emission.
+Idle credential revocation is implemented by the shared IPC interceptor, which
+closes the call and cancels its coroutine; the filesystem test verifies this through
+a quiet live watch. This PR depends on the authenticated transport from #575.
 
-BOSS (Business Operating System Service) is a desktop application built with Kotlin Multiplatform and Compose Multiplatform. It features WebAuthn/passkey authentication, integrated browser (JxBrowser), terminal integration (BossTerm), customizable keyboard shortcuts, and role-based access control.
+`FileSystemDataProviderProxy` currently has no production construction site. A
+plugin PROCESS credential is deliberately refused by this host-only service.
+Wiring that proxy for plugins requires a separately reviewed path-grant design;
+do not remove the host guard just to make a plugin call succeed.
 
-**Target Platforms**: Desktop only (macOS, Windows, Linux).
+Run focused validation with the workspace shared build lock:
+`./gradlew :boss-service-filesystem:test :boss-service-filesystem:ktlintCheck :boss-service-filesystem:detekt`.
+Do not launch the application for these tests.
 
-## Essential Commands
-
-```bash
-./gradlew run                    # Run desktop application
-./gradlew showVersion           # Display current version
-./gradlew test                  # Run tests
-./gradlew build                 # Build application
-./gradlew packageDmg            # Build macOS DMG
-./gradlew packageMsi            # Build Windows MSI
-./gradlew packageDistributionForCurrentOS  # Linux packages
-./gradlew incrementVersion      # Increment patch version
-```
-
-## Workflow Rules
-
-**IMPORTANT**: Do NOT run `./gradlew run` in a blocking/foreground way just to test — the user runs and tests the app themselves. **Exception:** launching the app **in a dedicated bottom split pane is allowed** (backgrounded so it doesn't wedge the pane).
-
-### Running commands in a visible terminal pane
-
-When a terminal MCP server is available, prefer it over the plain `Bash` tool for commands worth showing — it runs in a visible BossTerm pane and still returns stdout/stderr/exit code. Two servers may be present depending on which app hosts the session; use whichever the session's `SessionStart` hook designates:
-
-- **`mcp__boss__*`** — exposed by the `terminal-tab` plugin inside BossConsole (e.g. `mcp__boss__run_command`, `run_in_sidebar`).
-- **`mcp__bossterm__*`** — exposed by the standalone BossTerm app.
-
-For a bottom split use `panel: horizontal_split`. Reuse a pane across calls by passing back its `pane_id`. Keep plain `Bash` for trivial read-only commands where opening a visible pane is churn. (Do not mix the two servers in one session — they target different app instances.)
-
-## Architecture
-
-### Module Structure
-- **`composeApp/`** - Main Compose Multiplatform UI application
-- **`server/`** - Minimal Ktor server component
-- **`shared/`** - Shared business logic
-- **`modules/`** - Microkernel / out-of-process architecture Gradle modules
-  (`boss-ipc`, `boss-service-*`, `boss-orchestrator`, `boss-ui-sdk`,
-  `boss-mastery-*`, `boss-app-*`). They keep flat Gradle paths (`:boss-ipc`),
-  only the directory lives under `modules/`; excluded on Windows-ARM64 (no
-  protoc binary). `boss-ipc`/`boss-ui-sdk` publish as upstream jars consumed by
-  the standalone `boss-microkernel-runtime` repo.
-- **`plugin-platform/`** - Host-side plugin platform / SDK modules
-  (`plugin-loader`, `plugin-repository`, `plugin-api-core`, …). This is the
-  infrastructure that loads and runs plugins, **not** the plugins themselves —
-  those live in the separate `boss_plugins` repo.
-- **`supabase/`** - Database migrations and Edge Functions
-
-### External Dependencies
-- **BossEditor** (`com.risaboss:bosseditor-compose-desktop`) - Standalone code editor with LSP and PSI support. **Not a host dependency** — bundled privately inside the `editor-tab` plugin, like BossTerm inside `terminal-tab` (see [docs/BOSSEDITOR.md](docs/BOSSEDITOR.md))
-
-### Key Technologies
-- Kotlin Multiplatform + Compose Multiplatform
-- JxBrowser (version pinned in `gradle/libs.versions.toml`, with BOSS-branded Chromium)
-- Decompose for navigation
-- Supabase + Edge Functions
-- BossTerm for terminal integration (bundled in the `terminal-tab` plugin)
-
-## Configuration
-
-Create `local.properties`:
-```properties
-jxbrowser.license.key=<your-license-key>
-SUPABASE_URL=https://api.risaboss.com
-SUPABASE_ANON_KEY=<anon-key>
-SUPABASE_FUNCTION_URL=https://api.risaboss.com/functions/v1
-GITHUB_TOKEN=ghp_your_token_here  # Optional, 60 req/hr without
-OPENAI_API_KEY=sk-your-key-here  # Optional, enables AI self-healing in RepairEngine
-MACOS_DEVELOPER_ID=Developer ID Application: ...  # Optional, signs local packaging
-```
-
-**Priority**: Environment variables > System properties > local.properties > Embedded build config
-
-There are NO credential fallbacks in source (public repo). Packaged builds get
-the JxBrowser license and Supabase settings baked in by the
-`generateEmbeddedConfig` Gradle task, which reads env vars (CI secrets) or
-local.properties at build time and emits a git-ignored classpath resource.
-
-### Supabase Deployment
-```bash
-supabase functions deploy <function-name> --project-ref pcnwqamqdnsadranufjv --no-verify-jwt
-supabase link --project-ref pcnwqamqdnsadranufjv  # First time
-```
-
-## Code Quality
-
-- Use Compose Multiplatform Resource API (not Android resources)
-- Location: `composeApp/src/commonMain/composeResources/`
-- Use `BossLogger` for logging (not `println()` or `printStackTrace()`)
-- All Kotlin files must end with newline
-
-## Logging
-
-Use structured logging via `BossLogger` (SLF4J backend):
-
-```kotlin
-private val logger = BossLogger.forComponent("MyComponent")
-
-logger.info(LogCategory.AUTH, "User signed in", mapOf("email" to LogSanitizer.maskEmail(email)))
-logger.error(LogCategory.NETWORK, "Request failed", error = exception)
-```
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+System-path validation resolves existing ancestors before read/create/write or watch access,
+including missing destinations below symlinked directories. Rename/delete validate the
+parent but operate on the final directory entry without following its symlink; recursive
+delete must not traverse symlinked directories. Invalid paths return INVALID_ARGUMENT.
+This host-only guard is not a sandbox against concurrent filesystem mutation.
 
 ---
 > Source: [risa-labs-inc/BossConsole](https://github.com/risa-labs-inc/BossConsole) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
