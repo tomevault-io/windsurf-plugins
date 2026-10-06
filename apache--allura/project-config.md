@@ -21,9 +21,6 @@ description: Licensed to the Apache Software Foundation (ASF) under one
     specific language governing permissions and limitations
     under the License.
 -->
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
 
@@ -42,25 +39,35 @@ This is a multi-package monorepo. Each top-level directory is an independently `
 - `Forge*/` (ForgeTracker, ForgeWiki, ForgeDiscussion, ForgeGit, ForgeSVN, ForgeBlog, ForgeChat, ForgeActivity,
   ForgeLink, ForgeShortUrl, ForgeFiles, ForgeFeedback, ForgeUserStats, ForgeImporters) — individual "tools"
   (plugins) that plug into the core platform. Each has its own `setup.py`/`pyproject.toml`, own package dir
-  (lowercase, e.g. `forgetracker/`), own tests, and its own `*.egg-info`.
+  (lowercase, e.g. `forgetracker/`) and its own tests.
 - `scm_config/`, `solr_config/` — config for git/http and Solr, used by the Docker dev environment.
 - `scripts/` — one-off admin/migration scripts (run with the app's Python env), e.g.
   `scripts/convert_encrypted_field.py`, `scripts/migrations/`.
 
-Sibling repos extend this one as plugins rather than living in this monorepo: SourceForge's commercial
-layer `forge-classic` (dev checkout typically `/src/forge-classic`, deployed `/var/local/forge-classic`)
-and its theme `sftheme` (`/src/sftheme`, `/var/local/sftheme`). This repo has zero references back to
+Sibling repos extend this one as plugins rather than living in this monorepo. This repo has zero references back to
 either — the dependency runs one-way, entirely through the entry-point mechanism described below. See
 "Working with sibling extension repos" further down for how to debug across that boundary.
 
 Each Forge package registers itself with the core platform via entry points declared in its
-`pyproject.toml` (older packages may still show these in `setup.cfg`/`*.egg-info`), most importantly:
+`pyproject.toml`, most importantly:
 ```toml
 [project.entry-points.allura]
 Tickets = "forgetracker.tracker_main:ForgeTrackerApp"
 ```
 To find the root controller for a tool, look up its `[project.entry-points.allura]` entry, find that
 `Application` subclass, and look at its `root` attribute.
+
+## Code Style
+
+- No inline imports — put imports at the top of the file.
+- Prefer f-strings over `%s` formatting or `.format()` in new code; match existing nearby code if it already uses one of those.
+- Comments and docstrings: sparing and short — only when something is genuinely non-obvious.
+- Add type hints to function signatures when practical; keep them simple.
+- Line length up to 119 chars is ok
+
+### Tests
+- `assert` statements: no trailing explanation string.
+- Use `mock.patch` (decorator or context manager), not the `monkeypatch` pytest fixture.
 
 ## Setup / running locally
 
@@ -89,22 +96,19 @@ Tests use `pytest`. Run everything from the repo root:
 ./run_tests --coverage      # with coverage
 ./run_tests -n X # number of processes to be used per suite
 ./run_tests -m X # number of parallel processes to be used per suite
+./run_tests --no-network    # skip the tests marked `network` (see below)
 ```
 Or run a single package/test directly (faster while iterating):
 ```bash
 cd ForgeTracker && pytest
 cd ForgeTracker && pytest forgetracker/tests/functional/test_root.py::TestRootController::test_new_ticket -v
+cd Allura && pytest -m 'not network'
 ```
 Notes:
-- `AlluraTest` always runs first (it's imported by everything else; catches syntax errors early).
-- `ForgeGit` and `ForgeSVN` are NOT safe to run with `pytest-xdist` multiprocessing (`run_tests` handles
-  this automatically).
-- Functional/controller tests subclass `allura.tests.TestController`; its `self.app` is a WebTest app with
-  `c.project` preset to the `test` project and `c.user` preset to `test-admin`. Tools under test are
-  mounted at `/<entry point name>/`.
+- A handful of tests need outbound internet (they fetch `httpbin.dev` or `allura.apache.org`, or resolve a
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apache/allura](https://github.com/apache/allura) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
