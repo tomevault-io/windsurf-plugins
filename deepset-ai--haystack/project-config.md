@@ -15,4 +15,4 @@ description: - Edit `docs-website/docs/pipeline-components/` pages only for outd
 
 ---
 > Source: [deepset-ai/haystack](https://github.com/deepset-ai/haystack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
