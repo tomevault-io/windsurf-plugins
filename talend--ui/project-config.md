@@ -1,21 +1,26 @@
 ---
 trigger: always_on
-description: This is **Talend/UI**, a Yarn workspaces monorepo containing shared front-end libraries for Talend products.
+description: Instructions for AI coding agents (Claude Code, Copilot, Cursor, Codex…). Task-specific skills live in `.agents/skills/`; the maintenance directive for this file lives in `.agents/context/`.
 ---
 
-# Talend/UI — AI Coding Instructions
+# Talend/UI — Agent Instructions
+
+Instructions for AI coding agents (Claude Code, Copilot, Cursor, Codex…). Task-specific skills live in `.agents/skills/`; the maintenance directive for this file lives in `.agents/context/`.
 
 ## Repository Overview
 
-This is **Talend/UI**, a Yarn workspaces monorepo containing shared front-end libraries for Talend products.
+This is **Talend/UI**, a pnpm workspaces monorepo containing shared front-end libraries for Talend products.
 
-- **Workspaces**: `packages/*`, `tools/*`, `fork/*`
+- **Workspaces**: `packages/*`, `tools/*`, `fork/*` (`pnpm-workspace.yaml`)
 - **Stack**: React 18, TypeScript 5, Babel 7
-- **Build tooling**: shared `@talend/scripts-*` packages (see `tools/`)
+- **Build tooling**: shared `@talend/scripts-*` packages (see `tools/`), orchestrated by [Turborepo](https://turbo.build) (`turbo.json`)
+- **Tests**: Vitest · **Lint**: oxlint + Stylelint · **Format**: Prettier
 - **Versioning**: [Changesets](https://github.com/changesets/changesets) (`@changesets/cli`)
-- **Package manager**: Yarn 1 (classic)
+- **Package manager**: pnpm (version pinned in `packageManager` / `.tool-versions`)
 
-Run `yarn install` at the root. The `postinstall` script builds all libraries (`build:lib` + `build:lib:esm`).
+Run `pnpm install` at the root, then `pnpm build` (`build:lib` + `build:lib:esm` through turbo).
+
+Common root commands: `pnpm vitest:run`, `pnpm oxlint:run`, `pnpm stylelint:run`, `pnpm storybook:start-design-system`. Per package: `pnpm --filter <name> run <script>`.
 
 ---
 
@@ -25,18 +30,18 @@ Run `yarn install` at the root. The `postinstall` script builds all libraries (`
 
 Config: `@talend/scripts-config-prettier` (see `tools/scripts-config-prettier/.prettierrc.js`).
 
-| Setting          | Value              |
-| ---------------- | ------------------ |
-| Print width      | 100                |
-| Quotes           | Single (`'`)       |
-| Trailing commas  | All                |
-| Semicolons       | Yes                |
-| Indentation      | **Tabs**           |
-| Arrow parens     | Avoid (`x => x`)   |
-| JSON / rc files  | 2-space indent     |
-| SCSS files       | 1000 print width   |
+| Setting         | Value            |
+| --------------- | ---------------- |
+| Print width     | 100              |
+| Quotes          | Single (`'`)     |
+| Trailing commas | All              |
+| Semicolons      | Yes              |
+| Indentation     | **Tabs**         |
+| Arrow parens    | Avoid (`x => x`) |
+| JSON / rc files | 2-space indent   |
+| SCSS files      | 1000 print width |
 
-Prettier runs automatically on commit via `lint-staged` on `*.{json,md,mdx,html,js,jsx,ts,tsx}`.
+Prettier runs automatically on commit via `lint-staged` (Husky) on `*.{json,md,mdx,html,js,jsx,ts,tsx}`.
 
 ### EditorConfig
 
@@ -45,31 +50,18 @@ Prettier runs automatically on commit via `lint-staged` on `*.{json,md,mdx,html,
 - Tabs for `.js`, `.jsx`, `.css`, `.scss`
 - 2-space indent for `.json`
 
-### ESLint
+### Linting (oxlint)
 
-Each package has an `.eslintrc.json` extending `@talend` (resolved from `@talend/eslint-config` → `tools/scripts-config-eslint`).
+Config: `@talend/scripts-config-oxlint` (`tools/scripts-config-oxlint/index.mjs`), consumed by each package's `oxlint.config.mts` (and the root one).
 
-Key rules and extends:
-
-- `eslint:recommended`, `airbnb-base`, `plugin:prettier/recommended`
-- `plugin:react/recommended`, `plugin:react/jsx-runtime`
-- `plugin:react-hooks/recommended` — `rules-of-hooks` is error, `exhaustive-deps` is warning
-- `plugin:jsx-a11y/recommended`
-- `plugin:testing-library/react`, `plugin:jest-dom/recommended`
-- `plugin:storybook/recommended`
-
-Important rules:
-
+- Run: `pnpm oxlint:run` (all) or `oxlint` inside a package
 - **No `console.log`** — only `console.warn` and `console.error` allowed
-- JSX only in `.jsx` / `.tsx` files (`react/jsx-filename-extension`)
-- `@talend/import-depth` (error) — controls import depth into packages
-- `import/prefer-default-export`: off — named exports are fine
-- `react/jsx-props-no-spreading`: off — spread is allowed
-- `react/require-default-props`: off
-- `@typescript-eslint/no-explicit-any`: warning (not error) in `.ts`/`.tsx` files
-- `import/no-extraneous-dependencies`: off in test and story files
+- JSX only in `.jsx` / `.tsx` files
+- Prefer named exports
+- Avoid `any` in `.ts`/`.tsx` (warning)
+- Follow `react-hooks` rules (`rules-of-hooks` error, `exhaustive-deps` warning) and `jsx-a11y`
 
-For TypeScript projects, the config auto-detects `tsconfig.json` and adds `@typescript-eslint` with `airbnb-typescript`.
+`tools/scripts-config-eslint` and `tools/eslint-plugin` still exist in the repo, but oxlint is the linter used by the workspace scripts.
 
 ### Stylelint
 
@@ -88,29 +80,29 @@ Config: `stylelint-config-sass-guidelines` (see `tools/scripts-config-stylelint/
 
 Base config: `@talend/scripts-config-typescript/tsconfig.json` (see `tools/scripts-config-typescript/`).
 
-| Setting                      | Value      |
-| ---------------------------- | ---------- |
-| `strict`                     | `true`     |
-| `target`                     | `ES2015`   |
-| `module`                     | `esnext`   |
-| `moduleResolution`           | `bundler`  |
-| `jsx`                        | `react-jsx`|
-| `declaration`                | `true`     |
-| `sourceMap`                  | `true`     |
-| `isolatedModules`            | `true`     |
-| `esModuleInterop`            | `true`     |
-| `forceConsistentCasingInFileNames` | `true` |
-| `skipLibCheck`               | `true`     |
+| Setting                            | Value       |
+| ---------------------------------- | ----------- |
+| `strict`                           | `true`      |
+| `target`                           | `ES2015`    |
+| `module`                           | `esnext`    |
+| `moduleResolution`                 | `bundler`   |
+| `jsx`                              | `react-jsx` |
+| `declaration`                      | `true`      |
+| `sourceMap`                        | `true`      |
+| `isolatedModules`                  | `true`      |
+| `esModuleInterop`                  | `true`      |
+| `forceConsistentCasingInFileNames` | `true`      |
+| `skipLibCheck`                     | `true`      |
 
 Each package has a local `tsconfig.json` that extends this base:
 
 ```jsonc
 {
-  "extends": "@talend/scripts-config-typescript/tsconfig.json",
-  "include": ["src/**/*"],
-  "compilerOptions": {
-    "rootDirs": ["src"]
-  }
+	"extends": "@talend/scripts-config-typescript/tsconfig.json",
+	"include": ["src/**/*"],
+	"compilerOptions": {
+		"rootDirs": ["src"],
+	},
 }
 ```
 
@@ -135,11 +127,9 @@ Design system components (`packages/design-system`) use **closed APIs** — cons
 ### Component Conventions
 
 - Support `ForwardRef` — wrap components with `forwardRef` so consumers can pass refs.
-- Match native HTML element types — component props should extend the underlying element's attributes (e.g., `HTMLButtonElement` for buttons).
-- Export components from the package's root `index.ts`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Talend/ui](https://github.com/Talend/ui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
