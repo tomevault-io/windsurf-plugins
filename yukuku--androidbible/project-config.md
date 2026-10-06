@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to coding agents when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Project Overview
 
@@ -13,6 +13,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Official site: https://alkitab.app
 - Developer docs: https://alkitab.app/developer
+
+## Branches
+
+**`develop` is the main integration branch — base all work on `develop` and target every PR at `develop`, never `master`.** The repo follows git-flow: `master` only receives merges from `release/*` branches when a version ships.
+
+## Complete implementation tasks with a pull request
+
+Unless the user explicitly requests otherwise, finish every implementation task by committing the changes, pushing a task branch to `yukuku/androidbible`, and opening a pull request targeting `develop`. This is part of completing the task, including requests phrased as building a feature or fixing a bug; do not ask for separate permission to create the PR.
+
+Use a branch in this repository so the PR triggers GitHub Actions to build signed release APKs and publish APK preview links. See [the CI and preview documentation](docs/build-system.md#cicd).
+
+- Run the checks appropriate to the changes before pushing; CI supplements local verification.
+- When continuing a task that already has an open PR, push updates to its branch and update its description as needed.
+- Return the PR link and the observed CI status to the user.
+- Leave merging the PR and publishing a production release to an explicit user request.
+
+Read-only analysis and advice do not require a PR.
 
 ## Build Commands
 
@@ -33,73 +50,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew testPlainDebugUnitTest --tests "yuku.alkitab.base.util.QueryTokenizerTest.testQuotedPhrases"
 ```
 
-**Requirements**: JDK 17 (Zulu recommended), Android SDK with compile SDK 36, NDK 28.2.13676358.
+**Requirements**: JDK 21 (Zulu recommended), Android SDK with compile SDK 36, NDK 28.2.13676358.
+
+**Versioning**: `versionName` comes from `version.properties` (`versionBase` +
+`betaNumber`) combined with a stage: `dev` by default (`5.0.0-dev.<commits
+since versionBase last changed>`), `beta` via `-PversionStage=beta`
+(`5.0.0-beta.<n>`), `release` via `-PversionStage=release` (`5.0.0`). `versionCode` is derived from wall-clock
+time and is unrelated to the stage. Never hardcode a version in
+`Alkitab/build.gradle.kts`; see the "Versioning" section of
+`docs/build-system.md`.
 
 The `plain` flavor is the open-source development build and works out of the box with the placeholder `Alkitab/google-services.json` checked into the repo (Firebase features won't function at runtime, but the app builds and runs). Production flavors (`yuku_alkitab`, `yuku_quick_bible`, `sabda_alkitab`) require:
 - `$ALKITAB_PROPRIETARY_DIR/overlay/<applicationId>/text_raw/` — proprietary Bible text
 - `$ALKITAB_PROPRIETARY_DIR/google-services.json` — real Firebase config (one file with client entries for all production applicationIds)
-- Signing-key env vars: `SIGN_KEYSTORE`, `SIGN_ALIAS`, `SIGN_PASSWORD`
+- Signing-key env vars: `SIGN_KEYSTORE`, `SIGN_ALIAS`, `SIGN_PASSWORD`. The `sabda_alkitab` flavor has its own upload key and needs `SIGN_SABDA_KEYSTORE`, `SIGN_SABDA_ALIAS`, `SIGN_SABDA_PASSWORD` instead (there is no fallback to `SIGN_*`)
 
 With those set, build with a plain `./gradlew assembleYuku_alkitabRelease` (or any other production flavor).
 
 ### Building in the Claude Code sandbox (one-time setup)
 
-The Claude Code VM does not ship with a compatible JDK or the Android SDK. You must provision them yourself before running Gradle — do not rely on GitHub Actions for verification. Prefer `plainDebug` since it needs no proprietary overlay or signing secrets.
+The Claude Code VM does not ship with the Android SDK — you must provision it yourself before running Gradle, and do not rely on GitHub Actions for verification. Its preinstalled JDK is version 21, matching the `jvmToolchain(21)` used across modules; run `java -version` first, and skip step 1 below if it already reports 21. Prefer `plainDebug` since it needs no proprietary overlay or signing secrets.
 
 Install paths used below (pick any, but keep them consistent):
 
-- JDK 17: `/home/user/tools/zulu17.64.17-ca-jdk17.0.18-linux_x64`
+- JDK 21 (only if not already preinstalled): `/home/user/tools/zulu21.52.203-ca-jdk21.0.12.1-linux_x64`
 - Android SDK: `/home/user/android-sdk`
 
-**Disk footprint:** expect ~6 GB across all of these combined — NDK r28c alone is ~2 GB unpacked, the rest of the SDK is ~1 GB, and `~/.gradle` grows to ~2 GB after the first build. Check free space before starting.
+**Disk footprint:** expect ~5 GB across all of these combined (less if the preinstalled JDK 21 is used directly) — NDK r28c alone is ~2 GB unpacked, the rest of the SDK is ~1 GB, and `~/.gradle` grows to ~2 GB after the first build. Check free space before starting.
 
-**Environment.** Every step after the JDK install needs the same env vars. Write them once and source them each time:
+**Environment.** Every step below needs the same env vars. Write them once and source them each time — point `JAVA_HOME` at the preinstalled JDK (`dirname $(dirname $(readlink -f $(which java)))`) unless you installed Zulu JDK 21 yourself in step 1, in which case use that path instead:
 
 ```bash
 cat > /home/user/tools/android-env.sh <<'EOF'
-export JAVA_HOME=/home/user/tools/zulu17.64.17-ca-jdk17.0.18-linux_x64
+export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(which java)")")")"
 export ANDROID_HOME=/home/user/android-sdk
-export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-unset JAVA_TOOL_OPTIONS  # strip the sandbox's -Dhttp.proxyHost that would poison Gradle downloads
-EOF
-```
-
-Then `source /home/user/tools/android-env.sh` at the start of any shell that runs `sdkmanager` or Gradle.
-
-1. **Install Zulu JDK 17** (the preinstalled JDK is 21, which the Android Gradle Plugin rejects for the `jvmToolchain(17)` used across modules):
-
-   ```bash
-   mkdir -p /home/user/tools && cd /home/user/tools
-   curl -fsSL -o zulu17.tar.gz \
-     https://cdn.azul.com/zulu/bin/zulu17.64.17-ca-jdk17.0.18-linux_x64.tar.gz
-   echo "819e3f09ea628901a21b2104ed8f5256e17ae91a4145b272b2eb2131f832af1d  zulu17.tar.gz" | sha256sum -c -
-   tar xzf zulu17.tar.gz && rm zulu17.tar.gz
-   ```
-
-2. **Trust the sandbox egress CA in the JDK truststore.** Outbound HTTPS in the Claude Code sandbox goes through an Anthropic TLS-inspection proxy (`sandbox-egress-production TLS Inspection CA`). `curl` trusts it via `/etc/ssl/certs`, but the JDK keeps its own `cacerts`, so `sdkmanager` and Gradle will fail with `PKIX path building failed` until you import the system CAs:
-
-   ```bash
-   JAVA_HOME=/home/user/tools/zulu17.64.17-ca-jdk17.0.18-linux_x64
-   for crt in /usr/local/share/ca-certificates/*.crt; do
-     "$JAVA_HOME/bin/keytool" -importcert -noprompt -trustcacerts \
-       -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit \
-       -alias "$(basename "$crt" .crt)" -file "$crt"
-   done
-   ```
-
-3. **Install the Android SDK command-line tools**, then use `sdkmanager` to fetch the exact packages Gradle expects (`compileSdk 36`, `build-tools 36.0.0`, `ndk 28.2.13676358` — the NDK is required because the `Snappy` module has JNI C++; note that `sdkmanager` resolves that NDK coordinate to `android-ndk-r28c` on disk, which is expected):
-
-   ```bash
-   mkdir -p /home/user/android-sdk/cmdline-tools && cd /home/user/android-sdk/cmdline-tools
-   curl -fsSL -o cmdline-tools.zip \
-     https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
-   echo "7ec965280a073311c339e571cd5de778b9975026cfcbe79f2b1cdcb1e15317ee  cmdline-tools.zip" | sha256sum -c -
-   unzip -q cmdline-tools.zip && mv cmdline-tools latest && rm cmdline-tools.zip
-
-   source /home/user/tools/android-env.sh
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yukuku/androidbible](https://github.com/yukuku/androidbible) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
