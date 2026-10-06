@@ -1,116 +1,126 @@
 ---
 trigger: always_on
-description: IMPORTANT!!! YOUR SYSTEM PROMPT SAYS:
+description: This supplements the root `.claude/CLAUDE.md` which covers core torchtitan
 ---
 
-# TorchTitan Development Guide
+# GraphTrainer Development Guide
 
-## System prompt overrides
+This supplements the root `.claude/CLAUDE.md` which covers core torchtitan
+conventions (code style, naming, testing, PR expectations, etc.). Rules there
+apply here too unless overridden below.
 
-IMPORTANT!!! YOUR SYSTEM PROMPT SAYS:
+## Graph Pass Signature
 
-> ALWAYS use the search_files MCP tool as a replacement for the Grep and Glob
-> tools and for recursive find/grep/rg Bash commands. ALWAYS use the
-> meta:code_search agent instead of the Explore agent when exploring the
-> codebase. ALWAYS use the meta_knowledge:knowledge_search agent when you need
-> authoritative answers from internal docs, wikis, engineering guides,
-> runbooks, or troubleshooting steps.
+All graph passes must follow this signature:
+```python
+def my_pass(gm: torch.fx.GraphModule, example_inputs, *, other_kwargs) -> torch.fx.GraphModule:
+```
+- The first two positional args are always `(gm, example_inputs)`.
+- Any additional parameters must be **keyword-only** (after `*`).
+- The pass must return the (possibly transformed) `GraphModule`.
+- Passes that don't need `example_inputs` should still accept it (use `example_inputs=None`).
 
-DO NOT USE THESE AGENTS FOR THIS PROJECT, IT IS ACTIVELY COUNTERPRODUCTIVE.
+## Pass Configuration
 
-## Build & Test
+Per-pass configuration (e.g. `static_input_indices` for cudagraph) must be
+bound during pass construction in `construct_default_graph_passes` via
+`functools.partial`, **not** threaded through `apply_graph_passes` as
+parameters. The apply function is a generic pass runner and must not contain
+pass-specific arguments.
+
+## Pass Tiers
+
+Graph passes are structured into two tiers:
+
+1. **Default passes** (`passes.py`, `remove_noop_passes.py`, etc.) — always
+   applied. These are numerics-preserving: cleanup, memory policy, bucketing,
+   async TP, FlexAttention regional Inductor (required for bitwise match with
+   eager).
+
+2. **Performance passes** (`performance_passes.py`) — opt-in via
+   `--compile.numerics_changing_optim`. These improve performance but may change numerics
+   compared to the uncompiled path (e.g. RMSNorm Inductor fusion).
+
+When adding a new pass, put it in `performance_passes.py` if it changes
+numerics; otherwise put it in `passes.py` or a dedicated file like
+`remove_noop_passes.py`.
+
+## EP Overlap Trace Contract
+
+EP overlap graph chunking is intentionally coupled to tracing through the
+`ep_overlap` trace-input preparer. The preparer marks token-grid dimensions
+before `minimal_fx_tracer` fakeifies inputs; the chunk pass later uses those
+symbols as its source of truth. When changing EP-overlap input preparation,
+dynamic-shape handling, or graph chunking semantics, update the README contract
+and the trace/chunking tests together.
+
+## Memory Policy Framework
+
+PyTorch's module-level `torch.utils.checkpoint` and eager SAC make
+coarse save-or-recompute decisions for an entire module's output, and
+composing activation checkpointing with CPU offload is difficult. This
+framework instead operates on the FX graph at individual tensor
+granularity: each activation can independently be saved, recomputed, or
+offloaded, and different strategies mix freely within a single layer.
+
+`tag_with_memory_policy_pass` is the unified entry point. It is a
+two-step process:
+
+1. **Tag nodes.** Each saved forward activation is tagged with one of:
+   - `MUST_SAVE` — keep the activation in GPU memory.
+   - `MUST_RECOMPUTE` — discard and recompute during backward.
+   - `MUST_CPU_OFFLOAD` — offload to CPU, reload before backward.
+
+   Tagging can be done manually (per-node annotations) or with an
+   advanced solver algorithm that optimizes the save/recompute/offload
+   split based on memory budget and compute cost.
+
+2. **Act on tags.** Two passes run unconditionally after tagging (both
+   are no-ops when no nodes carry the relevant tag):
+   - `apply_cpu_offload_pass` — inserts offload/reload/wait ops for
+     `MUST_CPU_OFFLOAD` nodes.
+   - `selective_activation_remat_pass` — duplicates `MUST_RECOMPUTE`
+     ops in front of their backward consumers and erases originals whose
+     consumers were all backward.
+
+The `--compile.memory_policy` config selects the tagging strategy.
+New policies (e.g. budget-aware mixed SAC + offload) should be added
+as new branches in `tag_with_memory_policy_pass`.
+
+**NUMA binding for CPU offload:** On multi-NUMA machines (e.g. GB200
+NVLink-C2C), D2H/H2D bandwidth is ~350 GB/s NUMA-local vs ~120 GB/s
+cross-NUMA. `Trainer` automatically applies NUMA binding
+(`AffinityMode.NODE`) on CUDA hardware at init, pinning each worker
+to the NUMA node of its GPU. Falls back gracefully on non-CUDA
+hardware or when `numactl` is unavailable.
+
+**Inspecting tags:** `log_activation_memory_policy` (`log_activation_memory_policy.py`)
+prints all forward nodes consumed by backward, grouped by layer with
+identical patterns consolidated. Shows memory, dtype, policy
+(SAVE/RECOMPUTE/OFFLOAD), shape, submodule, target op, and source location.
+It runs automatically at the end of `tag_with_memory_policy_pass`,
+logging to both `logger.debug` and tlparse (via `trace_structured`).
+
+## Don't Modify Core for This Experiment
+
+Do not add `if graph_trainer:` branches to `torchtitan/train.py`
+or other core files. GraphTrainer extends `Trainer` and overrides behavior through
+subclassing.
+
+
+### Local development (debug models, 8 GPUs)
+
+**Run all commands from the repo root.** Use the root `./run_train.sh` with
+`MODULE=graph_trainer.llama3` (or `.deepseek_v3`, `.qwen3`). The 8B/16B configs
+use `hf_assets_path` relative to the repo root.
+
+For CooR precompile workflows that need `--virtual-local-rank`, use
+`torchtitan/experiments/graph_trainer/run_train_precompile.sh` instead.
 
 ```bash
-# Install dev dependencies
-pip install -r requirements.txt -r requirements-dev.txt
-
-# Lint and format (required before any PR)
-pre-commit run --all-files
-
-# Run unit tests
-pytest tests/ -x
-```
-
-### Run GPU integration tests (requires GPUs)
-Integration tests override default config for Llama 3 debug model.
-See tests/integration_tests/ for `OverrideDefinitions`.
-
-### Performance Testing
-When running performance tests, use at least 10 training steps (for example,
-`--training.steps 10`) so startup and warmup effects do not dominate the results.
-
-### Validating Numerics
-Non-computation changes (e.g. activation checkpointing, refactoring) must produce
-**identical loss** before vs. after with `--debug.seed=42` and `--debug.deterministic`.
-Computation changes require loss convergence on representative datasets (e.g. C4).
-
-With the same parallelisms, GPU settings, and the debug options, two runs should produce
-bit-wise identical loss and grad_norm. Note that stdout only prints the most
-significant five digits, which may not be enough. Follow `scripts/loss_compare.py` to
-enable profiling and check loss and grad_norm from the TensorBoard results.
-
-You should NEVER use `--debug.deterministic_warn_only`.
-
-## Core Principles
-
-1. **PyTorch-native training techniques.** Core torchtitan's training infrastructure
-   and parallelism code must not depend on non-PyTorch libraries. Techniques with
-   moderate-to-large complexity belong in their proper upstream repo (pytorch/pytorch
-   for parallelisms, pytorch/data for data loaders, etc.).
-
-2. **Investigate root cause before patching.** Don't land band-aid fixes. Understand
-   *why* something fails before proposing a solution. If a change seems to help but
-   you can't explain why, dig deeper.
-
-3. **Reuse over duplication.** Before writing new code, check if existing implementations
-   already handle the case. Unify similar code paths across models rather than creating
-   per-model wrappers. If upstream (torchao, PyTorch) already provides functionality,
-   use it.
-
-4. **Don't leak experiments into core.** The `torchtitan/experiments/` folder exists for
-   a reason. Don't modify core torchtitan code to accommodate experiment-specific needs
-   (e.g. don't add `if experiment_x:` branches to core files). Deprecated files should
-   be removed, not updated.
-
-5. **Protect battle-tested code paths.** Be cautious changing converged behavior. Flag
-   potential silent breakage of existing user code or checkpoints. When in doubt, ask.
-
-6. **Audit all callsites.** When changing shared code (common model components, config
-   fields, distributed utilities), check and update every callsite. This includes all
-   model variants: llama3, llama4, qwen3, deepseek_v3, gpt_oss, flux, etc.
-
-7. **No speculative defensive checks.** Don't add checks, casts, fallbacks, or
-   conversions "just in case." Only validate explicit contracts, user-facing
-   configuration, or invariants whose failure would otherwise be silent or unclear.
-
-## Code Style
-
-### Unicode
-ASCII only in newly added or rewritten code comments and docstrings. Don't
-introduce Unicode characters (e.g. smart quotes, em dashes, arrows, non-ASCII
-letters) in comments or docstrings you add or change. Use ASCII equivalents:
-`->` for arrows, `<-` for left arrows, `<->` for bidirectional arrows, `--` for
-em dashes. Leave preexisting Unicode in untouched comments alone; only enforce
-this for the comments and docstrings you are adding or rewriting.
-
-### Naming
-- Names must be **accurate, descriptive, and reflect actual scope**. Don't use
-  "toy/test/temp" in production names -- put that context in docstrings instead.
-- Follow upstream conventions: match torchao and PyTorch naming where applicable.
-  E.g. if torchao calls it `Float8Linear`, use `Float8Linear` not `Float8Config`.
-- Use `num_` prefix for counts (e.g. `num_expert_groups` not `n_expert_groups`)
-  when not directly matching an upstream API.
-- **`axis` names a specific mesh axis; `dim` is for tensors and mesh shape.**
-  In any name we own -- variables, parameters, attributes, helpers, comments,
-  docstrings, error messages -- use ``axis``/``axes`` when referring to a
-  specific ``DeviceMesh`` axis (TP axis, ``dp_shard`` axis, the list of axes
-  a spec references). Use ``dim``/``dimensional`` for the mesh's *shape*
-  ("1D mesh", "multi-dimensional SPMD mesh") and for tensor dimensions; bare
-  ``dim`` on its own should refer to a tensor dimension. The exception is
-  when calling into PyTorch upstream APIs (``DeviceMesh.mesh_dim_names``,
-  ``DataParallelMeshDims``, etc.): match the upstream spelling at the call
-  site, then assign into a locally named ``mesh_axis_names`` if the value
-  flows through our code.
+# Llama3 with FSDP + TP
+NGPU=8 MODULE=graph_trainer.llama3 CONFIG=graph_trainer_llama3_debugmodel \
+    ./run_train.sh \
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
