@@ -3,13 +3,13 @@ trigger: always_on
 description: This repository uses Nx as the task runner and monorepo manager for building and testing Angular ESLint packages.
 ---
 
-# Guidelines for Claude Code
+# Guidelines for coding agents
 
 This repository uses Nx as the task runner and monorepo manager for building and testing Angular ESLint packages.
 
 ## Package Manager
 
-This project uses **pnpm** (version 10) as the package manager. Always use `pnpm` commands instead of `npm` or `yarn`.
+This project uses **pnpm** as the package manager. Use the Node.js and pnpm versions declared in `package.json`. Always use `pnpm` commands instead of `npm` or `yarn`.
 
 ## Required checks
 
@@ -26,7 +26,7 @@ pnpm nx run-many -t check-rule-configs # run pnpm nx run-many -t update-rule-con
 When working on an individual rule, the preferred way to run tests is to target the specific spec file. For example, to run tests for the `prefer-standalone` rule within the `eslint-plugin` project, run:
 
 ```bash
-pnpm nx test eslint-plugin packages/eslint-plugin/tests/rules/prefer-standalone/spec.ts
+pnpm nx test eslint-plugin tests/rules/prefer-standalone/spec.ts
 ```
 
 Once rule specific tests have passed, run commands for all projects:
@@ -94,20 +94,13 @@ When creating or modifying ESLint rules:
 - **Snapshot testing**: Used for E2E tests and some rule outputs
 - **Test organization**: Tests mirror the source structure in separate `tests/` directories
 
-### Build and Release
+### Rule test layout
 
-- **Build**: Uses Nx with TypeScript compilation
-- **Targets**: Multiple build targets (`build`, `compile`) with dependency management
-- **Release**: Conventional Commits with automated changelogs
-- **Versioning**: Uses Nx release management with GitHub integration
-
-Claude should NEVER run versioning or publishing commands.
-
-## Commit conventions
-
+- Put rule test fixtures in `packages/<project>/tests/rules/<rule-name>/cases.ts`, in the exported `valid` or `invalid` array.
+- Keep `spec.ts` focused on setting up `RuleTester` and passing the imported `valid` and `invalid` arrays to `ruleTester.run()`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [angular-eslint/angular-eslint](https://github.com/angular-eslint/angular-eslint) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
