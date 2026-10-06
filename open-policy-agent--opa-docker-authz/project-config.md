@@ -1,0 +1,196 @@
+---
+trigger: always_on
+description: Generates `WithToken(v Token) ParseOption` function.
+---
+
+# AGENTS.md
+
+## For Module Consumers
+
+If you are writing code that *uses* jwx (not developing jwx itself):
+
+- **Examples**: See `examples/` directory for runnable usage patterns
+- **Documentation**: See `docs/` directory and package READMEs
+- **API Reference**: Use `go doc` or https://pkg.go.dev/github.com/lestrrat-go/jwx/v3
+
+The rest of this document focuses on developing the jwx library itself.
+
+---
+
+## Go Version
+
+This project requires **Go 1.25.0** or later. Check `go.mod` for the exact version.
+
+## Module Path vs Physical Layout
+
+This repository uses a **flat layout** with vanity import paths. There is no physical `v3/` directory.
+
+| Branch | Module Path | Physical Root |
+|--------|-------------|---------------|
+| `develop/v3` | `github.com/lestrrat-go/jwx/v3` | `/` (repo root) |
+
+`import "github.com/lestrrat-go/jwx/v3/jwt"` → files are at `./jwt/`, not `./v3/jwt/`.
+
+## Code Generation
+
+### Immutable Rule
+
+**NEVER edit files ending in `_gen.go` directly.** These are generated files. Edit the generator sources instead.
+
+### Generated Files Pattern
+
+Files matching `*_gen.go` are generated. Examples:
+- `jwt/options_gen.go`
+- `jwt/token_gen.go`
+- `jws/headers_gen.go`
+- `jwk/rsa_gen.go`
+- `jwa/signature_gen.go`
+
+### Generator Locations
+
+| Generator | Location | Input Files | Output |
+|-----------|----------|-------------|--------|
+| `genoptions` | `tools/cmd/genoptions/` | `{jwa,jwe,jwk,jws,jwt}/options.yaml` | `*/options_gen.go` |
+| `genjwt` | `tools/cmd/genjwt/` | `tools/cmd/genjwt/objects.yml` | `jwt/*_gen.go` |
+| `genjws` | `tools/cmd/genjws/` | `tools/cmd/genjws/objects.yml` | `jws/*_gen.go` |
+| `genjwe` | `tools/cmd/genjwe/` | `tools/cmd/genjwe/objects.yml` | `jwe/*_gen.go` |
+| `genjwk` | `tools/cmd/genjwk/` | `tools/cmd/genjwk/objects.yml` | `jwk/*_gen.go` |
+| `genjwa` | `tools/cmd/genjwa/` | `tools/cmd/genjwa/objects.yml` | `jwa/*_gen.go` |
+| `genreadfile` | `tools/cmd/genreadfile/` | - | ReadFile helpers |
+
+### Regeneration Commands
+
+```bash
+# Regenerate all code (includes options via `go generate .`)
+make generate
+
+# Regenerate specific package (objects/types only, NOT options)
+make generate-jwt
+make generate-jws
+make generate-jwe
+make generate-jwk
+make generate-jwa
+
+# Regenerate options only (options.yaml → options_gen.go for all packages)
+go generate .
+# or directly:
+./tools/cmd/genoptions.sh
+```
+
+**Important:** `make generate-<pkg>` does **not** regenerate options. If you
+edit an `options.yaml` file, run `make generate` or `go generate .`.
+
+## Functional Options Pattern
+
+Options are defined in `{package}/options.yaml` and generated into `{package}/options_gen.go`.
+
+Example `options.yaml` entry:
+
+```yaml
+options:
+  - ident: Token
+    interface: ParseOption
+    argument_type: Token
+    comment: |
+      WithToken specifies the token instance...
+```
+
+Generates `WithToken(v Token) ParseOption` function.
+
+## Multi-Module Structure
+
+This repository contains multiple Go modules. The nested modules use `replace` directives for local development.
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| Main | `./go.mod` | Core library |
+| Examples | `./examples/go.mod` | Usage examples |
+| CLI | `./cmd/jwx/go.mod` | Command-line tool |
+| Perf Bench | `./bench/performance/go.mod` | Performance benchmarks |
+| Comparison | `./bench/comparison/go.mod` | Library comparison |
+| Generators | `./tools/cmd/*/go.mod` | Code generators |
+
+### Local Development
+
+The `examples/go.mod` contains:
+```go
+replace github.com/lestrrat-go/jwx/v3 v3.0.0 => ../
+```
+
+No `go.work` file is committed. When working across modules, either:
+1. Create a temporary `go.work` file (it is .gitignored)
+2. Rely on the `replace` directives already in place
+
+## Development Commands
+
+```bash
+# Run all tests
+make test
+
+# Run tests with specific build tags
+make test-goccy       # Use goccy/go-json
+make test-es256k      # Enable ES256K support
+make test-alltags     # All optional features
+
+# Run short/smoke tests
+make smoke
+
+# Generate coverage report
+make cover
+make viewcover
+
+# Lint
+make lint
+
+# Format and tidy
+make imports
+make tidy
+```
+
+### Test Script Details
+
+Tests are run via `./tools/test.sh` which iterates over:
+- `.` (main module)
+- `./examples`
+- `./bench/performance`
+- `./cmd/jwx`
+
+## Package Directory Map
+
+| Package | Responsibility |
+|---------|----------------|
+| `jwa/` | Algorithm identifiers (e.g., `RS256`, `ES384`, `A128GCM`) |
+| `jwk/` | JSON Web Keys - key representation and management |
+| `jws/` | JSON Web Signatures - `Sign()` and `Verify()` |
+| `jwe/` | JSON Web Encryption - `Encrypt()` and `Decrypt()` |
+| `jwt/` | JSON Web Tokens - claims and validation |
+| `jwt/openid/` | OpenID Connect ID tokens |
+| `transform/` | Token transformation utilities |
+
+## Relevant RFCs
+
+- RFC 7515 - JWS (JSON Web Signature)
+- RFC 7516 - JWE (JSON Web Encryption)
+- RFC 7517 - JWK (JSON Web Key)
+- RFC 7518 - JWA (JSON Web Algorithms)
+- RFC 7519 - JWT (JSON Web Token)
+- OpenID Connect Core 1.0
+
+## Error Handling
+
+Sentinel errors are exposed via functions. Use `errors.Is()`:
+
+```go
+if errors.Is(err, jwt.TokenExpiredError()) { ... }
+```
+
+| Package | Function | Meaning |
+|---------|----------|---------|
+| `jwt` | `TokenExpiredError()` | `exp` claim not satisfied |
+| `jwt` | `TokenNotYetValidError()` | `nbf` claim not satisfied |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [open-policy-agent/opa-docker-authz](https://github.com/open-policy-agent/opa-docker-authz) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
