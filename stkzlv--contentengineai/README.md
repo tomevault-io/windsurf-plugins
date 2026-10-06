@@ -7,14 +7,14 @@ AI-powered video production pipeline that scrapes e-commerce products, generates
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [stkzlv/ContentEngineAI](https://github.com/stkzlv/ContentEngineAI).
+Original source: `GEMINI.md` in [stkzlv/ContentEngineAI](https://github.com/stkzlv/ContentEngineAI).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [stkzlv/ContentEngineAI](https://github.com/stkzlv/ContentEngineAI) — a repo with 9+ stars on GitHub.
