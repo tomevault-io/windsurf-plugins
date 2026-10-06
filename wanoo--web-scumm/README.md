@@ -7,11 +7,11 @@ Mobile-first SCUMM-style point-and-click engine with authoring tools and an AI-f
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [wanoo/web-scumm](https://github.com/wanoo/web-scumm).
+Original source: `AGENTS.md` in [wanoo/web-scumm](https://github.com/wanoo/web-scumm).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
