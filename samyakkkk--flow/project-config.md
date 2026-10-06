@@ -1,158 +1,77 @@
 ---
 trigger: always_on
-description: This document describes the process for going from zero to full Alchemy coverage for a single AWS service:
+description: Cursor Cloud environment setup and run notes for T3 Code (Cursor-specific; not for other editors/CI)
 ---
 
-# AWS Service Bring-Up Process
 
-This document describes the process for going from zero to full Alchemy coverage for a single AWS service:
+# Cursor Cloud specific instructions
 
-- all canonical resources
-- all bindings
-- all event sources
-- all ergonomic helpers
-- deterministic audit and test coverage checks
+These notes apply only to Cursor Cloud agents (kept out of the shared `AGENTS.md` since T3 Code is
+developed in many places). They cover the pre-provisioned VM environment and non-obvious run caveats.
 
-Use this process whenever adding a brand new AWS service or finishing an incomplete one.
+## Toolchain
 
-## Goal
+Pre-installed and wired into login shells (`~/.bashrc`/`~/.profile`): Node 24 (via nvm), the global
+`vp` (Vite+) CLI, and its bundled pnpm. `vp` is the package manager + task runner for this repo
+(`vp i`, `vp check`, `vp run typecheck`, `vp test`, `vp run --filter <pkg> <script>`).
 
-For a given AWS service, the end state should include:
+- Node gotcha: the base image also ships an older Node on `/exec-daemon` that wins on `PATH` in
+  non-login shells. Run commands in a login shell (`bash -lc '...'`) or prepend
+  `$HOME/.nvm/versions/node/v24.13.1/bin` so Node 24 (`engines.node: ^24.13.1`) is used.
+- `vp check` also runs the formatter (not just lint); markdown edits must be formatter-clean. Run
+  `vp check --fix` before committing.
 
-1. Every canonical Alchemy resource for that service.
-2. Every important AWS API operation represented either as:
-   - a binding,
-   - a resource lifecycle provider,
-   - an event source surface,
-   - or an intentional helper abstraction.
-3. Runtime-specific event-source implementations where applicable.
-4. End-to-end tests covering the implemented binding and event-source surface.
-5. Deterministic audit checks that report what is still missing.
+## Running the web app
 
-## Source Of Truth
+- `npm run dev` (from repo root) starts contracts (watch), web (Vite, port 5733), and the server
+  (`node --watch`, port 13773) together, auto-wiring `VITE_HTTP_URL`/`VITE_WS_URL`. Use
+  `npm run dev:server` / `npm run dev:web` for one side. If base ports are taken it auto-offsets to
+  the next free pair, so read the actual ports from stdout. Avoid production `build`/`start` in dev.
+- Auth/pairing: the server is unauthenticated by default and prints a pairing URL to stdout on startup
+  (e.g. `http://localhost:5733/pair#token=XXXX`). Open that URL in the browser to pair before the web
+  UI can talk to the server. Server state (SQLite, auth, projects) lives under `~/.t3`
+  (`T3CODE_HOME`); multiple `npm run dev` instances bind different ports but share that same DB.
+- Agent providers are external CLIs (`codex`, `claude`, `cursor-agent`, `opencode`) probed on `PATH`.
+  Without one installed the UI loads but no agent can run. Claude Code
+  (`npm i -g @anthropic-ai/claude-code`) works headlessly using `ANTHROPIC_API_KEY` from the
+  environment (the server forwards `process.env` to the child; no interactive `claude auth login`
+  needed). Provider probing runs at startup and refreshes roughly every 5 minutes — restart the dev
+  server to pick up a newly installed provider CLI immediately.
 
-Start from the distilled spec in:
+## Android native builds (apps/mobile)
 
-- `.vendor/distilled/@distilled.cloud/aws/src/services/<service>.ts`
+The Android toolchain is pre-installed and wired into login shells: OpenJDK 17
+(`JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64`; the base image's default `java` is 21, so builds must
+use `JAVA_HOME`), and the Android SDK at `$HOME/Android/Sdk` (`ANDROID_HOME`/`ANDROID_SDK_ROOT`) with
+platform-tools, `platforms;android-36`, `build-tools;36.0.0`, `ndk;27.1.12297006`, and `cmake;3.22.1`.
+Gradle auto-downloads any additional pinned SDK packages on demand.
 
-Never start from ad-hoc memory of the AWS service. The distilled spec is the source of truth for operations.
+- Generate the native project first: from `apps/mobile`,
+  `EXPO_NO_GIT_STATUS=1 APP_VARIANT=development npx expo prebuild --clean --platform android`
+  (the `android/` folder is generated, not committed). RN 0.85 defaults: compileSdk/targetSdk 36,
+  minSdk 24, NDK `27.1.12297006` (see `react-native/gradle/libs.versions.toml`).
+- Build with Gradle from `apps/mobile/android`, e.g. `./gradlew :app:assembleDebug`. First build is
+  slow (Kotlin + C++/NDK codegen). Limit ABIs to speed things up, e.g.
+  `-PreactNativeArchitectures=arm64-v8a`. Verified working end-to-end on a native module:
+  `./gradlew :react-native-worklets:assembleDebug` compiles Kotlin + C++ and emits an AAR + `.so`s.
+- No emulator: this VM has no `/dev/kvm` (nested virtualization), so a hardware-accelerated Android
+  emulator will not run. Use a physical device (`adb`) or EAS cloud builds (`vp run eas:android:*`) to
+  actually run the app. The full IDE GUI is unnecessary here — the SDK/NDK/Gradle toolchain that
+  Android Studio bundles is what is installed.
+- Known blocker for the full-app `:app:assembleDebug` (pre-existing, app-level — not the environment):
+  `:react-native-screens:compileDebugKotlin` fails because `patches/react-native-screens@4.25.2.patch`
+  adds new codegen props (`subtitle`, `largeSubtitle`, `navigationItemStyle`,
+  `headerCenterBarButtonItems`, `headerToolbarItems`) to the JS spec + iOS native code but includes no
+  Android Kotlin setters, so the generated `ScreenStackHeaderConfigManagerInterface` is unimplemented.
+  The mobile README documents only iOS for local builds and routes Android through EAS. Fixing local
+  Android app builds requires an app/patch change (add the Android Kotlin setters), which is out of
+  scope for environment setup.
 
-## Core Concepts
+## Known flaky tests (unrelated to setup)
 
-Every distilled operation must be classified into one of these buckets:
-
-### 1. Binding
-
-Use a binding when the operation is a runtime capability.
-
-Examples:
-
-- `GetItem(table)`
-- `PutItem(table)`
-- `ListTables()`
-- `DescribeTable(table)`
-
-Bindings are:
-
-- one file per operation
-- the combined `Binding.Service` form (`interface X extends Binding.Service<X, "id", Shape>` + `const X = Binding.Service<X>("id")`); the deploy-time IAM registration is inlined into the impl layer under `if (!globalThis.__ALCHEMY_RUNTIME__)`, resolving the host via `yield* Binding.host`
-- usually named `alchemy/src/AWS/<Service>/<Operation>.ts` (callable + types) with the impl layer in `<Operation>Http.ts` (AWS runtime impls call the distilled HTTP API authenticated by the Lambda's IAM role; `Http`, not `Binding` — `Binding` is a Cloudflare native-worker concept)
-
-### 2. Resource
-
-Use a resource when the operation set implies lifecycle ownership of infrastructure.
-
-Examples:
-
-- `createTable` / `updateTable` / `deleteTable` -> `Table`
-- `createBucket` / `deleteBucket` -> `Bucket`
-
-Resources are:
-
-- canonical Alchemy infrastructure entities
-- implemented as `Resource` contract + provider in a single file
-
-### 3. Event Source
-
-Use an event source when the service can push records/events into a runtime.
-
-This always has two layers:
-
-1. Service-level abstraction in `alchemy/src/AWS/<Service>/...`
-2. Runtime-specific implementation in places like:
-   - `alchemy/src/AWS/Lambda/...`
-   - `alchemy/src/Process/...`
-
-Examples:
-
-- `consumeBucketEvents(bucket, handler)`
-- `consumeQueueMessages(queue, handler)`
-- `consumeTableChanges(table, handler)` for DynamoDB-style change streams
-
-### 4. Helper
-
-Use a helper when multiple raw operations should collapse into a more ergonomic surface.
-
-Examples:
-
-- `consumeBucketEvents(bucket, handler)`
-- `consumeQueueMessages(queue, handler)`
-- batch or transaction wrappers
-
-Helpers should not hide missing low-level primitives. Implement the primitives first.
-
-## Resource Arity
-
-Classify each binding by resource arity:
-
-- `0`: service/account scoped
-  - example: `ListTables`
-- `1`: one resource
-  - example: `GetItem(table)`
-- `2+`: multiple resources
-  - example: `RestoreTableToPointInTime(fromTable, toTable)`
-  - example: copy, batch, or transaction style operations
-
-This classification helps decide:
-
-- binding shape
-- helper shape
-- policy shape
-- whether the operation belongs on a resource or service surface
-
-Arity should be modeled in terms of canonical resources whenever possible.
-
-- good: a `2`-arity binding accepts `<From extends Table, To extends Table>`
-- bad: a `2`-resource operation accepts one `Table` plus a raw `string` target name
-- only fall back to raw identifiers when there is no real canonical resource to bind against
-- when there's a missing canonical resource, that might suggest we need to add one
-
-### Case Study: `ExecuteTransaction`
-
-Use `ExecuteTransaction` as the reference pattern for bindings that touch `1..*` canonical resources.
-
-The ambiguity we want to avoid is:
-
-- bad: `ExecuteTransaction()` with IAM `Resource: ["*"]`
-- bad: `ExecuteTransaction(tableNames: string[])`
-- bad: a SID like `AWS.DynamoDB.ExecuteTransaction(2 table(s))` that hides which resources were bound
-
-The required pattern is:
-
-- good: `ExecuteTransaction(tableA, tableB, ...)`
-- good: the binding type requires at least one table
-- good: the policy enumerates exactly those table ARNs
-- good: the SID is deterministic and names the participating resources
-
-Runbook for any `1..*` resource-bound binding:
-
-1. Model the binding arguments as a non-empty tuple of canonical resources.
-2. Call `.bind(resourceA, resourceB, ...)`, never `.bind()` with hidden resource discovery.
-3. Before constructing the SID, sort the resources by `LogicalId` so equivalent calls produce the same binding identity.
-4. Pass the sorted resource array into the `host.bind` template so the SID renders each resource name explicitly, for example `AWS.DynamoDB.ExecuteTransaction(TableA, TableB)`.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `apps/server/src/git/GitManager.test.ts` (cross-repo PR metadata, can time out at 12s).
+- `apps/server/src/provider/Layers/ProviderRegistry.test.ts` (codex binaryPath re-probe ordering).
 
 ---
 > Source: [samyakkkk/flow](https://github.com/samyakkkk/flow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
