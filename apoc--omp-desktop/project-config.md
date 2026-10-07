@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: Tauri 2 desktop shell for `omp` (oh-my-pi). React UI served from `src/` in `tauri dev` (**no bundler** — JSX is transpiled in-browser by `@babel/standalone`) and from the precompiled `dist/` in release builds (see *Release frontend*). Rust backend spawns `omp --mode rpc` per tab.
+description: Tauri 2 desktop shell for `omp` (oh-my-pi). React UI served from `src/` in `tauri dev` (**no bundler** — JSX is transpiled in-browser by `@babel/standalone`) and from the precompiled `dist/` in release builds (see *Release frontend*). Rust backend spawns `omp --mode rpc-ui` per tab.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-Tauri 2 desktop shell for `omp` (oh-my-pi). React UI served from `src/` in `tauri dev` (**no bundler** — JSX is transpiled in-browser by `@babel/standalone`) and from the precompiled `dist/` in release builds (see *Release frontend*). Rust backend spawns `omp --mode rpc` per tab.
+Tauri 2 desktop shell for `omp` (oh-my-pi). React UI served from `src/` in `tauri dev` (**no bundler** — JSX is transpiled in-browser by `@babel/standalone`) and from the precompiled `dist/` in release builds (see *Release frontend*). Rust backend spawns `omp --mode rpc-ui` per tab.
 
 ## Commands
 
@@ -19,43 +19,43 @@ Tauri 2 desktop shell for `omp` (oh-my-pi). React UI served from `src/` in `taur
 | Rust fmt | `cd src-tauri && cargo fmt` |
 | Rust lint (must stay clean) | `cd src-tauri && cargo +nightly clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery -D warnings` |
 | Rust tests | `cd src-tauri && cargo test` |
-| All JS regression scripts | `npm test` — add a new `test-*.mjs` to its chain in `package.json` (not `test-rpc.mjs`, which needs a live omp) |
-| Probe omp RPC | `node test-rpc.mjs` |
-| Keymap chord regression | `node test-keymap.mjs` (or `npm run test:keymap`) |
-| Markdown XSS-escaping regression | `node test-markdown.mjs` (or `npm run test:markdown`) |
-| Chat scroll-pin regression | `node test-scroll-pin.mjs` (or `npm run test:scroll-pin`) |
-| Slash-command palette regression | `node test-slash-commands.mjs` (or `npm run test:slash-commands`) |
-| Prompt history regression | `node test-prompt-history.mjs` (or `npm run test:prompt-history`) |
-| Subagent manager reducer regression | `node test-subagents.mjs` (or `npm run test:subagents`) |
-| Updater state regression | `node test-updater.mjs` (or `npm run test:updater`) |
-| Updater feed assembly regression | `node test-updater-json.mjs` (or `npm run test:updater-json`) |
-| Image viewer geometry regression | `node test-lightbox.mjs` (or `npm run test:lightbox`) |
+| All JS regression scripts | `npm test` — add a new `tests/test-*.mjs` to its chain in `package.json` (not `tests/test-rpc.mjs`, which needs a live omp) |
+| Probe omp RPC | `node tests/test-rpc.mjs` |
+| Keymap chord regression | `node tests/test-keymap.mjs` (or `npm run test:keymap`) |
+| Markdown XSS-escaping regression | `node tests/test-markdown.mjs` (or `npm run test:markdown`) |
+| Chat scroll-pin regression | `node tests/test-scroll-pin.mjs` (or `npm run test:scroll-pin`) |
+| Session-title auto-rename gates regression | `node tests/test-session-title.mjs` (or `npm run test:session-title`) |
+| Slash-command palette regression | `node tests/test-slash-commands.mjs` (or `npm run test:slash-commands`) |
+| Prompt history regression | `node tests/test-prompt-history.mjs` (or `npm run test:prompt-history`) |
+| Subagent manager reducer regression | `node tests/test-subagents.mjs` (or `npm run test:subagents`) |
+| Bash tool-card output/copy text regression | `node tests/test-tool-output.mjs` (or `npm run test:tool-output`) |
+| Updater state regression | `node tests/test-updater.mjs` (or `npm run test:updater`) |
+| Updater feed assembly regression | `node tests/test-updater-json.mjs` (or `npm run test:updater-json`) |
+| Model picker recent group regression | `node tests/test-recent-models.mjs` (or `npm run test:recent-models`) |
+| Image viewer geometry regression | `node tests/test-lightbox.mjs` (or `npm run test:lightbox`) |
+| Project navigation + tab-layout regression | `node tests/test-project-nav.mjs` (or `npm run test:project-nav`) |
+| Empty-workspace backdrop regression | `node tests/test-matrix-rain.mjs` (or `npm run test:matrix-rain`) |
+| Per-tab composer/plan state + collapsed-paste regression | `node tests/test-session-ui.mjs` (or `npm run test:session-ui`) |
+| Goal mode reducer (rows, snapshots, strip, budget input) regression | `node tests/test-goal.mjs` (or `npm run test:goal`) |
+| Steer/follow-up queue strip regression | `node tests/test-message-queue.mjs` (or `npm run test:message-queue`) |
+| Ask dialog answer rules regression | `node tests/test-ask-dialog.mjs` (or `npm run test:ask-dialog`) |
+| Run state + failed-request + job row + retry row regression | `node tests/test-turn-status.mjs` (or `npm run test:turn-status`) |
+| Tab-switch transcript merge regression | `node tests/test-transcript-merge.mjs` (or `npm run test:transcript-merge`) |
+| Conversation-tree model regression | `node tests/test-conversation-tree.mjs` (or `npm run test:conversation-tree`) |
 
 `omp` must be on PATH (`%LOCALAPPDATA%\omp\omp.exe` on Win). CI and every release run the same suite (`.github/workflows/tests.yml`): `cargo test --locked` on win/linux/mac, plus `npm test`.
+
+**omp version floor.** `MIN_OMP_VERSION` in `src-tauri/src/agent/spawn.rs` is the only omp version knowledge in the app: `spawn_omp` runs `omp --version` and refuses an older omp with a message naming both versions, or unreadable output with one quoting it and the required version; either is cached in `last_errors` like any spawn failure, and the bridge's `openSession`/`openProject`/`resumeSession` file it as a note (`_openReported`). Only a pass is remembered, so an `omp update` takes effect without an app restart. A change that starts using an RPC command, event or `get_state` field from a newer omp release raises the constant in the same commit (plus a CHANGELOG line); no code branches on the omp version or keeps a fallback for an omp below the floor. Finding a command's first release in omp's repo: `git log --reverse --format=%h -S '"<command>"' -- packages/coding-agent/src/modes/rpc`, then `git tag --contains <sha> --sort=v:refname` (first line; plain `--contains` sorts `v18.4.10` before `v18.4.9`). State fields are unquoted (`-S 'isSettled:'`), and agent-core events live outside `modes/rpc`, so widen the path for those.
+
+The floor is 18.4.11: the conversation tree's `fork` command (see *Conversation tree*) is the newest RPC the app sends. `branch` is older. The tree reads session files directly, so it needs no other omp change.
 
 ## Architecture
 
 Three layers:
-
-1. **Rust (`src-tauri/src/`)** — `agent/` module:
-   - `mod.rs` — `AgentBridge` public API (start/stop/send/last_error).
-   - `inner.rs` — `BridgeInner` per-session: generation token, `Arc<Mutex<ChildStdin>>`, child handle.
-   - `spawn.rs` — `spawn_omp` candidate resolution + Win `CREATE_NO_WINDOW`.
-   - `reader.rs` — stdout/stderr threads + bounded `read_until_capped` (16 MiB).
-
-   `AgentBridge` = `HashMap<session_id, BridgeInner>`. Per-session stdin lock so writes don't serialise through the map. Reader emits `agent://line/{id}` per stdout line, `agent://exit/{id}` (empty payload = clean, non-empty = reason) — except a startup death before any frame ever arrived, where the reader substitutes a bounded stderr tail (`reader::StderrTail`) for the empty payload so a silent crash isn't read as a clean exit; also cached in `last_errors` so a background tab's death is visible from `session_status` without waiting for a switch. Tauri commands in `lib.rs`: `start_session`, `stop_session`, `send_command`, `session_status`, `open_project`, `take_pending_open_projects`. `Drop` + `stop_session` kill children — no orphans on hot-reload.
-
-2. **Bridge (`src/live.js`)** — listens to `agent://line/{id}` for active session only. Holds per-session live state and a `sessionRegistry` (tabs). Tab switch: snapshot → tear down listeners → restore (or reset+`_initFetch`) → re-listen. Exposes `window.OMP_BRIDGE` (commands + `onUpdate`) and legacy `window.OMP_DATA`.
-
-3. **React (`src/app-live.jsx` + `src/app/` + `src/design/*/`)** — sole React root. Uses `useBridgeSnapshot` (in `src/app/use-bridge-snapshot.jsx`) to mirror `OMP_BRIDGE.onUpdate` into hooks. Cross-cutting effects (theme on `<html>`) live there; keyboard shortcuts are resolved and dispatched by `src/app/use-keymap.jsx` (registry in `src/app/keymap.js`). Constants/framing strings in `src/app/constants.js`. Pure RPC↔UI shape transforms in `src/adapter.js` (no side effects, depends on `model-names.js`).
-
-## Session model
-
-One tab = one omp process. `default` session started in `lib.rs::setup`; new tabs via `OMP_BRIDGE.openSession(cwd)` → `start_session`. Tab switch preserves in-flight bubbles via `sessionSnapshots`; after re-listen, `get_messages` is called and `_handleResponse` merges persisted turns with cached `streamingBubble` (omp doesn't persist incomplete turns).
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [apoc/omp-desktop](https://github.com/apoc/omp-desktop) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
