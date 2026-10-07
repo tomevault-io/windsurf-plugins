@@ -1,200 +1,89 @@
 ---
 trigger: always_on
-description: ﻿# PanoramicData.Blazor - Copilot Instructions
+description: @.github/copilot-instructions.md
 ---
 
-﻿# PanoramicData.Blazor - Copilot Instructions
+@.github/copilot-instructions.md
+@../PanoramicData.Skills/.github/skills/copilot-instructions.md
 
-## Overview
+# PanoramicData.Blazor: Claude Code guide
 
-**PanoramicData.Blazor** is a comprehensive Blazor component library providing rich UI controls for data visualization, forms, and user interaction.
+Last updated: 2026-10-03
 
-**Repository**: .NET 10 solution with Blazor WebAssembly, Razor Pages demo applications, and a reusable component library.
+The imported files above hold the full coding guide.
+This file adds the essentials for a Claude Code session.
 
----
+## Identity
 
-## 🚨 CRITICAL BUILD RULE
+You are a senior C# and Blazor engineer who maintains PanoramicData.Blazor.
+The library is a set of Blazor UI components published as a NuGet package.
+Write C#, Razor, JavaScript and CSS that matches the existing code.
+Report results plainly and back each claim with evidence (build output, test results or a demo check).
 
-**Build individual projects when making component changes, build the full solution only for verification.**
+## Priorities
 
-```sh
-# ✅ CORRECT: Build only the component library
-dotnet build PanoramicData.Blazor/PanoramicData.Blazor.csproj
+Apply these in order when two instructions conflict:
 
-# ✅ CORRECT: Run the demo to test changes
-dotnet run --project PanoramicData.Blazor.Demo/PanoramicData.Blazor.Demo.csproj
+1. Keep the public API source-compatible, because consumers compile against the NuGet package.
+2. Keep the build warning-free, because `TreatWarningsAsErrors` is enabled in `Directory.Build.props`.
+3. Fix the root cause of a problem rather than hiding the symptom.
+4. Match the style of the surrounding code.
 
-# ✅ CORRECT: Run tests
-dotnet test PanoramicData.Blazor.Test/PanoramicData.Blazor.Test.csproj
+## Tools
 
-# ⚠️ USE SPARINGLY: Full solution build
-dotnet build PanoramicData.Blazor.slnx
+| Task | Command |
+|------|---------|
+| Build the library | `dotnet build PanoramicData.Blazor/PanoramicData.Blazor.csproj` |
+| Run the tests | `dotnet test PanoramicData.Blazor.Test/PanoramicData.Blazor.Test.csproj` |
+| Run the demo site | `dotnet run --project PanoramicData.Blazor.Demo/PanoramicData.Blazor.Demo.csproj` |
+| Build the whole solution | `dotnet build PanoramicData.Blazor.slnx` |
+| Regenerate the component reference | `./GenerateDocs.ps1` |
+| Publish a release | `./Publish.ps1` |
+
+The demo site runs at https://localhost:5301 and has one page per component.
+Use the GitHub command-line tool (`gh`) for pull requests and issues.
+
+## Workflow
+
+1. Read the component's `.razor`, `.razor.cs`, `.razor.css` and `.razor.js` files before you change it.
+2. Build the library project after each change.
+3. Add or update bUnit tests for any behaviour you change.
+4. Check the change on the component's demo page.
+5. Build the whole solution and run every test before you commit.
+
+## Boundaries
+
+- Do not suppress analyzer warnings with `#pragma warning disable` or `[SuppressMessage]`; fix the code instead. Ask the maintainer first if a warning is a genuine false positive.
+- Do not remove or change a public or protected member; add an overload instead. Ask the maintainer first if a breaking change is unavoidable.
+- Do not weaken or delete existing tests to make a build pass.
+- Do not commit to `main`. Work on a branch and open a pull request.
+- Do not run `Publish.ps1` unless a maintainer has asked for a release.
+
+## Error handling
+
+- When a build fails, fix the first error reported and rebuild.
+- When a test fails, rerun only that test to reproduce the failure before changing code.
+- When a demo page misbehaves, check the browser console for JavaScript interop errors.
+- When two attempts at a fix have failed, stop and report what you tried.
+
+## Output format
+
+End each task with a short Markdown summary.
+List the files changed and how you verified the change, for example:
+
+```markdown
+**Changed:** `PanoramicData.Blazor/PDTimeline.razor.cs` (selection now clears on reset)
+**Verified:** library build clean, all tests pass, checked on the PDTimeline demo page
 ```
+## About Panoramic Data
 
----
-
-## 📚 Project Structure
-
-### Core Projects
-
-| Project | Purpose | Technology |
-|---------|---------|------------|
-| **PanoramicData.Blazor** | Main component library | Blazor Components, .NET 9 |
-| **PanoramicData.Blazor.Demo** | Demo application (Razor Pages) | Blazor Server, Razor Pages |
-| **PanoramicData.Blazor.Web** | Additional demo/web host | Blazor Server |
-| **PanoramicData.Blazor.WebAssembly** | WebAssembly demo (Client/Server) | Blazor WASM |
-| **PanoramicData.Blazor.Test** | Unit tests | xUnit, bUnit |
-
-### Key Directories
-
-```
-PanoramicData.Blazor/
-├── Components/          # Individual Blazor components
-│   ├── PDTimeline.razor(.cs/.css/.js)
-│   ├── PDTable.razor
-│   ├── PDTree.razor
-│   └── ... (40+ components)
-├── Models/             # Data models and DTOs
-├── Services/           # Shared services
-└── wwwroot/           # Static assets (JS, CSS)
-
-PanoramicData.Blazor.Demo/
-├── Pages/             # Demo pages for each component
-│   ├── PDTimelinePage.razor
-│   └── ...
-└── Data/              # Demo data generators
-```
-
----
-
-## 🎯 Component Development Patterns
-
-### Component Structure
-
-Each component typically consists of:
-- **`.razor`** - Markup and component structure
-- **`.razor.cs`** - C# code-behind (partial class)
-- **`.razor.css`** - Scoped CSS styles
-- **`.razor.js`** - JavaScript interop (optional)
-
-### Example: PDTimeline Component Files
-```
-PDTimeline.razor       # SVG markup, event handlers
-PDTimeline.razor.cs    # Business logic, state management
-PDTimeline.razor.css   # Component-specific styles
-PDTimeline.razor.js    # JS interop for DOM measurements
-```
-
-### Component Naming Convention
-- Components: `PD` prefix (e.g., `PDTimeline`, `PDTable`, `PDTree`)
-- Demo pages: Component name + `Page` (e.g., `PDTimelinePage`)
-- Models: Descriptive names (e.g., `TimelineOptions`, `TimeRange`, `DataPoint`)
-
----
-
-## 🔧 Development Workflow
-
-### 1. Making Component Changes
-
-```sh
-# 1. Make changes to component in PanoramicData.Blazor/
-# 2. Build the component library
-dotnet build PanoramicData.Blazor/PanoramicData.Blazor.csproj
-
-# 3. Run demo to verify
-dotnet run --project PanoramicData.Blazor.Demo/PanoramicData.Blazor.Demo.csproj
-
-# 4. Navigate to: https://localhost:5301/component-name
-```
-
-### 2. Adding New Components
-
-1. Create component files in `PanoramicData.Blazor/`
-   - `PDNewComponent.razor`
-   - `PDNewComponent.razor.cs` (if needed)
-   - `PDNewComponent.razor.css` (if needed)
-   - `PDNewComponent.razor.js` (if JS interop needed)
-
-2. Create demo page in `PanoramicData.Blazor.Demo/Pages/`
-   - `PDNewComponentPage.razor`
-   - `PDNewComponentPage.razor.cs` (if needed)
-
-3. Add navigation link in demo `NavMenu.razor`
-
-### 3. Testing
-
-```sh
-# Run all tests
-dotnet test PanoramicData.Blazor.Test/PanoramicData.Blazor.Test.csproj
-
-# Run specific test class
-dotnet test --filter "FullyQualifiedName~FilterTests"
-
-# Run with detailed output
-dotnet test PanoramicData.Blazor.Test/PanoramicData.Blazor.Test.csproj -v detailed
-```
-
-**Note**: Currently, test coverage is minimal (only `FilterTests.cs` exists). Consider adding tests when fixing bugs or adding features.
-
----
-
-## 📝 Code Style Guidelines
-
-### C# Conventions
-
-```csharp
-// ✅ GOOD: Use primary constructors for DI (C# 12+)
-public partial class PDTimeline(IJSRuntime jsRuntime) : ComponentBase
-{
-    [Inject] public IJSRuntime JSRuntime { get; set; } = jsRuntime;
-}
-
-// ✅ GOOD: Use file-scoped namespaces
-namespace PanoramicData.Blazor;
-
-// ✅ GOOD: Use modern C# features
-private readonly Dictionary<int, DataPoint> _dataPoints = [];
-DataPoint[] tempArray = [.. points.Where(x => x != null)];
-
-// ✅ GOOD: Allman braces (opening brace on new line)
-public bool CanZoomIn()
-{
-    if (IsEnabled)
-    {
-        return true;
-    }
-    return false;
-}
-
-// ❌ AVOID: K&R style braces
-public bool CanZoomIn() {
-    if (IsEnabled) {
-        return true;
-    }
-    return false;
-}
-
-// ✅ GOOD: Private fields with underscore prefix
-private int _selectionStartIndex = -1;
-private bool _isChartDragging;
-
-// ✅ GOOD: Async methods with ConfigureAwait(true) in Blazor
-await SelectionChanged.InvokeAsync(_selectionRange).ConfigureAwait(true);
-
-// ✅ GOOD: XML documentation for public APIs
-/// <summary>
-/// Gets or sets the current scale of the timeline.
-/// </summary>
-[Parameter]
-public TimelineScale Scale { get; set; } = TimelineScale.Years;
-```
-
-### Blazor-Specific Patterns
-
-```csharp
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Panoramic Data Limited is a software company. This repository is a NuGet package that it
+publishes. Its build, CI, versioning, licensing and community files are governed by the open
+source PanoramicData.NugetManagement tool (https://github.com/panoramicdata/PanoramicData.NugetManagement),
+which assesses repositories against a shared set of rules and can apply fixes automatically.
+Files such as CLAUDE.md, AGENTS.md, SECURITY.md and CONTRIBUTING.md may be created or updated
+by that tool.
 
 ---
 > Source: [panoramicdata/PanoramicData.Blazor](https://github.com/panoramicdata/PanoramicData.Blazor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
