@@ -1,16 +1,20 @@
 ---
 trigger: always_on
-description: Always add benchmarks created during performance investigations to the permanent
+description: Read `../BRANDING.md` before changing the docs' visual identity. The user
 ---
 
-# Performance work
+# Documentation design
 
-Always add benchmarks created during performance investigations to the permanent
-benchmark corpus. Register runnable cases in `benchmarks/manifest.json`, include
-them in `benchmark all`, and retain correctness gates and reproducible commands.
-Temporary probes and saved reports alone do not satisfy this requirement. Cover
-both sides of any discovered threshold or performance cliff.
+Read `../BRANDING.md` before changing the docs' visual identity. The user
+approved the Casita companion logo from the Obrador repository, with the
+Rust-orange Root House and lowercase wordmark. Reuse the
+canonical SVGs in `public/brand/` and the shared `BrandLogo` component.
+
+Preserve the existing Astro/Starlight and site-kit integration and the
+Cloudflare Workers deployment flow. Validate changes with `npm run validate`
+from this directory (or `devenv shell -- npm --prefix docs run validate`
+from the repository root).
 
 ---
 > Source: [cachix/casita](https://github.com/cachix/casita) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
