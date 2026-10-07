@@ -1,120 +1,83 @@
 ---
 trigger: always_on
-description: CLAUDE.md - AI Assistant Guide for Entity Manager
+description: Home Assistant custom integration, domain `entity_manager`, **v3.6.0**.
 ---
 
-#
- CLAUDE.md - AI Assistant Guide for Entity Manager
+# AGENTS.md — Entity Manager
 
-This document provides comprehensive guidance for AI assistants working with the Entity Manager codebase.
+Home Assistant custom integration, domain `entity_manager`, **v3.6.0**.
+Repo `TheIcelandicguy/entity-manager`; source at `E:\entity-manager`.
 
-## Project Overview
+An admin-only sidebar panel ("Entity Manager", `mdi:tune`) for viewing, enabling,
+disabling, renaming, auditing and bulk-managing every entity across every
+integration, plus device/area/label assignment and firmware updates. Built for
+large installs. No Python requirements; `integration_type: service`,
+`iot_class: calculated`, `config_flow: true`, `dependencies: ["frontend"]`,
+minimum HA 2024.1.0.
 
-**Entity Manager** is a custom Home Assistant integration (v2.19.0) that provides a centralized interface for managing entities across all integrations and devices. It solves the common pain point of navigating through multiple settings pages to manage entities.
+`OVERVIEW.md` in this repo is current and was verified against source — use it
+when you need more depth than this file. The unverified root docs that used to
+sit beside it (STRUCTURE.md, PROJECT_SUMMARY.md, QUICKSTART.md, DEVREF.md,
+INSTALL.md, cursorrules.md) were deleted on 2026-09-22; README.md covers
+installation, and git history has the rest.
 
-### Key Value Proposition
-- Bulk enable/disable entities in seconds instead of minutes
-- Organized tree view by Integration → Device → Entity
-- Multiple smart grouping modes (Integration, Room/Area, Type, Device Name)
-- Search and filter capabilities across all entities
-- Advanced tools: entity renaming, YAML reference updater, firmware manager, automation impact analysis
-- Theme system with 4 built-in themes and a custom theme editor
-- Voice assistant support for hands-free control
+Before ending a session, run `python check_docs.py` and update this file.
+The script checks CLAUDE.md for stale paths, constants, line counts, test counts
+and services. Keep this guide aligned with it and validate both when editing.
 
-## Repository Structure
+## Layout
 
-```
-entity-manager/
-├── custom_components/entity_manager/   # Main integration code
-│   ├── __init__.py                     # Entry point, service registration, panel setup
-│   ├── config_flow.py                  # UI-based configuration flow
-│   ├── const.py                        # Constants (DOMAIN, MAX_BULK_ENTITIES, VALID_ENTITY_ID)
-│   ├── manifest.json                   # Integration metadata (v2.19.0)
-│   ├── services.yaml                   # Service schema for HA UI
-│   ├── strings.json                    # UI strings for config flow
-│   ├── voice_assistant.py              # Voice intent handlers
-│   ├── websocket_api.py                # WebSocket command handlers (16 commands)
-│   ├── frontend/
-│   │   ├── entity-manager-panel.js     # Custom web component UI (~9,600 lines)
-│   │   └── entity-manager-panel.css    # External stylesheet (~2,500 lines)
-│   └── translations/
-│       └── en.json                     # English translations
-├── sentences/en/
-│   └── entity_manager.yaml             # Voice assistant sentence patterns
-├── tests/
-│   └── test_const.py                   # Basic constant tests
-├── hacs.json                           # HACS configuration
-├── info.md                             # HACS info page
-├── README.md                           # User documentation
-├── INSTALL.md                          # Installation guide
-├── QUICKSTART.md                       # Quick reference
-├── STRUCTURE.md                        # Code structure documentation
-├── PROJECT_SUMMARY.md                  # Project overview
-├── package.json                        # Node dev dependencies (eslint)
-└── LICENSE                             # MIT License
-```
+All paths below are relative to the repo root. Note that `tests/` lives at the
+**root**, not inside the component directory.
+
+| Path | Responsibility |
+|---|---|
+| `custom_components/entity_manager/__init__.py` | 132 lines. Registers the static path `/api/entity_manager/frontend` (served with long cache headers), the WS API, voice intents, the two services, and the sidebar panel (`require_admin=True`), and installs the voice sentences
+(`async_install_sentences`). The panel JS `?v=` key is `<manifest version>-<first 10 hex of the file's SHA-256>`, so any redeploy that changes the panel reaches browsers and Companion apps after an HA restart, even without a version bump. |
+| `.../const.py` | `DOMAIN`, `MAX_BULK_ENTITIES = 500`, `VALID_ENTITY_ID = ^[a-z][a-z0-9_]*\.[a-z0-9_]+$`. No VERSION constant — the version lives only in `manifest.json` and `package.json`. |
+| `.../websocket_api.py` | 1,985 lines. All 24 WS handlers, `async_setup_ws_api()`, and the `enable_entity()` / `disable_entity()` helpers the services reuse. |
+| `.../voice_assistant.py` | Enable/Disable intent handlers and `resolve_voice_target()`, which turns what was said into an entity ID. It returns a `VoiceResolution` (entity, how it matched, the other candidates, the near misses); `_resolve_entity_id` is the thin wrapper the intents use, so the panel and intents share entity matching; routing and pipeline execution are separate checks. |
+| `.../voice_sentences.py` | 168 lines. Installing the sentence files into `<config>/custom_sentences/<lang>/` and reporting on them (`sentence_status`). Kept out of `__init__` because `websocket_api` reads the same files and cannot import `__init__` without a cycle. |
+| `.../sentences/en/entity_manager.yaml` | Voice sentences, copied into `<config>/custom_sentences/en/` at startup. Inside the component, because only that directory is deployed. |
+| `.../config_flow.py` | Single step, unique-ID guarded, no options flow. |
+| `.../frontend/entity-manager-panel.js` | 19,197 lines. The whole UI as one `EntityManagerPanel extends HTMLElement`. |
+| `.../frontend/entity-manager-panel.css` | 7,989 lines, all `--em-*` variables. |
+| `tests/` | Python tests: `test_const.py`, `test_websocket_api.py`, `test_voice_assistant.py`, `conftest.py`. |
+| `.../frontend/tests/` | Vitest specs + `vitest.setup.js`. |
+| `deploy.ps1` | Thin wrapper over `E:\tools\deploy-to-ha.ps1` (see Deploy). No `sync-to-ha.ps1` helper is checked in; that old name is still used locally on this machine only. |
+| `check_docs.py` | Verifies this file against the repo. Run it before ending a session. |
+| `ruff.toml` | Pins Ruff lint rules for this repo so CI does not inherit widened future defaults. |
 
 ## Architecture
 
-### Data Flow
-
 ```
-User Interface (JavaScript Web Component)
-         ↓ WebSocket
-WebSocket API (Python handlers)
-         ↓
-Home Assistant Core APIs
-         ↓
-Entity Registry / Device Registry / Area Registry / Label Registry
+entity-manager-panel.js  --this.hass.callWS-->  websocket_api.py  -->  HA registries
 ```
 
-### Component Responsibilities
+- The panel talks to the backend **only** over HA's WebSocket bus. There is no
+  HTTP view and no REST endpoint.
+- All 24 commands are named `entity_manager/<name>` and carry **both**
+  `@websocket_api.require_admin` and `@websocket_api.async_response` (24/24 in
+  source). The panel itself is `require_admin=True`. Every command reads or
+  writes registry data, so a handler missing either decorator is a security hole.
+- `async_setup_ws_api()` is the single registration point. A handler that isn't
+  registered there silently does not exist.
+- Registry writes happen in `websocket_api.py` (`er.async_get` / `dr.async_get`)
+  and in `voice_assistant.py`. Nowhere else.
+- The frontend uses **native** HA WS APIs for anything HA already exposes:
+  `config/{area,floor,device,entity,label}_registry/list|update`,
+  `history/history_during_period`, `homeassistant/expose_entity[/list]`,
+  `assist_pipeline/pipeline/list`, and services like `update.install` /
+  `button.press`. Custom `entity_manager/*` commands are reserved for what HA
+  does not expose cleanly — the grouped entity tree, YAML rewriting, recorder
+  queries, HACS scanning, config-entry health. Do not add a command that
+  duplicates a native API.
 
-| Component | Responsibility |
-|-----------|----------------|
-| `__init__.py` | Integration setup, service registration, sidebar panel + frontend resource registration |
-| `config_flow.py` | Handle UI-based integration setup (single-step, no config options) |
-| `const.py` | Domain, bulk operation limits, entity ID validation regex |
-| `websocket_api.py` | 18 WebSocket handlers covering entity ops, registry access, YAML management |
-| `voice_assistant.py` | Intent handlers for enable/disable voice commands |
-| `entity-manager-panel.js` | Complete frontend UI as a custom element |
-| `entity-manager-panel.css` | External stylesheet loaded at startup |
-
-## Key Patterns and Conventions
-
-### Python Code Style
-
-1. **Async/Await**: All HA interactions use async patterns
-2. **Entity Registry**: Access via `er.async_get(hass)`
-3. **Device Registry**: Access via `dr.async_get(hass)`
-4. **Logging**: Use module-level `_LOGGER = logging.getLogger(__name__)`
-5. **Error Handling**: Wrap registry operations in try/except; return structured error responses
-6. **Type Hints**: Use Python type hints (e.g., `dict[str, Any]`)
-7. **Bulk Limit**: Never exceed `MAX_BULK_ENTITIES = 500` in bulk operations
-8. **Entity ID Validation**: Use `VALID_ENTITY_ID` regex from `const.py` before acting
-
-### JavaScript Code Style
-
-1. **Vanilla JS**: No frameworks — pure ES6+ JavaScript
-2. **Web Components**: `EntityManagerPanel extends HTMLElement`
-3. **State Management**: Instance properties persisted to `localStorage` (see State section)
-4. **HA Integration**: Use `this.hass.callWS()` for WebSocket calls
-5. **Styling**: External CSS file + HA CSS variables; avoid inline styles for non-dynamic values
-6. **DOM Updates**: Batch changes, use `requestAnimationFrame` where possible
-7. **Keyboard Shortcuts**: Ctrl+Z (undo), Ctrl+Y (redo), Ctrl+E (export), Ctrl+G (grouping), Ctrl+B (sidebar)
-
-### Home Assistant Conventions
-
-1. **Domain**: `entity_manager` (used consistently across all files)
-2. **Services**: `entity_manager.enable_entity`, `entity_manager.disable_entity`
-3. **WebSocket Types**: `entity_manager/<command>` naming pattern
-4. **Admin Required**: All WebSocket commands use `@websocket_api.require_admin`
-5. **IoT Class**: `calculated` (not `local_push`)
-6. **Frontend Resources**: Registered at `/api/entity_manager/frontend` via `__init__.py`
+### The 24 commands
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TheIcelandicguy/entity-manager](https://github.com/TheIcelandicguy/entity-manager) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
