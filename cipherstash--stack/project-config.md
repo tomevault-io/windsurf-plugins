@@ -1,62 +1,105 @@
 ---
 trigger: always_on
-description: > **Repository ownership:** EQL is maintained in the `cipherstash/stack`
+description: This package has **two** Vitest configs (plus a self-skipping live-Postgres mode under the first). Run the right one for the change.
 ---
 
-# CLAUDE.md
+# `stash` — agent notes
 
-> **Repository ownership:** EQL is maintained in the `cipherstash/stack`
-> monorepo. Track all EQL work in `cipherstash/stack` GitHub Issues. The former
-> `cipherstash/encrypt-query-language` repository and its issues are historical
-> provenance only; do not create or update active work there.
+## Two test suites
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This package has **two** Vitest configs (plus a self-skipping live-Postgres mode under the first). Run the right one for the change.
 
-## Development Commands
+| Command | Config | Scope | Needs build? |
+| --- | --- | --- | --- |
+| `pnpm --filter stash test` | `vitest.config.ts` | Unit tests under `src/__tests__/**` and `src/**/__tests__/**` | **Partly** — needs `@cipherstash/stack` built (see below). Turbo's `^build` supplies it in CI. |
+| `pnpm --filter stash test:e2e` | `vitest.integration.config.ts` | E2E tests under `tests/e2e/**.e2e.test.ts` driving the built `dist/bin/stash.js` through a real pty (`node-pty`) | **Yes** — run `pnpm --filter stash build` first, or use the turbo `test:e2e` task which depends on `build`. One test also needs protect-ffi's native binding, which no `build` produces (see below). |
 
-This project uses `mise` for task management. Common commands:
+The unit config explicitly excludes `tests/e2e/**` so the default `pnpm test`
+stays fast.
 
-- `mise run build` (alias: `mise r b`) - Build SQL into single release file
-- `mise run test` (alias: `mise r test`) - Build, reset and run tests
-- `mise run postgres:up` - Start PostgreSQL container
-- `mise run postgres:down` - Stop PostgreSQL containers
-- `mise run reset` - Reset database state
-- `mise run clean` (alias: `mise r k`) - Clean release files
+**Live-Postgres suites run under the unit config but self-skip.**
+`src/**/__tests__/**.live.test.ts` gate on `STASH_TEST_DATABASE_URL` via
+`describe.skip`, so `pnpm --filter stash test` stays green with no database and
+CI reports them as skipped. To actually run them:
 
-### Documentation
-- `mise run docs:generate` - Generate API documentation (requires doxygen)
-  - Outputs XML (primary) and HTML (preview) formats
-  - XML suitable for downstream processing/website integration
-  - Output is written to `docs/api/` (generated, gitignored)
-- `mise run docs:generate:markdown` - Convert XML to Markdown API reference
-  - Generates single-file API reference: `docs/api/markdown/API.md` (all documented functions with parameters, return values, and source links)
-- `mise run docs:validate` - Validate documentation coverage and tags
-- `mise run docs:package` - Package XML docs for distribution (~230KB archive)
+```bash
+docker compose -f local/docker-compose.postgres.yml up -d --wait
+STASH_TEST_DATABASE_URL=postgres://cipherstash:password@localhost:55432/cipherstash \
+  pnpm --filter stash test
+```
 
-### Testing
-- Run all tests: `mise run test`
-- Run SQLx tests directly: `mise run test:sqlx`
-- Run SQLx tests in watch mode: `mise run test:sqlx:watch`
-- Tests are located in `tests/sqlx/` using Rust and SQLx framework
-- Property-based tests for the `eql_v3` encrypted scalar domains live in three suites — **catalog** (pure-Rust catalog invariants, no DB), **fixture** (oracle over committed ciphertext), and **e2e** (oracle over fresh end-to-end encryption, gated behind the `proptest-e2e` cargo feature). The structure, the shared all-pairs oracle engine, and the conventions/footguns (e.g. why they must not live under `scalars::`) are documented in `tests/sqlx/tests/encrypted_domain/property/README.md`.
-- Verify the scalar matrix coverage snapshot: `mise run test:matrix:inventory` (no database required). Committed token-normalized baselines under `tests/sqlx/snapshots/` pin the set of `scalars::<T>::*` test names so a silently dropped/renamed/`#[cfg]`-gated test fails CI's `matrix-coverage` job. The task discovers the present scalar types from the test binary's `--list` and cross-checks them against `cargo run -p eql-codegen -- list-types`, so a catalog type missing its matrix wiring also fails. When you change which matrix tests the macro emits, regenerate and commit the affected baseline in the same change. `tests/sqlx/snapshots/README.md` is the source of truth for which baselines exist and how each is regenerated.
+They need Postgres only — no CipherStash credentials. Reach for one when a
+change turns on a real SQL string, a real SQLSTATE, or a driver type
+conversion: a faked `pg` returns whatever the test author typed, so none of
+those is observable under it. `commands/eql/__tests__/applied.live.test.ts` is
+the worked example — it found that a missing *schema* raises `42P01`, not the
+`3F000` the code's own comment assumed.
 
-### Build System
-- Dependencies are resolved using `-- REQUIRE:` comments in SQL files
-- Build outputs to `release/` directory (a single installer + uninstaller, assembled from `src/v3` alone):
-  - `cipherstash-encrypt.sql` - The sole installer: the self-contained `eql_v3` surface, globbed from `src/v3` only (no `eql_v2`; installable into a DB with no `eql_v2` present)
-  - `cipherstash-encrypt-uninstall.sql` - Matching uninstaller
+It is **not** fully self-contained, despite running standalone in CI. Some `src`
+modules import workspace packages that publish `./dist` only, so an unbuilt
+workspace fails at collection with `Failed to resolve entry for package …`
+rather than at an assertion. `vitest.config.ts` aliases `@cipherstash/migrate`
+to its source to remove one such coupling; `@cipherstash/stack` remains, reached
+via `languages/typescript/packages/migrate/src/backfill.ts` and a direct import in
+`init/lib/__tests__/introspect.test.ts`. Deleting `languages/typescript/packages/stack/dist` fails 10
+files. Closing it needs `vitest.shared.ts`'s `stackSourceAlias`, which cannot be
+spread into this config: its `'@/'` points at `languages/typescript/packages/stack/src` while this
+package's points at `languages/typescript/packages/cli/src`, and a flat alias map admits only one —
+spread it after and stack's entry clobbers the CLI's, spread it before and the
+CLI's breaks stack's own source imports (#787 review).
 
-There are no longer separate Main / Supabase / Protect / v3-only build variants. The combined `eql_v2` build that previously produced multiple artefacts has been removed; the v3 surface now ships as one self-contained installer under the canonical `cipherstash-encrypt.sql` name (`eql-codegen order` walks `src/v3` only). Because the surface owns no `eql_v2` dependency, it is already Supabase / managed-Postgres compatible (functional indexes over extractors, no superuser-only operator classes) without a dedicated subset build. Self-containment — no `-- REQUIRE:` edge pointing outside `src/v3`, no `eql_v2.<symbol>` anywhere in the surface — is enforced at build time by `surface_order`'s `OutsideSurface` error (`crates/eql-codegen/src/ordering.rs`) and CI-gated by `mise run test:self_contained_v3`.
+## When to add or update an E2E test
 
-## Project Architecture
+Update `tests/e2e/**` whenever you:
 
-This is the **Encrypt Query Language (EQL)** - a PostgreSQL extension for searchable encryption. Key architectural components:
+- Add or rename a top-level command, subcommand, or flag (smoke tests assert
+  on help text, command names, and unknown-command behavior).
+- Change the user-facing string for an exit message that an existing E2E
+  asserts on (e.g. cancellation text, "Unknown auth command", the
+  `db migrate` stub warning). Strings that tests assert on live in
+  `src/messages.ts` — update the constant there and both prod and tests
+  pick it up. *Don't* hard-code the new wording in a test.
+- Touch `src/bin/stash.ts` argv parsing, exit codes, or top-level error
+  handling.
+- Add a new clack prompt that changes the *first* prompt rendered for a
+  command currently covered by E2E (the cancel test waits for a specific
+  prompt label).
 
-### Core Structure
+You do **not** need to add an E2E test for every new flag or branch — keep
+E2E coverage to the highest-value flows. Unit tests still own the bulk of
+behaviour coverage.
+
+## How the harness works
+
+`tests/helpers/pty.ts` exports `render(args, opts?)` which spawns
+`dist/bin/stash.js` inside a real pseudo-terminal and returns:
+
+- `output` — cumulative ANSI-stripped stdout.
+- `raw` — same, with ANSI escapes preserved (handy when debugging).
+- `waitFor(text|regex, timeoutMs?)` — polls until the match appears.
+- `key(name)` — sends keystrokes (`Enter`, `Up`, `Down`, `CtrlC`, etc.).
+- `write(string)` — raw stdin write.
+- `exit` — promise resolving to `{ exitCode, signal? }`.
+- `kill(signal?)` — terminate the pty.
+
+A real pty is required because `@clack/prompts` switches stdin to raw mode
+and renders differently when stdout isn't a TTY; piped-stdin mocks don't
+exercise the same code paths.
+
+## Gotchas
+
+- **Build before E2E.** `dist/bin/stash.js` is the artifact under test. The
+  turbo `test:e2e` task already depends on `build`, but if you invoke the
+  script directly you must build first.
+- **`doctor.e2e.test.ts` also needs protect-ffi's native binding, and no
+  `build` produces one.** `stash doctor` probes the encryption engine by
+  *calling* through `@cipherstash/stack/diagnostics` — importing it proves
+  nothing, since the neon load is lazy. `@cipherstash/stack` is a devDependency
+  of this package, so in the workspace the probe always resolves it and never
+  takes the "not installed, that's fine" arm; and the workspace-linked
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cipherstash/stack](https://github.com/cipherstash/stack) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
