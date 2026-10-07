@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to coding agents when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Quick Start
 
@@ -29,11 +29,13 @@ The rust-ibapi crate is a Rust implementation of the Interactive Brokers TWS API
 - [**API Patterns**](docs/api-patterns.md) - Builder patterns, protocol versions, and common patterns
 
 ### Development
+- [**Rule Nodes**](docs/rules/README.md) - Project conventions as linked nodes; indexed below under [Rule index](#rule-index)
 - [**Code Style Guidelines**](docs/code-style.md) - Coding standards and conventions
 - [**Build and Test**](docs/build-and-test.md) - Build commands, testing patterns, and CI
 - [**Testing Patterns**](docs/testing-patterns.md) - Test fixture stratification: `MessageBusStub` / `MemoryStream` / handshake-replay listener
 - [**Integration Tests**](docs/integration-tests.md) - Writing tests against a live gateway
 - [**Extending the API**](docs/extending-api.md) - Adding new TWS API functionality
+- [**Blocked Issues**](docs/block-issues.md) - Work waiting on a gateway capture or paper-account setup
 
 ## Version 3.0 Philosophy
 
@@ -46,17 +48,50 @@ Version 3.0 is a breaking release. Fix API inconsistencies even when it means br
 
 Default all work — features and fixes — to `main` alone. Do **not** open v2-stable PRs by default; only backport a specific named bug on explicit request. Changes to either branch go through pull requests.
 
-## Key Points to Remember
+## Rule index
 
-1. **Feature coverage**: default-async, sync-only, and all-features builds must compile **and** pass tests when touched
-2. **Follow module structure**: Client methods live as `impl Client` blocks in domain modules (e.g., `news/sync.rs`), not in `client/sync.rs` or `client/async.rs`. Prefer the flat `<domain>/sync.rs` + `<domain>/async.rs` layout over `<domain>/sync/mod.rs` — the project minimizes `mod.rs` files. Use `common/` for shared logic between sync/async. Protobuf decoders live in each domain's `common/decoders.rs`; shared proto→domain converters live in `proto/decoders.rs`
-3. **Run quality checks before committing**: every command in [Quick Commands](#quick-commands) below — formatter, all three clippy configs, all three rustdoc configs. `cargo test --doc` only validates doc-test compilation, not intra-doc link resolution; that's why the rustdoc step is separate
-4. **Design principles**: see [docs/code-style.md](docs/code-style.md#design-principles) for SRP, composition, and avoiding repetition. Project-specific constraint: max 3 params per function — use a builder for 4+. The receiver (`self` / `&self` / `&mut self`) does not count toward this budget; `pub fn foo(&self, a, b, c)` is at the limit, `pub fn foo(&self, a, b, c, d)` needs a builder. **Builder rationale matters**: the rule's goal is to spare callers from positional-argument noise when there are optional / defaultable fields. A 4+ param function where *every* arg is required with no reasonable default gains little from a builder — `client.foo(a, b, c, d, e)` is no worse than `client.foo(a).b(b).c(c).d(d).e(e).run()`. For all-required signatures, prefer grouping related args into a struct (e.g. `DateRange { start, end }`) or accept the violation with a comment, rather than mechanical builder conversion
-5. **Never use `block_on` in async code**: Do not use `futures::executor::block_on()` inside async contexts — it blocks tokio worker threads and risks deadlocks. Use atomics (`AtomicI32`, etc.) for lock-free access to rarely-written values, or make the function `async` and `.await` the lock
-6. **Every new function needs a test**: Before opening a PR, verify every new `pub`/`pub(crate)` function has a corresponding unit test. Review test coverage as a final step — missing tests should block the PR. **Overall line coverage target: 90%+** — run `just cover` and check the report; if a touched module drops below 90%, add tests before opening the PR
+Detail lives in [`docs/rules/`](docs/rules/README.md), one directive per file. Follow the
+link when the situation matches — the node carries the mechanics, the bug class, and the
+precedents. Every rule now lives in a node; nothing is inline.
+
+### Wire protocol — protobuf-only at `server_versions::PROTOBUF_REST_MESSAGES_3` (213)
+
+- **Writing or modifying a domain decoder** → [proto-only decoding](docs/rules/wire/proto-only-decoding.md)
+- **Adding a `ResponseMessage` accessor, or a public API on a proto inbound message type** →
+  [proto-aware accessors](docs/rules/wire/proto-aware-accessors.md)
+- **Typing a `String` field as an enum** → [wire enum typing](docs/rules/wire/enum-typing.md)
+- **Accepting an order id, minting a request id, or routing by an inbound id** →
+  [id partition](docs/rules/wire/id-partition.md)
+- **Adding a one-shot client method, or passing a processor to a `one_shot_*` helper** →
+  [one-shot narrowing](docs/rules/wire/one-shot-narrowing.md) — the `(message type, decoder)`
+  pair lives on the payload's `ProtoPayload` impl, so the call site names neither
+
+### Code structure and style
+
+- **Adding a client method, or creating a domain module** →
+  [domain module layout](docs/rules/style/domain-module-layout.md)
+- **Writing a function that takes four or more parameters** →
+  [param budget](docs/rules/style/param-budget.md) — clippy's `too_many_arguments` only fires
+  at eight, so nothing gates this
+- **Exposing one or two items from an otherwise-private module** →
+  [narrow re-exports](docs/rules/style/narrow-reexports.md)
+- **About to write a `macro_rules!`, or reviewing one** →
+  [macros last resort](docs/rules/style/macros-last-resort.md)
+- **Adding a named builder method that sets an enum, or adding a variant to such an enum** →
+  [builder enum coverage](docs/rules/style/builder-enum-coverage.md) — exhaustiveness checking
+  does not reach "one setter per variant"
+
+### Testing
+
+- **Adding a `pub` / `pub(crate)` fn, or checking coverage before opening a PR** →
+  [coverage floor](docs/rules/testing/coverage-floor.md)
+- **Reviewing a new test, or asserting on captured request bytes** →
+  [exercise production code](docs/rules/testing/exercise-production-code.md)
+- **Building a response test fixture** → [fixture builders](docs/rules/testing/fixture-builders.md)
+- **Writing a `#[cfg(test)] mod tests` block** → [sibling test files](docs/rules/testing/sibling-test-files.md)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [wboayue/rust-ibapi](https://github.com/wboayue/rust-ibapi) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
