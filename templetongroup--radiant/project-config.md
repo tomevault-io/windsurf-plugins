@@ -1,11 +1,18 @@
 ---
 trigger: always_on
-description: ⚠️ **STILL READ APP STORE CONNECT BEFORE YOU TRUST THIS.** `node
+description: The repo's root `AGENTS.md` still applies. Radiant loads this file first and the root one only
 ---
 
-# Radiant — read this first, every turn
+# Radiant for iPhone — read this before touching `apps/ios`
 
-## THE iPHONE APP — 1.1 (build 21) READY FOR SALE, approved 2026-09-18
+The repo's root `AGENTS.md` still applies. Radiant loads this file first and the root one only
+partly, so the root's shipping rule, in short: **every change is committed and
+pushed, gets a phone Read me entry (`Native/ReadMeView.swift`), and a
+Linear issue in TG / Radiant — then `node scripts/ship-check.mjs`.** A phone
+change also needs a new build on TestFlight (`scripts/ios-testflight.sh`) and
+on every device (`scripts/ios-install-all.sh`).
+
+## App Store status
 
 ⚠️ **STILL READ APP STORE CONNECT BEFORE YOU TRUST THIS.** `node
 scripts/asc.mjs get 6804891721` prints the live state in one line; this
@@ -13,16 +20,28 @@ heading has gone stale three times. 1.0 (build 7) was approved 2026-09-16; 1.1
 (build 21) was submitted 2026-09-17 from the command line (`asc.mjs submit`)
 and approved the next morning with no questions.
 
-**1.1 carries:** Hugging Face search with a run/won't-run verdict (unfiltered
+**1.1 carried:** Hugging Face search with a run/won't-run verdict (unfiltered
 — TG-454, do not reinstate a word filter), Archive on chats, the keyboard fix,
 the unsent-message fix (TG-467), the byline link to templetontech.com, and an
-age rating of 17+ — answered honestly for an open model list. `CURRENT_PROJECT_VERSION`
-is 21; the next upload must be higher.
+age rating of 17+ — answered honestly for an open model list.
 
-**The next build is an update:** a new version number in App Store Connect
-(`asc.mjs new-version`), its own what's new, its own review. Screenshots are
+**1.2 is being prepared** (PREPARE_FOR_SUBMISSION on 2026-09-27): the native
+SwiftUI rebuild (TG-567), subscription sign-in (TG-570), Jev Router (TG-571),
+builds 29–38 on TestFlight. It waits on Tony testing on his phone. Read
+`CURRENT_PROJECT_VERSION` in the project file — every upload must be higher.
+
+**Each version is its own review:** a version number in App Store Connect
+(`asc.mjs new-version` made 1.2), its own what's new, its own review. Screenshots are
 still 1.0's — replace them with the next submission (`asc.mjs shots` counts
 them). `scripts/asc.mjs` can do everything short of signing in.
+
+**TestFlight from the command line: `scripts/ios-testflight.sh`** (bump
+`CURRENT_PROJECT_VERSION` first). It signs LOCALLY — an Apple Distribution
+certificate created with the API key on 2026-09-25 (expires 2027-09-25), its key
+in `~/Library/Keychains/radiant-signing.keychain-db`, profile "Radiant App Store
+(command line)" — and uploads with `altool`, so it works with nobody signed in
+to Xcode. Xcode's own upload needs an Apple ID in Settings → Accounts; the API
+key is refused cloud signing. The Internal TestFlight group gets every build.
 
 **Anything to do with the submission: use the `app-store-review` skill**
 (`.claude/skills/app-store-review/`, also installed at `~/.claude/skills`;
@@ -48,56 +67,36 @@ the architecture. It also builds every row's real config.json with the phone's
 engine (the pinned one, and for main-list rows the oldest one still on phones —
 App Store 1.1's), which is what would have stopped Nemotron 3 Nano 4B shipping.
 
-Radiant is Tony's own coding harness: an Electron app wrapping a local node
-server (`server/index.js`, port 5834) and a React UI (`src/`). It is a public,
-MIT-licensed repo, signed and notarized, and it auto-updates from GitHub
-Releases. Work on `master`.
+## The app, the build and the devices
 
-## Written is not shipped
+`apps/ios` is a native SwiftUI app (`apps/ios/ios/App/App/Native/`). The
+Capacitor project remains only as the Xcode shell and for the `LocalModels`
+engine class; no web view is shown and `src/mobile` is gone (build 42,
+2026-09-28 — Tony: "get rid of the old design").
 
-**Every change closes all three of these, in the same turn:**
-
-1. **Git** — committed with a real message, and pushed. Tony runs the packaged
-   app, not the dev server, and other agents work from other checkouts. An
-   uncommitted fix looks exactly like no fix: on 2026-08-22 six corrected files
-   sat in the working tree while he tested the release and reported the bug as
-   still broken.
-2. **The in-app Read me** — the `GUIDE` array in `src/components/Settings.jsx`
-   (Settings → "Read me"). Standing rule from Tony: *"you MUST update that
-   readme when features are added or changed. end users deserve that."* Write it
-   for someone using the app: what they can now do, plain language, US spelling.
-3. **Linear** — team **The Templeton Group** (TG), project **Radiant**. Ship
-   something → its issue goes to Done, or create one already Done. Spot a
-   problem you are not fixing → file it.
-
-**This is automatic, not a question to ask.** Tony has standing authorization:
-run the `ship-sync` agent at the end of any turn that changed behavior.
-
-Run the objective half and fix whatever it flags:
+**Every iOS build goes to every device.** Standing instruction from Tony
+(2026-09-10): *"when you create new builds to the ios version, i want you to
+update it on all devices."* A dev install only changes when someone pushes a
+new one to that device, so a build that lands on one phone leaves the others
+on last week's code with no way to tell. One command does the whole job —
+web bundle, sync, build once, install on every paired device that answers:
 
 ```bash
-node scripts/ship-check.mjs
+scripts/ios-install-all.sh
 ```
 
-It verifies committed / pushed / Read-me-kept-current / tagged — and, fifth,
-**judged**: `scripts/ship-judge.mjs` has Jev (a decision model, see
-`server/decide.js`) read the commit message and any new Read me entries and
-answer whether they say *why* and whether they are written for a person using
-the app. On its first run it failed two entries that talked about prompt
-caches and tool schemas to users. Below 50% fails the check; unreachable, it
-passes and says so. Rewrite in plain words, commit again. Since 2026-09-19 it
-also reads the DIFF, per source file: a likely bug or a security hole at
-≥ 70% fails; "users would notice, message is silent" and "logic with no test"
-print as ⚠ warnings for a person to weigh.
+It lists the devices that did not answer (off, asleep, not on this network)
+at the end; run it again when they are. Devices today: iPhone 17 Pro Max,
+iPad Pro 11, iPad mini (A17 Pro). All are on the paid team's profile, which
+lasts a year — not the seven days a free Apple ID gets.
 
-New GitHub issues are sorted the moment they land (`scripts/triage.mjs`, run by
-`.github/workflows/triage.yml`): app, kind, severity, possible duplicate — as
-labels, with the probability, and nothing under 60% (90% for duplicate) is
-applied. `node scripts/triage.mjs --closed --dry-run` shows what it would say. Or hand the
-whole job to the **`ship-sync`** agent (runs on Haiku, cheap) — it loops until
+⚠️ **The store is a file, and its first launch imports the web's.** `KV`
+(NativeKit.swift) holds the same `radiant.phone.*` / `rx.*` keys and JSON
+shapes the old web design kept in localStorage, backed by
+`Application Support/radiant-store.json` (`Launch.swift`, `DiskStore`). The
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [templetongroup/radiant](https://github.com/templetongroup/radiant) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
