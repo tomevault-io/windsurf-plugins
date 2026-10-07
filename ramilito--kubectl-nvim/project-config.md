@@ -1,25 +1,46 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: These instructions apply to all coding assistants working in this repository.
 ---
 
-# CLAUDE.md
+# Repository Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+These instructions apply to all coding assistants working in this repository.
+
+## Shared Instructions
+
+`AGENTS.md` is the canonical entry point; `CLAUDE.md` is a relative symlink to it.
+Role guides live in `.agents/roles/`. The files in `.claude/agents/` are relative
+symlinks to those guides. Edit the shared sources rather than creating separate
+copies for each assistant.
+
+Before planning or editing, read the relevant role guides below. Their Markdown
+instructions apply to every assistant. The YAML `model` and `tools` fields are
+Claude-specific metadata retained for compatibility; other assistants use their
+available models and equivalent tools.
+
+When delegation is available, use it for the required roles and instruct each
+delegate to read its guide. These Markdown files do not register native agents
+in every tool. If delegation is unavailable, read and apply the role yourself,
+including its planning or review step. Do not skip the guidance.
+
+Before selecting a test strategy or writing, changing, or reviewing tests, read
+`.agents/roles/testing.md` yourself, even when delegating the testing work.
 
 ## Subagents
 
-This project uses Claude Code subagents (`.claude/agents/`). **You MUST use them.**
+This project defines shared roles in `.agents/roles/`. **You MUST use the relevant roles.**
 
 ### Rule 1: ALWAYS Plan First
 
-For ANY non-trivial task, invoke the `plan` subagent FIRST before doing anything else.
+For ANY non-trivial task, read `.agents/roles/plan.md` and use the `plan` role FIRST,
+before task exploration or edits.
 - Trivial = single obvious edit, typo fix, or direct question
 - Everything else = use `plan` first
 
 ### Rule 2: ALWAYS Use Domain Subagents
 
-When a task touches a domain, use that subagent. No exceptions.
+When a task touches a domain, read `.agents/roles/<role>.md` and use that role.
 
 | Domain | Subagent | Trigger |
 |--------|----------|---------|
@@ -85,7 +106,7 @@ make test              # Run all tests
 make test FILE=<path>  # Run specific test file
 ```
 
-Tests live in `tests/`. See `.claude/agents/testing.md` for the testing philosophy.
+Tests live in `tests/`. See `.agents/roles/testing.md` for the testing philosophy.
 
 Manual testing via minimal reproduction setup:
 ```bash
@@ -114,44 +135,9 @@ nvim -u repro.lua
 ### Rust Layer (`kubectl-client/src/`)
 
 **Key patterns:**
-- **Processor trait** (`processors/`) - Polymorphic handling for 28+ resource types, dispatched via GVK
-- **Informer pattern** (`store.rs`) - Efficient delta updates using resourceVersion
-- **Tokio runtime** - Singleton async runtime bridged to Lua via block-on pattern
-- **mlua FFI** - Lua bindings with LuaJIT, async, serialize support
-
-**Commands:** `cmd/` contains kubectl operation wrappers (get, apply, delete, exec, portforward, etc.)
-
-### Go FFI Bridge (`go/`)
-
-Minimal C-compatible exports for specialized kubectl operations (describe, drain). Compiled as static library and linked into Rust.
-
-## Key Commands
-
-```vim
-:Kubectl [get <resource>|diff|apply|top|api-resources] [args...]
-:Kubens [namespace]
-:Kubectx [context]
-```
-
-## User Events
-
-- `K8sResourceSelected` - Resource selected in view
-- `K8sContextChanged` - Kubernetes context switched
-- `K8sCacheLoaded` - API resources cache loaded
-
-## Denied Commands
-
-Do NOT run these commands:
-- `make build` - Takes too long, use `make build_dev` instead
-
-## Token Efficiency Rules
-
-Follow these rules to minimize token usage:
-
-**Before starting work:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Ramilito/kubectl.nvim](https://github.com/Ramilito/kubectl.nvim) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
