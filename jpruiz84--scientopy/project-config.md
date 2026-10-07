@@ -127,4 +127,4 @@ Match the change category to the suite — but **always run both before pushing 
 
 ---
 > Source: [jpruiz84/ScientoPy](https://github.com/jpruiz84/ScientoPy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
