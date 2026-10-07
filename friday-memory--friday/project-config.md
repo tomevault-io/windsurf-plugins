@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: > **ENVIRONMENT:** Configured for **Universal Agent Standard** interacting via the `friday` Model Context Protocol (MCP) server.
+description: > **ENVIRONMENT:** Configured for **Windsurf & Cascade** interacting via the `friday` Model Context Protocol (MCP) server.
 ---
 
 # AI Agent Core Directives — Persistent Memory Protocol for Friday
 
-> **ENVIRONMENT:** Configured for **Universal Agent Standard** interacting via the `friday` Model Context Protocol (MCP) server.
+> **ENVIRONMENT:** Configured for **Windsurf & Cascade** interacting via the `friday` Model Context Protocol (MCP) server.
 > **OBJECTIVE:** Enforce persistent state retention, eliminate session amnesia, and maintain verifiable project constraints across engineering sessions.
 
 ---
@@ -36,4 +36,4 @@ Every session must operate with bidirectional state validation through the Frida
 
 ---
 > Source: [friday-memory/friday](https://github.com/friday-memory/friday) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
