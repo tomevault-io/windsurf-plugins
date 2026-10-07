@@ -1,80 +1,85 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Tests for `open-sse/translator/`. Goals: (1) data-driven coverage of every provider/model, (2) expose bugs caused by using OpenAI as the intermediate format.
 ---
 
-# CLAUDE.md
+# Translation Layer Tests
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Tests for `open-sse/translator/`. Goals: (1) data-driven coverage of every provider/model, (2) expose bugs caused by using OpenAI as the intermediate format.
 
-## What this is
+## 1. Translation layer structure (`open-sse/translator/`)
 
-10Router (`10router-app`) — a local AI routing gateway + Next.js dashboard. It exposes one OpenAI-compatible endpoint (`/v1/*`) and routes traffic across 40+ upstream providers with format translation, model-combo fallback, multi-account fallback, OAuth/API-key credential management, token refresh, quota/usage tracking, and optional cloud sync.
+Pipeline uses **OpenAI as the intermediate format**:
+- Request: `source → openai → target` (`translateRequest`)
+- Response (SSE chunk): `target → openai → source` (`translateResponse`)
+- If `source === target` → translation is skipped (passthrough).
 
-Two published artifacts live in this one repo:
-- The **dashboard + gateway** (root `package.json`, `10router-app`) — the Next.js server that does the actual routing.
-- The **CLI launcher** (`cli/`, published to npm as `10router`) — a separate package that installs/starts the server and manages the tray. It has its own `package.json`, version, and build.
+Components:
+- `index.js` — `translateRequest` / `translateResponse` / `register(from, to, requestFn, responseFn)` / registry.
+- `formats.js` — `FORMATS` enum (openai, claude, gemini, gemini-cli, openai-responses, antigravity, kiro, cursor, commandcode, ollama, vertex).
+- `request/<from>-to-<to>.js` — one-way request translation.
+- `response/<from>-to-<to>.js` — one-way SSE response translation.
+- `schema/` — pure data enums (no logic): `roles.js` (ROLE, GEMINI_ROLE), `blocks.js` (OPENAI_BLOCK, CLAUDE_BLOCK, RESPONSES_ITEM, valid-type lists), `finishReasons.js` (OPENAI_FINISH, CLAUDE_STOP, GEMINI_FINISH), `defaults.js` (MODEL_FALLBACK, DEFAULT_IMAGE_MIME). Import via `schema/index.js`.
+- `concerns/` — cross-format translation LOGIC: `chunk.js`, `usage.js`, `reasoning.js`, `thinking.js` (effort↔budget/level), `toolCall.js`, `finishReason.js` (mapping fns), `image.js`, `json.js`.
+- `formats/` — per-format logic: `openai.js` (filterToOpenAIFormat), `claude.js`, `gemini.js`, `responsesApi.js`, `maxTokens.js`.
 
-The code lives in `src/` (Next.js app + dashboard/compat APIs), `open-sse/` (the provider-agnostic routing/translation engine), `cli/` (the launcher package), and `tests/`.
+**OpenAI-bridge pitfalls** (source of most bugs): going through OpenAI easily loses `thinking`/`reasoning`, image URLs (non-base64), `input_audio`, `is_error`; tool `id`/`index` become unstable (parallel tool calls), non-text system blocks, `tool_choice:"none"`.
 
-## Commands
+## 2. Test layout
 
-Dashboard/gateway (run from repo root):
+| File | Role |
+|---|---|
+| `matrix.js` | Reads `PROVIDER_MODELS` → builds matrix (alias, model, targetFormat, strip, upstreamId). DRY core. |
+| `registerAll.js` | Imports every translator to run `register()` side-effects. **Required** (see §5). |
+| `coverage-all-models.test.js` | Tier 1: every model translates without throwing; strip applied correctly. |
+| `format-roundtrip.test.js` | Tier 2: tool id/system/parallel survive the bridge. |
+| `bugs-openai-bridge.test.js` | Exposes concrete bugs (with source file:line). |
+
+## 3. Running
+
+Always pass `--config tests/vitest.config.js` (the alias config lives there; without it vitest may not resolve `@/...` subpaths).
+
 ```bash
-cp .env.example .env
-npm install
-PORT=20128 NEXT_PUBLIC_BASE_URL=http://localhost:20128 npm run dev   # dev (webpack, port 20127 by default via next dev)
-npm run build && PORT=20128 HOSTNAME=0.0.0.0 npm run start           # production
+# no-cred (default, offline): translator-only files
+cd app && npx vitest run --config tests/vitest.config.js "tests/translator/"
+cd app && npx vitest run --config tests/vitest.config.js "tests/translator/bugs-openai-bridge.test.js"
+
+# real (calls live providers using credentials from the local DB)
+cd app && RUN_REAL=1 npx vitest run --config tests/vitest.config.js "tests/translator/real/"
 ```
-- Bun variants: `npm run dev:bun` / `build:bun` / `start:bun`.
-- Default runtime port is **20128** (dashboard at `/dashboard`, API at `/v1`).
-- Lint: `npx eslint .` (config `eslint.config.mjs`, extends `eslint-config-next`).
+No-cred tests make NO network calls and need NO creds. Real tests (`real/`, gated by `RUN_REAL=1`) read active connections from `~/.10router/db/data.sqlite`, send a tiny prompt per provider through `handleChatCore`, and assert valid SSE. Account/quota errors (401/402/403/429) are treated as credential issues and skipped, not failures.
 
-CLI package (`cli/`):
-```bash
-npm run cli:pack       # build + npm pack from root
-cd cli && npm run dev  # nodemon watch
-```
+## 4. Adding a new provider → tests cover it AUTOMATICALLY
 
-Tests (vitest, in `tests/`, an **independent** ESM package — not wired into root `npm test`):
-```bash
-npm install                             # ROOT deps first — tests import from src/ which needs `open`, `undici`, etc.
-cd tests && npm install                 # then tests' own deps (vitest) → tests/node_modules (allowed by tests/.gitignore)
-npx vitest run                          # all tests; auto-discovers tests/vitest.config.js
-npx vitest run unit/capabilities.test.js   # single file (path relative to tests/)
-```
-> The committed `tests/package.json` `test` script hardcodes Unix paths (`NODE_PATH=/tmp/node_modules …`) — a shared-install workaround from upstream. On Windows (or anywhere), ignore it and use the `npx vitest` form above; `vitest.config.js` resolves the `open-sse`/`@/` aliases from the repo root regardless of where vitest lives.
->
-> **The suite is NOT expected to be all-green on a plain checkout.** ~938 pass, ~64 fail. Judge regressions with `tests/__baseline__/verify-no-regression.mjs`, not a raw run. Expected red:
-> - 26 catalogued in `tests/__baseline__/known-fails.txt` (rtk, oauth-cursor-auto-import, translator-request-normalization, …).
-> - `unit/embeddings.cloud.test.js` imports `cloud/src/handlers/embeddings.js` — the `cloud/` worker dir is **not in this repo**, so it always fails here.
-> - `unit/xai-oauth-service.test.js` times out (5s) when the xAI endpoint-discovery fetch isn't reachable/mocked.
-> - `real/*.real.test.js` make live provider calls — need credentials, skip otherwise.
-- `*.real.test.js` under `tests/translator/real/` make live provider calls — skip unless credentials are set.
-- Regression baselines: `tests/__baseline__/verify-*.mjs` compare against committed snapshots (providers, aliases, OAuth URLs). Run these after touching provider registry / alias logic.
+Add a provider by adding a key to `open-sse/config/providerModels.js` `PROVIDER_MODELS` (e.g. `newprov: [{ id, targetFormat?, strip?, upstreamModelId? }]`) plus its config in `open-sse/config/providers.js`.
 
-## Architecture
+→ `coverage-all-models.test.js` **automatically** runs for the new models with **no test edits**. `matrix.js` reads config directly.
 
-Two authoritative docs already exist — read them before working in these areas rather than re-deriving:
-- `docs/ARCHITECTURE.md` — full system: request lifecycle, combo/account fallback, OAuth + token refresh, cloud sync, data model.
-- `open-sse/AGENTS.md` — the routing/translation engine's own conventions and "how to add a provider/executor/translator". **Read this before editing anything under `open-sse/`.**
+Only add a dedicated test when a provider has a special format that does not round-trip cleanly (see §7).
 
-### Request flow (the thing to understand first)
-`src/app/api/v1/*` route (Next rewrite maps `/v1/*` → `/api/v1/*` in `next.config.mjs`)
-→ `src/sse/handlers/chat.js` (parse, combo expansion, account-selection loop)
-→ `open-sse/handlers/chatCore.js` (detect source format, translate request, dispatch to executor, retry/refresh, stream setup)
-→ `open-sse/executors/*` (per-provider upstream call; `default.js` handles any OpenAI-compatible provider)
-→ `open-sse/translator/*` (client format ↔ provider format)
-→ SSE back to client.
+## 5. `registerAll.js` — why it is required
 
-`src/sse/` is the app-side entry glue; `open-sse/` is the provider-agnostic engine (also usable standalone). Cross that boundary consciously.
+`translator/index.js` uses `require(...)` (bundler-only) to lazy-load translators. Under vitest/ESM, `require` **silently no-ops** → empty registry → `translateRequest` skips the translation step → **false pass** (data is lost but the test goes green by mistake).
 
-### Translator engine (`open-sse/translator/`)
-- Pivots through **OpenAI as the intermediate format**. A translator registered on an exact `source:target` pair (e.g. `claude:kiro`) runs as a **direct route**, skipping the lossy double-hop. Prefer a direct route for fragile pairs (thinking blocks, tool ids, non-base64 images, `is_error`).
-- Translators **self-register** via `register(from, to, reqFn, resFn)` as an import side effect — a new translator file MUST be imported in `open-sse/translator/index.js` or it never runs.
+→ Every test calling `translateRequest`/`translateResponse` MUST `import "./registerAll.js"` at the top of the file.
+
+## 6. Bug-exposure convention — `it.fails`
+
+- A bug confirmed in the app but NOT yet fixed → use `it.fails(...)`.
+- `it.fails` **passes while the app still has the bug**, **turns red once the bug is fixed** → a reminder to update the test (switch `it.fails` → `it` and confirm correct behavior).
+- Pattern for a new bug-exposure test: real input → assert the "should-be-kept" behavior → wrap in `it.fails` + a comment with the source `file:line`.
+
+## 7. Special formats to watch
+
+- `kiro` (binary AWS EventStream), `cursor` (protobuf ConnectRPC), `commandcode` (NDJSON) → responses do NOT round-trip cleanly through openai; test via their executors, not just the translator.
+- Single-provider-two-formats (most fragile): `opencode-go` (minimax models → claude, others openai), `github` (escalates `/chat/completions` → `/responses` at runtime), `xiaomi-tokenplan` (claude alias).
+- `gemini`/`gemini-cli`: only the LAST system message is kept → earlier system messages are lost.
+
+## 8. Current known bugs (currently `it.fails`)
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [techysy/10router](https://github.com/techysy/10router) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
