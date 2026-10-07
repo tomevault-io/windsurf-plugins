@@ -5,11 +5,12 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [roedyrustam/vibes-plug](https://github.com/roedyrustam/vibes-plug).
+Original source: `` in [roedyrustam/vibes-plug](https://github.com/roedyrustam/vibes-plug).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
