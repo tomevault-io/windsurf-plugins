@@ -1,49 +1,70 @@
 ---
 trigger: always_on
-description: - **ActionCell** - Component
+description: Usage Context for @texturehq/edges
 ---
 
 
-## @texturehq/edges Components (v1.28.2)
+ Usage Context for @texturehq/edges
 
-### Quick Reference
+## Setup
+This project uses @texturehq/edges design system with Tailwind 4. The theme CSS file contains all design system variables that automatically become available as Tailwind classes.
 
-- **ActionCell** - Component
-- **ActionMenu** - ActionMenu  A dropdown menu for actions, typically triggered by a button. Supports icons, destructive actions, and flexible alignment.
-- **ActivityFeed** - Height/maxHeight for scroll container
-- **ActivityFeedGroup** - Group content
-- **ActivityItem** - Marks the item as interactive, enabling keyboard semantics
-- **Alert** - Alert  A simple alert dialog with a single action button. Use for informational messages that require acknowledgment.
-- **AppShell** - Isomorphic AppShell component that works as both server and client component Uses CSS-only interactions by default for full SSR compatibility Can be progressively enhanced with JavaScript when enableJsEnhancements is true
-- **AreaSeries** - AreaSeries  Chart component for rendering area charts with gradient fill. Displays data as a filled area with optional line path, supporting animations and custom colors.
-- **Autocomplete** - Additional CSS classes to apply to the component
-- **AutoMobileRenderer** - Component
-- **Avatar** - Avatar  Display user, team, or organization avatars with support for images, initials, and fallback icons. Includes optional status indicators.
-- **Badge** - Badge  A non-interactive label for displaying status, counts, or categories. Use for read-only indicators. For interactive elements, use Chip instead.  Supports device states (charging, discharging, heat, cool, etc.) and grid states (importing, exporting) as variant values.
-- **BadgeCell** - Component
-- **Banner** - Banner  A prominent message component for displaying important information or system messages. Can be used inline within content sections or positioned at the page level.  Inspired by Atlassian's Section Message and Chakra UI's Alert, combining the best features of both: semantic variant colors, multiple appearances, inline actions, and flexible composition.  @example ```tsx // Simple info banner <Banner variant="info" title="New features available"> Check out the latest updates to improve your workflow. </Banner>  // With actions <Banner variant="warning" title="Your trial expires soon" primaryAction={{ label: "Upgrade now", onPress: () => {} }} secondaryAction={{ label: "Learn more", onPress: () => {}, asLink: true }} > Upgrade to continue using premium features. </Banner>  // Bold appearance <Banner variant="error" appearance="bold" title="Action required" dismissible onDismiss={() => {}} > Please update your payment information. </Banner> ```
-- **BarSeries** - BarSeries  Chart component for rendering bar/column charts. Displays data as vertical bars with customizable colors, opacity, and category-based coloring.
-- **BooleanCell** - Component
-- **BreadcrumbItem** - BreadcrumbItem  Individual breadcrumb item with optional link The last breadcrumb is automatically styled as the current page (non-interactive, bold) When `copyable` is true, adds a copy-to-clipboard button next to the current (last) breadcrumb
-- **Breadcrumbs** - Breadcrumbs  Navigation breadcrumbs that show the user's current location in the hierarchy Automatically collapses middle items into an ellipsis dropdown when the container width exceeds the maxWidth threshold (default: 600px)
-- **Button** - Renders an Edges Button. When `href` is provided, renders a link-styled button using the same visual system.
-- **Calendar** - Calendar  Single-date calendar primitive with Edges styling.
-- **Card** - When true and parent Card has layout="flex", content expands to fill available space
-- **CardContent** - When true and parent Card has layout="flex", content expands to fill available space
-- **CardFooter** - When true and parent Card has layout="flex", content expands to fill available space
-- **CardHeader** - When true and parent Card has layout="flex", content expands to fill available space
-- **CardMedia** - When true and parent Card has layout="flex", content expands to fill available space
-- **CardMobileRenderer** - Component
-- **CarouselAutoplayTrigger** - CarouselAutoplayTrigger - Toggle button for autoplay functionality. Allows users to pause and resume automatic slide transitions.
-- **CarouselControl** - CarouselControl - Container for navigation controls and indicators. Typically holds prev/next buttons, indicators, and autoplay controls.
-- **CarouselIndicator** - CarouselIndicator - Dot indicator for a specific slide. Clicking navigates to the slide at the specified index.
-- **CarouselIndicatorGroup** - CarouselIndicatorGroup - Container for all page indicators. Automatically generates indicators for each page/slide.
-- **CarouselItem** - Individual slide/item within the carousel. Handles sizing based on slidesPerView and applies snap alignment.
-- **CarouselItemGroup** - CarouselItemGroup - Container for carousel items with scrolling behavior. Manages scroll snap, drag interactions, and layout spacing.
-- **CarouselNextTrigger** - CarouselNextTrigger - Button to navigate to the next slide. Automatically disabled when at the last slide (unless loop is enabled).
-- **CarouselPrevTrigger** - CarouselPrevTrigger - Button to navigate to the previous slide. Automatically disabled when at the first slide (unless loop is enabled).
+## Theme Import
+The theme is imported via CSS:
+```css
+@import "@texturehq/edges/theme.css";
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## How It Works
+- CSS variables in the theme file automatically become Tailwind classes
+- `--color-brand-primary` becomes available as `bg-brand-primary`, `text-brand-primary`, `border-brand-primary`, etc.
+- `--spacing-md` becomes available as `p-md`, `m-md`, `gap-md`, etc.
+- `--text-lg` becomes available as `text-lg`
+- `--radius-lg` becomes available as `rounded-lg`
+
+## Usage Guidelines
+- **Use semantic classes over arbitrary values**
+- Prefer: `bg-brand-primary`, `text-text-body`, `p-md`, `rounded-lg`
+- Avoid: `bg-[#444ae1]`, `text-[#333333]`, `p-[1rem]`, `rounded-[0.5rem]`
+
+## Naming Conventions
+- Brand colors: `brand-primary`, `brand-light`, `brand-dark`
+- Text colors: `text-body`, `text-heading`, `text-muted`, `text-caption`
+- Background colors: `background-body`, `background-surface`, `background-muted`
+- Border colors: `border-default`, `border-focus`, `border-muted`
+- Action colors: `action-primary`, `action-secondary`, `action-destructive`
+- Feedback colors: `feedback-success`, `feedback-error`, `feedback-warning`, `feedback-info`
+- Spacing: `xs`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `4xl`
+- Typography: `xs`, `sm`, `base`, `lg`, `xl`, `2xl`, `3xl`, `4xl`
+- Border radius: `xs`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `4xl`
+
+## Examples
+```html
+<!-- ✅ Good - Uses semantic classes -->
+<div class="bg-brand-primary text-text-on-primary p-md rounded-lg shadow-md">
+  <h2 class="text-text-heading text-lg font-medium">Title</h2>
+  <p class="text-text-body text-base">Content</p>
+</div>
+
+<!-- ❌ Avoid - Uses arbitrary values -->
+<div class="bg-[#444ae1] text-[#ffffff] p-[1rem] rounded-[0.5rem]">
+  <h2 class="text-[#111827] text-[1.125rem] font-[500]">Title</h2>
+  <p class="text-[#333333] text-[1rem]">Content</p>
+</div>
+```
+
+## Dark Mode
+All colors automatically adapt to dark mode when `.theme-dark` class is present.
+
+## Available Variables
+All CSS variables from the theme file are automatically available. The theme includes:
+- Complete color system (brand, text, background, border, action, feedback, device states, data visualization)
+- Spacing scale
+- Typography scale  
+- Border radius scale
+- Shadow system
+- Animation definitions
+- Form control specifications
 
 ---
 > Source: [TextureHQ/commongrid](https://github.com/TextureHQ/commongrid) — distributed by [TomeVault](https://tomevault.io).
