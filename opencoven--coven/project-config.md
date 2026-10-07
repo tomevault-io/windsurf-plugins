@@ -1,18 +1,132 @@
 ---
 trigger: always_on
-description: **Read [`AGENTS.md`](AGENTS.md).** It is the canonical guide for AI agents
+description: Guidance for **AI agents** (Codex, Claude Code, Hermes, and any Coven familiar)
 ---
 
-# CLAUDE.md — coven
+# AGENTS.md — coven
 
-**Read [`AGENTS.md`](AGENTS.md).** It is the canonical guide for AI agents
-(including Claude Code) contributing to this repo — branch/PR workflow, local CI
-gates, the Rust-authority invariants, and contributor attribution.
+Guidance for **AI agents** (Codex, Claude Code, Hermes, and any Coven familiar)
+opening pull requests against this repo. Humans: your canonical guide is
+[`CONTRIBUTING.md`](CONTRIBUTING.md) — this is the agent-specific layer on top.
 
-Claude Code auto-loads this file; everything you need lives in `AGENTS.md` plus
-[`README.md`](README.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md). There is no
-separate Claude-only workflow for this repo — follow `AGENTS.md`.
+> **Read first:** [`README.md`](README.md) for what this repo is, and
+> [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contribution bar (including
+> the "Contributor First 10 Minutes" checkout path).
+
+---
+
+## What this repo is (one line)
+
+Coven is a small, boring **Rust authority layer** with TypeScript integration
+packages around it. The development loop must keep that boundary clear: core
+logic stays in Rust; the npm packages are thin integration surface.
+
+## Check, enter a worktree, then claim it
+
+Multiple agent sessions (Codex, Claude Code, familiars) frequently run against
+**the same checkout at once**, each in its own worktree. Worktrees keep git
+operations from racing, but they do **not** stop two sessions from independently
+building the *same issue* — which has happened repeatedly, producing duplicate
+PRs that a session then has to close. Before you touch code:
+
+1. **Check what's already taken.** Duplication hides behind divergent branch
+   names — one issue once spawned `fix/output-polish`, `fix/311-output-polish`,
+   *and* `fix/output-polish-311` — so branch names alone won't tell you. Check
+   both the shared claim registry and open PRs:
+   ```sh
+   coven claim status          # active claims, shared across every worktree of this repo
+   gh pr list --state open     # is there already a PR for this issue?
+   ```
+   If the issue is claimed or already has a PR, pick different work or coordinate.
+
+2. **Create or enter the task worktree.** The automatic fallback identity is
+   worktree-scoped, so enter the worktree before acquiring the claim:
+   ```sh
+   git fetch origin main
+   git worktree add -b <branch> /tmp/coven-<branch-slug> origin/main
+   cd /tmp/coven-<branch-slug>
+   ```
+
+3. **Claim it with a shared, issue-keyed token** — not your working branch name,
+   which no other session can predict:
+   ```sh
+   coven claim acquire issue-<N>     # e.g. issue-311; a TTL-bounded lock
+   ```
+   Claims live in the repo's shared `--git-common-dir/agent-claims/`, so every
+   worktree and session sees them. For long tasks, extend the TTL with
+   `coven claim heartbeat issue-<N>`.
+
+4. **Release from the same worktree when your PR merges or you stop:**
+   `coven claim release issue-<N>`.
+
+This step is cheap and it is the single thing that prevents duplicate-PR churn.
+Without an explicit `COVEN_AGENT_ID`, Coven identifies the owner as
+`$USER@<worktree-slug>`. Set distinct explicit IDs only when multiple agents
+must share one worktree.
+
+## Durable work tracking
+
+GitHub issues in the owning repository are the sole work tracker. Record
+assignees, priority, acceptance criteria, blockers/sub-issues, and exact delivery
+evidence there. Follow [`docs/work-tracking.md`](docs/work-tracking.md).
+Repository coordination still uses issue-keyed Coven claims and task worktrees.
+Do not initialize a separate local tracking database or sync branch.
+
+## Branch & PR workflow (all agents)
+
+- **Coordinate before editing** (see above) — check `coven claim status` and
+  `gh pr list`, enter a fresh worktree, then acquire `issue-<N>` from inside it.
+- **Never push to `main`.** Every change lands via a PR with green CI. Branch
+  from current `origin/main`.
+- **Fresh branch per task.** If multiple sessions may touch this repo, use the
+  task worktree created before claim acquisition so operations don't race.
+- Keep the diff **scoped to one concern**; no drive-by refactors in a feature PR.
+- Conventional-commit subjects: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`.
+- For larger changes, **start from an issue** and include the readiness packet
+  the PR template asks for.
+- After merge: delete the remote branch, remove your local worktree/branch.
+
+## CI gates — run locally before opening the PR
+
+CI (`.github/workflows/ci.yml`) rejects on any of these. Run them first:
+
+```sh
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --locked
+python scripts/check-secrets.py        # secret scan — must be clean
+python3 scripts/check-coven-privacy.py --staged   # privacy guard on your staged changes
+```
+
+If you touched the **npm/TypeScript** packages, also:
+
+```sh
+npm run build
+npm test
+```
+
+`-D warnings` has **no exceptions**. Fix lints; don't `#[allow(...)]` without a
+justifying comment.
+
+### The `Policy guard` job
+
+The five commands above are **not** the whole gate. `cargo test` does not run
+any of the repo's guard scripts, so a branch can be green locally and still fail
+the required `PR gate` on `Policy guard` — a ~24-step job whose failures show up
+only after you push. Two of its steps have bitten recent PRs: the documentation
+ownership guard (#1089) and the CI workflow guard (#1118).
+
+Reproduce the whole job before pushing. The subshell keeps a failing guard from
+closing your terminal, and still reports a non-zero status, so a printed
+`FAILED:` line cannot be lost in the scroll:
+
+```sh
+(
+  fail=0
+  for s in check-coven-privacy-test.py check-secrets-test.py \
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [OpenCoven/coven](https://github.com/OpenCoven/coven) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
