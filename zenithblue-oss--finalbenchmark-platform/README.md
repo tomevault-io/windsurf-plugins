@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [zenithblue-oss/finalbenchmark-platform](https://github.com/zenithblue-oss/finalbenchmark-platform).
+Original source: `GEMINI.md` in [zenithblue-oss/finalbenchmark-platform](https://github.com/zenithblue-oss/finalbenchmark-platform).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [zenithblue-oss/finalbenchmark-platform](https://github.com/zenithblue-oss/finalbenchmark-platform) — a repo with 87+ stars on GitHub.
