@@ -1,112 +1,45 @@
 ---
 trigger: always_on
-description: Read-only reconnaissance against `main` @ 29ea0099 (v1.45.1). Everything an
+description: - **Approach**: Each card lands as an isolated edit at its existing call site with no shared abstraction. Card 1 adds a title-plus-alias term pool and an inline "exactly one page carries this term" filter inside `collectRepairCandidates`; Card 2 adds a post-pass in `runPreExtract` that probes relative specifiers against the manifest path set and fills an optional `resolvedTo` on the seed; Card 3 adds one JSX opening-tag regex and a `uses` kind; Card 4 calls `rememberKey` from `applyWriteBatch` w
 ---
 
-# Recon: project conventions and the gates that fail a pull request late
+### Variant 1: Narrowest seams, per-card local logic
+- **Approach**: Each card lands as an isolated edit at its existing call site with no shared abstraction. Card 1 adds a title-plus-alias term pool and an inline "exactly one page carries this term" filter inside `collectRepairCandidates`; Card 2 adds a post-pass in `runPreExtract` that probes relative specifiers against the manifest path set and fills an optional `resolvedTo` on the seed; Card 3 adds one JSX opening-tag regex and a `uses` kind; Card 4 calls `rememberKey` from `applyWriteBatch` with a `write_batch` record whose `ref` carries the receipt; Card 5 is one sentence; Card 6 threads a `matchMode` boolean-ish flag through `SearchOptions` to `buildFtsMatch`.
+- **Trade-offs**:
+  - Pro: smallest diff, every default byte-identical, each card reviewable on its own.
+  - Pro: no new modules, no new public types beyond the widened union and optional fields.
+  - Con: the unique-match discipline is written twice (pages in Card 1, files in Card 2) with two chances to diverge.
+  - Con: ambiguous terms and unbound specifiers tend to vanish silently unless each site remembers to count and report them, which strains the "nothing degrades silently" convention.
+  - Con: Card 4 records the ledger entry after the commit, leaving a crash window between apply and remember that a retry can double-apply through.
+- **Complexity**: medium
+- **Risk**: medium
 
-Read-only reconnaissance against `main` @ 29ea0099 (v1.45.1). Everything an
-implementer on this release must know before writing a line.
+### Variant 2: Shared unique-resolution primitive with named refusals
+- **Approach**: Introduce one small pure module (a term index plus a resolver that returns `unique | ambiguous | none` with the candidate list) and consume it from both the repair-lane term resolver (Card 1, terms pooled from titles and `buildAliasIndex`) and the pre-extract specifier binder (Card 2, terms are extension-probed paths over the ingested-file set passed in as an explicit input). Both surfaces carry the refusal counts outward: the repair report gains an ambiguous-terms section and the pre-extract result gains an `unbound` list with reasons. Card 4 reuses `rememberKey` unchanged with the batch receipt in `ref`, consulted before any commit and recorded inside the batch's atomic unit so the receipt and the writes land together; Card 6 defines one `FtsMatchMode` type shared by `buildFtsMatch` and `buildExpandedFtsMatch`; Cards 3 and 5 stay local.
+- **Trade-offs**:
+  - Pro: one tested discipline for "bind only when exactly one target matches", so Cards 1 and 2 cannot drift.
+  - Pro: honesty by construction, since the resolver returns a typed status and callers must map every status to something visible.
+  - Pro: no new dependencies, no new machinery beyond a pure function module, determinism is trivial to prove because the resolver takes the index as an argument.
+  - Con: a new cross-cutting module means a broader test surface and one more thing for the link-graph and ingest owners to agree on.
+  - Con: putting the ledger record inside the batch commit touches the write-batch kernel's atomic path, which is the most sensitive code in the wave.
+- **Complexity**: medium
+- **Risk**: low
 
-## Tests
+### Variant 3: Index-first candidate tables and a separate receipt store
+- **Approach**: Build explicit reusable indexes as first-class inputs: `loadPages` returns a corpus term index that the repair lane, `findUnlinkedMentions` and future consumers share, and `ingestSource` builds an ingested-file index from the manifest and hands it to pre-extract. Cards 1 and 2 produce a full candidate table (every term with all matching targets and a resolution status) as an intermediate artifact surfaced in dry-run reports, and binding becomes a filter over that table. Card 4 gets a dedicated receipt store keyed by request ID rather than a ledger record, and Card 6 replaces the boolean with a parsed query object carrying tokens and mode.
+- **Trade-offs**:
+  - Pro: richest operator visibility, and the shared indexes would let the target-centric mention scanner converge with the corpus-wide path later.
+  - Pro: the candidate table makes ambiguity a reported fact instead of a dropped edge.
+  - Con: changes the shape of `loadPages` output and the pre-extract input contract, the widest blast radius in the wave.
+  - Con: a separate receipt store duplicates what the idempotency ledger already does and drifts from the card's stated scope of extending `rememberKey` semantics; it also edges toward the struck durable-queue territory.
+  - Con: the parsed query object for Card 6 is more than the card asks for and risks touching the two derived-term callers.
+- **Complexity**: large
+- **Risk**: high
 
-All tests live under `tests/`, none co-located in `src/` (1018 files). Top-level
-directories mirror the `src/` layers. Two naming styles coexist: the current
-directory form `tests/core/brain/<module>.test.ts`, and a legacy dot-flattened
-form in `tests/core/` only. New files use the directory form. Python is
-`tests/python/test_*.py`.
-
-The dominant vault fixture (186 files) is not the helper: it is
-`mkdtempSync(join(tmpdir(), "o2b-<suite>-"))` plus `bootstrapBrain(vault)` with
-`rmSync` in `afterEach`. `tests/helpers/fixtures.ts` exists but only four files use
-it. Helpers cover cross-cutting machinery instead: `run-cli.ts`,
-`search-fixtures.ts`, `mock-embedding.ts`, `sqlite-vec.ts`, `fake-http.ts`.
-
-`tests/setup.ts` is preloaded from `bunfig.toml` and guarantees two things: a
-pinned `O2B_DEVICE_ID`, and a hermetic throwaway config plus vault when
-`OPEN_SECOND_BRAIN_CONFIG` is unset. `bootstrapBrain` requires the default config
-path to exist, which is exactly what the preload provides.
-
-Two hazards. First, never delete `OPEN_SECOND_BRAIN_CONFIG`, `XDG_CONFIG_HOME`,
-`O2B_DEVICE_ID` or `VAULT_DIR` without restoring them: `bun test` shares one
-process, and a test that deletes without restoring strips the hermetic default
-from every file ordered after it. That shipped, and 1.45.1 fixed it. The
-save-and-restore idiom is `tests/core/config-read-failure.test.ts:45-74`. Second,
-in-process `runCli()` calls cannot overlap; await each one or pass
-`{ subprocess: true }`.
-
-## Code
-
-Every module opens with a docblock that argues the design decision rather than
-describing the API, usually tagged with the release wave and unit id, and it names
-the rejected alternative and the measurement that refuted it. Several modules
-declare their single reason to change. Inline comments explain why the code is not
-the obvious thing.
-
-`interface` for shapes (1642 exports against 355 `type`, which is reserved for
-unions), every field `readonly`, `ReadonlyArray`/`ReadonlyMap`/`ReadonlySet`, and
-2145 `Object.freeze` calls in `src/`.
-
-Closed vocabularies are always four pieces together: a frozen object with
-camelCase keys and snake_case values, a derived union type, a members array, and a
-type guard. Canonical form at `negative-recall.ts:115-143`.
-
-No shared error module: roughly forty per-module exported `Error` subclasses, each
-with a stable `code`, structured readonly fields, `this.name` set, and a message
-that names the fix. Config errors go through `BrainConfigError(message,
-"block.sub_key", source)`.
-
-Named exports only (exactly one `export default` in all of `src/`).
-`verbatimModuleSyntax` means `import type`; `allowImportingTsExtensions` means
-relative imports carry `.ts`. `strict`, `noUncheckedIndexedAccess`,
-`noImplicitOverride`, `noFallthroughCasesInSwitch`, `isolatedModules`. Format
-width 100.
-
-## CI gates, in order
-
-`validate` job: checkout, Bun, Python 3.11, `bun install --frozen-lockfile`,
-`bun run sync-version:check`, the OpenClaw bundle byte-diff, `link-ratchet:check`,
-`check:paths` (report only), `fmt:check`, `lint`, `typecheck`, `bun test`,
-`python -m unittest discover -s tests/python -v`, `python -m compileall -q
-plugins/hermes`.
-
-Version sync runs before everything else, so a forgotten bump fails the pull
-request before lint or tests start.
-
-`bun run validate` is typecheck, lint and test; it does **not** include
-`fmt:check`. The pre-commit hook does, so format separately.
-
-Practical pre-push sequence: `bun run fmt && bun run lint && bun run typecheck &&
-bun run build:openclaw && bun run sync-version && bun run link-ratchet:check &&
-bun test`.
-
-## Architectural guard tests
-
-`tests/core/architecture/write-site-census.test.ts`. A module is in scope if it
-lives under `src/core/brain/`, `src/core/search/`, `src/cli/brain/`, `src/mcp/`,
-or is `vault.ts`/`fs-atomic.ts`, or imports any relative `paths.ts` from anywhere.
-Fifteen sync fs calls plus their promise twins plus `Bun.write` count as writes;
-`mkdirSync` is deliberately excluded. The preferred fix is routing through a
-shared writer; otherwise add an entry with categories from a closed vocabulary, a
-`calls` array listing exactly the calls made, sorted, and a non-empty reason. Four
-assertions fail you, including an exclusion whose file no longer writes directly,
-and a `calls` array that drifts in either direction.
-
-`tests/core/architecture/import-cycles.test.ts`. Zero cycles in `src/`.
-`import type` is an edge; `await import()` is not, and deferred import is the
-sanctioned cure. A new leaf module must import nothing from the layer above it.
-
-`tests/core/architecture/verdict-vocabulary-census.test.ts`. Every closed
-vocabulary in the "silence is not an answer" family, or whose values are copied
-out of TypeScript into a tool schema or a persisted file, must register as
-`{name, values, members, guard}` with a comment. The audit demands a frozen values
-object, no duplicates, members and values in bijection, a guard that accepts every
-member and rejects the empty string.
-
-Others that fail a pull request: `tests/core/layering.test.ts:45` bans
+### Recommended: Variant 2
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [itechmeat/open-second-brain](https://github.com/itechmeat/open-second-brain) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
