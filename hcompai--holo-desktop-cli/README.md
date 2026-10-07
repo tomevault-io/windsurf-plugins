@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [hcompai/holo-desktop-cli](https://github.com/hcompai/holo-desktop-cli).
+Original source: `CLAUDE.md` in [hcompai/holo-desktop-cli](https://github.com/hcompai/holo-desktop-cli).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
