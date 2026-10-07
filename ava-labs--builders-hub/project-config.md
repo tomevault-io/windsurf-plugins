@@ -1,78 +1,95 @@
 ---
 trigger: always_on
-description: Agent-driven QA sweep of Academy courses, docs pages, and console tools on build.avax.network. Runs the Playwright harness in e2e/, judges results (screenshots, partial-mounts, failures), drives flows interactively where assertions can't, and files deduplicated GitHub issues for findings. Designed for /loop — each iteration processes a chunk of the surface manifest and persists progress.
+description: Instructions for coding agents and contributors in this repo. The repo is the source for [build.avax.network](https://build.avax.network): docs, Academy courses, the Builder Console, the Explorer, and the marketing pages.
 ---
 
+# AGENTS.md
 
-# Academy QA sweep
+Instructions for coding agents and contributors in this repo. The repo is the source for [build.avax.network](https://build.avax.network): docs, Academy courses, the Builder Console, the Explorer, and the marketing pages.
 
-You are the judgment tier of the QA harness in `e2e/` (read `e2e/README.md`
-first if you haven't). The deterministic tier (Playwright smoke) catches hard
-failures; your job is everything that needs eyes and interaction.
+## Next.js 16
 
-## Each iteration
+This repo uses Next.js 16 with Turbopack. Its APIs and conventions can differ from what you know. Read the guide in `node_modules/next/dist/docs/` before you use a Next.js API.
 
-1. **Load state.** Read `e2e/qa-manifest.json` (regenerate with
-   `yarn qa:manifest` if older than the newest commit touching `content/` or
-   `components/toolbox/`). Read `e2e/.qa-progress.json` if present —
-   `{ "sweepStartedAt": ISO, "done": [routes], "findings": [issue URLs] }`.
-   Create it if missing.
+- `proxy.ts` replaces `middleware.ts`, and it exports `proxy`.
+- `next.config.mjs` sets `agentRules: false`, so `next dev` writes no agent files. This file holds the instructions.
 
-2. **Run the deterministic tier** for the next chunk (~10 surfaces not in
-   `done`):
-   `yarn e2e --grep "<route1>|<route2>|..."` against `QA_TARGET_URL`
-   (default local dev — start `yarn dev` in a background task if nothing is
-   listening on :3000).
+## Stack
 
-3. **Judge the results** (`e2e/artifacts/results.json` + screenshots):
-   - **Failures** → real findings. Reproduce once with a targeted probe
-     (Playwright via node, shim injected — copy the pattern from
-     `e2e/smoke/wallet-shim.spec.ts` fixtures) to capture the page error and
-     a screenshot before filing.
-   - **`partial-mount` annotations** → open the page with the shim injected,
-     expand accordions/tabs, and determine whether the missing tool is
-     (a) legitimately lazy-mounted, (b) not wrapped in
-     `withConsoleToolMetadata` (consistency gap — finding), or (c) broken.
-   - **Passing screenshots** → spot-check ~3 per chunk for content-level
-     breakage assertions can't see: empty code panels, "undefined" in copy,
-     stacked error toasts, unstyled blocks, truncated tool UIs.
+- Next.js 16, React 19, TypeScript 5.9, Tailwind CSS 4 (CSS-first config in `app/global.css`, no `tailwind.config`).
+- fumadocs (`fumadocs-core`, `fumadocs-ui`, `fumadocs-mdx`) for MDX content.
+- Prisma 6 on PostgreSQL (`prisma/schema.prisma`).
+- wagmi 3, viem 2, `@avalanche-sdk/client` and `@avalabs/avalanchejs` for chain access.
+- AI SDK 6 (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`).
+- Package manager: yarn 1 (`packageManager` in `package.json`, `yarn.lock`). Do not use npm or pnpm in the repo root.
 
-4. **File findings as GitHub issues** (`gh issue create` on
-   ava-labs/builders-hub), but **dedupe first**:
-   `gh issue list --search "<route or tool name> in:title" --state open`.
-   One issue per root cause (not per page — the same broken tool on 3 pages
-   is one issue listing all 3 routes). Template:
-   - Title: `[academy-qa] <tool/page>: <symptom>`
-   - Body: route(s), what was expected, what happened, console/page errors,
-     screenshot, suspected cause (file:line if you traced it), harness command
-     to reproduce. Label `bug` + `academy-qa` if labels exist.
+## Layout
 
-5. **Persist + pace.** Update `.qa-progress.json` (append `done` routes and
-   any issue URLs). If surfaces remain, schedule the next iteration
-   (ScheduleWakeup; short delay — the work is continuous, stay under the
-   cache window at ~120–270s). When the manifest is exhausted: write a sweep
-   summary (surfaces checked, findings filed, pass rate) to
-   `e2e/artifacts/sweep-<date>.md`, report it to the user, reset `done`, and
-   end the loop unless told to run continuously.
+| Path | Contents |
+|---|---|
+| `app/` | App Router. `(home)` holds the marketing pages, `explorer/[network]`, `stats`, `solutions`. Also `academy/`, `docs/`, `console/`, `api/` |
+| `components/toolbox/` | The Builder Console: tools, flows, hooks, stores, `coreViem` |
+| `components/console/` | Console shell: sidebar, header, command palette, `console-flows.ts` |
+| `components/explorer-v2/` | The Explorer UI |
+| `content/` | MDX: `docs/`, `academy/`, `blog/`, `integrations/` |
+| `lib/` | Shared modules: `source.ts` (fumadocs loaders), `stats-api.ts`, `explorer-query/`, `pchain-rpc.ts` |
+| `server/services/` | Server-side business logic |
+| `prisma/` | Schema, migrations, seeds, client singleton |
+| `scripts/` | Build, generation and check scripts |
+| `tests/unit/` | Vitest unit tests |
+| `tests/e2e/` | Browser and API tests (tester-army/e2e). A separate npm package |
 
-## Tx-executing flows (deeper tier)
+## Commands
 
-Only when `QA_WALLET_KEY` is set to a funded Fuji key: drive one
-high-value flow per sweep end-to-end (rotate: deploy ICM demo → send message;
-create subnet → create chain → convert to L1; staking manager setup). Budget:
-abort the flow (and note it) if a single step takes >3 min. Never run
-tx flows against production or mainnet — the shim refuses mainnet txs by
-design; don't work around it.
+```bash
+yarn install          # postinstall: prisma generate, fumadocs-mdx (.source/), generated files
+yarn build:remote     # download remote MDX (API and RPC reference). Run once before yarn dev
+yarn dev              # next dev --turbopack
+npx tsc --noEmit      # typecheck (tests/ is excluded)
+npx vitest run tests/unit/explorer   # one unit test folder; npx vitest run for all
+yarn build            # tsc --noEmit && next build
+```
 
-## Hygiene
+The repo has no `lint` script. Run ESLint on the paths you changed, as CI does (see "Checks").
 
-- Dismiss the cookie-consent banner before screenshots ("Accept"/"Decline" —
-  either is fine).
-- A dev server compile on first page hit can take ~30s; don't misread slow
-  hydration as breakage — re-probe once before filing.
-- Don't fix bugs mid-sweep; file them. (Exception: harness bugs — fix those
-  and note it.)
+For the browser and API tests, read `tests/e2e/README.md`. They run against a running site:
+
+```bash
+cd tests/e2e && npm ci && npx playwright install chromium
+E2E_BASE_URL=http://localhost:3000 npm test
+```
+
+## Checks
+
+| Check | Runs on | What it does |
+|---|---|---|
+| `.github/workflows/console-ci.yml` | PRs that touch the Console, contracts or `content/academy` | tsc, toolbox ESLint, folder and import rules, `scripts/check-console-design.sh`, `scripts/check-academy-embeds.mts` |
+| `.github/workflows/explorer-ci.yml` | PRs that touch the Explorer | tsc, Explorer ESLint |
+| `.github/workflows/unit.yml` | Every PR, and each push to `master` | The whole Vitest suite (`npx vitest run`) |
+| `.github/workflows/e2e.yml` | Every PR, each push to `master`, and nightly | Browser tests (desktop, phone and in-app browsers) and API tests. A PR runs the tests its changed files reach plus a smoke set (`tests/e2e/select`); `master` and the nightly run all of them |
+| `.github/workflows/e2e-explore.yml` | Nightly, or by hand | AI bug hunt: one `e2e explore` per charter in `tests/e2e/explore/charters.json`, on production. Findings go to the job summary |
+| `.github/workflows/commitlint.yml` | Every PR | Conventional Commits on every commit |
+| `.husky/pre-commit` (lint-staged) | Each local commit | Prettier and ESLint on the toolbox, the design check on the Console, ESLint on other files that a block covers, then `tsc --noEmit` |
+| `.husky/commit-msg` | Each local commit | commitlint |
+
+## Rules that CI enforces
+
+**Explorer** (`eslint.config.mjs`, the `EXPLORER` list):
+- No unused code.
+- Each shared helper has one home: `lib/explorer-query/values.ts`, `components/explorer-v2/format.ts`, `lib/explorer-query/edges.ts`. Import the helper; do not define a copy.
+- A file has at most 600 code lines. A file over the cap has a ceiling in `scripts/explorer-size-ceilings.json`, and a ceiling can only go down. Split a file before you add to it.
+
+**Console** (`eslint.config.mjs`, `console-ci.yml`, `scripts/check-console-design.sh`):
+- Use `useResolvedWalletClient`, not wagmi `useWalletClient`.
+- Contract hooks use `useContractActions`, not `viem/actions`.
+- Use `@/` imports, not `../../../`.
+- Use `zinc-*` classes, not `gray-*` or `slate-*`.
+- Use `next/link`, not a raw `<a href>` (except `#` anchors and links with `target`).
+- Do not wrap contract-hook calls in `notify()`: the hooks notify.
+- Do not call `createPublicClient` in the toolbox. Use `usePublicClientForChain`, `makePublicClientForChain` or `useChainPublicClient`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ava-labs/builders-hub](https://github.com/ava-labs/builders-hub) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
