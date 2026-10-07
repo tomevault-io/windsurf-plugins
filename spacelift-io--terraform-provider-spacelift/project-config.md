@@ -3,7 +3,7 @@ trigger: always_on
 description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -37,4 +37,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 > Source: [spacelift-io/terraform-provider-spacelift](https://github.com/spacelift-io/terraform-provider-spacelift) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
