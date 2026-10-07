@@ -185,4 +185,4 @@ If validation fails:
 
 ---
 > Source: [jsdsg666/AutoWWTP-ASM-Demo](https://github.com/jsdsg666/AutoWWTP-ASM-Demo) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
