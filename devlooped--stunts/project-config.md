@@ -1,103 +1,97 @@
 ---
 trigger: always_on
-description: **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+description: `AddBehavior`/`InsertBehavior` (in `src/Stunts/StuntExtensions.cs`) are generic extension
 ---
 
-# .NET Repository
+# Stunts design notes
 
-**Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+## Behavior configuration API
 
-## Working Effectively
+`AddBehavior`/`InsertBehavior` (in `src/Stunts/StuntExtensions.cs`) are generic extension
+methods constrained to `IStunt`:
 
-### Essential Build Commands
-- **Restore dependencies**: `dotnet restore`
+```csharp
+public static TStunt AddBehavior<TStunt>(this TStunt stunt, ...) where TStunt : IStunt
+```
 
-- **Build the entire solution**: `dotnet build`
+The constraint makes the API discoverable only on actual stunts (instead of any object), and
+the generic type parameter preserves the concrete receiver type so calls can be chained.
 
-- **Run tests**: `dnx --yes retest`
-  - Runs all unit tests across the solution
-  - If tests fail due to Azure Storage, run the following commands and retry: `npm install azurite` and `npx azurite &`
+## `Stunt.Of` vs `Stunt.For` vs `Stunt.Get`
 
-### Build Validation and CI Requirements
-- **Always run before committing**: 
-  * `dnx --yes retest`
-  * `dotnet format whitespace -v:diag --exclude ~/.nuget`
-  * `dotnet format style -v:diag --exclude ~/.nuget`
+`src/Stunts.Package/Stunt.cs` ships as content into consuming projects and is the
+`[StuntGenerator]`-annotated factory API:
 
-### Project Structure and Navigation
+| API | Returns | Use |
+|-----|---------|-----|
+| `Stunt.Of<T>(...)` | `T` | Just the stunt, no behavior configuration needed |
+| `Stunt.For<T>(...)` | `StuntReference<T>` | Create and configure behaviors |
+| `Stunt.Get<T>(T stunt)` | `StuntReference<T>` | Configure an already created stunt |
+| `Stunt.Builder()` | `StuntBuilder` | Configure behaviors once, build many stunts |
 
-| Directory | Description |
-|-----------|-------------|
-| `src/` | Contains the repo source code. |
-| `bin/` | Contains built packages (if any) |
+`StuntReference<T>` implements `IStunt`, so the behavior extension methods apply to it
+directly, and exposes the stunt via `ToObject()`.
 
-### Code Style and Formatting
+`Stunt.For<T>` passes a `Lazy<T>`. The stunt is constructed on the first `ToObject()` call
+(the implicit conversion calls `ToObject()` too). That call installs the behaviors configured
+so far with `BehaviorPipelineFactory.UseAmbient`, so virtual members invoked from a base
+constructor are intercepted. If none were added, the factory already current at that call is
+used. After construction, `Behaviors` forwards to the stunt's own pipeline. `Stunt.Get<T>`
+still wraps an already constructed instance and forwards `Behaviors` immediately.
 
-#### EditorConfig Rules
-The repository uses `.editorconfig` at the repo root for consistent code style.
+An implicit conversion to `T` is also declared, but **C# does not allow user-defined
+conversions to interface types**, so it only kicks in for class and delegate stunts. Since most
+stunts are interfaces, `ToObject()` is the usage pattern tests and docs should show. This
+limitation is why `Stunt.Of<T>` keeps returning `T` instead of the reference type.
 
-- **Indentation**: 4 spaces for C# files, 2 spaces for XML/YAML/JSON
-- **Line endings**: LF (Unix-style)
-- **Sort using directives**: System.* namespaces first (`dotnet_sort_system_directives_first = true`)
-- **Type references**: Prefer language keywords over framework type names (`int` vs `Int32`)
-- **Modern C# features**: Use object/collection initializers, coalesce expressions when possible, use var when the type is apparent from the right-hand side of the assignment
-- **Visibility modifiers**: only explicitly specify visibility when different from the default (e.g. `public` for classes, no `internal` for classes or `private` for fields, etc.)
+Delegate stunts are unwrapped when the instance is materialized: for a delegate `T`, the
+generated stunt is the delegate's `Target`.
 
-#### Formatting Validation
-- CI enforces formatting with `dotnet format whitespace` and `dotnet format style`
-- Run locally: `dotnet format whitespace --verify-no-changes -v:diag --exclude ~/.nuget`
-- Fix formatting: `dotnet format` (without `--verify-no-changes`)
+The VB content file (`src/Stunts.Package/Stunt.vb`) mirrors the C# one: `StuntReference(Of T)`,
+`StuntBuilder`, `Get`, and the `Of`/`For`/`Build` overloads (including the delegate ones), with two
+VB-specific notes:
 
-### Testing Practices
+- VB cannot constrain a type parameter to `System.Delegate` (BC32061), so the delegate `Of`/`For`
+  overloads are declared as `(Of T)(implementation As T)` without a constraint. Behavior is
+  identical (the argument is passed as the single constructor argument), but a call passing a
+  lone `Nothing` (e.g. `Stunt.Of(Of IFoo)(Nothing)`) is ambiguous: use
+  `Stunt.Of(Of IFoo)(New Object() {Nothing})`. The overload is kept because it's what gives
+  lambdas their parameter type inference in `Stunt.Of(Of MyDelegate)(Function(x, y) x + y)`.
+- The `Widening` conversion to `T` has the same interface limitation as C# (BC30512 under
+  `Option Strict On`), so `ToObject()` is the pattern to show.
 
-#### Test Framework
-- **xUnit** for all unit and integration tests
-- **Moq** for mocking dependencies
-- Located in `src/*.Tests/`
+There is no VB project in the solution, so changes to this file are validated by compiling it
+in a scratch VB project referencing `src/Stunts/bin/Debug/netstandard2.0/Stunts.dll`.
 
-#### Test Attributes
-Custom xUnit attributes are sometimes used for conditional test execution:
-- `[SecretsFact("XAI_API_KEY")]` - Skips test if required secrets are missing from user secrets or environment variables
-- `[LocalFact("SECRET")]` - Runs only locally (skips in CI), requires specified secrets
-- `[CIFact]` - Runs only in CI environment
+Every factory overload (including the `For` and `Build` ones) must carry `[StuntGenerator]`: the source
+generator keys off that attribute on the invoked method (instance or static) and uses the call site's
+generic type arguments to decide which stunt types to generate.
 
-### Dependency Management
+### Generic wrappers
 
-#### Adding Dependencies
-- Add to appropriate `.csproj` file
-- Run `dotnet restore` to update dependencies
-- Ensure version consistency across projects where applicable
+Every generated stunt is a closed, non-generic type: there are no open generic templates.
+A generic method passing its own type parameters to a generator method (e.g.
+`static IDictionary<string, T> Make<T>() => Stunt.Of<IDictionary<string, T>>()`) is a *wrapper*
+and must itself carry `[StuntGenerator]` (`ST016`, with a code fix adding the attribute).
+`StuntClosure` (shared by analyzers and the generator) computes each wrapper's *stunt definitions*: the
+stunt types it creates expressed over its own type parameters, flattened through nested wrappers.
+Each concrete call site (`Make<int>()`) substitutes its type arguments into the definitions, so only
+the combinations actually used are generated. Wrappers cannot use type parameters of a containing
+type (`ST017`), be virtual/abstract/interface members (`ST018`), recurse with different type
+arguments or chain more than `StuntClosure.MaxDepth` (8) wrappers (`ST019`). Local functions are
+supported; their symbols are normalized to the closure's own semantic model, since local function
+symbols bound by different models are not equal.
 
-#### CI/CD Pipeline
-- **Build workflow**: `.github/workflows/build.yml` - runs on PR and push to main/rel/feature branches
-- **Publish workflow**: Publishes to Sleet feed when `SLEET_CONNECTION` secret is available
-- **OS matrix**: Configured in `.github/workflows/os-matrix.json` (defaults to ubuntu-latest)
+Cross-assembly: each stunt definition records the assembly that calls the leaf `Stunt.Of<T>` at run time
+(the internal `Stunt` content class passes `typeof(Stunt).Assembly`). Libraries emit a public
+`Stunts.Generated.StuntDefinitions` class whose `[StuntDefinition(docId, assembly)]` methods carry the
+stunt definitions of externally visible wrappers as parameter types (trivial forwarding definitions are omitted).
+Consumers read them from metadata, generate the closed stunts, and register them under the leaf
+assembly's name.
 
-### Special Files and Tools
 
-#### dnx Command
-- **Purpose**: built-in tool for running arbitrary dotnet tools that are published on nuget.org. `--yes` auto-confirms install before run.
-- **Example**: `dnx --yes retest` - runs tests with automatic retry on transient failures (retest being a tool package published at https://www.nuget.org/packages/retest)
-- **In CI**: `dnx --yes retest -- --no-build` (skips build, runs tests only)
-
-#### Directory.Build.rsp
-- MSBuild response file with default build arguments
-- `-nr:false` - disables node reuse
-- `-m:1` - single-threaded build (for stability)
-- `-v:m` - minimal verbosity
-
-#### Code Quality
-- All PRs must pass format validation
-- Tests must pass on all target frameworks
-- Follow existing patterns and conventions in the codebase
-
-## Documenting Work
-
-Project implemention details, design and key decisions should be documented in a top-level AGENTS.md file at the repo root. 
-Keep this file updated whenever you make change significant changes for future reference.
-
-User-facing features and APIs should be documented to highlight (not extensively, as an overview) key project features and capabilities, in the readme.md file at the repo root.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [devlooped/stunts](https://github.com/devlooped/stunts) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-01 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
