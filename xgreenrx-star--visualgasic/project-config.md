@@ -1,88 +1,75 @@
 ---
 trigger: always_on
-description: Visual Gasic + Godot 4.6 conventions for Cursor agents working in this repo
+description: | Task | Model to use |
 ---
 
+# VisualGasic — Copilot Instructions
 
-# Visual Gasic + Godot
+## Model selection (check before starting)
 
-This repo is **Visual Gasic (VG)**: a VB6-style language (`.vg`) with a C++ tokenizer/parser/VM (GDExtension) and a Godot 4.6.1 editor plugin (`addons/visual_gasic/`).
+| Task | Model to use |
+|---|---|
+| C++ parser / runtime bugs (M1) | **Claude Opus 4.8** — max mode |
+| GDScript plugin architecture (M4 UI Forms) | **Claude Opus 4.8** — max mode |
+| AST walker / algorithm design (M6) | **Claude Opus 4.8** — standard mode |
+| Extending existing GDScript files (M3) | **Claude Sonnet 4.6** — standard mode |
+| Examples audit / mechanical fixes (M2) | **Claude Sonnet 4.6** — standard mode |
+| Narcea prompt engineering (M5) | **Claude Sonnet 4.6** — standard mode |
+| README / docs / issue bodies | **Claude Sonnet 4.6** — standard mode |
+| Quick questions / one-liners | **Claude Haiku** |
 
-## Active product scope (until v6.0 stable)
+Switch the model in the Copilot chat dropdown before pasting a large prompt.
 
-- **In scope:** Godot IDE integration — Toolbox, Properties, Code Navigator, Narcea Vibe Code, autocomplete, Godot-native 2D/3D editors (default).
-- **Alpha (not v6.0 core):** Standalone VG IDE shell / legacy Form Designer — experimental; see `docs/manual/VG_IDE_ALPHA.md`. Off unless `vg/enable_experimental_plugins` is on. Prefer Godot Script + floating VG panels (`vg/editor/floating_vg_code_editor_on_script`).
+---
 
-## Languages & style
+## Project context
 
-| Area | Convention |
-|------|------------|
-| GDScript | `snake_case` functions/vars, `PascalCase` classes, `@tool` on editor scripts |
-| VG (`.vg`) | VB6-style: `Sub`/`Function`, `Dim x As String`, `If … Then … End If`, `Connect node, "signal", "Handler"` |
-| C++ (`src/`) | Match existing style; tabs; actionable errors with line numbers; no drive-by refactors |
+- **Language:** VB6-style BASIC (`VisualGasic` / `.vg` files), tokenizer/parser/AST/VM in C++
+- **Runtime:** Godot 4.6.1 plugin via GDExtension (`.gdextension`)
+- **Primary IDE:** Godot's native Script editor — VG extends it with autocomplete, Code Navigator, dot-completion
+- **VG custom IDE shell / legacy Form Designer:** **experimental Alpha** — **not** on the v6.0 EOY critical path; mothballed unless `vg/enable_experimental_plugins = true`. User-facing status: `docs/manual/VG_IDE_ALPHA.md` (standalone Form Designer repo extraction is **planned**, not shipped yet).
+- **Godot IDE integration (active scope):** Toolbox panel, Properties window, Immediate window, Narcea Vibe Code, Code Navigator, autocomplete, dot-completion — these are docked inside Godot's editor and are **in scope for all milestones**
+- **Focus until v6.0:** VG Script language quality + Godot IDE integration. Do NOT expand the VG standalone IDE shell.
+- **AI providers:** `addons/visual_gasic/vg_ai_providers.gd` — Ollama, OpenAI, Claude, Gemini
+- **Canonical Claude models (Anthropic direct API):** `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5` (verified 2026-06-29)
+- **GitHub Copilot model dropdown:** also exposes `claude-opus-4-6`, `claude-opus-4-7` — these are Copilot-specific variants not on the direct API
 
-## GDScript pitfalls (Godot 4.6)
+## Milestone schedule
 
-- `StringName + String` fails — use `str(name) + suffix`.
-- `ProjectSettings.clear_setting()` is **not** in GDScript — use `ProjectSettings.set_setting(key, null)`.
-- After editing `addons/visual_gasic/*.gd`, **always** run headless smoke before finishing:
-  ```bash
-  scripts/ci_smoke.sh projects/vg_narcea_test
-  ```
-  One parse error in `visual_gasic_plugin.gd` disables the entire addon.
+| Milestone | Due | Status | Focus |
+|---|---|---|---|
+| M1 | Jul 31 | ✅ DONE (Jun 29) | 4 critical bugs — all fixed |
+| M2 | Aug 15 | ✅ DONE (Jun 30) | 44/44 corpus examples passing |
+| M3 | Aug 31 | ✅ DONE (Jul 1) | Code Navigator upgrade (#7) |
+| M4 | Sep 30 | ✅ DONE (Jul 1) | UI Forms experimental (#8–12) |
+| M5 | Oct 15 | 🔄 NEXT | Narcea Vibe Code (#13) |
+| M6 | Oct 31 | ✅ **Partial** | Causal Chain text-mode (#14) — C++ `vg_analyze_causal_graph`, Code Navigator button, Context Rail preview, 8 headless fixtures |
+| M7 | Nov 15 | 🟡 **Close-out** | Python Library Integration — C2 typed msgpack **default-on** for new projects; large-array binary lane shipped (`test_py_large_array.vg`); Windows CI M7 smoke; macOS e2e still deferred |
+| M8 | Nov 22 | — | Language parity (Try/Catch/Lambda/`?.` tests), `Let` keyword, C++ interop |
+| M9 | Nov 28 | — | Asset Library submission, installer smoke test, 50+ corpus, docs |
+| Stable v6.0 | Jan 1 2027 | — | — |
 
-## VG property aliases (never use raw Godot names in user-facing VG code)
+## Code conventions
 
-Writes like `ctrl.position.x = N` **silently fail**. Use VB6 names:
+- GDScript: `snake_case` for functions and variables, `PascalCase` for classes
+- VG language: VB6-style — `Sub`, `Function`, `End Sub`, `Dim x As String`, `If ... Then ... End If`
+- **Unicode text:** VG controls are Godot controls (Unicode-native). The VB6 pitfall where standard TextBox/Label show `???` for non-ANSI text does **not** apply. `StrConv(..., vbUnicode/vbFromUnicode)` are no-ops. Save `.vg` as UTF-8; use `vbCrLf`/`vbTab` for control chars in source; choose fonts with needed glyphs for CJK/emoji.
+- C++: follow existing style in `src/` — no trailing whitespace, tabs not spaces
+- C++ memory: strict manual management within GDExtension bounds; verify zero leaks on node destruction
+- C++ errors: no generic panics — use clean, actionable error messages with exact line numbers
+- Do not add docstrings, comments, or type annotations to code you didn't change
+- Do not refactor or rename symbols outside the scope of the current task
 
-- `Caption` → `.text`
-- `Left` / `Top` / `Width` / `Height` → position/size setters
-- `Visible`, `Enabled` on controls and timers
-- Timer: `Interval` (ms), `Enabled = True/False`, handler `Sub tmr_Timer()`
+## Documentation tone
 
-Event handlers wire by name: `Sub btnOK_Click()`, `Sub Form_Load()`.
+- Technical, precise, highly instructional — no marketing language
 
-**Do not hallucinate:** `ConnectSignal`, `HasMember`, `PropertyGet`, `ArrayLen` — use `Connect`, `UBound`, direct property access.
+## Known open bugs
 
-## Key paths
+- **AST evaluator missing Godot type-constructor dispatch (OPEN, found Jul 30 2026)** — the bytecode compiler recognizes `Vector2i`/`Rect2i`/`Color`/etc. as type constructors (`_godot_type_ctors[]` in `src/visual_gasic_compiler.cpp` ~line 6953, emits `OP_NEW_OBJECT`), but the AST tree-walk evaluator has no equivalent dispatch — calling e.g. `Rect2i(...)` in a Sub that's fallen back to AST interpretation (see ByRef fallback landmine in `/memories/repo/v6.0_blockers.md` §0) throws `Sub or Function not defined`. Found while fixing the C64 emulator's `BlitImage` bug below. Not yet fixed.
+- **C64/GBA Emulator `BlitImage` no-op — FIXED Jul 30 2026** — both `samples/demos/C64_Emulator/c64_main.vg` and `samples/demos/GBA_Emulator/gba_main.vg` called `BlitImage` with `Rect2`/`Vector2` (float) instead of the required `Rect2i`/`Vector2i`/plain-int form, so the VIC/GPU framebuffer was never actually copied to the display texture (silent no-op, zero pixels copied, every frame, forever). Fixed by switching to `BlitImage`'s plain-integer 8-arg overload.
 
-| What | Where |
-|------|--------|
-| Main editor plugin | `addons/visual_gasic/visual_gasic_plugin.gd` |
-| Vibe Code / Narcea panel | `addons/visual_gasic/vg_ai_help.gd` |
-| Narcea system prompt / VG knowledge | `addons/visual_gasic/vg_ai_narcea.gd` |
-| AI providers (Ollama, Claude, Gemini, …) | `addons/visual_gasic/vg_ai_providers.gd` |
-| MCP server (Cursor can call VG tools) | `addons/visual_gasic/vg_mcp_server.gd` — `127.0.0.1:8766` |
-| Plugin settings | Project Settings → **Vg → Plugins** (`vg/plugins/<id>`) |
-| Scene editor mode | **Vg → Scene Editors → Simple 2d 3d** (`vg/scene_editors/simple_2d_3d`) |
-
-## Pairing Cursor with VG (today)
-
-1. Open this repo in **Cursor**; rules in `.cursor/rules/` apply automatically.
-2. Run the project in **Godot** with Visual Gasic enabled — MCP starts on port **8766**.
-3. In **Vibe Code**, click **↗ Cursor** (Tier 1 handoff) to write `.vg/cursor_handoff.md`, copy a Composer prompt, and open the project in Cursor.
-4. Use **Narcea** inside Godot for in-IDE context; use **Cursor Composer** for multi-file refactors.
-
-## When editing AI / Narcea
-
-- Providers are OpenAI-compatible HTTP streams except Ollama (local) and **Cursor** (optional SDK subprocess — `pip install cursor-sdk`, API key in ⚙️).
-- **Cursor (Composer)** — Tier 2 embedded provider; use **↗ Cursor** for Tier 1 handoff to full Cursor IDE.
-- Narcea persona id: `"narcea"` — injects VG control catalog, AGCK, Working Nodes, and tutorial index into the system prompt.
-- Narcea knowledge for **canvas Node2D games**: poll `Input.IsActionJustPressed` / `IsKeyJustPressed` in `_Process` (not `ev.IsActionPressed` on `InputEvent`). **climatist_poc**: five nav buttons (`EnsureNavUi`), Pattern load on `InputPoll` timer (`PatternLoadTick`), screens Now/Pattern/Discussion/Settings. See `samples/apps/climatist_poc/Main.vg` (novice comments).
-- **web_hello** (HTML5 smoke at `build/web/web_hello`) ≠ **climatist_poc** (James weather POC — F5 `samples/apps/climatist_poc/`). Open-Meteo CONUS: `models=ncep_hrrr_conus` (not `hrrr_conus`).
-
-## Docs to consult
-
-- `.github/copilot-instructions.md` — milestone context, known bugs, model guidance
-- `docs/manual/ide_tools.md` — plugin activation, 2D/3D routing
-- `docs/manual/IDE_SHORTCUTS.md` — editor shortcuts
-- `addons/visual_gasic/PLUGIN_SDK.md` — sub-plugin API
-
-## Change discipline
-
-- Minimize diff scope; match surrounding code.
-- Do not commit unless the user asks.
-- Do not expand docs unless requested.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [xgreenrx-star/VisualGasic](https://github.com/xgreenrx-star/VisualGasic) — distributed by [TomeVault](https://tomevault.io).
