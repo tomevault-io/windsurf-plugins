@@ -2,16 +2,14 @@
 
 > Source: [techysy/10router](https://github.com/techysy/10router). Graded, signed and kept current as the models change by [TomeVault](https://tomevault.io)
 
-9Router fork: local optimizations and fixes
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [techysy/10router](https://github.com/techysy/10router).
+Original source: `AGENTS.md` in [techysy/10router](https://github.com/techysy/10router).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
