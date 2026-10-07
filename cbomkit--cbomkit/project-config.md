@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Guidance for agents working in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for agents working in this repository.
 
 ## What this is
 
@@ -44,7 +44,7 @@ make dev           # postgres only          -> run backend + frontend locally
 make dev-backend   # postgres + frontend    -> run backend locally
 make dev-frontend  # postgres + backend     -> run frontend locally
 make production    # full stack
-make ext-compliance# full stack + OPA container serving opa/*.rego
+make ext-compliance # full stack + OPA container serving opa/*.rego
 make coeus         # frontend only (viewer)
 ```
 
@@ -82,4 +82,4 @@ infrastructure/ buses, Panache entities, read models, compliance services, confi
 
 ---
 > Source: [cbomkit/cbomkit](https://github.com/cbomkit/cbomkit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
