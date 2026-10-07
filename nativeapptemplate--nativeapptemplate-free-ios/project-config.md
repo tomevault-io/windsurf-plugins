@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to AI coding agents (Claude Code, Codex, etc.) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents (Claude Code, Codex, etc.) when working with code in this repository.
 
 ## Build, Test, and Development Commands
 
@@ -16,7 +16,7 @@ xcodebuild -project NativeAppTemplate.xcodeproj \
   -scheme "NativeAppTemplate" \
   -configuration Debug \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   build
 
 # Build for Release
@@ -24,7 +24,7 @@ xcodebuild -project NativeAppTemplate.xcodeproj \
   -scheme "NativeAppTemplate" \
   -configuration Release \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   build
 ```
 
@@ -34,7 +34,7 @@ xcodebuild -project NativeAppTemplate.xcodeproj \
 xcodebuild -project NativeAppTemplate.xcodeproj \
   -scheme "NativeAppTemplate" \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   test
 ```
 
@@ -82,11 +82,6 @@ The app uses iOS 17's `@Observable` macro for state management with clean separa
 
 ### Key Features Implementation
 
-**NFC Support**:
-- Tag reading/writing capabilities (`/NFC/`)
-- Background tag reading support
-- Application-specific tag data format
-
 **Offline Support**:
 - Network monitoring (`/Networking/NetworkMonitor.swift`)
 - Keychain storage for secure data persistence
@@ -107,8 +102,7 @@ NativeAppTemplate/
 ├── UI/                      # SwiftUI views by feature
 ├── Sessions/                # Authentication
 ├── Persistence/             # Keychain storage
-├── Utilities/               # Helpers and extensions
-└── NFC/                     # NFC functionality
+└── Utilities/               # Helpers and extensions
 ```
 
 ### Error Handling (CodedError System)
@@ -125,13 +119,25 @@ All errors use the `CodedError` protocol in `NativeAppTemplate/Common/Errors/`. 
 - Use `Message(error: error)` convenience to post errors to `MessageBus`
 - Error code numbers must match across iOS and Android
 
-### Dependencies (Swift Package Manager)
-- KeychainAccess (4.2.2) - Secure credential storage
-- Swift Collections (1.1.4) - Additional data structures
+### Dependencies
+- No third-party Swift packages. Keychain access goes through `Persistence/KeychainStore/Keychain.swift`, a small wrapper over the Security framework
 
 ### Testing
 Uses Swift Testing framework with `@Test` attribute. Tests are organized by component type (models, adapters, networking).
 
+## Testing Policy
+
+- **Bug fixes start with a failing test that reproduces the bug. No exceptions.** Every fix commit must include that reproduction test.
+- **Record where each expected value comes from.** Cite the relevant part of the spec, a hand calculation, or a known oracle. Never paste the value the implementation happens to produce as the expected value.
+
+  ```swift
+  // floor(10000 * 31 / 71) = 4366   ← state the derivation like this
+  ```
+
+- **See it go red at least once before calling it done.** For every new test — especially guards and configuration checks — deliberately break the code under test and confirm the test fails. A test that cannot fail verifies nothing.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
 ---
 > Source: [nativeapptemplate/NativeAppTemplate-Free-iOS](https://github.com/nativeapptemplate/NativeAppTemplate-Free-iOS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
