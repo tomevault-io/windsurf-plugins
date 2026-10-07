@@ -13,4 +13,4 @@ description: - **MUST**, **MUST NOT**, **SHOULD** and **MAY** use RFC 2119 meani
 
 ---
 > Source: [antfu/starter-ts](https://github.com/antfu/starter-ts) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
