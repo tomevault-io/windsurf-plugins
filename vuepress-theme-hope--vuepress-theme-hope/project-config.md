@@ -1,67 +1,77 @@
 ---
 trigger: always_on
-description: - Target developers: concise, clear, essential information only
+description: Guidance for AI agents working on this monorepo. Read it before making changes.
 ---
 
-# VuePress Theme Hope Coding Standards
+# vuepress-theme-hope — Agent Guide
 
-## Content Rules
+Guidance for AI agents working on this monorepo. Read it before making changes.
 
-- Target developers: concise, clear, essential information only
-- Focus on essential information developers need to understand and implement features
-- No typos or grammar errors
+## Repository Overview
 
-## Code Rules
+A [pnpm workspaces](https://pnpm.io/workspaces) monorepo holding the VuePress Hope theme and its companion plugins, plus the documentation sites for each of them.
 
-### API Usage Restrictions
+```plain
+packages/   # Published packages (components, create, lightgallery, md-enhance, shared, theme)
+docs/       # Documentation sites (components, lightgallery, md-enhance, shared, theme)
+demo/       # Demo sites for each package
+scripts/    # Shared build / release helpers
+```
 
-- No Node.js APIs in `client` folder
-- No browser APIs in `node` folder
-- No cross import between `client` and `node` folders
-- No Node.js or browser APIs in `shared` folder
+Each package follows the same layout:
+
+```plain
+src/
+  client/   # Browser-only code (Vue components, composables, styles)
+  node/     # Node.js-only code (plugin factory, markdown-it extensions)
+  shared/   # Code that runs in both environments (types, constants, utils)
+  index.ts  # Re-exports the node entry (consumed by VuePress core)
+```
+
+## Essential Commands
+
+| Command                     | What it does                          |
+| --------------------------- | ------------------------------------- |
+| `pnpm build`                | Build every package with `tsdown`     |
+| `pnpm bundle`               | Same, with `NODE_ENV=production`      |
+| `pnpm test`                 | Run Vitest with coverage              |
+| `pnpm lint`                 | OxLint + Oxfmt + Stylelint (auto-fix) |
+| `pnpm lint:check`           | Same checks without auto-fix          |
+| `pnpm lint:md`              | Markdownlint over every `*.md`        |
+| `pnpm --filter <pkg> build` | Build a single package                |
+
+Documentation sites are built per package, e.g. `pnpm --filter docs-theme docs:vite-build` or, from `docs/theme/`, `pnpm docs:vite-build`.
+
+## Coding Standards
+
+### Import / Export Rules
+
+- Relative imports must use the `.js` extension even though sources are `.ts`.
+- No cross-folder imports between `client`, `node` and `shared`.
+- No Node.js APIs in `client`, no browser APIs in `node`, and neither in `shared`.
+- No bundled external dependency warnings from the `bundle` command.
 
 ### Export Requirements
 
-- **Plugin and theme exports** must satisfy:
-  - Name: consistent with package name
-  - Types: All types in export content shall be exported
-- **Single function files**: filename should match export function/class name
+- Plugin and theme factory exports must be named consistently with the package name, and every type used in the exported API must also be exported.
+- A file that exports a single function or class must have a filename matching that export.
 
-### Import/Export Rules
+### CSS / SCSS
 
-- Relative imports/exports must use `.js` extension with `.ts` files
-- No external dependencies warnings with `bundle` command
+- All CSS classes start with `vp-`. Classes integrating third-party content are exempt, e.g. `waline-wrapper` for the Waline comment system.
+- Color variables must contain `-c-`; plugin variables are prefixed with the plugin name; theme variables with `vp-`.
+- Icon variables inside class definitions must use `--icon`.
 
-## CSS Rules
+### JSDoc
 
-### Class Naming
+- Required for all user-visible exports. Internal implementations do not need it, but existing comments must stay correct.
+- Bilingual: English description first, a blank line, then Chinese.
+- `@param` is required for every parameter, written bilingually and separated with `/`.
+- `@default` is always included for user-visible things that have a default (including `@default false`); elsewhere only when the value is not obvious from the parameters.
+- `@example` only on exported functions.
+- `@description` is optional, only when extra explanation is needed.
 
-- **Classes**: Must start with `vp-` prefix
-- **External Integration Exception**: Classes for external content integration are exempt. E.g.: `waline-wrapper` for Waline comment system
-
-### Variable Naming
-
-- **Color variables**: Must contain `-c-`
-- **Plugin variables**: Prefixed with plugin name
-- **Theme variables**: Prefixed with `vp-`
-- **Icon variables**: If in class definitions, `--icon` is required.
-
-## JSDoc Rules
-
-### Scope
-
-- **Required for**: All user-visible exports
-- **Not required for**: Internal implementations (but existing ones must be correct)
-
-### Format Requirements
-
-- **Bilingual**: English + Chinese for all exported content
-- **@default**:
-  - User-visible things: Always include if exists (including `@default false`)
-  - Others: Only when not clearly visible in function parameters
-- **@example**: Only for exported functions
-- **@description**: Optional, only if necessary to explain more
-- **@param**: Required for all parameters, should be bilingual, separate with `/` for English and Chinese
+**JSDoc template:**
 
 ````typescript
 /**
@@ -83,64 +93,40 @@ description: - Target developers: concise, clear, essential information only
  */
 ````
 
-## Documentation Rules
+## Commit Messages
+
+Conventional Commits, single line only (the `commit-msg` hook rejects a body and enforces a 1–50 character subject):
+
+```plain
+feat(theme): add markdown field option
+```
+
+Allowed types: `feat|fix|docs|style|refactor|perf|test|workflow|build|ci|chore|types|release`.
+Allowed scopes: `components|create|lightgallery|md-enhance|shared|theme|deps|demo|release` (or none).
+
+## Documentation
+
+Each package has its own docs site under `docs/<package>/src`, with English at the root and Chinese under `zh/`. Upstream plugin documentation lives in the [`vuepress-ecosystem`](https://github.com/vuepress/ecosystem) repository; when a plugin option or behavior changes upstream, sync the matching page here.
 
 ### General Requirements
 
-- Consistent with code behaviors
-- Chinese/English content must be consistent in structure and content
-- Make content concise and clear, remove unnecessary words, avoid redundancy, prefer shorter if possible
-- Use "你" instead of "您" in Chinese
-- Ignore any errors with `@[code ...` as they are VuePress code import grammar, which is not standard.
-- Ignore any errors with VuePress components in markdown.
+- Write for developers: concise, clear and essential information only, with no typos or grammar errors.
+- Consistent with code behaviors.
+- Chinese and English content must be consistent in structure and content.
+- Keep content concise and clear, prefer shorter over longer.
+- Use "你" instead of "您" in Chinese.
+- Ignore errors from the `@[code ...` import grammar and from VuePress components in markdown, which are valid in VuePress but not standard markdown.
+- Always keep a blank line before a container closing marker (`:::`, `::::`). Without it Oxfmt treats the marker as a list continuation and drops it, leaving the container unclosed.
+- Do not repeat a plugin's built-in locale data in its documentation; link to the shared locales page instead.
 
-### Options Documentation Format
+### Page Structure
 
-Each option in plugin/theme documentation must include these sections **in this exact order**:
+Feature descriptions and option references are separated so the options section stays short:
 
-1. **Type**
-   - English: `- Type: \`type\``
-   - Chinese: `- 类型：\`type\``
-   - Follow with code fence for complex types
+- `## Usage`: install command and a minimal config example.
 
-2. **Required Status**
-   - Only for required options: `- Required: Yes` / `- 必填：是`
-   - **Never write "Required: No" for optional options**
-
-3. **Default Value**
-   - **INCLUDE Default when**: Default value is NOT the expected/obvious value
-   - **OMIT Default when**: Default value is expected/obvious
-     - `boolean` options with `false` default → **OMIT**
-     - `string` options with `''` default → **OMIT**
-     - `object` options with `undefined` default → **OMIT**
-   - Format: `- Default: \`value\``/`- 默认值：\`value\``
-
-4. **Details** (必须包含)
-   - English: `- Details: Brief description`
-   - Chinese: `- 详情：简要描述`
-   - Prefer same line for short contents and paragraph for long contents.
-
-**Example Format:**
-
-```md
-### optionName
-
-- Type: `boolean`
-- Details: Whether to enable this feature.
-
-### requiredOption
-
-- Type: `string`
-- Required: Yes
-- Details: The required configuration.
-
-### optionWithNonStandardDefault
-
-- Type: `number`
-- Default: `100`
-- Details: Custom timeout value.
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [vuepress-theme-hope/vuepress-theme-hope](https://github.com/vuepress-theme-hope/vuepress-theme-hope) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
