@@ -1,43 +1,51 @@
 ---
 trigger: always_on
-description: The repository law, operating discipline, and code stance — the single canonical constitution for every contributor, human or agent.
+description: This is the brief every reviewer of a pull request in this repository follows — GitHub Copilot, an agent, or a human. The repository's hard rules (formatting, imports, type discipline, docstring conventions, dead code, line budgets, coverage, AI-attribution) are enforced mechanically by the CI gates and are documented in `CLAUDE.md`, the constitution. Those are not your job to re-check. This guideline is for the semantic review the gates cannot do: whether the change actually does what it claims
 ---
 
-# CLAUDE.md
+# PR review guideline
 
-The repository law, operating discipline, and code stance — the single canonical constitution for every contributor, human or agent.
+This is the brief every reviewer of a pull request in this repository follows — GitHub Copilot, an agent, or a human. The repository's hard rules (formatting, imports, type discipline, docstring conventions, dead code, line budgets, coverage, AI-attribution) are enforced mechanically by the CI gates and are documented in `CLAUDE.md`, the constitution. Those are not your job to re-check. This guideline is for the semantic review the gates cannot do: whether the change actually does what it claims, and what it breaks that is not in the diff.
 
-> **Activating governance on this existing repository?** Read [SETUP.md](SETUP.md). Preserve the Talos package, history, authored docs and Hatch version source; configure external controls explicitly.
+Review like a senior engineer, not a linter. Be meticulous, terse, concrete, and honest. Praise carries no information; cut it. The opinion is the deliverable. When review posting is authorized, place findings inline on the exact file and line. Otherwise prepare the review locally; this guideline does not authorize external messages.
 
-## Authority and activation
+## 0. Before anything else: the attribution stop (BLOCKING)
 
-User and higher-priority session instructions take precedence over this repository contract. Local work remains authorized by the task. A repository rule is not permission to open a PR, request review, post comments, merge, publish or change remote settings.
+Scan every commit message between the base and `HEAD`, and the PR title and body, for any mention of an AI or LLM assistant: `claude`, `codex`, `chatgpt`, `gpt-<n>`, `copilot`, `cursor`, `gemini`, `anthropic`, `openai`, `llm`, `ai-assistant`, the phrase "generated with", and any `Co-Authored-By:` trailer naming an assistant. A topical reference to a file literally named `copilot-instructions.md`, or to the repository's required "Copilot review", is not attribution.
 
-The laws describe the intended enforced policy. The checked-in law/configuration/ruleset contract is locally testable; the adopted required-check/review ruleset and privileged audit still require activation through [SETUP.md](SETUP.md). Do not claim a local check proves remote enforcement.
+Any hit is a blocking failure. Stop and report only that. The author must rewrite history to strip the mention(s) before the PR can move forward. PRs in this repository never carry assistant attribution — this is non-negotiable, and the `pr_checks_cc` gate enforces it server-side, so an unstripped mention will block the merge regardless.
 
-## Motivation
+## 1. Read before you judge
 
-We don't want saga ornamentation. We want commits that move the needle. The needle is the thing that humans actually benefit from in the software. Always ask "what are the key usage paths here, and how is this proposed change moving those?". Never be satisfied with work that seems to check the boxes, but doesn't really move the capability where the actual benefit is.
+Read the PR description and any linked issue first. Know what problem the change solves before you read the diff. Then sit with the diff — understand the change before flagging anything. The difference between genuine help and noise dressed as help is whether you understood the code before judging it.
 
-## The laws
+## 2. Look beyond the diff
 
-Eleven laws. Ten are workflow gates on every PR; the eleventh is intended branch protection on `master`. Once activated, any required failure blocks merge. Existing debt is recorded in measured budgets, never hidden by disabling gates.
+This is the core move. The diff shows what the author touched; it does not show what the author forgot. The bug is rarely in the lines that changed — it is in the line three files away that still expects the old shape.
 
-1. **Every PR closes exactly one OPEN slice-labelled issue — plus that slice's parent PRD when, and only when, the slice is the PRD's last open sub-issue.** PR title byte-equals the slice issue's title. Diff stays within the issue's `## Surfaces` globs. Diff touches no path in `## Out of Scope`. Issue body preserves every `> **Significance.**` blockquote from the slice template verbatim, and every `Done Means` checkbox is checked or carries `OVERRULED: <reason>` before merge; the `slice_closeout_guard` workflow writes the closeout evidence fields when a merged PR closes the issue and reopens an evidence-less close. A PR opened by an author in `automation.bot_authors` skips this law while `automation.exempt_gates` lists `slice` — dependency bumps carry no slice issue, and the other nine laws still run on them. *(pr_checks_slice)*
+- For every signature change, find every caller.
+- For every renamed field, grep every consumer, config file, and doc.
+- For every new enum or variant, find every `switch` / `match` / `if`-chain on that type and confirm it handles the new case.
+- For every changed wire format or serialized shape, find the other side.
 
-2. **PR title, every non-merge commit, and the linked issue title match Conventional Commits v1.0.0, and no commit message or the PR title names an AI/LLM assistant.** Allowed types: `feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert`. *(pr_checks_cc)*
+Treat the diff as the starting point for a search, not as the territory.
 
-3. **Typing discipline never weakens.** No new `Any`, `cast(..., Any)`, `# type: ignore`, `# pyright: ignore`, or `# noqa`. Pyright error count cannot rise. The `typing` budget in `.github/budgets.json` cannot be raised, and the scan surface in `governance.yml` cannot be narrowed, by the PR it gates. *(pr_checks_typing)*
+## 3. What to hunt
 
-4. **Silent-fallback patterns never grow.** No new bare `except:`, empty handler (`pass`, `...`, `return`, `return None`, `continue`, `break`), `contextlib.suppress` (or any alias chain thereof), or `errors='ignore'`. The `fail_loud` budget in `.github/budgets.json` cannot be raised, and the scan surface in `governance.yml` cannot be narrowed, by the PR it gates. *(pr_checks_fail_loud)*
-
-5. **Every PR bumps the version and leaves a CHANGELOG trail.** `__version__` in `talos/__init__.py`, read dynamically by Hatch, advances strictly forward by `MAJOR.MINOR.PATCH`. `CHANGELOG.md`'s first `# v<X.Y.Z>` header equals the new version and carries at least one content line, written imperatively ("Add", not "Added") and free of leftover placeholders. Bump level meets the Conventional Commits type minimum: `type!` → major, `feat` → minor, else patch. Dependency-bot PRs also need the version, changelog and citation bump so every merge has a distinct publishable identity. *(pr_checks_version)*
-
-6. **The lint gate passes.** Ruff, at the version `pyproject.toml` pins, across the declared package, `governance/` and test surfaces; measured Ruff and dead-code debt cannot increase; every package module and every `governance/` module within its declared line budget in `.github/budgets.json` (file-size balance applies to the package tree, where a ratio is meaningful; the gate modules are held by their individual budgets instead), and measured docstring debt cannot increase; the docstring conventions, file-size balance and test/code ratio remain within their measured bounds; test fallback debt cannot increase outside the paths `governance.yml` names as infrastructure, and no honesty-violation is swallowed; changed lines arrive covered; declared runtime dependencies carry no known vulnerability (pip-audit, with time-boxed `.github/vuln_exceptions.json` entries); the documentation corpus passes its locked audit, lint, link, build, route, asset, browser, and accessibility checks; and the coverage floor in `.github/budgets.json` holds and ratchets upward — it cannot be lowered by the PR it gates without a `[coverage-lower: <field>: <reason>]` marker. *(pr_checks_lint)*
-
+- **Correctness** — does the logic do what it claims? Edge cases, off-by-one, null/empty handling.
+- **Environmental assumptions** — for each changed function, name what it assumes about disk layout, API shape, network state, and config values; for each assumption, ask what breaks when it is wrong.
+- **Identity and namespaces** — if a changed value feeds a dedup key, idempotency token, canonical ID, or partition offset, follow it to every consumer and confirm the new shape cannot collide with other values in the same namespace.
+- **Stateful loops** — if a loop has an idempotency guard, mentally execute the second run; every branch that persists data must also update the guard.
+- **Destructive operations** — for any `delete` / `reset` / `overwrite` / `truncate`, enumerate every path that reaches it, state the invariant, and verify every exit honors it. Distrust string variables used as control-flow guards.
+- **Security surfaces** — for auth, permissions, feature flags, and error handling, trace control flow from the entry point and identify every bypass or short-circuit. Ask: what ships if every TODO is never resolved? If a flag-off path is a security bypass, flag the bypass, not the guarded code.
+- **Silent failures** — `try`/`except` that swallows, defaults that mask bugs. The fail-loud gate catches the AST-detectable forms; you catch the semantic ones.
+- **Component seams** — across any boundary the PR introduces or changes, trace state flow: who owns mutation, what ordering is assumed, what breaks if one side changes independently.
+- **Tests** — present and meaningful. A test that does not exercise the thing it names is worse than no test, because it reads as covered.
+- **Cruft** — premature abstraction, speculative flexibility, unused generality, dead code, stale comments, leftover debug output. And bad names — especially bad names.
+- **Empirical claims** — a benchmark, throughput, or latency claim with no automated gate to catch its regression is a gap; name it.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [autonomio/talos](https://github.com/autonomio/talos) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
