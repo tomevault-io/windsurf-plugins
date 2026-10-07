@@ -139,4 +139,4 @@ Uses `podman` by default, set `RUNTIME=docker` or `USE_DOCKER=1` to use Docker i
 
 ---
 > Source: [openshift/cluster-dns-operator](https://github.com/openshift/cluster-dns-operator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
