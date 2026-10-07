@@ -1,84 +1,108 @@
 ---
 trigger: always_on
-description: Guidance for AI coding agents working in the **OptimalPortfolios** repository.
+description: >-
 ---
 
-# AGENTS.md
 
-Guidance for AI coding agents working in the **OptimalPortfolios** repository.
+# Conventions, notation and glossary
 
-## Project overview
+*Author: [Artur Sepp](https://github.com/ArturSepp)*
 
-`optimalportfolios` implements the production pipeline for multi-asset portfolio construction and backtesting: alpha signals -> covariance estimation (EWMA or the HCGL factor model from `factorlasso`) -> constrained optimisation (risk budgeting, maximum diversification, maximum Sharpe, alpha over tracking error, and others) -> rolling backtest and reporting through `qis`.
+This page defines, once, the conventions that every page of the
+[OptimalPortfolios](https://github.com/ArturSepp/OptimalPortfolios) documentation relies on.
+Articles link here instead of restating them, and each methodology article summarises the ones
+it uses in a convention card at the start of its inputs section. The conventions of the qis
+analytics and of FactorLasso estimation are linked, not repeated.
 
-It is the reference implementation of the ROSAA framework published in *The Journal of Portfolio Management* (Sepp, Ossa and Kastenholz, 2026). Distribution and import name `optimalportfolios`. Licensed MIT (`LICENSE.txt`).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/OptimalPortfolios/blob/main/CITATION.cff).
 
-## Ecosystem position
+## Notation
 
-This package is one of eight open-source Python libraries maintained at [github.com/ArturSepp](https://github.com/ArturSepp). Before implementing anything non-trivial, check whether it already exists in one of these:
+The symbols below keep one meaning on every page. A page declares any further symbol in its own
+notation table and does not reuse a reserved one. Pages revised from 27 September 2026 onwards
+use this notation; some earlier pages still write the benchmark as $w_b$ or $b$ and the
+annualisation factor as $a$, and they are brought in line when they are revised.
 
-| Package | Repository | Purpose |
+| Symbol | Meaning |
+|---|---|
+| $N$, $M$ | Number of assets and of factors |
+| $t$, $t_k$ | A date; the $k$-th rebalancing (decision) date |
+| $r$ | Returns; each page states whether they are simple or log returns |
+| $w$ | Target weights, as fractions of net asset value |
+| $w_0$ | Pre-trade weights: the previous targets drifted to the decision date |
+| $w^{\mathrm{bm}}$ | Benchmark weights |
+| $d = w - w^{\mathrm{bm}}$ | Active weights |
+| $\mu$ | Expected returns |
+| $\alpha$ | Alphas or signal scores used as expected active returns |
+| $\Sigma$, $\sigma_i$ | Asset covariance matrix; asset volatility $\sigma_i = \sqrt{\Sigma_{ii}}$ |
+| $\beta$, $\Sigma_F$, $D$ | Factor loadings ($N \times M$), factor covariance and residual covariance |
+| $\sigma(w)$ | Portfolio volatility $\sqrt{w^{\top} \Sigma w}$ |
+| $\mathrm{RC}_i$ | Risk contribution $w_i (\Sigma w)_i / \sigma(w)$ of asset $i$ |
+| $b$ | Risk budgets, non-negative and summing to one |
+| $\mathrm{TE}(w)$ | Ex-ante tracking error $\sqrt{d^{\top} \Sigma d}$ |
+| $s$, $\lambda$ | EWMA span and the decay it implies |
+| $\mathrm{af}$ | Annualisation factor, set upright as one symbol and named after the `af` argument of qis |
+| $\gamma$ | Risk aversion |
+
+The transpose is written $x^{\top}$. Covariance matrices are $N \times N$ and indexed by asset
+labels; loadings are indexed by asset and then by factor, as in
+[FactorLasso's conventions](https://factorlasso.readthedocs.io/en/latest/conventions.html).
+
+## Returns, grids and estimation dates
+
+Estimation samples prices on a return grid and produces estimates on a rebalancing grid. The
+defaults are:
+
+| Setting | Default | Used by |
 |---|---|---|
-| `qis` | QuantInvestStrats | Performance analytics, factsheets, visualisation |
-| `optimalportfolios` | OptimalPortfolios | Portfolio construction and backtesting |
-| `factorlasso` | factorlasso | Sparse factor models and factor covariance estimation |
-| `bbg-fetch` | BloombergFetch | Bloomberg data fetching |
-| `trendfollowing` | TrendFollowingSystems | Trend-following systems: closed-form theory and replication |
-| `goal-based-allocation` | GoalBasedAllocation | Dynamic MV allocation under regime-switching jump-diffusions |
-| `stochvolmodels` | StochVolModels | Stochastic volatility pricing analytics |
-| `vanilla-option-pricers` | VanillaOptionPricers | Vanilla option pricers and implied volatility fitters |
+| `returns_freq` | `'W-WED'` (weekly, Wednesday close) | `EwmaCovarEstimator`, and the dispatcher's expected returns and CARA mixture |
+| `factor_returns_freq` | `'W-WED'` | `FactorCovarEstimator` |
+| `rebalancing_freq` | `'QE'` (quarter ends) | Both estimators, which key their estimates by these dates |
+| `span`, `factor_covar_span` | `52` observations | EWMA covariance and EWMA means |
 
-Actual package dependencies within the stack: `optimalportfolios` depends on `qis` and `factorlasso`; `trendfollowing` depends on `qis`; `stochvolmodels` has an optional `research` extra that pulls in `qis`. The others are independent.
+The rebalancing frequency only selects which dates carry an estimate; it does not change the
+return frequency. Assets observed at different cadences are handled as in
+[mixed-frequency data](mixed_frequency_data.md).
 
-Do not vendor or copy code between these packages. If functionality belongs in a sibling package, say so rather than reimplementing it here.
+**Return basis.** Estimation uses log returns: `compute_returns_from_prices` defaults to
+`is_log_returns=True`, subtracts an EWMA mean and drops the first row, and the factor model and
+the dispatcher's expected returns also use log returns. Weight drift and the qis backtest use
+simple price ratios, and qis's own `to_returns` defaults to simple returns. Each page states the
+basis of every return it shows.
 
-### `rosaa` dependency floors
+**Estimation date.** An estimate dated $t$ uses information available at $t$: the EWMA estimate
+keyed by $t$ includes the sampled return ending at $t$, and factor-model inputs are sliced
+through $t$ inclusive. The weights decided at $t$ are executed afterwards, as described under
+[timing](#decision-execution-and-drift). Nothing in a rolling path looks ahead.
 
-`rosaa/` is gitignored and carries no `pyproject.toml`, so its floors have nowhere else to live and are recorded here. They are not advisory: each names a symbol or keyword `rosaa` calls that does not exist below the floor.
+## EWMA spans
 
-| Package | Floor | What `rosaa` needs at it |
-|---|---|---|
-| `qis` | **>= 5.5.0** | `load_df_from_csv` / `load_df_dict_from_csv` take `float_precision`; the inputs store cannot round-trip a float exactly without it |
-| `factorlasso` | **>= 0.11.0** | `RollingFactorCovarData.get_alphas` forwards `asset_frequencies` / `default_freq`; below it a per-frequency `alpha_span` silently applies the `'ME'` entry to every quarterly asset |
-| `optimalportfolios` | **>= 6.8.0** | signal spans accept a per-cadence `Mapping[str, int]`; below it `product_config.SIGNALS` raises, since it passes dicts |
+A span $s$ sets the decay
 
-`optimalportfolios 6.7.0` was tagged in `CITATION.cff` but never published — its `pyproject.toml` stayed at 6.6.0 — so a fresh `pip install optimalportfolios` before 6.8.0 gives a package `rosaa` cannot run on. Verified with `pip index versions optimalportfolios`, not from the changelog.
+$$
+\lambda = 1 - \frac{2}{s + 1},
+$$
 
-## Repository layout
+and the half-life $h$ with $\lambda^{h} = 1/2$ is $h = \ln(1/2) / \ln(\lambda)$. The default span
+of 52 weekly observations gives $\lambda = 51/53 \approx 0.962$ and a half-life of about 18
+weeks. This is the convention of
+[qis](https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html) and FactorLasso.
 
-```
-optimalportfolios/
-  alphas/            alpha signal construction
-  covar_estimation/  covariance estimators (EWMA, factor/HCGL via factorlasso)
-  optimization/      optimisers, constraints, solvers
-  universe/          instrument universes
-  reports/           reporting built on qis
-  tests/             cross-cutting tests (release metadata agreement)
-  utils/, examples/, docs/, config.py, local_path.py, settings.yaml
-papers/              code accompanying the published papers (excluded from ruff)
-```
+> **Pitfall.** A span is neither a half-life nor a hard look-back window. `span=52` weights
+> the most recent 18 weeks as heavily as all earlier observations together. Some example scripts
+> and the ROSAA replication folder still call the span a half-life; they are wrong on this point.
 
-Tests live inside the package as `optimalportfolios/<subpackage>/tests/*_test.py`; there is no top-level `tests/` directory. Not every `*_test.py` is a pytest module: sixteen of them are `run_local_test` diagnostic scripts that print and plot, contribute no collected tests, and need the author's local price data. They are still imported during collection, so they must stay importable on a core install — put an optional import inside the function that needs it and raise `ImportError` naming the extra.
+## Units
 
-## Commands
-
-```bash
-pip install -e ".[dev]"                                  # editable install with dev tools
-pytest                                                   # run the test suite (180 tests, ~9 s)
-pytest optimalportfolios/optimization/tests/constraints_test.py -v
-ruff check optimalportfolios/                            # lint (papers/ is excluded)
-```
-
-*Note: Terminal execution should be compatible with Windows PowerShell within PyCharm.*
-
-Optional extras: `data`, `reports`, `visualization`, `jupyter`, `dev`, `all`. Supported Python is >= 3.10; CI runs 3.10 – 3.12 on a `[dev]` install and 3.12 again on a core install, which must be green: no test may need data, network or a Bloomberg terminal.
-
-## Conventions
-
-- Test files are named `*_test.py` and live in a `tests/` directory inside the subpackage under test.
+**Covariance.** The estimators return annualised covariance. `EwmaCovarEstimator` multiplies the
+per-observation estimate by the annualisation factor $\mathrm{af}$ inferred from the sampled
+index: 52 for weekly, 12 for monthly and 4 for quarterly returns, with a fallback of 252 and a
+warning when the frequency cannot be inferred. `estimate_current_ewma_covar` with
+`apply_an_factor=False` keeps per-observation units. `FactorCovarEstimator` annualises the
+factor covariance and the residual variances; loadings are not scaled. The optimisers never
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ArturSepp/OptimalPortfolios](https://github.com/ArturSepp/OptimalPortfolios) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
