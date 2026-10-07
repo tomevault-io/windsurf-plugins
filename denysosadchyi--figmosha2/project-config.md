@@ -1,13 +1,20 @@
 ---
 trigger: always_on
-description: Drive Figma by sending JS code through a local bridge that's connected to a custom plugin running inside Figma Desktop.
+description: For any coding agent working in this repo: Codex reads this file directly, Claude Code through
 ---
 
-# Figmosha 2.0 — Claude Code instructions
+# Figmosha 2.0 — agent instructions
+
+For any coding agent working in this repo: Codex reads this file directly, Claude Code through
+`CLAUDE.md` (which just imports it). Machine-specific paths and hosts live in `CLAUDE.local.md`
+(gitignored) — **read it first if it exists**, whichever agent you are.
 
 Drive Figma by sending JS code through a local bridge that's connected to a custom plugin running inside Figma Desktop.
 
 ## How to send code
+
+> **macOS / Linux:** there is no `python` command on a stock Mac — wherever this file says
+> `python figmosha.py`, run `./venv/bin/python figmosha.py` (or `python3 figmosha.py`).
 
 ```bash
 # Preferred — subcommand-style
@@ -27,101 +34,76 @@ curl -s -X POST http://localhost:8787/exec \
   -d '{"code":"return figma.currentPage.id"}'
 
 # Status
-curl -s http://localhost:8787/status   # {"plugin_connected": true/false, "pending": 0}
+curl -s http://localhost:8787/status   # {"plugin_connected": ..., "files": [...], "pending": 0, "abandoned": []}
 ```
 
-If the bridge isn't running: `bash start-bridge.sh` (runs in tmux `figmosha-bridge`; logs at `/tmp/figmosha-bridge.log`).
+## Multiple files: targets (`-T`) — READ THIS FIRST
 
-If the plugin isn't connected: tell the user — `Plugins → Development → Figmosha Bridge → Run`.
+The bridge holds **one connection per open Figma file** that is running the plugin, not one globally.
 
-## Helpers (available as `h.*` in every exec)
+```bash
+python figmosha.py targets                      # name / doc id / fileKey / conn / queue (busy, waiting)
+curl -s http://localhost:8787/targets
 
-The plugin runtime exposes a small helper namespace. Use these to keep scripts short:
-
-| Helper | What |
-|---|---|
-| `await h.bF(node, idx, varOrId)` | Bind fill paint to variable (id or instance) |
-| `await h.bS(node, idx, varOrId)` | Bind stroke paint to variable |
-| `await h.bN(node, prop, varOrId)` | Bind numeric prop (radius, padding, size...) |
-| `h.findByName(root, name)` | First descendant by exact name |
-| `h.findAllByName(root, name)` | All descendants by exact name |
-| `h.dumpTree(node, {maxDepth, showSize, showText, showLayout})` | Indented tree string |
-| `await h.withFonts(root, asyncFn)` | Loads every unique font in subtree, then runs `asyncFn` |
-| `await h.setText(node, text)` | Set TEXT node chars with auto font load |
-| `h.cloneNext(node, {direction, gap, name})` | Clone + place adjacent (`right`/`left`/`up`/`down`) |
-| `await h.variant(instance, props)` | Wrapper around `instance.setProperties(...)` |
-| `await h.variantsOf(instance)` | `{ current, groups, all }` for the component set |
-| `h.sel()` | Currently selected nodes as `{id,name,type,w,h}` |
-| `h.resolve(idOrAlias)` | Node by id, or the aliases `page` / `sel` |
-| `h.hex("#1a2b3c")` | Hex to Figma's 0..1 `{r,g,b}` |
-| `h.solid("#1a2b3c", opacity?)` | Ready-to-assign paint array |
-| `h.frame(parent, opts)` | Frame with auto-layout applied in the right order |
-| `await h.node(id)` | Shorthand for `figma.getNodeByIdAsync(id)` |
-| `await h.var_(idOrKey)` | Resolve a variable from instance, local id, or library key |
-| `await h.importComp(key)` | `figma.importComponentByKeyAsync(key)` |
-| `await h.importVar(key)` | `figma.variables.importVariableByKeyAsync(key)` |
-
-**Use them.** Compared to inline boilerplate, helpers save ~70% of the script and avoid common mistakes (frozen `node.fills`, missing `loadFontAsync`, etc.).
-
-### Bad vs good
-
-```js
-// Bad — verbose, easy to miss
-const f = JSON.parse(JSON.stringify(node.fills));
-f[0] = figma.variables.setBoundVariableForPaint(f[0], "color", v);
-node.fills = f;
-
-// Good — helper handles freezing + setBoundVariableForPaint
-await h.bF(node, 0, v);
+# -T is a per-subcommand flag — it goes AFTER the subcommand, never before it
+python figmosha.py exec "return figma.root.name" -T "Component Library"
+python figmosha.py tree 123:456 -T "Component Library"
+curl -s -X POST http://localhost:8787/exec -d '{"code":"...","target":"Icons"}'
 ```
 
-```js
-// Bad — must remember to load fonts first; mixed-font case is silent
-await figma.loadFontAsync(node.fontName);
-node.characters = "new";
+`target` matching (`resolve_target` in `bridge.py`): document id (the `doc` column, 6+ chars) →
+connection id → exact file name (case-insensitive) → exact `fileKey` → unambiguous substring of the name.
 
-// Good
-await h.setText(node, "new");
+- **Two different files with the same name** (two fresh "Untitled" files, say) → the name is a 409;
+  target each by its **document id**: `-T dk2m9q4x`. Each file carries its own id (plugin data
+  `figmosha-doc` on the document root, written once on first run), so the bridge never mixes them up,
+  and the id survives reconnects and bridge restarts. The `conn` id changes on every reconnect — don't
+  store it.
+
+- The name is `figma.root.name` as the plugin reports it, which is often not the name you remember —
+  a trailing plural, a rename that never propagated. **Verify with `targets`, don't assume.**
+- **`fileKey` targeting does not work for a local dev plugin** — it reports `fileKey: null` (shown as
+  `-` in `targets`). A file key is still what `importComponentByKeyAsync` needs; it is just not usable
+  as a `-T`. Match by name only.
+
+- **No target + exactly 1 file connected** → routed there (the old default).
+- **No target + 2 or more connected** → **HTTP 409** `"N files connected — specify a target"`.
+  This is the #1 wasted call. **Always pass `-T`** with the file name from the project profile.
+- Ambiguous substring → 409 listing the candidates. Nothing connected → 503.
+
+### Concurrency: the per-file queue
+
+**The bridge queues execs per document.** Requests are multiplexed by request id, and `/exec` waits for
+the document's lock before sending — so two callers on the same file (orchestrator + agent, or two
+agents) run **one after another, never interleaved**, and callers on *different* files never wait for
+each other. The lock belongs to the document, not the connection: one file open in two tabs is one
+queue.
+
+**Several agents at once — name yourself and bound your wait:**
+
+```bash
+export FIGMOSHA_AGENT=designer            # or --agent designer / -A designer, or "agent" in the JSON
+python figmosha.py exec --file build.js -T "Component Library" --queue-timeout 30
 ```
 
-```js
-// Bad — manual font collection
-const texts = root.findAll(n => n.type === "TEXT");
-const fonts = [...new Set(texts.map(t => `${t.fontName.family}|${t.fontName.style}`))];
-// ... load each ...
+- `targets` / `/status` show each file's queue: who is running and for how long, who is waiting.
+- A reply that waited carries `queued_ms`; the CLI prints `(waited 2.1s in the file's queue)`.
+- `--queue-timeout` (JSON `queue_timeout`, default = `--timeout`) caps the wait. When it runs out the
+  reply is **503 `file busy`** naming who holds the file, and **nothing was run** — retrying is safe,
+  unlike after a 504.
+- A caller that hangs up while queued is dropped from the queue; its script never runs.
+- **Speed.** A round trip is ~2 ms over HTTP and ~100 ms through the CLI (Python start-up) — for
+  dozens of small calls from code, POST to `/exec` directly. Return what you need, not whole trees:
+  a 50k-item result costs ~250 ms, a 5 MB one about the same.
+- **Don't pause with `setTimeout` in scripts.** Figma throttles timers in background tabs:
+  `setTimeout(30)` takes ~30ms in the visible tab and up to ~1s in a background one, and every
+  agent queued behind you pays for it. Figma API calls stay fast in the background.
 
-// Good
-await h.withFonts(root, async () => {
-  // bulk-edit text inside `root` here
-});
-```
-
-## CLI subcommands (save tokens for common ops)
-
-| Command | Equivalent JS | Use case |
-|---|---|---|
-| `figmosha doctor` | — | Diagnose bridge → plugin → Figma, with the fix for each break |
-| `figmosha sel` | `h.sel()` | What the user has selected right now |
-| `figmosha tree <id>` | `h.dumpTree(await h.node(id))` | Explore node structure |
-| `figmosha find <id> name=Button` | `(await h.node(id)).findAll(n => n.name === "Button")` | Locate by name |
-| `figmosha find <id> name~Btn` | `findAll(n => n.name.includes("Btn"))` | Substring name match |
-| `figmosha find <id> type=INSTANCE` | `findAll(n => n.type === "INSTANCE")` | Filter by type |
-| `figmosha find <id> text~Привіт` | `findAll(n => n.type === "TEXT" && n.characters.includes(...))` | Find by text |
-| `figmosha text <id> "новий"` | `await h.setText(n, "новий")` | Edit text safely |
-| `figmosha variant <id> "Property 1=Default"` | `await n.setProperties({...})` | Switch variant |
-| `figmosha clone <id> --right --gap 100` | `h.cloneNext(n, {direction:'right',gap:100})` | Duplicate adjacent |
-| `figmosha rm <id> [<id>…]` | `n.remove()` | Delete one or more |
-| `figmosha icomp <key>` | `(await h.importComp(key)).createInstance()` | Pull from library |
-
-Anywhere an id is taken, `page` and `sel` work too — `figmosha tree sel --layout`
-dumps the selected subtree without hunting for its id first.
-
-Use subcommands when the op fits one of these. Fall back to `exec` for anything else.
-
-When the user says "this frame" or "the selected one", call `figmosha sel` — don't
+Why the lock is needed: each file's plugin sandbox is a single-threaded async message handler over one
+shared document and one shared undo stack. Without it, two scripts yield to each other at **every
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [denysosadchyi/figmosha2](https://github.com/denysosadchyi/figmosha2) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
