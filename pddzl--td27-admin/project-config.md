@@ -1,104 +1,96 @@
 ---
 trigger: always_on
-description: Gin + Vue3 admin dashboard. Keep this open; refer before acting.
+description: - UI 组件库: Element Plus
 ---
 
-# TD27 Admin — Agent Guide
 
-Gin + Vue3 admin dashboard. Keep this open; refer before acting.
+# 项目开发规范
 
-## Entry points
+- 你是一位前端开发专家，精通前端架构
 
-- **Backend**: `server/cmd/server/main.go` — init order: Viper → slog → Gorm → RegisterTables → InitCron → Routers → RunServer
-- **Frontend**: `web/src/main.ts`
+## 技术栈
 
-## Backend
+- 框架: Vue 3.5+
+- 打包构建工具: Vite 7+
+- 路由管理: Vue Router
+- 状态管理: Pinia
+- UI 组件库: Element Plus
+- CSS 预处理器: Scss
+- 代码校验与格式化: ESLint
+- 开发语言: TypeScript
+- 包管理工具: pnpm
+- 网络请求: Axios
 
-### Architecture
-- Gin handlers: `server/internal/api/{module}/{feature}.go`
-- Services: `server/internal/service/{module}/{feature}.go`
-- Models (entity + dto + repository): `server/internal/model/{module}/{entity}.go`
-- Routes: `server/internal/router/{module}/{router}.go` + `enter.go` for registration
-- Init modules: `server/internal/initialize/gorm.go` (RegisterTables for auto-migration), `server/internal/initialize/router.go`, `server/internal/initialize/cron.go`
+## 导入规范
 
-### Conventions
-- Logging uses `log/slog` as the underlying implementation. Use `global.TD27_LOG.Info/Error/Debug` with key-value pairs for all logging calls (direct `slog` calls are not recommended).
-- Logger config in `server/configs/config.yaml` under `logger` section (level/format/show-line/service). The `show-line` flag maps to `slog.HandlerOptions.AddSource`. Supports both text and JSON output formats.
-- Log output is split by level: `log/debug.log`, `log/info.log`, `log/warn.log`, `log/error.log`. Each file contains only its exact level — routing via `levelFilter` handler wrapper.
-- Static attributes (`service`, `env`) automatically injected on every log line via `multiHandler.attrs`.
-- Structured logging is implemented for Gorm operations and status-based HTTP access logs (5xx→Error, 4xx→Warn).
-- DB auto-migration is `disabled` by default (`disable-auto-migrate: true`). Enable it or run init.sql manually.
-- API response codes: `0` = success, `7` = response error, `4` = request error. Helpers in `internal/model/common/response.go`.
-- JWT token passed via `x-token` header. Multi-login support with configurable device limit.
-- Casbin RBAC: policies in `permissions` table, enforced via `CasbinHandler` middleware. Role hierarchy and data permission flags in config.
-- Middleware chain (applied in `router.go`): GinLogger → GinRecovery → JWTAuth → CasbinHandler → OperationLog (+ DataPermissionHandler on specific routes).
-- Cron jobs register via `init()` with `pkgCron.Register(name, job)`. The `Scheduler` loads enabled jobs from DB at startup.
-- New permissions: use `PermissionDomainAPI`, `PermissionDomainMenu` constants. Subject format for service tokens is `token:{id}`.
+- 使用路径别名 `@` 指向 `src` 目录
+- 使用路径别名 `@@` 指向 `src/common` 目录
 
-### Commands (run from `server/`)
-```bash
-make run          # go run cmd/server/main.go
-make build        # build for host OS
-make test         # go test ./... -v
-make lint         # golangci-lint run ./...
-make fmt          # go fmt ./...
-make swag         # swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+## 目录结构
+
+```sh
+# v3-admin-vite
+├─ .husky                # commit 时进行代码校验和格式化
+├─ .vscode               # vscode 配置和插件
+├─ public
+│  ├─ favicon.ico        # 网站头像
+│  ├─ app-loading.css    # 首屏 loading 动画
+│  └─ detect-ie.js       # 检测 ie
+├─ src
+│  ├─ common             # 通用目录
+│  │  ├─ apis            # 通用目录 - 接口
+│  │  ├─ assets          # 通用目录 - 静态资源
+│  │  ├─ components      # 通用目录 - 组件
+│  │  ├─ composables     # 通用目录 - 组合式函数
+│  │  ├─ constants       # 通用目录 - 常量
+│  │  └─ utils           # 通用目录 - 工具函数
+│  ├─ http               # 网络请求
+│  ├─ layouts            # 布局
+│  ├─ pages              # 页面
+│  │  └─ login           # 登录模块
+│  │     ├─ apis         # 登录模块 - 私有接口
+│  │     ├─ components   # 登录模块 - 私有组件
+│  │     ├─ composables  # 登录模块 - 私有组合式函数
+│  │     ├─ images       # 登录模块 - 私有图片
+│  │     └─ index.vue    # 登录模块 - 页面
+│  ├─ pinia              # 状态管理
+│  ├─ plugins            # 插件（全局组件、自定义指令等）
+│  ├─ router             # 路由
+│  ├─ App.vue            # 入口页面
+│  └─ main.ts            # 入口文件
+├─ tests                 # 单元测试
+├─ types                 # 类型声明
+├─ .editorconfig         # 编辑器配置
+├─ .env                  # 所有环境
+├─ .env.development      # 开发环境
+├─ .env.production       # 生产环境
+├─ .env.staging          # 预发布环境
+├─ eslint.config.js      # eslint 配置
+├─ tsconfig.json         # ts 配置
+├─ uno.config.ts         # unocss 配置
+└─ vite.config.ts        # vite 配置
 ```
-Swagger at `http://localhost:8888/swagger/index.html`.
 
-## Frontend
+- 保持目录结构清晰，遵循现有目录规范
+- 同一个业务逻辑的代码和资源应当被收拢到了一起，避免在不同的目录间来回跳跃 (例如登录模块的接口应该放在 `@/pages/login/apis` 而不是 `@/common/apis`)
 
-### Conventions
-- Composition API with `<script setup lang="ts">` on all `.vue` files.
-- Path aliases: `@/` → `src/`, `@@/` → `src/common/`.
-- Vue block order: `<script>`, `<template>`, `<style scoped lang="scss">`.
-- ESLint: `@antfu/eslint-config` — double quotes, no semicolons, 2-space indent, no-console allowed.
-- State: Pinia with Setup store syntax, stores in `web/src/pinia/`.
-- API modules in `web/src/api/{module}/`; page-local APIs go in `@/pages/{page}/apis/`.
-- All page components in `web/src/pages/` (kebab-case dirs).
-- Auto-imports: vue, vue-router, pinia APIs; Element Plus components.
+## 代码
 
-### Commands (run from `web/`)
-```bash
-pnpm dev              # dev server on :8080, proxied to backend :8888
-pnpm build            # vue-tsc && vite build for production
-pnpm build:stage      # build for pre-release environment
-pnpm preview:stage    # preview pre-release environment build
-pnpm preview:prod     # preview production environment build
-pnpm test             # vitest (happy-dom), test files: tests/**/*.test.{ts,js}
-pnpm lint             # eslint . --fix
-```
+- 编写整洁不冗余、可读性强的代码，始终提取共用逻辑
+- 编写对开发者友好的注释
+- 代码必须能够立即运行，包含所有必要的导入和依赖
+- 尽量避免使用兼容性不好的 JS、CSS 语法，使用时必须提供相应的注释
+- 建议参考项目已有代码的编码风格
 
-## Testing
+## 代码检查
 
-- **Backend**: `make test` or `go test ./... -v`. Test utilities in `server/internal/testutil/` (DB helpers).
-- Test coverage includes: Casbin RBAC, pkg utilities, md5 function, and core business logic.
-- Casbin tests in `server/internal/service/sysManagement/casbin_test.go`.
+- 使用 ESLint 进行代码校验与格式化
+- 禁用 Prettier 进行代码格式化
 
-## Full project structure (tl;dr)
+## 其他
 
-```
-server/                     # Go backend
-├── cmd/server/main.go      # entry point
-├── internal/api/           # Gin handlers (sysManagement, sysMonitor, sysTool)
-├── internal/service/       # business logic
-├── internal/model/         # entities, DTOs, repos
-├── internal/router/        # route registration
-├── internal/middleware/    # JWT, Casbin, CORS, logging
-├── internal/initialize/    # app bootstrap (gorm, router, cron)
-├── internal/core/          # config (Viper) + logger (slog)
-├── internal/global/        # global vars (DB, Config, LOG)
-├── internal/pkg/           # shared (cron, casbin, rbac, cache, jwt, async, utilities)
-├── configs/config.yaml     # all runtime config
-├── log/                    # Application logs
-├── resource/               # Static resources (images, attachments, templates)
-│   └── upload/             # File upload target directory
-└── scripts/                # Shell scripts (build, deploy, maintenance)
-
-web/                        # Vue3 frontend
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- 优先使用现有第三方依赖，避免重新发明轮子
 
 ---
 > Source: [pddzl/td27-admin](https://github.com/pddzl/td27-admin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-26 -->
