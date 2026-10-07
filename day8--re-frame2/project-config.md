@@ -1,93 +1,58 @@
 ---
 trigger: always_on
-description: This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
+description: > **Type:** Convention
 ---
 
-# Agent Instructions
+# Conventions
 
-This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
+> **Type:** Convention
+> Locked naming and structural conventions that span the Story spec — reserved namespaces for Story-owned ids, the canonical id grammars, the `reg-*` macro / `*`-fn split, the chrome-installer pair shape, the `*-id` Var pattern, and the token-banning rules.
 
-## Quick Reference
+The framework's [`spec/Conventions.md`](../../../spec/Conventions.md) catalogues conventions that span the **whole** spec; this document catalogues the conventions that span only Story. The two are read together: Story honours every framework convention (single `:rf/*` root, `*`-suffix on programmatic fn partners, bang on process-level lifecycle, `:rf.assert/*` is framework-reserved per Story's library-owned `:story.*` carve-out), and adds the Story-specific rules below.
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
-```
+## Reserved namespaces (Story-owned)
 
-## Non-Interactive Shell Commands
+Story is a [**library-owned prefix**](../../../spec/Conventions.md#library-owned-prefixes) under the framework's single-root convention. The carve-outs live outside `:rf.*` (`:story.*` and `:Workspace.*` for user-facing ids) and inside `:rf.story.*` (for Story-emitted framework events). Both sets are reserved by Story's spec; both follow the framework's "fixed-and-additive" discipline.
 
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
+### The `:story.*` / `:Workspace.*` user-facing carve-outs
 
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
+| Sub-namespace | Used for | Spec |
+|---|---|---|
+| `:story.<path>/<name>` | User-authored story ids (`:story.auth/login-form`) and variant ids (`:story.auth.login-form/empty`). The path segments mirror the source-tree feature hierarchy; the trailing `/<name>` names the story or variant within that path. | [001-Authoring.md](001-Authoring.md) §Story id grammar |
+| `:Workspace.<path>/<name>` | User-authored workspace ids (`:Workspace.Auth/all-states`). The capitalised root segment is the convention — workspaces are top-level affordances, not story-graph leaves. | [001-Authoring.md](001-Authoring.md) §Workspace id grammar |
+| `:Mode.<path>/<name>` | User-authored mode ids consumed by the toolbar (`:Mode.Theme/dark`, `:Mode.Viewport/mobile`). The capitalised root names the axis; the trailing `/<name>` names the value. | [010-Toolbar.md](010-Toolbar.md) §Mode id grammar |
 
-**Use these forms instead:**
-```bash
-# Force overwrite without prompting
-cp -f source dest           # NOT: cp source dest
-mv -f source dest           # NOT: mv source dest
-rm -f file                  # NOT: rm file
+User code MUST use one of these grammars for the corresponding registration kind. The capitalised root segments (`:Workspace.*`, `:Mode.*`) are visually distinct from the lower-case `:story.*` so a reader scanning a registration form can tell the kind from the id alone.
 
-# For recursive operations
-rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
-```
+### The `:rf.story.*` framework carve-out
 
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
+Story-emitted framework events and panel ids live under the framework's `:rf.*` root, in the `:rf.story.*` sub-namespace. The framework's [`spec/Conventions.md`](../../../spec/Conventions.md) reserves the sub-namespace; Story owns the closed member set.
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
-## Beads Issue Tracker
+| Sub-namespace | Closed member set | Spec |
+|---|---|---|
+| `:rf.story/*` | Story-emitted events (`:rf.story/save-current-as-variant`) and built-in decorator ids (`:rf.story/force-fx-stub`). | [005-SOTA-Features.md](005-SOTA-Features.md) |
+| `:rf.story.panel/*` | Story-panel registration ids (`:rf.story.panel/schema-validation`, `:rf.story.panel/layout-debug`). The `panel` segment is the discriminator so a reader scanning a panel id can tell the registry kind. | [003-Render-Shell.md](003-Render-Shell.md) §Panel registration contract |
+| `:rf.story/layout-debug.*` | Built-in layout-debug decorator ids (`:rf.story/layout-debug.measure`, `:rf.story/layout-debug.outline`, `:rf.story/layout-debug.pseudo`) — dotted names under the `:rf.story/*` root (`layout_debug.cljc`), not a sub-namespace. | [005-SOTA-Features.md](005-SOTA-Features.md) §Layout-debug overlay trio |
+| `:rf.story.inline/*` | Anonymous inline-plan frame ids (`:rf.story.inline/plan-1`, `:rf.story.inline/plan-2`, …), minted per-run by `mint-inline-frame-id` for an inline (map-target) plan execution. Never a registered variant id, so an inline frame can neither collide with nor appear alongside a navigable variant. | [017-Testing-Story.md](017-Testing-Story.md) §Inline plan |
 
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
+Third-party Story extensions MUST NOT register handlers, fx, subs, panels, or decorators under `:rf.story.*`. Library authors choose their own top-level prefix per [framework Conventions §Library-owned prefixes](../../../spec/Conventions.md#library-owned-prefixes).
 
-### Quick Reference
+## `reg-*` macro / `*`-fn split
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
-```
+Every registration kind in Story ships **two surfaces** under the same name:
 
-### Rules
+- The `reg-<kind>` **macro** — author-facing. Captures call-site source-coords (file + line + ns) via `&form` meta + `*file*` + `(ns-name *ns*)`, threads them into the runtime helper via `re-frame.story.macros`. This is the form authors write in their stories ns.
+- The `reg-<kind>*` **fn** — programmatic. Same body shape, no source-coord stamping (callers supply coords explicitly if needed). This is the form MCP write tools and hot-reload tooling call.
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+Mirror of [`re-frame.core`](../../../implementation/core/src/re_frame/core.cljc)'s `dispatch` / `dispatch*` precedent. The nine registration kinds ship both surfaces uniformly:
 
-## Session Completion
+| Macro | `*`-fn partner | Body shape | Spec |
+|---|---|---|---|
+| `reg-story` | `reg-story*` | story body + optional `:variants` desugaring (Form B) | [001-Authoring.md](001-Authoring.md) |
+| `reg-variant` | `reg-variant*` | variant body (`:doc`, `:component`, `:args`, `:decorators`, `:script`, …) | [001-Authoring.md](001-Authoring.md) |
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [day8/re-frame2](https://github.com/day8/re-frame2) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
