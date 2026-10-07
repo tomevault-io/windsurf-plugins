@@ -15,23 +15,27 @@ IAM Floyd is an AWS IAM policy statement generator with a fluent interface. It g
 
 ### Generated Code Structure
 
-- `lib/generated/policy-statements/` - Generated TypeScript class per AWS service (460+ files)
-- `lib/generated/index.ts` - Re-exports all service classes
-- `lib/generated/aws-managed-policies/` - Generated AWS managed policies
-- `lib/shared/` - Hand-written core: `PolicyStatement`, `All`, `Operator`, `AccessLevel`
+- `lib/generated/model/` - Service model per AWS service (JSON, committed). The single source of truth for all generated code
+- `lib/generated/policy-statements/` - TypeScript class per AWS service, emitted from the model (not committed)
+- `lib/generated/index.ts` - Re-exports all service classes (emitted, not committed)
+- `lib/generated/aws-managed-policies/` - Generated AWS managed policies (committed)
+- `lib/generated/aws-service-principals/` - List of AWS service principals (`principals.json`, committed) and the class `AwsServicePrincipal` emitted from it (`index.ts`, not committed)
+- `lib/shared/` - Hand-written core: `PolicyStatement`, `PolicyDocument`, `All`, `Operator`, `AccessLevel`
 - `lib/collection/` - Predefined policy collection utilities
-- `lib/generator/` - Scrapes AWS docs and generates `lib/generated/` via `cheerio` + `ts-morph`
+- `lib/generator/` - Scrapes AWS docs with `cheerio` into the model (`model.ts`), and emits TypeScript from the model with `ts-morph` (`emit/typescript.ts`), and the index of the policy converter (`emit/converter.ts`)
 
 ### PolicyStatement Inheritance Chain
 
 Built in 10 numbered layers (`lib/shared/policy-statement/`):
 
-```
+```text
 1-base → 2-conditions → 3-actions → 4-resources → 5-effect
        → 6-arn-defaults → 8-principals → 10-final (PolicyStatement)
 ```
 
 Each `*.CDK.ts` file is the CDK variant of that layer (swapped in by `bin/mkcdk.ts`).
+
+The policy documents (`lib/shared/policy/`) build on `1-base`, which holds the statements: in the CDK variant (`1-base.CDK.ts`) `PolicyBase` extends `aws_iam.PolicyDocument` and reads its private `statements`. `PolicyDocument` in `2-final.ts` takes the maximum size and the statements, estimates the size of the policy like the AWS CDK (ARNs with tokens count as `arnSizeEstimate`, 150, actions with tokens as 20), plus the parts the AWS CDK leaves out (`Version`, braces, `Sid`, principal keys), validates it against the maximum size, and splits it first fit like `PolicyDocument._splitDocument` (the protected `splitDocument`). `3-documents.ts` has one subclass per type of policy (`ManagedPolicyDocument`, `InlineRolePolicyDocument`, `S3BucketPolicyDocument`, …), which takes only the statements; only `ManagedPolicyDocument`, `ServiceControlPolicyDocument` and `ResourceControlPolicyDocument` have a public `split()`.
 
 ### Dual Package Strategy
 
@@ -40,89 +44,21 @@ One codebase produces two npm packages:
 - `iam-floyd` - Standalone (uses built-in base class)
 - `cdk-iam-floyd` - Extends `aws_iam.PolicyStatement` from AWS CDK
 
-`bin/mkcdk.ts` transforms between variants by swapping `*.CDK.ts` files and rewriting constructors.
+`bin/mkcdk.ts` transforms between variants by swapping `*.CDK.ts` files and emitting the CDK variant of the service classes from the model.
 
-## Development Commands
+### CDK Constructs in `on*()` Methods
 
-### Build
+In the CDK variant, the `on*()` method of a resource type with a single required placeholder also takes a construct, if aws-cdk-lib has a reference interface for it (`aws-cdk-lib/interfaces`, e.g. `onFunction(fn)` with `interfaces.aws_lambda.IFunctionRef`). The method then uses the ARN of the reference (`fn.functionRef.functionArn`), or, if the reference has no ARN, its identifier in place of the placeholder. `lib/generator/cdk-refs.ts` matches the resource types of the model with the reference interfaces of the installed aws-cdk-lib (service prefix ↔ module, resource type ↔ interface) and writes them as `cdkRef` into the model; it runs with `make generate` and alone with `make cdk-refs`. `lib/generated/cdk-refs.json` (committed) has the interfaces in use and the minimum version of aws-cdk-lib, the peer dependency of `cdk-iam-floyd`, which is raised to the installed version only when interfaces are added, and the version of constructs this aws-cdk-lib requires, the other peer dependency (lower, NuGet fails with NU1605). Wrong matches are fixed in `fixes.ts` (`cdkModule`, `resourceTypes.<name>.cdkRef`).
 
-```bash
-make build           # tsc --build --force tsconfig.main.json
-make package         # build + npm pack
-make clean           # remove node_modules, *.js, *.d.ts
-make install         # clean + npm i
-```
+### Other Languages (jsii)
 
-### Code Generation
+`cdk-iam-floyd` is also packaged for Python, Java, .NET and Go with `jsii-pacmak`. The jsii compiler is not used: `lib/generator/emit/jsii.ts` writes the `.jsii` assembly from the model, and `bin/jsii.ts` adds the `jsii` targets to package.json, writes the assembly and appends the jsii type info to `lib/index.js`. The same `.jsii` is what Construct Hub renders the API docs from. jsii-pacmak runs with `--no-runtime-type-checking` and `bin/jsii-pack.ts` as pack command, which embeds an npm tarball without docs and `.d.ts` files in the packages.
 
-```bash
-make generate        # generate lib/generated/ from AWS docs (25hr cache)
-make generate-force  # NOCACHE=1 - ignores time-based cache
-make index-managed-policies  # regenerate AWS managed policies index
-```
+`test/jsii/` builds `floyd-consumer`, a jsii library that depends on `cdk-iam-floyd`, and runs the same scenarios in TypeScript (the baseline, without jsii), Python, Java, .NET and Go against `test/jsii/expected.json`. It also runs the examples of the docs in each language (`examples/<name>/<name>.{py,java,cs,go}`, through the runners in `test/jsii/examples/`) and compares them to the `.result` files. Every example needs a file in every language.
 
-### Testing
-
-The project has **no unit test framework**. Tests are integration-style: TypeScript examples are compiled, run, and their output is diffed against stored `.result` files.
-
-```bash
-make test            # compile examples/ + diff against *.result files (standalone)
-make test-typescript # same, via Test.TypeScript.Makefile
-make cdk-test        # CDK test: real deploy + destroy via AWS CDK
-make cdk-all         # cdk + install + build + cdk-test
-```
-
-**Run a single example test manually:**
-
-```bash
-# 1. Compile a single example
-npx tsc -p tsconfig.test-iam-floyd.json
-
-# 2. Run and compare output
-node examples/allow/allow.js > /tmp/out.txt
-diff /tmp/out.txt examples/allow/allow.result
-
-# Or run the integration test harness directly:
-npx ts-node test/main.ts
-```
-
-**Regenerate expected results** (after intentional changes):
-
-```bash
-make regenerate-code-example-results
-```
-
-### Linting
-
-```bash
-make eslint          # npx eslint .
-```
-
-### CDK Variant
-
-```bash
-make cdk             # transforms codebase to CDK variant (modifies lib/shared, lib/generated, package.json)
-make uncdk           # reverts via git stash (lib/generated, lib/shared, package.json)
-```
-
-## Fixing AWS Documentation Errors (`lib/generator/fixes.ts`)
-
-The generator scrapes live AWS docs, which sometimes contain errors or inconsistencies. `fixes.ts` is the central place to patch these before code is generated. **When the generator produces wrong output, add a fix here rather than editing generated files.**
-
-### `fixes` object (keyed by URL slug)
-
-Each top-level key is the URL slug of a service's IAM docs page (e.g. `ec2`, `ssm`, `'neptune-db'`). Supported sub-keys:
-
-| Sub-key                              | Effect                                                                                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ignore: true`                       | Skip generating this service entirely (used for EOL services)                                                                                                 |
-| `name: 'slug'`                       | Override the generated filename and class name (needed when the same service prefix spans multiple doc pages, e.g. `pinpointemailservice` → `ses-pinpoint`)   |
-| `service: 'prefix'`                  | Override the IAM service prefix used in the generated code                                                                                                    |
-| `resourceTypes.<name>.arn`           | Replace the ARN template for a resource type with a corrected one                                                                                             |
-| `conditions.<key>.key`               | Rewrite the condition key string (used when docs have a concrete example key like `RequestTag/tag-key` instead of the parametric form `RequestTag/${TagKey}`) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [udondan/iam-floyd](https://github.com/udondan/iam-floyd) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
