@@ -3,7 +3,7 @@ trigger: always_on
 description: Read and follow `agent-instructions/PROJECT_RULES.md` for every task in this
 ---
 
-# Quant-Perf Agent Bootstrap
+# Quant-Perf Claude Code Bootstrap
 
 Read and follow `agent-instructions/PROJECT_RULES.md` for every task in this
 module.
@@ -12,7 +12,7 @@ For PyTorch or HuggingFace model quantization, mixed-precision search, accuracy
 evaluation, throughput benchmarking, TraceLens, GEAK, PerfOpt, session resume,
 status, or reporting work, use the discovered `quark-torch-quant-perf` skill.
 In a Quark source checkout, the module-local discovery entry is
-`.agents/skills/quark-torch-quant-perf`. In a wheel installation or standalone
+`.claude/skills/quark-torch-quant-perf`. In a wheel installation or standalone
 copy without the repository metadata and discovery directories, use a project-
 or user-level installation of the same skill.
 
@@ -22,4 +22,4 @@ them here.
 
 ---
 > Source: [amd/Quark](https://github.com/amd/Quark) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
