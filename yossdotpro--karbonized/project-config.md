@@ -1,164 +1,82 @@
 ---
 trigger: always_on
-description: This file summarizes how `karbonized` is organized so an agent or contributor can work on it quickly and safely.
+description: **Agent** is the design assistant built into Karbonized. You describe what you want and it edits the canvas with the same actions you use: it adds and updates blocks, aligns them, changes the background and exports images. It works with the model provider you choose.
 ---
 
-# AGENTS.md
+# Agent and the MCP server
 
-## Purpose
+**Agent** is the design assistant built into Karbonized. You describe what you want and it edits the canvas with the same actions you use: it adds and updates blocks, aligns them, changes the background and exports images. It works with the model provider you choose.
 
-This file summarizes how `karbonized` is organized so an agent or contributor can work on it quickly and safely.
+The desktop app can also expose those actions as a local **MCP server**, so Claude Desktop, Claude Code, Cursor and other MCP clients can control Karbonized.
 
-## What This Project Is
+- [Using Agent](#using-agent)
+- [Model providers](#model-providers)
+- [API keys](#api-keys)
+- [Undo](#undo)
+- [Tools](#tools)
+- [MCP server (desktop app)](#mcp-server-desktop-app)
+- [Troubleshooting](#troubleshooting)
+- [For contributors](#for-contributors)
 
-Karbonized is a visual image/mockup editor built with React + Vite + TypeScript. The core app allows users to:
+## Using Agent
 
-- create and edit visual workspaces
-- add blocks such as text, code, images, shapes, QR codes, and custom components
-- move, resize, rotate, crop, and warp blocks
-- export the result as `png`, `jpeg`, or `svg`
-- load packaged extensions as `.kext`
+Open the panel with <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>L</kbd>, the **Agent** button in the status bar, the **AI** menu in the menu bar or **Show Agent** in the command palette. It docks on the left edge of the window, opposite the properties panel. The layout button at the left of the status bar switches between the canvas alone, the properties panel, the agent, or both.
 
-There is no in-app agent system in this project. The closest thing to an extensible architecture is the plugin/extension system.
+- Type a request and press <kbd>Enter</kbd> (<kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line).
+- Answers stream in. Every action shows up as a card; open it to see its arguments, its result and how long it took.
+- **Stop** ends the response at any point. **Retry** asks again from your last message.
+- The model picker under the message box switches between your providers.
+- **New chat** starts over; the history button reopens the last 30 chats. Chats are stored on your device.
 
-## Main Stack
+When the model accepts images, Agent can look at a snapshot of the canvas to check its work.
 
-- Frontend: React 18, TypeScript, Vite
-- Global state: Easy Peasy
-- UI: Tailwind CSS v4, DaisyUI, Radix UI, shadcn/ui
-- Canvas interaction: `react-moveable`, `react-infinite-viewer`
-- Lightweight persistence: `localforage`
-- Desktop: Electron, plus signs of Tauri/Capacitor integration
-- Exporting: `html-to-image`
+## Model providers
 
-## Key Folders
+Open **Agent settings** (gear in the panel, or the command palette) and add a provider:
 
-- `src/`: main web/editor app
-- `src/pages/`: main screens such as `Editor` and `ProjectWizard`
-- `src/components/`: canvas, blocks, panels, modals, and reusable controls
-- `src/stores/AppStore.ts`: global state, history, workspaces, controls, and main actions
-- `src/utils/`: exporting, platform utilities, helper lists, and static data
-- `src/models/Extension.ts`: TypeScript contract for extensions
-- `docs/plugin_system.md`: functional documentation for the plugin system
-- `src-electron/`: main process/preload for the Vite-based Electron variant
-- `electron/`: additional/legacy Electron implementation based on Capacitor; do not assume both runtime paths are equally active without checking
+| Provider          | Base URL                                    | Key      | Notes                                           |
+| ----------------- | ------------------------------------------- | -------- | ----------------------------------------------- |
+| Anthropic         | `https://api.anthropic.com`                 | Required |                                                 |
+| OpenAI            | `https://api.openai.com/v1`                 | Required |                                                 |
+| Google Gemini     | `https://generativelanguage.googleapis.com` | Required |                                                 |
+| OpenRouter        | `https://openrouter.ai/api/v1`              | Required | Any model on OpenRouter                         |
+| Ollama            | `http://localhost:11434/v1`                 | No       | Local models                                    |
+| LM Studio         | `http://localhost:1234/v1`                  | No       | Local models                                    |
+| OpenAI-compatible | your server                                 | Optional | Any server that speaks the Chat Completions API |
 
-## App Flow
+**Browse** lists the models of the provider, and **Test connection** checks the base URL and key. Pick a model that supports tool calling; small local models may struggle with multi-step edits.
 
-1. `src/main.tsx` mounts `App` inside `StoreProvider`.
-2. `src/App.tsx` initializes theme/context and lazy-loads `Editor`.
-3. `src/pages/Editor.tsx` composes the main layout:
-   - infinite viewer
-   - workspace
-   - left/right panels
-   - status bar
-4. `src/components/Workspace.tsx` renders the active canvas and connects `Moveable`.
-5. Actual blocks are materialized through `ControlHandler` and the components in `src/components/Blocks/`.
+### Web version and CORS
 
-## State Source of Truth
+The web app calls providers straight from the browser. Anthropic, OpenAI, Gemini and OpenRouter allow it. For local servers:
 
-The source of truth is `src/stores/AppStore.ts`.
+- **Ollama**: allow the site with the `OLLAMA_ORIGINS` environment variable (set it to the address of the site, for example `OLLAMA_ORIGINS=https://example.github.io`) and restart Ollama.
+- **LM Studio**: turn on **Enable CORS** in the server settings.
+- **Other servers**: enable CORS on the server, or use the desktop app.
 
-It contains:
+The desktop app sends provider requests from its main process, so CORS never applies there.
 
-- `workspaces`
-- `currentWorkspaceID`
-- `ControlProperties` and `initialProperties`
-- selected control `currentControlID`
-- history via `pastHistory` / `futureHistory`
-- editing flags such as `drag`, `crop`, `warp`, `isDrawing`, `isErasing`
+## API keys
 
-When changing editor behavior, check first whether the change should go through a store action instead of only using local React state.
+Keys never leave your device except in requests to their provider, and they are never logged.
 
-## How the Editor Models Elements
+- **Desktop app**: keys are encrypted with the system keychain and only decrypted by the main process when it sends a request. The page cannot read them back, and a key only works with the base URL it was saved for. If you change the base URL, save the key again.
+- **Web app**: keys are stored in this browser (IndexedDB).
 
-- Each control has an id like `<type>-<random>`
-- Many properties are stored as `History` entries with ids like `<controlId>-<property>`
-- The active workspace holds the list of controls, but their properties live separately in `ControlProperties`
+## Undo
 
-That means duplicating, importing, or deleting controls usually requires touching both layers:
+Everything Agent does in one response is **one undo step**: press <kbd>Ctrl</kbd> + <kbd>Z</kbd> on the canvas, or **Undo changes** under the response. Changes made by MCP clients undo one tool call at a time. Your own edits made while Agent works are never merged into its step.
 
-- the controls list
-- the associated properties
+## Tools
 
-## Extension System
+Agent and the MCP server share the same tools:
 
-Extensions are not compiled into the repo; they are loaded at runtime through Electron.
-
-Important touchpoints:
-
-- `src/components/Panels/ExtensionsPanel.tsx` listens for IPC events and displays extensions
-- `src/models/Extension.ts` defines the expected shape
-- `docs/plugin_system.md` documents packaging
-- `src-electron/main.ts` reads `.kext` files from `%APPDATA%/karbonized/extensions`
-
-Expected extension structure:
-
-```text
-my-plugin/
-  components/
-    component1.jsx
-    component1.json
-    component1.png
-  info.json
-```
-
-At runtime, the app consumes objects shaped like:
-
-```ts
-interface Extension {
-  logo: string;
-  info: {
-    name: string;
-    author: string;
-    description: string;
-    version: string;
-  };
-  components: Array<{
-    properties: { name: string };
-    code: string;
-    image: string;
-  }>;
-}
-```
-
-## Exporting and Platforms
-
-- `src/utils/Exporter.ts` exports `png`, `jpeg`, and `svg`
-- On web, it downloads through a temporary `a` element
-- On native environments, it uses Tauri APIs
-
-The codebase contains mixed support for multiple targets:
-
-- web/PWA
-- Electron
-- Tauri/Capacitor
-
-Before refactoring platform integration, verify which runtime path is actually used by the target user flow.
-
-## Useful Commands
-
-- `yarn dev`: web development
-- `yarn electron:dev`: desktop development with Electron
-- `yarn build`: web build
-- `yarn electron:build`: desktop build
-- `yarn lint`: lint `src`
-- `yarn format`: run Prettier on `src`
-
-## Practical Editing Conventions
-
-- Prefer small, localized changes; editor state is fairly coupled.
-- Review `AppStore.ts` before changing selection, duplication, undo/redo, or workspaces.
-- For new block types, inspect `src/components/Blocks/` and `ControlHandler` first.
-- For UI work, try to preserve consistency between legacy DaisyUI components and `src/components/ui/` components.
-- Use the `@/` alias when the surrounding file already follows that pattern; the repo mixes relative imports and alias-based imports.
-- Do not assume commented-out code is dead; some features are in transition, especially templates and desktop runtimes.
-
-## Visible Risks and Technical Debt
-
+| Tool                                   | What it does                                                                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_design_guide`                     | The design standards (sizes per platform, layout, type, color, HTML block rules, final checklist)                                    |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [yossdotpro/karbonized](https://github.com/yossdotpro/karbonized) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-13 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
