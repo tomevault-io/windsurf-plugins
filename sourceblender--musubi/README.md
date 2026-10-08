@@ -7,11 +7,11 @@ Musubi (結び) — Ai Agent shared memory and thought layer. The braiding of th
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [sourceblender/musubi](https://github.com/sourceblender/musubi).
+Original source: `AGENTS.md` in [sourceblender/musubi](https://github.com/sourceblender/musubi).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
