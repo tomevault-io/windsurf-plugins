@@ -7,11 +7,11 @@ Runtime authorization & audit layer for physical AI — T0–T3 tiers, capabilit
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [pshkv/sint-protocol](https://github.com/pshkv/sint-protocol).
+Original source: `AGENTS.md` in [pshkv/sint-protocol](https://github.com/pshkv/sint-protocol).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
