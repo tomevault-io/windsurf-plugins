@@ -7,13 +7,13 @@ Share what you do, in real time
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [nowly-presence/nowly](https://github.com/nowly-presence/nowly).
+Original source: `CLAUDE.md` in [nowly-presence/nowly](https://github.com/nowly-presence/nowly).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
