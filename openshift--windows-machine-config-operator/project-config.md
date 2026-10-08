@@ -1,163 +1,93 @@
 ---
 trigger: always_on
-description: The Windows Machine Config Operator (WMCO) configures Windows Server instances as worker nodes in OpenShift/OKD clusters, enabling Windows container workloads.
+description: This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 ---
 
-# AGENTS.md
+# Agent Guide for opentelemetry-go
 
-## Project Overview
+This file contains active, task-oriented instructions for autonomous and semi-autonomous coding agents working in this repository.
 
-The Windows Machine Config Operator (WMCO) configures Windows Server instances as worker nodes in OpenShift/OKD clusters, enabling Windows container workloads.
+Before starting any task, read `.github/copilot-instructions.md`, `CONTRIBUTING.md`, and this file.
+Treat `.github/copilot-instructions.md` as global passive guidance for every task, including docs-only and review-only work.
 
-**Architecture:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    OpenShift Cluster                        │
-├────────────────────────┬────────────────────────────────────┤
-│   Linux Control Plane  │        Windows Worker Nodes        │
-│  ┌──────────────────┐  │  ┌──────────────────────────────┐  │
-│  │  WMCO Operator   │──┼──│  WICD (daemon)               │  │
-│  │  - Controllers   │SSH│  │  - Service reconciliation    │  │
-│  │  - CSR Approval  │  │  │  - Certificate rotation      │  │
-│  └──────────────────┘  │  │  - Environment management    │  │
-│                        │  └──────────────────────────────┘  │
-│                        │  ┌──────────────────────────────┐  │
-│                        │  │  Windows Components          │  │
-│                        │  │  kubelet, containerd,        │  │
-│                        │  │  kube-proxy, hybrid-overlay  │  │
-│                        │  └──────────────────────────────┘  │
-└────────────────────────┴────────────────────────────────────┘
-```
+## Core expectations
 
-**Provisioning Modes:**
-- **Machine API**: Create Windows VMs via MachineSets, auto-configured by WMCO
-- **BYOH**: Define existing instances in `windows-instances` ConfigMap
+- Preserve OpenTelemetry specification compliance, API stability, and idiomatic Go.
+- Prefer minimal, surgical changes over broad refactors or speculative cleanup.
+- Read the package you are editing and match its existing naming, option types, error handling, comments, tests, and concurrency patterns.
+- Keep public APIs backward compatible unless the task explicitly requires a breaking change.
+- Keep telemetry resilient and loosely coupled. Do not introduce behavior that can unexpectedly interfere with host applications.
+- Inspect boundaries carefully: input validation, resource limits, cancellation, shutdown, error propagation, concurrency, and memory growth.
+- Prefer fail-safe behavior and explicit invariants over implicit assumptions.
+- Keep dependencies minimal and justified.
+- Preserve host-application safety: telemetry should not panic, block indefinitely, or amplify attacker-controlled input.
+- Be conservative on hot paths. Avoid unnecessary allocations, reflection, interface churn, blocking, global state, and high-cardinality telemetry.
+- Write comments only for intent, invariants, and non-obvious constraints. Do not add comments that restate the code.
 
-**Tech Stack:** Go 1.24+, Kubernetes Operator (controller-runtime), OpenShift APIs, Windows Server 2019/2022
+## Default workflow
 
----
+For new features and behavior changes, use this order unless the task explicitly says otherwise:
 
-## Product Overview
+1. Read the relevant package, its tests, and any package docs or `README.md`.
+2. Add or update a failing unit test that captures the required behavior or regression.
+3. Implement the smallest change that makes the test pass.
+4. Refactor only after the behavior is locked in, and only if the refactor keeps the diff focused.
+5. If the changed code is on a hot path or performance-sensitive, inspect existing benchmarks and run them. Add a benchmark if coverage is missing.
+6. Update documentation artifacts as needed while the context is fresh. Follow the documentation and changelog conventions below for the specific updates required.
+7. Run `make precommit` each time before considering the work complete.
 
-Red Hat OpenShift support for Windows Containers is a layered component of OpenShift that allows the integration of Windows Nodes for running Windows Containers on an OpenShift 4 Cluster.
+For docs-only, test-only, or review-only tasks, still start with the required repository guidance above, then skip the workflow steps that do not apply while keeping the same discipline around scope, verification, and repository conventions.
 
-This is achieved by installing the Windows Machine Config Operator (WMCO), which runs on Linux based control-plane nodes. The WMCO bootstraps Windows nodes to join the cluster as Windows worker nodes.
+## Verification
 
-### Subscription Requirements
+- Use `make` as the canonical repository verification command. The default target is `precommit`.
+- `make precommit` is the expected final verification step for linting, generation, README checks, module checks, and tests.
+- During iteration, targeted commands are fine for fast feedback, but do not stop there if the task changes code.
+- If you touch performance-sensitive code, run focused benchmarks and compare the results using `benchstat` in addition to `make`.
 
-Windows Containers requires a specific subscription, in addition to an OpenShift Container Platform subscription:
-- **Worker nodes only** - Control plane and infrastructure nodes don't need a paid subscription for Windows Containers
-- When working cases, verify entitlement mapping to ensure compliance
+## Documentation and changelog
 
-### Entitlement Validation
+- Non-internal, non-test packages should have Go doc comments, usually in `doc.go`.
+- Non-internal, non-test, non-documentation packages should also have a `README.md` with at least a title and a `pkg.go.dev` badge.
+- Prefer examples over long code snippets in GoDoc when practical.
+- Keep docs aligned with actual behavior. Do not leave stale comments, stale examples, or stale package documentation behind.
+- For user-visible changes, update `CHANGELOG.md` under the appropriate `Added`, `Changed`, `Deprecated`, `Fixed`, or `Removed` section within `## [Unreleased]`.
 
-Look for the **"for Windows"** phrase in the entitlement name.
+## Repository habits
 
-**Example Entitlements:**
-- `MW01465`: Red Hat OpenShift Container Platform, Standard (2 Cores or 4 vCPUs, for Windows)
-- `MW01615`: Red Hat OpenShift Container Platform, Premium (2 Cores or 4 vCPUs, for Windows)
+- Prefer focused diffs. Avoid drive-by cleanup.
+- Follow existing option patterns and exported API conventions instead of inventing new abstractions.
+- Generated files are checked in. If your change affects generation, keep generated output up to date.
+- Prefer fast local search tools such as `rg` when exploring the repository.
+- When changing behavior, make the invariants explicit in tests.
 
----
+## Personas
 
-## Requesting Engineering Assistance
+### Feature Agent
 
-### Jira Projects
+Use this persona for new behavior, new API surface, or spec-driven feature work.
 
-| Project | Purpose | Link |
-|---------|---------|------|
-| OpenShift Bugs (OCPBUGS) | Bug reports | [Red Hat Issue Router](https://access.redhat.com/labs/rhir/) → "Windows Containers" component |
-| Windows Containers (WINC) | Engineering tracking | [issues.redhat.com/projects/WINC](https://issues.redhat.com/projects/WINC/issues/) |
-| RFE | Feature requests | [issues.redhat.com/project/RFE](https://issues.redhat.com/project/RFE) → "Windows Containers" component |
-| Portfolio Backlog | Roadmap/planning | [Portfolio Plan View](https://issues.redhat.com/secure/PortfolioPlanView.jspa?id=1226&sid=1226&vid=4843#plan/backlog) |
+- Start with a failing unit test.
+- Confirm the expected behavior against the spec, existing package behavior, and public API compatibility.
+- Implement the smallest viable change.
+- Update GoDoc, examples, `README.md`, and `CHANGELOG.md` when the change is user-visible.
+- If the feature touches a hot path, check benchmarks and add one if the coverage is missing.
 
-### Creating a Bug Report
+### Refactoring Agent
 
-Search for the **"Windows Containers"** component on the [Red Hat Issue Router](https://access.redhat.com/labs/rhir/), then create a bug with:
+Use this persona when improving structure without intentionally changing behavior.
 
-1. **Detailed explanation** of the issue including:
-   - Troubleshooting steps already taken
-   - Any recent changes to the cluster
-   - Relevant contextual information
-2. **Link to customer case** (if one exists)
-3. **Must-gather archive** recently generated on the cluster
-4. **Command outputs** (not present in older must-gather archives):
+- Treat behavior preservation as the default contract.
+- Add or tighten tests before moving code if current behavior is not already pinned down.
+- Avoid broad rewrites, clever abstractions, or package-wide cleanup unless explicitly requested.
+- If a refactor touches a hot path, benchmark before and after.
+- Keep API shape, semantics, concurrency guarantees, and failure modes unchanged unless the task says otherwise.
 
-```bash
-oc get network.operator cluster -o yaml
-oc logs -f deployment/windows-machine-config-operator -n openshift-windows-machine-config-operator
-```
+### Test Agent
 
-5. **MachineSet object** describing Windows instances (if using Machine API/IPI)
-6. **windows-instances ConfigMap** (if using BYOH method)
-
-### Bug Report Template
-
-Use this template when filing bugs in **OpenShift Bugs (OCPBUGS)** with **Component: Windows Containers**:
-
-```
-Description of problem:
-{code:none}
-    
-{code}
-
-Version-Release number of selected component (if applicable):
-{code:none}
-    
-{code}
-
-How reproducible:
-{code:none}
-    
-{code}
-
-Steps to Reproduce:
-{code:none}
-    1.
-    2.
-    3.
-{code}
-
-Actual results:
-{code:none}
-    
-{code}
-
-Expected results:
-{code:none}
-    
-{code}
-
-Additional info:
-{code:none}
-    
-{code}
-```
-
-### Reaching Out on Slack
-
-Slack is a **supplement** to bug reports in Jira. Only reach out if:
-- A bug is already filed
-- The issue hasn't received a prompt response
-
-**Channel:** `#forum-ocp-winc` (CoreOS Slack)
-**Tag:** Use only `@winc-watcher` to get the team's attention
-Do NOT use `@here` or `@everyone`
-
----
-
-## Setup Commands
-
-### Build
-- `make build` - Build operator binary
-- `GOOS=windows make build-daemon` - Build Windows daemon (WICD)
-- `make build-all` - Build everything
-
-### Test
-- `make unit` - Run all unit tests
-- `go test -v ./pkg/nodeconfig/...` - Test specific package
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openshift/windows-machine-config-operator](https://github.com/openshift/windows-machine-config-operator) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-06 -->
