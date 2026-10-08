@@ -7,11 +7,11 @@ Stop building CMS infrastructure from scratch. This starter gives you a full con
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [buildlabs-io/payload-cms](https://github.com/buildlabs-io/payload-cms).
+Original source: `AGENTS.md` in [buildlabs-io/payload-cms](https://github.com/buildlabs-io/payload-cms).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
