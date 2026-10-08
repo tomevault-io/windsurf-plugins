@@ -7,11 +7,11 @@ Local-first knowledge compiler for humans and agents. Inspired by Karpathy's vis
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [The-Vibe-Company/granite](https://github.com/The-Vibe-Company/granite).
+Original source: `AGENTS.md` in [The-Vibe-Company/granite](https://github.com/The-Vibe-Company/granite).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
