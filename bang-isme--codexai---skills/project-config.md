@@ -1,11 +1,10 @@
 ---
 trigger: always_on
-description: CodexAI core routing. Load codex-master-instructions first, then the smallest matching skill.
+description: <!-- codexai-agentic-workflow:start -->
 ---
 
-
 <!-- codexai-agentic-workflow:start -->
-# CodexAI Core
+# AGENTS.md
 
 ## CodexAI Workflow Defaults
 
