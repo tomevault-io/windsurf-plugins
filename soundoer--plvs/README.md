@@ -7,11 +7,11 @@ Real-time audio metering desktop app. Free and open source, for Windows and macO
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [SounDoer/PLVS](https://github.com/SounDoer/PLVS).
+Original source: `AGENTS.md` in [SounDoer/PLVS](https://github.com/SounDoer/PLVS).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
