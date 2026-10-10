@@ -1,84 +1,95 @@
 ---
 trigger: always_on
-description: - **Never push directly to main.** Always use a feature branch and open a PR.
+description: The release steps are in [RELEASE.md](../../RELEASE.md). This file gives the rules that a
 ---
 
-# AGENTS.md — Home Keeper
 
-## Workflow
+# CHANGELOG and release rules
 
-- **Never push directly to main.** Always use a feature branch and open a PR.
-- Wait for CI (tests, HACS validation, code review) and approval before merging.
-- **Always squash merge PRs.**
-- **CHANGELOG.md** — update for every user-facing change before tagging a release.
-  Developer-only changes (CI config, AGENTS.md, IDEAS.md) don't need entries.
-- **A stable release's `## [X.Y.Z]` notes describe what changed since the last
-  _stable_ release — not since its betas.** When cutting `X.Y.Z` from an `X.Y.ZbN`
-  line, write the section for someone upgrading from the previous stable version and
-  roll the beta work into Added/Changed/Fixed as they'd perceive it. A feature
-  introduced over the betas is **Added** (even if a later beta changed how it worked
-  mid-stream); don't carry beta-to-beta framing — e.g. a `### Changed` for something
-  that didn't exist in the last stable — into the stable section. **Include a `###
-  Fixed` section listing every GitHub issue closed by commits since the last stable**
-  — check the git log for `(Fixes #N)` / `(#N)` references and link each issue number
-  so they auto-close on merge (`Fixes #N` in the CHANGELOG entry).
-- **Beta versioning — always use the next release number.** After every stable
-  `X.Y.0` ships, immediately bump `manifest.json` and `const.py` (`PANEL_VERSION`)
-  to `X.(Y+1).0b1` on `main`, and rename the `## [Unreleased]` CHANGELOG section to
-  `## [X.(Y+1).0b1]`. Beta iterations go `b1 → b2 → …` until the stable
-  `X.(Y+1).0` is cut. **Never use `X.Y.0bN` after `X.Y.0` has shipped** — PEP 440
-  sorts those below the stable version, so HACS would offer the stable as an
-  "upgrade" to anyone on the beta, which feels like a downgrade.
-- **Always cut a beta release for a new feature.** A PR that adds a user-facing
-  feature must bump to the next beta in the same change — `manifest.json` +
-  `const.py` (`PANEL_VERSION`) to the next `bN`, with a matching `## [X.Y.0bN]`
-  CHANGELOG section — so the work ships to beta testers via HACS rather than waiting
-  on the floor. (If the current top CHANGELOG section is an already-released beta,
-  open the next `bN`; if it's an unreleased beta still being iterated, fold the
-  feature into it.) Bug-fix-only / developer-only PRs don't need a fresh beta.
-- **Always add the `preview-release` label to a new-feature PR.** As soon as the PR
-  is open, apply the `preview-release` label so `preview-release.yml` publishes an
-  installable ephemeral pre-release (`X.Y.Z.dev<pr>`) from the PR head — testers can
-  try the feature via HACS *before* merge. The build is ephemeral and auto-deletes
-  when the PR closes (see RELEASE.md → "Preview releases"). Bug-fix-only /
-  developer-only PRs don't need it.
-- **Always run tests locally before pushing.** Never use CI as the test runner.
-  - Pure-logic unit tests need only `pip install pytest`: `pytest tests/unit -v`.
-  - Full unit suite uses `pip install pytest-homeassistant-custom-component`.
-- **Mutation testing gates every PR** at an 80% mutation score on the code the PR
-  changed — see "Mutation testing" below. It is too slow for the
-  run-before-you-push loop; run it when you touch the mutable surface.
-- **User-facing prose is linted for AI-tell phrasing.** `lint.yml`'s `vale` job runs
-  the [vale-ai-tells](https://github.com/tbhb/vale-ai-tells) Vale style (pinned in
-  `.vale.ini`) over `README.md`, `CHANGELOG.md`, the canonical `docs/*.md` (not the
-  scratch `*_PLAN.md`/research docs), `website/docs/intro.md`, `strings.json`,
-  `services.yaml`, and the English frontend locale (`locales/en.json`), catching
-  things like "delve", "it's important to note", em-dash overuse, and other
-  AI-writing tells. **It's diff-scoped** (`filter_mode: added`): only lines your PR
-  touches are checked, so it's a real gate on new prose without failing on the
-  existing backlog. Run it locally with `vale sync && vale <paths>` (Vale CLI from
-  [github.com/errata-ai/vale releases](https://github.com/errata-ai/vale/releases)).
-  For an accepted false positive, either disable the rule for that file in
-  `.vale.ini` (`ai-tells.RuleName = NO`) or wrap the exception inline with
-  `<!-- vale ai-tells.RuleName = NO -->` / `<!-- vale ai-tells.RuleName = YES -->`.
-  Diff-scoping only checks added/changed lines, so a wholesale rewrite of a file's
-  prose (not just a small edit) can surface pre-existing hits on lines that just
-  moved. Run `vale <file>` on the whole file yourself before a rewrite-style PR to
-  catch those ahead of CI. There's no automated version-bump for the pinned
-  `ai-tells.zip` release in `.vale.ini` (Dependabot/Renovate don't track raw
-  GitHub release URLs), so bump it by hand occasionally, e.g. alongside the next
-  full-corpus cleanup pass.
-- **Every PR that touches the panel UI MUST include screenshots — no exceptions.**
-  This is a hard gate: a UI change is not reviewable (or mergeable) until the PR
-  body embeds current screenshots of the changed surface. The capture harness is
-  `tests/e2e/screenshots.capture.ts` (the test) driven by `screenshots.config.ts`
-  (the config — **pass this one to `--config`**, not the test file itself).
-  Step-by-step:
-  ```bash
-  # 1. Start HA and leave it running (from repo root)
+The release steps are in [RELEASE.md](../../RELEASE.md). This file gives the rules that a
+feature PR must follow so that its work ships.
+
+## CHANGELOG entries
+
+- Update `CHANGELOG.md` for every user-facing change. Developer-only changes (CI config,
+  `AGENTS.md`, `IDEAS.md`, the rules) need no entry.
+- **One bullet, 3 sentences at most, for the whole bullet.** The bold lead counts as the
+  first sentence. Then write what a user notices. Then a caveat or `(Fixes #N)` if one is
+  needed. Never write a second paragraph.
+- Cut the worked example, the before-and-after story, the list of surfaces that show the
+  new value, and the inventory of new service fields and attributes. That detail goes in
+  `docs/guide/`, `docs/`, or the PR body.
+- **The bullet says what a user gets.** Do not narrate the mechanism: which buttons the
+  feature hides or shows, what it rewrites, which fields it adds. If a trimmed bullet
+  loses a real fact, split it into 2 bullets. Do not grow 1 bullet.
+- Every bullet is user-facing text. It follows [writing-style.md](writing-style.md)
+  and the vale `ai-tells` style.
+
+### The bold lead
+
+- **The lead is a label.** It is a short noun phrase of 2 to 5 words, 8 at most:
+  `**Declarative companions.**`, `**Snooze and skip.**`.
+- **Write it as a heading.** Drop the articles and prepositions: `**Seasonal tasks.**`,
+  not `**Seasons on a task.**`. If a lead still has "a", "the", "of", "on", or "for",
+  try again.
+- A lead that opens `Home Keeper can now…`, `A user can now…`, `The panel now…` or
+  `Give a task…` narrates. Cut it back to the noun.
+- The lead must stand alone. `summarize()` in `ci/release-issues.py` quotes the whole
+  bullet into the comment that an issue reporter gets, and the lead comes first.
+- **An `### Added` lead links its documentation**, with the bold outside the link:
+  `**[Import and export](https://prestomation.github.io/ha-home-keeper/docs/guide/import-export).**`.
+  Use the absolute site URL. A guide page is `.../docs/guide/<slug>`, where the slug is the
+  `USER_SECTIONS` entry in `website/scripts/doc-map.mjs`. Link the nearest page that says
+  what the feature does, never the README.
+- A `### Fixed` or `### Changed` lead can link the same way. It does not have to.
+- Nothing validates these URLs, so copy the shape of a link that is already live. A link
+  to a page that the release adds 404s for beta testers until a stable ships, because
+  `deploy-docs` in `release.yml` runs only for a stable. Write the link in the feature PR
+  anyway.
+
+### Issues and credits
+
+- **`(Fixes #N)` in a version's section is what notifies and closes the issue.**
+  `release.yml`'s `notify-issues` job comments on every issue that the shipped section
+  names, and closes it on a stable. An issue left out is never told and never closes.
+- Only the closing keyword counts. `(Related to #N)` and a bare `(#N)` are ignored,
+  because `(#N)` is also the squash-merge PR number.
+- Put `(Fixes #N)` in the bullet's **first** paragraph. `ci/release-issues.py` quotes the
+  bullet where the reference first appears. Change the format there, not in the workflow.
+- **Credit an outside contributor** with `(Thanks @user!)` at the end of the bullet,
+  after `(Fixes #N)`. The credit is outside the 3-sentence budget. An outside contributor
+  has no write access when the PR opens. If a maintainer and a contributor share the work,
+  the contributor gets the credit. `summarize()` removes the credit from the issue comment.
+- **Link an issue from a PR with `Fixes #N`.** Closing on merge is off for this
+  repository, so the keyword fills the issue's Development panel and closes nothing. The
+  release that ships the fix closes the issue.
+
+## Stable sections
+
+- A stable `## [X.Y.Z]` section describes the changes since the last **stable**, for a
+  user who upgrades from it. Roll the beta work into Added, Changed and Fixed as that user
+  sees it. A feature that the betas introduced is **Added**, even if a later beta changed it.
+- Include a `### Fixed` section with every issue that commits since the last stable fixed.
+  Search the git log for `(Fixes #N)` and write each one as `(Fixes #N)`. `notify-issues`
+  posts a CI warning for an issue that a commit named and the section forgot.
+
+## Versions and betas
+
+- `manifest.json` `version` is the source of truth. `const.py` `PANEL_VERSION` must match.
+  A `bN`, `aN` or `rcN` suffix ships as a GitHub pre-release, which is the HACS beta channel.
+- **Use the next release number for a beta.** After stable `X.Y.0` ships, bump `main` to
+  `X.(Y+1).0b1` at once and rename `## [Unreleased]` to `## [X.(Y+1).0b1]`. Never cut
+  `X.Y.0bN` after `X.Y.0`: PEP 440 sorts it below the stable, so HACS offers the stable
+  to beta users as an upgrade.
+- **A new feature cuts a beta.** The feature PR bumps `manifest.json` and `PANEL_VERSION`
+  to the next `bN` and adds a matching `## [X.Y.0bN]` section. If the top section is an
+  unreleased beta, fold the feature into it. If that beta is already tagged, open the next
+  `bN`. A bug-fix or developer-only PR needs no new beta.
+- `release.yml` skips a version that is already tagged and says nothing. So
+  `lint.yml`'s `changelog-release-gap` job (`ci/check-changelog-release-gap.py`) fails a PR
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [prestomation/ha-home-keeper](https://github.com/prestomation/ha-home-keeper) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-12 -->
+<!-- tomevault:4.0:windsurf_rules:2026-10-07 -->
