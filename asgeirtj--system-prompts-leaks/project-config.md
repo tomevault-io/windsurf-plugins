@@ -22,4 +22,4 @@ Everything else: keep working.
 
 ---
 > Source: [asgeirtj/system_prompts_leaks](https://github.com/asgeirtj/system_prompts_leaks) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
