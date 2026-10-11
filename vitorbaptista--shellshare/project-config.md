@@ -1,60 +1,134 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > Contributing to this repository? See [CLAUDE.md](CLAUDE.md) for build,
 ---
 
-# CLAUDE.md
+# Using shellshare from scripts and AI agents
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> Contributing to this repository? See [CLAUDE.md](CLAUDE.md) for build,
+> lint, and test instructions. This file documents how to *use* shellshare
+> programmatically — e.g. an AI agent sharing a live terminal with its user.
 
-## Project Overview
+shellshare broadcasts a terminal session to a web link in one command. No
+signup, no configuration: run it, parse the link, hand the link to a human.
+Viewers see the terminal live in their browser, read-only.
 
-Shellshare is a live terminal broadcasting tool that allows users to share their terminal session via web links. The project is a complete Rust rewrite providing both client and server in a single binary.
-
-## Build & Development Commands
+## Install
 
 ```bash
-# Build
-make build                     # Same as above
-
-# Lint (pedantic clippy lints are enabled)
-make lint                      # Both clippy + check
-
-# Run locally
-cargo run -- server            # Start server on 0.0.0.0:3000
-cargo run -- server --port 8080 --host 127.0.0.1
-cargo run -- --server http://localhost:3000  # Run client
-cargo run -- serve             # Share via a local server on localhost:3000
-
-# E2E tests (Python + Playwright)
-# Requires a release binary: the suite starts its own servers from it
-cargo build --release
-cd e2e && uv sync && uv run pytest -n 10
+npx -y shellshare --help                 # no install (Node.js)
+curl -sLo shellshare https://get.shellshare.net/ && chmod +x shellshare   # static binary (auto-detects OS)
 ```
 
-## Architecture
+Binaries exist for Linux x64, macOS x64/arm64, and Windows x64
+(`https://get.shellshare.net/?os=linux|mac|mac-arm|windows`).
 
-**Dual-mode binary**: `shellshare` operates as client (default) or server (`shellshare server`). `shellshare serve` combines both: it boots the embedded server on a background thread (default `localhost:3000`, configurable via `--host`/`--port`) and runs the client against it, sharing the terminal with no external server. Both `serve` and `server` accept `--tunnel` (`src/tunnel.rs`): it spawns the user's pre-installed `cloudflared` against the local server, waits for the `https://*.trycloudflare.com` URL from its stderr banner, and uses it as the share link (the broadcaster still talks to localhost); missing cloudflared is a fatal error pointing at the install docs, and the tunnel process dies with shellshare.
+## The machine-readable contract: `--json`
 
-**Scripting surface**: `shellshare exec -- <cmd>` runs one command in the PTY (instead of a shell), broadcasts it, and exits with the command's exit code. The global `--json` flag switches stdout to newline-delimited JSON events: first one with event `sharing` (parse its `url` field), last `{"event":"end","exit_code":N}` (errors stay on stderr as `ERROR: ...`). This contract is documented in `AGENTS.md` and `public/llms.txt` and covered by `e2e/test_agents.py` - the three must stay in lockstep.
+With `--json`, shellshare prints newline-delimited JSON events to stdout:
 
-### Client (`src/cli/`)
-Multi-threaded design ensures network latency never blocks terminal display:
-- **PTY reader thread**: Captures shell output, displays locally, sends to the sender thread
-- **Sender thread**: Owns the WebSocket transport; coalesces whatever is queued and sends immediately (no pacing - frames are cheap)
-- **Stdin forwarder thread**: Routes user input to PTY
-- **Signal handler** (Unix): Handles SIGWINCH for terminal resize
+- First line, before any terminal output:
+  `{"event":"sharing","room":"<room>","server":"https://shellshare.net","url":"https://shellshare.net/r/<room>"}`
+- Last line: `{"event":"end","exit_code":0}`
 
-Key files:
-- `mod.rs`: Entry point, room ID generation, server URL handling, terminal size. Connecting the transport claims the room, so auth failures surface before the shell spawns
-- `script.rs`: PTY lifecycle, raw terminal mode, shell spawning
-- `ws.rs`: WebSocket transport. Binary frames carry raw terminal bytes; JSON text frames carry control messages (`size`, `delete`). Reliability: output stays in a bounded replay buffer until the server acks it (`{"ack": n}`, cumulative per-connection bytes); on failure the client reconnects with backoff and replays everything unacked (at-least-once delivery). Only authorization errors are fatal
-- `crypto.rs`: end-to-end encryption, on by default (opt out with `--disable-encryption`). Every output chunk is sealed into a self-delimiting AES-256-GCM record (`[u32 BE len][nonce][ciphertext+tag]`) as it enters the replay buffer, so acks/replay operate on ciphertext and the server stays an opaque relay (zero server changes - it never knew about encryption). The key is HKDF-derived from this machine's id and the room name (so a named room keeps one reusable share link across restarts; nothing is written to disk) and rides only in the link's `#fragment`. The `size` message carries `encrypted: true` so the viewer knows whether to decrypt (via WebCrypto, needs https or localhost) or render plaintext, and shows an explanatory notice when an encrypted link's fragment is missing/invalid/wrong or the context is insecure. `--disable-encryption` broadcasts plaintext for viewers on plain HTTP (a classroom LAN), where browsers have no WebCrypto. Record format must stay in lockstep with `templates/room.html`. Threat model (honest-but-curious server serving the unmodified page; key secrecy rests on the high-entropy machine id; metadata/timing still visible) is documented in `crypto.rs`
+Errors are printed to stderr as `ERROR: ...` and the process exits non-zero.
+Parse the `url` field from the first stdout line — that is the link to give
+to your user.
 
-### Server (`src/server/`)
+## Recipes
+
+**Share one command and exit when it finishes** (the usual agent case —
+e.g. let the user watch a long build, test run, or migration live):
+
+```bash
+shellshare exec --json -- npm test
+```
+
+`exec` runs the command in a PTY, streams it live, and exits with the
+command's exit code (a signal-killed command reports exit code 1). Note
+the `--` separator before the command.
+
+**Stream a log or pipe** (no PTY; a non-TTY stdin auto-detects this and reads
+stdin until EOF):
+
+```bash
+tail -f build.log | shellshare --json
+```
+
+**Background it and capture the URL while you keep working:**
+
+```bash
+shellshare exec --json -- ./long-task.sh </dev/null >/tmp/ss.out 2>/tmp/ss.err &
+until URL=$(head -1 /tmp/ss.out | jq -re .url) 2>/dev/null; do sleep 0.2; done
+echo "Watch live: $URL"
+```
+
+(The `</dev/null` matters when backgrounding from an interactive shell:
+without it the broadcast keeps the TTY as stdin and job control suspends
+it with SIGTTIN.)
+
+**Stable room name across restarts** (same link every time):
+
+```bash
+shellshare exec --json -r my-room -W my-password -- make deploy
+```
+
+Without `-W`, the machine's MAC address is the password, so the same room
+is only reclaimable from the same machine.
+
+**Fully local / private** — `shellshare serve` runs the broadcast through an
+embedded server on localhost (nothing leaves the machine); add `--tunnel` to
+get a public `https://*.trycloudflare.com` link without using shellshare.net
+(requires `cloudflared` installed).
+
+**Recover the link from inside a session** — `shellshare status` re-prints
+the current broadcast's link (and QR code). With `--json` it prints a single
+object `{"url":"...","room":"..."}`; outside a live session it prints
+`ERROR: ...` to stderr and exits non-zero. It reads the link from the
+`SHELLSHARE_URL` environment variable the broadcaster exports into the shell
+it spawns, so it only works from within that shell.
+
+## Reading a broadcast (read-only consumer)
+
+The inverse of broadcasting: an agent can *watch* a shellshare broadcast
+read-only — e.g. tail a build or dev server you started, or watch a
+human's terminal — without the shellshare CLI. Given a share link
+`https://shellshare.net/r/<room>#<key>`, the key after `#` is a URL
+fragment the server never sees, so you decrypt locally (Node's built-in
+`crypto`/`WebSocket`, no install):
+
+- **Snapshot** (current state): `GET /r/<room>.bin` returns the room's
+  accumulated history as raw bytes — opaque ciphertext, since the server
+  is an end-to-end-encryption-blind relay. Decrypt with the `#` key.
+- **Follow** (live): open a WebSocket to `/ws/v/r/<room>`. On connect the
+  server sends the catch-up snapshot, then live frames. Binary frames are
+  ciphertext records; text frames are control JSON you can ignore.
+
+Both are a sequence of self-delimiting records:
+`[u32 BE N][12-byte nonce][ciphertext || 16-byte GCM tag]`, where
+`N = 12 + len(ciphertext || tag)`, AES-256-GCM, key = the 64 hex chars
+after `#`. Concatenate the decrypted plaintexts to rebuild the terminal
+stream; strip ANSI escapes and fold CRLF line endings to LF for a clean
+log (the stream is terminal output, so lines end in CRLF - as a PTY
+produces - regardless of how the broadcast was fed).
+
+Ready-to-run reference decoders (Node, zero install) are in
+[`agent/`](agent/): `decrypt.mjs` (snapshot) and `follow.mjs` (live, with
+`--seconds`/`--idle`/`--until` bounds and a background-tail mode).
+
+## Behavior worth knowing
+
+- One-way only: viewers cannot send input to the terminal.
+- The share link is unguessable (18 random alphanumerics) but public —
+  anyone with the link can watch. Don't broadcast secrets.
+- Broadcasts are live-only and not recorded; rooms are deleted when the
+  broadcast ends (or after a period of inactivity).
+- Late joiners see recent history, so the page is not blank if the user
+  opens the link mid-run.
+- Transient network failures are handled: output is buffered and replayed
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [vitorbaptista/shellshare](https://github.com/vitorbaptista/shellshare) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-25 -->
