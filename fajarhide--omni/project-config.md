@@ -1,165 +1,93 @@
 ---
 trigger: always_on
-description: This file is for AI assistants (Claude, Codex, etc.) and human contributors working on OMNI.
+description: Host mana yang Anda jalankan menentukan apa yang bisa dilakukan OMNI, dan
 ---
 
-# CLAUDE.md — OMNI Developer Guide
+# Agent yang didukung
 
-This file is for AI assistants (Claude, Codex, etc.) and human contributors working on OMNI.
+Host mana yang Anda jalankan menentukan apa yang bisa dilakukan OMNI, dan
+langit-langitnya milik host, bukan milik pipeline-nya. Halaman ini layak dibaca
+sebelum menilai apakah OMNI layak berada di sana.
 
-## Quick Reference
+## Tingkatannya
 
-```bash
-cargo build              # Build debug binary
-cargo build --release    # Build release binary
-cargo test               # Run all tests
-cargo test <module>      # Run specific module tests
-cargo insta review       # Review snapshot test changes
-cargo clippy             # Lint
-cargo fmt                # Format
+| tingkat | host | yang Anda dapat |
+|---|---|---|
+| **Penuh** | Claude Code, Codex CLI, Gemini CLI, Aider (pipa) | Host menerapkan tulis ulang OMNI, jadi model membaca keluaran sulingan dari tool bawaannya sendiri. |
+| **Handoff dulu** | Cursor, Windsurf | Host tidak bisa menulis ulang keluaran tool bawaannya. `omni_run` menyuling apa pun yang dilewatkan melaluinya, dan `omni init --cursor` memasang aturan yang membuat agent meraihnya. |
+| **MCP saja** | Cline, Roo, OpenCode, VS Code, Zed, Copilot, Antigravity, Hermes, Pi | Ingatan, pemanggilan kembali dan keadaan sesi. Tanpa penyulingan shell, dan tanpa klaim soal itu. |
+
+```sh
+omni doctor     # mencetak tingkat untuk setiap host yang terpasang
 ```
 
-## Project Structure
+Penghematan hanya pernah dihitung di tempat model benar-benar menerima lebih
+sedikit. Host yang tidak bisa menerapkan tulis ulangnya tidak akan menggerakkan
+angka penyulingan sebaik apa pun penyaringnya, dan mengaku sebaliknya akan
+menjadi cacat yang sama dengan distiller yang melaporkan penghematan yang tidak
+ia lakukan.
 
-```
-src/
-├── main.rs              # CLI dispatch
-├── lib.rs               # Library re-exports for integration tests
-├── paths.rs             # Path resolution and discovery
-├── agents/              # Multi-agent support (Claude, Cursor, Copilot, etc.)
-├── cli/                 # Command-line interfaces
-│   ├── init.rs, stats.rs, doctor.rs, learn.rs, session.rs
-│   └── diff.rs, exec.rs, optimize.rs, reset.rs, rewind.rs, rewrite.rs, update.rs
-├── distillers/          # Content filtering logic by type
-│   ├── git.rs, build.rs, test.rs, cloud.rs, database.rs, jsts.rs
-│   └── readfile.rs, search.rs, security.rs, system_ops.rs, vcs.rs
-├── graph/               # Code graph indexing
-│   └── indexer.rs
-├── guard/               # Safety, security, limits, and trust bounds
-│   ├── config.rs, env.rs, limits.rs, trust.rs, update.rs
-├── hooks/               # Pipeline execution hooks
-│   ├── dispatcher.rs    # Universal hook router
-│   ├── pre_tool.rs, post_tool.rs, post_tool_failure.rs
-│   └── session_start.rs, session_end.rs, pre_compact.rs, pipe.rs
-├── mcp/                 # Model Context Protocol
-│   └── server.rs        # MCP server tools
-├── pipeline/            # Core processing pipeline
-│   ├── analyzer.rs, collapse.rs, registry.rs, scorer.rs, toml_filter.rs
-├── session/             # Session tracking and learning
-│   ├── tracker.rs, learn.rs, correction.rs
-├── store/               # Persistence layer
-│   └── sqlite.rs, transcript.rs
-└── util/                # Common utilities
-    └── command_family.rs, token_estimate.rs
+## Memasang untuk masing-masing
+
+```sh
+omni init --claude       omni init --cursor      omni init --zed
+omni init --cline        omni init --roo         omni init --roo-code
+omni init --copilot      omni init --gemini      omni init --opencode
+omni init --codex        omni init --openclaw    omni init --antigravity
+omni init --hermes       omni init --vscode      omni init --pi
+omni init --all
 ```
 
-## Pipeline Architecture
+## Catatan khusus per host
 
-```
-Input (raw tool output)
-  │
-  ▼
-┌─────────────────────────────────────────────┐
-│ Stage 1: Registry                           │
-│ registry::resolve_profile(command)          │
-│ (Matches command to specialized distiller)  │
-└─────────────┬───────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────┐
-│ Stage 2: Scorer                             │
-│ scorer::score_with_command(input, cmd, sess)│
-│ → Vec<OutputSegment> with relevance scores  │
-│ (Critical=1.0, Important=0.7, Noise=0.1)    │
-└─────────────┬───────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────┐
-│ Stage 3: Distiller                          │
-│ distillers::distill_with_command(...)       │
-│ → output_string                             │
-│ Filters noise                               │
-└─────────────┬───────────────────────────────┘
-              │
-              ▼
-Output (distilled signal)
-```
+**Codex CLI** hanya menjalankan hook yang sudah dinyatakan tepercaya, dan
+melewati sisanya tanpa sepatah kata. Setelah `omni init --codex`, jalankan
+`codex` sekali lalu setujui di bagian "Hooks need review". `omni doctor` gagal
+sampai Anda melakukannya. Ini pernah menggigit: Codex menjalankan nol hook
+selama satu rilis penuh sementara semuanya tampak terpasang dengan benar.
 
-1. Create `src/distillers/my_type.rs`:
-```rust
-use crate::pipeline::{OutputSegment, SessionState};
-use super::Distiller;
+**Cursor** tidak bisa menulis ulang keluaran tool shell bawaannya. Mencegat
+shell-nya dengan menolak eksekusi lalu mengembalikan keluarannya sebagai pesan
+hook secara teknis mungkin dan sudah ditolak: itu memberi tahu agent bahwa
+perintahnya diblokir, menghilangkan kode keluarnya, memindahkan semantik eksekusi
+ke dalam OMNI, dan melewati alur persetujuan host.
 
-pub struct MyDistiller;
+**Claude Code** mencocokkan lebih dari sekadar `Bash`. Pencocok post-tool-nya
+`Bash|Read|Grep|WebFetch`, dan itulah yang akhirnya membuat distiller pembacaan
+berkas, pencarian dan pengambilan web berjalan sama sekali. Tiga di antaranya
+sudah ditulis dan diuji sepenuhnya dan tidak pernah sekali pun berjalan di sesi
+sungguhan.
 
-impl Distiller for MyDistiller {
-    fn distill(
-        &self, 
-        segments: &[OutputSegment], 
-        input: &str,
-        session: Option<&SessionState>,
-    ) -> String {
-        // Extract and summarize the critical information
-        todo!()
-    }
-}
+**Hermes** punya halaman integrasinya sendiri:
+[Hermes Agent](../integrations/hermes.md).
+
+**Windows** didukung. Jalur, akhiran baris dan imbuhan `.exe` sudah ditangani,
+dan matriks CI-nya menyertakan `windows-latest`.
+
+## Beberapa agent sekaligus
+
+Beri masing-masing identitasnya sendiri supaya angkanya tetap bisa dipisah:
+
+```sh
+OMNI_AGENT_ID=claude ...
+OMNI_AGENT_ID=cursor ...
 ```
 
-2. Register in `src/distillers/mod.rs`:
-```rust
-pub mod my_type;
-// In get_distiller():
-ContentType::MyType => Box::new(my_type::MyDistiller),
-```
+`omni_agents` melaporkan agent mana yang sedang aktif di proyeknya. Setiap baris
+penyulingan membawa id-nya, dan angka apa pun yang mencampurnya sedang
+menggambarkan sebuah campuran, bukan sebuah produk.
 
-3. Add a fixture file in `tests/fixtures/my_type_example.txt`
+## Menambahkan sebuah host
 
-4. Add a snapshot test in `src/distillers/mod.rs`:
-```rust
-snapshot_test!(test_my_type_distillation, "my_type_example.txt", ContentType::MyType);
-```
+Modul agent-nya ada di `src/agents/`, satu berkas per host, dan masing-masing
+menulis format konfigurasi milik host itu di lokasi milik host itu. Polanya kecil
+dan sebagian besar mekanis.
 
-5. Run `cargo test` then `cargo insta review` to approve the snapshot.
-
-## How to Add a TOML Filter
-
-Create a file in `~/.omni/signals/my_signal.toml`:
-```toml
-schema_version = 1
-
-[filters.my_filter]
-description = "My custom filter"
-match_command = "^my-tool\\b"
-strip_lines_matching = ["^DEBUG", "^TRACE"]
-max_lines = 50
-
-[[tests.my_filter]]
-name = "basic test"
-input = "DEBUG: ignore\nIMPORTANT: keep"
-expected = "IMPORTANT: keep"
-```
-
-Verify with: `omni learn --verify`
-
-## Database Schema
-
-- **sessions**: Session state (id, timestamps, task/domain hints, state JSON)
-- **distillations**: Every distillation event (filter, input/output bytes, route, score, latency, agent_id)
-- **file_access**: Hot file tracking per session
-- **rewind_store**: Compressed content (SHA-256 hash → content, with retrieval counter)
-- **session_events (FTS5)**: Full-text searchable event index
-- **passthrough_events**: Telemetry for commands that bypass the pipeline
-- **unhandled_tools**: Telemetry for tools that OMNI doesn't yet support natively
-- **execution_traces**: Execution traces containing raw input and distilled output per command
-- **session_summaries**: Summarized metrics per session
-- **project_knowledge**: Cross-session semantic memory and knowledge
-- **agent_sessions**: Shared state tracking across multiple agents
-
-## Cross-Platform OS Best Practices
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Bagian yang tidak mekanis adalah verifikasinya. "Penyedia tidak bisa dihubungi"
+bukan alasan membiarkan sebuah jalur hook tak terverifikasi: sajikan API-nya, dan
+palsukan modelnya saja. Hook yang tidak pernah berjalan di produksi sudah
+ditemukan di tiga host justru dengan cara itu.
 
 ---
 > Source: [fajarhide/omni](https://github.com/fajarhide/omni) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-16 -->
