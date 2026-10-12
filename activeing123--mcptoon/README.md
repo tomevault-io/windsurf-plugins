@@ -5,25 +5,26 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [activeing123/mcptoon](https://github.com/activeing123/mcptoon).
+Original source: `GEMINI.md` in [activeing123/mcptoon](https://github.com/activeing123/mcptoon).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-## Bundled Skills (5)
+## Bundled Skills (6)
 
 - [mcptoon](https://github.com/activeing123/mcptoon/tree/main/skills/mcptoon/SKILL.md)
 - [mcptoon](https://github.com/activeing123/mcptoon/tree/main/claude-code-plugin/skills/mcptoon/SKILL.md)
 - [mcptoon](https://github.com/activeing123/mcptoon/tree/main/plugin/mcptoon-skills/skills/triage/SKILL.md)
 - [mcptoon](https://github.com/activeing123/mcptoon/tree/main/plugin/mcptoon-skills/skills/connect/SKILL.md)
 - [mcptoon](https://github.com/activeing123/mcptoon/tree/main/plugin/mcptoon-skills/skills/authoring/SKILL.md)
+- [mcptoon](https://github.com/activeing123/mcptoon/tree/main/src/mcptoon/skill/SKILL.md)
 
-From [activeing123/mcptoon](https://github.com/activeing123/mcptoon) — a repo with 203+ stars on GitHub.
+From [activeing123/mcptoon](https://github.com/activeing123/mcptoon) — a repo with 0+ stars on GitHub.
 
 ---
 
