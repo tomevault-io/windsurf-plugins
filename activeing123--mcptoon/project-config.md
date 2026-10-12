@@ -1,91 +1,48 @@
 ---
 trigger: always_on
-description: Any AI agent (Codex, Claude Code, Cursor, DSH, ...) writing code, docs, or cutting
+description: mcptoon is a zero-dependency Python CLI that manages and calls MCP servers
 ---
 
-# AGENTS.md — rules for AI agents working on mcptoon
+# mcptoon for Gemini CLI
 
-Any AI agent (Codex, Claude Code, Cursor, DSH, ...) writing code, docs, or cutting
-releases in this repo follows the rules on this page. They exist because mcptoon is
-now carried by external automation: numtide/llm-agents.nix packages this project and
-an official bot auto-bumps it on every PyPI release. A careless release breaks that
-channel; these rules keep it clean. Human contributors: see [CONTRIBUTING.md](CONTRIBUTING.md).
+mcptoon is a zero-dependency Python CLI that manages and calls MCP servers
+with token-efficient discovery. This extension registers `mcptoon serve` as
+one stdio MCP bridge: a single connection exposes every server in your
+mcptoon config, so Gemini CLI does not need a separate MCP entry per server.
 
-## Hard rules
+## Prerequisites
 
-1. **Zero dependencies, always.** The `dependencies` field in `pyproject.toml` stays
-   empty. Standard library only. CI enforces this via `scripts/check_zero_deps.py` —
-   treat a red zero-deps job as a broken build, not a suggestion.
-2. **Tests gate every change.** New behavior ships with tests in `tests/`. Run
-   `python -m pytest tests/` and paste the real green output before claiming done.
-3. **Windows is a first-class target.** Anything touching paths, subprocess, or npx
-   must work on Windows; the CI matrix runs it on every PR.
-4. **Conventional Commits** for every commit (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+```bash
+pip install mcptoon
+mcptoon discover --write   # or: mcptoon add <name> --command ... --args ...
+```
 
-## Release discipline
+## Bridge mode (this extension)
 
-A release is complete only when all five land together:
+Servers from `~/.mcptoon/config.json` appear as tools on one MCP server
+(server-prefixed names). Per-tool output compression is configurable:
+`mcptoon policy <server> <tool> toon|slim|raw`.
 
-1. version bumped in `pyproject.toml`
-2. `CHANGELOG.md` entry written for the new version
-3. full test suite green
-4. git tag `vX.Y.Z` pushed
-5. PyPI publish green (`.github/workflows/publish.yml`)
+## CLI mode (shell, zero injected schemas)
 
-The numtide bot turns PyPI releases into Nix bump PRs automatically. A version that
-exists on main but not on PyPI (or the reverse) leaves a broken bump in that channel.
-Breaking changes must land as deprecation warnings one minor version before removal.
+From a shell tool, mcptoon keeps full tool schemas out of the prompt
+entirely; discovery costs a compact name index instead of JSON schemas:
 
-Details that bit us during v0.7.4 (2026-09-05), so they are now part of the ritual:
+```bash
+mcptoon manifest                 # compact tool index across all servers
+mcptoon inspect <server> <tool>  # full schema, on demand
+mcptoon call <server> <tool> '{"k":"v"}'
+mcptoon call --auto <tool> ...   # auto-find the server
+```
 
-- **The version lives in five places.** `pyproject.toml`, `server.json`
-  (twice: top level and `packages[]`), the hardcoded `__version__` in
-  `src/mcptoon/__init__.py`, and `gemini-extension.json`. 0.7.6 shipped with
-  `mcptoon --version` printing 0.7.5 because the last one was missed — caught
-  only by the post-release smoke test. `tests/test_registry_sync.py` pins the
-  registry set and `tests/test_gemini_manifest.py` pins the extension; update
-  every one on every bump and run both suites green.
-- **The publish workflows used to race each other.** `publish.yml` and
-  `publish-mcp.yml` start on the same release event; the registry run
-  validated the PyPI version while the wheel was still uploading and failed
-  with 400. This happened on both 0.7.6 and 0.7.7. Root cause fixed in
-  `publish-mcp.yml`: a wait step now polls PyPI's JSON API for the released
-  version (up to 5 minutes) before pushing the registry record. If the wait
-  step ever times out, retry with `gh workflow run publish-mcp.yml -f reason=...`.
-- **Pushing a tag does not publish.** `publish.yml` triggers on `release: [published]`,
-  so a GitHub Release must be created (`gh release create vX.Y.Z --notes-file …`).
-- **Verify against the real index.** This machine's pip points at a mirror that lags —
-  and its global `ALL_PROXY=socks5://` breaks fresh venvs (no PySocks). Confirm a fresh
-  release with a clean venv, proxy vars cleared:
-  `python -m venv .scratch/check && .scratch/check/Scripts/python -m pip install --no-cache-dir --index-url https://pypi.org/simple/ mcptoon`,
-  then run `mcptoon --version` from that venv and compare with the tag.
-- **Run the lint job locally** (`python -m ruff check src/mcptoon/ tests/`, ruff 0.15.20)
-  before pushing — unpushed commits never see CI, and one UP037 turned the release red.
-- **Update the `Tests-<n> passed` badges** in `README.md` and `README.zh-CN.md` (and the
-  matching comment in their contributor sections) to the suite total of the release.
-- **The MCP Registry record used to be pushed by hand.** 0.7.0 and 0.7.2 were published
-  from a laptop; 0.7.3–0.7.5 never reached it, and `server.json`'s package version had
-  drifted a release behind its own top-level version. `publish-mcp.yml` now publishes on
-  every release, and `tests/test_registry_sync.py` fails CI if the versions, the
-  `mcp-name:` marker in the PyPI README, or the workflow drift apart. Do not remove that
-  marker when rewriting the README — it is invisible when rendered and load-bearing.
+## Notes
 
-## Ecosystem channel ledger
-
-What mcptoon has earned externally, and the standing obligation each one creates:
-
-| Channel | Standing | Our obligation |
-|---|---|---|
-| numtide/llm-agents.nix | S-tier: packaged; bot auto-follows since init PR #7839 (zimbatm) | Release discipline above; after each release, confirm the bot PR merged |
-| PyPI | every release | publish workflow green before announcing |
-| MCP Registry (`server.json`) | listed; published automatically by `.github/workflows/publish-mcp.yml` on every release (OIDC) | keep `server.json` in sync — CI enforces the versions, the `mcp-name:` README marker and the workflow itself via `tests/test_registry_sync.py` |
-| apify/mcpc client comparison | listed in comparison table | none — leave the table alone |
-| awesome-mcp-clients PR #283 | pending | do not nag maintainers until ≥500 stars |
-| striki18/benchmark | third-party benchmark harness running mcptoon | external repo — read for intel, do not touch |
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- The first `tools/list` on the bridge pre-warms every configured server;
+  with slow npx-based servers this can take tens of seconds. CLI mode has
+  no such up-front cost.
+- Config lives at `~/.mcptoon/config.json`; docs and releases:
+  https://github.com/activeing123/mcptoon
 
 ---
 > Source: [activeing123/mcptoon](https://github.com/activeing123/mcptoon) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-09-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-09-26 -->
