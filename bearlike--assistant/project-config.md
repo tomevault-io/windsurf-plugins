@@ -1,42 +1,93 @@
 ---
 trigger: always_on
-description: > ↑ [root /CLAUDE.md](../CLAUDE.md)
+description: > ↑ [data/device/CLAUDE.md](../CLAUDE.md) · [apps/mewbo_aura/CLAUDE.md](../../../../../../../../../../CLAUDE.md) · [root](../../../../../../../../../../../../CLAUDE.md)
 ---
 
-> ↑ [root /CLAUDE.md](../CLAUDE.md)
+> ↑ [data/device/CLAUDE.md](../CLAUDE.md) · [apps/mewbo_aura/CLAUDE.md](../../../../../../../../../../CLAUDE.md) · [root](../../../../../../../../../../../../CLAUDE.md)
 
-# Documentation site — authoring guide
+# Screen control at shell UID — data/device/shizuku/
 
-Scope: `docs/` — the MkDocs site (`mkdocs.yml`, theme `shadcn`/mkdocs-shadcn-mewbo). The REST reference is Scalar over `docs/openapi.json` (see [root → "REST API reference"]); most pages are hand-authored markdown.
+Scope: the Shizuku-backed half of device control. `ShizukuDeviceControl` (the app-side binding),
+`DeviceUserService` (the shell-UID implementation), and the pure logic each is built from:
+`ElementPruner`, `DisplayGeometry`, `SettlePolicy`, `UiSnapshot`, `ScreenCapture`.
 
-## Code-reference badges — link to what we own
+## Two processes, and only one of them is the app
 
-**Rule (KISS/DRY):** any reference to an artifact **we own** renders as a badge, never a bare hyperlink or inline code. Two kinds, and *only* these two:
+`DeviceUserService` does **not run in the app's process**. Shizuku starts it as a separate
+`app_process` at uid 2000 and hands the app a binder. Nothing in it may touch app state, Hilt, or
+any singleton — only what arrives over the binder. `ShizukuDeviceControl` is the app-side half and
+the only thing that binds.
 
-1. **A file/artifact in our repo** (`bearlike/Assistant`, GitHub or the Gitea mirror):
-   `[`backend.py`](repo:apps/mewbo_api/src/mewbo_api/backend.py)` — optional line range `…#L12-L20`.
-2. **One of our REST endpoints** (`/api/...` or `/v1/...`):
-   `[POST /api/sessions](endpoint:POST /api/sessions)` — method optional.
+**The binding is held, not per-action.** That is the whole latency argument: a spawn per tap would
+pay process startup every time. Measured on the dev container, the marginal cost of an
+`app_process` spawn is **~16 ms** — two orders of magnitude below the ~1s figure the design was
+originally argued from, so the *reason* to hold the binding is that `newProcess` is deprecated and a
+held channel is the right shape, not that a spawn is ruinous. **The real cost centre is the element
+read at ~2.0s**, which is ~124x a tap. Optimise there or nowhere.
 
-You write a normal markdown link with a `repo:` or `endpoint:` URI; the MkDocs hook `docs/hooks/code_refs.py` rewrites it to the badge at build time (file badge = GitHub octicon + path, SHA-pinned to the build commit; endpoint badge = method-tinted, deep-linked into the Scalar reference). Styling lives in `docs/assets/code-refs.css` (bound to the theme's design tokens, light + dark). **Never hand-write badge HTML** — just use the scheme.
+## Index addressing is a correctness mechanism, not an ergonomic one
 
-### Do NOT badge (leave as plain inline `code`)
-- **Anything we don't own:** third-party API endpoints (Gitea/GitHub `/repos/...`, `/api/v1/users/...`; LiteLLM `/v1/models`), external URLs, package names.
-- **Config keys / settings** (`api.master_token`, `agent.lsp.enabled`), env vars, CLI commands, tool/event/field names, JSON values, MIME types.
-- **`configs/app.json`** — user-created and gitignored, so it isn't a committed artifact (`configs/app.schema.json` and `configs/app.example.json` *are* → badge those).
-- **Headings** (`#…`) and **fenced code blocks** (```` ``` ````) — badges there break the TOC/anchors or the code sample.
+The model names an element index; the client resolves it to a centre point. There is deliberately
+no coordinate argument anywhere in the tool surface. This removes by construction the failure where
+coordinates computed against a downscaled screenshot are applied to full-resolution device space:
+every tap lands proportionally wrong, hitting a real control rather than erroring, so nothing
+reports a problem.
 
-### Guardrails
-- A `repo:` path must be **repo-root-relative and exist** (verify before adding). Don't fabricate line numbers — omit the range and link the whole file unless you've confirmed the lines.
-- Minimal edits: swap the reference token to a badge link; don't rewrite prose.
-- The generated `configuration.md` (from `docs/hooks/schema_to_md.py`) emits the same `repo:` scheme — keep new generators consistent.
+Two consequences:
 
-## Build & gotchas
-- `make docs-build` = `mkdocs build --strict`. The badge hook runs `on_page_content` (rendered HTML), so refs inside code fences survive untouched.
-- A backtick link label (`` [`x.py`](repo:…) ``) renders to `<code>…</code>` inside the anchor — the hook strips inline tags to plain text; don't rely on the wrapper.
-- `docs/hooks/` is in `exclude_docs` so build scripts aren't published.
-- `configuration.md` and `openapi.json` are **generated** — edit the generators (`schema_to_md.py`, `scripts/ci/generate_openapi_spec.py`), not the output.
+- **Geometry never crosses the wire.** Four coordinates per element would be paid for on every
+  observation and read by nobody. Pinned by a test, because it is the kind of field a future edit
+  adds back "for completeness".
+- **A stale index must be a structured error, never a silent mis-tap.** The list the model holds may
+  be several turns old. `DeviceActionHandler.resolve` re-reads at action time and refuses with the
+  actual element count, which is a state the model can recover from.
+
+## An injected tap hits the TOPMOST window — including one of ours
+
+`input tap` is delivered to whatever window is on top at those coordinates, so any overlay this app
+draws intercepts the taps it is trying to inject. The device-control Stop pill sits bottom-centre
+and would have ended the grant it was acting under. The cure is temporal — `ScreenCaptureVeil` wraps
+`tap`/`swipe`/`type` (`type` included: it taps to focus the field first), and a window that is not
+on screen cannot be hit. See [`ui/control/CLAUDE.md`](../../../ui/control/CLAUDE.md) for the window
+side, and [`data/device/CLAUDE.md`](../CLAUDE.md) § "The capture veil" for the seam.
+
+Two related window facts, both of which fail with NO error, if you ever add another overlay:
+`TYPE_APPLICATION_OVERLAY` above **0.8** obscuring alpha silently drops every touch to the app
+underneath (Android 12 untrusted-window rule), and a view added straight to the `WindowManager` does
+not inherit the manifest's hardware acceleration — AGSL has no software path, so a shader draws
+nothing without `FLAG_HARDWARE_ACCELERATED`.
+
+## `show_touches` cannot verify an injected tap — do not reach for it
+
+Injected events enter the pipeline at `InputDispatcher`, **downstream of
+`PointerChoreographer`**, which is the only stage that draws touch spots. So the setting renders
+nothing for our taps while still rendering the human's — a signal that is silent when correct and
+misleading when wrong. Verification is by EFFECT (did the screen change), which is what
+`SettlePolicy` is for.
+
+## The settle is bounded, and the bound is not the interval
+
+Three identical reads, 0.5s apart, 6.0s cap. **Never an unbounded idle wait** — `uiautomator2`
+disables framework idle-waiting by default because a device that never idles (an animation, a
+video, an ad) hangs the caller, and inside a 30s dispatch budget that is a timeout generator.
+
+The real worst case is the cap **plus one read**, since the deadline is checked before starting a
+poll rather than mid-read. With a ~2.0s read that is ~7s, not ~1s. Still inside the budget, still
+incapable of running away.
+
+## `uiautomator dump` ships, against the original plan, on a measurement
+
+It was rejected as "an `app_process` launch — same cost class as the rejected route". Measured, the
+spawn is ~16 ms and the other ~2003 ms is the accessibility-tree read itself, which any method pays.
+Reading the tree in-process saves the 16 ms, not the 2 seconds.
+
+What it does avoid is the file round-trip: the dump goes to stdout and is parsed in memory, so there
+is no `/sdcard` write and no temp file. `UiSnapshot` isolates it behind one function precisely so a
+held `UiAutomation` connection can replace it later without touching the pruning or the wire format.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [bearlike/Assistant](https://github.com/bearlike/Assistant) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-08-23 -->
