@@ -1,99 +1,77 @@
 ---
 trigger: always_on
-description: This repository is a React‑based MapGuide viewer.  The following document is intended for autonomous agents that will be reading and modifying the codebase.  It contains the most common commands, linting rules, testing patterns, and style guidelines.
+description: - Use `PascalCase` for class names and React components.
 ---
 
-# AGENTS
+# Naming Convention and coding style
 
-## Overview
-This repository is a React‑based MapGuide viewer.  The following document is intended for autonomous agents that will be reading and modifying the codebase.  It contains the most common commands, linting rules, testing patterns, and style guidelines.
-
----
-
-## Build / Lint / Test Commands
-
-| Task | Command | Notes |
-|------|---------|-------|
-| **Clean build artifacts** | `yarn run clean` | Removes `viewer/dist`, `package/`, `lib/`.  Use before a full rebuild.
-| **Full production build** | `yarn run build:prod` | Builds with Vite in production mode.  Produces `viewer.zip`.
-| **Development build** | `yarn run build:dev` | Builds the viewer bundle with Vite in development mode.
-| **Watch dev build** | `yarn run watch:dev` | Rebuilds the viewer bundle with Vite on file changes.
-| **Build storybook** | `yarn run build:storybook` | Generates static Storybook at `storybook-static/` and zips it.
-| **Lint TS/TSX** | `yarn run lint` | Uses TSLint configured in `tslint.json`.
-| **Run all tests** | `yarn run test` | Executes Vitest across the `test/` folder.
-| **Run all tests with coverage** | `yarn run test:coverage` | Executes Vitest with coverage collection across the `test/` folder. Coverage results saved to `coverage-report/`
-| **Single‑file test** | `vitest run <path/to/file.test.tsx>` | Example: `vitest run test/components/MyComponent.test.tsx`
-| **Watch tests** | `yarn run watch:test` | Re‑runs changed tests automatically.
-| **Coverage report** | `yarn run test:gha` | Generates lcov and outputs `coverage-report/lcov.info`.
-
-### Running a single Vitest file in CI
-```bash
-vitest run --config vitest.config.ts <file>
+- Use `PascalCase` for class names and React components.
+- Use `camelCase` for variables and function names.
+- Use `UPPER_SNAKE_CASE` for constants.
+- Use `kebab-case` for file names.
+- TypeScript interfaces should be prefixed with `I` (e.g., `IUser`).
+- React component prop interfaces should be suffixed with `Props` (e.g., `UserProps`).
+- Use `const` for constants and `let` for variables that may change.
+- Use `async/await` for asynchronous code.
+- NEVER USE `await import(...)` inside functions. Always use static imports at the top of the file. Depending on the use case, dynamic imports may be used at the top of the file, but they should never be used inside functions.
+- Use TypeScript mapped and utility types where possible to avoid creating new types.
+- In any exported function or class that is generated, insert a `@hidden` tag in the JSDoc comment to indicate that it is not intended for public use.
+   - This tag may be removed at a later time at the author's discretion. Do not re-insert this tag if it is not already present in any JSDoc comments.
+- Generated TypeScript test files should be named with a `.spec.ts` or `.spec.tsx` suffix.
+- When generating import statements for internal modules, use the most-relative path possible.
+   - Avoid importing from relative directories (implying an index.ts or index.tsx barrel module is present there)
+   - If an import can be made a type-only import, use `import type` syntax.
+- Do not use `import *` syntax for importing any of our modules.
+- Do not bother adding a `@returns` tag in JSDoc comments for functions return `void`
+- Ensure that import statements for static content like images, SVG icons or CSS files come after regular import statements.
+- Tag all generated code with a `@since` tag in the JSDoc comment to indicate the version of the library in which it was introduced.
+   - The value of this tag should be the current version of the library, e.g., `@since 0.15`. This version number can be found in the `version` property of the root `package.json` file.
+   - Only consider the major.version.minor parts of this `version` property, the minor part can be omitted if it is `0`.
+      - e.g., if the `version` property is `0.15.0`, the value of the `@since` tag should be `0.15`.
+      - e.g., if the `version` property is `0.15.3`, the value of the `@since` tag should be `0.15.3`.
+      - e.g., if the `version` property is `0.15.0-pre.1234`, the value of the `@since` tag should be `0.15`.
+      - e.g., if the `version` property is `0.15.4-pre.1234`, the value of the `@since` tag should be `0.15.4`.
+   - If a comment already exists with a `@since` tag, do not overwrite it. Instead, append the new version to the existing `@since` tag and provide a short description of changes after it.
+      - e.g., if the existing comment is `@since 0.15.0`, the new comment should be 
+         ```
+         @since 0.15.3 - Added new feature X
+         @since 0.15.0
+         ```
+   - Only apply this tag to code that is generated by the AI. Do not apply this tag to code that is already present in the codebase.
+- When generating comments/documentation for a React functional component, do not generate documentation for the `props` parameter of the component function.
+   - This is because the `props` parameter is already documented by the TypeScript interface that defines the props for the component.
+   - Instead, document the component itself and its purpose, and refer to the props interface for details on the props.
+- When generating comments/documentation for a React functional component, do not document the return type of the component function.
+   - The return type of a React functional component is always `JSX.Element`, and this is already implied by the fact that the component returns JSX.
+- When generating comments/documentation for a React functional component, do not document the `children` prop.
+   - The `children` prop is a special prop in React that is automatically passed to every component, and it is already documented by the TypeScript interface that defines the props for the component.
+- When generating comments/documentation for a React functional component, include examples of how to use the component in the documentation.
+   - This helps users understand how to use the component and provides a quick reference for common use cases.
+   - Use the `@example` tag in the JSDoc comment to provide examples of how to use the component.
+- If generated comments or documentation only spans a single line, still put newlines before and after the comment or documentation.
+   - This is to ensure consistency with multi-line comments and documentation, and to make it easier to read and maintain the code.
+   - Do not do this:
+```typescript
+   /** This comment only spans a single line */
 ```
-This is the same as `yarn run test` but you can specify a path.
-
----
-
-## Code Style Guidelines
-
-1. **TypeScript** – All source files are `.ts` or `.tsx`.  The project uses strict mode (`strict: true`).  Never use `any`; prefer `unknown` and narrow types explicitly.
-2. **Imports** – Order:
-   * External packages (alphabetical, case‑insensitive)
-   * Internal modules relative to the repo root
-   * Type imports (`import type { X } from '…'`) should come last.
-3. **Formatting** – `prettier` is not used; rely on TSLint rules in `tslint.json`.  Use 3‑space indentation, double quotes for strings, and end statement with semicolons.
-4. **Naming** –
-   * Components: PascalCase (`MyComponent`) exported as named.
-   * Hooks: `useXxx` prefix.
-   * Types/interfaces: `IXXX` is preferred for `interface`s, but discouraged for `type`s; use descriptive names (`UserProps`).
-5. **Error handling** – Prefer `try/catch` around async API calls.  Log errors to console with a clear prefix and re‑throw if the caller needs it.
-6. **State management** – Redux store lives in `/src/store`.  Use action creators and thunks; avoid direct state mutation.
-7. **Testing** –
-   * Tests live in `test/` mirroring source structure.
-   * Test file should mirror the name of the module but with a `.spec.ts` or `.spec.tsx` extension.
-      * For example, `test/components/about.spec.tsx` tests code under `src/components/about.tsx`
-   * Each test file should export a default describe block.
-   * Use `@testing-library/react` queries (`getByText`, `queryAllByRole`).
-8. **Documentation** – 
-   * Public APIs have JSDoc comments; private helpers are documented only if non‑obvious.
-9. **Linting rules** – See `tslint.json`.  Key rules:
-   * `no-console` – allowed only in error handling paths.
-   * `variable-name` – camelCase for variables, PascalCase for types/classes.
-10. **Cursor / Copilot rules** – No `.cursor/rules/` or `.cursorrules` folder exists.  The repo contains a `.github/copilot-instructions.md` with the following snippet:
+   - Instead, do this:
+```typescript
+   /**
+    * This comment only spans a single line
+    */
 ```
-# Agent instructions
-- Never modify `package.json` unless you are adding a dependency.
-- Use `yarn run clean` before any build.
-- All new files must be added to Git and have a brief comment header.
-``` 
-Follow these when making changes.
 
----
+# Story generation for Storybook
 
-## Common Patterns
+- Use `@storybook/react` for React components.
+- Use `@storybook/addon-docs` for documentation.
+- Use `@storybook/addon-controls` for dynamic controls.
+- Use `@storybook/addon-actions` for event handling.
+- Use `@storybook/addon-viewport` for responsive design testing.
+- Use `@storybook/addon-a11y` for accessibility testing.
 
-* **Barrel files** – `src/index.ts` re‑exports public modules.  Keep barrel imports minimal.
-* **Redux Thunks** – All async actions end with `Async`.  Example:
-  ```ts
-  export const fetchDataAsync = () => async (dispatch: Dispatch) => {
-    try { … }
-    catch (e) { dispatch(errorAction(e)); }
-  };
-  ```
-* **React‑Redux** – Prefer `useSelector` and `useDispatch` hooks over the legacy `<Connect>`.
-
----
-
-## Testing a Single File Example
-```bash
-vitest run test/components/Map.test.tsx
-```
-The output will show only that file’s tests.  For debugging, add `--watch` to re‑run on changes.
-
----
-
-> **Tip**: If you need a fresh environment, run `yarn install` after pulling new dependencies.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jumpinjackie/mapguide-react-layout](https://github.com/jumpinjackie/mapguide-react-layout) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-24 -->
